@@ -2856,6 +2856,7 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         // We can't recompute a 'load' from a mutable function parameter, or from an element of
         // one: address elimination leaves a reference parameter in memory, so its elements are
         // loaded through element addresses.
+        //
         auto rootAddr = getRootAddr(ptr);
         if (as<IRParam>(rootAddr) || as<IRVar>(rootAddr))
         {

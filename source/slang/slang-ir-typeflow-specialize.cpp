@@ -6259,6 +6259,7 @@ struct TypeFlowSpecializationContext
             // parameter infos come from each callee's `getDataType()`, which has no rate, so we
             // compare directions on the type inside the rate. The dispatch function's parameter
             // type is built from those infos, so it does not carry the rate either.
+            //
             if (auto rateQualifiedType = as<IRRateQualifiedType>(paramTypeUnionMask))
                 paramTypeUnionMask = rateQualifiedType->getValueType();
 

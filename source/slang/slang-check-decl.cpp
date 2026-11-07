@@ -5779,13 +5779,13 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
+
             // Beyond matching modes exactly, two by-reference parameters match only if they refer
             // to storage in the same address space. `groupshared` is currently the only way to
             // spell an address space for a by-reference parameter, so this requires either both
-            // parameters or neither to be `groupshared`. (A `Ptr<T, access, addrSpace>` parameter
-            // is a pointer passed by value, so its address space is part of its type and is
-            // already compared with the type.) A synthesized witness can still forward between
-            // them where the call type-checks.
+            // parameters or neither to be `groupshared`. When they differ, the requirement can
+            // still be satisfied by a synthesized wrapper whose call to the method type-checks.
+            //
             if (isByReferenceParamPassingMode(requiredParamInfo.mode) &&
                 getReferenceParamAddressSpace(requiredParam.getDecl()) !=
                     getReferenceParamAddressSpace(satisfyingParam.getDecl()))
@@ -7717,8 +7717,9 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
 
         // The synthesized declaration's passing mode is copied above, but a `groupshared`
         // parameter also requires its argument to be thread-group-shared memory. The wrapper
-        // forwards its own parameter as that argument, so the parameter keeps `groupshared`
-        // (otherwise the forwarded argument is E30711).
+        // forwards its own parameter as that argument, so the parameter keeps `groupshared`;
+        // otherwise the forwarded argument would be rejected as not naming shared memory.
+        //
         if (auto groupShared = paramDeclRef.getDecl()->findModifier<HLSLGroupSharedModifier>())
         {
             auto clonedModifier = m_astBuilder->create<HLSLGroupSharedModifier>();
@@ -15189,6 +15190,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     // A `groupshared` parameter names thread-group-shared memory that other invocations can access
     // during the call, so it must be a reference to that memory. A written `in`, `out`, `inout`, or
     // `__borrow` (or its alias `__constref`) gives the parameter a mode that is not a reference.
+    //
     if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
     {
         auto mode = getExplicitlyDeclaredParamPassingMode(paramDecl);

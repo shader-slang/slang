@@ -87,16 +87,15 @@ void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink)
     }
 }
 
-// A `groupshared` parameter that reaches this point belongs to a function the inliner could not
-// remove, so the function keeps a call boundary. We check the same functions the HLSL emitter
-// would write out: definitions that are not target intrinsics. A mesh-shader input payload shares
-// the group-shared rate but crosses the boundary legitimately through HLSL's `in payload` syntax,
-// so it is excluded.
 void validateGroupSharedParamsForHLSL(
     IRModule* module,
     CapabilitySet const& targetCaps,
     DiagnosticSink* sink)
 {
+    // A `groupshared` parameter that reaches this point belongs to a function the inliner could
+    // not remove, so the function keeps a call boundary. We check the same functions the HLSL
+    // emitter would write out: definitions that are not target intrinsics.
+    //
     for (auto globalInst : module->getGlobalInsts())
     {
         auto func = as<IRFunc>(globalInst);
@@ -106,11 +105,16 @@ void validateGroupSharedParamsForHLSL(
         IRInst* intrinsicInst;
         if (findTargetIntrinsicDefinition(func, targetCaps, intrinsicDef, intrinsicInst))
             continue;
+
         // In user code, `export` is what keeps such a function's definition, so we name it when it
         // is the cause.
+        //
         bool isExported = func->findDecoration<IRHLSLExportDecoration>() != nullptr;
         for (auto param : func->getParams())
         {
+            // A mesh-shader input payload shares the group-shared rate but crosses the boundary
+            // legitimately through HLSL's `in payload` syntax, so we skip it.
+            //
             if (as<IRGroupSharedRate>(param->getRate()) &&
                 !param->findDecoration<IRHLSLMeshPayloadDecoration>())
             {

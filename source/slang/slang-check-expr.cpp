@@ -7814,17 +7814,15 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
     return expr;
 }
 
-// Strip the projections that read a part of an object -- `.field`, `[i]`, a single-component
-// swizzle such as `.x` or `._m00`, and `(...)` -- to reach the object whose declaration carries the
-// address space. `groupshared` sits on that object, never on the part.
-//
-// Anything reached through a pointer stops the walk, because there the pointer's own type carries
-// the address space.
-//
-// `getValidTypeForAddressOf` would walk these projections itself, but it judges a field access by
-// the field's declaration and so loses the base object's address space (issue #14094).
+// Return the object that `expr` reads a part of, such as `g` for `g[i].a.x`, by stripping
+// `(...)`, `[i]`, `.field`, and single-component swizzles.
 static Expr* getBaseObjectOfProjection(Expr* expr)
 {
+    // The `groupshared` modifier sits on the declaration of a whole object, never on a part, so we
+    // walk out to that object. `getValidTypeForAddressOf` would walk these projections itself,
+    // but it judges a field access by the field's declaration and so loses the base object's
+    // address space (issue #14094).
+    //
     for (;;)
     {
         if (auto parenExpr = as<ParenExpr>(expr))
@@ -7834,8 +7832,10 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
         else if (auto swizzleExpr = as<SwizzleExpr>(expr))
         {
             // A multi-element swizzle may be non-contiguous, so it has no address of its own and
-            // the caller materializes a private temporary for it. Stop, so that such an argument is
-            // judged on its own and rejected rather than inheriting the base's address space.
+            // the caller materializes a private temporary for it. We stop, so that such an
+            // argument is judged on its own and rejected rather than inheriting the base's address
+            // space.
+            //
             if (swizzleExpr->elementIndices.getCount() > 1)
                 return expr;
             expr = swizzleExpr->base;
@@ -7848,6 +7848,11 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
         }
         else if (auto memberExpr = as<MemberExpr>(expr))
         {
+            // We stop at a member reached through a pointer, because the pointer's own type
+            // carries the address space. We also stop at a member that is not a field of the
+            // object: a `static` field is a variable of its own, and a property or method names
+            // no part of the object's storage.
+            //
             auto memberDecl = memberExpr->declRef.getDecl();
             if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
                 (memberDecl && memberDecl->hasModifier<HLSLStaticModifier>()))
@@ -7860,40 +7865,48 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
 }
 
 // Return whether `arg` is one of the type-only placeholder arguments that
-// `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types: a bare `VarExpr`
-// with a checked type but neither a name nor a declaration. A placeholder stands for some l-value
-// of its type and names no storage, so a check about which storage an argument names has no answer
-// for it. No other expression shape is exempted.
+// `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types.
 static bool isTypeOnlyPlaceholderArg(Expr* arg)
 {
+    // A placeholder is a bare `VarExpr` with a checked l-value type but neither a name nor a
+    // declaration. It stands for some l-value of its type and names no storage, so a check about
+    // which storage an argument names has no answer for it.
+    //
     auto varExpr = as<VarExpr>(arg);
     return varExpr && varExpr->astNodeType == ASTNodeType::VarExpr && !varExpr->name &&
            !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
 }
 
-// Return whether `arg` comes from an expression that already failed to check. Coercion wraps an
-// error-typed operand in an implicit cast to the parameter's type, so we look through that cast; a
-// storage diagnostic for such an argument would only repeat the reported error.
+// Return whether `arg` comes from an expression that already failed to check, so that a storage
+// diagnostic for it would only repeat the reported error.
 static bool isArgumentOfFailedCheck(Expr* arg)
 {
     if (as<ErrorType>(arg->type))
         return true;
+
+    // Coercion wraps an error-typed operand in an implicit cast to the parameter's type, so we
+    // look through that cast.
+    //
     auto castExpr = as<ImplicitCastExpr>(arg);
     return castExpr && as<ErrorType>(castExpr->arguments[0]->type);
 }
 
-// Return whether `arg` names thread-group-shared storage: strip the projections that read a part of
-// an object to reach the addressed object, then ask `getValidTypeForAddressOf` for its addressable
-// pointer type and inspect that pointer's address space. `getValidTypeForAddressOf` already
-// computes the addressable pointer type -- carrying its address space -- for an addressable
-// expression, so it is reused as the source of truth rather than re-deriving addressability here.
+// Return whether `arg` names thread-group-shared storage, such as `g[i].a` for
+// `groupshared Pair g[4]`.
 bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 {
     SLANG_ASSERT(arg);
+
+    // A part of an object is in the address space of the whole object, so we judge the whole.
+    //
     auto addressedExpr = getBaseObjectOfProjection(arg);
     if (isTypeOnlyPlaceholderArg(addressedExpr))
         return false;
 
+    // `getValidTypeForAddressOf` gives the pointer type of an addressable expression, and that
+    // type carries the address space, so we read the address space from it instead of deciding
+    // addressability again here.
+    //
     if (auto ptrType = getValidTypeForAddressOf(
             this,
             m_astBuilder,
@@ -7906,10 +7919,8 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
     return false;
 }
 
-// A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
-// its argument must itself name thread-group-shared storage. Passing a private local, a copy, or an
-// rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
-// semantics. HLSL proposal 0043 (`groupshared` Arguments) imposes the same rule.
+// Report an error if `argIn`, passed to `paramIn`, does not name thread-group-shared storage
+// although `paramIn` is a `groupshared` parameter.
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
     SLANG_ASSERT(paramIn && argIn);
@@ -7917,6 +7928,11 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
         isArgumentOfFailedCheck(argIn))
         return;
 
+    // A `groupshared` parameter is a reference to a thread-group-shared location, so its argument
+    // must name such a location. A private local, a copy, or an rvalue would let the callee treat
+    // memory that no other invocation can see as shared. HLSL proposal 0043 (`groupshared`
+    // Arguments) imposes the same rule.
+    //
     if (!argumentNamesGroupSharedStorage(argIn))
         getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
             .param = getText(paramIn->getName()),
@@ -7924,8 +7940,7 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
 }
 
 // Return whether `invoke` is written as a prefix, postfix or infix operator, such as `g[i]++` or
-// `g[i] += 1`, rather than as a call by name. Whoever writes a mutating operator on a variable
-// expects it to read, modify and write that variable in place.
+// `g[i] += 1`, rather than as a call by name.
 static bool isOperatorInvocation(InvokeExpr* invoke)
 {
     return as<OperatorExpr>(invoke) != nullptr;
@@ -7939,9 +7954,8 @@ struct WrittenBackArgument
     // The argument as written in the call.
     Expr* arg = nullptr;
 
-    // The storage that the call writes back to. An argument that is implicitly converted to the
-    // parameter's type goes through a temporary of that type, which the call writes back to the
-    // operand of the conversion, so `storage` is that operand; otherwise it is `arg` itself.
+    // The storage that the call writes back to: the operand of an implicit conversion of `arg`,
+    // or otherwise `arg` itself.
     Expr* storage = nullptr;
 
     // The parameter, or null for a receiver and for an argument of a call through a value of
@@ -7954,8 +7968,7 @@ struct WrittenBackArgument
 };
 
 // Call `visit` with each argument of `invoke` that the call writes back to, other than arguments
-// that already failed to check. Warning 30709 and error 38039 judge the same set of arguments by
-// different rules, so we enumerate the set in one place.
+// that already failed to check. Warning 30709 and error 38039 both use this set.
 template<typename Visit>
 static void forEachWrittenBackArgument(
     SemanticsVisitor* visitor,
@@ -7965,18 +7978,23 @@ static void forEachWrittenBackArgument(
     List<DeclRef<ParamDecl>> const& paramDeclRefs,
     Visit const& visit)
 {
-    // A `groupshared` parameter is a reference that names its argument's storage, so the call
-    // accesses that storage in place and writes nothing back.
-    //
     Index argCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
     for (Index i = 0; i < argCount; ++i)
     {
+        // Only an `out` or `inout` parameter is written back. A reference parameter, including a
+        // `groupshared` one, names its argument's storage, so the call accesses that storage in
+        // place and writes nothing back.
+        //
         if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
             continue;
         WrittenBackArgument written;
         written.arg = invoke->arguments[i];
         if (isArgumentOfFailedCheck(written.arg))
             continue;
+
+        // An implicitly converted argument goes through a temporary of the parameter's type, and
+        // the call writes the temporary back to the operand of the conversion.
+        //
         written.storage = written.arg;
         if (auto lValueCast = as<LValueImplicitCastExpr>(written.arg))
             written.storage = lValueCast->arguments[0];
@@ -7985,8 +8003,9 @@ static void forEachWrittenBackArgument(
         visit(written);
     }
 
-    // The receiver of a method whose receiver mode is `inout` is the base expression of the member
-    // access.
+    // A `[mutating]` method's implicit `this` is an `inout` parameter, so the call also writes back
+    // its receiver: the base expression of the member access. A call through a value of function
+    // type has no declaration to tell us the receiver mode, and no receiver.
     //
     if (!calleeDeclRef)
         return;
@@ -8011,14 +8030,6 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
     DeclRef<CallableDecl> calleeDeclRef,
     List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
-    if (!calleeDeclRef)
-        return;
-
-    // A mutating operator on an element of shared memory, such as `g[i] += 1`, passes the element
-    // to an `inout` parameter, but the user who wrote it already expects a read-modify-write of
-    // that element, so a warning would only be noise. An implicitly converted argument goes
-    // through a temporary of the parameter's type even for an operator, so it is still checked.
-    //
     bool callIsOperator = isOperatorInvocation(invoke);
     forEachWrittenBackArgument(
         this,
@@ -8028,8 +8039,18 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
         paramDeclRefs,
         [&](WrittenBackArgument const& written)
         {
+            // A mutating operator on an element of shared memory, such as `g[i] += 1`, passes the
+            // element to an `inout` parameter, but the user who wrote it already expects a
+            // read-modify-write of that element, so a warning would only be noise. An implicitly
+            // converted argument goes through a temporary of the parameter's type even for an
+            // operator, so we still check it.
+            //
             if (callIsOperator && !written.isConverted())
                 return;
+
+            // The warning names the parameter, and a call through a value of function type has no
+            // parameter declarations to name.
+            //
             if (!written.param && !written.isReceiver)
                 return;
 
@@ -8063,10 +8084,7 @@ struct ModesDifferentiatedFromBody
 };
 
 // Return the modes in which autodiff generates a derivative of `func` from its body: those in
-// which `func` is marked differentiable and has no custom derivative. A custom derivative may be
-// attached by an attribute on `func` or by a `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]`
-// attribute on the derivative; we only see the latter when the derivative's module is visible
-// from here.
+// which `func` is marked differentiable and has no custom derivative.
 static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
     SharedSemanticsContext* shared,
     FunctionDeclBase* func)
@@ -8078,6 +8096,10 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
     if (!isBackwardDifferentiable && !func->hasModifier<ForwardDifferentiableAttribute>())
         return modes;
 
+    // A custom derivative may be attached by an attribute on `func`, or by a
+    // `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the derivative. We see the
+    // latter only when the derivative's module is visible from here.
+    //
     bool hasCustomForward = func->hasModifier<ForwardDerivativeAttribute>() ||
                             func->hasModifier<HasTrivialForwardDerivativeAttribute>();
     bool hasCustomBackward = func->hasModifier<BackwardDerivativeAttribute>();
@@ -8095,48 +8117,7 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
 
 // Report `target` if it writes part of a thread-group-shared variable in the body of a function
 // whose derivative Slang may generate from that body. `storage` is the storage that `target`
-// writes: `target` itself, or for an implicitly converted call argument, the operand of the
-// conversion. `isWrittenBackByCall` says whether a call by name writes `target` back as an `out`
-// or `inout` argument or a `[mutating]` receiver, which changes the advice we give.
-//
-// Autodiff prepares a function body for differentiation by replacing the addresses it computes
-// with values, so a write to part of a thread-group-shared variable becomes a read of the whole
-// variable, an update of the part, and a write of the whole variable. Each invocation then
-// stores back stale copies of the parts other invocations wrote. A call writes back its `out` and
-// `inout` arguments and its `[mutating]` receiver the same way when it returns, whatever the
-// callee is. A write of the whole variable stays a single store, and a write through a
-// `groupshared` parameter stays in place, because autodiff leaves the storage behind a reference
-// parameter in memory.
-//
-// The rule is deliberately broader than the set of writes that race in a given program; we chose
-// a rule that is easy to state over a precise one. We report such a write in every function that
-// is marked differentiable and has no visible custom derivative for some mode, whether or not any
-// code requests that derivative. A differentiability attribute allows any module that imports the
-// function to request a derivative generated from its body, and only this module can check the
-// body, so we check what the attribute allows rather than what one program requests. For the same
-// reason, a custom derivative that another module declares does not exempt the function here.
-// Basing the rule on the source, rather than on how lowering and autodiff currently rewrite each
-// write, also keeps it in step as those passes change.
-//
-// Consider this example:
-//
-//     groupshared float g[4];
-//     groupshared float4 v;
-//     void setOne(inout float y) { y = 1.0; }
-//
-//     [Differentiable]
-//     float f(groupshared float a[4], uint i, float x)
-//     {
-//         g[i] = x;       // reported
-//         v.yz += 1.0;    // reported
-//         setOne(g[i]);   // reported
-//         v = float4(0);  // not reported
-//         a[i] = x;       // not reported
-//         return x;
-//     }
-//
-// Error 38038 rejects `f` itself today, because its `groupshared` parameter is a reference
-// parameter; the last write shows how a write through such a parameter is treated.
+// writes, and `isWrittenBackByCall` says whether a call by name writes it back.
 void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
     Expr* target,
     Expr* storage,
@@ -8145,6 +8126,39 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
     SLANG_ASSERT(target && storage);
     if (isArgumentOfFailedCheck(target))
         return;
+
+    // Consider this example:
+    //
+    //     groupshared float g[4];
+    //     groupshared float4 v;
+    //     void setOne(inout float y) { y = 1.0; }
+    //
+    //     [Differentiable]
+    //     float f(uint i, float x)
+    //     {
+    //         g[i] = x;       // reported
+    //         v.yz += 1.0;    // reported
+    //         setOne(g[i]);   // reported
+    //         v = float4(0);  // not reported
+    //         return x;
+    //     }
+    //
+    // Autodiff prepares the body of `f` for differentiation by replacing the addresses it
+    // computes with values, so each reported write becomes a read of the whole variable, an
+    // update of the part, and a write of the whole variable. Each invocation then stores back
+    // stale copies of the parts that other invocations wrote.
+    //
+    // We report such a write in every function that is marked differentiable and has no visible
+    // custom derivative for some mode, whether or not any code requests that derivative. The rule
+    // is deliberately broader than the set of writes that race in a given program; we chose a
+    // rule that is easy to state over a precise one. A differentiability attribute allows any
+    // module that imports the function to request a derivative generated from its body, and only
+    // this module can check the body, so we check what the attribute allows rather than what one
+    // program requests. For the same reason, a custom derivative that another module declares
+    // does not exempt the function here. Basing the rule on the source, rather than on how
+    // lowering and autodiff currently rewrite each write, also keeps it in step as those passes
+    // change.
+    //
     if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
         return;
 
@@ -8152,7 +8166,9 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
     while (auto parenExpr = as<ParenExpr>(wholeExpr))
         wholeExpr = parenExpr->base;
 
-    // A multi-element swizzle has no address of its own, so we judge the object it selects from.
+    // A multi-element swizzle, such as `v.yz`, has no address of its own, so we judge the object
+    // it selects from.
+    //
     Expr* addressedExpr = wholeExpr;
     if (auto swizzleExpr = as<SwizzleExpr>(wholeExpr))
         addressedExpr = swizzleExpr->base;
@@ -8161,9 +8177,16 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
 
     if (!argumentNamesGroupSharedStorage(addressedExpr))
         return;
+
+    // A write of the whole variable, such as `v = float4(0)`, stays a single store.
+    //
     auto baseExpr = getBaseObjectOfProjection(addressedExpr);
     if (baseExpr == wholeExpr)
         return;
+
+    // A write to part of a `groupshared` parameter stays in place, because autodiff leaves the
+    // storage behind a reference parameter in memory.
+    //
     auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
     if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
         return;
@@ -8183,14 +8206,17 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
 }
 
 // Report each argument of `invoke` that the call writes back to part of thread-group-shared
-// memory in the body of a function whose derivative Slang may generate from that body, as
-// `checkGroupSharedPartialWriteInDifferentiatedBody` describes.
+// memory in the body of a function whose derivative Slang may generate from that body.
 void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
     InvokeExpr* invoke,
     FuncType* funcType,
     DeclRef<CallableDecl> calleeDeclRef,
     List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
+    // A call writes back its `out` and `inout` arguments and its `[mutating]` receiver when it
+    // returns, whatever the callee is, so in a differentiated body each write-back to part of
+    // shared memory races like an assignment to that part.
+    //
     bool isCallByName = !isOperatorInvocation(invoke);
     forEachWrittenBackArgument(
         this,

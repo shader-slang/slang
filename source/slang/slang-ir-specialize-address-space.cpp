@@ -138,13 +138,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         builder.setInsertBefore(func);
         auto specializedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, func));
 
-        // Update the parameter types with new address spaces in the specialized function.
-        // Use `getDataType()`/`setDataType()` rather than `getFullType()`/`setFullType()` so a
-        // rate-qualified parameter is handled: a `groupshared` by-reference parameter (#10641)
-        // has type `RateQualified(GroupShared, RefParam(...))`, and `as<IRPtrTypeBase>`
-        // on the rate-qualified wrapper is null -- without unwrapping the rate the pointer's
-        // address space would never be specialized, so the Metal/WGSL emitter would later see a
-        // pointer parameter with the default address space and abort.
+        // Update the parameter types with new address spaces in the specialized function. A
+        // `groupshared` parameter's full type wraps its pointer type in the group-shared rate, as
+        // in `RateQualified(GroupShared, RefParam(T))`, so we read and replace the data type
+        // inside the rate.
+        //
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
