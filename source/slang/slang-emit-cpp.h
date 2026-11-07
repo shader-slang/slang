@@ -102,6 +102,8 @@ protected:
 
     void _emitInOutParamType(IRType* type, String const& name, IRType* valueType);
 
+    void _diagnoseUnsupportedAtomicOperation(IRAtomicOperation* inst);
+
     static TypeDimension _getTypeDimension(IRType* type, bool vecSwap);
 
     void _emitAccess(
