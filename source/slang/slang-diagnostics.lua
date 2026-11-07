@@ -2918,6 +2918,13 @@ err(
 )
 
 err(
+    "invalid-cuda-kernel-attribute-value",
+    31167,
+    "invalid CUDA kernel attribute value",
+    span { loc = "attr:Modifier", message = "value '~value:Int' is out of range for attribute '~attrName:Name'" }
+)
+
+err(
     "invalid-node-launch-mode",
     31113,
     "invalid 'NodeLaunch' mode",
@@ -6429,6 +6436,13 @@ warning(
     56115,
     "'WaveSize(~waveSize:int)' cannot be honored on target '~target', whose wave size is always ~targetWaveSize:int; the attribute will be ignored",
     span { loc = "location", message = "the entry point runs with ~targetWaveSize:int-lane waves, so code that assumes ~waveSize:int lanes per wave computes wrong results" }
+)
+
+warning(
+    "cuda-kernel-attribute-on-non-kernel",
+    56116,
+    "'~attrName' only applies to a CUDA kernel and is ignored on '~func'",
+    span { loc = "location", message = "only an entry point other than a callable shader, or a function marked [CudaKernel], is emitted as a '__global__' kernel" }
 )
 
 -- SPIRV (57001-57007)

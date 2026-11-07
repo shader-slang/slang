@@ -885,5 +885,7 @@ return {
 	["Decoration.glslPatch"] = 909,
 	["metalTextureFence"] = 910,
 	["Type.TraceProgramDescriptor"] = 911,
-	["metalTraceRay"] = 912
+	["metalTraceRay"] = 912,
+	["Decoration.cudaLaunchBounds"] = 913,
+	["Decoration.cudaMaxRegisters"] = 914
 }
