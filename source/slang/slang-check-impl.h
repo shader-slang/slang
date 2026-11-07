@@ -4190,8 +4190,8 @@ public:
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
 
     bool argumentNamesGroupSharedStorage(Expr* arg);
-    void checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn);
-    void checkGroupSharedArgumentsOfExclusiveParams(
+    void checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn);
+    void checkGroupSharedArgumentsToExclusiveParams(
         InvokeExpr* invoke,
         FuncType* funcType,
         DeclRef<CallableDecl> calleeDeclRef,

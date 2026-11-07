@@ -4424,8 +4424,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 // value of function type has no parameter declarations, so neither has a
                 // `groupshared` argument to check.
                 //
-                if (paramDecl && argExpr)
-                    checkGroupSharedArgumentOfParam(paramDecl, argExpr);
+                if (paramDecl && argExpr && paramDecl->hasModifier<HLSLGroupSharedModifier>())
+                    checkArgumentOfGroupSharedParam(paramDecl, argExpr);
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
@@ -4617,7 +4617,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when the same storage is passed to two parameters that may both be references
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
-            checkGroupSharedArgumentsOfExclusiveParams(
+            checkGroupSharedArgumentsToExclusiveParams(
                 invoke,
                 funcType,
                 callableDeclRef,
@@ -7814,14 +7814,15 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
     return expr;
 }
 
-// Return the object that `expr` reads a part of, such as `g` for `g[i].a.x`, by stripping
-// `(...)`, `[i]`, `.field`, and single-component swizzles.
-static Expr* getBaseObjectOfProjection(Expr* expr)
+// Return the object whose declaration gives the address space of the storage that `expr` names,
+// such as `g` for `g[i].a.x`, by stripping `(...)`, `[i]`, `.field`, and single-component
+// swizzles. The groupshared checks use it to find the declaration that carries `groupshared`.
+static Expr* getObjectDeclaringAddressSpace(Expr* expr)
 {
-    // The `groupshared` modifier sits on the declaration of a whole object, never on a part, so we
-    // walk out to that object. `getValidTypeForAddressOf` would walk these projections itself,
-    // but it judges a field access by the field's declaration and so loses the base object's
-    // address space (issue #14094).
+    // An address-space modifier such as `groupshared` sits on the declaration of a whole object,
+    // never on a part, so we walk out to that object. `getValidTypeForAddressOf` would walk these
+    // projections itself, but it judges a field access by the field's declaration and so loses the
+    // base object's address space (issue #14094).
     //
     for (;;)
     {
@@ -7866,7 +7867,7 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
 
 // Return whether `arg` is one of the type-only placeholder arguments that
 // `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types.
-static bool isTypeOnlyPlaceholderArg(Expr* arg)
+static bool isSpecializeWithArgTypesPlaceholder(Expr* arg)
 {
     // A placeholder is a bare `VarExpr` with a checked l-value type but neither a name nor a
     // declaration. It stands for some l-value of its type and names no storage, so a check about
@@ -7877,9 +7878,10 @@ static bool isTypeOnlyPlaceholderArg(Expr* arg)
            !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
 }
 
-// Return whether `arg` comes from an expression that already failed to check, so that a storage
-// diagnostic for it would only repeat the reported error.
-static bool isArgumentOfFailedCheck(Expr* arg)
+// Return whether `arg`, or the operand of an implicit cast that `arg` is, has an error type. Such
+// an argument comes from an expression that already failed to check, so a storage diagnostic for
+// it would only repeat the reported error.
+static bool isErrorTypedArgument(Expr* arg)
 {
     if (as<ErrorType>(arg->type))
         return true;
@@ -7899,8 +7901,8 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 
     // A part of an object is in the address space of the whole object, so we judge the whole.
     //
-    auto addressedExpr = getBaseObjectOfProjection(arg);
-    if (isTypeOnlyPlaceholderArg(addressedExpr))
+    auto addressedExpr = getObjectDeclaringAddressSpace(arg);
+    if (isSpecializeWithArgTypesPlaceholder(addressedExpr))
         return false;
 
     // `getValidTypeForAddressOf` gives the pointer type of an addressable expression, and that
@@ -7919,13 +7921,12 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
     return false;
 }
 
-// Report an error if `argIn`, passed to `paramIn`, does not name thread-group-shared storage
-// although `paramIn` is a `groupshared` parameter.
-void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
+// Report an error if `argIn`, passed to the `groupshared` parameter `paramIn`, does not name
+// thread-group-shared storage.
+void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn)
 {
-    SLANG_ASSERT(paramIn && argIn);
-    if (!paramIn->hasModifier<HLSLGroupSharedModifier>() || isTypeOnlyPlaceholderArg(argIn) ||
-        isArgumentOfFailedCheck(argIn))
+    SLANG_ASSERT(paramIn && argIn && paramIn->hasModifier<HLSLGroupSharedModifier>());
+    if (isSpecializeWithArgTypesPlaceholder(argIn) || isErrorTypedArgument(argIn))
         return;
 
     // A `groupshared` parameter is a reference to a thread-group-shared location, so its argument
@@ -7937,13 +7938,6 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
         getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
             .param = getText(paramIn->getName()),
             .arg = argIn});
-}
-
-// Return whether `invoke` is written as a prefix, postfix or infix operator, such as `g[i]++` or
-// `g[i] += 1`, rather than as a call by name.
-static bool isOperatorInvocation(InvokeExpr* invoke)
-{
-    return as<OperatorExpr>(invoke) != nullptr;
 }
 
 // An argument of a call that the call writes back to the caller's storage when it returns: the
@@ -7989,7 +7983,7 @@ static void forEachWrittenBackArgument(
             continue;
         WrittenBackArgument written;
         written.arg = invoke->arguments[i];
-        if (isArgumentOfFailedCheck(written.arg))
+        if (isErrorTypedArgument(written.arg))
             continue;
 
         // An implicitly converted argument goes through a temporary of the parameter's type, and
@@ -8024,13 +8018,13 @@ static void forEachWrittenBackArgument(
 
 // Warn about each argument of `invoke` that passes thread-group-shared storage to an `out` or
 // `inout` parameter, including the implicit `this` of a `[mutating]` method.
-void SemanticsVisitor::checkGroupSharedArgumentsOfExclusiveParams(
+void SemanticsVisitor::checkGroupSharedArgumentsToExclusiveParams(
     InvokeExpr* invoke,
     FuncType* funcType,
     DeclRef<CallableDecl> calleeDeclRef,
     List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
-    bool callIsOperator = isOperatorInvocation(invoke);
+    bool callIsOperator = as<OperatorExpr>(invoke) != nullptr;
     forEachWrittenBackArgument(
         this,
         invoke,
@@ -8124,7 +8118,7 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
     bool isWrittenBackByCall)
 {
     SLANG_ASSERT(target && storage);
-    if (isArgumentOfFailedCheck(target))
+    if (isErrorTypedArgument(target))
         return;
 
     // Consider this example:
@@ -8180,7 +8174,7 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
 
     // A write of the whole variable, such as `v = float4(0)`, stays a single store.
     //
-    auto baseExpr = getBaseObjectOfProjection(addressedExpr);
+    auto baseExpr = getObjectDeclaringAddressSpace(addressedExpr);
     if (baseExpr == wholeExpr)
         return;
 
@@ -8217,7 +8211,7 @@ void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
     // returns, whatever the callee is, so in a differentiated body each write-back to part of
     // shared memory races like an assignment to that part.
     //
-    bool isCallByName = !isOperatorInvocation(invoke);
+    bool isCallByName = !as<OperatorExpr>(invoke);
     forEachWrittenBackArgument(
         this,
         invoke,

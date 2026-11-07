@@ -2656,7 +2656,7 @@ static bool isInstInPrimalOrTransposedParameterBlocks(IRInst* inst)
 // passes such an address through to a reference parameter, so the callee accesses the storage in
 // place. The backward pass then cannot rerun the call: the propagate function has no address for
 // that storage, and rerunning would access it a second time, after other code may have changed it.
-static bool isPassedReferenceToNonLocalStorage(IRCall* call)
+static bool isCallPassedAddressOfNonLocalStorage(IRCall* call)
 {
     for (auto arg : call->getArgsList())
     {
@@ -2767,7 +2767,7 @@ static bool shouldStoreInst(IRInst* inst)
         return false;
     case kIROp_Call:
         {
-            if (isPassedReferenceToNonLocalStorage(as<IRCall>(inst)))
+            if (isCallPassedAddressOfNonLocalStorage(as<IRCall>(inst)))
                 return true;
 
             // If the callee has a preference, we should follow it.
