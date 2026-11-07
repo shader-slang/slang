@@ -14,5 +14,12 @@ struct IRModule;
 /// results. Returns whether the module changed; returns false on other targets. Unsupported cases
 /// leave their resource-producing operations intact for subsequent specialization or target
 /// diagnostics.
+///
+/// Requires late target IR. Global shader parameters and function-entry parameters are retained
+/// inputs; uses of other values in a supported selection graph must belong to block instructions
+/// in their owning function, including local debug records. Surviving branch/function metadata
+/// must not retain those values.
+/// Metadata removed with a graph instruction must have no users outside that instruction's owned
+/// subtree.
 bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModule* module);
 } // namespace Slang

@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl -stage fragment -entry imageFromBinding -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl -stage fragment -entry constructedPair -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=IMAGE): -target spirv-asm -stage fragment -entry imageFromBinding -O0 -validate-ir -validate-ir-detailed
-//TEST:SIMPLE(filecheck=IMAGE): -target spirv-asm -stage fragment -entry imageFromBinding -validate-ir -validate-ir-detailed
+//TEST:SIMPLE(filecheck=IMAGE): -target spirv-asm -stage fragment -entry imageFromBinding -validate-ir -validate-ir-detailed -O1
 
 // A precombined binding does not expose a separately addressable sampler on Khronos targets.
 // `specializeResourceSelections` must leave conditional resource operations intact when recreating

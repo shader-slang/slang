@@ -94,6 +94,14 @@ namespace Slang
 // with ordinary state instead of recursively expanding a resource expression. Replacement block
 // parameters exist before we construct any back-edge argument. Two recipe alternatives can use
 // Boolean state and an `if`/`else`; larger sets use integer state and a `switch`.
+//
+// This pass consumes late target IR. `stripAutoDiffDecorations`, also called by
+// `finalizeAutoDiffPass`, removes annotations such as `IRBackwardDerivativePrimalReturnDecoration`,
+// and `removeWeakUseInsts` removes module-level weak uses before resource specialization.
+// The live producers of `kIROp_DependsOnDecoration` attach function metadata referencing globals.
+// The entry contract excludes nonlocal references to removable resource values and external users
+// of their owned metadata. Decoration operands are exempt from ordinary IR visibility checks,
+// so this locality is a pipeline precondition, not a consequence of SSA dominance.
 
 namespace
 {
@@ -643,6 +651,9 @@ struct ResourceSelectionContext
             {
                 auto user = use->getUser();
                 auto operation = findEnclosingInstructionInBlockOfCurrentFunc(user);
+                // We follow each use through its enclosing block instruction, including local
+                // debug records. The late-IR contract above excludes surviving nonlocal metadata
+                // that could retain a replaced value.
                 if (!operation)
                     continue;
                 if (isSelection(operation))
@@ -934,7 +945,7 @@ struct ResourceSelectionContext
         if (onTrue == onFalse)
             return onTrue;
         if (auto trueLiteral = as<IRBoolLit>(onTrue))
-            if (auto falseLiteral = as<IRBoolLit>(onFalse))
+            if (as<IRBoolLit>(onFalse))
             {
                 if (trueLiteral->getValue())
                     return condition;
@@ -1580,9 +1591,11 @@ struct ResourceSelectionContext
     /// Delete replaced instructions after their external uses are rewritten, retaining roots.
     void removeResourceGraph()
     {
-        // Selection cycles can still reference each other even after all executable consumers
+        // Selection cycles can still reference each other even after all terminal consumers
         // have been replaced. We unlink operands of every replaced instruction before deallocating
         // any of them, so deleting a loop parameter cannot leave a dangling use in another node.
+        // The late-IR contract also excludes external users of these instructions' owned metadata,
+        // so deleting their owned subtrees cannot leave a dangling metadata reference.
         for (auto value : values)
         {
             if (value->isRoot)

@@ -3,10 +3,10 @@
 //TEST:SIMPLE(filecheck=WARNING): -target spirv-asm -stage fragment -entry implicitLod -capability texture_querylod -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=WARNING-GLSL): -target glsl -stage fragment -entry implicitLod -capability texture_querylod -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=SILENT): -target spirv-asm -stage fragment -entry implicitSample -Wno-56020 -validate-ir -validate-ir-detailed
-//TEST:SIMPLE(filecheck=EXPLICIT): -target spirv-asm -stage fragment -entry explicitSample -warnings-as-errors 56020 -validate-ir -validate-ir-detailed
+//TEST:SIMPLE(filecheck=EXPLICIT): -target spirv-asm -stage fragment -entry explicitSample -O0 -warnings-as-errors 56020 -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=EXPLICIT-GLSL): -target glsl -stage fragment -entry explicitSample -warnings-as-errors 56020 -validate-ir -validate-ir-detailed
-//TEST:SIMPLE(filecheck=SILENT): -target spirv-asm -stage fragment -entry sameArray -warnings-as-errors 56020 -validate-ir -validate-ir-detailed
-//TEST:SIMPLE(filecheck=SILENT): -target glsl -stage fragment -entry sameArray -warnings-as-errors 56020 -validate-ir -validate-ir-detailed
+//TEST:SIMPLE(filecheck=SAME-SPV): -target spirv-asm -stage fragment -entry sameArray -warnings-as-errors 56020 -validate-ir -validate-ir-detailed
+//TEST:SIMPLE(filecheck=SAME-GLSL): -target glsl -stage fragment -entry sameArray -warnings-as-errors 56020 -validate-ir -validate-ir-detailed
 
 // Moving a resource operation into conditional arms can make implicit derivatives undefined.
 // We require one warning per original operation, even when both its texture and sampler are
@@ -27,7 +27,51 @@
 // SILENT-NOT: warning[E56021]
 // EXPLICIT-NOT: warning[E56020]
 // EXPLICIT-NOT: warning[E56021]
+// EXPLICIT: %[[GX:[^ ]+]] = OpFunctionCall %v2float %ddx{{( |$)}}
+// EXPLICIT: %[[GY:[^ ]+]] = OpFunctionCall %v2float %ddy{{( |$)}}
+// EXPLICIT-NOT: OpFunctionCall %v2float %{{(ddx|ddy)}}
+// EXPLICIT: OpBranchConditional
+// EXPLICIT-NOT: OpFunctionCall %v2float %{{(ddx|ddy)}}
+// EXPLICIT: OpImageSampleExplicitLod {{[^ ]+}} {{[^ ]+}} {{[^ ]+}} Grad %[[GX]] %[[GY]]{{( |$)}}
+// EXPLICIT-NOT: OpFunctionCall %v2float %{{(ddx|ddy)}}
+// EXPLICIT: OpImageSampleExplicitLod {{[^ ]+}} {{[^ ]+}} {{[^ ]+}} Grad %[[GX]] %[[GY]]{{( |$)}}
+// EXPLICIT-NOT: OpFunctionCall %v2float %{{(ddx|ddy)}}
 // EXPLICIT-GLSL-NOT: warning[E56020]
+// EXPLICIT-GLSL: vec2 [[GX:[^ ]+]] = dFdx(
+// EXPLICIT-GLSL: vec2 [[GY:[^ ]+]] = dFdy(
+// EXPLICIT-GLSL-NOT: {{(dFdx|dFdy)}}(
+// EXPLICIT-GLSL: if(
+// EXPLICIT-GLSL-NOT: {{(dFdx|dFdy)}}(
+// EXPLICIT-GLSL: textureGrad({{.*}}, ([[GX]]), ([[GY]]))
+// EXPLICIT-GLSL-NOT: {{(dFdx|dFdy)}}(
+// EXPLICIT-GLSL: textureGrad({{.*}}, ([[GX]]), ([[GY]]))
+// EXPLICIT-GLSL-NOT: {{(dFdx|dFdy)}}(
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[UV:[^ ]+]] = OpLoad %v2float %uv{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[X:[^ ]+]] = OpCompositeExtract %float %[[UV]] 0
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[CONDITION:[^ ]+]] = OpFOrdGreaterThan %bool %[[X]] %float_0_5{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[INDEX:[^ ]+]] = OpSelect %int %[[CONDITION]] %int_0 %int_1{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplerArray %[[INDEX]]{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[POINTER]]{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %textureA{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: %[[PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} %[[IMAGE]] %[[SAMPLER]]{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-SPV: OpImageSampleImplicitLod {{[^ ]+}} %[[PAIR]]{{( |$)}}
+// SAME-SPV-NOT: {{warning\[E5602[01]\]|Op(Branch|Switch)}}
+// SAME-GLSL-NOT: {{warning\[E5602[01]\]|if\(|switch\(}}
+// SAME-GLSL-DAG: uniform texture2D [[IMAGE:textureA[^; ]*]];
+// SAME-GLSL-DAG: uniform sampler {{ *}}[[SAMPLERS:samplerArray[A-Za-z0-9_]*]][2];
+// SAME-GLSL-DAG: in vec2 [[UV:uv[^; ]*]];
+// SAME-GLSL-NOT: {{warning\[E5602[01]\]|if\(|switch\(}}
+// SAME-GLSL: texture(sampler2D([[IMAGE]],[[SAMPLERS]][nonuniformEXT(([[UV]].x) > 0.5 ? 0 : 1)]),
+// SAME-GLSL-NOT: {{warning\[E5602[01]\]|if\(|switch\(}}
 
 Texture2D<float4> textureA;
 Texture2D<float4> textureB;

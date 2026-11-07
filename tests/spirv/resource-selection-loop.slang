@@ -1,19 +1,22 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -capability spvDescriptorHeapEXT -O0 -validate-ir
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -capability spvDescriptorHeapEXT -validate-ir
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry main -capability spvDescriptorHeapEXT -validate-ir -O1
 
 // Check that a conditionally updated sampler is carried through a loop as a heap index,
 // and that a texture select also selects a heap index.
 
 // CHECK: %[[S:[^ ]+]] = OpVariable %_ptr_Function_uint Function
-// CHECK: OpStore %[[S]] %uint_0
+// CHECK: OpStore %[[S]] %uint_0{{( |$)}}
 // CHECK: OpLoopMerge
-// CHECK: %[[NEXT:[^ ]+]] = OpIAdd %uint
-// CHECK: OpStore %[[S]] %[[NEXT]]
-// CHECK: %[[TEXTURE:[^ ]+]] = OpSelect %uint
-// CHECK: OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %[[TEXTURE]]
-// CHECK: %[[INDEX:[^ ]+]] = OpLoad %uint %[[S]]
-// CHECK: OpUntypedAccessChainKHR {{.*}} %slang_samplerHeap %[[INDEX]]
-// CHECK: OpImageSampleImplicitLod
+// CHECK: %[[NEXT:[^ ]+]] = OpIAdd %uint{{( |$)}}
+// CHECK: OpStore %[[S]] %[[NEXT]]{{( |$)}}
+// CHECK: %[[TEXTURE:[^ ]+]] = OpSelect %uint{{( |$)}}
+// CHECK: %[[TEXTURE_POINTER:[^ ]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %[[TEXTURE]]{{( |$)}}
+// CHECK: %[[IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %[[TEXTURE_POINTER]]{{( |$)}}
+// CHECK: %[[INDEX:[^ ]+]] = OpLoad %uint %[[S]]{{( |$)}}
+// CHECK: %[[SAMPLER_POINTER:[^ ]+]] = OpUntypedAccessChainKHR {{.*}} %slang_samplerHeap %[[INDEX]]{{( |$)}}
+// CHECK: %[[SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[SAMPLER_POINTER]]{{( |$)}}
+// CHECK: %[[PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} %[[IMAGE]] %[[SAMPLER]]{{( |$)}}
+// CHECK: OpImageSampleImplicitLod {{[^ ]+}} %[[PAIR]]{{( |$)}}
 
 cbuffer Ubo { uint x; uint i; uint j; };
 
