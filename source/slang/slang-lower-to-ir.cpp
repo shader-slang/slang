@@ -693,6 +693,18 @@ struct IRGenContext
     {
     }
 
+    /// Clears the enclosing function's control-flow and debug context.
+    /// Preserves `thisType`, `thisTypeWitness`, and the declaration environment.
+    void clearEnclosingFunctionContext()
+    {
+        returnDestination = LoweredValInfo();
+        catchHandler = nullptr;
+        funcDecl = nullptr;
+        currentDebugScope = nullptr;
+        irFunc = nullptr;
+        debugFunctionBody = nullptr;
+    }
+
     void setGlobalValue(Decl* decl, LoweredValInfo value) { shared->setGlobalValue(decl, value); }
 
     void setValue(Decl* decl, LoweredValInfo value) { env->mapDeclToValue[decl] = value; }
@@ -11336,12 +11348,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.thisType = outerContext->thisType;
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
 
-            subContextStorage.returnDestination = LoweredValInfo();
-            subContextStorage.catchHandler = nullptr;
-            subContextStorage.funcDecl = nullptr;
-            subContextStorage.currentDebugScope = nullptr;
-            subContextStorage.irFunc = nullptr;
-            subContextStorage.debugFunctionBody = nullptr;
+            subContextStorage.clearEnclosingFunctionContext();
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -14865,22 +14872,24 @@ LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl)
     }
 
     IRBuilder subIRBuilder(context->irBuilder->getModule());
-    if (as<VarDecl>(decl) && decl->findModifier<LocalTempVarModifier>())
-    {
-        // Do not modify insert location.
-        subIRBuilder.setInsertLoc(context->irBuilder->getInsertLoc());
-    }
-    else
-    {
-        subIRBuilder.setInsertInto(subIRBuilder.getModule());
-    }
-
     IRGenEnv subEnv;
     subEnv.outer = context->env;
 
     IRGenContext subContext = *context;
     subContext.irBuilder = &subIRBuilder;
     subContext.env = &subEnv;
+
+    if (as<VarDecl>(decl) && decl->findModifier<LocalTempVarModifier>())
+    {
+        // Local temporaries are lowered in their enclosing function's scope.
+        subIRBuilder.setInsertLoc(context->irBuilder->getInsertLoc());
+    }
+    else
+    {
+        subIRBuilder.setInsertInto(subIRBuilder.getModule());
+        // A module declaration is independent of the function that first references it.
+        subContext.clearEnclosingFunctionContext();
+    }
 
     auto result = lowerDecl(&subContext, decl);
 
