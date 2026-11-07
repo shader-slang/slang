@@ -6163,7 +6163,8 @@ struct HigherOrderInvokeExprCheckingActions
 
         // `checkDifferentiableCallableSignature` reports the reference parameters of a function
         // with a differentiability or derivative attribute, so we report only those of a function
-        // without one, which becomes differentiated by being named here.
+        // without one. Naming such a function here is otherwise rejected only later, with a less
+        // specific error about the missing derivative.
         //
         if (!funcDeclRef.getDecl()->findModifier<DifferentiableAttribute>())
         {
