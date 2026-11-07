@@ -22,6 +22,14 @@ This document is designed to guide you in contributing to the project. It is int
 
 By submitting a Contribution to this repository, you additionally represent that, to the extent any of Your Contributions were developed with the assistance of artificial intelligence tools or AI-generated code, You have exercised sufficient review, judgment, and creative direction over such tools and resulting material to reasonably consider it Your original creation, and You are not aware of any third-party license, intellectual property claim, or other restriction arising from such use that is associated with any part of Your Contribution or use thereof.
 
+State that assistance in the PR description in one line: `AI assistance: None`, `Editorial`
+(spelling, grammar, translation, completion), or `Substantive: <tool>, verified by <tests or checks>`
+when generated code, tests or documentation is retained or a tool chose the approach. Substantive
+assistance also carries an `Assisted-by: <tool>` trailer in the squash commit. Disclosure never
+lowers the bar: the same tests, the same reproducer for a bug fix, and an explicit "not tested
+on ..." when something was not run. No AI detector is used; defects are judged as defects whoever
+produced them.
+
 ## Table of Contents
 
 1. [Contribution Process](#contribution-process)
