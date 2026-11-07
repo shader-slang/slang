@@ -926,17 +926,45 @@ bool isPrimaryDecl(CallableDecl* decl)
     return (!decl->primaryDecl) || (decl == decl->primaryDecl);
 }
 
-// Finds a function by name, optionally sending only the not-found diagnostic to a separate sink.
-// Entry-point selection uses that sink while checking for a structural stage selection.
-DeclRef<FuncDecl> findFunctionDeclByName(
-    Module* translationUnit,
-    Name* name,
-    DiagnosticSink* sink,
-    DiagnosticSink* notFoundSink = nullptr)
+static bool _isPlainIdentifier(UnownedStringSlice text)
+{
+    if (text.getLength() == 0)
+        return false;
+    for (char c : text)
+    {
+        if (!CharUtil::isAlphaOrDigit(c) && c != '_' && c != '$')
+            return false;
+    }
+    return true;
+}
+
+DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, DiagnosticSink* sink)
 {
     DeclRef<FuncDecl> entryPointFuncDeclRef;
 
-    auto expr = translationUnit->findDeclFromString(getText(name), sink);
+    // A name that does not resolve is reported by the caller, which knows what the
+    // name was for (an entry point or a `[patchconstantfunc]`). The lookup would also
+    // report it as an undefined identifier, with neither the name nor a location, so
+    // it runs with a temporary sink.
+    //
+    DiagnosticSink lookupSink(sink->getSourceManager(), nullptr, sink);
+    auto expr = translationUnit->findDeclFromString(getText(name), &lookupSink);
+
+    // When a plain identifier does not resolve, the lookup can only report that the name
+    // is undefined, which the caller reports better. Otherwise the diagnostics are kept:
+    // a resolved name can still be reported as removed or deprecated, and a longer
+    // expression, such as `main<MissingType>`, can fail in a part the caller does not
+    // mention.
+    //
+    auto lookupDeclRefExpr = as<DeclRefExpr>(expr);
+    bool resolved = (lookupDeclRefExpr && lookupDeclRefExpr->declRef) || as<OverloadedExpr>(expr);
+    if (lookupSink.outputBuffer.getLength() != 0 &&
+        (resolved || !_isPlainIdentifier(getText(name).getUnownedSlice())))
+    {
+        sink->diagnoseRaw(
+            lookupSink.getErrorCount() ? Severity::Error : Severity::Warning,
+            lookupSink.outputBuffer.getUnownedSlice());
+    }
     if (auto declRefExpr = as<DeclRefExpr>(expr))
     {
         entryPointFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
@@ -964,14 +992,6 @@ DeclRef<FuncDecl> findFunctionDeclByName(
             entryPointFuncDeclRef = DeclRef<FuncDecl>();
     }
 
-    if (!entryPointFuncDeclRef)
-    {
-        auto translationUnitSyntax = translationUnit->getModuleDecl();
-        (notFoundSink ? notFoundSink : sink)
-            ->diagnose(Diagnostics::EntryPointFunctionNotFound{
-                .name = name->text,
-                .location = translationUnitSyntax->loc});
-    }
     return entryPointFuncDeclRef;
 }
 
@@ -2937,16 +2957,15 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto entryPointProfile = entryPointReq->getProfile();
 
     // Consider `-entry SkyMiss`, where SkyMiss implements rt::IMissShader. Ordinary function
-    // lookup reports that no function has that name, but experimental lookup may still select
-    // the struct's checked invoke implementation. Hold only the not-found diagnostic until
-    // structural lookup has had a chance to recognize the struct. A name such as `SkyMiss.invoke`
-    // can already resolve to a function, but still selects that same structural conformance.
-    // Other lookup diagnostics must reach the real sink: `SkyMiss<1.5>` can warn when converting
+    // lookup finds no function with that name, but experimental lookup may still select the
+    // struct's checked invoke implementation, so the not-found error waits until structural
+    // lookup has had a chance to recognize the struct. A name such as `SkyMiss.invoke` can
+    // already resolve to a function, but still selects that same structural conformance.
+    // Other lookup diagnostics reach the real sink: `SkyMiss<1.5>` can warn when converting
     // a generic argument to int, and structural lookup reuses the cached result without emitting
     // that warning again.
-    DiagnosticSink notFoundSink(linkage->getSourceManager(), sink->getSourceLocationLexer(), sink);
     DeclRef<FuncDecl> entryPointFuncDeclRef =
-        findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink, &notFoundSink);
+        findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
     bool foundStructuralStage = false;
     Type* structuralStageType = nullptr;
     if (linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
@@ -2963,17 +2982,17 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
             entryPointFuncDeclRef = structuralEntryPointFuncDeclRef;
     }
 
-    // A recognized structural type already supplies either the entry point or its own diagnostic.
-    if (!foundStructuralStage && notFoundSink.outputBuffer.getLength())
-    {
-        sink->diagnoseRaw(
-            notFoundSink.getErrorCount() ? Severity::Error : Severity::Warning,
-            notFoundSink.outputBuffer.getUnownedSlice());
-    }
-
     // Did we find a function declaration in our search?
     if (!entryPointFuncDeclRef)
     {
+        // A recognized structural type already supplies either the entry point or its own
+        // diagnostic.
+        if (!foundStructuralStage)
+        {
+            sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
+                .name = entryPointName->text,
+                .location = translationUnit->getModule()->getModuleDecl()->loc});
+        }
         return nullptr;
     }
 
