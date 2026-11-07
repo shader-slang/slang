@@ -1502,51 +1502,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // is already handled by the base `CLikeSourceEmitter`
             return false;
         }
-    case kIROp_ByteAddressBufferStore:
-        {
-            // Similar to the case for a load, we want to specialize
-            // the generated code for the case where we store a `uint`
-            // or a vector of `uint`.
-            //
-            auto elementType = inst->getDataType();
-            IRIntegerValue elementCount = 1;
-            if (auto vecType = as<IRVectorType>(elementType))
-            {
-                if (auto elementCountInst = as<IRIntLit>(vecType->getElementCount()))
-                {
-                    elementType = vecType->getElementType();
-                    elementCount = elementCountInst->getValue();
-                }
-            }
-            if (elementType->getOp() == kIROp_UIntType)
-            {
-                auto outerPrec = inOuterPrec;
-                auto prec = getInfo(EmitOp::Postfix);
-                bool needClose = maybeEmitParens(outerPrec, prec);
-
-                emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-                m_writer->emit(".Store");
-                if (elementCount != 1)
-                {
-                    m_writer->emit(elementCount);
-                }
-                m_writer->emit("(");
-                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-                m_writer->emit(", ");
-                emitOperand(
-                    inst->getOperand(inst->getOperandCount() - 1),
-                    getInfo(EmitOp::General));
-                m_writer->emit(")");
-
-                maybeCloseParens(needClose);
-                return true;
-            }
-
-            // Otherwise we fall back to the base case, which
-            // is already handled by the base `CLikeSourceEmitter`
-            return false;
-        }
-        break;
     case kIROp_NonUniformResourceIndex:
         {
             // Need to emit as a Function call for HLSL

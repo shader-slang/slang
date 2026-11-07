@@ -3132,14 +3132,68 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 
     case kIROp_ByteAddressBufferStore:
         {
+            // A `uint` or `uintN` value is stored with `Store`/`StoreN`. FXC has no templated
+            // `Store<T>`, and on SM 5.0 byte-address legalization turns non-`uint` scalars and
+            // partially covered vectors into `uint` stores, so those reach FXC in this form. The
+            // C++ and CUDA preludes implement the same methods as direct word writes, so we make
+            // this choice here for every target, unlike the load, whose `uint` forms only the
+            // HLSL emitter selects.
+            //
+            // Every other value names its type with `Store<T>`, as the load does. Without it, the
+            // downstream compiler would deduce the type from the spelling of the value, and that
+            // spelling can name a different type: HLSL writes a `double` or `half` constant as a
+            // bare literal such as `42.0`, which dxc deduces as `float`, and C++ and CUDA write a
+            // `double` infinity as the `float` macro `SLANG_INFINITY` and a `float` NaN as the
+            // `double` expression `(0.0 / 0.0)`.
+            //
+            // DXC rejects explicit template arguments on the methods of
+            // `RasterizerOrderedByteAddressBuffer`, so a store to one calls `Store` without them
+            // and DXC deduces `T` from the value. Converting a scalar or vector value to its own
+            // type, as in `Store(0U,double(42.0))`, makes that deduction match the value; array and
+            // struct values are passed unchanged, because their spelling already has their type.
+            // Legalization has split any matrix into vectors before this point. Loads from such a
+            // buffer still emit `Load<T>`, which DXC rejects in the same way.
+            //
+            auto store = cast<IRByteAddressBufferStore>(inst);
+            auto valueType = store->getValue()->getDataType();
+            auto valueBaseType = getIRVectorBaseType(valueType);
+            bool isUIntValue = valueBaseType->getOp() == kIROp_UIntType;
+            bool canNameValueType = !as<IRHLSLRasterizerOrderedByteAddressBufferType>(
+                store->getBuffer()->getDataType());
+            bool convertValue = !isUIntValue && !canNameValueType && as<IRBasicType>(valueBaseType);
+
             auto prec = getInfo(EmitOp::Postfix);
             needClose = maybeEmitParens(outerPrec, prec);
 
-            emitOperand(inst->getOperand(0), leftSide(outerPrec, prec));
-            m_writer->emit(".Store(");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            emitOperand(store->getBuffer(), leftSide(outerPrec, prec));
+            m_writer->emit(".Store");
+            if (isUIntValue)
+            {
+                auto elementCount = getIRVectorElementSize(valueType);
+                if (elementCount != 1)
+                {
+                    m_writer->emit(elementCount);
+                }
+            }
+            else if (canNameValueType)
+            {
+                m_writer->emit("<");
+                emitType(valueType);
+                m_writer->emit(" >");
+            }
+            m_writer->emit("(");
+            emitOperand(store->getOffset(), getInfo(EmitOp::General));
             m_writer->emit(",");
-            emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+            if (convertValue)
+            {
+                emitType(valueType);
+                m_writer->emit("(");
+            }
+            emitOperand(store->getValue(), getInfo(EmitOp::General));
+            if (convertValue)
+            {
+                m_writer->emit(")");
+            }
             m_writer->emit(")");
             break;
         }
