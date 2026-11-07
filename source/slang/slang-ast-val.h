@@ -1013,10 +1013,12 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 /// For `dyn IFoo`, this represents conformance to `IDifferentiable` or
 /// `IDifferentiablePtrType`, based on a witness that `IFoo` refines that interface.
 ///
-/// This conformance is unfounded according to the Slang type system, but autodiff uses this
-/// witness for compatibility. In general, `dyn IFoo` does not conform
-/// to `IBar` just because `IFoo` refines `IBar`, including when `IFoo` and `IBar` are equal.
-/// This class encodes a compatibility hack, not a precedent for other box conformances.
+/// This conformance is unfounded according to the Slang type system. Autodiff temporarily
+/// uses this witness so existing differentiated functions can accept or return boxes and use
+/// boxed differential values, pending a type-system design for that behavior.
+/// In general, `dyn IFoo` does not conform to `IBar` just because `IFoo` refines `IBar`,
+/// including when `IFoo` and `IBar` are equal. This compatibility hack is not a precedent
+/// for other box conformances.
 FIDDLE()
 class ExistentialBoxDifferentiabilityWitness : public SubtypeWitness
 {

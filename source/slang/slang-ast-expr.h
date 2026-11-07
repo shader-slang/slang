@@ -516,7 +516,9 @@ class IsTypeExpr : public Expr
     FIDDLE() Expr* value = nullptr;
     FIDDLE() TypeExp typeExpr;
 
-    /// An optional declared conformance from the tested type to `typeExpr.type`, or null.
+    /// The witness for an optional constraint from the tested type to `typeExpr.type`.
+    ///
+    /// The field is null for other checked tests.
     FIDDLE() Val* witnessArg = nullptr;
 
     /// A known result that does not evaluate `value`, or null when the result is not known.
@@ -540,6 +542,14 @@ class AsTypeExpr : public Expr
 ///
 /// The result is `bool`. The opened value and the target conformance refer to the same
 /// interface, so their conformance witnesses can identify the concrete payload type.
+//
+// We use `OpenedExistentialTypeTestExpr` and `OpenedExistentialTypeCastExpr` as stopgaps to
+// preserve compatibility with the mixed semantics of `is` and `as` on existential boxes.
+// For example, `value as Foo` tests the payload when `Foo` conforms to the boxed interface,
+// but `value as T` can compare the whole box type when `T` is an unresolved type parameter.
+// TODO: We want simpler semantics that consistently apply both operators either to the box
+// itself or to its opened payload. Choosing either rule changes existing behavior and needs
+// a separate language-version decision.
 FIDDLE()
 class OpenedExistentialTypeTestExpr : public Expr
 {
@@ -552,7 +562,8 @@ class OpenedExistentialTypeTestExpr : public Expr
     FIDDLE() TypeExp targetType;
 
     /// The target type's conformance to the interface in `value`'s `ExtractExistentialType`.
-    /// This conformance may be optional.
+    ///
+    /// The witness is non-null in a checked expression and may come from an optional constraint.
     FIDDLE() Val* targetWitness = nullptr;
 };
 
@@ -560,6 +571,9 @@ class OpenedExistentialTypeTestExpr : public Expr
 ///
 /// The result is `Optional<targetType>`, containing the payload when its concrete type matches
 /// `targetType` and containing no value otherwise.
+//
+// We use `OpenedExistentialTypeCastExpr` for the payload-cast compatibility case described
+// with `OpenedExistentialTypeTestExpr`.
 FIDDLE()
 class OpenedExistentialTypeCastExpr : public Expr
 {
@@ -572,7 +586,8 @@ class OpenedExistentialTypeCastExpr : public Expr
     FIDDLE() TypeExp targetType;
 
     /// The target type's conformance to the interface in `value`'s `ExtractExistentialType`.
-    /// This conformance may be optional.
+    ///
+    /// The witness is non-null in a checked expression and may come from an optional constraint.
     FIDDLE() Val* targetWitness = nullptr;
 };
 
