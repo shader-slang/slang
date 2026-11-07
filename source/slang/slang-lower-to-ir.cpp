@@ -9539,7 +9539,7 @@ void maybeEmitDebugLine(
 
     // Minimal debug info carries only line information and cannot mark the function being
     // lowered as artificial, so we omit the lines of an artificial function; otherwise its
-    // generated member stores would appear to be user-written statements.
+    // generated statements would appear to be user-written.
     if (context->debugInfoLevel == DebugInfoLevel::Minimal && isArtificialInst(context->irFunc))
         return;
 
