@@ -215,7 +215,7 @@ local insts = {
 			{
 				TensorView = {
 					struct_name = "TensorViewType",
-					operands = { { "elementType", "IRType" } },
+					operands = { { "elementType", "IRType" }, { "offsetType", "IRType" } },
 					hoistable = true,
 				},
 			},

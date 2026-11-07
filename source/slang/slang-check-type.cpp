@@ -332,115 +332,85 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
 
     if (auto genericDeclRefType = as<GenericDeclRefType>(type))
     {
-        // We are using a reference to a generic declaration as a concrete
-        // type. This means we should substitute in any default parameter values
-        // if they are available.
-        //
-        // TODO(tfoley): A more expressive type system would substitute in
-        // "fresh" variables and then solve for their values...
-        //
-
         auto genericDeclRef = genericDeclRefType->getDeclRef();
         ensureDecl(genericDeclRef, DeclCheckState::CanSpecializeGeneric);
-        List<Val*> args;
-        List<Val*> witnessArgs;
+
+        // A bare generic type requires defaults for every ordinary parameter.
         for (Decl* member : genericDeclRef.getDecl()->getDirectMemberDecls())
         {
+            bool needsArgument = false;
             if (auto typeParam = as<GenericTypeParamDecl>(member))
             {
-                if (auto defaultArg = typeParam->initType.type)
-                {
-                    if (outProperType)
-                        args.add(defaultArg);
-                }
-                else
-                {
-                    if (diagSink)
-                    {
-                        diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                            .type = typeExp.type,
-                            .typeExp = typeExp.exp});
-                        *outProperType = m_astBuilder->getErrorType();
-                    }
-                    return false;
-                }
+                needsArgument = !typeParam->initType.type;
             }
             else if (as<GenericTypePackParamDecl>(member) || as<GenericValuePackParamDecl>(member))
             {
-                if (diagSink)
-                {
-                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                        .type = typeExp.type,
-                        .typeExp = typeExp.exp});
-                    *outProperType = m_astBuilder->getErrorType();
-                }
-                return false;
+                needsArgument = true;
             }
             else if (auto valParam = as<GenericValueParamDecl>(member))
             {
-                if (!valParam->initExpr)
-                {
-                    if (diagSink)
-                    {
-                        diagSink->diagnose(Diagnostics::Unimplemented{
-                            .feature = "can't fill in default for generic type parameter",
-                            .location = typeExp.exp->loc});
-                        *outProperType = m_astBuilder->getErrorType();
-                    }
-                    return false;
-                }
-                // TODO: this is one place where syntax should get cloned!
-                if (outProperType)
-                {
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        makeDeclRef(valParam),
-                        nullptr);
-                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
-                }
+                needsArgument = !valParam->initExpr;
+            }
+            if (needsArgument)
+            {
+                if (diagSink)
+                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                        .type = typeExp.type,
+                        .typeExp = typeExp.exp});
+                *outProperType = m_astBuilder->getErrorType();
+                return false;
             }
         }
 
-        for (auto constraintParam :
-             genericDeclRef.getDecl()->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        // Resolve dependent defaults and their witnesses together, just as for
+        // an explicit generic application. Consider this example:
+        //
+        //     struct View<T = uint, W : IWrapper<T> = Wrapper<T>> { W value; }
+        //     View view;
+        //
+        // Copying the declaration's default for W would leave Wrapper<T> in a
+        // concrete type. The solver first chooses uint for T, then substitutes
+        // Wrapper<uint> and proves its IWrapper<uint> conformance. Lowering can
+        // then use the resulting specialization without unresolved parameters.
+        GenericArgumentInferenceFailure failure;
+        GenericInferenceContext inferenceContext;
+        inferenceContext.genericDecl = genericDeclRef.getDecl();
+        inferenceContext.failure = &failure;
+        inferenceContext.applicationLoc = typeExp.exp ? typeExp.exp->loc : genericDeclRef.getLoc();
+        ConversionCost solveCost = kConversionCost_None;
+        auto solved =
+            trySolveGenericArguments(_Move(inferenceContext), genericDeclRef, {}, solveCost);
+        if (!solved)
         {
-            auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
-            if (!genericParam)
-                return false;
-            auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
-            if (!genericTypeParamDecl)
+            if (diagSink)
             {
-                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                    .type = typeExp.type,
-                    .typeExp = typeExp.exp});
-                return false;
+                if (failure.kind ==
+                    GenericArgumentInferenceFailure::Kind::InterfaceConformanceNotSatisfied)
+                {
+                    auto& conformance = failure.interfaceConformanceNotSatisfied;
+                    auto location = conformance.location;
+                    // For a direct parameter constraint, point at the default
+                    // that supplied the invalid type, as explicit arguments do.
+                    if (auto param = isDeclRefTypeOf<GenericTypeParamDecl>(
+                            conformance.constraintDecl->sub.type))
+                    {
+                        if (auto defaultExpr = param.getDecl()->initType.exp)
+                            location = defaultExpr->loc;
+                    }
+                    diagSink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                        .typeArg = conformance.subType,
+                        .interface = conformance.supType,
+                        .location = location});
+                }
+                else
+                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                        .type = typeExp.type,
+                        .typeExp = typeExp.exp});
             }
-            auto defaultType = CheckProperType(genericTypeParamDecl->initType);
-            if (!defaultType)
-            {
-                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
-                    .type = typeExp.type,
-                    .typeExp = typeExp.exp});
-                return false;
-            }
-            auto constraintType = CheckProperType(constraintParam->sup);
-            auto witness = tryGetSubtypeWitness(defaultType, constraintType);
-            if (!witness)
-            {
-                // diagnose
-                getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
-                    .typeArg = defaultType,
-                    .interface = constraintType,
-                    .location = genericTypeParamDecl->initType.exp->loc});
-                return false;
-            }
-            witnessArgs.add(witness);
+            *outProperType = m_astBuilder->getErrorType();
+            return false;
         }
-        // Combine args and witnessArgs
-        args.addRange(witnessArgs);
-
-        result = DeclRefType::create(
-            getASTBuilder(),
-            getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
+        result = DeclRefType::create(m_astBuilder, solved);
     }
 
     // default case: we expect this to already be a proper type

@@ -3045,9 +3045,9 @@ private:
         // (`runWorkList` returns `Failed`), before final argument validation
         // runs. The abstract-self-type guard above (and the optional-constraint
         // cases) have already returned, so reaching this point means a genuine
-        // unsatisfiable required conformance. We record only the substituted
-        // `sub`/`sup` types; `CompleteOverloadCandidate` formats the diagnostic
-        // if this candidate is selected. First recorded reason wins.
+        // unsatisfiable required conformance. We record the substituted
+        // `sub`/`sup` types and source constraint; the caller formats the
+        // diagnostic if needed. First recorded reason wins.
         //
         // `trySolveSubtypeWitnessForConstraint` can run speculatively while the
         // subject argument is still an unsolved generic parameter, so guard on
@@ -3070,6 +3070,7 @@ private:
             !hasUnreadyDependenciesForVal(sub) && !hasUnreadyDependenciesForVal(sup))
         {
             auto& conformance = m_context.failure->setInterfaceConformanceNotSatisfied();
+            conformance.constraintDecl = constraintDecl;
             conformance.subType = sub;
             conformance.supType = sup;
             conformance.location = m_context.applicationLoc;
