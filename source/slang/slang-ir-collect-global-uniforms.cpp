@@ -266,6 +266,9 @@ struct CollectGlobalUniformParametersContext
 
             SLANG_ASSERT(globalParam);
 
+            // A diagnostic about the new field reports the parameter's declaration.
+            fieldKey->sourceLoc = globalParam->sourceLoc;
+
             // The new structure field will need to have whatever decorations
             // had been put on the global parameter (notably including any name hint)
             //
