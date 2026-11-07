@@ -18,6 +18,16 @@
       }
     },
     {
+      "name": "performance",
+      "inherits": "default",
+      "description": "Match the distributed binaries' build configuration",
+      "binaryDir": "${sourceDir}/build.performance",
+      "cacheVariables": {
+        "SLANG_ENABLE_RELEASE_LTO": "ON",
+        "SLANG_STANDARD_MODULE_DEVELOP_BUILD": "OFF"
+      }
+    },
+    {
       "name": "emscripten",
       "description": "Emscripten-based Wasm build",
       "generator": "Ninja Multi-Config",
@@ -181,6 +191,11 @@
       "name": "minSizeRel",
       "configurePreset": "default",
       "configuration": "MinSizeRel"
+    },
+    {
+      "name": "performance",
+      "configurePreset": "performance",
+      "configuration": "Release"
     },
     {
       "name": "vs2022-debug",
