@@ -59,7 +59,7 @@ standard output = {
     ],
     "globalScope": {
         "kind": "constantBuffer",
-        "binding": {"kind": "descriptorTableSlot", "index": 0},
+        "binding": {"kind": "descriptorTableSlot", "space": 9, "index": 5},
         "parameters": [
             {
                 "name": "a",
