@@ -8530,6 +8530,7 @@ bool all(matrix<T,N,M> x)
 /// @category barrier Memory and control barriers
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::AllMemoryBarrier))]
 void AllMemoryBarrier()
 {
     __target_switch
@@ -8550,6 +8551,7 @@ void AllMemoryBarrier()
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::AllMemoryBarrierWithGroupSync))]
 void AllMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -10691,6 +10693,7 @@ T determinant(matrix<T,N,N> m)
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::DeviceMemoryBarrier))]
 void DeviceMemoryBarrier()
 {
     __target_switch
@@ -10711,6 +10714,7 @@ void DeviceMemoryBarrier()
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::DeviceMemoryBarrierWithGroupSync))]
 void DeviceMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -12711,6 +12715,7 @@ float2 GetRenderTargetSamplePosition(int Index)
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::GroupMemoryBarrier))]
 void GroupMemoryBarrier()
 {
     __target_switch
@@ -12749,6 +12754,7 @@ void __subgroupBarrier()
 /// @category barrier
 __glsl_extension(GL_KHR_memory_scope_semantics)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, memorybarrier)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::GroupMemoryBarrierWithGroupSync))]
 void GroupMemoryBarrierWithGroupSync()
 {
     __target_switch
@@ -35829,6 +35835,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 /// @remarks This intrinsic maps to `workgroupUniformLoad` when targeting WGSL and is a no-op on other targets.
 /// WGSL is strict on uniformity, and this intrinsic is needed to mark a variable as workgroup uniform in order
 // to silence uniformity errors in certain cases.
+[KnownBuiltin($((int)KnownBuiltinDeclName::workgroupUniformLoad))]
 T workgroupUniformLoad<T>(__ref T v)
 {
     __target_switch
@@ -35845,6 +35852,7 @@ T workgroupUniformLoad<T>(__ref T v)
 /// @return The value of `v`, the same for every invocation of the workgroup.
 /// @remarks Maps to `workgroupUniformLoad` on an `atomic<T>` when targeting WGSL (a workgroup
 /// barrier, then the load); on other targets it is an atomic load.
+[KnownBuiltin($((int)KnownBuiltinDeclName::workgroupUniformLoad))]
 T workgroupUniformLoad<T : IAtomicable>(__ref Atomic<T> v)
 {
     __target_switch

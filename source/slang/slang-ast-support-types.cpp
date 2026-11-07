@@ -39,6 +39,13 @@ KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
     SLANG_KNOWN_BUILTIN_DECL(RayTracingProgramHitGroups)
     SLANG_KNOWN_BUILTIN_DECL(RayTracingProgramMissShaders)
     SLANG_KNOWN_BUILTIN_DECL(RayTracingProgramCallableShaders)
+    SLANG_KNOWN_BUILTIN_DECL(AllMemoryBarrier)
+    SLANG_KNOWN_BUILTIN_DECL(AllMemoryBarrierWithGroupSync)
+    SLANG_KNOWN_BUILTIN_DECL(DeviceMemoryBarrier)
+    SLANG_KNOWN_BUILTIN_DECL(DeviceMemoryBarrierWithGroupSync)
+    SLANG_KNOWN_BUILTIN_DECL(GroupMemoryBarrier)
+    SLANG_KNOWN_BUILTIN_DECL(GroupMemoryBarrierWithGroupSync)
+    SLANG_KNOWN_BUILTIN_DECL(workgroupUniformLoad)
 #undef SLANG_KNOWN_BUILTIN_DECL
     return KnownBuiltinDeclName::COUNT;
 }

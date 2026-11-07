@@ -250,6 +250,13 @@ FIDDLE() namespace Slang
         RayTracingProgramHitGroups,
         RayTracingProgramMissShaders,
         RayTracingProgramCallableShaders = 24,
+        AllMemoryBarrier = 25,
+        AllMemoryBarrierWithGroupSync = 26,
+        DeviceMemoryBarrier = 27,
+        DeviceMemoryBarrierWithGroupSync = 28,
+        GroupMemoryBarrier = 29,
+        GroupMemoryBarrierWithGroupSync = 30,
+        workgroupUniformLoad = 31,
         COUNT
     };
 
