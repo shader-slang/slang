@@ -54,6 +54,14 @@ bool GlobalInstInliningContextGeneric::isLegalGlobalInst(IRInst* inst)
 {
     if (as<IRConstant>(inst))
         return true;
+    // A spec-const-rate value is a legal global on every target: SPIR-V emits it as
+    // `OpSpecConstantOp`, which must be outside function bodies, and the C-like emitters fold it
+    // into each use (WGSL writes `i32(64) + N_0` over the `override` declaration `N_0`).
+    // Inlining one would also not terminate. `IRBuilder::_createInst` hoists and deduplicates
+    // an instruction whose operands satisfy `shouldHaveSpecConstRate`, so a clone with the same
+    // operands is the original (see the assertion in `inlineInst`).
+    if (isSpecConstRateType(inst->getFullType()))
+        return true;
     if (isLegalGlobalInstForTarget(inst))
         return true;
     return false;
@@ -191,6 +199,12 @@ IRInst* GlobalInstInliningContextGeneric::inlineInst(
         maybeInlineGlobalValue(operandBuilder, inst, operand, cloneEnv);
     }
     result = cloneInstAndOperands(&cloneEnv, &builder, inst);
+    // `cloneInstAndOperands` returns `inst` itself when `IRBuilder` deduplicates a clone whose
+    // operands did not change, and copying `inst`'s decorations into itself below would then
+    // never terminate. Every deduplicated instruction that inlining can select is either a legal
+    // global, cloned only when one of its operands is inlined, or lowered before this pass, so a
+    // self-clone here means a legality rule is missing.
+    SLANG_RELEASE_ASSERT(result != inst);
     cloneEnv.mapOldValToNew[inst] = result;
     IRBuilder subBuilder(builder);
     subBuilder.setInsertInto(result);
