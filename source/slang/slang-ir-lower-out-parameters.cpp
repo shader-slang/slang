@@ -392,35 +392,33 @@ static void transferFunctionDecorations(
     }
 }
 
-// Handle cleanup of original function if needed
-static void handleOriginalFunction(IRFunc* func, IRCall* callResult)
+// Re-point at `newFunc` every `IREntryPointParamDecoration` that currently names `oldFunc` as
+// its originating entry point. When entry-point `uniform` parameters are hoisted to global scope
+// (moveEntryPointUniformParamsToGlobalScope), each resulting global param is tagged with an
+// IREntryPointParamDecoration recording the entry-point function it came from. Once the wrapper
+// replaces the entry point those tags must follow it: introduceExplicitGlobalContext binds a
+// global uniform to an entry point only when this decoration names that entry point.
+static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
 {
-    // Count uses of original function
-    UInt useCount = 0;
-    for (auto use = func->firstUse; use; use = use->nextUse)
-        useCount++;
-
-    if (useCount == 1)
-    {
-        inlineCall(callResult);
-
-        // Remove decorations from old function
-        List<IRDecoration*> decorationsToRemove;
-        for (auto decor : func->getDecorations())
+    traverseUses(
+        oldFunc,
+        [&](IRUse* use)
         {
-            if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor))
-            {
-                decorationsToRemove.add(decor);
-            }
-        }
+            if (as<IREntryPointParamDecoration>(use->getUser()))
+                use->set(newFunc);
+        });
+}
 
-        for (auto decor : decorationsToRemove)
-        {
-            decor->removeFromParent();
-        }
-
-        func->removeAndDeallocate();
-    }
+// `call`, the wrapper's call to the original entry point `func`, must be the only remaining use of
+// `func`: fixEntryPointCallsites has already moved every other call to a separate ordinary-function
+// copy, and retargetEntryPointParamDecorations has moved the hoisted uniforms' tags to the wrapper.
+static void inlineOriginalFunction(IRFunc* func, IRCall* call)
+{
+    SLANG_RELEASE_ASSERT(
+        func->firstUse && func->firstUse->getUser() == call && !func->hasMoreThanOneUse());
+    bool inlined = inlineCall(call);
+    SLANG_RELEASE_ASSERT(inlined);
+    func->removeAndDeallocate();
 }
 
 // Main function that orchestrates the transformation
@@ -496,8 +494,8 @@ IRFunc* lowerOutParameters(
 
     builder.emitReturn(returnValue);
 
-    // Handle cleanup of original function
-    handleOriginalFunction(func, callResult);
+    retargetEntryPointParamDecorations(func, newFunc);
+    inlineOriginalFunction(func, callResult);
 
     return newFunc;
 }
