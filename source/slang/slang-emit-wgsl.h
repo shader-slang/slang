@@ -11,11 +11,6 @@ class WGSLSourceEmitter : public CLikeSourceEmitter
 public:
     explicit WGSLSourceEmitter(const Desc& desc);
 
-    virtual bool isResourceTypeBindless(IRType* type) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(type);
-        return true;
-    }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(

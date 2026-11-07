@@ -849,6 +849,47 @@ entries are unaffected.
 > drivers expose acceleration structure descriptors in the heap (as device addresses), and requires either
 > the `SPV_KHR_ray_tracing` or `SPV_KHR_ray_query` extension.
 
+### WGSL with `wgsl_chromium_experimental_resource_table`
+
+On WGSL, `DescriptorHandle<T>` is a `vec2<u32>`. By default Slang looks the handle up in a global
+array of descriptors, as on SPIR-V, but core WGSL cannot declare an array of textures or samplers.
+
+When the `wgsl_chromium_experimental_resource_table` capability is requested (for example with
+`-capability wgsl_chromium_experimental_resource_table`), Slang instead lowers each lookup to the resource
+table of Chromium's experimental bindless extension: the handle's `.x` component is the table index, and
+the lookup becomes `getResource<T>(index)`. The output starts with
+`enable chromium_experimental_resource_table;` and declares no heap bindings.
+
+```slang
+struct Material { Texture2D.Handle albedo; SamplerState.Handle smp; };
+StructuredBuffer<Material> materials;
+// ...
+Material m = materials[i];
+float4 c = m.albedo.Sample(m.smp, uv);
+```
+
+becomes (with Slang's generated names shortened)
+
+```wgsl
+textureSample(getResource<texture_2d<f32>>(m.albedo.x), getResource<sampler>(m.smp.x), uv)
+```
+
+The resource table holds sampled textures (including depth and multisampled textures) and samplers.
+A handle to any other kind of resource (a storage texture, a buffer or a combined texture-sampler) is a
+compile-time error under this capability. The extension is experimental: Dawn exposes it behind the
+`chromium-experimental-sampling-resource-table` feature, which needs unsafe APIs to be allowed. A pipeline
+created with `layout: 'auto'` enables the table itself; an explicit pipeline layout needs
+`usesResourceTable: true`. Neither one creates or binds a table. The host creates a `GPUResourceTable`
+with `device.createResourceTable`, puts each texture and sampler at the index its handle holds, and sets
+the table on the pass before dispatch (`GPUComputePassEncoder.setResourceTable`).
+
+Tint crashes on two shapes of code that use the table, and the crash takes down Chrome's GPU process
+([Chromium issue 574322344](https://issues.chromium.org/issues/574322344)): (1) a `let` that holds a
+texture from the table and is sampled with a sampler looked up inline, and (2) a texture from the table
+passed to a function parameter. Slang avoids both: it emits each `getResource<T>(index)` call inside the
+expression that uses it, and it inlines a function that receives a looked-up texture or sampler.
+Textures and samplers from ordinary global bindings are still passed to functions as parameters.
+
 ### Custom Descriptor Fetch
 
 If none of the above behaviors are desired, users can customize the conversion logic from descriptor handle
