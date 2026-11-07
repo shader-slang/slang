@@ -1658,6 +1658,9 @@ local insts = {
 	{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } },
 	{ GroupMemoryBarrierWithGroupSync = {} },
 	{ ControlBarrier = {} },
+	-- WGSL `workgroupUniformLoad(ptr)`: a workgroup barrier followed by a load of the
+	-- `var<workgroup>` that `ptr` points to, whose result WGSL treats as uniform.
+	{ workgroupUniformLoad = { operands = { { "ptr" } } } },
 	-- GPU_FOREACH loop of the form
 	{ gpuForeach = { min_operands = 3 } },
 	-- Wrapper for OptiX intrinsics used to load and store ray payload data using
