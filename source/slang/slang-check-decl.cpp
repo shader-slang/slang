@@ -16136,8 +16136,23 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
             // check for `no_diff` on one now, since every one is rejected.
             //
             if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
-                getSink()->diagnose(
-                    Diagnostics::ReferenceParameterOfDifferentiableFunction{.param = paramDecl});
+            {
+                // A `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute declares this
+                // function as the derivative of another one rather than requesting a derivative of
+                // this one, so it gets its own wording.
+                //
+                auto attribute = decl->findModifier<DifferentiableAttribute>();
+                if (as<DerivativeOfAttribute>(attribute))
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfUserDefinedDerivative{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+                else
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+            }
             if (!isTypeDifferentiable(paramDecl->type.type))
             {
                 if (!paramDecl->hasModifier<NoDiffModifier>())

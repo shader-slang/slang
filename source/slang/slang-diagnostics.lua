@@ -4850,8 +4850,20 @@ err(
 err(
     "reference-parameter-of-differentiable-function",
     38038,
-    "parameter '~param:Decl' is passed by reference, which a differentiable function, a function with a user-defined derivative, or a user-defined derivative does not support",
-    span { loc = "param:Decl", message = "if the function needs no derivative, remove the differentiability or derivative attribute that applies to it; otherwise pass the value as an ordinary parameter" }
+    "'~func:Decl' cannot be differentiated, because parameter '~param:Decl' is passed by reference",
+    span { loc = "param:Decl", message = "consider accessing the 'groupshared' variable directly instead of passing it as a parameter" },
+    -- At most one of these notes has a location: the attribute that makes the function
+    -- differentiable, or the `fwd_diff` or `bwd_diff` that names a function without one.
+    note { message = "this requests a derivative; remove it if the function needs none", span { loc = "attributeLocation" } },
+    note { message = "a derivative is requested here", span { loc = "requestLocation" } }
+)
+
+err(
+    "reference-parameter-of-user-defined-derivative",
+    38044,
+    "user-defined derivative '~func:Decl' cannot have parameter '~param:Decl', because it is passed by reference",
+    span { loc = "param:Decl", message = "consider accessing the 'groupshared' variable directly instead of passing it as a parameter" },
+    note { message = "this declares the function as a user-defined derivative", span { loc = "attributeLocation" } }
 )
 
 err(

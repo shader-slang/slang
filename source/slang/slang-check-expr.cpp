@@ -6147,11 +6147,12 @@ struct HigherOrderInvokeExprCheckingActions
         return declRef.as<CallableDecl>();
     }
 
-    /// Return whether `funcExpr`, the function that `fwd_diff` or `bwd_diff` differentiates, has a
-    /// reference parameter and so cannot be differentiated, and report an error on each such
-    /// parameter that has not already been reported.
+    /// Return whether `funcExpr`, the function that `diffExpr` (a `fwd_diff` or `bwd_diff`)
+    /// differentiates, has a reference parameter and so cannot be differentiated, and report an
+    /// error on each such parameter that has not already been reported.
     bool rejectDifferentiationOfFunctionWithReferenceParameter(
         SemanticsVisitor* semantics,
+        HigherOrderInvokeExpr* diffExpr,
         Expr* funcExpr)
     {
         // A function with a reference parameter cannot be differentiated, so its derivative has no
@@ -6173,7 +6174,9 @@ struct HigherOrderInvokeExprCheckingActions
                 if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
                     semantics->getSink()->diagnose(
                         Diagnostics::ReferenceParameterOfDifferentiableFunction{
-                            .param = paramDecl});
+                            .func = funcDeclRef.getDecl(),
+                            .param = paramDecl,
+                            .requestLocation = diffExpr->loc});
             }
         }
         return true;
@@ -6219,7 +6222,10 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        if (rejectDifferentiationOfFunctionWithReferenceParameter(semantics, funcExpr))
+        if (rejectDifferentiationOfFunctionWithReferenceParameter(
+                semantics,
+                resultDiffExpr,
+                funcExpr))
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             return;
@@ -6258,7 +6264,10 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        if (rejectDifferentiationOfFunctionWithReferenceParameter(semantics, funcExpr))
+        if (rejectDifferentiationOfFunctionWithReferenceParameter(
+                semantics,
+                resultDiffExpr,
+                funcExpr))
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             return;
