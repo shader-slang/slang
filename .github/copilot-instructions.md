@@ -107,6 +107,19 @@ change.)
   construction site.
 - **Fail loudly on out-of-contract input.** When a helper is only valid for a restricted set of
   inputs, `SLANG_RELEASE_ASSERT` outside that set rather than silently returning a default.
+- **Keep process out of source comments.** No issue or PR numbers, dates, or history in a comment;
+  references go in the commit message and the PR. A doc comment states the contract, an
+  implementation comment the approach; neither records what the code is not or used to be.
+- **Name booleans as propositions; initialize them.** `isEnabled`, `shouldEmit`, never an imperative
+  verb phrase; every `bool` member gets a default initializer.
+- **Every non-obvious assertion states its reason; an unexplained early-out is a defect.** Assert
+  the impossible shape or explain why it arises and why the handling is right.
+- **A pass's policy lives in the pass**, not in a shared utility header; a shared helper does exactly
+  what its name says.
+- **Use current terminology**: never introduce or spread a term marked deprecated, and rename a
+  misnamed declaration when the change already touches all of its call sites.
+- **A behavior downstream code must honor gets its own representation** (a type or opcode), not a
+  value tucked into an existing field that every consumer has to inspect.
 
 ## PR Description Format
 
