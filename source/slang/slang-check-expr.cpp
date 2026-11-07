@@ -2739,21 +2739,27 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
             resultValue = constArgVals[0] >> shiftCount;
         }
-        // binary operators with chance of divide-by-zero
-        // TODO: issue a suitable error in that case
-#define CASE(OP)                                          \
-    else if (opName == getName(#OP)) do                   \
-    {                                                     \
-        if (argCount != 2)                                \
-            return nullptr;                               \
-        if (!constArgVals[1])                             \
-            return nullptr;                               \
-        resultValue = constArgVals[0] OP constArgVals[1]; \
-    }                                                     \
-    while (0)
-        CASE(/);
-        CASE(%);
-#undef CASE
+        // Division folds through `BuiltinOperationIntVal::tryFoldImpl`, the folder the
+        // builtin-operator fast path uses, so both paths share its handling of a -1 divisor
+        // (`INT64_MIN / -1` traps on the host) and of unsigned operands. With no sink, a zero
+        // divisor fails to fold without the diagnostic the fast path reports.
+        // TODO: issue a suitable error for a zero divisor.
+        else if (opName == getName("/") || opName == getName("%"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            List<IntVal*> divisionArgs;
+            divisionArgs.add(argVals[0]);
+            divisionArgs.add(argVals[1]);
+            return as<IntVal>(BuiltinOperationIntVal::tryFoldImpl(
+                m_astBuilder,
+                invokeExpr.getExpr()->type.type,
+                getBuiltinOperationKindFromString(
+                    getText(opName).getUnownedSlice(),
+                    OperatorArity::Binary),
+                divisionArgs,
+                nullptr));
+        }
         else if (opName == getName("?:"))
         {
             if (argCount != 3)
