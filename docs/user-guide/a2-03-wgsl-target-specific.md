@@ -197,3 +197,28 @@ Translates to:
 ```wgsl
 @id(7) override a : i32 = 2;
 ```
+
+## Barriers and Groupshared Values
+
+WGSL requires a workgroup barrier to run in uniform control flow, and its uniformity analysis treats every read of a `var<workgroup>` as possibly non-uniform, even right after a barrier.
+When a `groupshared` value decides whether a barrier runs, or how many times it runs, Slang emits that read as `workgroupUniformLoad`.
+Examples are a loop bound for a loop that contains a barrier, and a condition for an early `return` before a barrier.
+
+```hlsl
+groupshared uint gCount;
+...
+for (uint i = 0; i < gCount; ++i) // read with workgroupUniformLoad(&gCount)
+{
+    ...
+    GroupMemoryBarrierWithGroupSync();
+}
+```
+
+`workgroupUniformLoad` runs a workgroup barrier before it loads the value, so each such read adds a barrier.
+Slang also finds such a read when it reaches the barrier's condition through a local copy, a parameter passed by value, the return value of a function, or the result of a call that is computed from its arguments.
+A `groupshared` `Atomic<T>` that is read with `load()` gets the same treatment.
+When the read is inside a function, every call to that function must then be in uniform control flow, because `workgroupUniformLoad` is itself a barrier.
+Slang does not change a read from a `read_write` storage buffer, such as an `RWStructuredBuffer`, because WGSL has no uniform load for storage memory.
+Slang also does not change a value that gets to the barrier through an `inout` or `out` parameter.
+In those cases, call `workgroupUniformLoad(x)` on the `groupshared` variable in your code. For a storage-buffer value, copy it into a `groupshared` variable first.
+On other targets, `workgroupUniformLoad(x)` is a plain load.
