@@ -17146,6 +17146,9 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 
 // Across lane ops
 
+// HLSL has no masked bitwise reduction. A WaveMask must equal the active lanes
+// (docs/wave-intrinsics.md), so the HLSL cases of WaveMaskBitAnd/Or/Xor reduce with
+// WaveActiveBit*, which also supplies the bool lowering.
 __generic<T : __BuiltinLogicalType>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
@@ -17154,7 +17157,7 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitAnd($1)";
+        return WaveActiveBitAnd(expr);
     default:
         return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
@@ -17168,7 +17171,7 @@ vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitAnd($1)";
+        return WaveActiveBitAnd(expr);
     default:
         return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
@@ -17181,7 +17184,7 @@ matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitAnd($1)";
+        return WaveActiveBitAnd(expr);
     default:
         return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
@@ -17195,7 +17198,7 @@ T WaveMaskBitOr(WaveMask mask, T expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitOr($1)";
+        return WaveActiveBitOr(expr);
     default:
         return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
@@ -17208,7 +17211,7 @@ vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitOr($1)";
+        return WaveActiveBitOr(expr);
     default:
         return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
@@ -17222,7 +17225,7 @@ matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitOr($1)";
+        return WaveActiveBitOr(expr);
     default:
         return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
@@ -17236,7 +17239,7 @@ T WaveMaskBitXor(WaveMask mask, T expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitXor($1)";
+        return WaveActiveBitXor(expr);
     default:
         return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
@@ -17250,7 +17253,7 @@ vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitXor($1)";
+        return WaveActiveBitXor(expr);
     default:
         return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
@@ -17264,7 +17267,7 @@ matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr)
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "WaveActiveBitXor($1)";
+        return WaveActiveBitXor(expr);
     default:
         return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
@@ -17762,7 +17765,7 @@ __generic<T : __BuiltinLogicalType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
-    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
+    return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
@@ -17770,7 +17773,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
-    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
+    return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
 //@public:
@@ -17997,9 +18000,14 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
+//
+// These functions accept bool on CUDA, GLSL, HLSL and SPIR-V; the Metal and WGSL cases still
+// pass bool to the native intrinsic unchanged. SPIR-V's Bitwise group ops take only integers, so
+// bool uses the Logical ops (spirvBoolName). HLSL's WaveActiveBit* takes only unsigned integers,
+// so a bool is reduced as a 0/1 uint; on 0/1 values the bitwise and logical results are the same.
 ${
-struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* metalName; };
-const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "xor"}};
+struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* spirvBoolName; const char* metalName; };
+const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "LogicalAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "LogicalOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "LogicalXor", "xor"}};
 for (auto opName : kWaveActiveBitOpEntries) {
 $}
 /// @category wave Wave and quad functions
@@ -18016,11 +18024,19 @@ T WaveActive$(opName.hlslName)(T expr)
     case wgsl:
         __intrinsic_asm "subgroup$(opName.glslName)";
     case hlsl:
+        if (__isBool<T>())
+        {
+            let bits = WaveActive$(opName.hlslName)(uint(__slang_noop_cast<bool>(expr)));
+            return __slang_noop_cast<T>(bits != 0);
+        }
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal:
         __intrinsic_asm "simd_$(opName.metalName)";
     case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$T result Subgroup Reduce $expr};
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvBoolName) $$T result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$T result Subgroup Reduce $expr};
     case cuda:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -18039,11 +18055,19 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
     case wgsl:
         __intrinsic_asm "subgroup$(opName.glslName)";
     case hlsl:
+        if (__isBool<T>())
+        {
+            let bits = WaveActive$(opName.hlslName)(vector<uint, N>(__slang_noop_cast<vector<bool, N>>(expr)));
+            return __slang_noop_cast<vector<T, N>>(bits != 0);
+        }
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal:
         __intrinsic_asm "simd_$(opName.metalName)";
     case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$vector<T, N> result Subgroup Reduce $expr};
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvBoolName) $$vector<T, N> result Subgroup Reduce $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$vector<T, N> result Subgroup Reduce $expr};
     case cuda:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }
@@ -18058,6 +18082,15 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
     case cuda:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     case hlsl:
+        if (__isBool<T>())
+        {
+            // Each row goes through the vector overload's uint lowering.
+            matrix<T, N, M> result;
+            [ForceUnroll]
+            for (int i = 0; i < N; ++i)
+                result[i] = WaveActive$(opName.hlslName)(expr[i]);
+            return result;
+        }
         __intrinsic_asm "WaveActive$(opName.hlslName)";
     default:
         matrix<T,N,M> result;
@@ -20303,6 +20336,8 @@ $}
 //
 // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
 //
+// SPIR-V's Bitwise group ops take only integers, so a bool operand uses the Logical ops.
+//
 ${
 struct WaveMultiBitsEntry { const char* name; };
 const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
@@ -20323,10 +20358,16 @@ T WaveMultiBit$(opName.name)(T value, uint4 mask)
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
-        return spirv_asm
-        {
-            result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformLogical$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
     }
 }
 
@@ -20344,10 +20385,16 @@ vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
-        return spirv_asm
-        {
-            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformLogical$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+            };
     }
 }
 
@@ -20377,6 +20424,9 @@ $}
 // WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
+//
+// SPIR-V's Bitwise group ops take only integers, so a bool operand uses the Logical ops. DXC's
+// WaveMultiPrefixBit* accepts bool, so the HLSL case passes it through unchanged.
 //
 ${
 struct WaveMultiPrefixBitwiseEntry
@@ -20426,10 +20476,16 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     case hlsl:
         __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
     case spirv:
-        return spirv_asm
-        {
-            result:$$T = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformLogical$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$T = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
     }
 }
 
@@ -20449,10 +20505,16 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     case hlsl:
         __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
     case spirv:
-        return spirv_asm
-        {
-            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
-        };
+        if (__isBool<T>())
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformLogical$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
+        else
+            return spirv_asm
+            {
+                result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+            };
     }
 }
 
