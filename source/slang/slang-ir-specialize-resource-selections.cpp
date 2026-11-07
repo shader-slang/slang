@@ -95,6 +95,12 @@ namespace Slang
 // parameters exist before we construct any back-edge argument. Two recipe alternatives can use
 // Boolean state and an `if`/`else`; larger sets use integer state and a `switch`.
 //
+// Graph discovery avoids revisiting shared values, and recipe interning shares repeated
+// construction descriptions. Neither limits combinations of independent resource choices.
+// We enumerate a constructor's child-recipe combinations during analysis and again when building
+// its selector and payloads. `emitConsumer` separately enumerates combinations of the operation's
+// distinct resource arguments.
+//
 // This pass consumes late target IR. `stripAutoDiffDecorations`, also called by
 // `finalizeAutoDiffPass`, removes annotations such as `IRBackwardDerivativePrimalReturnDecoration`,
 // and `removeWeakUseInsts` removes module-level weak uses before resource specialization.
@@ -311,9 +317,9 @@ struct ResourceSelectionContext
     Dictionary<IRBlock*, List<IRParam*>> originalParams;
     Dictionary<IRInst*, Index> consumerMap;
     List<ResourceSelectionConsumer> consumers;
-    // These payload values are computed by selects or parameters that replace conditional
-    // resource computations. When used as descriptor indices, they need `NonUniformResourceIndex`
-    // even if their incoming values were constants.
+    // These payload values carry conditional resource replacement state. We mark their uses as
+    // descriptor-array indices with `NonUniformResourceIndex`: selection can be nonuniform even
+    // with constant incoming indices. Folds may reuse an existing IR value for this state.
     HashSet<IRInst*> selectedPayloads;
     IRType* commonIndexType = nullptr;
 
@@ -791,14 +797,19 @@ struct ResourceSelectionContext
     /// convergence; otherwise, every graph value has at least one reconstruction alternative.
     bool discoverRecipes()
     {
-        // A select or block parameter only unions the recipes of its incoming resource values.
-        // Indexing descends through finite array types. Address constructors, such as
-        // `GetElementPtr` and `FieldAddress`, can extend a recipe only along acyclic dependencies:
+        // We union incoming recipes to determine a select or block parameter's alternatives.
+        // Indexing descends through finite array types. We add recipe steps for
+        // `kIROp_GetElementPtr` and `kIROp_FieldAddress` only along acyclic dependencies:
         // `isSelection` and `discoverGraph` exclude pointer-valued selection state, so an address
-        // cannot be carried back around a loop to extend itself. Combination constructs one
-        // sampled-image recipe from texture and sampler recipes, and projection normalization
-        // removes the inverse construction. Thus loops can propagate alternatives but cannot keep
-        // adding access steps, so discovery terminates.
+        // cannot be carried back around a loop to extend itself. For
+        // `kIROp_MakeCombinedTextureSampler`, we form a recipe from texture and sampler recipes;
+        // we normalize projections to remove the inverse construction. We can therefore propagate
+        // recipes around loops without continually adding access steps, so discovery terminates.
+        // Convergence does not imply a small recipe set. Eight texture alternatives and eight
+        // sampler alternatives can produce 64 combined recipes.
+        // `addConstructorRecipes` enumerates those combinations during analysis.
+        // `emitConstructorSelector` and `addConstructorPayloads` enumerate them again when building
+        // ordinary replacement state.
         bool changed = true;
         while (changed)
         {
@@ -1417,6 +1428,8 @@ struct ResourceSelectionContext
         // original selection graph. A repeated argument is registered only once. Independently
         // selected arguments can require a Cartesian product, but a selected combined pair
         // remains one argument and therefore preserves its joint choice.
+        // A retained call with four independently selected two-way sampler arguments produces 16
+        // call copies before simplification, even with only two roots shared by all arguments.
         //
         // Each branch receives a child clone environment so choosing a resource in one arm
         // cannot change the mappings used by another arm.
@@ -1520,6 +1533,59 @@ struct ResourceSelectionContext
         return nullptr;
     }
 
+    /// Replace a consumer's result in IR uses and cached ordinary replacement state.
+    ///
+    /// Requires matching data types and a replacement that dominates all rewritten uses after the
+    /// caller completes its control-flow changes. The caller must update these references before
+    /// deleting `original` or reusing cached state.
+    void replaceConsumerResult(IRInst* original, IRInst* replacement)
+    {
+        // Selectors and payloads can refer directly to a consumer result. Consider this example:
+        //
+        //     Texture2D<float4> first, second;
+        //     SamplerState samplers[4];
+        //     [noinline]
+        //     int getIndex(Texture2D<float4> texture)
+        //     {
+        //         return int(asuint(texture.Load(int3(0)).x) & 3u);
+        //     }
+        //     float4 sampleSelected(bool condition, float2 uv)
+        //     {
+        //         Texture2D<float4> t = select(condition, first, second);
+        //         int index = getIndex(t);
+        //         Sampler2D<float4> pair = __makeCombinedTextureSampler(t, samplers[index]);
+        //         return pair.SampleLevel(uv, 0);
+        //     }
+        //
+        // We cache the call's result as the sampler-array payload before rewriting consumers.
+        // Replacing registered `IRUse` edges does not update those C++ pointers. We must also
+        // replace the cached index before deleting the call, or later reconstruction would use
+        // the removed instruction. Boolean folds can similarly leave a selector pointing directly
+        // to an earlier consumer result. The selected-payload classification follows that value.
+        SLANG_RELEASE_ASSERT(original);
+        SLANG_RELEASE_ASSERT(replacement);
+        SLANG_RELEASE_ASSERT(original->getDataType() == replacement->getDataType());
+        original->replaceUsesWith(replacement);
+
+        // One scan updates this graph's cached selectors and payload slots for the original
+        // consumer, regardless of how many operation copies its dispatch emitted. This also works
+        // when a later consumer was rewritten first: its emitted IR uses follow the replacement.
+        for (auto value : values)
+        {
+            if (value->selector == original)
+                value->selector = replacement;
+            for (auto& entry : value->payloads)
+                for (auto& payload : entry.second)
+                    if (payload == original)
+                        payload = replacement;
+        }
+        if (selectedPayloads.contains(original))
+        {
+            selectedPayloads.remove(original);
+            selectedPayloads.add(replacement);
+        }
+    }
+
     /// Replace one terminal operation at its execution point and merge only its ordinary result.
     void rewriteConsumer(ResourceSelectionConsumer& consumer)
     {
@@ -1562,7 +1628,7 @@ struct ResourceSelectionContext
             IRCloneEnv environment;
             auto replacement = emitConsumer(builder, consumer, arguments, 0, environment);
             if (replacement)
-                original->replaceUsesWith(replacement);
+                replaceConsumerResult(original, replacement);
 
             // The final dispatch merge already dominates the continuation. We append the
             // remaining instructions to that merge rather than adding an empty forwarding
@@ -1581,7 +1647,7 @@ struct ResourceSelectionContext
             IRCloneEnv environment;
             auto replacement = emitConsumer(builder, consumer, arguments, 0, environment);
             if (replacement)
-                original->replaceUsesWith(replacement);
+                replaceConsumerResult(original, replacement);
         }
         original->removeAndDeallocate();
         if (temporaryContinuation)

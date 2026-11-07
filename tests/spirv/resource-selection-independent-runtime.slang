@@ -1,5 +1,7 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -DMANUAL
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -DMANUAL -Xslang -O0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -DMANUAL -Xslang -O1
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 
@@ -7,7 +9,8 @@
 // hand-written conditional. We use gradient textures of different sizes with point and linear
 // filtering, sampled away from texel centers, so all four texture/sampler pairs differ.
 // A fifth output checks that the fixture distinguishes those pairs on the test device.
-// The `MANUAL` run validates that fixture without selecting any resources.
+// The `MANUAL` form validates that fixture without selecting any resources.
+// Both the selected and `MANUAL` forms run at explicit `-O0` and `-O1`.
 // SPIRV: OpImageSampleExplicitLod
 // GLSL: textureLod
 //TEST_INPUT: Texture2D(size=4, content=gradient, format=RGBA8Unorm):name textureA

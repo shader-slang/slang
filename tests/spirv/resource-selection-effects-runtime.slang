@@ -1,4 +1,5 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O1
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 
@@ -6,6 +7,7 @@
 // a different texel, so the unselected image must still contain its initial zero value.
 // Executing both writes speculatively would fail the comparison even if the selected image
 // received the correct value.
+// We run the write/read comparisons at both `-O0` and `-O1`.
 // SPIRV: OpImageWrite
 // GLSL: imageStore
 //TEST_INPUT: RWTexture2D(format=R32Uint, size=4, content=zero):name textureA

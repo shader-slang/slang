@@ -15,6 +15,9 @@ struct IRModule;
 /// leave their resource-producing operations intact for subsequent specialization or target
 /// diagnostics.
 ///
+/// This pass does not cap combinations of resource constructions or copies of a consuming
+/// operation. Independent resource choices can multiply both analysis work and generated code.
+///
 /// Requires late target IR. Global shader parameters and function-entry parameters are retained
 /// inputs; uses of other values in a supported selection graph must belong to block instructions
 /// in their owning function, including local debug records. Surviving branch/function metadata

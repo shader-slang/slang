@@ -1,4 +1,5 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute -shaderobj -output-using-type -emit-spirv-directly -Xslang -O1
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -O0 -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -validate-ir -validate-ir-detailed -O1
 
@@ -6,6 +7,7 @@
 // sampled values separately to establish the expected results without resource selections.
 // Each output must pass six checks: the three initial values differ pairwise, and all three
 // textures selected after the loop produce the corresponding rotated reference values.
+// We run these comparisons at both `-O0` and `-O1`.
 // SPIRV: OpLoopMerge
 // SPIRV: OpImageSampleExplicitLod
 
