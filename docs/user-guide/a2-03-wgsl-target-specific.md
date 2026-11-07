@@ -97,6 +97,8 @@ ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)By
 -----------------------------------------------------------------------------------------------
 
 ConstantBuffer translates to the `uniform` address space with `read` access mode in WGSL.
+By default its contents use the std140 layout that `uniform` requires without extensions (16-byte array strides and struct alignment).
+`ConstantBuffer<T, Std430DataLayout>` and `ConstantBuffer<T, ScalarDataLayout>` use WGSL's standard layout for host-shareable types instead, the one `storage` buffers have (std430; WGSL has no scalar layout, so both give the same offsets), and the module declares `requires uniform_buffer_standard_layout;`. That language extension must be supported by the WebGPU implementation (`navigator.gpu.wgslLanguageFeatures`).
 ByteAddressBuffer and RWByteAddressBuffer translate to `array<u32>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
 StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
 AppendStructuredBuffer with element type T translates to two bindings in the `storage` address space, an `array<T>` that holds the elements and an `array<atomic<i32>>` that holds the append counter. The Append method updates this counter with the WGSL `atomicAdd` built-in.
