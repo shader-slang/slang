@@ -900,8 +900,6 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     // The derivative takes a reference parameter of the primal as is, with the
                     // same access, and does not differentiate the storage it refers to.
                     //
-                    if (diffWitness)
-                        SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
                     newParamTypes.add(getParamTypeWithModeWrapper(
                         astBuilder,
                         _getNoDiffType(astBuilder, paramInfo.type),

@@ -20795,7 +20795,7 @@ void checkDerivativeOfAttributeImpl(
 
     Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(
         higherOrderFuncExpr,
-        visitor->allowStaticReferenceToNonStaticMember().resolvingPrimalOfDerivativeOfAttribute());
+        visitor->allowStaticReferenceToNonStaticMember());
 
     if (!checkedHigherOrderFuncExpr)
     {
