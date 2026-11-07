@@ -8,20 +8,6 @@
 namespace Slang
 {
 
-// Returns true if `type` is itself a leaf opaque "handle" type that SPIR-V
-// forbids from being stored to or loaded from
-// (VUID-StandaloneSpirv-OpTypeImage-06924): images/textures, samplers, sampled
-// images, subpass inputs (including GLSL input attachments), and acceleration
-// structures. These map to `OpTypeImage`/`OpTypeSampler`/`OpTypeSampledImage`/
-// `OpTypeAccelerationStructureKHR`, none of which may live in a function-local
-// variable.
-static bool isLeafUnstorableOpaqueHandleType(IRType* type)
-{
-    return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
-           as<IRSubpassInputType>(type) || type->getOp() == kIROp_GLSLInputAttachmentType ||
-           type->getOp() == kIROp_RaytracingAccelerationStructureType;
-}
-
 // Find an opaque handle type (see `isLeafUnstorableOpaqueHandleType`) that cannot
 // live in a function-local variable, recursing into the element/field types of
 // aggregates (arrays, structs, tuples) since storing an aggregate that contains

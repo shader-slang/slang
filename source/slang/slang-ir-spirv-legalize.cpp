@@ -23,6 +23,7 @@
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang-ir-undefined-opaque-handle.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
@@ -3454,6 +3455,10 @@ void legalizeIRForSPIRV(
 
     // Run DCE to clean up any values that became unused after removing unreachable code
     eliminateDeadCode(module);
+
+    // An undefined opaque handle that is still present would be emitted as an `OpUndef` that
+    // spirv-val rejects, so we report it instead.
+    diagnoseUndefinedOpaqueHandles(module, codeGenContext->getSink());
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
 

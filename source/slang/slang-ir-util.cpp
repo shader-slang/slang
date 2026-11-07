@@ -4041,4 +4041,11 @@ bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool ha
     return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
 }
 
+bool isLeafUnstorableOpaqueHandleType(IRType* type)
+{
+    return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
+           as<IRSubpassInputType>(type) || type->getOp() == kIROp_GLSLInputAttachmentType ||
+           type->getOp() == kIROp_RaytracingAccelerationStructureType;
+}
+
 } // namespace Slang
