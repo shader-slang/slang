@@ -64,6 +64,60 @@ static UnownedStringSlice getOptixCoopVecMatrixLayoutName(int matrixLayout)
     }
 }
 
+/// Return the CUDA round-to-nearest intrinsic (e.g. `__fmul_rn`) for the scalar floating-point
+/// `Add`, `Sub` or `Mul` in `inst`, or an empty slice for any other instruction. nvcc never
+/// contracts these intrinsics into an FMA, whatever its `--fmad` setting, so they carry
+/// `-fp-mode precise` into the generated source; the prelude's vector and matrix operators do the
+/// same under `SLANG_CUDA_ENABLE_PRECISE_MATH`.
+static UnownedStringSlice getRoundToNearestArithmeticIntrinsic(IRInst* inst)
+{
+    switch (inst->getDataType()->getOp())
+    {
+    case kIROp_FloatType:
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+            return UnownedStringSlice("__fadd_rn");
+        case kIROp_Sub:
+            return UnownedStringSlice("__fsub_rn");
+        case kIROp_Mul:
+            return UnownedStringSlice("__fmul_rn");
+        default:
+            break;
+        }
+        break;
+    case kIROp_DoubleType:
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+            return UnownedStringSlice("__dadd_rn");
+        case kIROp_Sub:
+            return UnownedStringSlice("__dsub_rn");
+        case kIROp_Mul:
+            return UnownedStringSlice("__dmul_rn");
+        default:
+            break;
+        }
+        break;
+    case kIROp_HalfType:
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+            return UnownedStringSlice("__hadd_rn");
+        case kIROp_Sub:
+            return UnownedStringSlice("__hsub_rn");
+        case kIROp_Mul:
+            return UnownedStringSlice("__hmul_rn");
+        default:
+            break;
+        }
+        break;
+    default:
+        break;
+    }
+    return UnownedStringSlice();
+}
+
 struct FragmentShape
 {
     int m, n, k;
@@ -403,10 +457,18 @@ void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     Super::emitFrontMatterImpl(targetReq);
 
     // Must precede the prelude, which is emitted immediately after this front
-    // matter and gates its transcendental wrappers on this define.
-    if (getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Fast)
+    // matter and gates its transcendental wrappers (fast) or its vector and
+    // matrix arithmetic operators (precise) on these defines.
+    switch (getTargetProgram()->getOptionSet().getFloatingPointMode())
     {
+    case FloatingPointMode::Fast:
         m_writer->emit("#define SLANG_CUDA_ENABLE_FAST_MATH 1\n");
+        break;
+    case FloatingPointMode::Precise:
+        m_writer->emit("#define SLANG_CUDA_ENABLE_PRECISE_MATH 1\n");
+        break;
+    default:
+        break;
     }
 }
 
@@ -1034,6 +1096,26 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+        {
+            // Like the prelude define, this follows the module's `-fp-mode`, so the whole
+            // module stays contraction-free, as it does on the NVRTC path under `--fmad=false`.
+            if (getTargetProgram()->getOptionSet().getFloatingPointMode() !=
+                FloatingPointMode::Precise)
+                break;
+            auto intrinsic = getRoundToNearestArithmeticIntrinsic(inst);
+            if (intrinsic.getLength() == 0)
+                break;
+            m_writer->emit(intrinsic);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
         {
