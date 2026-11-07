@@ -7,6 +7,8 @@
 //TEST:SIMPLE(filecheck=PRECISE): -stage compute -entry computeMain -target cuda -fp-mode precise
 //TEST:SIMPLE(filecheck=DEFAULT): -stage compute -entry computeMain -target cuda
 //TEST:SIMPLE(filecheck=FAST): -stage compute -entry computeMain -target cuda -fp-mode fast
+// NVRTC compiles the emitted `__d*_rn` and `__h*_rn` calls, which the text checks above do not.
+//TEST:SIMPLE(filecheck=PTX_PRECISE): -stage compute -entry computeMain -target ptx -fp-mode precise
 // The define and the intrinsics are CUDA-only: they must never leak into the shared C++ base
 // emitter's output.
 //TEST:SIMPLE(filecheck=CPP): -stage compute -entry computeMain -target cpp -fp-mode precise
@@ -88,3 +90,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 //CPP-LABEL: float mulAddFloat_0(
 //CPP: return a_{{[0-9]+}} * b_{{[0-9]+}} + c_{{[0-9]+}};
 //CPP-NOT: _rn(
+
+//PTX_PRECISE-DAG: mul.rn.f64
+//PTX_PRECISE-DAG: add.rn.f64
+//PTX_PRECISE-DAG: mul.rn.f16
+//PTX_PRECISE-DAG: add.rn.f16
