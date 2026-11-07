@@ -19,6 +19,8 @@ public:
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_glslExtensionTracker; }
 
+    virtual void emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec) SLANG_OVERRIDE;
+
 protected:
     virtual void beforeComputeEmitActions(IRModule* module) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
@@ -76,6 +78,7 @@ protected:
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual bool canHoldPtrTypeInTemporary(IRType* ptrType) SLANG_OVERRIDE;
 
     virtual void emitGlobalInstImpl(IRInst* inst) override;
     void emitBufferPointerTypeDefinition(IRInst* ptrType);
