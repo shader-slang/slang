@@ -1383,8 +1383,9 @@ struct ICompileRequest : public ISlangUnknown
     /** Specify the concrete type to be used for a global "existential slot."
 
     Every shader parameter (or leaf field of a `struct`-type shader parameter)
-    that has an interface or array-of-interface type introduces an existential
-    slot. The number of slots consumed by a shader parameter, and the starting
+    that has an existential box type, or an array of boxes, introduces a slot
+    for the concrete type stored in those boxes.
+    The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
     `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 
@@ -1399,8 +1400,9 @@ struct ICompileRequest : public ISlangUnknown
     /** Specify the concrete type to be used for an entry-point "existential slot."
 
     Every shader parameter (or leaf field of a `struct`-type shader parameter)
-    that has an interface or array-of-interface type introduces an existential
-    slot. The number of slots consumed by a shader parameter, and the starting
+    that has an existential box type, or an array of boxes, introduces a slot
+    for the concrete type stored in those boxes.
+    The number of slots consumed by a shader parameter, and the starting
     slot of each parameter can be queried via the reflection API using
     `SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM`.
 

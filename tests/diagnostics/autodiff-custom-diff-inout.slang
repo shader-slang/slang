@@ -19,5 +19,10 @@ void __d_f(float x, float.Differential dout)
 float main(float x)
 {
     DifferentialPair<float> dpx = diffPair(x, 1.f);
+    // We do not synthesize a `bwd_diff` member for `f` after rejecting its custom derivative.
     bwd_diff(f)(dpx, 1.f);
+    /*CHECK:
+    ^^^^^^^^ member not found
+    ^^^^^^^^ 'bwd_diff' is not a member of 'f'.
+    */
 }

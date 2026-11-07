@@ -750,6 +750,21 @@ public:
 
     Type* getAndType(Type* left, Type* right);
 
+    /// Get the existential box type retaining the supplied `interfaceType` operand.
+    ///
+    /// Requires a checked type naming one `InterfaceDecl`, with any generic arguments applied.
+    /// The box's canonicalization routine canonicalizes the interface operand when needed.
+    ExistentialBoxType* getExistentialBoxType(Type* interfaceType);
+
+    /// Get the compatibility conformance witness for a differentiable existential box.
+    ///
+    /// Requires `interfaceWitness` to start at the boxed interface and end at `IDifferentiable`
+    /// or `IDifferentiablePtrType`. The result relates `boxType` to that same built-in interface,
+    /// as described by `ExistentialBoxDifferentiabilityWitness`.
+    ExistentialBoxDifferentiabilityWitness* getExistentialBoxDifferentiabilityWitness(
+        ExistentialBoxType* boxType,
+        SubtypeWitness* interfaceWitness);
+
     Type* getModifiedType(Type* base, Count modifierCount, Val* const* modifiers);
     Type* getModifiedType(Type* base, List<Val*> const& modifiers)
     {

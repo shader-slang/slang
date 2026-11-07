@@ -160,29 +160,25 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         return nullptr;
     }
 
-    auto getDiffWitness = [&](Type* type) -> SubtypeWitness*
-    {
-        auto witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableInterfaceType());
-
-        if (!witness)
-            witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableRefInterfaceType());
-
-        return witness;
-    };
-
+    // Consider a callable with a boxed result:
+    //
+    //     interface IFoo : IDifferentiable {}
+    //     [Differentiable] dyn IFoo makeBox(float value);
+    //     let pair = makeBox.fwd_diff(diffPair(3.0, 1.0));
+    //
+    // We need the result's differentiability witness to form the derivative callable's result
+    // type, `DifferentialPair<dyn IFoo>`. The autodiff compatibility convention treats the box
+    // as differentiable because `IFoo` refines `IDifferentiable`. We request that artificial
+    // conformance explicitly; an ordinary subtype query would reject it.
     for (auto paramType : funcType->getParamTypes())
     {
         auto paramInfo = getParamInfoFromTypeWithModeWrapper(paramType);
-        auto witness =
-            doesTypeHaveNoDiffModifier(paramInfo.type) ? nullptr : getDiffWitness(paramInfo.type);
-        paramWitnesses.add(witness);
+        paramWitnesses.add(isTypeDifferentiable(paramInfo.type));
     }
 
-    SubtypeWitness* returnWitness =
-        doesTypeHaveNoDiffModifier(funcType->getResultType()) ||
-                callableDeclRef.getDecl()->findModifier<NoDiffModifier>()
-            ? nullptr
-            : getDiffWitness(funcType->getResultType());
+    SubtypeWitness* returnWitness = nullptr;
+    if (!callableDeclRef.getDecl()->findModifier<NoDiffModifier>())
+        returnWitness = isTypeDifferentiable(funcType->getResultType());
 
     Type* thisParamType = nullptr;
     SubtypeWitness* thisWitness = nullptr;
@@ -193,8 +189,7 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         // consumer applies its own role-specific transformation to this declaration-derived mode;
         // specialization and the differentiated value type must not reselect the mode.
         thisParamType = getParamTypeWithModeWrapper(astBuilder, *thisParamInfo);
-        if (!doesTypeHaveNoDiffModifier(thisParamInfo->type))
-            thisWitness = getDiffWitness(thisParamInfo->type);
+        thisWitness = isTypeDifferentiable(thisParamInfo->type);
     }
 
     return astBuilder->getOrCreate<DiffTypeInfoWitness>(
@@ -234,9 +229,10 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     //
     //      int x = get<IFoo>(); // This needs to be an error!!!
     //
-    // We will eventually need to clarify the distinction between the different kinds of
-    // subtype-ish relationships, *or* we will need to ensure that `interface`s are not
-    // treated as proper types (such that they can be passed as generic arguments, etc.)
+    // Proper-type checking prevents the interface contract in `get<IFoo>()` from serving
+    // as a conforming value type. Legacy, 2025, and 2026 first box that argument; 202c
+    // requires explicit `dyn`. Ordinary queries on a box use the box's own facets rather
+    // than the interface's refinements, so neither spelling satisfies the constraint.
     //
     // Note that there is one more case of a subtype-ish relationship that is not covered
     // by this function, but that is relevant if/when we do more serious type inference:
@@ -292,20 +288,19 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // subtype relationship, which we can use here.
         auto witness = as<SubtypeWitness>(facet->subtypeWitness->resolve());
 
-        // `getInheritanceInfo` for an interface *type* roots its facet witnesses at the
-        // interface's `ThisType` (treating the type as a requirement template; see #11469).
-        // When the query `subType` is the interface (existential box) itself, the facet
-        // witness's `sub` is the standalone `ThisType`, not the box we were asked about.
-        // Re-root the witness onto the queried `subType` so the returned witness satisfies
-        // the invariant `result->getSub() == subType`; this yields a well-formed,
-        // box-rooted witness instead of one anchored at a free-floating `ThisType`.
-        if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
+        // Modifier inheritance still forwards the underlying type's facets. For example,
+        // `unorm float4 : ITexelElement` can encounter a witness starting at `float4`.
+        // We retain this declared-witness endpoint adjustment for existing annotated type
+        // arguments. It is a partial compatibility workaround; it does not repair composed proofs.
+        // TODO: Value operations should query their proper payload types. The remaining annotated
+        // type-argument relationships need a producer-side contract before removing this repair.
+        if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
         {
-            if (boxWitness->getSub() != subType || boxWitness->getSup() != superType)
+            if (declaredWitness->getSub() != subType || declaredWitness->getSup() != superType)
                 return m_astBuilder->getDeclaredSubtypeWitness(
                     subType,
                     superType,
-                    boxWitness->getDeclRef());
+                    declaredWitness->getDeclRef());
         }
         return witness;
     }
@@ -406,16 +401,41 @@ bool SemanticsVisitor::isValidGenericConstraintType(Type* type)
 SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)
 {
     if (auto valueWitness =
-            isSubtype(type, m_astBuilder->getDiffInterfaceType(), IsSubTypeOptions::None))
+            tryGetDifferentiabilityWitness(type, m_astBuilder->getDiffInterfaceType()))
         return valueWitness;
     else if (
-        auto ptrWitness = isSubtype(
-            type,
-            m_astBuilder->getDifferentiableRefInterfaceType(),
-            IsSubTypeOptions::None))
+        auto ptrWitness =
+            tryGetDifferentiabilityWitness(type, m_astBuilder->getDifferentiableRefInterfaceType()))
         return ptrWitness;
 
     return nullptr;
+}
+
+SubtypeWitness* SemanticsVisitor::tryGetDifferentiabilityWitness(Type* type, Type* interfaceType)
+{
+    auto isValueDifferentiability = interfaceType->equals(m_astBuilder->getDiffInterfaceType());
+    auto isPointerDifferentiability =
+        interfaceType->equals(m_astBuilder->getDifferentiableRefInterfaceType());
+    SLANG_RELEASE_ASSERT(isValueDifferentiability || isPointerDifferentiability);
+
+    if (auto boxType = as<ExistentialBoxType>(type))
+    {
+        // The Slang type system does not justify this box conformance, even when the boxed
+        // interface refines a differentiability interface. We retain the artificial witness
+        // because existing differentiated functions accept or return boxes and use boxed
+        // differential values. This is a compatibility hack, isolated from ordinary subtype
+        // queries so they cannot infer the same unfounded conformance.
+        //
+        // A future design could make those functions generic over a proper type conforming to
+        // the interface, with differentiation through dynamic dispatch handled separately.
+        // Until that design is established, we preserve existing programs without treating this
+        // exception as a general rule for existential boxes.
+        auto interfaceWitness = tryGetSubtypeWitness(boxType->getInterfaceType(), interfaceType);
+        if (!interfaceWitness)
+            return nullptr;
+        return m_astBuilder->getExistentialBoxDifferentiabilityWitness(boxType, interfaceWitness);
+    }
+    return tryGetSubtypeWitness(type, interfaceType);
 }
 
 bool SemanticsVisitor::doesTypeHaveTag(Type* type, TypeTag tag)

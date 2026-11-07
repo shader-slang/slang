@@ -380,9 +380,12 @@ static Type* getDifferentialValueTypeFromWitness(
 {
     if (witness && (witness->getSup() == astBuilder->getDifferentiableInterfaceType()))
     {
-        if (auto declRefType = as<DeclRefType>(primalType))
-            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
-                return witness->getSup();
+        if (as<ExistentialBoxType>(primalType))
+        {
+            // Differentiating a boxed value produces another box because its concrete
+            // differential type is determined by the packed value's conformance.
+            return astBuilder->getExistentialBoxType(witness->getSup());
+        }
 
         if (auto concretePack = as<ConcreteTypePack>(primalType))
         {
@@ -1972,6 +1975,34 @@ Val* ValuePackType::_substituteImplOverride(
         return this;
     (*ioDiff)++;
     return astBuilder->getOrCreate<ValuePackType>(newElementType);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialBoxType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ExistentialBoxType::_toTextOverride(StringBuilder& out)
+{
+    out << "dyn " << getInterfaceType();
+}
+
+Type* ExistentialBoxType::_createCanonicalTypeOverride()
+{
+    return getCurrentASTBuilder()->getExistentialBoxType(getInterfaceType()->getCanonicalType());
+}
+
+Val* ExistentialBoxType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substitutedInterfaceType =
+        as<Type>(getInterfaceType()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+
+    // Substituting `dyn IFoo<T>` changes the interface argument, but the result is still a box.
+    (*ioDiff)++;
+    return astBuilder->getExistentialBoxType(substitutedInterfaceType);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

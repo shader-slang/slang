@@ -27,15 +27,17 @@ float f(float x)
 
 [ForwardDerivative(IFoo.dd)]
 /*diag:
- ^^^^^^^^^^^^^^^^^ interface requirement cannot be used as derivative
- ^^^^^^^^^^^^^^^^^ cannot use an interface requirement as a derivative.
+ ^^^^^^^^^^^^^^^^^ cannot resolve derivative function
+ ^^^^^^^^^^^^^^^^^ cannot resolve the custom derivative function
+                        ^^ cannot reference interface requirement 'dd' through the interface itself; use a conforming type or value
 */
 float bbb(float x);
 
 [ForwardDerivativeOf(IFoo.bar)]
 /*diag:
- ^^^^^^^^^^^^^^^^^^^ interface requirement cannot have derivative
- ^^^^^^^^^^^^^^^^^^^ cannot associate an interface requirement with a derivative.
+ ^^^^^^^^^^^^^^^^^^^ cannot resolve original function for derivative
+ ^^^^^^^^^^^^^^^^^^^ cannot resolve the original function for the the custom derivative.
+                          ^^^ cannot reference interface requirement 'bar' through the interface itself; use a conforming type or value
 */
 DifferentialPair<float> dd1(DifferentialPair<float> x)
 {

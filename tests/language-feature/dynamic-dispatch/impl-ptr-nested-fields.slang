@@ -1,4 +1,4 @@
-// Regression coverage for #10908: dyn interface impls whose pointer fields
+// Regression coverage for #10908: conforming types whose pointer fields
 // are reached via the recursive arms of containsUnmarshalableType
 // (StructType -> PtrType, ArrayType -> PtrType) must also compile to valid
 // SPIR-V via the AnyValue dynamic dispatch path. Mirrors the shapes the
@@ -10,7 +10,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry main -conformance NestedPtrImpl:IFoo -conformance ArrayPtrImpl:IFoo
 
-dyn interface IFoo
+interface IFoo
 {
     float get();
 };
