@@ -1085,20 +1085,77 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         {
         case IRConstant::FloatKind::Nan:
             {
-                // TODO(JS):
-                // It's not clear this will work on all targets.
-                // In particular Visual Studio reports an error with this expression.
-                m_writer->emit("(0.0 / 0.0)");
+                // `(0.0 / 0.0)` would lose the NaN's sign and payload (and MSVC rejects it), so
+                // rebuild a `float` or `double` NaN from its bits. CUDA needs a constant
+                // expression for a `__device__` variable's initializer, which the prelude's
+                // `U32_asfloat` is not, so it uses `__builtin_bit_cast`. Other types (e.g. `half`)
+                // keep `(0.0 / 0.0)`.
+                const IRFloatingPointValue value = constantInst->value.floatVal;
+                const bool isCUDA = isCUDATarget(getTargetReq());
+                switch (type ? type->getOp() : kIROp_Invalid)
+                {
+                case kIROp_FloatType:
+                    m_writer->emit(isCUDA ? "__builtin_bit_cast(float, " : "U32_asfloat(");
+                    emitHexLiteral(DoubleToFloatBits(value), 8);
+                    m_writer->emit("U)");
+                    break;
+                case kIROp_DoubleType:
+                    {
+                        const uint64_t bits = uint64_t(DoubleAsInt64(value));
+                        if (isCUDA)
+                        {
+                            m_writer->emit("__builtin_bit_cast(double, ");
+                            emitHexLiteral(bits, 16);
+                            m_writer->emit("ULL)");
+                        }
+                        else
+                        {
+                            m_writer->emit("U32_asdouble(");
+                            emitHexLiteral(uint32_t(bits), 8);
+                            m_writer->emit("U, ");
+                            emitHexLiteral(uint32_t(bits >> 32), 8);
+                            m_writer->emit("U)");
+                        }
+                        break;
+                    }
+                default:
+                    m_writer->emit("(0.0 / 0.0)");
+                    break;
+                }
                 break;
             }
         case IRConstant::FloatKind::PositiveInfinity:
-            {
-                m_writer->emit("SLANG_INFINITY");
-                break;
-            }
         case IRConstant::FloatKind::NegativeInfinity:
             {
-                m_writer->emit("(-SLANG_INFINITY)");
+                const bool isNegative =
+                    constantInst->getFloatKind() == IRConstant::FloatKind::NegativeInfinity;
+                const IROp typeOp = type ? type->getOp() : kIROp_Invalid;
+                // The CUDA prelude's `SLANG_INFINITY` overflows a double product, which is not a
+                // constant expression, so NVRTC 13 rejects it in a module-scope `__device__`
+                // initializer ("dynamic initialization is not supported"). There, write a `float`
+                // or `double` infinity as a bit cast, as a NaN is.
+                if (isCUDATarget(getTargetReq()) && !m_isEmittingFunctionBody &&
+                    (typeOp == kIROp_FloatType || typeOp == kIROp_DoubleType))
+                {
+                    if (typeOp == kIROp_FloatType)
+                    {
+                        m_writer->emit("__builtin_bit_cast(float, ");
+                        emitHexLiteral(isNegative ? 0xFF800000u : 0x7F800000u, 8);
+                        m_writer->emit("U)");
+                    }
+                    else
+                    {
+                        m_writer->emit("__builtin_bit_cast(double, ");
+                        emitHexLiteral(
+                            isNegative ? 0xFFF0000000000000ull : 0x7FF0000000000000ull,
+                            16);
+                        m_writer->emit("ULL)");
+                    }
+                }
+                else
+                {
+                    m_writer->emit(isNegative ? "(-SLANG_INFINITY)" : "SLANG_INFINITY");
+                }
                 break;
             }
         default:

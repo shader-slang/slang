@@ -1768,8 +1768,31 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
             case IRConstant::FloatKind::Nan:
                 {
-                    m_writer->emit("(0.0f / 0.0f)");
-                    return;
+                    // `0.0f / 0.0f` would lose the NaN's sign and payload, so rebuild a `float` or
+                    // `double` NaN from its bits. A `half` NaN keeps `0.0f / 0.0f`: `asfloat16`
+                    // needs 16-bit types to be enabled.
+                    const IRFloatingPointValue value = constantInst->value.floatVal;
+                    switch (constantInst->getDataType()->getOp())
+                    {
+                    case kIROp_FloatType:
+                        m_writer->emit("asfloat(");
+                        emitHexLiteral(DoubleToFloatBits(value), 8);
+                        m_writer->emit("U)");
+                        return;
+                    case kIROp_DoubleType:
+                        {
+                            const uint64_t bits = uint64_t(DoubleAsInt64(value));
+                            m_writer->emit("asdouble(");
+                            emitHexLiteral(uint32_t(bits), 8);
+                            m_writer->emit("U, ");
+                            emitHexLiteral(uint32_t(bits >> 32), 8);
+                            m_writer->emit("U)");
+                            return;
+                        }
+                    default:
+                        m_writer->emit("(0.0f / 0.0f)");
+                        return;
+                    }
                 }
             case IRConstant::FloatKind::PositiveInfinity:
                 {
