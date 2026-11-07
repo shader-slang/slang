@@ -8,6 +8,19 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=HLSL): -lang hlsl tests/diagnostics/global-varying-language-rules.slang -target spirv -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=GLSL): -lang glsl tests/diagnostics/global-varying-language-rules.slang -target spirv -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=NESTED): -target spirv -no-codegen -DNESTED -warnings-disable 30627
+//DIAGNOSTIC_TEST:SIMPLE(diag=SLANG2025): -target spirv -no-codegen -DUSE_MODULE_DECLARATION
+//DIAGNOSTIC_TEST:SIMPLE(diag=SLANG2025): -target spirv -no-codegen -DUSE_PUBLIC
+
+// A `module` declaration or a `public` declaration makes a legacy Slang file Slang 2025, so those
+// runs expect the 2025 diagnostics.
+#ifdef USE_MODULE_DECLARATION
+module "global-varying-language-rules";
+#endif
+#ifdef USE_PUBLIC
+public struct PublicType
+{
+};
+#endif
 
 in float4 gColor;
 /*LEGACY:
