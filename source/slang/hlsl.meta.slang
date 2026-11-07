@@ -9750,7 +9750,7 @@ vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+[require(fp64)]
 vector<double,N> copysign_double(vector<double,N> x, vector<double,N> y)
 {
     let ux = reinterpret<vector<uint64_t,N>>(x);
@@ -9777,6 +9777,11 @@ vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
     __target_switch
     {
     case metal: __intrinsic_asm "copysign";
+    case wgsl:
+        // The `default` case calls `copysign_double`, which requires `fp64`, so WGSL needs its own
+        // case. WGSL has neither `double` nor 16-bit integers, so `half` and `float` both compute
+        // through `float`; the `half` to `float` round trip is exact and keeps the sign of `-0.0`.
+        return __real_cast<T>(copysign_float(__real_cast<float>(x), __real_cast<float>(y)));
     default:
     {
         // sign of -0.0 needs to be respected.

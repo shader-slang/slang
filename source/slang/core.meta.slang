@@ -1184,6 +1184,17 @@ for (int tt = 0; tt < kBaseTypeCount; ++tt)
 {
 $}
 
+${
+    // WGSL and Metal have no 64-bit floating-point type. Requiring `fp64` on `double` makes every
+    // use of `double` (and of vectors, matrices and structs that contain it) a capability error on
+    // those targets, reported at the user's code instead of failing in the emitter.
+    if (kBaseTypes[tt].tag == BaseType::Double)
+    {
+$}
+[require(fp64)]
+${
+    }
+$}
 __builtin_type($(int(kBaseTypes[tt].tag)))
 struct $(kBaseTypes[tt].name)
     : __BuiltinType
@@ -1387,8 +1398,14 @@ $}
          __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
          __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
          [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
-         [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
-         [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
+${
+    // The `[require(fp64)]` above is the declared capability set of every `double` member. A member
+    // whose body needs more than that must declare it: `min` and `max` require `sm_4_0_version`.
+    // `float` and `half` declare no set of their own, so their members keep their inferred sets.
+    const char* minMaxRequire = kBaseTypes[tt].tag == BaseType::Double ? "[require(fp64, sm_4_0_version)]" : "";
+$}
+         $(minMaxRequire) [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+         $(minMaxRequire) [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
