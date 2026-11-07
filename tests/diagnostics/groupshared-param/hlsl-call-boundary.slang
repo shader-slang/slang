@@ -15,8 +15,11 @@ static const uint N = 8;
 groupshared uint groupSharedData[N];
 
 export void exportedWrite(uint tid, groupshared uint scratch[N])
-//HLSL:                                              ^^^^^^^ error E30708
-//HLSL:                                              ^^^^^^^ this function is 'export', so its definition is kept, and HLSL cannot pass thread-group-shared memory across a call; remove 'export', or have the function access the 'groupshared' variable directly instead of taking it as a parameter
+/*HLSL:
+^^^^^^ 'exportedWrite' cannot have the 'groupshared' parameter 'scratch' when targeting HLSL, because calls to it cannot be inlined
+^^^^^^ this prevents calls to the function from being inlined
+                                                     ^^^^^^^ 'groupshared' parameter declared here
+*/
 {
     scratch[tid] = tid + 1;
 }
@@ -27,12 +30,27 @@ void noInlineWrite(uint tid, groupshared uint scratch[N])
     scratch[tid] = tid + 2;
 }
 
+// `[noRefInline]` prevents calls to a function with reference parameters from being inlined, so
+// the diagnostic points at the attribute.
+//
+[noRefInline]
+/*HLSL:
+ ^^^^^^^^^^^ error E30708
+ ^^^^^^^^^^^ this prevents calls to the function from being inlined
+*/
+void noRefInlineWrite(uint tid, groupshared uint scratch[N])
+//HLSL:                                          ^^^^^^^ 'groupshared' parameter declared here
+{
+    scratch[tid] = tid + 3;
+}
+
 [shader("compute")]
 [numthreads(N, 1, 1)]
 void computeMain(uint3 tid : SV_GroupThreadID)
 {
     exportedWrite(tid.x, groupSharedData);
     noInlineWrite(tid.x, groupSharedData);
+    noRefInlineWrite(tid.x, groupSharedData);
     GroupMemoryBarrierWithGroupSync();
     outputBuffer[tid.x] = groupSharedData[(tid.x + 1) % N];
 }

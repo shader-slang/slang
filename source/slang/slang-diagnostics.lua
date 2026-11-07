@@ -4012,10 +4012,11 @@ err(
 )
 
 err(
-    "groupshared-parameter-not-allowed-on-hlsl-with-boundary",
+    "groupshared-parameter-of-non-inlinable-function-on-hlsl",
     30708,
-    "a 'groupshared' parameter cannot be passed across a function boundary when targeting HLSL",
-    span { loc = "location", message = "~reason:String, and HLSL cannot pass thread-group-shared memory across a call; ~suggestion:String" }
+    "'~func:IRInst' cannot have the 'groupshared' parameter '~param:IRInst' when targeting HLSL, because calls to it cannot be inlined",
+    span { loc = "modifierLocation", message = "this prevents calls to the function from being inlined" },
+    span { loc = "location", message = "'groupshared' parameter declared here" }
 )
 
 warning(

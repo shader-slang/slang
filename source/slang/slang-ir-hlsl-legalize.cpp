@@ -87,6 +87,25 @@ void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink)
     }
 }
 
+// Return the location of the modifier that prevents calls to `func` from being inlined: an
+// exporting modifier such as `export`, or `[noRefInline]`. A function without either should have
+// been inlined, so we treat it as an internal error.
+static SourceLoc getLocationOfModifierPreventingInlining(IRFunc* func)
+{
+    IRDecoration* decoration = func->findDecoration<IRHLSLExportDecoration>();
+    if (!decoration)
+        decoration = func->findDecoration<IRNoRefInlineDecoration>();
+    if (!decoration)
+        SLANG_UNEXPECTED(
+            "groupshared parameter survived inlining without a modifier preventing it");
+
+    // A decoration added internally, or loaded from a module compiled without source locations,
+    // has no location. The diagnostic then omits the span rather than pointing it at something
+    // that does not prevent inlining, and its message still names the function and parameter.
+    //
+    return decoration->sourceLoc;
+}
+
 void validateGroupSharedParamsForHLSL(
     IRModule* module,
     CapabilitySet const& targetCaps,
@@ -106,10 +125,6 @@ void validateGroupSharedParamsForHLSL(
         if (findTargetIntrinsicDefinition(func, targetCaps, intrinsicDef, intrinsicInst))
             continue;
 
-        // In user code, `export` is what keeps such a function's definition, so we name it when it
-        // is the cause.
-        //
-        bool isExported = func->findDecoration<IRHLSLExportDecoration>() != nullptr;
         for (auto param : func->getParams())
         {
             // A mesh-shader input payload shares the group-shared rate but crosses the boundary
@@ -118,16 +133,10 @@ void validateGroupSharedParamsForHLSL(
             if (as<IRGroupSharedRate>(param->getRate()) &&
                 !param->findDecoration<IRHLSLMeshPayloadDecoration>())
             {
-                sink->diagnose(Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{
-                    .reason = isExported ? "this function is 'export', so its definition is kept"
-                                         : "this function keeps a call boundary that could not "
-                                           "be inlined away",
-                    .suggestion = isExported
-                                      ? "remove 'export', or have the function access the "
-                                        "'groupshared' variable directly instead of taking it "
-                                        "as a parameter"
-                                      : "have the function access the 'groupshared' variable "
-                                        "directly instead of taking it as a parameter",
+                sink->diagnose(Diagnostics::GroupsharedParameterOfNonInlinableFunctionOnHlsl{
+                    .func = func,
+                    .param = param,
+                    .modifierLocation = getLocationOfModifierPreventingInlining(func),
                     .location = param->sourceLoc});
             }
         }
