@@ -582,6 +582,12 @@ public:
 
 protected:
     virtual bool shouldEmitOnlyHeader() { return false; }
+    /// Returns true when `emitFuncDecl` may declare an entry point. Such a declaration is built
+    /// only from `emitFunctionPreambleImpl`, `emitFuncDecorations` and the function's
+    /// `IRFuncType`, so a target opts in only when those carry everything its entry-point
+    /// declarations need; an HLSL declaration, for example, would also need the entry-point
+    /// attributes.
+    virtual bool shouldEmitEntryPointDecl() { return false; }
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);
