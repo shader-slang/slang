@@ -9,20 +9,23 @@ This chapter covers two interrelated Slang language features: interfaces and gen
 
 ## Interfaces
 
-Interfaces are used to define the methods and services a type should provide. You can define an interface as in the following example:
+An interface defines a *contract*: a set of related operations, types, and other services.
+A type can be made to *conform* to an interface, by providing all of the services defined by the interface contract.
 
-```csharp
+The following is an example of an interface declaration:
+
+```slang
 interface IFoo
 {
     int myMethod(float arg);
 }
 ```
 
-Slang's syntax for defining interfaces is similar to `interface`s in C# and `protocol`s in Swift. In this example, the `IFoo` interface establishes a contract that any type conforming to this interface must provide a method named `myMethod` that accepts a `float` argument and returns an `int` value.
+In the above example, the `IFoo` interface establishes a contract: for a type to conform to this interface, a method must be provided named `myMethod` that accepts a `float` value and returns an `int` value.
 
-A `struct` type may declare its conformance to an `interface` via the following syntax:
+A user-defined type such as a `struct` may declare that it conforms to an interface by naming that interface in its list of bases:
 
-```csharp
+```slang
 struct MyType : IFoo
 {
     int myMethod(float arg)
@@ -32,11 +35,12 @@ struct MyType : IFoo
 }
 ```
 
-By declaring the conformance to `IFoo`, the definition of `MyType` must include a method named `myMethod` with a matching signature to that defined in the `IFoo` interface to satisfy the declared conformance. If a type misses any methods required by the interface, the Slang compiler will generate an error message.
+When `MyType` declares that it conforms to `IFoo`, the Slang compiler validates that it provides a suitable `myMethod` that can satisfy the requirement declared by the interface.
+If a type does not provide some of the methods provided by the interface, the Slang compiler will diagnose an error.
 
-A `struct` type may declare multiple interface conformances:
+A user-defined type may declare multiple interface conformances:
 
-```csharp
+```slang
 interface IBar { uint myMethod2(uint2 x); }
 
 struct MyType : IFoo, IBar
@@ -70,6 +74,14 @@ struct MyType2 : IFoo
     override int getVal() { return 1; }
 }
 ```
+
+### Interfaces Aren't Types
+
+For developers coming to Slang with experience in languges like C#, Java, or C++, it may be easy to think of an interface like `IFoo` as a type, and thing of syntax like `struct MyType : IFoo` as indicating that `MyType` "inherits" from `IFoo`, and is thus a subtype.
+This intuition does not carry over to Slang, and can create confusion for developers who don't mind the difference.
+
+In Slang an interface is just a contract that types can conform to, but it is not itself a type.
+A concrete type like `MyType` may conform to an interface `IFoo`, but there is no inheritance or subtyping going on because `IFoo` isn't a type at all.
 
 ## Generics
 
@@ -639,10 +651,14 @@ void test()
 }
 ```
 
-## Existential Box Types
+## Using Interfaces for Dynamic Dispatch
 
-An interface defines a contract that a conforming type must satisfy.
-Consider the following definitions:
+In Slang an interface is not a type, but rather a contract that a user defined type can conform to.
+The primary way that Slang programs use interfaces is as constraints on generic type parameters, where they enable both ahead-of-time type checking and generation of efficient specialized code.
+In this way Slang is more similar to Rust or Swift, but different from familiar object-oriented languages like Java, C#, and C++.
+In this section we will discuss how Slang interfaces can be used to express more dynamic runtime behavior, similar to that of object-oriented languages.
+
+Consider this example of typical Slang code using interfaces and generics:
 
 ```slang
 interface ITransform
@@ -655,107 +671,91 @@ struct AddOne : ITransform
     int compute(int value) { return value + 1; }
 }
 
-int apply<TTransform : ITransform>(TTransform transform, int value)
+int apply<T : ITransform>(T transform, int value)
 {
     return transform.compute(value);
 }
 ```
 
-In this example, `ITransform` defines a contract requiring a `compute` method.
-`AddOne` conforms to that contract by providing an implementation of `compute`.
-The generic function `apply` uses `ITransform` as a constraint on `TTransform`, so callers can use `apply` only with types that satisfy the contract.
-A caller supplies a type argument explicitly or lets the compiler infer it.
-For `apply(AddOne(), 3)`, the caller knows the concrete type `AddOne`; the compiler infers `TTransform` to be that type and verifies its conformance to `ITransform`.
-With that static knowledge, the compiler back-end can specialize `apply` for `AddOne`.
+In this example, `ITransform` defines a contract requiring a `compute` method, and the `AddOne` type conforms to that contract.
+The generic function `apply` then uses the interface `ITransform` to constrain the types allowed as arguments for its type parameter `T`.
+When other code calls `apply`, such as with:
 
-A function may need to accept values of different conforming types through a single parameter type, without requiring its caller to expose each value's concrete type.
-For that purpose, `dyn ITransform` is an _existential box type_.
-A box contains a value of some type that conforms to `ITransform`; this stored value is its _payload_.
-The box also includes the information the compiler needs to call `ITransform`'s methods on that value.
-Different boxes can contain values of different concrete types.
-The `dyn` operator forms the type of the box used to store or pass a value.
+```slang
+let four = apply(AddOne(), 3);
+```
 
-Using the definitions above, `applyBox` accepts a box instead of a generic parameter:
+the Slang compiler statically determines the exact type to use for `T` - in this case, `AddOne`.
+because it knows the type statically, the compiler can generate specialized code for this exact case.
+
+But what if a developer can't determine the type of transform to use statically?
+Perhaps they want to have a buffer with many different transforms in it, and select between them dynamically at runtime.
+For that purpose Slang provides the `dyn` keyword and the concept of an _existential box_.
+
+The following declaration is similar to the generic `apply` above, but instead uses `dyn`:
 
 ```slang
 int applyBox(dyn ITransform transform, int value)
 {
     return transform.compute(value);
 }
-
-int demonstrate()
-{
-    AddOne transform = {};
-    return apply(transform, 3) + applyBox(transform, 3); // Returns 8.
-}
 ```
 
-For the call to `apply`, the compiler infers `TTransform` to be `AddOne`.
-For the call to `applyBox`, the compiler converts the `AddOne` value to a box.
-Inside `applyBox`, the call `transform.compute(value)` invokes the implementation of `compute` for the box's payload.
+The type `dyn ITransform` is an _existential box type_.
+The box holds a _payload_ of some dynamically-determined type, where that type is known to conform to `ITransform`.
+Code can call methods of the corresponding interface on an existential box: for example, the `applyBox` function calls the `compute` method from the `ITransform` interface on the existential box `transform`.
 
-Boxes can also be used as local variable, field, array element, and return types.
-For example, the following function copies a box without changing its payload's type:
-
-```slang
-dyn ITransform copyTransform(dyn ITransform argument)
-{
-    dyn ITransform result = argument;
-    return result;
-}
-```
-
-### Aliases and Type Expressions
-
-An alias preserves whether its definition names an interface or a box.
-Using `ITransform` from the preceding example:
-
-```slang
-interface ITagged {}
-
-typealias TransformContract = ITransform;
-typealias TransformBox = dyn TransformContract;
-typealias TaggedTransform = ITransform & ITagged;
-
-int applyTagged<T : TaggedTransform>(T transform, int value)
-{
-    return transform.compute(value);
-}
-```
-
-`TransformContract` names the same interface as `ITransform`; it does not form a box.
-`TransformBox` names a box type because its definition applies `dyn`.
-`TaggedTransform` names a conjunction of two interface contracts.
-In `<T : TaggedTransform>`, `T` must conform to both.
-Boxes over conjunctions, such as `dyn (ITransform & ITagged)`, are unsupported in every language version.
-
-Qualification and generic arguments are part of the interface operand of `dyn`.
+Because an existential box doesn't need to know the type of its payload statically, code can dynamically pick between options.
 For example:
 
 ```slang
-namespace Transforms
+struct Double : ITransform
 {
-    interface ITransform<T>
-    {
-        T compute(T value);
-    }
+    int compute(int value) { return value * 2; }
+
 }
 
-typealias IntTransformBox = dyn Transforms.ITransform<int>;
+int applyDynamically( int value, bool which )
+{
+    let adder : dyn ITransform = AddOne();
+    let doubler : dyn ITransform = Double();
+    let chosenTransform = which ? adder : doubler;
+    return applyBox(chosenTransform, value);
+}
 ```
 
-Pointer and array suffixes instead apply to the box: `dyn ITransform*` is a pointer to a box, and `dyn ITransform[4]` is an array of four boxes.
+In this example, instances of the concrete types `AddOne` and `Double` are stored into existential box variables `adder` and `doubler`.
+Because `adder` and `doubler` both have the same type - `dyn ITransform` - a conditional selection can be used to pick between them based on a runtime-computed value `which`.
+The `applyBox` function can then apply to the chosen transform, without having to know at compile time which option it will be.
 
-### Boxes and Generic Constraints
+An existential box type can be used as the type of local variables, fields, array elements, and function return types.
 
-The payload's type conforms to the interface, but the box type itself does not.
-For an ordinary function call with inferred generic arguments, the compiler can open the box and infer the payload's type.
-Such a call remains subject to restrictions on runtime generic specialization; opening a box does not make every generic call executable.
-In Slang 2025 and later, generic arguments for specializations of user-defined generic declarations must be statically resolvable.
+Currently Slang only allows an existential box type to be exprssed for contracts comprised of a single interface, such as `dyn ITransform`.
+Contracts that are defined as the conjunction of multiple interfaces are not allowed: a type like `dyn (ITransform & ITagged)` will be diagnosed as an error.
 
-An explicit type argument of `dyn IFoo` denotes the box type rather than its payload's type, so it cannot satisfy a constraint of `IFoo`.
-A static interface requirement cannot be called through the interface name, because that name does not identify a conforming type's implementation.
-For example, both marked calls are errors:
+### Legacy Language Behavior
+
+In Slang language versions 2026 and earlier, code is allowed to use an interface *as if* it were a concrete type, and the compiler implicitly acts as if a `dyn` keyword were inserted:
+
+```slang
+// allowed in Slang 2026 and earlier:
+let implicitBox : ITransform = AddOne();
+
+// allowed in all Slang language versions:
+let explicitBox : dyn ITransform = AddOne();
+```
+
+Developers are encouraged to always use the `dyn` keyword when working with existential boxes.
+
+In Slang 2026 and later, explicitly default-initializing a box, as in `dyn ITransform transform = {};`, is an error.
+A declaration without an initializer, such as `dyn ITransform transform;`, is allowed and leaves `transform` uninitialized.
+
+### Interaction with Generics
+
+When working with an existential box type like `dyn ITransform`, it is important to understand that while the *payload* of such an existential box must be a value of a type that conforms to `ITransform`, the existential box type itself does not.
+Put simply: the type `dyn ITransform` does not conform to the interface `ITransform`.
+
+As an example, consider the following interface, and a generic function using it as a constraint:
 
 ```slang
 interface IStaticValue
@@ -767,81 +767,60 @@ int readValue<T : IStaticValue>()
 {
     return T.get();
 }
+```
 
-void invalidCalls()
+If a developer tried to explicitly specialize the generic `readValue` to the existential box type `dyn IStaticValue`:
+
+```slang
+let whatValue = readValue<dyn IStaticValue>();
+```
+
+There is no implementation of the `get` requirement of `IStaticValue` that `readValue` could possibly invoke.
+The Slang compiler will diagnose an error on the above use of `readValue`, because the type `dyn IStaticValue` is not a valid argument for the generic type parameter of `readValue`.
+
+In contexts where an existential box value is passed to a generic function, the Slang compiler will try to infer a generic type argument based on what is inside of the box, instead of using the box type itself.
+For example, using the `ITransform` interface from earlier:
+
+```slang
+func transformSeven<T>(transform: T) -> int
+    where T : ITransform
 {
-    IStaticValue.get();             // Error: no conforming type was supplied.
-    readValue<dyn IStaticValue>();  // Error: the box type does not conform to `IStaticValue`.
+    return transform.compute(7);
+}
+
+func implicitlyOpeningExistential()
+{
+    let addOne : dyn ITransform = AddOne();
+    let eight = transformSeven(addOne);
 }
 ```
 
-### Static Specialization and Dynamic Dispatch
+In the call to `transformSeven`, rather than infer from the type of `addOne` that the type `T` should be `dyn ITransform` (which would result in an error), the Slang compiler will instead implicitly _open_ the existential box `addOne`, and infer that the type `T` should be the type of the payload inside.
+We can see by looking at the example that the type of the payload will be `AddOne` at runtime, but the Slang type checker does not take that into account.
 
-The compiler attempts to determine each box's payload type at compile time and specialize the code for that type.
-When specialization succeeds, calls through the box need no runtime dispatch.
-If the payload type cannot be determined at compile time, calling its interface requirements needs dynamic dispatch based on the payload's type at runtime.
-Dynamic dispatch can introduce performance overhead and is subject to the target's capabilities and the language version's restrictions.
-Writing `dyn` does not enable those capabilities or bypass those restrictions.
+Note that in Slang 2025 and later, the compiler places many restrictions on where existential boxes may be used with generics, with the intention that the compiler must be able to statically resolve the concrete payload type before code generation.
+Developers are advised to exercise caution and for the most part only use `dyn` in cases where they are specifically intending to make use of dynamic dispatch.
 
-For example, `getTransform` returns boxes with different payload types depending on `kind`:
+### Restrictions of Dynamic Dispatch
+
+When the Slang compiler can determine the type of an existential box's payload statically (perhaps after optimizations), it will specialize code to the determined payload type, eliminating any possible overhead due to runtime dispatch.
+If a payload type cannot be determined before code generation, the compiler will emit code that dynamically selects the implementation path to use at runtime.
+The details of dynamic dispatch code depend on the compilation target, but developers should be mindful that it can add performance overhead compared to the kind of specialization typically achieved with generics.
+
+When defining an interface, if a developer wants it to be usable for dynamic dispatch on as many targets as possible, they must put an `[anyValueSize(...)]` attribute on the interface declaration.
+For example:
 
 ```slang
-[anyValueSize(16)]
+[anyValueSize(32)]
 interface ITransform
 {
     int compute(int value);
 }
-
-struct AddOne : ITransform
-{
-    int compute(int value) { return value + 1; }
-}
-
-struct Double : ITransform
-{
-    int compute(int value) { return value * 2; }
-}
-
-dyn ITransform getTransform(int kind)
-{
-    if (kind == 0)
-        return AddOne();
-    return Double();
-}
-
-int evaluate(int kind, int value)
-{
-    dyn ITransform transform = getTransform(kind);
-    return transform.compute(value);
-}
 ```
 
-If `kind` is unknown at compile time, `evaluate` needs dynamic dispatch to select the implementation of `compute`.
-With `[anyValueSize(16)]`, the compiler reserves room for a payload of at most 16 bytes when dynamic dispatch is needed.
+In this example, any type that conforms to `ITransform` needs to be able to fit inside of 32 bytes; code generation for `dyn ITransform` may rely on this assumption.
 A payload stored this way cannot contain opaque fields such as resources or buffers.
-For example, adding a `StructuredBuffer<int>` field to a type conforming to this `ITransform` is rejected.
 In Slang 2026 and later, additional checks apply to interface declarations with an `[anyValueSize(...)]` attribute and to declarations of conformance to those interfaces; see [Slang 2026](11-language-version.md#slang-2026).
-
-Returning a box through an `out dyn ITransform` parameter, or assigning payloads of different types to a box variable, can also prevent static specialization.
-Passing boxes only as function parameters often lets the compiler determine their payload types, as in `demonstrate` above, but the parameter syntax alone does not guarantee that specialization succeeds.
-
-### Legacy Syntax and Language Versions
-
-In legacy Slang, Slang 2025, and Slang 2026, the compiler accepts an interface name without `dyn` where a box type is required.
-In those versions, the following function has the same parameter and return types as the version of `copyTransform` above:
-
-```slang
-ITransform copyTransform(ITransform argument)
-{
-    ITransform result = argument;
-    return result;
-}
-```
-
-In Slang 202c, box types must be written with explicit `dyn` for parameters, return values, local variables, fields, array elements, and generic type arguments.
-When an alias of an interface contract is used as a box type, `dyn` must be written explicitly.
-In Slang 2026 and later, explicitly default-initializing a box, as in `dyn ITransform transform = {};`, is an error.
-A declaration without an initializer, such as `dyn ITransform transform;`, is allowed and leaves `transform` uninitialized.
 
 ## Extending a Type with Additional Interface Conformances
 

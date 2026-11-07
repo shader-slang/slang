@@ -81,7 +81,7 @@ Slang language version 202c brings these changes on top of Slang 2026:
 - Existential box types must be written explicitly with `dyn`, as in `dyn IFoo`.
   The interface name `IFoo` denotes the contract and is valid in aliases, constraints, and conformance declarations.
   In legacy Slang, Slang 2025, and Slang 2026, the compiler implicitly forms a box when an interface name appears where a value type is required.
-  See [Existential Box Types](06-interfaces-generics.md#existential-box-types).
+  See [Using Interfaces for Dynamic Dispatch](06-interfaces-generics.md#using-interfaces-for-dynamic-dispatch).
 
 - The generic-parameter-count overload tie-breaker has been removed.
   Older compilers treated required generic-parameter count as an ordinary ranking rule and
