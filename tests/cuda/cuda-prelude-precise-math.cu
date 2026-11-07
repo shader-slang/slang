@@ -108,6 +108,15 @@ extern "C" __global__ void coopMatBFloat16(__nv_bfloat16* p)
         Slang_CUDA_WMMA::WmmaFragment<__nv_bfloat16, 16, 16, 16, Slang_CUDA_WMMA::MatrixA>>(p);
 }
 
+// A bf16 `dot()` reaches the CUDA output as a call to the prelude's `_slang_vector_dot`, not as
+// Slang IR arithmetic, so the emitter's `_rn` scalars do not cover it.
+extern "C" __global__ void dotBFloat16(__nv_bfloat16* p)
+{
+    __nv_bfloat163 a = {p[0], p[1], p[2]};
+    __nv_bfloat163 b = {p[3], p[4], p[5]};
+    p[6] = _slang_vector_dot(a, b);
+}
+
 // An explicit fma() stays fused under the define; this kernel shows the lanes can see `fma.rn`.
 extern "C" __global__ void explicitFma(float* p)
 {
@@ -162,6 +171,9 @@ extern "C" __global__ void explicitFma(float* p)
 //CHECK-DAG: mul.rn.bf16x2
 //CHECK-DAG: add.rn.bf16x2
 //CHECK-DAG: sub.rn.bf16x2
+//CHECK-LABEL: .entry dotBFloat16(
+//CHECK-DAG: mul.rn.bf16
+//CHECK-DAG: add.rn.bf16
 //CHECK-LABEL: .entry explicitFma(
 //CHECK: fma.rn.f32
 

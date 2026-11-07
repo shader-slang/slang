@@ -417,6 +417,57 @@ struct __nv_fp8_e5m24
 };
 #endif
 
+/* The vector, matrix and cooperative-matrix `+`, `-` and `*` operators, and the bfloat16
+   `_slang_vector_dot`, compute each element (or packed pair of elements) with these helpers.
+   SLANG_CUDA_ENABLE_PRECISE_MATH is emitted (as `1`) into the CUDA output by Slang's CUDA back-end
+   under `-fp-mode precise`. When nonzero, the floating-point overloads use the CUDA `_rn`
+   intrinsics, which nvcc never contracts into an FMA whatever its `--fmad` setting, so the
+   precise mode survives a compile of the emitted source with nvcc's default `--fmad=true`.
+   Otherwise, and for every other element type, the helpers are the plain operators.
+   These overloads precede every template that calls them: `float` and `double` have no associated
+   namespace, so a dependent call in a template only sees the overloads declared before it. */
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_add(T a, T b)
+{
+    return a + b;
+}
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_sub(T a, T b)
+{
+    return a - b;
+}
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_mul(T a, T b)
+{
+    return a * b;
+}
+#if SLANG_CUDA_ENABLE_PRECISE_MATH
+#define SLANG_CUDA_PRECISE_ELEMENT_OPS(T, ADD, SUB, MUL)              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_add(T a, T b) \
+    {                                                                 \
+        return ADD(a, b);                                             \
+    }                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_sub(T a, T b) \
+    {                                                                 \
+        return SUB(a, b);                                             \
+    }                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_mul(T a, T b) \
+    {                                                                 \
+        return MUL(a, b);                                             \
+    }
+SLANG_CUDA_PRECISE_ELEMENT_OPS(float, __fadd_rn, __fsub_rn, __fmul_rn)
+SLANG_CUDA_PRECISE_ELEMENT_OPS(double, __dadd_rn, __dsub_rn, __dmul_rn)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_CUDA_PRECISE_ELEMENT_OPS(__half, __hadd_rn, __hsub_rn, __hmul_rn)
+SLANG_CUDA_PRECISE_ELEMENT_OPS(__half2, __hadd2_rn, __hsub2_rn, __hmul2_rn)
+#endif
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_CUDA_PRECISE_ELEMENT_OPS(__nv_bfloat16, __hadd_rn, __hsub_rn, __hmul_rn)
+SLANG_CUDA_PRECISE_ELEMENT_OPS(__nv_bfloat162, __hadd2_rn, __hsub2_rn, __hmul2_rn)
+#endif
+#undef SLANG_CUDA_PRECISE_ELEMENT_OPS
+#endif
+
 #define SLANG_VECTOR_GET_ELEMENT(T)                                                   \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##1 x, int index) \
     {                                                                                 \
@@ -490,7 +541,9 @@ _slang_vector_dot(__nv_bfloat162 v0, __nv_bfloat162 v1)
     __nv_bfloat16 result = __nv_bfloat16(0.0f);
     for (int i = 0; i < 2; i++)
     {
-        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+        result = _slang_element_add(
+            result,
+            _slang_element_mul(_slang_vector_get_element(v0, i), _slang_vector_get_element(v1, i)));
     }
     return result;
 }
@@ -500,7 +553,9 @@ _slang_vector_dot(__nv_bfloat163 v0, __nv_bfloat163 v1)
     __nv_bfloat16 result = __nv_bfloat16(0.0f);
     for (int i = 0; i < 3; i++)
     {
-        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+        result = _slang_element_add(
+            result,
+            _slang_element_mul(_slang_vector_get_element(v0, i), _slang_vector_get_element(v1, i)));
     }
     return result;
 }
@@ -510,7 +565,9 @@ _slang_vector_dot(__nv_bfloat164 v0, __nv_bfloat164 v1)
     __nv_bfloat16 result = __nv_bfloat16(0.0f);
     for (int i = 0; i < 4; i++)
     {
-        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+        result = _slang_element_add(
+            result,
+            _slang_element_mul(_slang_vector_get_element(v0, i), _slang_vector_get_element(v1, i)));
     }
     return result;
 }
@@ -589,54 +646,6 @@ SLANG_CUDA_VECTOR_TRAITS(__half4, bool4, 4, false, false)
     typename SlangCudaVectorEnableIf<SlangCudaVectorTraits<T>::kIsIntegral>::Type* = nullptr
 #define SLANG_CUDA_VECTOR_ENABLE_IF_FMOD \
     typename SlangCudaVectorEnableIf<SlangCudaVectorTraits<T>::kSupportsFmod>::Type* = nullptr
-
-/* The vector, matrix and cooperative-matrix `+`, `-` and `*` operators below compute each element
-   (or packed pair of elements) with these helpers.
-   SLANG_CUDA_ENABLE_PRECISE_MATH is emitted (as `1`) into the CUDA output by Slang's CUDA back-end
-   under `-fp-mode precise`. When nonzero, the floating-point overloads use the CUDA `_rn`
-   intrinsics, which nvcc never contracts into an FMA whatever its `--fmad` setting, so the
-   precise mode survives a compile of the emitted source with nvcc's default `--fmad=true`.
-   Otherwise, and for every other element type, the helpers are the plain operators. */
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_add(T a, T b)
-{
-    return a + b;
-}
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_sub(T a, T b)
-{
-    return a - b;
-}
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_mul(T a, T b)
-{
-    return a * b;
-}
-#if SLANG_CUDA_ENABLE_PRECISE_MATH
-#define SLANG_CUDA_PRECISE_ELEMENT_OPS(T, ADD, SUB, MUL)              \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_add(T a, T b) \
-    {                                                                 \
-        return ADD(a, b);                                             \
-    }                                                                 \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_sub(T a, T b) \
-    {                                                                 \
-        return SUB(a, b);                                             \
-    }                                                                 \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_mul(T a, T b) \
-    {                                                                 \
-        return MUL(a, b);                                             \
-    }
-SLANG_CUDA_PRECISE_ELEMENT_OPS(float, __fadd_rn, __fsub_rn, __fmul_rn)
-SLANG_CUDA_PRECISE_ELEMENT_OPS(double, __dadd_rn, __dsub_rn, __dmul_rn)
-#if SLANG_CUDA_ENABLE_HALF
-SLANG_CUDA_PRECISE_ELEMENT_OPS(__half, __hadd_rn, __hsub_rn, __hmul_rn)
-SLANG_CUDA_PRECISE_ELEMENT_OPS(__half2, __hadd2_rn, __hsub2_rn, __hmul2_rn)
-#endif
-#if SLANG_CUDA_ENABLE_BF16
-SLANG_CUDA_PRECISE_ELEMENT_OPS(__nv_bfloat162, __hadd2_rn, __hsub2_rn, __hmul2_rn)
-#endif
-#undef SLANG_CUDA_PRECISE_ELEMENT_OPS
-#endif
 
 #define SLANG_CUDA_VECTOR_ARITHMETIC_OP(op, ELEMENT_OP)                  \
     template<typename T, SLANG_CUDA_VECTOR_ENABLE_IF>                    \
