@@ -3559,6 +3559,8 @@ struct FunctionReflection
 
     /** Resolve this function as a call with arguments of `types`.
 
+        Uses the language-version option of the session that owns this function's declaration,
+        as described by `ISession`. A module's `#language` directive does not override that option.
         Through Slang 2026, the compiler implicitly converts interface metadata to its
         existential-box type. In Slang 202c, callers must supply explicit `dyn` types.
         Normal call inference opens existential arguments to infer their payload types.
@@ -3937,6 +3939,8 @@ struct ShaderReflection
 
     /** Specialize a generic declaration with explicit arguments.
 
+        Uses the program's session language-version option, as described by `ISession`, rather
+        than a module's `#language` directive.
         Through Slang 2026, the compiler implicitly converts interface metadata supplied as a
         type argument to its existential-box type. In Slang 202c, callers must supply an explicit
         box type, such as `dyn IFoo`. Constraints apply directly to the resulting type arguments.
@@ -4656,6 +4660,11 @@ then there will only be one copy of `X` loaded within the session.
 In order to be able to generate target code, the session
 owns a list of available compilation targets, which specify
 code generation options.
+
+The language version used by `getTypeLayout`, `getContainerType`, and `specializeType`
+comes from `CompilerOptionName::LanguageVersion` in `SessionDesc::compilerOptionEntries`,
+with legacy as the default. Module-level `#language` directives control module checking;
+they do not override the session language version for these operations.
 
 Code loaded and compiled within a session is owned by the session
 and will remain resident in memory until the session is released.
