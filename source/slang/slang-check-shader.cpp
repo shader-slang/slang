@@ -1991,6 +1991,65 @@ static void validateEntryPointCapabilities(
     }
 }
 
+/// Returns whether `module` imports the GLSL module, directly or through the modules it imports.
+static bool doesModuleDependOnGLSLModule(Linkage* linkage, Module* module)
+{
+    const auto glslModuleName = linkage->getSessionImpl()->glslModuleName;
+    for (auto dependency : module->getModuleDependencyList())
+    {
+        if (dependency->getNameObj() == glslModuleName)
+            return true;
+    }
+    return false;
+}
+
+/// Returns the directions in which the module-scope varying `globalVarying` passes data: an `in`
+/// variable is an input of the entry point, an `out` variable an output, and an `inout` variable
+/// both.
+static EntryPointParamDirections getGlobalVaryingDirections(VarDeclBase* globalVarying)
+{
+    EntryPointParamDirections directions;
+    directions.isInput =
+        globalVarying->hasModifier<InModifier>() || globalVarying->hasModifier<InOutModifier>();
+    directions.isOutput = globalVarying->hasModifier<OutModifier>();
+    return directions;
+}
+
+/// Validates the system-value semantic of an entry-point input or output `decl` (a parameter or a
+/// module-scope varying) for `stage`, once for each direction in `directions`.
+static void validateSystemValueSemanticForDirections(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    Decl* decl,
+    EntryPointParamDirections directions,
+    Stage stage,
+    Scope* scope,
+    CapabilitySet* outInferredCaps)
+{
+    if (directions.isInput || !directions.isOutput)
+    {
+        validateSystemValueSemantic(
+            visitor,
+            sink,
+            decl,
+            stage,
+            SemanticDirection::Input,
+            scope,
+            outInferredCaps);
+    }
+    if (directions.isOutput)
+    {
+        validateSystemValueSemantic(
+            visitor,
+            sink,
+            decl,
+            stage,
+            SemanticDirection::Output,
+            scope,
+            outInferredCaps);
+    }
+}
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -2288,6 +2347,26 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         paramDirections.add(checkEntryPointParamPassingMode(param, sink));
     }
 
+    // The module-scope varyings that the entry point owns are inputs and outputs of the entry point
+    // just as its parameters are, so the checks below apply to them too.
+    const auto& globalVaryings = entryPoint->getGlobalVaryings();
+    List<EntryPointParamDirections> globalVaryingDirections;
+    for (auto globalVarying : globalVaryings)
+        globalVaryingDirections.add(getGlobalVaryingDirections(globalVarying));
+
+    if (returnType && !returnType->equals(linkage->getASTBuilder()->getVoidType()))
+    {
+        for (auto directions : globalVaryingDirections)
+        {
+            if (directions.isOutput)
+            {
+                sink->diagnose(Diagnostics::EntryPointMustReturnVoidWhenGlobalOutputPresent{
+                    .location = entryPointFuncDecl->loc});
+                break;
+            }
+        }
+    }
+
     // Collect the requirements that depend on the entry point's stage and signature.
     // The checked reference's generic arguments are joined after these base requirements below.
     CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
@@ -2312,49 +2391,25 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Validate system value semantics for entry point parameters
             for (Index i = 0; i < params.getCount(); ++i)
             {
-                const auto param = params[i];
-                const auto directions = paramDirections[i];
-                if (directions.isInput && directions.isOutput)
-                {
-                    validateSystemValueSemantic(
-                        &visitor,
-                        sink,
-                        param,
-                        stage,
-                        SemanticDirection::Input,
-                        scope,
-                        &entryPointInferredCaps);
-                    validateSystemValueSemantic(
-                        &visitor,
-                        sink,
-                        param,
-                        stage,
-                        SemanticDirection::Output,
-                        scope,
-                        &entryPointInferredCaps);
-                }
-                else if (directions.isOutput)
-                {
-                    validateSystemValueSemantic(
-                        &visitor,
-                        sink,
-                        param,
-                        stage,
-                        SemanticDirection::Output,
-                        scope,
-                        &entryPointInferredCaps);
-                }
-                else
-                {
-                    validateSystemValueSemantic(
-                        &visitor,
-                        sink,
-                        param,
-                        stage,
-                        SemanticDirection::Input,
-                        scope,
-                        &entryPointInferredCaps);
-                }
+                validateSystemValueSemanticForDirections(
+                    &visitor,
+                    sink,
+                    params[i],
+                    paramDirections[i],
+                    stage,
+                    scope,
+                    &entryPointInferredCaps);
+            }
+            for (Index i = 0; i < globalVaryings.getCount(); ++i)
+            {
+                validateSystemValueSemanticForDirections(
+                    &visitor,
+                    sink,
+                    globalVaryings[i],
+                    globalVaryingDirections[i],
+                    stage,
+                    scope,
+                    &entryPointInferredCaps);
             }
 
             // Validate the return type semantic
@@ -2390,13 +2445,19 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
         // The return value is also an output of the entry point.
         collectDepthOutputSemantics(astBuilder, entryPointFuncDecl, depthOutputSemantics);
+        for (Index i = 0; i < globalVaryings.getCount(); ++i)
+        {
+            if (globalVaryingDirections[i].isOutput)
+                collectDepthOutputSemantics(astBuilder, globalVaryings[i], depthOutputSemantics);
+        }
 
         if (depthOutputSemantics.getCount() > 1)
         {
             // Report at the second collected depth output — the one that makes the count
             // exceed one — and name it as conflicting with the first. Collection order is
-            // parameters (in declaration order) then the return value, so the "second" is the
-            // later contributor, not necessarily the lexically-later one.
+            // parameters (in declaration order), then the return value, then module-scope
+            // outputs, so the "second" is the later contributor, not necessarily the
+            // lexically-later one.
             sink->diagnose(Diagnostics::MultipleDepthOutputSemantics{
                 .conflictingSemantic = String(depthOutputSemantics[1]->name.getContent()),
                 .earlierSemantic = String(depthOutputSemantics[0]->name.getContent()),
@@ -2684,6 +2745,28 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.stage = stage;
             validateVaryingType(ctx, param->getType());
         }
+
+        for (Index i = 0; i < globalVaryings.getCount(); ++i)
+        {
+            const auto globalVarying = globalVaryings[i];
+
+            VaryingTypeValidationContext ctx;
+            ctx.astBuilder = astBuilder;
+            ctx.sink = sink;
+            ctx.entryPointName = entryPointName;
+            ctx.loc = globalVarying->loc;
+            const auto directions = globalVaryingDirections[i];
+            ctx.direction =
+                directions.isOutput ? (directions.isInput ? "input/output" : "output") : "input";
+
+            StringBuilder contextSb;
+            contextSb << "global variable '" << globalVarying->getName()->text << "'";
+            String contextStr = contextSb.produceString();
+            ctx.context = contextStr.getBuffer();
+            ctx.targets = targets.getArrayView();
+            ctx.stage = stage;
+            validateVaryingType(ctx, globalVarying->getType());
+        }
     }
 
     // For vertex shaders, warn when an output has been declared but none
@@ -2696,11 +2779,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // users who hit this can add the semantic to a vertex output, or
     // silence the warning explicitly.
     //
-    // We deliberately skip the check when the entry point declares no
-    // outputs at all (void return type, no `out`/`inout` parameters).
-    // GLSL-style entry points write `gl_Position` via a global rather
-    // than as a returned member, so we cannot tell whether SV_Position
-    // is missing just by looking at the signature.
+    // We deliberately skip the check when the entry point has no outputs
+    // at all: a void return type, no `out`/`inout` parameters, and no
+    // module-scope outputs. A module-scope output counts here like an
+    // output parameter, except that in a module that imports the GLSL
+    // module it only supplies SV_Position: GLSL-style entry points write
+    // the builtin `gl_Position`, which is not one of the entry point's
+    // module-scope varyings, so module-scope outputs alone cannot show
+    // that SV_Position is missing.
     if (stage == Stage::Vertex)
     {
         auto astBuilder = linkage->getASTBuilder();
@@ -2723,6 +2809,28 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 const auto param = params[i];
                 hasOutputs = true;
                 if (_outputDeclHasSemantic(astBuilder, param, param->getType(), svPosition))
+                {
+                    hasSvPosition = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasSvPosition)
+        {
+            const bool globalOutputsCount = !doesModuleDependOnGLSLModule(linkage, module);
+            for (Index i = 0; i < globalVaryings.getCount(); ++i)
+            {
+                if (!globalVaryingDirections[i].isOutput)
+                    continue;
+                const auto globalVarying = globalVaryings[i];
+                if (globalOutputsCount)
+                    hasOutputs = true;
+                if (_outputDeclHasSemantic(
+                        astBuilder,
+                        globalVarying,
+                        globalVarying->getType(),
+                        svPosition))
                 {
                     hasSvPosition = true;
                     break;
