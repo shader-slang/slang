@@ -90,21 +90,30 @@ void computeMain(uint i : SV_GroupIndex)
     setOne(local);
 }
 
-//diag: 'a' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'original_value' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: 'this' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
-//diag: if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit
+//diag: 'myFunc' needs exclusive access to parameter 'a', but 'g_a' is thread-group-shared memory that other invocations could access
+//diag: 'setOne' needs exclusive access to parameter 'v', but 'g_a[i]' is thread-group-shared memory that other invocations could access
+//diag: 'writeOut' needs exclusive access to parameter 'v', but 'g_a[i]' is thread-group-shared memory that other invocations could access
+//diag: 'setUint' needs exclusive access to parameter 'v', but 'g_c.n' is thread-group-shared memory that other invocations could access
+//diag: 'setUint' needs exclusive access to parameter 'v', but 'g_a[i]' is thread-group-shared memory that other invocations could access
+//diag: 'inlinedSet' needs exclusive access to parameter 'v', but 'g_a[i]' is thread-group-shared memory that other invocations could access
+//diag: 'inlinedSet' needs exclusive access to parameter 'v', but 'g_u[i]' is thread-group-shared memory that other invocations could access
+//diag: 'InterlockedAdd' needs exclusive access to parameter 'original_value', but 'g_u[1]' is thread-group-shared memory that other invocations could access
+//diag: 'bump' needs exclusive access to parameter 'this', but 'g_c' is thread-group-shared memory that other invocations could access
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: consider copying value through a local variable to make the access explicit
+//diag: 'inout' requires exclusive access
+//diag: 'inout' requires exclusive access
+//diag: 'inout' requires exclusive access
+//diag: 'inout' requires exclusive access
+//diag: 'inout' requires exclusive access
+//diag: 'inout' requires exclusive access
+//diag: 'out' requires exclusive access
+//diag: 'out' requires exclusive access
+//diag: '[mutating]' requires exclusive access to 'this'

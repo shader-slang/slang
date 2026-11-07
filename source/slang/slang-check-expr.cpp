@@ -8054,17 +8054,41 @@ void SemanticsVisitor::checkGroupSharedArgumentsToExclusiveParams(
             //
             if (!argumentNamesGroupSharedStorage(written.storage))
                 return;
+            // We name the thread-group-shared storage itself, which for an implicitly converted
+            // argument is the operand of the conversion rather than the conversion call.
+            //
+            ASTPrinter storagePrinter(m_astBuilder);
+            storagePrinter.addExpr(written.storage);
+            // The note points at what requires exclusive access: the parameter's `out` or `inout`
+            // keyword, or for a receiver the `[mutating]` attribute, or else the method itself,
+            // such as a `set` accessor or a method in HLSL source, where methods are mutating by
+            // default.
+            //
+            auto callee = calleeDeclRef.getDecl();
+            ParamPassingMode mode = ParamPassingMode::BorrowInOut;
+            SourceLoc modeLocation, mutatingLocation, methodLocation;
             if (written.isReceiver)
-                getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
-                    .param = "this",
-                    .suggestion = "",
-                    .arg = written.arg});
+            {
+                if (auto mutating = callee->findModifier<MutatingAttribute>())
+                    mutatingLocation = mutating->loc;
+                else
+                    methodLocation = callee->loc;
+            }
             else
-                getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
-                    .param = getText(written.param->getName()),
-                    .suggestion = "; if the callee needs to see other invocations' writes, "
-                                  "declare the parameter 'groupshared'",
-                    .arg = written.arg});
+            {
+                mode = getParamPassingMode(written.param);
+                if (auto modeModifier = written.param->findModifier<OutModifier>())
+                    modeLocation = modeModifier->loc;
+            }
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
+                .func = callee,
+                .param = written.isReceiver ? "this" : getText(written.param->getName()),
+                .storageText = storagePrinter.getString(),
+                .mode = mode,
+                .arg = written.arg,
+                .modeLocation = modeLocation,
+                .mutatingLocation = mutatingLocation,
+                .methodLocation = methodLocation});
         });
 }
 

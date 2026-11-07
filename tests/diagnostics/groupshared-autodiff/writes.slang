@@ -98,17 +98,20 @@ float nestedWrite(uint i, float x)
 }
 
 void setElement(inout float v)
+//CHECK:        ^^^^^ 'inout' requires exclusive access
 {
     v = 1.0;
 }
 
 [ForceInline]
 void setElementInlined(inout float v)
+//CHECK:               ^^^^^ 'inout' requires exclusive access
 {
     v = 1.0;
 }
 
 void setElementUint(inout uint v)
+//CHECK:            ^^^^^ 'inout' requires exclusive access
 {
     v = 1;
 }
@@ -118,6 +121,9 @@ struct Counter
     float n;
 
     [mutating]
+/*CHECK:
+     ^^^^^^^^ '[mutating]' requires exclusive access to 'this'
+*/
     void bump()
     {
         n += 1.0;
@@ -131,8 +137,8 @@ groupshared Counter gCounters[4];
 float callWrite(uint i, float x)
 {
     setElement(g[i]);
-//CHECK:        ^ 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
-//CHECK:        ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//CHECK:        ^ 'setElement' needs exclusive access to parameter 'v', but 'g[i]' is thread-group-shared memory that other invocations could access
+//CHECK:        ^ consider copying value through a local variable to make the access explicit
 //CHECK:        ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
 //CHECK:        ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
     return x;
@@ -142,8 +148,8 @@ float callWrite(uint i, float x)
 float inlinedCallWrite(uint i, float x)
 {
     setElementInlined(g[i]);
-//CHECK:               ^ 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
-//CHECK:               ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//CHECK:               ^ 'setElementInlined' needs exclusive access to parameter 'v', but 'g[i]' is thread-group-shared memory that other invocations could access
+//CHECK:               ^ consider copying value through a local variable to make the access explicit
 //CHECK:               ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
 //CHECK:               ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
     return x;
@@ -153,8 +159,8 @@ float inlinedCallWrite(uint i, float x)
 float convertedCallWrite(uint i, float x)
 {
     setElementUint(gInt[i]);
-//CHECK:               ^ 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
-//CHECK:               ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//CHECK:               ^ 'setElementUint' needs exclusive access to parameter 'v', but 'gInt[i]' is thread-group-shared memory that other invocations could access
+//CHECK:               ^ consider copying value through a local variable to make the access explicit
 //CHECK:               ^ writing part of thread-group-shared variable 'gInt' introduces a race condition when this function is differentiated
 //CHECK:               ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
     return x;
@@ -164,8 +170,8 @@ float convertedCallWrite(uint i, float x)
 float mutatingReceiverWrite(uint i, float x)
 {
     gCounters[i].bump();
-//CHECK:     ^ 'this' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
-//CHECK:     ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit
+//CHECK:     ^ 'bump' needs exclusive access to parameter 'this', but 'gCounters[i]' is thread-group-shared memory that other invocations could access
+//CHECK:     ^ consider copying value through a local variable to make the access explicit
 //CHECK:     ^ writing part of thread-group-shared variable 'gCounters' introduces a race condition when this function is differentiated
 //CHECK:     ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
     return x;

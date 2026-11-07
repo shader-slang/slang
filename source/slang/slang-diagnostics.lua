@@ -4022,8 +4022,14 @@ err(
 warning(
     "groupshared-argument-to-exclusive-parameter",
     30709,
-    "'~param' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory",
-    span { loc = "arg:Expr", message = "if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit~suggestion:String" }
+    "'~func:Decl' needs exclusive access to parameter '~param', but '~storageText' is thread-group-shared memory that other invocations could access",
+    span { loc = "arg:Expr", message = "consider copying value through a local variable to make the access explicit" },
+    -- At most one of these notes has a location: the parameter's `out` or `inout` keyword, the
+    -- method's `[mutating]` attribute, or a method that can modify `this` without one, such as a
+    -- `set` accessor or a method in HLSL source.
+    note { message = "'~mode:ParamPassingMode' requires exclusive access", span { loc = "modeLocation" } },
+    note { message = "'[mutating]' requires exclusive access to 'this'", span { loc = "mutatingLocation" } },
+    note { message = "this method can modify 'this', which requires exclusive access", span { loc = "methodLocation" } }
 )
 
 err(
