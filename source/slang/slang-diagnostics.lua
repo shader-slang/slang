@@ -4720,6 +4720,22 @@ err(
     "entry point index ~entryPointIndex:int is out of range; the program's entry-point count is ~entryPointCount:int"
 )
 
+err(
+    "duplicate-entry-point-name",
+    38016,
+    "more than one entry point would be emitted as '~symbol' for target '~target'",
+    span { loc = "location", message = "this entry point would also be emitted as '~symbol'" },
+    note { message = "the other entry point emitted as '~symbol' is here", span { loc = "otherLocation" } }
+)
+
+err(
+    "ambiguous-entry-point-name",
+    38017,
+    "entry point name '~name' is ambiguous",
+    span { loc = "location", message = "more than one function matches entry point name '~name'" },
+    variadic_note { cpp_name = "Candidate", message = "candidate: ~candidateSignature", span { loc = "candidate:Decl" } }
+)
+
 
 -- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
 -- (inlined from slang-diagnostics-semantic-checking-10.lua)

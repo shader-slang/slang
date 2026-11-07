@@ -9,6 +9,7 @@
 #include "slang-intrinsic-expand.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-link.h"
@@ -1129,15 +1130,11 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
 
 inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink)
 {
-    if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
-        isMetalTarget(getTargetReq()))
+    if (doesTargetRenameEntryPointName(getTarget(), name.getUnownedSlice()))
     {
-        if (name == "main")
-        {
-            String newName = _generateUniqueName(name.getUnownedSlice());
-            sink->diagnose(Diagnostics::MainEntryPointRenamed{.oldName = name, .newName = newName});
-            return newName;
-        }
+        String newName = _generateUniqueName(name.getUnownedSlice());
+        sink->diagnose(Diagnostics::MainEntryPointRenamed{.oldName = name, .newName = newName});
+        return newName;
     }
     return name;
 }
