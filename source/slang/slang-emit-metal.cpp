@@ -920,9 +920,17 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             auto elementType = inst->getDataType();
             auto buffer = inst->getOperand(0);
             auto offset = inst->getOperand(1);
-            m_writer->emit("as_type<");
-            emitType(elementType);
-            m_writer->emit(">(");
+            // `as_type` rejects `bool`; a stored `bool` is the word 0 or 1, so convert it.
+            if (as<IRBoolType>(elementType))
+            {
+                m_writer->emit("bool(");
+            }
+            else
+            {
+                m_writer->emit("as_type<");
+                emitType(elementType);
+                m_writer->emit(">(");
+            }
             emitOperand(buffer, getInfo(EmitOp::General));
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
@@ -935,11 +943,15 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             // Other element types should have been lowered by previous legalization passes.
             auto buffer = inst->getOperand(0);
             auto offset = inst->getOperand(1);
+            auto value = inst->getOperand(inst->getOperandCount() - 1);
             emitOperand(buffer, getInfo(EmitOp::General));
             m_writer->emit("[(");
             emitOperand(offset, getInfo(EmitOp::General));
-            m_writer->emit(")>>2] = as_type<uint32_t>(");
-            emitOperand(inst->getOperand(inst->getOperandCount() - 1), getInfo(EmitOp::General));
+            // `as_type` rejects `bool`; store it as the word 0 or 1.
+            m_writer->emit(
+                as<IRBoolType>(value->getDataType()) ? ")>>2] = uint32_t("
+                                                     : ")>>2] = as_type<uint32_t>(");
+            emitOperand(value, getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
