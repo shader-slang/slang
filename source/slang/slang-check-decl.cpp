@@ -18841,6 +18841,15 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto importedModuleDecl = importedModule->getModuleDecl();
     decl->importedModuleDecl = importedModuleDecl;
 
+    // An entry point owns the module-scope varyings of its own module only, so the varyings of an
+    // imported module would belong to no entry point.
+    if (importedModuleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+    {
+        getSink()->diagnose(Diagnostics::ImportedModuleHasGlobalVaryings{
+            .module = name,
+            .location = decl->moduleNameAndLoc.loc});
+    }
+
     // Add the declarations from the imported module into the scope
     // that the `import` declaration is set to extend.
     //

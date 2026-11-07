@@ -5046,6 +5046,13 @@ err(
 )
 
 err(
+    "imported-module-has-global-varyings",
+    38208,
+    "cannot import a module that declares module-scope varyings",
+    span { loc = "location", message = "module '~module:Name' declares module-scope 'in'/'out' variables, which belong only to the entry points declared in that module" }
+)
+
+err(
     "glsl-module-not-available",
     38201,
     "'glsl' module not available",
