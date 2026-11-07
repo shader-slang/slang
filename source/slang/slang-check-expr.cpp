@@ -1347,19 +1347,15 @@ LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(
 
 bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
 {
-    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
-    if (!declaredWitness)
+    // A witness derived from an optional constraint, such as `T : IArithmetic` reached
+    // through `where optional T : IFloat`, is checked exactly when that constraint is, so
+    // the `if (sub is sup)` guard we look for is the one for the optional constraint itself.
+    auto optionalWitness = findOptionalConstraintWitness(witness);
+    if (!optionalWitness)
         return false;
 
-    auto decl = declaredWitness->getDeclRef().getDecl();
-    if (!decl || !decl->hasModifier<OptionalConstraintModifier>())
-        return false;
-
-    // Okay, we've found an optional subtype witness. This result needs
-    // to be removed if we're not inside a block that directly checks
-    // if (sub is sup)
-    auto sub = witness->getSub();
-    auto sup = witness->getSup();
+    auto sub = optionalWitness->getSub();
+    auto sup = optionalWitness->getSup();
 
     for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
     {
@@ -1386,8 +1382,6 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
         }
     }
 
-    // If we got this far, it's both an optional witness and there's no
-    // statement checking its validity.
     return true;
 }
 
@@ -1436,6 +1430,39 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
         }
     }
     return result;
+}
+
+void SemanticsVisitor::diagnoseDefaultInitializerBehindOptionalConstraint(
+    VarDeclBase* varDecl,
+    Type* type)
+{
+    // Resolve the zero-argument initializer call again without the optional-constraint filter.
+    // If that finds an applicable initializer, the filter is what removed it.
+    OverloadResolveContext context;
+    context.loc = varDecl->nameAndLoc.loc;
+    context.mode = OverloadResolveContext::Mode::JustTrying;
+    context.sourceScope = m_outerScope;
+    List<Expr*> args;
+    context.args = &args;
+    AddOverloadCandidates(lookupConstructorsInType(type, m_outerScope), context);
+    // Two optional constraints can each provide a default initializer, which leaves an
+    // ambiguous set rather than one best candidate.
+    if (context.bestCandidate)
+        context.bestCandidates.add(*context.bestCandidate);
+    for (auto& candidate : context.bestCandidates)
+    {
+        if (candidate.status != OverloadCandidate::Status::Applicable)
+            continue;
+        LookupResult candidateResult;
+        AddToLookupResult(candidateResult, candidate.item);
+        bool diagnosed = false;
+        filterLookupResultByCheckedOptionalAndDiagnose(
+            candidateResult,
+            varDecl->nameAndLoc.loc,
+            diagnosed);
+        if (diagnosed)
+            return;
+    }
 }
 
 LookupResult SemanticsVisitor::resolveOverloadedLookup(
