@@ -2684,34 +2684,28 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         CASE_UINT(&);
         CASE_UINT(|);
         CASE_UINT(^);
-        CASE_UINT(!=);
-        CASE_UINT(==);
 #undef CASE_UINT
 
-        // Signed comparison operators (uint64_t cast would break e.g. (-1 < 0))
-        else if (opName == getName(">="))
+        // Comparisons fold through `BuiltinOperationIntVal::tryFoldImpl`, the folder the
+        // builtin-operator fast path uses, so a comparison folds the same way on both paths.
+        else if (
+            opName == getName("==") || opName == getName("!=") || opName == getName(">=") ||
+            opName == getName("<=") || opName == getName("<") || opName == getName(">"))
         {
             if (argCount != 2)
                 return nullptr;
-            resultValue = constArgVals[0] >= constArgVals[1];
-        }
-        else if (opName == getName("<="))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] <= constArgVals[1];
-        }
-        else if (opName == getName("<"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] < constArgVals[1];
-        }
-        else if (opName == getName(">"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] > constArgVals[1];
+            List<IntVal*> comparisonArgs;
+            comparisonArgs.add(argVals[0]);
+            comparisonArgs.add(argVals[1]);
+            return as<IntVal>(BuiltinOperationIntVal::tryFoldImpl(
+                m_astBuilder,
+                invokeExpr.getExpr()->type.type,
+                getBuiltinOperationKindFromString(
+                    getText(opName).getUnownedSlice(),
+                    OperatorArity::Binary),
+                comparisonArgs,
+                getSink(),
+                invokeExpr.getExpr()->loc));
         }
 
         // Shift operators: guard negative count (UB), use modulo for width

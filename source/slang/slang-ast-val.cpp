@@ -2112,6 +2112,48 @@ void TypeCastIntVal::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
+// Convert `value` to the representation of the scalar `baseType`, truncating and sign- or
+// zero-extending it as a cast to that type does (e.g. `int(0x1FFFFFFFF)` is -1). For any other
+// `baseType`, including `char`, it returns false and leaves `value` unchanged.
+static bool _tryConvertIntegerValueToBaseType(BaseType baseType, IntegerLiteralValue& value)
+{
+    switch (baseType)
+    {
+    case BaseType::Int:
+        value = (int)value;
+        return true;
+    case BaseType::UInt:
+        value = (unsigned int)value;
+        return true;
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+        value = (Int64)value;
+        return true;
+    case BaseType::UInt64:
+    case BaseType::UIntPtr:
+        value = (UInt64)value;
+        return true;
+    case BaseType::Int16:
+        value = (int16_t)value;
+        return true;
+    case BaseType::UInt16:
+        value = (uint16_t)value;
+        return true;
+    case BaseType::Int8:
+        value = (int8_t)value;
+        return true;
+    case BaseType::UInt8:
+        value = (uint8_t)value;
+        return true;
+    case BaseType::Bool:
+        // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
+        value = (value != 0);
+        return true;
+    default:
+        return false;
+    }
+}
+
 Val* TypeCastIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
@@ -2119,57 +2161,20 @@ Val* TypeCastIntVal::tryFoldImpl(
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    auto convertValue = [&](BasicExpressionType* baseType, IntegerLiteralValue& resultValue) -> bool
-    {
-        switch (baseType->getBaseType())
-        {
-        case BaseType::Int:
-            resultValue = (int)resultValue;
-            return true;
-        case BaseType::UInt:
-            resultValue = (unsigned int)resultValue;
-            return true;
-        case BaseType::Int64:
-        case BaseType::IntPtr:
-            resultValue = (Int64)resultValue;
-            return true;
-        case BaseType::UInt64:
-        case BaseType::UIntPtr:
-            resultValue = (UInt64)resultValue;
-            return true;
-        case BaseType::Int16:
-            resultValue = (int16_t)resultValue;
-            return true;
-        case BaseType::UInt16:
-            resultValue = (uint16_t)resultValue;
-            return true;
-        case BaseType::Int8:
-            resultValue = (int8_t)resultValue;
-            return true;
-        case BaseType::UInt8:
-            resultValue = (uint8_t)resultValue;
-            return true;
-        case BaseType::Bool:
-            // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
-            resultValue = (resultValue != 0);
-            return true;
-        default:
-            return false;
-        }
-    };
     if (auto c = as<ConstantIntVal>(base))
     {
         IntegerLiteralValue resultValue = c->getValue();
         auto baseType = as<BasicExpressionType>(resultType);
         if (baseType)
         {
-            if (!convertValue(baseType, resultValue))
+            if (!_tryConvertIntegerValueToBaseType(baseType->getBaseType(), resultValue))
                 return nullptr;
         }
         else if (auto enumDecl = isEnumType(resultType))
         {
             baseType = as<BasicExpressionType>(enumDecl->tagType);
-            if (!baseType || !convertValue(baseType, resultValue))
+            if (!baseType ||
+                !_tryConvertIntegerValueToBaseType(baseType->getBaseType(), resultValue))
                 return nullptr;
         }
         return astBuilder->getIntVal(resultType, resultValue);
@@ -2240,6 +2245,54 @@ static bool _tryFoldConstantShift(
                     static_cast<std::make_unsigned_t<IntegerLiteralValue>>(base) << shiftCount)
               : (base >> shiftCount);
     return true;
+}
+
+// Fold the comparison `op` (`==`, `!=`, `<`, `>`, `<=` or `>=`) of two integer constants as values
+// of their types. Front-end folding does not narrow its results (#13954), so `1u - 0xFFFFFFFFu` is
+// held as -4294967294 rather than 2; converting each operand to its own type recovers the value
+// the target computes. The values are then compared as unsigned when either operand is unsigned,
+// because `IntegerLiteralValue` is signed and holds `0xFFFFFFFFFFFFFFFFull` as -1. An operand
+// whose type the conversion does not cover, such as an enum or `char`, is compared as held.
+static bool _foldComparison(BuiltinOperationKind op, ConstantIntVal* lhs, ConstantIntVal* rhs)
+{
+    auto compare = [op](auto a, auto b) -> bool
+    {
+        switch (op)
+        {
+        case BuiltinOperationKind::Eql:
+            return a == b;
+        case BuiltinOperationKind::Neq:
+            return a != b;
+        case BuiltinOperationKind::Less:
+            return a < b;
+        case BuiltinOperationKind::Greater:
+            return a > b;
+        case BuiltinOperationKind::Leq:
+            return a <= b;
+        case BuiltinOperationKind::Geq:
+            return a >= b;
+        default:
+            SLANG_UNEXPECTED("not a comparison");
+        }
+    };
+    auto isUnsignedIntegerType = [](BasicExpressionType* type)
+    {
+        const auto flags = BaseTypeInfo::Flag::Integer | BaseTypeInfo::Flag::Signed;
+        return type && (BaseTypeInfo::getInfo(type->getBaseType()).flags & flags) ==
+                           BaseTypeInfo::Flag::Integer;
+    };
+
+    IntegerLiteralValue lhsValue = lhs->getValue();
+    IntegerLiteralValue rhsValue = rhs->getValue();
+    auto lhsType = as<BasicExpressionType>(lhs->getType());
+    auto rhsType = as<BasicExpressionType>(rhs->getType());
+    if (lhsType)
+        _tryConvertIntegerValueToBaseType(lhsType->getBaseType(), lhsValue);
+    if (rhsType)
+        _tryConvertIntegerValueToBaseType(rhsType->getBaseType(), rhsValue);
+    if (isUnsignedIntegerType(lhsType) || isUnsignedIntegerType(rhsType))
+        return compare(UInt64(lhsValue), UInt64(rhsValue));
+    return compare(lhsValue, rhsValue);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2444,22 +2497,12 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         r = (a0 == 0);
         break;
     case BuiltinOperationKind::Eql:
-        r = (a0 == a1);
-        break;
     case BuiltinOperationKind::Neq:
-        r = (a0 != a1);
-        break;
     case BuiltinOperationKind::Less:
-        r = (a0 < a1);
-        break;
     case BuiltinOperationKind::Greater:
-        r = (a0 > a1);
-        break;
     case BuiltinOperationKind::Leq:
-        r = (a0 <= a1);
-        break;
     case BuiltinOperationKind::Geq:
-        r = (a0 >= a1);
+        r = _foldComparison(op, constArgs[0], constArgs[1]);
         break;
     case BuiltinOperationKind::BitAnd:
         r = a0 & a1;
