@@ -219,6 +219,110 @@ void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, Dia
     }
 }
 
+/// Return true if nothing but debug information observes `inst`: `inst` has no side effects,
+/// and every user is a debug instruction or, recursively, such a value.
+//
+// With `-g`, `DebugValue` keeps alive values that the program never reads, such as `x` in
+// `uint64_t x = uint64_t((float*)a); x = x * x;`, which a build without `-g` removes as dead code.
+// `cache` keeps the walk linear. A value that is still being visited counts as observed, so a use
+// cycle is reported rather than removed.
+static bool isObservedOnlyByDebugInfo(IRInst* inst, Dictionary<IRInst*, bool>& cache)
+{
+    if (auto cached = cache.tryGetValue(inst))
+        return *cached;
+    cache[inst] = false;
+    bool result = !inst->mightHaveSideEffects();
+    for (auto use = inst->firstUse; result && use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (!isDebugInfoInst(user) && !isObservedOnlyByDebugInfo(user, cache))
+            result = false;
+    }
+    cache[inst] = result;
+    return result;
+}
+
+/// Append `inst` and its transitive users to `outInsts`, each user before the value it uses, so
+/// that removing them in that order never leaves a use of a removed instruction.
+static void collectUsersFirst(IRInst* inst, HashSet<IRInst*>& visited, List<IRInst*>& outInsts)
+{
+    if (!visited.add(inst))
+        return;
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+        collectUsersFirst(use->getUser(), visited, outInsts);
+    outInsts.add(inst);
+}
+
+bool checkUnsupportedPhysicalPointers(IRModule* module, DiagnosticSink* sink)
+{
+    // A physical pointer is a `T*`: a `Ptr` in the `UserPointer` address space. After
+    // specialization, a `T*` value in code comes from an integer (`CastIntToPtr`, or `BitCast` from
+    // a non-pointer), from `nullptr` (`PtrLit`), or from memory (#13399, not checked here). We
+    // report the first two. IR types are deduplicated, so we walk the values whose type is a `T*`
+    // type: a field, parameter or variable type that mentions `T*` is not a value and is skipped.
+    // `(float*)addr` is reported at the cast. `p != nullptr` and `static float* g = nullptr;` use a
+    // `PtrLit` that has no location, so we report each of its users.
+    //
+    // A value that only debug information observes is not an error. We remove it, its users and
+    // their debug uses, so `-g` reports and emits the same as a build without debug information.
+    // Compiler-made copies of a value can have no location. We report one of those only if
+    // nothing else is reported, so that the compilation still fails.
+    HashSet<SourceLoc::RawValue> diagnosedLocations;
+    bool hasValueWithoutLocation = false;
+    Dictionary<IRInst*, bool> observedOnlyByDebugInfo;
+    HashSet<IRInst*> instsToRemoveSet;
+    List<IRInst*> instsToRemove;
+    auto diagnose = [&](IRInst* inst)
+    {
+        if (isDebugInfoInst(inst))
+            return;
+        if (isObservedOnlyByDebugInfo(inst, observedOnlyByDebugInfo))
+        {
+            collectUsersFirst(inst, instsToRemoveSet, instsToRemove);
+            return;
+        }
+        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+        if (!loc.isValid())
+            hasValueWithoutLocation = true;
+        else if (diagnosedLocations.add(loc.getRaw()))
+            sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = loc});
+    };
+
+    // A compile-time constant such as `(float*)16ULL` has a `@ConstExpr` rate-qualified type that
+    // wraps the `T*` type, so we also walk those wrappers.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto rateType = as<IRRateQualifiedType>(globalInst);
+        if (!isUserPointerType(rateType ? rateType->getValueType() : globalInst))
+            continue;
+        for (auto use = globalInst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (use != &user->typeUse)
+                continue;
+            switch (user->getOp())
+            {
+            case kIROp_CastIntToPtr:
+                diagnose(user);
+                break;
+            case kIROp_BitCast:
+                if (!isUserPointerType(user->getOperand(0)->getDataType()))
+                    diagnose(user);
+                break;
+            case kIROp_PtrLit:
+                for (auto litUse = user->firstUse; litUse; litUse = litUse->nextUse)
+                    diagnose(litUse->getUser());
+                break;
+            }
+        }
+    }
+    for (auto inst : instsToRemove)
+        inst->removeAndDeallocate();
+    if (hasValueWithoutLocation && diagnosedLocations.getCount() == 0)
+        sink->diagnose(Diagnostics::PhysicalPointerNotSupportedOnTarget{.location = SourceLoc()});
+    return instsToRemove.getCount() != 0;
+}
+
 // True if `target` is a C++/CUDA *kernel* output target. The `String` type is
 // implemented in terms of the Slang core runtime (`Slang::String`), which is
 // available for host C++ output and for the LLVM-backed CPU path, but not in the
