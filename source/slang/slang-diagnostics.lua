@@ -4858,7 +4858,7 @@ err(
     "groupshared-partial-write-in-differentiated-body",
     38039,
     "writing part of thread-group-shared variable '~var:Decl' introduces a race condition when this function is differentiated",
-    span { loc = "target:Expr", message = "~suggestion" }
+    span { loc = "target:Expr", message = "consider moving this into a function that is not differentiable or has a custom derivative" }
 )
 
 err(

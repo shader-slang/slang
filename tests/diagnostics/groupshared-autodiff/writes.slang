@@ -34,7 +34,7 @@ float elementWrite(uint i, float x)
     g[i] = float(i);
 /*CHECK:
      ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-     ^ move the access into a function that is not differentiable or has a custom derivative
+     ^ consider moving this into a function that is not differentiable or has a custom derivative
 */
     return x;
 }
@@ -45,7 +45,7 @@ float compoundElementWrite(uint i, float x)
     g[i] += 1.0;
 /*CHECK:
      ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-     ^ move the access into a function that is not differentiable or has a custom derivative
+     ^ consider moving this into a function that is not differentiable or has a custom derivative
 */
     return x;
 }
@@ -56,7 +56,7 @@ float incrementElement(uint i, float x)
     g[i]++;
 /*CHECK:
      ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-     ^ move the access into a function that is not differentiable or has a custom derivative
+     ^ consider moving this into a function that is not differentiable or has a custom derivative
 */
     return x;
 }
@@ -66,7 +66,7 @@ float fieldWrite(float x)
 {
     gPair.b = 1.0;
 //CHECK:  ^ writing part of thread-group-shared variable 'gPair' introduces a race condition when this function is differentiated
-//CHECK:  ^ move the access into a function that is not differentiable or has a custom derivative
+//CHECK:  ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -75,7 +75,7 @@ float vectorIndexWrite(uint i, float x)
 {
     gVector[i] = 1.0;
 //CHECK:   ^ writing part of thread-group-shared variable 'gVector' introduces a race condition when this function is differentiated
-//CHECK:   ^ move the access into a function that is not differentiable or has a custom derivative
+//CHECK:   ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -84,7 +84,7 @@ float swizzleWrite(float x)
 {
     gVector.yz = float2(1.0, 2.0);
 //CHECK:    ^^ writing part of thread-group-shared variable 'gVector' introduces a race condition when this function is differentiated
-//CHECK:    ^^ move the access into a function that is not differentiable or has a custom derivative
+//CHECK:    ^^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -93,7 +93,7 @@ float nestedWrite(uint i, float x)
 {
     gNested.pairs[i % 2].a = 1.0;
 //CHECK:                 ^ writing part of thread-group-shared variable 'gNested' introduces a race condition when this function is differentiated
-//CHECK:                 ^ move the access into a function that is not differentiable or has a custom derivative
+//CHECK:                 ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -140,7 +140,7 @@ float callWrite(uint i, float x)
 //CHECK:        ^ 'setElement' needs exclusive access to parameter 'v', but 'g[i]' is thread-group-shared memory that other invocations could access
 //CHECK:        ^ consider copying value through a local variable to make the access explicit
 //CHECK:        ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-//CHECK:        ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
+//CHECK:        ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -151,7 +151,7 @@ float inlinedCallWrite(uint i, float x)
 //CHECK:               ^ 'setElementInlined' needs exclusive access to parameter 'v', but 'g[i]' is thread-group-shared memory that other invocations could access
 //CHECK:               ^ consider copying value through a local variable to make the access explicit
 //CHECK:               ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-//CHECK:               ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
+//CHECK:               ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -162,7 +162,7 @@ float convertedCallWrite(uint i, float x)
 //CHECK:               ^ 'setElementUint' needs exclusive access to parameter 'v', but 'gInt[i]' is thread-group-shared memory that other invocations could access
 //CHECK:               ^ consider copying value through a local variable to make the access explicit
 //CHECK:               ^ writing part of thread-group-shared variable 'gInt' introduces a race condition when this function is differentiated
-//CHECK:               ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
+//CHECK:               ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -173,7 +173,7 @@ float mutatingReceiverWrite(uint i, float x)
 //CHECK:     ^ 'bump' needs exclusive access to parameter 'this', but 'gCounters[i]' is thread-group-shared memory that other invocations could access
 //CHECK:     ^ consider copying value through a local variable to make the access explicit
 //CHECK:     ^ writing part of thread-group-shared variable 'gCounters' introduces a race condition when this function is differentiated
-//CHECK:     ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
+//CHECK:     ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
 }
 

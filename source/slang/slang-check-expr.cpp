@@ -3878,7 +3878,7 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     }
     else
     {
-        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left, expr->left, false);
+        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left, expr->left);
     }
     expr->type = type;
     return expr;
@@ -8135,11 +8135,8 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
 
 // Report `target` if it writes part of a thread-group-shared variable in the body of a function
 // whose derivative Slang may generate from that body. `storage` is the storage that `target`
-// writes, and `isWrittenBackByCall` says whether a call by name writes it back.
-void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
-    Expr* target,
-    Expr* storage,
-    bool isWrittenBackByCall)
+// writes.
+void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target, Expr* storage)
 {
     SLANG_ASSERT(target && storage);
     if (isErrorTypedArgument(target))
@@ -8209,17 +8206,8 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
     if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
         return;
 
-    // The write-back of a call by name happens when the call returns, so moving only the indexing
-    // into a non-differentiable function is not enough: the call has to move with it. An operator
-    // reads as an access, so it gets the same advice as an assignment.
-    //
     getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
         .var = baseDeclRefExpr->declRef.getDecl(),
-        .suggestion = isWrittenBackByCall
-                          ? "the call writes this argument back when it returns; move the call "
-                            "into a function that is not differentiable or has a custom derivative"
-                          : "move the access into a function that is not differentiable or has a "
-                            "custom derivative",
         .target = target});
 }
 
@@ -8231,23 +8219,18 @@ void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
     DeclRef<CallableDecl> calleeDeclRef,
     List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
-    // A call writes back its `out` and `inout` arguments and its `[mutating]` receiver when it
-    // returns, whatever the callee is, so in a differentiated body each write-back to part of
-    // shared memory races like an assignment to that part.
+    // A call can write its `out` and `inout` arguments and its `[mutating]` receiver, whatever
+    // the callee is, so in a differentiated body each such argument that is part of shared memory
+    // races like an assignment to that part.
     //
-    bool isCallByName = !as<OperatorExpr>(invoke);
     forEachWrittenBackArgument(
         this,
         invoke,
         funcType,
         calleeDeclRef,
         paramDeclRefs,
-        [&](WrittenBackArgument const& written) {
-            checkGroupSharedPartialWriteInDifferentiatedBody(
-                written.arg,
-                written.storage,
-                isCallByName);
-        });
+        [&](WrittenBackArgument const& written)
+        { checkGroupSharedPartialWriteInDifferentiatedBody(written.arg, written.storage); });
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)
