@@ -4196,8 +4196,11 @@ public:
         FuncType* funcType,
         DeclRef<CallableDecl> calleeDeclRef,
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
-    void checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target);
-    void checkGroupSharedPartialWritesByInlinedCall(
+    void checkGroupSharedPartialWriteInDifferentiatedBody(
+        Expr* target,
+        Expr* storage,
+        bool isWrittenBackByCall);
+    void checkGroupSharedPartialWritesByCall(
         InvokeExpr* invoke,
         FuncType* funcType,
         DeclRef<CallableDecl> calleeDeclRef,

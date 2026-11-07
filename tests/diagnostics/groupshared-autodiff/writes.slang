@@ -3,9 +3,10 @@
 // component write into a read-modify-write of the whole variable, so each invocation stores back
 // stale copies of the other invocations' parts. Each case below writes part of shared memory in a
 // differentiable function without a custom derivative. A whole-variable write and an atomic stay
-// in place; they are in silent.slang. An element passed to an `inout` parameter of a
-// `[ForceInline]` helper is written in the body once the helper is inlined, so it is reported here
-// too. A write in the helper's own body is in write-in-force-inline-helper.slang.
+// in place; they are in silent.slang. A call that takes part of shared memory as an `out` or
+// `inout` argument, including a `[mutating]` receiver, writes that part back when it returns, so
+// it is reported whatever the callee. A write in a helper's own body is in
+// write-in-force-inline-helper.slang.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
@@ -96,20 +97,77 @@ float nestedWrite(uint i, float x)
     return x;
 }
 
-[ForceInline]
 void setElement(inout float v)
 {
     v = 1.0;
 }
 
+[ForceInline]
+void setElementInlined(inout float v)
+{
+    v = 1.0;
+}
+
+void setElementUint(inout uint v)
+{
+    v = 1;
+}
+
+struct Counter
+{
+    float n;
+
+    [mutating]
+    void bump()
+    {
+        n += 1.0;
+    }
+}
+
+groupshared int gInt[4];
+groupshared Counter gCounters[4];
+
 [Differentiable]
-float inlinedCallWrite(uint i, float x)
+float callWrite(uint i, float x)
 {
     setElement(g[i]);
 //CHECK:        ^ 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
 //CHECK:        ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
 //CHECK:        ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
-//CHECK:        ^ move the access into a function that is not differentiable or has a custom derivative
+//CHECK:        ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
+    return x;
+}
+
+[Differentiable]
+float inlinedCallWrite(uint i, float x)
+{
+    setElementInlined(g[i]);
+//CHECK:               ^ 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
+//CHECK:               ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//CHECK:               ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
+//CHECK:               ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
+    return x;
+}
+
+[Differentiable]
+float convertedCallWrite(uint i, float x)
+{
+    setElementUint(gInt[i]);
+//CHECK:               ^ 'v' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
+//CHECK:               ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit; if the callee needs to see other invocations' writes, declare the parameter 'groupshared'
+//CHECK:               ^ writing part of thread-group-shared variable 'gInt' introduces a race condition when this function is differentiated
+//CHECK:               ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
+    return x;
+}
+
+[Differentiable]
+float mutatingReceiverWrite(uint i, float x)
+{
+    gCounters[i].bump();
+//CHECK:     ^ 'this' is an 'out' or 'inout' parameter, which needs exclusive access to its argument during the call, but other invocations in the thread group can access this thread-group-shared memory
+//CHECK:     ^ if no other invocation accesses this memory during the call, copy it through a local variable to make that explicit
+//CHECK:     ^ writing part of thread-group-shared variable 'gCounters' introduces a race condition when this function is differentiated
+//CHECK:     ^ the call writes this argument back when it returns; move the call into a function that is not differentiable or has a custom derivative
     return x;
 }
 
@@ -120,5 +178,6 @@ void computeMain(uint i : SV_GroupIndex)
     bwd_diff(elementWrite)(i, x, 1.0);
     outputBuffer[i] = x.d + compoundElementWrite(i, 1.0) + incrementElement(i, 1.0) +
                       fieldWrite(1.0) + vectorIndexWrite(i, 1.0) + swizzleWrite(1.0) +
-                      nestedWrite(i, 1.0) + inlinedCallWrite(i, 1.0);
+                      nestedWrite(i, 1.0) + callWrite(i, 1.0) + inlinedCallWrite(i, 1.0) +
+                      convertedCallWrite(i, 1.0) + mutatingReceiverWrite(i, 1.0);
 }

@@ -3878,7 +3878,7 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     }
     else
     {
-        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left);
+        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left, expr->left, false);
     }
     expr->type = type;
     return expr;
@@ -4622,11 +4622,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 funcType,
                 callableDeclRef,
                 paramDeclRefs);
-            checkGroupSharedPartialWritesByInlinedCall(
-                invoke,
-                funcType,
-                callableDeclRef,
-                paramDeclRefs);
+            checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -8096,38 +8092,62 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
     return modes;
 }
 
+// Report `target` if it writes part of a thread-group-shared variable in the body of a function
+// whose derivative Slang may generate from that body. `storage` is the storage that `target`
+// writes: `target` itself, or for an implicitly converted call argument, the operand of the
+// conversion. `isWrittenBackByCall` says whether a call by name writes `target` back as an `out`
+// or `inout` argument or a `[mutating]` receiver, which changes the advice we give.
+//
 // Autodiff prepares a function body for differentiation by replacing the addresses it computes
 // with values, so a write to part of a thread-group-shared variable becomes a read of the whole
 // variable, an update of the part, and a write of the whole variable. Each invocation then
-// stores back stale copies of the parts other invocations wrote. A write of the whole variable
-// stays a single store. A write through a `groupshared` parameter stays in place, because
-// autodiff leaves the storage behind a reference parameter in memory. A non-differentiable
-// function called from the body keeps its own writes in place, because autodiff does not rewrite
-// it.
+// stores back stale copies of the parts other invocations wrote. A call writes back its `out` and
+// `inout` arguments and its `[mutating]` receiver the same way when it returns, whatever the
+// callee is. A write of the whole variable stays a single store, and a write through a
+// `groupshared` parameter stays in place, because autodiff leaves the storage behind a reference
+// parameter in memory.
+//
+// The rule is deliberately broader than the set of writes that race in a given program; we chose
+// a rule that is easy to state over a precise one. We report such a write in every function that
+// is marked differentiable and has no visible custom derivative for some mode, whether or not any
+// code requests that derivative. A differentiability attribute allows any module that imports the
+// function to request a derivative generated from its body, and only this module can check the
+// body, so we check what the attribute allows rather than what one program requests. For the same
+// reason, a custom derivative that another module declares does not exempt the function here.
+// Basing the rule on the source, rather than on how lowering and autodiff currently rewrite each
+// write, also keeps it in step as those passes change.
 //
 // Consider this example:
 //
 //     groupshared float g[4];
 //     groupshared float4 v;
+//     void setOne(inout float y) { y = 1.0; }
 //
 //     [Differentiable]
 //     float f(groupshared float a[4], uint i, float x)
 //     {
 //         g[i] = x;       // reported
 //         v.yz += 1.0;    // reported
+//         setOne(g[i]);   // reported
 //         v = float4(0);  // not reported
 //         a[i] = x;       // not reported
 //         return x;
 //     }
-void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target)
+//
+// Error 38038 rejects `f` itself today, because its `groupshared` parameter is a reference
+// parameter; the last write shows how a write through such a parameter is treated.
+void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(
+    Expr* target,
+    Expr* storage,
+    bool isWrittenBackByCall)
 {
-    SLANG_ASSERT(target);
+    SLANG_ASSERT(target && storage);
     if (isArgumentOfFailedCheck(target))
         return;
     if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
         return;
 
-    Expr* wholeExpr = target;
+    Expr* wholeExpr = storage;
     while (auto parenExpr = as<ParenExpr>(wholeExpr))
         wholeExpr = parenExpr->base;
 
@@ -8147,46 +8167,41 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
     if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
         return;
 
+    // The write-back of a call by name happens when the call returns, so moving only the indexing
+    // into a non-differentiable function is not enough: the call has to move with it. An operator
+    // reads as an access, so it gets the same advice as an assignment.
+    //
     getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
         .var = baseDeclRefExpr->declRef.getDecl(),
+        .suggestion = isWrittenBackByCall
+                          ? "the call writes this argument back when it returns; move the call "
+                            "into a function that is not differentiable or has a custom derivative"
+                          : "move the access into a function that is not differentiable or has a "
+                            "custom derivative",
         .target = target});
 }
 
-// Return whether every call to `callee` is replaced by the callee's body or by an intrinsic, so
-// that its `out`/`inout` arguments are written in the calling body rather than across a call
-// boundary. The core module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such
-// calls.
-static bool isCallAlwaysInlinedOrIntrinsic(CallableDecl* callee)
-{
-    return callee->hasModifier<ForceInlineAttribute>() ||
-           callee->hasModifier<UnsafeForceInlineEarlyAttribute>() ||
-           callee->hasModifier<IntrinsicOpModifier>() ||
-           callee->hasModifier<TargetIntrinsicModifier>();
-}
-
-// A call that is always inlined, or to an intrinsic, writes its `out` and `inout` arguments in
-// the calling body, where autodiff rewrites them like any other write, so we check those arguments
-// as writes. A call to any other function needs exclusive access to those arguments, which
-// `checkGroupSharedArgumentsOfExclusiveParams` already reports.
-void SemanticsVisitor::checkGroupSharedPartialWritesByInlinedCall(
+// Report each argument of `invoke` that the call writes back to part of thread-group-shared
+// memory in the body of a function whose derivative Slang may generate from that body, as
+// `checkGroupSharedPartialWriteInDifferentiatedBody` describes.
+void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
     InvokeExpr* invoke,
     FuncType* funcType,
     DeclRef<CallableDecl> calleeDeclRef,
     List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
-    if (!calleeDeclRef || !isCallAlwaysInlinedOrIntrinsic(calleeDeclRef.getDecl()))
-        return;
+    bool isCallByName = !isOperatorInvocation(invoke);
     forEachWrittenBackArgument(
         this,
         invoke,
         funcType,
         calleeDeclRef,
         paramDeclRefs,
-        [&](WrittenBackArgument const& written)
-        {
-            if (written.isConverted() || written.isReceiver)
-                return;
-            checkGroupSharedPartialWriteInDifferentiatedBody(written.arg);
+        [&](WrittenBackArgument const& written) {
+            checkGroupSharedPartialWriteInDifferentiatedBody(
+                written.arg,
+                written.storage,
+                isCallByName);
         });
 }
 
