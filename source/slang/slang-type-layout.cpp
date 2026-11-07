@@ -3035,6 +3035,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
 TypeLayoutContext getInitialLayoutContextForTarget(
     TargetRequest* targetReq,
+    CompilerOptionSet& optionSet,
     ProgramLayout* programLayout,
     slang::LayoutRules rules)
 {
@@ -3055,9 +3056,10 @@ TypeLayoutContext getInitialLayoutContextForTarget(
     TypeLayoutContext context;
     context.astBuilder = astBuilder;
     context.targetReq = targetReq;
+    context.optionSet = &optionSet;
     context.programLayout = programLayout;
     context.rules = nullptr;
-    context.matrixLayoutMode = targetReq->getOptionSet().getMatrixLayoutMode();
+    context.matrixLayoutMode = optionSet.getMatrixLayoutMode();
 
     if (auto hlslToVulkanLayoutOptions = targetReq->getHLSLToVulkanLayoutOptions())
     {
@@ -3070,10 +3072,10 @@ TypeLayoutContext getInitialLayoutContextForTarget(
         switch (rules)
         {
         case slang::LayoutRules::DefaultStructuredBuffer:
-            context.rules = rulesFamily->getStructuredBufferRules(targetReq->getOptionSet());
+            context.rules = rulesFamily->getStructuredBufferRules(optionSet);
             break;
         default:
-            context.rules = rulesFamily->getConstantBufferRules(targetReq->getOptionSet(), nullptr);
+            context.rules = rulesFamily->getConstantBufferRules(optionSet, nullptr);
             break;
         }
     }
@@ -4295,7 +4297,7 @@ RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
         return elementTypeLayout;
 
     return _createParameterGroupTypeLayout(
-        context.with(context.targetReq->getOptionSet().getMatrixLayoutMode()),
+        context.with(context.optionSet->getMatrixLayoutMode()),
         nullptr,
         elementTypeLayout);
 }
@@ -4366,7 +4368,7 @@ RefPtr<TypeLayout> createParameterGroupTypeLayout(
     auto elementTypeRules = getParameterBufferElementTypeLayoutRules(
         parameterGroupType,
         parameterGroupRules,
-        context.targetReq->getOptionSet());
+        *context.optionSet);
 
     auto elementType = parameterGroupType->getElementType();
 
@@ -4388,7 +4390,7 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferWithCounterTypeLayout(
         createStructuredBufferTypeLayout(context, kind, structuredBufferType, elementTypeLayout);
 
     const auto structuredBufferLayoutRules =
-        context.getRulesFamily()->getStructuredBufferRules(context.targetReq->getOptionSet());
+        context.getRulesFamily()->getStructuredBufferRules(*context.optionSet);
 
     const auto counterType = context.astBuilder->getIntType();
     const auto counterBufferType = context.astBuilder->getRWStructuredBufferType(counterType);
@@ -4525,7 +4527,7 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
 {
     // look up the appropriate rules via the `LayoutRulesFamily`
     auto structuredBufferLayoutRules =
-        context.getRulesFamily()->getStructuredBufferRules(context.targetReq->getOptionSet());
+        context.getRulesFamily()->getStructuredBufferRules(*context.optionSet);
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout =
@@ -5978,11 +5980,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             if (context.sink)
             {
                 auto name = classDeclRef.getName();
-                context.sink->diagnose(Diagnostics::ClassTypeNotSupported{
-                    .name = name ? String(name->text) : String("(anonymous)"),
-                    .location = context.layoutDeclForDiagnostics
-                                    ? context.layoutDeclForDiagnostics->loc
-                                    : classDeclRef.getLoc()});
+                context.sink->diagnose(
+                    Diagnostics::ClassTypeNotSupported{
+                        .name = name ? String(name->text) : String("(anonymous)"),
+                        .location = context.layoutDeclForDiagnostics
+                                        ? context.layoutDeclForDiagnostics->loc
+                                        : classDeclRef.getLoc()});
             }
             return createSimpleTypeLayout(SimpleLayoutInfo(), type, rules);
         }
