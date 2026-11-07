@@ -12,6 +12,7 @@
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
 #include "core/slang-char-util.h"
+#include "core/slang-io.h"
 #include "core/slang-math.h"
 #include "core/slang-short-dictionary.h"
 #include "core/slang-string-util.h"
@@ -5526,6 +5527,12 @@ static Name* findClosestInScopeName(
                 if (Math::Abs(candidateText.getLength() - target.getLength()) > maxDistance)
                     continue;
 
+                // Skip declarations that the failed `LookupMask::Default` lookup could not
+                // have returned, such as a `module` declaration: suggesting one would name
+                // something the user cannot refer to.
+                if (!DeclPassesLookupMask(candidateDecl, LookupMask::Default))
+                    continue;
+
                 // Don't suggest a declaration the user could not have referenced:
                 // real lookup already filtered inaccessible (`private`/`internal`)
                 // candidates, so offering one as a "did you mean" would name a
@@ -5558,6 +5565,54 @@ static Name* findClosestInScopeName(
     for (auto n : bestNames)
         best = n;
     return best;
+}
+
+// Return whether `name` names a module that the code at `scope` can see, so that an
+// undefined-identifier error on `name` can explain that a module name cannot be used in code.
+// The modules that count are the module that `scope` belongs to and every module in
+// `importedModulesList`, which holds the modules this checking session imported, including the
+// ones re-exported with `__exported import`. A module is named both by its declared name
+// (`module ModA;`, or for a module without one, the name taken from its file or import path)
+// and by the path that an `import` in this module spells (`import mod_a;`, `import lib.mod_d;`,
+// `import "lib/StrMod.slang";`), including an `import` in a file the module `__include`s. User
+// code would write the last path component without its extension, so that is what we compare
+// `name` with.
+static bool isNameOfCurrentOrImportedModule(SemanticsVisitor* semantics, Name* name, Scope* scope)
+{
+    if (!name)
+        return false;
+
+    const String nameText = getText(name);
+    auto isSpellingOfModule = [&](Name* moduleName)
+    { return moduleName && Path::getFileNameWithoutExt(getText(moduleName)) == nameText; };
+    auto hasImportSpelledAsName = [&](ContainerDecl* containerDecl)
+    {
+        for (auto importDecl : containerDecl->getMembersOfType<ImportDecl>())
+        {
+            // An `import` that failed to load names no module.
+            if (importDecl->importedModuleDecl &&
+                isSpellingOfModule(importDecl->moduleNameAndLoc.name))
+                return true;
+        }
+        return false;
+    };
+
+    if (auto moduleDecl = getModuleDecl(scope))
+    {
+        if (isSpellingOfModule(moduleDecl->getName()) || hasImportSpelledAsName(moduleDecl))
+            return true;
+        for (auto fileDecl : moduleDecl->getMembersOfType<FileDecl>())
+        {
+            if (hasImportSpelledAsName(fileDecl))
+                return true;
+        }
+    }
+    for (auto importedModuleDecl : semantics->getShared()->importedModulesList)
+    {
+        if (isSpellingOfModule(importedModuleDecl->getName()))
+            return true;
+    }
+    return false;
 }
 
 Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
@@ -5609,13 +5664,21 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
         // 'length'?" note to the error; this turns a bare "undefined identifier
         // 'lenght'" into an actionable hint. The note only renders when
         // `suggestionLocation` is valid, so a null suggestion is harmless.
-        auto suggestion =
-            findClosestInScopeName(this, expr->name, expr->scope, getDeclToExcludeFromLookup());
+        // A name that names a module was not misspelled, so its module-name note replaces
+        // the spelling suggestion.
+        const bool namesModule = isNameOfCurrentOrImportedModule(this, expr->name, expr->scope);
+        auto suggestion = namesModule ? nullptr
+                                      : findClosestInScopeName(
+                                            this,
+                                            expr->name,
+                                            expr->scope,
+                                            getDeclToExcludeFromLookup());
         getSink()->diagnose(Diagnostics::UndefinedIdentifier{
             .name = expr->name,
             .suggestion = suggestion,
             .location = expr->loc,
-            .suggestionLocation = suggestion ? expr->loc : SourceLoc{}});
+            .suggestionLocation = suggestion ? expr->loc : SourceLoc{},
+            .moduleNameLocation = namesModule ? expr->loc : SourceLoc{}});
     }
 
     return resultExpr;

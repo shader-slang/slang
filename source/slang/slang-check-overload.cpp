@@ -2053,12 +2053,6 @@ int SemanticsVisitor::CompareLookupResultItems(
         }
     }
 
-    // Any decl is strictly better than a module decl.
-    bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
-    bool rightIsModule = (as<ModuleDeclarationDecl>(right.declRef) != nullptr);
-    if (leftIsModule != rightIsModule)
-        return int(leftIsModule) - int(rightIsModule);
-
     // If both are interface requirements, prefer the more derived interface.
     if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)
     {
