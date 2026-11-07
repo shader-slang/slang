@@ -3349,6 +3349,7 @@ ConstructorDecl* SemanticsDeclVisitorBase::createCtor(
 {
     auto ctor = m_astBuilder->create<ConstructorDecl>();
     addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
+    addModifier(ctor, m_astBuilder->create<ArtificialModifier>());
     auto ctorName = getName("$init");
     ctor->ownedScope = m_astBuilder->create<Scope>();
     ctor->ownedScope->containerDecl = ctor;
@@ -7793,6 +7794,7 @@ CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitnessIn
     CallableDecl* synFuncDecl = as<CallableDecl>(
         m_astBuilder->createByNodeType(requiredMemberDeclRef.getDecl()->astNodeType));
     SLANG_ASSERT(synFuncDecl);
+    addModifier(synFuncDecl, m_astBuilder->create<ArtificialModifier>());
 
     synFuncDecl->ownedScope = m_astBuilder->create<Scope>();
     synFuncDecl->ownedScope->containerDecl = synFuncDecl;
@@ -8814,6 +8816,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         //
         auto synAccessorDecl = (AccessorDecl*)m_astBuilder->createByNodeType(
             requiredAccessorDeclRef.getDecl()->astNodeType);
+        addModifier(synAccessorDecl, m_astBuilder->create<ArtificialModifier>());
         synAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
         synAccessorDecl->ownedScope->containerDecl = synAccessorDecl;
         synAccessorDecl->ownedScope->parent = getScope(context->parentDecl);
