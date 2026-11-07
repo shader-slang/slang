@@ -1661,7 +1661,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_DXBC:
     case SLANG_DXBC_ASM:
         {
-            return PassThroughFlag::Fxc;
+            return PassThroughFlags(1) << int(DownstreamCompilerUtil::getDefaultDXBCCompiler());
         }
     case SLANG_SPIRV:
     case SLANG_SPIRV_ASM:
@@ -1844,14 +1844,15 @@ static SlangResult _extractSlangCTestRequirements(
     const CommandLine& cmdLine,
     TestRequirements* ioRequirements)
 {
+    SlangPassThrough passThroughCompiler = SLANG_PASS_THROUGH_NONE;
     // This determines what the requirements are for a slangc like command line
     // First check pass through
     {
         String passThrough;
         if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-pass-through", passThrough)))
         {
-            ioRequirements->addUsedBackEnd(
-                TypeTextUtil::findPassThrough(passThrough.getUnownedSlice()));
+            passThroughCompiler = TypeTextUtil::findPassThrough(passThrough.getUnownedSlice());
+            ioRequirements->addUsedBackEnd(passThroughCompiler);
         }
     }
 
@@ -1862,7 +1863,14 @@ static SlangResult _extractSlangCTestRequirements(
         {
             const SlangCompileTarget target =
                 TypeTextUtil::findCompileTargetFromName(targetName.getUnownedSlice());
-            ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+            if (target == SLANG_DXBC && passThroughCompiler != SLANG_PASS_THROUGH_NONE)
+            {
+                ioRequirements->addUsedBackEnd(passThroughCompiler);
+            }
+            else
+            {
+                ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+            }
         }
     }
 

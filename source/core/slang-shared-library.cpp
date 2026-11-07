@@ -37,7 +37,12 @@ SlangResult DefaultSharedLibraryLoader::loadSharedLibrary(
     *outSharedLibrary = nullptr;
     // Try loading
     SharedLibrary::Handle handle;
-    SLANG_RETURN_ON_FAIL(SharedLibrary::load(path, handle));
+    SlangPathType pathType;
+    const bool isFile =
+        SLANG_SUCCEEDED(Path::getPathType(path, &pathType)) && pathType == SLANG_PATH_TYPE_FILE;
+    SLANG_RETURN_ON_FAIL(
+        isFile ? SharedLibrary::loadWithPlatformPath(path, handle)
+               : SharedLibrary::load(path, handle));
     *outSharedLibrary = ComPtr<ISlangSharedLibrary>(new DefaultSharedLibrary(handle)).detach();
     return SLANG_OK;
 }

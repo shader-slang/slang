@@ -211,7 +211,8 @@ void Session::_initCodeGenTransitionMap()
     // Add all the straightforward transitions
     map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::CUDAHeader, CodeGenTarget::PTX, PassThroughMode::NVRTC);
-    map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
+    const auto dxbcCompiler = PassThroughMode(DownstreamCompilerUtil::getDefaultDXBCCompiler());
+    map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, dxbcCompiler);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::Metal, CodeGenTarget::MetalLib, PassThroughMode::MetalC);
@@ -224,10 +225,7 @@ void Session::_initCodeGenTransitionMap()
         CodeGenTarget::WGSLSPIRVAssembly,
         PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::DXIL, CodeGenTarget::DXILAssembly, PassThroughMode::Dxc);
-    map.addTransition(
-        CodeGenTarget::DXBytecode,
-        CodeGenTarget::DXBytecodeAssembly,
-        PassThroughMode::Fxc);
+    map.addTransition(CodeGenTarget::DXBytecode, CodeGenTarget::DXBytecodeAssembly, dxbcCompiler);
     map.addTransition(
         CodeGenTarget::MetalLib,
         CodeGenTarget::MetalLibAssembly,

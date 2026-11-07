@@ -26,6 +26,7 @@ struct PassThroughFlag
     {
         Dxc = 1 << int(SLANG_PASS_THROUGH_DXC),
         Fxc = 1 << int(SLANG_PASS_THROUGH_FXC),
+        Vkd3d = 1 << int(SLANG_PASS_THROUGH_VKD3D),
         Glslang = 1 << int(SLANG_PASS_THROUGH_GLSLANG),
         VisualStudio = 1 << int(SLANG_PASS_THROUGH_VISUAL_STUDIO),
         GCC = 1 << int(SLANG_PASS_THROUGH_GCC),

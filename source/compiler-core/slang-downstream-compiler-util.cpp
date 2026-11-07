@@ -23,6 +23,7 @@
 #include "slang-nvrtc-compiler.h"
 #include "slang-tint-compiler.h"
 #include "slang-visual-studio-compiler-util.h"
+#include "slang-vkd3d-compiler.h"
 
 namespace Slang
 {
@@ -57,6 +58,7 @@ struct DownstreamCompilerInfos
 
     infos.infos[int(SLANG_PASS_THROUGH_DXC)] = Info(SourceLanguageFlag::HLSL);
     infos.infos[int(SLANG_PASS_THROUGH_FXC)] = Info(SourceLanguageFlag::HLSL);
+    infos.infos[int(SLANG_PASS_THROUGH_VKD3D)] = Info(SourceLanguageFlag::HLSL);
     infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] = Info(SourceLanguageFlag::GLSL);
     infos.infos[int(SLANG_PASS_THROUGH_SPIRV_OPT)] = Info(SourceLanguageFlag::SPIRV);
 
@@ -351,6 +353,15 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     }
 }
 
+SlangPassThrough DownstreamCompilerUtil::getDefaultDXBCCompiler()
+{
+#if SLANG_ENABLE_VKD3D_SHADER && !SLANG_WINDOWS_FAMILY
+    return SLANG_PASS_THROUGH_VKD3D;
+#else
+    return SLANG_PASS_THROUGH_FXC;
+#endif
+}
+
 /* static */ void DownstreamCompilerUtil::setDefaultLocators(
     DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)])
 {
@@ -360,6 +371,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     outFuncs[int(SLANG_PASS_THROUGH_NVRTC)] = &NVRTCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &DXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_VKD3D)] = &Vkd3dDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &GlslangDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_SPIRV_OPT)] = &SpirvOptDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_LLVM)] = &LLVMDownstreamCompilerUtil::locateCompilers;
