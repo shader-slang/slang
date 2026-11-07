@@ -136,6 +136,7 @@
 #include "slang-ir-variable-scope-correction.h"
 #include "slang-ir-vk-invert-y.h"
 #include "slang-ir-wgsl-legalize.h"
+#include "slang-ir-wgsl-uniform-load.h"
 #include "slang-ir-wrap-cbuffer-element.h"
 #include "slang-ir-wrap-structured-buffers.h"
 #include "slang-legalize-types.h"
@@ -2837,6 +2838,12 @@ Result linkAndOptimizeIR(
     // Legalization keeps a void placeholder for `differential` to preserve field positions.
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
+
+    // WGSL only accepts a barrier whose execution it can prove uniform across the workgroup, and
+    // it never treats a plain `var<workgroup>` read as uniform. We run this after the passes that
+    // reshape the CFG and before phi elimination, while values still flow through block params.
+    if (isWGPUTarget(targetRequest))
+        SLANG_PASS(insertWorkgroupUniformLoadsForWGSL);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
