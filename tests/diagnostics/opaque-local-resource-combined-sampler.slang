@@ -11,8 +11,8 @@
 // In contrast, a texture and sampler combined by the program can be separated by retaining the
 // actual sampler value; `resource-selection-combined.slang` covers that sampler extraction.
 // CHECK: error[E56004]: opaque type in local variable
-// IMAGE: OpImage
-// IMAGE: OpImageFetch
+// IMAGE: %[[EXTRACTED:[^ ]+]] = OpImage {{[^ ]+}}
+// IMAGE: OpImageFetch {{[^ ]+}} %[[EXTRACTED]]{{( |$)}}
 
 Sampler2D<float4> combinedA;
 Sampler2D<float4> combinedB;

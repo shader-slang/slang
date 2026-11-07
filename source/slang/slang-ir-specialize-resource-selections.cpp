@@ -83,8 +83,9 @@ namespace Slang
 // SSA construction represents conditional resource computations as `IRSelect` instructions or
 // non-entry block parameters whose incoming branch arguments supply the possible resource values.
 // We call the connected set of those instructions, their resource constructors, and roots a
-// *selection graph*. We follow both incoming dependencies and uses so that shared computations
-// are rewritten together. A loop can introduce cycles through block parameters in this graph.
+// *selection graph*. We follow incoming dependencies and the uses of values that will be replaced,
+// so shared resource computations are rewritten together. Roots remain available and can be inputs
+// to separate graphs. A loop can introduce cycles through block parameters in a graph.
 //
 // The implementation has four phases: discover a selection graph, determine its finite recipe
 // alternatives and validate the constructions needed by its consumers, replace resource-valued
@@ -314,10 +315,11 @@ struct ResourceSelectionContext
     bool tryRewrite(IRInst* candidate)
     {
         // We finish analysis before changing executable IR. Roots and constructor operands must
-        // be reconstructible, and every resource use must end in a supported ordinary-valued
-        // operation. The caller, `specializeResourceUsage`, also runs `specializeResourceOutputs`
-        // and tries inlining calls whose resource outputs could not be reconstructed. Its next
-        // iteration can retry a graph that could not be rewritten before that inlining.
+        // be reconstructible, and every use of a replaced resource value must end in a supported
+        // ordinary-valued operation. The caller, `specializeResourceUsage`, also runs
+        // `specializeResourceOutputs` and tries inlining calls whose resource outputs could not be
+        // reconstructed. Its next iteration can retry a graph that could not be rewritten before
+        // that inlining.
         if (!discoverGraph(candidate))
             return false;
         if (!discoverRecipes())
@@ -552,8 +554,8 @@ struct ResourceSelectionContext
                 commonIndexType = type;
     }
 
-    /// Discover all resource dependencies and uses, rejecting unsupported producers before
-    /// mutation.
+    /// Discover the resource graph containing `candidate`, rejecting unsupported producers before
+    /// executable IR is changed.
     bool discoverGraph(IRInst* candidate)
     {
         addValue(candidate);
@@ -628,8 +630,15 @@ struct ResourceSelectionContext
                 return false;
             }
 
-            // We follow uses as well as dependencies. Otherwise a shared selection could be
-            // deleted while a second selection still expected its resource-valued representation.
+            // Roots remain available after the graph is rewritten, so their other uses need no
+            // replacement. We stop at a root rather than pulling an independent resource-valued
+            // operation into this graph, where it could prevent a supported selection rewrite.
+            if (value->isRoot)
+                continue;
+
+            // For values that we replace, we follow uses as well as dependencies. Otherwise a
+            // shared selection could be deleted while a second selection still expected its
+            // resource-valued representation.
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
                 auto user = use->getUser();
@@ -1572,8 +1581,8 @@ struct ResourceSelectionContext
     void removeResourceGraph()
     {
         // Selection cycles can still reference each other even after all executable consumers
-        // have been replaced. We unlink operands for the whole graph before deallocating any
-        // node, so deleting a loop parameter cannot leave a dangling use in another graph node.
+        // have been replaced. We unlink operands of every replaced instruction before deallocating
+        // any of them, so deleting a loop parameter cannot leave a dangling use in another node.
         for (auto value : values)
         {
             if (value->isRoot)
