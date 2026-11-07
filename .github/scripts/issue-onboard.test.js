@@ -3,6 +3,8 @@
 "use strict";
 
 const assert = require("node:assert");
+const fs = require("node:fs");
+const path = require("node:path");
 const extractor = require("./extract-workflow-js.js");
 const { currentIteration } = extractor.load({
   workflow: ".github/workflows/issue-board-onboard.yml",
@@ -75,6 +77,18 @@ test("currentIteration: accepts a Date", () => {
     currentIteration([SPRINT_61], new Date("2026-08-25T12:00:00Z")).title,
     "Sprint 61",
   );
+});
+
+test("setIteration declares iterationId as String, not ID", () => {
+  const yaml = fs.readFileSync(
+    path.join(__dirname, "..", "workflows", "issue-board-onboard.yml"),
+    "utf8",
+  );
+  const mutations = [...yaml.matchAll(/mutation\([^)]+\)/g)].map((m) => m[0]);
+  const sprint = mutations.find((m) => m.includes("$iteration"));
+  assert.ok(sprint, "expected a mutation that takes $iteration");
+  assert.match(sprint, /\$iteration: String!/);
+  assert.doesNotMatch(sprint, /\$iteration: ID!/);
 });
 
 (async () => {
