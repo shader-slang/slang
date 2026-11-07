@@ -324,6 +324,13 @@ struct BackwardDiffTranslationContext
             rematFuncResult,
             intermediateTypeNameStorage.getUnownedSlice());
 
+        // The apply / propagate / remat bodies were split out of the unzipped forward
+        // derivative, so their scopes inherit that function's debug record. The record is a
+        // sibling of the function, so it outlives the removal below.
+        IRInst* inheritedDebugRoot = nullptr;
+        if (auto debugFuncDecor = unzippedFwdDiffFunc->findDecoration<IRDebugFuncDecoration>())
+            inheritedDebugRoot = debugFuncDecor->getDebugFunc();
+
         // At this point the unzipped func is just an empty shell
         // and we can simply remove it.
         unzippedFwdDiffFunc->removeAndDeallocate();
@@ -406,9 +413,9 @@ struct BackwardDiffTranslationContext
         generateName(builder, targetFunc, rematFuncResult, "s_remat_");
         // generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
 
-        copyDebugInfo(targetFunc, applyFunc);
-        copyDebugInfo(targetFunc, propagateFunc);
-        copyDebugInfo(targetFunc, rematFuncResult);
+        copyDebugInfo(targetFunc, applyFunc, inheritedDebugRoot);
+        copyDebugInfo(targetFunc, propagateFunc, inheritedDebugRoot);
+        copyDebugInfo(targetFunc, rematFuncResult, inheritedDebugRoot);
 
         propagatePropertiesForSingleFunc(builder->getModule(), propagateFunc);
         propagatePropertiesForSingleFunc(builder->getModule(), applyFunc);
