@@ -1691,13 +1691,22 @@ void MetalSourceEmitter::_emitStageAccessSemantic(
 
 void MetalSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
+    // Metal accepts `[[raster_order_group]]` on the parameters of a fragment function only. In
+    // the other entry points a rasterizer-ordered resource behaves like the read-write one.
+    auto func = getParentFunc(param);
+    auto entryPointDecor = func ? func->findDecoration<IREntryPointDecoration>() : nullptr;
+    m_omitRasterOrderGroup =
+        entryPointDecor && entryPointDecor->getProfile().getStage() != Stage::Fragment;
     Super::emitSimpleFuncParamImpl(param);
+    m_omitRasterOrderGroup = false;
     emitFuncParamLayoutImpl(param);
 }
 
 void MetalSourceEmitter::emitPostDeclarationAttributesForType(IRInst* type)
 {
     Super::emitPostDeclarationAttributesForType(type);
+    if (m_omitRasterOrderGroup)
+        return;
     if (auto textureType = as<IRTextureTypeBase>(type))
     {
         if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
