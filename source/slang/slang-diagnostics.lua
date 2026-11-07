@@ -3974,6 +3974,20 @@ err(
 )
 
 err(
+    "global-varying-not-supported",
+    30626,
+    "module-scope varying '~decl:Decl' is not supported in ~language",
+    span { loc = "decl:Decl", message = "module-scope 'in'/'out' variables are a GLSL feature; declare '~decl' as an entry-point parameter instead" }
+)
+
+warning(
+    "deprecated-global-varying",
+    30627,
+    "module-scope varying '~decl:Decl' is deprecated",
+    span { loc = "decl:Decl", message = "module-scope 'in'/'out' variables are intended for the GLSL dialect only, and support for them in Slang will be removed in a later compiler release; declare '~decl' as an entry-point parameter instead" }
+)
+
+err(
     "generic-value-parameter-type-not-supported",
     30624,
     "generic value parameter type '~type:Type' is not supported; only integer and enum types are allowed",
@@ -4282,6 +4296,13 @@ err(
     31400,
     "declaration not allowed in this context",
     span { loc = "decl:Decl", message = "~childKind declaration is not allowed inside ~parentKind." }
+)
+
+err(
+    "global-varying-not-at-module-scope",
+    31401,
+    "module-scope varying '~decl:Decl' must be declared at the top level of its module",
+    span { loc = "decl:Decl", message = "'~decl' is an 'in'/'out' variable declared inside a namespace" }
 )
 
 --
@@ -4961,6 +4982,14 @@ err(
     span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have an output stream parameter of type PointStream<T>, LineStream<T>, or TriangleStream<T>" }
 )
 
+warning(
+    "entry-point-varying-param-with-global-varyings",
+    38044,
+    "entry point has varying parameters and also owns module-scope varyings",
+    span { loc = "param:Decl", message = "'~param' is a varying parameter of an entry point that also owns module-scope varyings; this will be an error in a future compiler release" },
+    note { message = "module-scope varying '~globalVarying' is declared here", span { loc = "globalVarying:Decl" } }
+)
+
 err(
     "geometry-shader-missing-max-vertex-count",
     38046,
@@ -5024,6 +5053,13 @@ err(
     39999,
     "import failed due to compilation error",
     span { loc = "location", message = "import of module '~module' failed because of a compilation error" }
+)
+
+err(
+    "imported-module-has-global-varyings",
+    38208,
+    "cannot import a module that declares module-scope varyings",
+    span { loc = "location", message = "module '~module:Name' declares module-scope 'in'/'out' variables, which belong only to the entry points declared in that module" }
 )
 
 err(
@@ -6480,6 +6516,13 @@ err(
 )
 
 -- GLSL Compatibility (58001-58003)
+
+standalone_note(
+    "global-varying-owned-by-entry-point",
+    -1,
+    "'~decl:Decl' belongs to entry point '~entryPoint:Name', which owns every module-scope varying of its module, whether or not it uses it",
+    span { loc = "decl:Decl" }
+)
 
 err(
     "entry-point-must-return-void-when-global-output-present",

@@ -32,6 +32,9 @@ RefPtr<EntryPoint> EntryPoint::create(
     // capabilities). The seed keeps the field non-null for paths that skip validation.
     entryPoint->m_inferredCapabilityRequirements =
         funcDeclRef.getDecl()->inferredCapabilityRequirements;
+    // Every caller creates entry points after `Module::_collectShaderParams` has filled the
+    // module's list.
+    entryPoint->m_globalVaryings = Slang::getModule(funcDeclRef.getDecl())->getGlobalVaryings();
     return entryPoint;
 }
 

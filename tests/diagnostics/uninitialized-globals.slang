@@ -1,4 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHK): -lang glsl tests/diagnostics/uninitialized-globals.slang -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHK): -lang glsl tests/diagnostics/uninitialized-globals.slang -target spirv -entry computeMain -warnings-disable 38044
+// The compute entry point owns this module's `in`/`out` globals, so W38044 would flag its
+// `SV_DispatchThreadID` parameter. This test is about uninitialized globals, so it disables W38044.
 
 // Using groupshared variables
 groupshared float4 gsUninitialized;

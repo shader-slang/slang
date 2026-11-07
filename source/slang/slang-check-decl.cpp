@@ -576,6 +576,54 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
             }
         }
+
+        if (isGlobalVaryingVar(decl) && !isFromCoreModule(decl))
+            checkAndMarkGlobalVaryingVarDecl(decl);
+    }
+
+    /// Checks a module-scope varying (see `isGlobalVaryingVar`) declared outside the builtin core
+    /// and `glsl` modules, and adds `HasLegacyGlobalVaryingsModifier` to its module.
+    ///
+    /// Module-scope varyings are a GLSL idiom: Slang and HLSL entry points declare their inputs and
+    /// outputs as parameters. We therefore reject them in HLSL and in Slang 2025 and later, and
+    /// warn about them in legacy Slang. We also restrict them to the top level of the module in
+    /// every language: they exist for the GLSL dialect, which has no namespaces, so a varying
+    /// declared inside a namespace has no meaning to carry over.
+    void checkAndMarkGlobalVaryingVarDecl(VarDecl* decl)
+    {
+        auto moduleDecl = getModuleDecl(decl);
+        if (!moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+            addModifier(moduleDecl, getASTBuilder()->create<HasLegacyGlobalVaryingsModifier>());
+
+        if (as<NamespaceDecl>(getParentDecl(decl)))
+            getSink()->diagnose(Diagnostics::GlobalVaryingNotAtModuleScope{.decl = decl});
+
+        switch (getSourceLanguage())
+        {
+        case SourceLanguage::HLSL:
+            getSink()->diagnose(
+                Diagnostics::GlobalVaryingNotSupported{.language = "HLSL", .decl = decl});
+            break;
+        case SourceLanguage::Slang:
+            if (getShared()->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2025)
+            {
+                getSink()->diagnose(Diagnostics::GlobalVaryingNotSupported{
+                    .language = "Slang 2025 and later",
+                    .decl = decl});
+            }
+            else
+            {
+                getSink()->diagnose(Diagnostics::DeprecatedGlobalVarying{.decl = decl});
+            }
+            break;
+        case SourceLanguage::GLSL:
+            // GLSL is the dialect that module-scope varyings belong to.
+            break;
+        default:
+            // Other source languages either cannot declare `in`/`out` variables, or are checked
+            // without a translation unit (`Unknown`), so there is no language rule to apply.
+            break;
+        }
     }
 
     void visitDecl(Decl* decl)
@@ -1607,6 +1655,19 @@ bool isGlobalDecl(Decl* decl)
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 {
     return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
+}
+
+/// Is `decl` a module-scope varying, that is, a variable declared `in`, `out` or `inout` outside
+/// any function or type, either at the top level of its module or inside a namespace? (`inout`
+/// counts because `InOutModifier` derives from `OutModifier`.)
+///
+/// GLSL-style shaders read their inputs and write their outputs through such variables instead of
+/// through entry-point parameters. The code calls them "global varyings".
+bool isGlobalVaryingVar(VarDeclBase* decl)
+{
+    if (!isGlobalDecl(decl))
+        return false;
+    return decl->hasModifier<InModifier>() || decl->hasModifier<OutModifier>();
 }
 
 /// Is `decl` a global shader parameter declaration?
@@ -18799,6 +18860,15 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     // it later during code generation.
     auto importedModuleDecl = importedModule->getModuleDecl();
     decl->importedModuleDecl = importedModuleDecl;
+
+    // An entry point owns the module-scope varyings of its own module only, so an entry point of
+    // the importing module could read or write an imported varying that it does not own.
+    if (importedModuleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+    {
+        getSink()->diagnose(Diagnostics::ImportedModuleHasGlobalVaryings{
+            .module = name,
+            .location = decl->moduleNameAndLoc.loc});
+    }
 
     // Add the declarations from the imported module into the scope
     // that the `import` declaration is set to extend.

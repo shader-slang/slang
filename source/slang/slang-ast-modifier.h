@@ -137,6 +137,16 @@ class FromCoreModuleModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a module that declares legacy GLSL-style module-scope varyings (see
+// `isGlobalVaryingVar`). The builtin core and `glsl` modules never carry it. Being part of the
+// AST, the marker is serialized with a precompiled module, and `visitImportDecl` reads it to
+// reject an import of such a module.
+FIDDLE()
+class HasLegacyGlobalVaryingsModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class PrefixModifier : public Modifier
 {

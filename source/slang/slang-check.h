@@ -21,6 +21,7 @@ class TranslationUnitRequest;
 constexpr UInt kMaxTypeNestingDepth = 128;
 
 bool isGlobalShaderParameter(VarDeclBase* decl);
+bool isGlobalVaryingVar(VarDeclBase* decl);
 bool isFromCoreModule(Decl* decl);
 
 void registerBuiltinDecl(SharedASTBuilder* sharedASTBuilder, Decl* decl);

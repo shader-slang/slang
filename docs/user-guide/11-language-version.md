@@ -34,6 +34,9 @@ When the language version is set to `legacy`, the compiler behavior will be cons
 
 - All declarations have `public` visibility.
 - A `module` declaration is not required at the start of each module.
+- Module-scope `in`/`out`/`inout` variables (GLSL-style global varyings) are accepted with a deprecation
+  warning. They are intended for the GLSL dialect only; declare entry-point inputs and outputs as
+  parameters instead. See GitHub issue [#14375](https://github.com/shader-slang/slang/issues/14375).
 
 ## Slang 2025
 
@@ -46,6 +49,9 @@ Slang language version 2025 brings these changes on top of the legacy language:
   in GLSL source code for compatibility reasons.
 - Compile-time for (`$for`) has been deprecated. Use `[ForceUnroll] for` instead. See GitHub issue
   [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
+- Module-scope `in`/`out`/`inout` variables (GLSL-style global varyings) are rejected. Declare entry-point
+  inputs and outputs as parameters instead. GLSL source code is unaffected. See GitHub issue
+  [#14375](https://github.com/shader-slang/slang/issues/14375) for details.
 
 ## Slang 2026
 
