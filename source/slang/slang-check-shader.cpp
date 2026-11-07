@@ -2689,6 +2689,23 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // An entry point that owns module-scope varyings passes its inputs and outputs the GLSL way,
+    // so a varying parameter mixes two ways of declaring them. Uniform parameters and builtin
+    // parameter types such as `TriangleStream<T>` have no module-scope equivalent and are allowed.
+    if (globalVaryings.getCount() != 0)
+    {
+        for (auto param : entryPointFuncDecl->getParameters())
+        {
+            if (param->hasModifier<HLSLUniformModifier>())
+                continue;
+            if (isBuiltinParameterType(param->getType()))
+                continue;
+            sink->diagnose(Diagnostics::EntryPointVaryingParamWithGlobalVaryings{
+                .param = param,
+                .globalVarying = globalVaryings[0]});
+        }
+    }
+
     // Validate that varying parameter/return types are legal. Runs after the
     // auto-uniform classification above so that parameters that will end up
     // being treated as uniform on non-varying stages are not diagnosed.

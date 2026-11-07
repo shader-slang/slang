@@ -4972,6 +4972,14 @@ err(
     span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have an output stream parameter of type PointStream<T>, LineStream<T>, or TriangleStream<T>" }
 )
 
+warning(
+    "entry-point-varying-param-with-global-varyings",
+    38044,
+    "entry point declares both varying parameters and module-scope varyings",
+    span { loc = "param:Decl", message = "'~param' is a varying parameter of an entry point that also owns module-scope varyings; this will be an error in a future compiler release" },
+    note { message = "module-scope varying '~globalVarying' is declared here", span { loc = "globalVarying:Decl" } }
+)
+
 err(
     "geometry-shader-missing-max-vertex-count",
     38046,
