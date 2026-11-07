@@ -4723,6 +4723,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
 bool isUnsizedArrayType(Type* type);
 
+/// Return true if `fromType` and `toType` differ only in matrix layout. That holds for two matrix
+/// types with the same element type and dimensions, and for sized arrays of such matrices.
+bool isMatrixLayoutConversion(Type* toType, Type* fromType);
+
 bool isInterfaceType(Type* type);
 
 bool isImmutableBufferType(Type* type);

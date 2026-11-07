@@ -3957,6 +3957,41 @@ static bool _canLValueCoerce(Type* a, Type* b)
     return _canLValueCoerceScalarType(a, b);
 }
 
+/// Return the l-value that `argExpr` implicitly converts, if an `out` or `inout` argument can
+/// carry that conversion through a temporary in both directions, and null otherwise.
+///
+/// Consider this example:
+///
+///     struct S { row_major float4x4 m; }
+///     void addOne(inout float4x4 x);
+///     addOne(buf[0].m);
+///
+/// The argument is a layout conversion of the l-value `buf[0].m`. The call works on a temporary
+/// in the parameter's layout, and the result is stored back in the field's own layout. Besides
+/// matrix layout conversions, we accept conversions between integer types of the same size, as
+/// `_canLValueCoerce` decides.
+static Expr* _getImplicitlyConvertedLValue(Expr* argExpr)
+{
+    if (auto implicitCastExpr = as<ImplicitCastExpr>(argExpr))
+    {
+        if (implicitCastExpr->arguments.getCount() != 1)
+            return nullptr;
+        auto base = implicitCastExpr->arguments[0];
+        if (base->type.isLeftValue && _canLValueCoerce(base->type, implicitCastExpr->type))
+            return base;
+        return nullptr;
+    }
+    // `_coerce` represents a matrix layout conversion as a `BuiltinCastExpr`, because there is no
+    // conversion function to call.
+    if (auto builtinCastExpr = as<BuiltinCastExpr>(argExpr))
+    {
+        auto base = builtinCastExpr->base;
+        if (base->type.isLeftValue && isMatrixLayoutConversion(builtinCastExpr->type, base->type))
+            return base;
+    }
+    return nullptr;
+}
+
 
 void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn)
 {
@@ -4432,7 +4467,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
                                                             argExpr->type.isReadOnlyMemoryLocation))
                         {
-                            auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
+                            Expr* convertedLValue = as<OutParamTypeBase>(paramType)
+                                                        ? _getImplicitlyConvertedLValue(argExpr)
+                                                        : nullptr;
 
                             // NOTE:
                             // This is currently only enabled for in/inout based scenarios. Ie
@@ -4455,12 +4492,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             // Without this check, passing a literal (e.g.
                             // `foo(0)` for `inout uint`) would survive the
                             // front end and ICE during IR lowering.
-                            if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1 &&
-                                as<OutParamTypeBase>(paramType) &&
-                                implicitCastExpr->arguments[0]->type.isLeftValue &&
-                                _canLValueCoerce(
-                                    implicitCastExpr->arguments[0]->type,
-                                    implicitCastExpr->type))
+                            if (convertedLValue)
                             {
                                 // This is to work around issues like
                                 //
@@ -4489,15 +4521,16 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 if (as<OutType>(paramType))
                                 {
                                     lValueImplicitCast =
-                                        getASTBuilder()->create<OutImplicitCastExpr>(
-                                            *implicitCastExpr);
+                                        getASTBuilder()->create<OutImplicitCastExpr>();
                                 }
                                 else
                                 {
                                     lValueImplicitCast =
-                                        getASTBuilder()->create<InOutImplicitCastExpr>(
-                                            *implicitCastExpr);
+                                        getASTBuilder()->create<InOutImplicitCastExpr>();
                                 }
+                                lValueImplicitCast->type = argExpr->type;
+                                lValueImplicitCast->loc = argExpr->loc;
+                                lValueImplicitCast->arguments.add(convertedLValue);
 
                                 // Replace the expression. This should make this situation
                                 // easier to detect.
@@ -4535,7 +4568,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     .param = String(pp),
                                     .arg = argExpr});
 
-
+                                auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
                                 if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
