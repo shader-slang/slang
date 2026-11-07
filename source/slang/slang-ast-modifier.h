@@ -137,6 +137,14 @@ class FromCoreModuleModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a module that declares legacy GLSL-style module-scope varyings (see
+// `isGlobalVaryingVar`). The core and GLSL modules never carry it.
+FIDDLE()
+class HasLegacyGlobalVaryingsModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class PrefixModifier : public Modifier
 {

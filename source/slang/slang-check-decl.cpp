@@ -576,6 +576,52 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
             }
         }
+
+        if (isGlobalVaryingVar(decl) && !isFromCoreModule(decl))
+            checkGlobalVaryingVarDecl(decl);
+    }
+
+    /// Checks a module-scope varying (see `isGlobalVaryingVar`) declared outside the core and GLSL
+    /// modules, and marks its module as declaring such varyings.
+    ///
+    /// Module-scope varyings are a GLSL idiom: Slang and HLSL entry points declare their inputs and
+    /// outputs as parameters. We therefore reject them in HLSL and in Slang 2025 and later, and
+    /// warn about them in legacy Slang. Every entry point of a module owns all of the module's
+    /// varyings, so a varying must be declared at the top level of the module rather than inside
+    /// a namespace.
+    void checkGlobalVaryingVarDecl(VarDecl* decl)
+    {
+        auto moduleDecl = getModuleDecl(decl);
+        if (!moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+            addModifier(moduleDecl, getASTBuilder()->create<HasLegacyGlobalVaryingsModifier>());
+
+        auto parentDecl = decl->parentDecl;
+        if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+            parentDecl = genericParentDecl->parentDecl;
+        if (!as<ModuleDecl>(parentDecl) && !as<FileDecl>(parentDecl))
+            getSink()->diagnose(Diagnostics::GlobalVaryingNotAtModuleScope{.decl = decl});
+
+        switch (getSourceLanguage())
+        {
+        case SourceLanguage::HLSL:
+            getSink()->diagnose(
+                Diagnostics::GlobalVaryingNotSupported{.language = "HLSL", .decl = decl});
+            break;
+        case SourceLanguage::Slang:
+            if (getShared()->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2025)
+            {
+                getSink()->diagnose(Diagnostics::GlobalVaryingNotSupported{
+                    .language = "Slang 2025 and later",
+                    .decl = decl});
+            }
+            else
+            {
+                getSink()->diagnose(Diagnostics::DeprecatedGlobalVarying{.decl = decl});
+            }
+            break;
+        default:
+            break;
+        }
     }
 
     void visitDecl(Decl* decl)

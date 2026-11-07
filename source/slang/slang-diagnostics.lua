@@ -3974,6 +3974,20 @@ err(
 )
 
 err(
+    "global-varying-not-supported",
+    30626,
+    "module-scope varying '~decl:Decl' is not supported in ~language",
+    span { loc = "decl:Decl", message = "module-scope 'in'/'out' variables are a GLSL feature; declare '~decl' as an entry-point parameter instead" }
+)
+
+warning(
+    "deprecated-global-varying",
+    30627,
+    "module-scope varying '~decl:Decl' is deprecated",
+    span { loc = "decl:Decl", message = "module-scope 'in'/'out' variables are intended for the GLSL dialect only, and support for them in Slang will be removed in a later compiler release; declare '~decl' as an entry-point parameter instead" }
+)
+
+err(
     "generic-value-parameter-type-not-supported",
     30624,
     "generic value parameter type '~type:Type' is not supported; only integer and enum types are allowed",
@@ -4282,6 +4296,13 @@ err(
     31400,
     "declaration not allowed in this context",
     span { loc = "decl:Decl", message = "~childKind declaration is not allowed inside ~parentKind." }
+)
+
+err(
+    "global-varying-not-at-module-scope",
+    31401,
+    "module-scope varying '~decl:Decl' must be declared at the top level of its module",
+    span { loc = "decl:Decl", message = "'~decl' is an 'in'/'out' variable declared inside a namespace" }
 )
 
 --

@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d11 -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -Xslang -warnings-disable -Xslang 30627
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-d3d11 -output-using-type -Xslang -warnings-disable -Xslang 30627
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
