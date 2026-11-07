@@ -1100,10 +1100,17 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Sub:
     case kIROp_Mul:
         {
-            // Like the prelude define, this follows the module's `-fp-mode`, so the whole
-            // module stays contraction-free, as it does on the NVRTC path under `--fmad=false`.
+            // Like the prelude define, this follows the module's `-fp-mode`, so every device
+            // function stays contraction-free, as it does on the NVRTC path under `--fmad=false`.
+            // Vector and matrix operands fall through to the infix form, which the prelude's
+            // operators implement with the same intrinsics under that define.
             if (getTargetProgram()->getOptionSet().getFloatingPointMode() !=
                 FloatingPointMode::Precise)
+                break;
+            // A `[CudaHost]` function is emitted as `__host__` and built by the host compiler,
+            // where the device-only `_rn` intrinsics do not exist, so it keeps the infix form.
+            if (auto func = getParentFunc(inst);
+                func && func->findDecoration<IRCudaHostDecoration>())
                 break;
             auto intrinsic = getRoundToNearestArithmeticIntrinsic(inst);
             if (intrinsic.getLength() == 0)
