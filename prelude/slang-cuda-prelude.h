@@ -590,6 +590,67 @@ SLANG_CUDA_VECTOR_TRAITS(__half4, bool4, 4, false, false)
 #define SLANG_CUDA_VECTOR_ENABLE_IF_FMOD \
     typename SlangCudaVectorEnableIf<SlangCudaVectorTraits<T>::kSupportsFmod>::Type* = nullptr
 
+/* The vector, matrix and cooperative-matrix `+`, `-` and `*` operators below compute each element
+   (or packed pair of elements) with these helpers.
+   SLANG_CUDA_ENABLE_PRECISE_MATH is emitted (as `1`) into the CUDA output by Slang's CUDA back-end
+   under `-fp-mode precise`. When nonzero, the floating-point overloads use the CUDA `_rn`
+   intrinsics, which nvcc never contracts into an FMA whatever its `--fmad` setting, so the
+   precise mode survives a compile of the emitted source with nvcc's default `--fmad=true`.
+   Otherwise, and for every other element type, the helpers are the plain operators. */
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_add(T a, T b)
+{
+    return a + b;
+}
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_sub(T a, T b)
+{
+    return a - b;
+}
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_mul(T a, T b)
+{
+    return a * b;
+}
+#if SLANG_CUDA_ENABLE_PRECISE_MATH
+#define SLANG_CUDA_PRECISE_ELEMENT_OPS(T, ADD, SUB, MUL)              \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_add(T a, T b) \
+    {                                                                 \
+        return ADD(a, b);                                             \
+    }                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_sub(T a, T b) \
+    {                                                                 \
+        return SUB(a, b);                                             \
+    }                                                                 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_element_mul(T a, T b) \
+    {                                                                 \
+        return MUL(a, b);                                             \
+    }
+SLANG_CUDA_PRECISE_ELEMENT_OPS(float, __fadd_rn, __fsub_rn, __fmul_rn)
+SLANG_CUDA_PRECISE_ELEMENT_OPS(double, __dadd_rn, __dsub_rn, __dmul_rn)
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_CUDA_PRECISE_ELEMENT_OPS(__half, __hadd_rn, __hsub_rn, __hmul_rn)
+SLANG_CUDA_PRECISE_ELEMENT_OPS(__half2, __hadd2_rn, __hsub2_rn, __hmul2_rn)
+#endif
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_CUDA_PRECISE_ELEMENT_OPS(__nv_bfloat162, __hadd2_rn, __hsub2_rn, __hmul2_rn)
+#endif
+#undef SLANG_CUDA_PRECISE_ELEMENT_OPS
+#endif
+
+#define SLANG_CUDA_VECTOR_ARITHMETIC_OP(op, ELEMENT_OP)                  \
+    template<typename T, SLANG_CUDA_VECTOR_ENABLE_IF>                    \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator op(T thisVal, T other) \
+    {                                                                    \
+        T result;                                                        \
+        result.x = ELEMENT_OP(thisVal.x, other.x);                       \
+        result.y = ELEMENT_OP(thisVal.y, other.y);                       \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 3)             \
+            result.z = ELEMENT_OP(thisVal.z, other.z);                   \
+        if constexpr (SlangCudaVectorTraits<T>::kWidth >= 4)             \
+            result.w = ELEMENT_OP(thisVal.w, other.w);                   \
+        return result;                                                   \
+    }
 #define SLANG_CUDA_VECTOR_BINARY_OP(op, ENABLE)                          \
     template<typename T, ENABLE>                                         \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T operator op(T thisVal, T other) \
@@ -655,9 +716,9 @@ SLANG_CUDA_VECTOR_TRAITS(__half4, bool4, 4, false, false)
         return result;                                          \
     }
 
-SLANG_CUDA_VECTOR_BINARY_OP(+, SLANG_CUDA_VECTOR_ENABLE_IF)
-SLANG_CUDA_VECTOR_BINARY_OP(-, SLANG_CUDA_VECTOR_ENABLE_IF)
-SLANG_CUDA_VECTOR_BINARY_OP(*, SLANG_CUDA_VECTOR_ENABLE_IF)
+SLANG_CUDA_VECTOR_ARITHMETIC_OP(+, _slang_element_add)
+SLANG_CUDA_VECTOR_ARITHMETIC_OP(-, _slang_element_sub)
+SLANG_CUDA_VECTOR_ARITHMETIC_OP(*, _slang_element_mul)
 SLANG_CUDA_VECTOR_BINARY_OP(/, SLANG_CUDA_VECTOR_ENABLE_IF)
 SLANG_CUDA_VECTOR_BINARY_OP(&&, SLANG_CUDA_VECTOR_ENABLE_IF)
 SLANG_CUDA_VECTOR_BINARY_OP(||, SLANG_CUDA_VECTOR_ENABLE_IF)
@@ -686,18 +747,29 @@ SLANG_CUDA_VECTOR_UNARY_OP(~, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
    which stay in use for `__half2`'s comparison and logical operators and for `__half3`/`__half4`.
    (cuda_fp16.h is included with `__CUDA_NO_HALF2_OPERATORS__`, so it supplies none of these
    itself.)
-   `__half2` is also the only vector type with compound-assignment operators. */
+   `__half2` is also the only vector type with compound-assignment operators.
+   Under SLANG_CUDA_ENABLE_PRECISE_MATH, add/sub/mul use the `_rn` forms of the packed intrinsics,
+   which nvcc never contracts into an FMA (see `_slang_element_add`). */
+#if SLANG_CUDA_ENABLE_PRECISE_MATH
+#define SLANG_CUDA_HALF2_ADD __hadd2_rn
+#define SLANG_CUDA_HALF2_SUB __hsub2_rn
+#define SLANG_CUDA_HALF2_MUL __hmul2_rn
+#else
+#define SLANG_CUDA_HALF2_ADD __hadd2
+#define SLANG_CUDA_HALF2_SUB __hsub2
+#define SLANG_CUDA_HALF2_MUL __hmul2
+#endif
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh)
 {
-    return __hadd2(lh, rh);
+    return SLANG_CUDA_HALF2_ADD(lh, rh);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh)
 {
-    return __hsub2(lh, rh);
+    return SLANG_CUDA_HALF2_SUB(lh, rh);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh)
 {
-    return __hmul2(lh, rh);
+    return SLANG_CUDA_HALF2_MUL(lh, rh);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, const __half2& rh)
 {
@@ -709,17 +781,17 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& h)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator+=(__half2& lh, const __half2& rh)
 {
-    lh = __hadd2(lh, rh);
+    lh = SLANG_CUDA_HALF2_ADD(lh, rh);
     return lh;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator-=(__half2& lh, const __half2& rh)
 {
-    lh = __hsub2(lh, rh);
+    lh = SLANG_CUDA_HALF2_SUB(lh, rh);
     return lh;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator*=(__half2& lh, const __half2& rh)
 {
-    lh = __hmul2(lh, rh);
+    lh = SLANG_CUDA_HALF2_MUL(lh, rh);
     return lh;
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half2& rh)
@@ -727,6 +799,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half
     lh = __h2div(lh, rh);
     return lh;
 }
+#undef SLANG_CUDA_HALF2_ADD
+#undef SLANG_CUDA_HALF2_SUB
+#undef SLANG_CUDA_HALF2_MUL
 #endif
 // Uses `_slang_fmod`, so it is gated on `kSupportsFmod` rather than reusing the integral `%` above:
 // `__half` is excluded because there is no `_slang_fmod(__half, __half)`.
@@ -1281,6 +1356,21 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
         return result;                                                  \
     }
 
+#define SLANG_MATRIX_ARITHMETIC_OP(T, op, ELEMENT_OP)                            \
+    template<int R, int C>                                                       \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, R, C> operator op(              \
+        const Matrix<T, R, C>& thisVal,                                          \
+        const Matrix<T, R, C>& other)                                            \
+    {                                                                            \
+        Matrix<T, R, C> result;                                                  \
+        for (int i = 0; i < R; i++)                                              \
+            for (int j = 0; j < C; j++)                                          \
+                *_slang_vector_get_element_ptr(result.rows + i, j) = ELEMENT_OP( \
+                    _slang_vector_get_element(thisVal.rows[i], j),               \
+                    _slang_vector_get_element(other.rows[i], j));                \
+        return result;                                                           \
+    }
+
 #define SLANG_MATRIX_UNARY_OP(T, op)                                                               \
     template<int R, int C>                                                                         \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, R, C> operator op(const Matrix<T, R, C>& thisVal) \
@@ -1326,17 +1416,17 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
-#define SLANG_FLOAT_MATRIX_OPS(T)         \
-    SLANG_MATRIX_BINARY_OP(T, +)          \
-    SLANG_MATRIX_BINARY_OP(T, -)          \
-    SLANG_MATRIX_BINARY_OP(T, *)          \
-    SLANG_MATRIX_BINARY_OP(T, /)          \
-    SLANG_MATRIX_UNARY_OP(T, -)           \
-    SLANG_MATRIX_BINARY_COMPARE_OP(T, >)  \
-    SLANG_MATRIX_BINARY_COMPARE_OP(T, <)  \
-    SLANG_MATRIX_BINARY_COMPARE_OP(T, >=) \
-    SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
-    SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
+#define SLANG_FLOAT_MATRIX_OPS(T)                        \
+    SLANG_MATRIX_ARITHMETIC_OP(T, +, _slang_element_add) \
+    SLANG_MATRIX_ARITHMETIC_OP(T, -, _slang_element_sub) \
+    SLANG_MATRIX_ARITHMETIC_OP(T, *, _slang_element_mul) \
+    SLANG_MATRIX_BINARY_OP(T, /)                         \
+    SLANG_MATRIX_UNARY_OP(T, -)                          \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >)                 \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <)                 \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, >=)                \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, <=)                \
+    SLANG_MATRIX_BINARY_COMPARE_OP(T, ==)                \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(uint)
@@ -1405,6 +1495,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<__half, R, C> operator%(
 #endif
 #undef SLANG_FLOAT_MATRIX_MOD
 #undef SLANG_MATRIX_BINARY_OP
+#undef SLANG_MATRIX_ARITHMETIC_OP
 #undef SLANG_MATRIX_BINARY_COMPARE_OP
 #undef SLANG_MATRIX_UNARY_OP
 #undef SLANG_INT_MATRIX_OPS
@@ -7926,8 +8017,9 @@ __device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
 //     __CUDA_NO_HALF2_OPERATORS__ so the prelude can supply HLSL-friendly versions).
 //   - __nv_bfloat162 ops come straight from <cuda_bf16.h>.
 // So this trait only needs to expose the pair type and the per-type broadcast
-// intrinsic - arithmetic in the WmmaFragment operator overloads can use native
-// `+`, `-`, `*`, `/`, unary `-` directly.
+// intrinsic - the WmmaFragment operator overloads use native `/` and unary `-`
+// directly, and route `+`, `-`, `*` through `_slang_element_add`/`_sub`/`_mul` so
+// that SLANG_CUDA_ENABLE_PRECISE_MATH can select the `_rn` intrinsics.
 // ====================================================================================
 
 template<typename T>
@@ -8091,14 +8183,14 @@ struct WmmaFragment
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) * bv;
+                PairT r = _slang_element_mul(*reinterpret_cast<const PairT*>(&regs[i]), bv);
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
         {
             for (int i = 0; i < GetLength(); i++)
-                result.set(i, get(i) * b);
+                result.set(i, _slang_element_mul(get(i), b));
         }
         return result;
     }
@@ -8112,15 +8204,16 @@ struct WmmaFragment
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) *
-                          *reinterpret_cast<const PairT*>(&b.regs[i]);
+                PairT r = _slang_element_mul(
+                    *reinterpret_cast<const PairT*>(&regs[i]),
+                    *reinterpret_cast<const PairT*>(&b.regs[i]));
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
         {
             for (int i = 0; i < GetLength(); i++)
-                result.set(i, get(i) * b.get(i));
+                result.set(i, _slang_element_mul(get(i), b.get(i)));
         }
         return result;
     }
@@ -8156,15 +8249,16 @@ struct WmmaFragment
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) -
-                          *reinterpret_cast<const PairT*>(&other.regs[i]);
+                PairT r = _slang_element_sub(
+                    *reinterpret_cast<const PairT*>(&regs[i]),
+                    *reinterpret_cast<const PairT*>(&other.regs[i]));
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
         {
             for (int i = 0; i < GetLength(); i++)
-                result.set(i, get(i) - other.get(i));
+                result.set(i, _slang_element_sub(get(i), other.get(i)));
         }
         return result;
     }
@@ -8199,15 +8293,16 @@ struct WmmaFragment
 #pragma unroll
             for (int i = 0; i < RegsCount; i++)
             {
-                PairT r = *reinterpret_cast<const PairT*>(&regs[i]) +
-                          *reinterpret_cast<const PairT*>(&other.regs[i]);
+                PairT r = _slang_element_add(
+                    *reinterpret_cast<const PairT*>(&regs[i]),
+                    *reinterpret_cast<const PairT*>(&other.regs[i]));
                 memcpy(&result.regs[i], &r, 4);
             }
         }
         else
         {
             for (int i = 0; i < GetLength(); i++)
-                result.set(i, get(i) + other.get(i));
+                result.set(i, _slang_element_add(get(i), other.get(i)));
         }
         return result;
     }
