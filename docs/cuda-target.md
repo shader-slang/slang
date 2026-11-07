@@ -289,6 +289,13 @@ Wrappers with no fast intrinsic (`exp2`, `atan2`, `asin`, `acos`, `atan`, `sqrt`
 
 This define is intentionally transcendental-only and narrower than nvcc's `--use_fast_math`: it does not enable approximate division, `sqrt`, flush-to-zero, or FMA contraction. Its value is on the `-target cuda` path, where you compile the emitted `.cu` with your own toolchain — the `-target ptx` path is compiled by Slang's NVRTC invocation, which already receives `--use_fast_math` under `-fp-mode fast`. The redirect is also module-global (it is a single front-matter `#define`), so it reflects the module's `-fp-mode` and does not honor a per-function floating-point-mode override, such as the `Fast` override auto-diff places on generated derivative functions.
 
+Precise Math
+============
+
+When compiling with `-fp-mode precise`, Slang emits scalar floating-point add, subtract and multiply as the CUDA round-to-nearest intrinsics (`__fadd_rn`, `__fsub_rn`, `__fmul_rn`, and the `__d*_rn` and `__h*_rn` forms for `double` and `half`). It also emits `#define SLANG_CUDA_ENABLE_PRECISE_MATH` ahead of the `slang-cuda-prelude.h` include, which switches the prelude's vector, matrix and cooperative-matrix `+`, `-` and `*` operators, including the packed `__half2` and `__nv_bfloat162` forms, to the same intrinsics. nvcc never contracts these intrinsics into a fused multiply-add, so the emitted `.cu` keeps precise semantics even when you compile it with nvcc's default `--fmad=true`. An explicit `fma()` or `mad()` still lowers to a fused multiply-add. The `half` and `bfloat16` forms need CUDA 11.8 or later.
+
+The `-target ptx` path is compiled by Slang's NVRTC invocation, which already receives `--fmad=false` under `-fp-mode precise`. Like that flag and the fast-math define, the precise output is module-global: it reflects the module's `-fp-mode` and does not honor a per-function floating-point-mode override, such as the `Fast` override auto-diff places on generated derivative functions.
+
 Wave Intrinsics
 ===============
 
