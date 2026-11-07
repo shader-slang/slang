@@ -278,7 +278,17 @@ BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 void MatrixExpressionType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("matrix<") << getElementType() << toSlice(",") << getRowCount() << toSlice(",")
-        << getColumnCount() << toSlice(">");
+        << getColumnCount();
+    if (hasSpecifiedLayout())
+        out << toSlice(",") << getLayout();
+    out << toSlice(">");
+}
+
+bool MatrixExpressionType::hasSpecifiedLayout()
+{
+    SLANG_ASSERT(getLayout());
+    auto layout = as<ConstantIntVal>(getLayout());
+    return !layout || layout->getValue() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 }
 
 BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
@@ -996,8 +1006,9 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(getCurrentASTBuilder()->getOutParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
+                        newParamTypes.add(
+                            getCurrentASTBuilder()->getOutParamType(
+                                _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -1011,8 +1022,9 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
+                        newParamTypes.add(
+                            getCurrentASTBuilder()->getBorrowInOutParamType(
+                                _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -1036,8 +1048,9 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
+                        newParamTypes.add(
+                            getCurrentASTBuilder()->getConstRefParamType(
+                                _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
