@@ -4975,7 +4975,7 @@ err(
 warning(
     "entry-point-varying-param-with-global-varyings",
     38044,
-    "entry point declares both varying parameters and module-scope varyings",
+    "entry point has varying parameters and also owns module-scope varyings",
     span { loc = "param:Decl", message = "'~param' is a varying parameter of an entry point that also owns module-scope varyings; this will be an error in a future compiler release" },
     note { message = "module-scope varying '~globalVarying' is declared here", span { loc = "globalVarying:Decl" } }
 )

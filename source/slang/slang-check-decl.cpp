@@ -578,18 +578,18 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         }
 
         if (isGlobalVaryingVar(decl) && !isFromCoreModule(decl))
-            checkGlobalVaryingVarDecl(decl);
+            checkAndMarkGlobalVaryingVarDecl(decl);
     }
 
-    /// Checks a module-scope varying (see `isGlobalVaryingVar`) declared outside the core and GLSL
-    /// modules, and marks its module as declaring such varyings.
+    /// Checks a module-scope varying (see `isGlobalVaryingVar`) declared outside the builtin core
+    /// and `glsl` modules, and adds `HasLegacyGlobalVaryingsModifier` to its module.
     ///
     /// Module-scope varyings are a GLSL idiom: Slang and HLSL entry points declare their inputs and
     /// outputs as parameters. We therefore reject them in HLSL and in Slang 2025 and later, and
-    /// warn about them in legacy Slang. Every entry point of a module owns all of the module's
-    /// varyings, so a varying must be declared at the top level of the module rather than inside
-    /// a namespace.
-    void checkGlobalVaryingVarDecl(VarDecl* decl)
+    /// warn about them in legacy Slang. We also restrict them to the top level of the module in
+    /// every language: they exist for the GLSL dialect, which has no namespaces, so a varying
+    /// declared inside a namespace has no meaning to carry over.
+    void checkAndMarkGlobalVaryingVarDecl(VarDecl* decl)
     {
         auto moduleDecl = getModuleDecl(decl);
         if (!moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
@@ -616,7 +616,12 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                 getSink()->diagnose(Diagnostics::DeprecatedGlobalVarying{.decl = decl});
             }
             break;
+        case SourceLanguage::GLSL:
+            // GLSL is the dialect that module-scope varyings belong to.
+            break;
         default:
+            // Other source languages either cannot declare `in`/`out` variables, or are checked
+            // without a translation unit (`Unknown`), so there is no language rule to apply.
             break;
         }
     }
@@ -1652,11 +1657,12 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
     return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
 }
 
-/// Is `decl` a module-scope varying, that is, a global or namespace-scope variable declared `in`,
-/// `out` or `inout`?
+/// Is `decl` a module-scope varying, that is, a variable declared `in`, `out` or `inout` outside
+/// any function or type, either at the top level of its module or inside a namespace? (`inout`
+/// counts because `InOutModifier` derives from `OutModifier`.)
 ///
 /// GLSL-style shaders read their inputs and write their outputs through such variables instead of
-/// through entry-point parameters.
+/// through entry-point parameters. The code calls them "global varyings".
 bool isGlobalVaryingVar(VarDeclBase* decl)
 {
     if (!isGlobalDecl(decl))

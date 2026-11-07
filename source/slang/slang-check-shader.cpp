@@ -28,11 +28,21 @@ enum class SemanticDirection
     Output,
 };
 
+/// The directions in which an entry-point input or output (a parameter or a module-scope varying)
+/// passes data. `checkEntryPointParamPassingMode` and `getGlobalVaryingDirections` each set at
+/// least one of them.
 struct EntryPointParamDirections
 {
     bool isInput = false;
     bool isOutput = false;
 };
+
+static const char* getVaryingDirectionLabel(EntryPointParamDirections directions)
+{
+    if (directions.isInput && directions.isOutput)
+        return "input/output";
+    return directions.isOutput ? "output" : "input";
+}
 
 /// Check the passing mode of entry-point parameter `param`, and return whether the parameter is a
 /// stage input, a stage output, or both.
@@ -640,13 +650,14 @@ static bool isDepthOutputSemantic(UnownedStringSlice semanticName)
 }
 
 // Append to `ioDepthSemantics` every depth-output system-value semantic that `decl` contributes
-// as a fragment output. `decl` is an `out`/`inout` parameter or the entry-point function itself
-// (whose return type is examined). A fragment output can only be a scalar, a struct, or an array
-// of those — never a mesh/stream output wrapper, which belong to non-fragment stages — so
-// unwrapping Conditional and array wrappers and recursing into struct fields reaches every place
-// a depth semantic can appear. Each depth semantic is recorded independently (a decl may
-// contribute both its own semantic and those of its fields), so a collected count greater than
-// one means the fragment entry point genuinely declares more than one depth output.
+// as a fragment output. `decl` is an `out`/`inout` parameter, a module-scope output, or the
+// entry-point function itself (whose return type is examined). A fragment output can only be a
+// scalar, a struct, or an array of those — never a mesh/stream output wrapper, which belong to
+// non-fragment stages — so unwrapping Conditional and array wrappers and recursing into struct
+// fields reaches every place a depth semantic can appear. Each depth semantic is recorded
+// independently (a decl may contribute both its own semantic and those of its fields), so a
+// collected count greater than one means the fragment entry point genuinely declares more than one
+// depth output.
 static void collectDepthOutputSemantics(
     ASTBuilder* astBuilder,
     Decl* decl,
@@ -2005,7 +2016,8 @@ static bool doesModuleDependOnGLSLModule(Linkage* linkage, Module* module)
 
 /// Returns the directions in which the module-scope varying `globalVarying` passes data: an `in`
 /// variable is an input of the entry point, an `out` variable an output, and an `inout` variable
-/// both.
+/// both, as for an `inout` parameter. `InOutModifier` derives from `OutModifier`, so the output
+/// test covers `inout` too.
 static EntryPointParamDirections getGlobalVaryingDirections(VarDeclBase* globalVarying)
 {
     EntryPointParamDirections directions;
@@ -2026,7 +2038,8 @@ static void validateSystemValueSemanticForDirections(
     Scope* scope,
     CapabilitySet* outInferredCaps)
 {
-    if (directions.isInput || !directions.isOutput)
+    SLANG_ASSERT(directions.isInput || directions.isOutput);
+    if (directions.isInput)
     {
         validateSystemValueSemantic(
             visitor,
@@ -2348,12 +2361,18 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // The module-scope varyings that the entry point owns are inputs and outputs of the entry point
-    // just as its parameters are, so the checks below apply to them too.
+    // just as its parameters are. The system-value, depth-output, varying-type and SV_Position
+    // checks below cover them along with the parameters. Checks that concern only parameters
+    // (passing modes, uniform classification, generic type requirements) do not apply.
     const auto& globalVaryings = entryPoint->getGlobalVaryings();
     List<EntryPointParamDirections> globalVaryingDirections;
     for (auto globalVarying : globalVaryings)
         globalVaryingDirections.add(getGlobalVaryingDirections(globalVarying));
 
+    // A GLSL-style entry point writes its outputs through module-scope varyings and returns `void`.
+    // IR lowering repackages those outputs as the entry point's result, so a result of its own has
+    // nowhere to go. The IR pass reports the same error for outputs declared by the builtin `glsl`
+    // module, which are not in the entry point's list.
     if (returnType && !returnType->equals(linkage->getASTBuilder()->getVoidType()))
     {
         for (Index i = 0; i < globalVaryings.getCount(); ++i)
@@ -2700,8 +2719,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     // An entry point that owns module-scope varyings passes its inputs and outputs the GLSL way,
-    // so a varying parameter mixes two ways of declaring them. Uniform parameters and builtin
-    // parameter types such as `TriangleStream<T>` have no module-scope equivalent and are allowed.
+    // so a varying parameter mixes two ways of declaring them. Uniform parameters are allowed,
+    // including resources, which the auto-uniform classification above has already made uniform,
+    // and so are builtin parameter types such as `TriangleStream<T>`, which have no module-scope
+    // equivalent. A result is not diagnosed here: with module-scope outputs, E58001 already rejects
+    // it, and with only module-scope inputs it is the entry point's one output.
     if (globalVaryings.getCount() != 0)
     {
         for (auto param : entryPointFuncDecl->getParameters())
@@ -2757,8 +2779,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
             const auto directions = paramDirections[i];
-            ctx.direction =
-                directions.isOutput ? (directions.isInput ? "input/output" : "output") : "input";
+            ctx.direction = getVaryingDirectionLabel(directions);
 
             StringBuilder contextSb;
             auto paramName = param->getName();
@@ -2783,11 +2804,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.entryPointName = entryPointName;
             ctx.loc = globalVarying->loc;
             const auto directions = globalVaryingDirections[i];
-            ctx.direction =
-                directions.isOutput ? (directions.isInput ? "input/output" : "output") : "input";
+            ctx.direction = getVaryingDirectionLabel(directions);
 
             StringBuilder contextSb;
-            contextSb << "global variable '" << globalVarying->getName()->text << "'";
+            if (auto globalVaryingName = globalVarying->getName())
+                contextSb << "global variable '" << globalVaryingName->text << "'";
+            else
+                contextSb << "global variable";
             String contextStr = contextSb.produceString();
             ctx.context = contextStr.getBuffer();
             ctx.targets = targets.getArrayView();
@@ -2809,11 +2832,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // We deliberately skip the check when the entry point has no outputs
     // at all: a void return type, no `out`/`inout` parameters, and no
     // module-scope outputs. A module-scope output counts here like an
-    // output parameter, except that in a module that imports the GLSL
-    // module it only supplies SV_Position: GLSL-style entry points write
-    // the builtin `gl_Position`, which is not one of the entry point's
-    // module-scope varyings, so module-scope outputs alone cannot show
-    // that SV_Position is missing.
+    // output parameter, with one exception. In a module that imports the
+    // `glsl` module (directly or through other imports), a module-scope
+    // output can still supply SV_Position, but it does not by itself make
+    // the entry point count as having outputs. Such entry points may write
+    // the builtin `gl_Position`, which is not one of their module-scope
+    // varyings, so their module-scope outputs alone cannot show that
+    // SV_Position is missing.
     if (stage == Stage::Vertex)
     {
         auto astBuilder = linkage->getASTBuilder();
@@ -3252,21 +3277,18 @@ void Module::_collectShaderParams(DiagnosticSink* sink)
         {
             if (auto globalVar = as<VarDecl>(globalDecl))
             {
-                // We do not want to consider global variable declarations
-                // that don't represents shader parameters. This includes
-                // things like `static` globals and `groupshared` variables.
+                // Module-scope varyings are recorded as shader parameters too, because the
+                // program-scope layout and reflection still list them.
                 //
                 const bool isGlobalVarying = isGlobalVaryingVar(globalVar);
                 if (!isGlobalShaderParameter(globalVar) && !isGlobalVarying)
                     continue;
 
-                // The varyings that the core and GLSL modules declare (such as `gl_Position`)
-                // are builtins rather than inputs and outputs of user entry points, so they do
-                // not belong to any entry point.
-                if (isGlobalVarying && !m_moduleDecl->hasModifier<FromCoreModuleModifier>())
+                // The varyings that the builtin core and `glsl` modules declare (such as
+                // `gl_Position`) are builtins rather than inputs and outputs of user entry
+                // points, so they do not belong to any entry point.
+                if (isGlobalVarying && !isFromCoreModule(globalVar))
                     m_globalVaryings.add(globalVar);
-
-                // At this point we know we have a global shader parameter.
 
                 ShaderParamInfo shaderParamInfo;
                 shaderParamInfo.paramDeclRef = makeDeclRef(globalVar);

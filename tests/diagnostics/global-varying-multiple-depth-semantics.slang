@@ -21,7 +21,7 @@ void main()
 }
 #else
 void main(out float d : SV_DepthLessEqual)
-//MIXED:            ^ entry point declares both varying parameters and module-scope varyings
+//MIXED:            ^ entry point has varying parameters and also owns module-scope varyings
 //MIXED:            ^ 'd' is a varying parameter of an entry point that also owns module-scope varyings; this will be an error in a future compiler release
 {
     gDepth = 0.5;

@@ -241,7 +241,8 @@ public:
     /// Get the module-scope varyings that belong to this entry point, in declaration order. They
     /// are inputs and outputs of the entry point just as its varying parameters are. An entry
     /// point owns every module-scope varying declared in the module of its function, whether or
-    /// not the function uses it.
+    /// not the function uses it. Semantic checking uses this list; the IR pass
+    /// `translateGlobalVaryingVar` still finds an entry point's global varyings by reachability.
     List<VarDeclBase*> const& getGlobalVaryings() { return m_globalVaryings; }
 
     /// Marks an entry selected through a checked structural ray-tracing conformance.

@@ -14,10 +14,10 @@ in float4 gColor;
 
 float4 main(
     float4 color : COLOR,
-//MIXED:   ^^^^^ entry point declares both varying parameters and module-scope varyings
+//MIXED:   ^^^^^ entry point has varying parameters and also owns module-scope varyings
 //MIXED:   ^^^^^ 'color' is a varying parameter of an entry point that also owns module-scope varyings; this will be an error in a future compiler release
     uint vertexID : SV_VertexID,
-//MIXED: ^^^^^^^^ entry point declares both varying parameters and module-scope varyings
+//MIXED: ^^^^^^^^ entry point has varying parameters and also owns module-scope varyings
 //MIXED: ^^^^^^^^ 'vertexID' is a varying parameter of an entry point that also owns module-scope varyings; this will be an error in a future compiler release
     uniform float4 tint,
     Texture2D texture) : SV_Position

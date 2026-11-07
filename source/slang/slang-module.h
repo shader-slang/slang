@@ -377,7 +377,7 @@ public:
 
     /// Get the module-scope varyings (see `isGlobalVaryingVar`) declared in this module, in
     /// declaration order. Every entry point declared in the module owns all of them. The list is
-    /// empty for the core and GLSL modules, whose varyings are builtins.
+    /// empty for the builtin core and `glsl` modules, whose varyings are builtins.
     List<VarDeclBase*> const& getGlobalVaryings() { return m_globalVaryings; }
 
     SLANG_NO_THROW Index SLANG_MCALL getSpecializationParamCount() SLANG_OVERRIDE
