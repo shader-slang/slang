@@ -2171,6 +2171,98 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 /// other modifiers on the declaration that should impact out layout
 /// is computed.
 ///
+// Whether a fragment-output struct places a field, directly or nested, by its own
+// `SV_Target<N>`.
+static bool hasTargetPlacedField(TypeLayout* typeLayout)
+{
+    auto structLayout = as<StructTypeLayout>(typeLayout);
+    if (!structLayout)
+        return false;
+    for (auto field : structLayout->fields)
+    {
+        auto decl = field->varDecl.getDecl();
+        if (!decl || decl->findModifier<GLSLLocationAttribute>())
+            continue;
+        if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+        {
+            if (decomposeSimpleSemantic(semantic).name.toLower() == "sv_target")
+                return true;
+            continue;
+        }
+        if (hasTargetPlacedField(field->getTypeLayout()))
+            return true;
+    }
+    return false;
+}
+
+struct VaryingLocationRange
+{
+    UInt index;
+    UInt space;
+    UInt count;
+};
+
+// Collects the `kind` locations of the leaves under `varLayout`, offset by `index`/`space`.
+static void collectVaryingLocationRanges(
+    VarLayout* varLayout,
+    LayoutResourceKind kind,
+    UInt index,
+    UInt space,
+    List<VaryingLocationRange>& outRanges)
+{
+    auto resInfo = varLayout->FindResourceInfo(kind);
+    auto typeResInfo = varLayout->getTypeLayout()->FindResourceInfo(kind);
+    if (!resInfo || !typeResInfo || !typeResInfo->count.isFinite())
+        return;
+    index += resInfo->index.getValidValue();
+    space += resInfo->space;
+    auto structLayout = as<StructTypeLayout>(varLayout->getTypeLayout());
+    if (structLayout && structLayout->fields.getCount())
+    {
+        for (auto field : structLayout->fields)
+            collectVaryingLocationRanges(field, kind, index, space, outRanges);
+        return;
+    }
+    outRanges.add({index, space, typeResInfo->count.getFiniteValue().getValidValue()});
+}
+
+// Diagnoses a varying whose leaf locations overlap those of an earlier one. Leaves that
+// differ in `space` (the `[[vk::index]]` of dual-source blending) never overlap.
+static void diagnoseOverlappingVaryingLocation(
+    DiagnosticSink* sink,
+    List<VarLayout*> const& earlierVars,
+    VarLayout* var,
+    Decl* decl)
+{
+    for (auto kind : {LayoutResourceKind::VaryingInput, LayoutResourceKind::VaryingOutput})
+    {
+        List<VaryingLocationRange> ranges;
+        collectVaryingLocationRanges(var, kind, 0, 0, ranges);
+        for (auto other : earlierVars)
+        {
+            List<VaryingLocationRange> otherRanges;
+            collectVaryingLocationRanges(other, kind, 0, 0, otherRanges);
+            for (auto r : ranges)
+            {
+                for (auto o : otherRanges)
+                {
+                    if (r.space != o.space || std::max(r.index, o.index) >=
+                                                  std::min(r.index + r.count, o.index + o.count))
+                        continue;
+                    auto otherDecl = other->varDecl.getDecl();
+                    if (!decl || !otherDecl)
+                        return;
+                    sink->diagnose(Diagnostics::OverlappingVaryingLocations{
+                        .paramName = decl->getName(),
+                        .otherName = otherDecl->getName(),
+                        .location = decl->loc});
+                    return;
+                }
+            }
+        }
+    }
+}
+
 static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     ParameterBindingContext* context,
     Decl* decl,
@@ -2261,13 +2353,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // the `[[vk::location(...)]]` and `[[vk::index(...)]]` attributes,
     // if present.
     //
-    // TODO: In principle we should *also* be using the data from
-    // `SV_Target<N>` semantics as an equivalent to `location = <N>`
-    // when targetting Vulkan. Right now we are kind of skating by
-    // on the fact that people almost always declare `SV_Target`s
-    // in numerical order, so that our automatic assignment of
-    // `location`s in declaration order coincidentally matches
-    // the `SV_Target` order.
+    // A fragment output declared with `SV_Target<N>` gets `location = <N>`,
+    // unless `[[vk::location(...)]]` overrides it.
     //
     if (decl &&
         (isKhronosTarget(context->getTargetRequest()) ||
@@ -2331,6 +2418,25 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
         {
             getSink(context)->diagnose(
                 Diagnostics::VkIndexWithoutVkLocation{.location = indexAttr->loc});
+        }
+        else if (
+            (inState.directionMask & kEntryPointParameterDirection_Output) &&
+            inState.stage == Stage::Fragment && !inState.optSemanticName &&
+            typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
+        {
+            // `SV_Target<N>` is an absolute location, so a struct placing fields by it
+            // sits at location 0.
+            if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+            {
+                auto semanticInfo = decomposeSimpleSemantic(semantic);
+                if (semanticInfo.name.toLower() == "sv_target")
+                    varLayout->findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)->index =
+                        (UInt)semanticInfo.index;
+            }
+            else if (hasTargetPlacedField(typeLayout))
+            {
+                varLayout->findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)->index = 0;
+            }
         }
     }
 
@@ -2788,6 +2894,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 //
                 Decl* firstExplicit = nullptr;
                 Decl* firstImplicit = nullptr;
+                List<VarLayout*> explicitFields;
                 for (auto field : getFields(
                          context->getASTBuilder(),
                          structDeclRef,
@@ -2823,6 +2930,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     }
                     fieldVarLayout->typeLayout = fieldTypeLayout;
 
+                    bool isExplicitVarying = false;
+
                     // The field needs to have offset information stored
                     // in `fieldVarLayout` for every kind of resource
                     // consumed by `fieldTypeLayout`.
@@ -2856,6 +2965,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                         {
                             if (!firstExplicit)
                                 firstExplicit = field.getDecl();
+                            if (kind == LayoutResourceKind::VaryingInput ||
+                                kind == LayoutResourceKind::VaryingOutput)
+                                isExplicitVarying = true;
 
                             // In the explicit case, the field already has offset
                             // information, and we just need to update the computed
@@ -2866,6 +2978,15 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             structTypeResInfo->count =
                                 maximum(structTypeResInfo->count, fieldEndOffset);
                         }
+                    }
+                    if (isExplicitVarying)
+                    {
+                        diagnoseOverlappingVaryingLocation(
+                            getSink(context),
+                            explicitFields,
+                            fieldVarLayout,
+                            field.getDecl());
+                        explicitFields.add(fieldVarLayout);
                     }
                 }
                 if (firstImplicit && firstExplicit)
@@ -3173,9 +3294,11 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
         // scope.
         //
         UsedRanges usedRangeSet[kLayoutResourceKindCount];
+        List<VarLayout*> explicitVaryingParams;
         for (auto paramVarLayout : m_structLayout->fields)
         {
             auto paramTypeLayout = paramVarLayout->getTypeLayout();
+            bool isExplicitVarying = false;
             for (auto paramTypeResInfo : paramTypeLayout->resourceInfos)
             {
                 auto kind = paramTypeResInfo.kind;
@@ -3194,9 +3317,22 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 // If we found an explicit binding, then we need
                 // to add it to our set for tracking.
                 //
+                if (kind == LayoutResourceKind::VaryingInput ||
+                    kind == LayoutResourceKind::VaryingOutput)
+                    isExplicitVarying = true;
+
                 auto startOffset = paramResInfo->index;
                 auto endOffset = LayoutSize{startOffset} + paramTypeResInfo.count;
                 usedRangeSet[int(kind)].Add(paramVarLayout, startOffset, endOffset);
+            }
+            if (isExplicitVarying)
+            {
+                diagnoseOverlappingVaryingLocation(
+                    getSink(m_context),
+                    explicitVaryingParams,
+                    paramVarLayout,
+                    paramVarLayout->varDecl.getDecl());
+                explicitVaryingParams.add(paramVarLayout);
             }
         }
         //
@@ -3582,6 +3718,22 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
+                // An explicit location (e.g. from `SV_Target<N>`) is kept.
+                if (auto explicitResInfo = resultLayout->FindResourceInfo(rr.kind))
+                {
+                    List<VarLayout*> params;
+                    for (auto param : paramsStructLayout->fields)
+                        params.add(param);
+                    diagnoseOverlappingVaryingLocation(
+                        getSink(context),
+                        params,
+                        resultLayout,
+                        entryPointFuncDeclRef.getDecl());
+                    entryPointRes->count = maximum(
+                        entryPointRes->count,
+                        LayoutSize{explicitResInfo->index} + rr.count);
+                    continue;
+                }
                 resultLayout->findOrAddResourceInfo(rr.kind)->index =
                     entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;

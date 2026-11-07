@@ -378,6 +378,44 @@ static IRInst* constructReturnValue(
     return nullptr;
 }
 
+// An entry point's result layout must describe its new return struct: the original result
+// becomes the `resultKey` field and each out parameter's layout becomes its field's layout.
+static void rebuildEntryPointResultLayout(
+    IRFunc* newFunc,
+    IRBuilder& builder,
+    IRStructKey* resultKey,
+    const List<LoweredOutParamInfo>& paramInfos)
+{
+    IREntryPointLayout* entryPointLayout = nullptr;
+    IRVarLayout* paramsLayout = nullptr;
+    IRVarLayout* resultLayout = nullptr;
+    if (!findEntryPointLayoutInfo(newFunc, entryPointLayout, paramsLayout, resultLayout))
+        return;
+
+    IRStructTypeLayout::Builder structLayoutBuilder(&builder);
+    auto addField = [&](IRStructKey* key, IRVarLayout* fieldLayout)
+    {
+        structLayoutBuilder.addField(key, fieldLayout);
+        structLayoutBuilder.addResourceUsageFrom(fieldLayout->getTypeLayout());
+    };
+    if (resultKey && resultLayout)
+        addField(resultKey, resultLayout);
+    for (auto& info : paramInfos)
+    {
+        if (!info.isOut || !info.outFieldKey)
+            continue;
+        if (auto paramLayout = findVarLayout(info.origParam))
+            addField(info.outFieldKey, paramLayout);
+    }
+    IRVarLayout::Builder resultVarLayoutBuilder(&builder, structLayoutBuilder.build());
+
+    while (auto layoutDecor = newFunc->findDecoration<IRLayoutDecoration>())
+        layoutDecor->removeAndDeallocate();
+    builder.addLayoutDecoration(
+        newFunc,
+        builder.getEntryPointLayout(paramsLayout, resultVarLayoutBuilder.build()));
+}
+
 // Transfer decorations from original to new function
 static void transferFunctionDecorations(
     IRFunc* func,
@@ -478,6 +516,9 @@ IRFunc* lowerOutParameters(
     // Set function type
     auto funcType = builder.getFuncType(newParamTypes, resultType);
     newFunc->setFullType(funcType);
+
+    if (returnStruct)
+        rebuildEntryPointResultLayout(newFunc, builder, resultKey, paramInfos);
 
     // Create function body
     auto firstBlock = builder.createBlock();
