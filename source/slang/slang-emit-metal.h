@@ -89,6 +89,7 @@ protected:
 
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
 
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
@@ -125,6 +126,7 @@ protected:
     void emitAtomicDestOperand(IRInst* operand);
     void emitAtomicSrcOperand(bool isImage, IRInst* operand);
     void emitAtomicSemanticOperand(IRInst* inst);
+    bool tryEmitNonPointerHandleBitsCast(IRInst* inst, const EmitOpInfo& inOuterPrec);
 
     static const char* kMetalBuiltinPreludeMatrixCompMult;
     static const char* kMetalBuiltinPreludeMatrixReshape;
