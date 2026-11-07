@@ -4041,4 +4041,30 @@ bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool ha
     return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
 }
 
+bool isImageSamplerOrAccelerationStructureType(IRType* type)
+{
+    // Every type in the `ResourceTypeBase` family is a texture or storage image, which maps to
+    // `OpTypeImage`, or to `OpTypeSampledImage` when it is combined with a sampler.
+    if (as<IRResourceTypeBase>(type))
+        return true;
+
+    // A sampler, including a comparison sampler, maps to `OpTypeSampler`.
+    if (as<IRSamplerStateTypeBase>(type))
+        return true;
+
+    // A subpass input maps to an `OpTypeImage` whose dimension is `SubpassData`.
+    if (as<IRSubpassInputType>(type))
+        return true;
+
+    // A GLSL input attachment is the GLSL spelling of a subpass input.
+    if (as<IRGLSLInputAttachmentType>(type))
+        return true;
+
+    // An acceleration structure maps to `OpTypeAccelerationStructureKHR`.
+    if (as<IRRaytracingAccelerationStructureType>(type))
+        return true;
+
+    return false;
+}
+
 } // namespace Slang

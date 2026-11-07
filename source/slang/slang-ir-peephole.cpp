@@ -32,6 +32,61 @@ struct PeepholeContext : InstPassBase
             inst->removeAndDeallocate();
     }
 
+    /// Replace `extraction`, the texture or sampler extracted from `undefined`, an undefined
+    /// combined texture-sampler, by an undefined value of the same kind.
+    ///
+    /// The texture or sampler of a poison value is poison. A `LoadFromUninitializedMemory` is one
+    /// fixed value, so its texture is one fixed texture, and likewise for its sampler. We therefore
+    /// replace the uses of every extraction of the same part and type from `undefined` by one fresh
+    /// `LoadFromUninitializedMemory`, placed right after `undefined` so that it dominates them all.
+    /// We remove only `extraction`; the other extractions may still be queued for this pass, so we
+    /// leave them, now unused, for dead-code elimination.
+    void replaceExtractionFromUndefined(IRInst* extraction, IRUndefined* undefined)
+    {
+        // An unused extraction needs no replacement, and dead-code elimination removes it.
+        if (!extraction->hasUses())
+            return;
+
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, extraction->sourceLoc);
+
+        if (as<IRPoison>(undefined))
+        {
+            builder.setInsertBefore(extraction);
+            extraction->replaceUsesWith(builder.getPoison(extraction->getFullType()));
+            maybeRemoveOldInst(extraction);
+            changed = true;
+            return;
+        }
+
+        // Collect the extractions first, since replacing their uses changes the use list that we
+        // walk.
+        List<IRInst*> extractionsOfPart;
+        for (auto use = undefined->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+
+            // An extraction of the other part, or another use of `undefined`, gets no share.
+            if (user->getOp() != extraction->getOp())
+                continue;
+
+            // `__getSampler` and `__getComparisonSampler` both extract the sampler, one as a
+            // `SamplerState` and the other as a `SamplerComparisonState`. A value of one type
+            // cannot stand in for the other, so each type gets its own value.
+            if (user->getFullType() != extraction->getFullType())
+                continue;
+
+            extractionsOfPart.add(user);
+        }
+
+        builder.setInsertAfter(undefined);
+        auto part = builder.emitLoadFromUninitializedMemory(extraction->getFullType());
+        for (auto extractionOfPart : extractionsOfPart)
+            extractionOfPart->replaceUsesWith(part);
+        maybeRemoveOldInst(extraction);
+        changed = true;
+    }
+
     bool tryFoldElementExtractFromUpdateInst(IRInst* inst)
     {
         bool isAccessChainEqual = false;
@@ -847,6 +902,36 @@ struct PeepholeContext : InstPassBase
                     inst->replaceUsesWith(v);
                     inst->removeAndDeallocate();
                 }
+            }
+            break;
+        case kIROp_CombinedTextureSamplerGetTexture:
+            // `getTexture(makeCombinedTextureSampler(t, s))` is `t`.
+            if (auto combined = as<IRMakeCombinedTextureSampler>(inst->getOperand(0)))
+            {
+                inst->replaceUsesWith(combined->getTexture());
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            else if (auto undefined = as<IRUndefined>(inst->getOperand(0)))
+            {
+                replaceExtractionFromUndefined(inst, undefined);
+            }
+            break;
+        case kIROp_CombinedTextureSamplerGetSampler:
+            // `getSampler(makeCombinedTextureSampler(t, s))` is `s`, if `s` has the type that
+            // `getSampler` yields. The sampler can be extracted as a `SamplerState` or as a
+            // `SamplerComparisonState`, and only `s` of the matching type can stand in for it.
+            if (auto combined = as<IRMakeCombinedTextureSampler>(inst->getOperand(0)))
+            {
+                if (combined->getSampler()->getFullType() != inst->getFullType())
+                    break;
+                inst->replaceUsesWith(combined->getSampler());
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            else if (auto undefined = as<IRUndefined>(inst->getOperand(0)))
+            {
+                replaceExtractionFromUndefined(inst, undefined);
             }
             break;
         case kIROp_FieldExtract:
