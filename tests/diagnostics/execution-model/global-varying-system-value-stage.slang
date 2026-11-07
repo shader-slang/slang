@@ -10,10 +10,12 @@
 in uint gPrim : SV_PrimitiveID;
 /*VERTEX:
         ^^^^^ system value semantic 'SV_PrimitiveID' cannot be used as input in 'vertex' shader stage
+        ^^^^^ 'gPrim' belongs to entry point 'main'
 */
 out float gDepth : SV_Depth;
 /*VERTEX:
           ^^^^^^ system value semantic 'SV_Depth' cannot be used as output in 'vertex' shader stage
+          ^^^^^^ 'gDepth' belongs to entry point 'main'
 */
 
 //FRAGMENT-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId

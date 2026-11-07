@@ -7,6 +7,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage fragment -no-codegen -warnings-disable 30627
 
 out float gDepth : SV_Depth;
+//CHECK:  ^^^^^^ 'gDepth' belongs to entry point 'main'
 in int2x2 gIntMatrix;
 /*CHECK:
           ^^^^^^^^^^ type cannot be used as entry-point varying for this target

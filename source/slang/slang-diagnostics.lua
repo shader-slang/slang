@@ -6507,6 +6507,13 @@ err(
 
 -- GLSL Compatibility (58001-58003)
 
+standalone_note(
+    "global-varying-owned-by-entry-point",
+    -1,
+    "'~decl:Decl' belongs to entry point '~entryPoint:Name', which owns every module-scope varying of its module, whether or not it uses it",
+    span { loc = "decl:Decl" }
+)
+
 err(
     "entry-point-must-return-void-when-global-output-present",
     58001,

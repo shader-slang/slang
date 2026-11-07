@@ -595,10 +595,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         if (!moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
             addModifier(moduleDecl, getASTBuilder()->create<HasLegacyGlobalVaryingsModifier>());
 
-        auto parentDecl = decl->parentDecl;
-        if (auto genericParentDecl = as<GenericDecl>(parentDecl))
-            parentDecl = genericParentDecl->parentDecl;
-        if (!as<ModuleDecl>(parentDecl) && !as<FileDecl>(parentDecl))
+        if (as<NamespaceDecl>(getParentDecl(decl)))
             getSink()->diagnose(Diagnostics::GlobalVaryingNotAtModuleScope{.decl = decl});
 
         switch (getSourceLanguage())
@@ -18841,8 +18838,8 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto importedModuleDecl = importedModule->getModuleDecl();
     decl->importedModuleDecl = importedModuleDecl;
 
-    // An entry point owns the module-scope varyings of its own module only, so the varyings of an
-    // imported module would belong to no entry point.
+    // An entry point owns the module-scope varyings of its own module only, so an entry point of
+    // the importing module could read or write an imported varying that it does not own.
     if (importedModuleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
     {
         getSink()->diagnose(Diagnostics::ImportedModuleHasGlobalVaryings{

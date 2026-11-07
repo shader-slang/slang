@@ -2356,12 +2356,15 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     if (returnType && !returnType->equals(linkage->getASTBuilder()->getVoidType()))
     {
-        for (auto directions : globalVaryingDirections)
+        for (Index i = 0; i < globalVaryings.getCount(); ++i)
         {
-            if (directions.isOutput)
+            if (globalVaryingDirections[i].isOutput)
             {
                 sink->diagnose(Diagnostics::EntryPointMustReturnVoidWhenGlobalOutputPresent{
                     .location = entryPointFuncDecl->loc});
+                sink->diagnose(Diagnostics::GlobalVaryingOwnedByEntryPoint{
+                    .entryPoint = entryPointName,
+                    .decl = globalVaryings[i]});
                 break;
             }
         }
@@ -2402,6 +2405,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             }
             for (Index i = 0; i < globalVaryings.getCount(); ++i)
             {
+                const auto errorCountBefore = sink->getErrorCount();
                 validateSystemValueSemanticForDirections(
                     &visitor,
                     sink,
@@ -2410,6 +2414,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     stage,
                     scope,
                     &entryPointInferredCaps);
+                if (sink->getErrorCount() != errorCountBefore)
+                {
+                    sink->diagnose(Diagnostics::GlobalVaryingOwnedByEntryPoint{
+                        .entryPoint = entryPointName,
+                        .decl = globalVaryings[i]});
+                }
             }
 
             // Validate the return type semantic
@@ -2835,13 +2845,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         if (!hasSvPosition)
         {
-            const bool globalOutputsCount = !doesModuleDependOnGLSLModule(linkage, module);
+            const bool globalOutputsCountAsOutputs = !doesModuleDependOnGLSLModule(linkage, module);
             for (Index i = 0; i < globalVaryings.getCount(); ++i)
             {
                 if (!globalVaryingDirections[i].isOutput)
                     continue;
                 const auto globalVarying = globalVaryings[i];
-                if (globalOutputsCount)
+                if (globalOutputsCountAsOutputs)
                     hasOutputs = true;
                 if (_outputDeclHasSemantic(
                         astBuilder,

@@ -1,5 +1,6 @@
 // An entry point owns the module-scope varyings of its own module only, so importing a module that
-// declares module-scope varyings is an error: those varyings would belong to no entry point.
+// declares module-scope varyings is an error: `main` below would read `gHelperColor`, which it
+// does not own.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage fragment -no-codegen -warnings-disable 30627
 
