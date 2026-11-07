@@ -20795,7 +20795,7 @@ void checkDerivativeOfAttributeImpl(
 
     Expr* checkedHigherOrderFuncExpr = visitor->dispatchExpr(
         higherOrderFuncExpr,
-        visitor->allowStaticReferenceToNonStaticMember());
+        visitor->allowStaticReferenceToNonStaticMember().resolvingPrimalOfDerivativeOfAttribute());
 
     if (!checkedHigherOrderFuncExpr)
     {
@@ -20890,6 +20890,36 @@ void checkDerivativeOfAttributeImpl(
         visitor->getSink()->diagnose(
             Diagnostics::CannotUseInterfaceRequirementAsDerivative{.attr = derivativeOfAttr->loc});
         return;
+    }
+
+    // A primal with a reference parameter cannot be differentiated. Consider this example:
+    //
+    //     float prim(__ref float a, float x) { return a * x; }
+    //
+    //     [BackwardDerivativeOf(prim)]
+    //     void primBwd(float a, inout DifferentialPair<float> x, float dOut) { ... }
+    //
+    // `prim` has no attribute of its own, so `checkDifferentiableCallableSignature` does not look
+    // at it, and this attribute is the only thing trying to give it a derivative. We therefore
+    // report the error here, with a note at the attribute. When the primal does have an attribute,
+    // the error was already reported there. Either way, `checkDerivativeAttribute` then skips
+    // matching the derivative against the primal, and no derivative is attached to it.
+    //
+    if constexpr (!std::is_same_v<TDerivativeAttr, PrimalSubstituteAttribute>)
+    {
+        if (hasReferenceParameter(primalFuncDecl) &&
+            !primalFuncDecl->findModifier<DifferentiableAttribute>())
+        {
+            for (auto paramDecl : primalFuncDecl->getParameters())
+            {
+                if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+                    visitor->getSink()->diagnose(
+                        Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                            .func = primalFuncDecl,
+                            .param = paramDecl,
+                            .derivativeOfLocation = higherOrderFuncExpr->loc});
+            }
+        }
     }
 
     if (auto existingModifier = _findModifier<TDerivativeAttr>(primalFuncDecl))

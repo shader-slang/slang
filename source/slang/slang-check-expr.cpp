@@ -4021,6 +4021,20 @@ DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
     return declRef;
 }
 
+// Return the name of the member that a higher-order expression like `fwd_diff(fn)` looks up on
+// `fn`, such as `fwd_diff`, or null for an expression that is not resolved by such a lookup.
+//
+static Name* getHigherOrderLookupName(SemanticsVisitor* visitor, HigherOrderInvokeExpr* expr)
+{
+    if (as<ForwardDifferentiateExpr>(expr))
+        return visitor->getName("fwd_diff");
+    if (as<BackwardDifferentiateExpr>(expr))
+        return visitor->getName("bwd_diff");
+    if (as<ApplyForBwdExpr>(expr))
+        return visitor->getName("apply_bwd");
+    return nullptr;
+}
+
 // Convert an expression of the form "hof(fn)" where "hof" is a higher-order function like
 // "fwd_diff" or "bwd_diff", into a lookup of the form "fn.fwd_diff" or "fn.bwd_diff"
 //
@@ -4028,20 +4042,8 @@ static Expr* convertHigherOrderExprToLookup(
     SemanticsVisitor* visitor,
     HigherOrderInvokeExpr* resultExpr)
 {
-    Name* lookupName = nullptr;
-    if (as<ForwardDifferentiateExpr>(resultExpr))
-    {
-        lookupName = visitor->getName("fwd_diff");
-    }
-    else if (as<BackwardDifferentiateExpr>(resultExpr))
-    {
-        lookupName = visitor->getName("bwd_diff");
-    }
-    else if (as<ApplyForBwdExpr>(resultExpr))
-    {
-        lookupName = visitor->getName("apply_bwd");
-    }
-    else
+    Name* lookupName = getHigherOrderLookupName(visitor, resultExpr);
+    if (!lookupName)
     {
         visitor->getSink()->diagnose(
             Diagnostics::InternalCompilerError{.location = resultExpr->loc});
@@ -6148,36 +6150,42 @@ struct HigherOrderInvokeExprCheckingActions
     }
 
     /// Return whether `funcExpr`, the function that `diffExpr` (a `fwd_diff` or `bwd_diff`)
-    /// differentiates, has a reference parameter and so cannot be differentiated, and report an
-    /// error on each such parameter that has not already been reported.
+    /// differentiates, has a reference parameter and so cannot be differentiated. Such a function
+    /// has no derivative signature, so the caller gives `diffExpr` an error type instead of
+    /// building one, and we make sure an error has been reported for it.
     bool rejectDifferentiationOfFunctionWithReferenceParameter(
         SemanticsVisitor* semantics,
         HigherOrderInvokeExpr* diffExpr,
         Expr* funcExpr)
     {
-        // A function with a reference parameter cannot be differentiated, so its derivative has no
-        // signature, and the caller gives the expression an error type instead of building one.
-        //
         auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr);
         if (!funcDeclRef || !hasReferenceParameter(funcDeclRef.getDecl()))
             return false;
 
-        // `checkDifferentiableCallableSignature` reports the reference parameters of a function
-        // with a differentiability or derivative attribute, so we report only those of a function
-        // without one. Naming such a function here is otherwise rejected only later, with a less
-        // specific error about the missing derivative.
+        // Consider this example:
         //
-        if (!funcDeclRef.getDecl()->findModifier<DifferentiableAttribute>())
+        //     float prim(__ref float a, float x) { return a * x; }
+        //     ... fwd_diff(prim)(a, diffPair(x, 1.0)) ...
+        //
+        // `prim` has no differentiability attribute, so nothing gives it a derivative, and the
+        // user's mistake is the same one as for a `prim` without the reference parameter. We
+        // therefore report the missing `fwd_diff` member that `convertHigherOrderExprToLookup`
+        // reports in that case.
+        //
+        // Other checks own the remaining cases. `checkDifferentiableCallableSignature` reports a
+        // function that has an attribute, at that attribute. `checkDerivativeOfAttributeImpl`
+        // reports a function that a `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute
+        // names, and checks the `fwd_diff(prim)` it builds for that purpose with
+        // `isResolvingPrimalOfDerivativeOfAttribute` set, so we stay silent there.
+        //
+        if (!semantics->isResolvingPrimalOfDerivativeOfAttribute() &&
+            !funcDeclRef.getDecl()->findModifier<DifferentiableAttribute>())
         {
-            for (auto paramDecl : funcDeclRef.getDecl()->getParameters())
-            {
-                if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
-                    semantics->getSink()->diagnose(
-                        Diagnostics::ReferenceParameterOfDifferentiableFunction{
-                            .func = funcDeclRef.getDecl(),
-                            .param = paramDecl,
-                            .requestLocation = diffExpr->loc});
-            }
+            semantics->getSink()->diagnose(Diagnostics::NoMemberOfNameInType{
+                .name = getHigherOrderLookupName(semantics, diffExpr),
+                .type =
+                    DeclRefType::create(semantics->getASTBuilder(), getResolvedFunc(funcDeclRef)),
+                .expr = diffExpr});
         }
         return true;
     }

@@ -4851,11 +4851,11 @@ err(
     "reference-parameter-of-differentiable-function",
     38038,
     "'~func:Decl' cannot be differentiated, because parameter '~param:Decl' is passed by reference",
-    span { loc = "param:Decl", message = "consider accessing the 'groupshared' variable directly instead of passing it as a parameter" },
+    span { loc = "param:Decl" },
     -- At most one of these notes has a location: the attribute that makes the function
-    -- differentiable, or the `fwd_diff` or `bwd_diff` that names a function without one.
+    -- differentiable, or the `...DerivativeOf` attribute that names a function without one.
     note { message = "this requests a derivative; remove it if the function needs none", span { loc = "attributeLocation" } },
-    note { message = "a derivative is requested here", span { loc = "requestLocation" } }
+    note { message = "a user-defined derivative is declared for it here", span { loc = "derivativeOfLocation" } }
 )
 
 err(

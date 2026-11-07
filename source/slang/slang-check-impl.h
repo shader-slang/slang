@@ -1723,6 +1723,18 @@ public:
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
 
+    SemanticsContext resolvingPrimalOfDerivativeOfAttribute()
+    {
+        SemanticsContext result(*this);
+        result.m_isResolvingPrimalOfDerivativeOfAttribute = true;
+        return result;
+    }
+
+    bool isResolvingPrimalOfDerivativeOfAttribute()
+    {
+        return m_isResolvingPrimalOfDerivativeOfAttribute;
+    }
+
     bool getAllowDroppingDerivatives() { return m_allowDroppingDerivatives; }
 
     OrderedHashSet<Val*>* getCapturedPacks() { return m_capturedPacks; }
@@ -1759,6 +1771,12 @@ protected:
     bool m_allowStaticReferenceToNonStaticMember = false;
 
     bool m_allowDroppingDerivatives = false;
+
+    /// Whether the `fwd_diff` or `bwd_diff` expression being checked is one that
+    /// `checkDerivativeOfAttributeImpl` builds to find the primal that a `[ForwardDerivativeOf]` or
+    /// `[BackwardDerivativeOf]` attribute names, rather than one the user wrote. Such an expression
+    /// does not request a derivative; the attribute declares one.
+    bool m_isResolvingPrimalOfDerivativeOfAttribute = false;
 
     /// The type of the try clause (if any) that covers the call being checked. A `try` covers only
     /// the call it wraps, so `visitInvokeExpr`, `visitIndexExpr` and `visitTypeCastExpr` check
