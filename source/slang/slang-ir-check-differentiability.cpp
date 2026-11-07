@@ -2,7 +2,6 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
-#include "slang-ir-sccp.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
@@ -96,38 +95,6 @@ public:
             callInst->findDecoration<IRDifferentiableCallDecoration>());
     }
 
-    bool isConstantVal(IRInst* inst)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_IntLit:
-        case kIROp_FloatLit:
-            return true;
-        case kIROp_MakeValuePack:
-            {
-                for (UInt i = 0; i < inst->getOperandCount(); i++)
-                {
-                    if (!isConstantVal(inst->getOperand(i)))
-                        return false;
-                }
-                return true;
-            }
-        }
-
-        if (isEvaluableOpCode(inst->getOp()))
-        {
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
-            {
-                auto operand = inst->getOperand(i);
-                if (!isConstantVal(operand))
-                    return false;
-            }
-            return true;
-        }
-
-        return false;
-    }
-
     // If a function call takes all literals as arguments, it will implies that this function
     // will not be expected to any gradients, in this case, this call should be treated as
     // no_diff even there is no 'no_diff' decorated on it explicitly. In the actual check, we
@@ -146,23 +113,8 @@ public:
         if (!calleeFuncType)
             return false;
 
-        SLANG_RELEASE_ASSERT(calleeFuncType->getParamCount() == callInst->getArgCount());
-
-        bool doesImplyNoDiff = true;
-        UInt paramIndex = 0;
-        for (auto paramType : calleeFuncType->getParamTypes())
-        {
-            auto [paramDirectionInfo, paramBaseType] = splitParameterDirectionAndType(paramType);
-            if (diffTypeContext.isDifferentiableType(paramBaseType))
-            {
-                auto arg = callInst->getArg(paramIndex);
-                if (!isConstantVal(arg))
-                {
-                    doesImplyNoDiff = false;
-                }
-            }
-            paramIndex++;
-        }
+        bool doesImplyNoDiff =
+            hasOnlyConstantDifferentiableArgs(diffTypeContext, callInst, calleeFuncType);
 
         if (doesImplyNoDiff)
         {

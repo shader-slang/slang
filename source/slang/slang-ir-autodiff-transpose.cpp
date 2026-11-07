@@ -1271,6 +1271,7 @@ struct DiffTransposePass
 
         auto fwdPropCallee = cast<IRForwardDifferentiatePropagate>(fwdCall->getCallee());
         auto fwdPropCalleeFuncType = cast<IRFuncType>(fwdPropCallee->getDataType());
+        SLANG_RELEASE_ASSERT(fwdPropCalleeFuncType->getParamCount() == fwdCall->getArgCount());
 
         auto baseFn = fwdPropCallee->getBaseFn();
 
