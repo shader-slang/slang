@@ -48,11 +48,6 @@ protected:
     {
         return m_target == CodeGenTarget::CPPHeader;
     }
-    virtual bool isResourceTypeBindless(IRType* type) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(type);
-        return true;
-    }
     virtual bool doesTargetSupportPtrTypes() SLANG_OVERRIDE { return true; }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
