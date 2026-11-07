@@ -3040,11 +3040,11 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 // CUDA has no native floating-point atomicMin/atomicMax, so the prelude implements them. Both
 // implementations below follow the SPIR-V OpAtomicFMinEXT/OpAtomicFMaxEXT rules and return the
 // original value: a NaN operand is ignored, a stored NaN is replaced, and either zero may win
-// between -0.0 and +0.0. Both write only the exact bits of an operand, never a result of
-// fminf/fmaxf, and both return without a write when the stored value already wins; the initial
-// volatile load is a coherent relaxed load, which makes that a valid min/max at that load. Neither
-// depends on -fp-mode: float and double compare in integer order, and half values widen to normal
-// floats.
+// between -0.0 and +0.0. The one exception is a float reduction, described below. Both write only
+// the exact bits of an operand, never a result of fminf/fmaxf, and both return without a write when
+// the stored value already wins; the initial volatile load is a coherent relaxed load, which makes
+// that a valid min/max at that load. Neither depends on -fp-mode: float and double compare in
+// integer order, and half values widen to normal floats.
 
 // Float and double use integer atomics on the bit pattern. When the sign bit is clear, signed
 // integer order matches floating-point order; for negative values, unsigned order is its reverse.
@@ -3056,9 +3056,15 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 // Each loop iteration starts from `old`, the latest stored bits this thread has seen. A winning
 // update takes one integer atomic and no retry; only a stored NaN goes through atomicCAS, which
 // retries when another kind of write changes the value first.
+//
+// When `checkOriginal` is set, the original value the integer atomic returns is checked for a NaN
+// that another kind of write stored after our load. Float reductions (reduceMin/reduceMax) discard
+// the original value and skip that check, so their integer atomic compiles to `red`, which the
+// compiler can also combine across a warp; a NaN stored concurrently by an exchange can then
+// survive the reduction.
 template<typename T, typename Bits, typename UBits>
 __device__ __forceinline__ T
-__slang_atomic_min_max_with_integer_atomics(T* address, T val, bool isMin)
+__slang_atomic_min_max_with_integer_atomics(T* address, T val, bool isMin, bool checkOriginal)
 {
     static_assert(sizeof(T) == sizeof(Bits) && sizeof(Bits) == sizeof(UBits), "size mismatch");
     Bits* bits = reinterpret_cast<Bits*>(address);
@@ -3089,7 +3095,7 @@ __slang_atomic_min_max_with_integer_atomics(T* address, T val, bool isMin)
                     isMin ? atomicMax(reinterpret_cast<UBits*>(bits), UBits(valBits))
                           : atomicMin(reinterpret_cast<UBits*>(bits), UBits(valBits)));
             const T originalValue = *reinterpret_cast<const T*>(&original);
-            if (!isnan(originalValue))
+            if (!checkOriginal || !isnan(originalValue))
                 return originalValue;
             // Another kind of write stored a NaN after our load. If the integer atomic kept it,
             // replace it below like any stored NaN; if it wrote `val`, it already did.
@@ -3109,38 +3115,50 @@ __slang_atomic_min_max_with_integer_atomics(T* address, T val, bool isMin)
     }
 }
 
-__device__ __forceinline__ float __slang_atomic_min_max(float* address, float val, bool isMin)
+__device__ __forceinline__ float __slang_atomic_min_max(
+    float* address,
+    float val,
+    bool isMin,
+    bool checkOriginal)
 {
     return __slang_atomic_min_max_with_integer_atomics<float, int, unsigned int>(
         address,
         val,
-        isMin);
+        isMin,
+        checkOriginal);
 }
 
-__device__ __forceinline__ double __slang_atomic_min_max(double* address, double val, bool isMin)
+// 64-bit integer min/max stays an `atom` even when its result is unused, so skipping the check
+// would gain nothing: double reductions keep it, and the last parameter is unused.
+__device__ __forceinline__ double __slang_atomic_min_max(
+    double* address,
+    double val,
+    bool isMin,
+    bool)
 {
     return __slang_atomic_min_max_with_integer_atomics<double, long long, unsigned long long>(
         address,
         val,
-        isMin);
+        isMin,
+        true);
 }
 
 #define SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(T)                                             \
     __device__ __forceinline__ T __slang_atomic_min(T* address, T val)                      \
     {                                                                                       \
-        return __slang_atomic_min_max(address, val, true);                                  \
+        return __slang_atomic_min_max(address, val, true, true);                            \
     }                                                                                       \
     __device__ __forceinline__ T __slang_atomic_max(T* address, T val)                      \
     {                                                                                       \
-        return __slang_atomic_min_max(address, val, false);                                 \
+        return __slang_atomic_min_max(address, val, false, true);                           \
     }                                                                                       \
     __device__ __forceinline__ void __slang_atomic_reduce_min(T* address, T val, int order) \
     {                                                                                       \
-        __slang_atomic_min_max(address, val, true);                                         \
+        __slang_atomic_min_max(address, val, true, false);                                  \
     }                                                                                       \
     __device__ __forceinline__ void __slang_atomic_reduce_max(T* address, T val, int order) \
     {                                                                                       \
-        __slang_atomic_min_max(address, val, false);                                        \
+        __slang_atomic_min_max(address, val, false, false);                                 \
     }
 
 SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(float)
@@ -3150,7 +3168,10 @@ SLANG_CUDA_FLOAT_ATOMIC_MIN_MAX_IMPL(double)
 // in float after an exact widening. 16-bit atomicCAS is only declared for sm_70 and up and for the
 // host pass, which this condition matches.
 #if defined(SLANG_CUDA_ENABLE_HALF) && (!defined(__CUDA_ARCH__) || (__CUDA_ARCH__ >= 700))
-__device__ __forceinline__ __half __slang_atomic_min_max(__half* address, __half val, bool isMin)
+// The compare-and-swap loop has no separate check for reductions to skip, so the last parameter
+// is unused.
+__device__ __forceinline__ __half
+__slang_atomic_min_max(__half* address, __half val, bool isMin, bool)
 {
     unsigned short* bits = reinterpret_cast<unsigned short*>(address);
     const unsigned short valBits = __half_as_ushort(val);
