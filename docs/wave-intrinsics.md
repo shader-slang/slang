@@ -315,7 +315,7 @@ T WaveMultiPrefixExclusiveBitOr(T value, uint4 mask);
 T WaveMultiPrefixExclusiveBitXor(T value, uint4 mask);
 
 
-// Prefix min/max operations. Supported when targeting SPIRV and GLSL.
+// Prefix min/max operations. Supported when targeting SPIRV, GLSL and CUDA.
 
 T WaveMultiPrefixInclusiveMin(T value, uint4 mask);
 
