@@ -9898,6 +9898,65 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getOperand(3));
     }
 
+    /// Return true if `spvInst` is a specialization-constant instruction, which
+    /// OpConstantComposite may not take as a constituent. The list holds the
+    /// specialization-constant opcodes that this emitter produces.
+    static bool isSpecConstant(SpvInst* spvInst)
+    {
+        SLANG_ASSERT(spvInst);
+        switch (spvInst->opcode)
+        {
+        case SpvOpSpecConstant:
+        case SpvOpSpecConstantTrue:
+        case SpvOpSpecConstantFalse:
+        case SpvOpSpecConstantComposite:
+        case SpvOpSpecConstantOp:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// Return true if the module-scope `irInst` is emitted as a specialization constant.
+    /// Like `emitOperand`, this emits `irInst` through `ensureInst` if it has not been
+    /// emitted yet, so it must not be called on a function-local instruction.
+    bool isSpecConstant(IRInst* irInst) { return isSpecConstant(ensureInst(irInst)); }
+
+    /// Return true if any of `constituents` (module-scope IR instructions or
+    /// already-emitted SPIR-V instructions) is a specialization constant.
+    template<typename T>
+    bool hasSpecConstantConstituent(const List<T>& constituents)
+    {
+        for (auto constituent : constituents)
+        {
+            if (isSpecConstant(constituent))
+                return true;
+        }
+        return false;
+    }
+
+    bool hasSpecConstantConstituent(OperandsOf const& operands)
+    {
+        auto irInst = operands.irInst;
+        for (UInt i = 0; i < irInst->getOperandCount(); i++)
+        {
+            if (isSpecConstant(irInst->getOperand(i)))
+                return true;
+        }
+        return false;
+    }
+
+    /// Emit a composite of `constituents`. In a function body this is OpCompositeConstruct.
+    /// In the constants section it is OpSpecConstantComposite if any constituent is a
+    /// specialization constant, and OpConstantComposite otherwise, because SPIR-V does not
+    /// allow a specialization constant as an OpConstantComposite constituent.
+    ///
+    /// We decide from the emitted SPIR-V opcodes, not from the IR: a composite never has a
+    /// spec-constant rate (`canOperationBeSpecConst` excludes it), and the row vectors that
+    /// `emitMakeMatrix` builds have no IR instruction at all. Checking only the direct
+    /// constituents is enough, because an inner composite was emitted before this one, by
+    /// this function or by `emitSpecializationConstant`, and so is already
+    /// OpSpecConstantComposite if it depends on a specialization constant.
     template<typename T, typename Ts>
     SpvInst* emitCompositeConstruct(
         SpvInstParent* parent,
@@ -9906,15 +9965,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const Ts& constituents)
     {
         if (parent == getSection(SpvLogicalSectionID::ConstantsAndTypes))
+        {
+            if (hasSpecConstantConstituent(constituents))
+                return emitOpSpecConstantComposite(parent, inst, idResultType, constituents);
             return emitOpConstantComposite(parent, inst, idResultType, constituents);
+        }
         return emitOpCompositeConstruct(parent, inst, idResultType, constituents);
     }
 
     SpvInst* emitCompositeConstruct(SpvInstParent* parent, IRInst* inst)
     {
-        if (parent == getSection(SpvLogicalSectionID::ConstantsAndTypes))
-            return emitOpConstantComposite(parent, inst, inst->getDataType(), OperandsOf(inst));
-        return emitOpCompositeConstruct(parent, inst, inst->getDataType(), OperandsOf(inst));
+        return emitCompositeConstruct(parent, inst, inst->getDataType(), OperandsOf(inst));
     }
 
     SpvInst* emitMakeArrayFromElement(SpvInstParent* parent, IRInst* inst)
