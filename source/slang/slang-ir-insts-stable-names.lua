@@ -882,5 +882,8 @@ return {
 	["DebugLexicalBlock"] = 906,
 	["Decoration.fileOrNamespaceScopeMutableVar"] = 907,
 	["Decoration.uninitializedGlobalCheckFoundPossibleWrite"] = 908,
-	["Decoration.glslPatch"] = 909
+	["Decoration.glslPatch"] = 909,
+	["metalTextureFence"] = 910,
+	["Type.TraceProgramDescriptor"] = 911,
+	["metalTraceRay"] = 912
 }

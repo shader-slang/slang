@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 671b9ed682adbf414a55ec67fa68b82abc91c2aea9c886087f23ead3285a7c2d
+model: claude-sonnet-5-5
+generated_at: 2026-11-03
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: c43e0e630d51ac9b363fa905060d2361e78098b08359d47ea1f1237612ccbd70
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -51,7 +51,7 @@ The sink owns:
 
 A nested sink can inherit settings from an enclosing one: the
 `DiagnosticSink(SourceManager*, SourceLocationLexer, DiagnosticSink*
-parentSink)` constructor copies the flags, color mode, unicode setting,
+parentSink)` constructor copies the flags, diagnostic format, color mode, unicode setting,
 enabled warning groups, and severity overrides from `parentSink`. This
 is distinct from `setParentSink`, which routes diagnostics upward: a
 legacy diagnostic is forwarded as already-formatted text, while a rich
@@ -103,9 +103,10 @@ single catalog, and every entry in it is a rich diagnostic:
    `standalone_note`, `internal`, and `fatal` helpers.
 2. [slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua)
    collects those calls, validates them, and parses each message into
-   typed parameters and spans. The file ends by calling
-   `helpers.process_diagnostics` and returning the processed list,
-   raising a Lua error if validation failed.
+   typed parameters and spans, and exports `process_diagnostics`.
+   `slang-diagnostics.lua` itself ends by calling
+   `helpers.process_diagnostics`, raising a Lua error if validation
+   failed, and returning the processed list.
 3. [slang-rich-diagnostics.h.lua](../../../../source/slang/slang-rich-diagnostics.h.lua)
    loads that processed list and supplies the mapping helpers used by
    the templates (`toPascalCase`, `getCppType`, `getSeverityEnum`,
@@ -182,10 +183,14 @@ of condition the entry describes. `err`, `warning`, and
 `standalone_note` entries report on the input; `fatal` entries do too,
 but on a condition the compiler cannot continue past (e.g.
 `cyclic-reference`). `internal` entries report the compiler's own
-failure: `internal-compiler-error`, `unimplemented`, and `unexpected`
-— all code `99999` — are what the macros under
-[Internal-compiler errors](#internal-compiler-errors) raise, so input
-that reaches one is a compiler defect, not a supported reproduction.
+failure. Eight exist: `internal-compiler-error`, `unimplemented`, and
+`unexpected` — all code `99999` — are what the macros under
+[Internal-compiler errors](#internal-compiler-errors) raise, and
+`serial-debug-verification-failed`, `spirv-validation-failed`, and
+`no-blocks-or-intrinsic` also use `99999`, while `ir-validation-failed`
+(`40007`) and `missing-existential-bindings-for-parameter` (`50010`)
+carry their own codes. Input that reaches an `internal` entry is a
+compiler defect, not a supported reproduction.
 
 A `variadic_span` or `variadic_note` becomes a nested struct plus a
 `List<>` member on the generated struct, and `toGenericDiagnostic()`
@@ -295,11 +300,15 @@ nine a given input will actually produce.
 The second route needs no declared entry at all and is fully visible
 here: `outputExceptionDiagnostic` in
 [slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp)
-(line 978) calls `diagnoseRaw(Severity::Fatal, "An unknown exception
-occurred")`, so any C++ exception that escapes to that boundary renders
-a code-less `fatal error: An unknown exception occurred`. It then
+(line 981) calls `diagnoseRaw(Severity::Fatal, "An unknown exception
+occurred")`, so any C++ exception that escapes to that boundary emits
+the bare text `An unknown exception occurred`: `diagnoseRaw` writes the
+message verbatim, with no severity prefix, code, or newline, and uses
+the `Fatal` severity only to trigger the abort. It then
 catches the resulting `AbortCompilationException` itself, deliberately,
-so the abort does not leak out through `loadModule`.
+so the abort does not leak out through `loadModule`; the `try` is
+spelled `SLANG_EXCEPTION_TRY` and the `catch` exists only when
+`SLANG_HAS_EXCEPTIONS` is set.
 
 Note also that `getEffectiveMessageSeverity` (below) will not let a
 `-Wno-` style override lower a severity that has already reached
@@ -320,7 +329,9 @@ takes precedence over group gating, which is what lets `-W<id>`
 force-enable a single warning from a group that is off. The option
 table spells these `-W<id>` / `-Wno-<id>`, but the operand goes
 through `overrideDiagnostic`, which accepts an integer id or a
-diagnostic name.
+diagnostic name. `-notes-disable <id>[,<id>...]`
+(`CompilerOptionName::DisableNotes`) takes the same id-or-name operand
+but requires the diagnostic to be a `Note`.
 
 ### Warning groups
 
@@ -379,7 +390,8 @@ When the sink formats a diagnostic, it uses the `SourceManager` to
 decode the `SourceLoc` into `file:line:column` and to retrieve the
 original source line for caret rendering. Two formatting paths differ
 here. The legacy path (`diagnoseImpl`, taken only when the
-`AlwaysGenerateRichDiagnostics` flag is not set) calls the
+`AlwaysGenerateRichDiagnostics` flag is not set and the sink's
+diagnostic format is not Visual Studio) calls the
 `formatDiagnostic` helper in
 [slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp),
 which, when the location falls in a synthesized token-paste view
@@ -402,13 +414,30 @@ warning[E41016]: use of uninitialized variable
  --> uninit.slang:6:13
 ```
 
+`-diagnostic-format <default|vs>` sets the sink's
+`SlangDiagnosticFormat` (`SLANG_DIAGNOSTIC_FORMAT_DEFAULT` or
+`SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO`, option
+`CompilerOptionName::DiagnosticFormat`). With `vs` the sink routes
+every catalog diagnostic through the rich path and
+`renderVisualStudio` in
+[slang-rich-diagnostics-render.cpp](../../../../source/compiler-core/slang-rich-diagnostics-render.cpp)
+replaces the box layout: the header is
+`<file>(<line>,<col>): <severity> E<5-digit id>: <message>` (no
+brackets and no colon after the severity name; a diagnostic with no
+location, or one on the command-line source, drops the `(line,col)`
+part), notes get their own `note` header without an id, and source
+excerpts and continuation lines are indented four spaces, uncolored,
+with ASCII glyphs. The machine-readable flag takes precedence over the
+format.
+
 `-diagnostic-color always|never|auto` selects more than colour:
 unless a host sets the unicode flag explicitly through
 `setEnableUnicode`, the renderer picks its frame glyphs with the same
 predicate. With colour off the frame is ASCII (`-->`, `|`, `^`, `-`);
 with colour on it is Unicode box drawing (`╭╼`, `│`, `━`, `┬`)
 wrapped in ANSI SGR escapes. `auto` asks the writer whether it is a
-console, so piped output gets the ASCII form.
+console, so piped output gets the ASCII form. The `vs` format always
+uses ASCII glyphs and no colour.
 
 Diagnostics raised while parsing the command line are attached to a
 synthetic source, not to a file in the translation unit: the options
@@ -603,7 +632,8 @@ the sink entirely. The sink-based internal-error path is the
   them here would replicate the build artefact and drift on every
   change.
 - The command-line and API surfaces that drive the sink
-  (`-warnings-disable`, `-warnings-as-errors`, `-Wno-<name>`, `-Wall` /
+  (`-warnings-disable`, `-warnings-as-errors`, `-notes-disable`,
+  `-diagnostic-format`, `-Wno-<name>`, `-Wall` /
   `-Wextra` / `-Wpedantic`, and the matching `CompilerOptionName`
   entries). These live in
   [slang-options.cpp](../../../../source/slang/slang-options.cpp),

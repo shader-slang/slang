@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -emit-spirv-directly
 
 // CHECK: cyclic reference
 interface IFoo { void ff(); }

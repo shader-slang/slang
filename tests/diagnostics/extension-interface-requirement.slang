@@ -4,7 +4,7 @@
 // Extensions cannot declare new interface requirements - they must provide implementations.
 // See https://github.com/shader-slang/slang/issues/9198
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv
 
 // Simple interface
 public interface IROTensor<T, let D : int>
