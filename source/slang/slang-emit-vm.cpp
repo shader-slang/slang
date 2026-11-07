@@ -234,10 +234,11 @@ public:
                 }
                 else if (inst->getDataType()->getOp() == kIROp_FloatType)
                 {
-                    float floatValue = (float)value;
+                    // Not `(float)value`, which would quiet a signaling NaN.
+                    uint32_t floatBits = DoubleToFloatBits(value);
                     byteCodeBuilder.constantSection.addRange(
-                        (uint8_t*)&floatValue,
-                        sizeof(floatValue));
+                        (uint8_t*)&floatBits,
+                        sizeof(floatBits));
                     operand.setType(OperandDataType::Float32);
                 }
                 else
