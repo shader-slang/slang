@@ -897,23 +897,10 @@ Val* BwdDiffFuncType::_resolveImplOverride()
             case ParamPassingMode::RefReadOnly:
             case ParamPassingMode::RefWriteOnly:
                 {
-                    // A reference parameter shares its storage with the caller, or with the whole
-                    // thread group for a `groupshared` parameter. Consider this example:
-                    //
-                    //     float scale(__ref float a, float x) { return a * x; }
-                    //
-                    // The result depends on the value that `a` refers to, so a correct derivative
-                    // would propagate a derivative to that storage, and would need derivative
-                    // storage that is shared in the same way. We have no representation for that,
-                    // so the signature we build here passes `a` through as non-differentiable, as
-                    // if it were marked `no_diff`, and is not a correct derivative.
-                    //
-                    // We build it anyway because semantic checking rejects every request to
-                    // differentiate a function with a reference parameter, in
-                    // `checkDifferentiableCallableSignature`, `checkDerivativeOfAttributeImpl` and
-                    // `visitFuncExtensionDecl`, but resolves expressions like `bwd_diff(scale)`
-                    // along the way, and failing here would be an internal compiler error. The
-                    // forward-derivative signature passes references through in the same way.
+                    // We pass a reference parameter through unchanged and treat its storage as
+                    // non-differentiable. That is not a correct derivative, but no function with a
+                    // reference parameter is ever differentiated; semantic checking only needs this
+                    // signature to resolve expressions like `bwd_diff(f)`.
                     //
                     // TODO: Differentiate the storage that a reference parameter refers to.
                     //

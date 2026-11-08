@@ -6072,12 +6072,8 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
         case ParamPassingMode::RefReadOnly:
         case ParamPassingMode::RefWriteOnly:
             {
-                // The derivative takes a reference parameter of the primal as is, with the same
-                // access, and treats the storage it refers to as non-differentiable. As
-                // `BwdDiffFuncType::_resolveImplOverride` explains, that is not a correct
-                // derivative when the referenced type is differentiable, but no function with a
-                // reference parameter is ever differentiated, and semantic checking still needs
-                // the signature to resolve expressions like `bwd_diff(scale)`.
+                // We pass a reference parameter through unchanged and treat its storage as
+                // non-differentiable, as `BwdDiffFuncType::_resolveImplOverride` does.
                 //
                 // TODO: Differentiate the storage that a reference parameter refers to.
                 //

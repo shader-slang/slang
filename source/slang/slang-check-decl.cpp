@@ -17703,28 +17703,25 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     // conformance or synthesized members that depend on the invalid signature.
     extensionDecl->addMember(innerFunc);
 
-    // A function with a reference parameter cannot be differentiated. Consider this example:
-    //
-    //     float scale(__ref float a, float x) { return a * x; }
-    //
-    //     __func_extension bwd_diff(scale)(__ref float a, inout DifferentialPair<float> x,
-    //                                      float dOut) -> void { ... }
-    //
-    // Like a `[BackwardDerivativeOf(scale)]` attribute, the extension tries to give `scale` a
-    // derivative, so we report the error here, with a note where the extension names `scale`,
-    // unless an attribute on `scale` already reported it. In either case we then leave only the
-    // ownership shell, as for an invalid signature, so `scale` gets no derivative. The conformance
-    // and members that the helpers below add would otherwise be built from a derivative signature
-    // that drops the derivative of `a`, as `BwdDiffFuncType` explains. For `bwd_diff` and
-    // `__apply` they would also use a `BwdCallableFuncType`, which gives `a` an error type without
-    // a diagnostic, and lowering that to IR is an internal compiler error.
-    //
-    // Otherwise, we dispatch to the helper for the kind of higher-order expression.
+    // We dispatch to the helper for the kind of higher-order expression, unless the function has a
+    // reference parameter. A function with a reference parameter cannot be differentiated, so an
+    // extension that gives it a derivative is an error, as a `[BackwardDerivativeOf]` attribute
+    // would be. We report it here unless the function's own `[Differentiable]` attribute already
+    // did.
     //
     auto primalFuncDecl = as<CallableDecl>(baseFuncDeclRef.getDecl());
     SLANG_ASSERT(primalFuncDecl);
     if (hasReferenceParameter(primalFuncDecl))
+    {
         diagnoseReferenceParametersOfPrimal(getSink(), primalFuncDecl, diffExpr->baseFunction->loc);
+
+        // We leave the extension holding only the user's function, without a conformance or
+        // synthesized members, so the function gets no derivative. The helpers would build those
+        // from a derivative signature that cannot represent the derivative of a reference
+        // parameter, and for `bwd_diff` and `__apply` the `BwdCallableFuncType` they use gives the
+        // parameter an error type, which is an internal compiler error in lowering.
+        //
+    }
     else if (isForwardDiff)
         _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (isBackwardDiff)
@@ -20935,18 +20932,11 @@ void checkDerivativeOfAttributeImpl(
         return;
     }
 
-    // A primal with a reference parameter cannot be differentiated. Consider this example:
-    //
-    //     float prim(__ref float a, float x) { return a * x; }
-    //
-    //     [BackwardDerivativeOf(prim)]
-    //     void primBwd(float a, inout DifferentialPair<float> x, float dOut) { ... }
-    //
-    // `prim` has no attribute of its own, so `checkDifferentiableCallableSignature` does not look
-    // at it, and this attribute is the only thing trying to give it a derivative. We therefore
-    // report the error here, with a note at the attribute. When the primal does have an attribute,
-    // the error was already reported there. Either way, `checkDerivativeAttribute` then skips
-    // matching the derivative against the primal, and no derivative is attached to it.
+    // A primal with a reference parameter cannot be differentiated. If the primal has its own
+    // `[Differentiable]` attribute, `checkDifferentiableCallableSignature` has already reported
+    // that; otherwise this attribute is the only thing trying to give it a derivative, so we
+    // report the error here. Either way, `checkDerivativeAttribute` skips matching the derivative
+    // against the primal, so no derivative is attached.
     //
     if constexpr (!std::is_same_v<TDerivativeAttr, PrimalSubstituteAttribute>)
     {
