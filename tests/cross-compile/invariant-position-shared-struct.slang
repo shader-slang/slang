@@ -1,24 +1,24 @@
-// The fragment entry point is legalized before the vertex entry point that shares its struct, so
-// stripping `invariant` from the fragment input must not take it off the vertex output.
+// Both entry points are legalized together, fragment first. The fragment input nests the shared
+// struct, so it gets flattened, and stripping `invariant` there must not reach the vertex output.
 
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl
 //TEST:SIMPLE(filecheck=METAL): -target metal
 
-struct Inner
-{
-    float2 uv : TEXCOORD0;
-};
-
 struct VSOut
 {
     invariant float4 pos : SV_Position;
-    Inner inner;
+    float2 uv : TEXCOORD0;
+};
+
+struct FragmentInput
+{
+    VSOut vertex;
 };
 
 [shader("fragment")]
-float4 fragmentMain(VSOut input) : SV_Target
+float4 fragmentMain(FragmentInput input) : SV_Target
 {
-    return float4(input.inner.uv, input.pos.z, 1.0);
+    return float4(input.vertex.uv, input.vertex.pos.z, 1.0);
 }
 
 [shader("vertex")]
@@ -26,7 +26,7 @@ VSOut vertexMain(float3 p : POSITION)
 {
     VSOut output;
     output.pos = float4(p, 1.0);
-    output.inner.uv = p.xy;
+    output.uv = p.xy;
     return output;
 }
 
