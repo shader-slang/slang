@@ -1,7 +1,5 @@
 // Metal has no floating-point texture atomics. An exchange, min or max on a float texel is
-// diagnosed exactly once: the texture check in the Metal emitter skips these operations, because
-// another check already diagnoses them for every destination. The message differs between those
-// checks, so only the diagnostic code is matched.
+// diagnosed exactly once, by the Metal checks in slang-ir-check-unsupported-inst.cpp.
 
 //TEST:SIMPLE(filecheck=XCHG,exit-code=-1):-target metal -entry exchangeMain -stage compute
 //TEST:SIMPLE(filecheck=MIN,exit-code=-1):-target metal -entry minMain -stage compute
