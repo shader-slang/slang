@@ -678,18 +678,37 @@ SLANG_CUDA_PRECISE_FP_OP(add, +)
 SLANG_CUDA_PRECISE_FP_OP(sub, -)
 SLANG_CUDA_PRECISE_FP_OP(mul, *)
 #if SLANG_CUDA_ENABLE_HALF
+/* The half `_rn` intrinsics (`__hadd_rn`, `__hadd2_rn`, ...) are in CUDA 11.6 and later. With an
+   older toolkit, compute in float with the float `_rn` intrinsics and round once to half. That
+   gives the correctly rounded half result: float has more than 2 * 11 + 2 significand bits, so
+   rounding twice cannot change the result of an add, sub or mul. */
+#if (__CUDACC_VER_MAJOR__ > 11) || (__CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ >= 6)
+#define SLANG_CUDA_HAS_HALF_RN 1
+#define SLANG_CUDA_HALF_RN(name, a, b) __h##name##_rn(a, b)
+#else
+#define SLANG_CUDA_HAS_HALF_RN 0
+#define SLANG_CUDA_HALF_RN(name, a, b) __float2half_rn(__f##name##_rn(__half2float(a), __half2float(b)))
+#endif
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half _slang_precise_add(__half a, __half b)
 {
-    return __hadd_rn(a, b);
+    return SLANG_CUDA_HALF_RN(add, a, b);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half _slang_precise_sub(__half a, __half b)
 {
-    return __hsub_rn(a, b);
+    return SLANG_CUDA_HALF_RN(sub, a, b);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half _slang_precise_mul(__half a, __half b)
 {
-    return __hmul_rn(a, b);
+    return SLANG_CUDA_HALF_RN(mul, a, b);
 }
+#if SLANG_CUDA_HAS_HALF_RN
+#define SLANG_CUDA_HALF2_RN(name, a, b) __h##name##2_rn(a, b)
+#else
+#define SLANG_CUDA_HALF2_RN(name, a, b)                                \
+    __halves2half2(                                                    \
+        _slang_precise_##name(__low2half(a), __low2half(b)),           \
+        _slang_precise_##name(__high2half(a), __high2half(b)))
+#endif
 #endif
 #define SLANG_CUDA_VECTOR_ARITH_OP(op, name)                             \
     template<typename T, SLANG_CUDA_VECTOR_ENABLE_IF>                    \
@@ -743,7 +762,7 @@ SLANG_CUDA_VECTOR_UNARY_OP(~, SLANG_CUDA_VECTOR_ENABLE_IF_INTEGRAL)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh)
 {
 #if SLANG_CUDA_PRECISE_FP
-    return __hadd2_rn(lh, rh);
+    return SLANG_CUDA_HALF2_RN(add, lh, rh);
 #else
     return __hadd2(lh, rh);
 #endif
@@ -751,7 +770,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh)
 {
 #if SLANG_CUDA_PRECISE_FP
-    return __hsub2_rn(lh, rh);
+    return SLANG_CUDA_HALF2_RN(sub, lh, rh);
 #else
     return __hsub2(lh, rh);
 #endif
@@ -759,7 +778,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh)
 {
 #if SLANG_CUDA_PRECISE_FP
-    return __hmul2_rn(lh, rh);
+    return SLANG_CUDA_HALF2_RN(mul, lh, rh);
 #else
     return __hmul2(lh, rh);
 #endif

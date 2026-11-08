@@ -3,6 +3,9 @@
 // floating-point add, sub and mul are emitted as `__fadd_rn` / `__dmul_rn` / ..., which nvcc never
 // contracts, and SLANG_CUDA_PRECISE_FP switches the prelude's vector and matrix operators to the
 // same functions. An explicit `fma` stays fused. The default mode is unchanged.
+// The FileCheck lanes cover the emitter. The compute lane checks that the precise code builds and
+// gives the unfused values; it would pass without the intrinsics too, because render-test's NVRTC
+// compile already gets `--fmad=false` under `-fp-mode precise`.
 
 //TEST:SIMPLE(filecheck=PRECISE): -target cuda -entry computeMain -stage compute -fp-mode precise -line-directive-mode none
 //TEST:SIMPLE(filecheck=DEFAULT): -target cuda -entry computeMain -stage compute -line-directive-mode none
@@ -15,9 +18,10 @@
 // PRECISE-DAG: __dadd_rn(__dmul_rn(
 // PRECISE-DAG: F32_fma(
 
-// DEFAULT-NOT: SLANG_CUDA_PRECISE_FP
-// DEFAULT-NOT: __fadd_rn
-// DEFAULT-NOT: __fmul_rn
+// The prelude may be emitted inline, so match the define and the calls, not the names alone.
+// DEFAULT-NOT: #define SLANG_CUDA_PRECISE_FP 1
+// DEFAULT-NOT: = __fadd_rn(
+// DEFAULT-NOT: = __fmul_rn(
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
