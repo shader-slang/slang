@@ -141,6 +141,10 @@ public:
     SourceLoc lastErrorLoc;
     ParserOptions options;
     Modifiers* pendingModifiers = nullptr;
+
+    // The container receiving variables from the current HLSL `for` initializer, or null
+    // outside an initializer. Declarations in nested containers are excluded.
+    ContainerDecl* hlslForLoopInitializerContainer = nullptr;
     int genericDepth = 0;
 
     // Is the parser in a "recovering" state?
@@ -245,6 +249,8 @@ public:
     Stmt* ParseStatement(
         Stmt* parentStmt = nullptr,
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
+    /// Parse a control-flow body, including the implicit scope of an unbraced HLSL body.
+    Stmt* parseControlFlowBody(Stmt* parentStmt = nullptr);
     Stmt* parseBlockStatement(
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
     // Test whether lookahead is a declaration keyword allowed in statement contexts.
@@ -6017,6 +6023,27 @@ static UniformParameterShadowVarDecl* createUniformParameterShadowVarIfNeeded(
     return shadowVar;
 }
 
+/// Attach an `HLSLForLoopInitializerAttribute` to a variable in the current initializer.
+///
+/// We record the initializer's container in `Parser::hlslForLoopInitializerContainer`.
+/// A type or lambda inside an initializer can introduce declarations in nested containers.
+/// We exclude those declarations by requiring the variable's parent to be the recorded container.
+static void addHLSLForLoopInitializerAttributeIfNeeded(Parser* parser, Decl* decl)
+{
+    auto initializerContainer = parser->hlslForLoopInitializerContainer;
+    if (!initializerContainer)
+        return;
+    if (decl->parentDecl != initializerContainer)
+        return;
+    auto varDecl = as<VarDecl>(decl);
+    if (!varDecl)
+        return;
+
+    auto attribute = parser->astBuilder->create<HLSLForLoopInitializerAttribute>();
+    attribute->loc = varDecl->loc;
+    addModifier(varDecl, attribute);
+}
+
 // Finish up work on a declaration that was parsed.
 static void CompleteDecl(
     Parser* parser,
@@ -6157,6 +6184,12 @@ static void CompleteDecl(
             }
         }
     }
+
+    // Consider `for (int2 v = 0, w = int2(v.x < 2, 0); false;) {}`.
+    // Parsing `w` can check `v.x` to distinguish comparison from generic application.
+    // We attach the attribute before setting `ReadyForParserLookup` so that lookup can select
+    // the new `v` over an earlier local with the same name.
+    addHLSLForLoopInitializerAttributeIfNeeded(parser, decl);
 
     if (parser->semanticsVisitor && parser->getStage() == ParsingStage::Body)
     {
@@ -7770,6 +7803,29 @@ Stmt* Parser::parseIfLetStatement()
     return newBody;
 }
 
+Stmt* Parser::parseControlFlowBody(Stmt* parentStmt)
+{
+    if (getSourceLanguage() != SourceLanguage::HLSL)
+        return ParseStatement(parentStmt);
+    if (LookAheadToken(TokenType::LBrace))
+        return ParseStatement(parentStmt);
+
+    // Consider `for (int i = 0; i < 2; ++i) for (int i = 0; i < 3; ++i) {}`.
+    // HLSL places each initializer in the containing scope. The outer loop's body has an
+    // implicit scope even without braces, so the inner initializer must belong to that body,
+    // not the block containing the outer loop. We represent the body with an ordinary
+    // `BlockStmt` so checking and debug lowering use the same ownership as a braced body.
+    auto blockStmt = astBuilder->create<BlockStmt>();
+    FillPosition(blockStmt);
+    blockStmt->scopeDecl = astBuilder->create<ScopeDecl>();
+    pushScopeAndSetParent(blockStmt->scopeDecl);
+    blockStmt->body = ParseStatement(parentStmt);
+    // The next token bounds the implicit body for language-server AST searches.
+    blockStmt->closingSourceLoc = tokenReader.peekLoc();
+    PopScope();
+    return blockStmt;
+}
+
 IfStmt* Parser::parseIfStatement()
 {
     IfStmt* ifStatement = astBuilder->create<IfStmt>();
@@ -7778,11 +7834,11 @@ IfStmt* Parser::parseIfStatement()
     ReadToken(TokenType::LParent);
     ifStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
-    ifStatement->positiveStatement = ParseStatement(ifStatement);
+    ifStatement->positiveStatement = parseControlFlowBody(ifStatement);
     if (LookAheadToken("else"))
     {
         ReadToken("else");
-        ifStatement->negativeStatement = ParseStatement(ifStatement);
+        ifStatement->negativeStatement = parseControlFlowBody(ifStatement);
     }
     ifStatement->afterLoc = tokenReader.peekLoc();
 
@@ -7823,7 +7879,12 @@ ForStmt* Parser::ParseForStatement()
     ReadToken(TokenType::LParent);
     if (!LookAheadToken(TokenType::Semicolon))
     {
+        // Only variables completed for this initializer's own container receive the attribute.
+        // Saving the previous container also keeps nested initializer parsing independent.
+        auto previousInitializerContainer = hlslForLoopInitializerContainer;
+        hlslForLoopInitializerContainer = brokenScoping ? currentScope->containerDecl : nullptr;
         stmt->initialStatement = ParseStatement();
+        hlslForLoopInitializerContainer = previousInitializerContainer;
         if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {
             // These are the only allowed form of initial statements of a for loop.
@@ -7846,7 +7907,7 @@ ForStmt* Parser::ParseForStatement()
     if (!LookAheadToken(TokenType::RParent))
         stmt->sideEffectExpression = ParseExpression();
     ReadToken(TokenType::RParent);
-    stmt->statement = ParseStatement();
+    stmt->statement = parseControlFlowBody();
 
     if (!brokenScoping)
         PopScope();
@@ -7862,7 +7923,7 @@ WhileStmt* Parser::ParseWhileStatement()
     ReadToken(TokenType::LParent);
     whileStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
-    whileStatement->statement = ParseStatement();
+    whileStatement->statement = parseControlFlowBody();
     return whileStatement;
 }
 
@@ -7917,7 +7978,7 @@ Stmt* Parser::ParseDoStatement()
 {
     SourceLoc position = tokenReader.peekLoc();
     ReadToken("do");
-    Stmt* statement = ParseStatement();
+    Stmt* statement = parseControlFlowBody();
     if (LookAheadToken("while"))
     {
         Stmt* whileStatement = ParseDoWhileStatement(statement);

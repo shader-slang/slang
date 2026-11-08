@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/preprocessor/elif-eval.slang(4): error 15900: #error: Not this one!
-#   error Not this one!
-    ^~~~~
-}
-standard output = {
-}

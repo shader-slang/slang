@@ -1,18 +1,18 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:03:14+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T20:10:50+00:00
 target_doc: target-pipelines/spirv.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 68a85e13aad997a240500c6924c43cbfb5c7a2705b13eee149bc97d9ad794aeb
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: a50fb58bbc9789d4e73034b91a5610e1ced90f57c3c4eb3b19560e9cb5d4c072
+source_commit: f40a5af1027e6fd524a5855f77d62bddffd998c9
 checklist:
   factual_accuracy: partial
-  cross_references: pass
+  cross_references: partial
   completeness: partial
-  style_consistency: pass
+  style_consistency: partial
   source_alignment: partial
-  front_matter_validity: fail
+  front_matter_validity: pass
 finding_count: 6
 severity_breakdown:
   critical: 1
@@ -24,26 +24,26 @@ severity_breakdown:
 # Review report for target-pipelines/spirv.md
 
 ## Summary
-The page is detailed and mostly tracks the SPIR-V direct-emission source correctly, but it needs remediation in pipeline gating, contract coverage, citations, and front matter. The most important error is Phase D row 20: active downstream compilation is gated by the presence of the downstream compiler, not solely by `needsOptimization`.
+
+The document closely tracks the current pipeline, but needs corrections before acceptance. The most important error is its claim that SPIR-V uniquely changes phi-elimination defaults: the documented settings already match the defaults, invalidating the accompanying comparison of emitted code. Other findings concern pointer ordering, diagram/table consistency, a broken anchor, and overgeneralized gating explanations.
 
 ## Items checked
-- Inspected the target, `_common.md`, the per-document prompt, all eight resolved watched files, and all five dependency documents from `regenerate.py show`.
-- Confirmed the watched source files match the target's recorded `source_commit`, then verified every line-number citation; three citation-bearing statements are stale and are reported below.
-- Spot-checked more than 20 factual claims, including dispatch, required-pass scans, Phase A-C ordering, SPIR-V legalization, both fixed-point loops, abort lowering, descriptor-heap handling, debug emission, capability selection, and the downstream link/validate/compile chain.
-- Ran the document linter and resolved the relative source and generated-peer links; no dangling links were reported.
-- Checked every required target-pipeline section, phase diagram/table pairing, conditional-gate grouping, loop coverage, front-matter field, and severity/count invariant.
+
+- Read `_review.md`, `_common.md`, the target’s generation prompt, and `regenerate.py show target-pipelines/spirv.md`.
+- Verified against the **current working tree**. `git diff` against the document’s source commit showed no differences under `source/`; confirmed HEAD matches the supplied report commit.
+- Checked all 204 explicit line-number citation expressions, including repeated references, against their source locations.
+- Spot-checked more than 20 behavioral claims: direct-emit dispatch, accumulating lowering flags, autodiff branching, optional/result ordering, resource legalization, byte-address options, phi elimination, address-space specialization, both documented loops, abort lowering, descriptor pointers and strides, debug emission, depth modes, gather capabilities, flat inputs, switch widths, float-to-bool casts, and downstream link/validate/optimize gates.
+- Resolved 230 Markdown links: all 102 distinct file targets exist both locally and at the document’s source commit. Checked both local anchors and confirmed all five referenced generated peers are manifest entries; dependency documents were inspected only for cross-reference checks.
+- Checked required sections, phase diagrams/tables, front-matter fields, Liquid safety, and the size cap: 114,952 bytes against 131,072.
+- No files were written.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Phase D: IR-to-SPIR-V emit, simplification loop, downstream tools`, table row 20 | The row says downstream `compiler->compile` is gated by `needsOptimization`. In source the call runs whenever `compiler` was loaded; `needsOptimization` is only one contributor to `needsDownstreamCompiler`, alongside linking, validation, and separate debug info. This misstates when the final downstream compile executes. | `source/slang/slang-emit.cpp:3387-3404` computes `needsDownstreamCompiler` and loads `compiler`; `source/slang/slang-emit.cpp:3473` calls `compiler->compile` without a surrounding `needsOptimization` test. | Change the Gate cell to `compiler != nullptr` / `needsDownstreamCompiler`, and state that `needsOptimization` is one reason the compiler may be loaded rather than the direct call gate. |
-| F-002 | major | Front matter, lines 1-7 | `watched_paths_digest` is stale. The document records `68a85e...`, but the resolved watched files are clean at the recorded `source_commit` and `regenerate.py digest target-pipelines/spirv.md` computes `acce7b597096fbbe5e6eff92e308e01122e6271397aec68a4f310b729f497200`. | `docs/generated/design/target-pipelines/spirv.md:5-6`; the manifest entry's watched-path set is unchanged, and `git diff --quiet 53b76e6d... -- <resolved watched files>` succeeds. | Replace the front-matter digest with `acce7b597096fbbe5e6eff92e308e01122e6271397aec68a4f310b729f497200` during remediation and refresh it through the normal freshness workflow. |
-| F-003 | major | `## Conditional gates`, lines 825-927 | The required consolidated table does not cover every gate drawn in the phase diagrams. In particular, Phase C's `target != PyTorchCppBinding && targetCaps imply descriptor_handle` gate and Phase D's `compiler loaded?` / `needsDownstreamCompiler` gate have no rows; the explicitly required simplification-mode group is also folded into option toggles instead of appearing in prompt order. | `source/slang/slang-emit.cpp:2726-2734` contains the descriptor-handle gate; `source/slang/slang-emit.cpp:3393-3404` contains the downstream-compiler gate. The contract is `docs/generated/design/_meta/prompts/_common.md:340-348`, with group order refined by `docs/generated/design/_meta/prompts/target-pipelines-spirv.md:78-117`. | Add rows for both missing gates and split simplification-mode predicates into their required group between context predicates and SPIR-V runtime predicates. |
-| F-004 | minor | Phase tables, lines 417-484, 639-686, and 790-819 | The companion tables do not consistently use the required one-row-per-node, 1-based order. Phase B combines the separate `finalizeAutoDiffPass` and `stripAutoDiffDecorations` nodes into row 9; Phase C labels consecutive rows `44`, `44`, `46`; Phase D uses `5a` through `5g`. | `source/slang/slang-emit.cpp:1446-1452` has two distinct `SLANG_PASS` calls. The table contract at `docs/generated/design/_meta/prompts/_common.md:329-338` requires one row per pass node and a 1-based order. | Split Phase B row 9 and renumber each affected table with consecutive integer row numbers while retaining loop membership in Notes. |
-| F-005 | minor | Lines 205, 217, and 643 | Three line citations are materially stale: the metadata object is created at line 1019, not `~944`; the non-Khronos `glslSSBO` branch is at line 1057, not 983; and `translateGlobalVaryingVar` is invoked at line 2188, not `~1996`. | `source/slang/slang-emit.cpp:1015-1020`, `source/slang/slang-emit.cpp:1057-1058`, and `source/slang/slang-emit.cpp:2188`. | Refresh those three citations to the recorded source commit; retain the other verified line citations unchanged. |
-| F-006 | minor | `## Source`, lines 112-115 | The `slang-target-program.h` bullet says that header declares both `TargetProgram::shouldEmitSPIRVDirectly` and the `OptionSet` accessors. It only declares the forwarding `TargetProgram` method; the cited option accessors are in `slang-compiler-options.h`. | `source/slang/slang-target-program.h:113-116`; `source/slang/slang-compiler-options.h:340` and `source/slang/slang-compiler-options.h:380`. | Limit the existing bullet to `TargetProgram::shouldEmitSPIRVDirectly` and add or reference a `slang-compiler-options.h` source bullet for the `OptionSet` accessors. |
-
-## No-issues notes
-- The direct-emit dispatch and SPIR-V Assembly indirection match `slang-code-gen.cpp`.
-- The page correctly records that the nominal 8/16 simplification bounds are unenforced because neither counter is incremented.
-- The active spirv-link and spirv-val conditions, disabled in-source `optimizeSPIRV`, and validation of the freshly emitted buffer match source.
+| F-001 | critical | `## Notable passes`, lines 1098–1112 | The claim that SPIR-V is the only backend that `flips both knobs`, and that the default mode would leave an `OpPhi`, contradicts the actual defaults. Both explicitly assigned SPIR-V values already equal the default settings. | `source/slang/slang-ir-eliminate-phis.h:13–14` initializes `eliminateCompositeTypedPhiOnly = false` and `useRegisterAllocation = true`. `source/slang/slang-ir-eliminate-phis.cpp:458–468` allocates temporaries for scalar as well as composite phis when the former is false. | Keep the explicit assignments described at `slang-emit.cpp:2788–2794`, but state that they currently restate the defaults. Remove the claim of unique SPIR-V settings and the default-mode `OpPhi` comparison. |
+| F-002 | minor | `### Forward-declared pointer fixup`, lines 1072–1076 | The statement that the `module ends with all forward pointer declarations` confuses pointer definitions with forward declarations and the types section with the whole module. | `source/slang/slang-emit-spirv.cpp:2609–2617` records the `OpTypePointer` definition and separately emits `OpTypeForwardPointer`; its comment explicitly says the definition moves to the end of the Types & Constants section. Lines 77–90 place globals and functions after that section. | Say that the loop ensures pointee types are emitted, then moves the recorded pointer **definitions** to the end of their ConstantsAndTypes section. |
+| F-003 | major | `### Option-set toggles`, line 976 | The link `#embedding-source-at--g1` has no corresponding heading or explicit anchor. | `docs/generated/design/target-pipelines/spirv.md:1310` contains the relevant heading, `### Debug levels and -debug-info-include-source` with inline-code formatting; no “Embedding source” heading exists. | Retarget the link to `#debug-levels-and--debug-info-include-source` and update its label to match that section. |
+| F-004 | major | Phase A/B/D tables; `## Conditional gates` | The required diagram/table correspondence is incomplete. Phase B draws `clearTranslationDictionary`, `reportCheckpointIntermediates`, and `checkStaticAssert` without companion rows; Phase A draws the build-identifier emission and lowering-set scan without distinct rows; Phase D draws `createArtifactFromIR` without a row and lists `addAssociated(metadata)` without a node. Conditional gates are also split into five tables instead of the required single consolidated table. | `docs/generated/design/_meta/prompts/_common.md:363–378` requires one row per pass node and a single gates table. The omitted Phase B calls exist in `source/slang/slang-emit.cpp` between `removeWeakUseInsts` and `performTypeInlining`, at lines 1906–1909, and at line 2178 respectively; metadata attachment is at line 3798. | Reconcile the diagrams and tables, adding ordered rows for the displayed direct calls and a metadata-attachment node before the final artifact. Consolidate the gates into one table grouped in the prescribed order. |
+| F-005 | minor | Phase diagrams, especially lines 158–164 and 254–261 | Gate labels repeatedly replace source expressions with prose or incomplete expressions, despite the prompt’s verbatim-expression requirement. Examples include `reqSet.debugInfo and DebugInfoLevel::None`, `getBoolOption ValidateUniformity`, and `not isSpecializationDisabled`. The first omits the debug-level comparison altogether. | `docs/generated/design/_meta/prompts/target-pipelines-spirv.md`, “Diagram conventions,” requires verbatim gate expressions with limited abbreviation. Actual conditions appear at `source/slang/slang-emit.cpp:1099–1101`, `1501`, and `1555`. | Use quoted Mermaid diamond labels containing the actual C++ predicates, retaining operators, calls, and comparisons. Define any shortened receiver aliases explicitly and apply them consistently. |
+| F-006 | minor | Introduction, lines 67–72 | The universal explanation that every gated construct is produced before the last scan is too strong. Some gated constructs are produced later, and correctness depends on explicitly updating a flag rather than on the scans alone. | `source/slang/slang-emit.cpp:1757–1761` runs `lowerTaggedUnionTypes` after the second scan and sets `requiredLoweringPassSet.reinterpret = true` when it creates reinterpret instructions. The document itself correctly describes this exception in Phase B row 31. | Qualify the explanation: the scans accumulate flags, and later producers must update affected flags explicitly. Name `lowerTaggedUnionTypes` updating `reinterpret` as the concrete exception. |
