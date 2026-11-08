@@ -4392,6 +4392,16 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Attached to "no overload for 'op=' applicable" when the binary operator `op` applies to the
+-- same arguments and its result converts to the left operand's type: Slang does not derive a
+-- compound assignment from the binary operator (issue #14038).
+standalone_note(
+    "compound-assignment-binary-operator-applies",
+    40026,
+    "'~binaryOp:String' applies to these arguments, but '~compoundOp:String' is not derived from it: declare 'operator~compoundOp' with an 'inout' first parameter, or write 'x = x ~binaryOp y'",
+    span { loc = "location" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,

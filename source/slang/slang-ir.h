@@ -2246,11 +2246,11 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // The structural ray-tracing stage and descriptor AST classes shift the sequential
-    // `ASTNodeType` values, so version-37 modules would decode later nodes as different classes.
-    // Version 38 also adds the trace-program descriptor and Metal trace IR instructions.
-    const static UInt k_minSupportedModuleVersion = 38;
-    const static UInt k_maxSupportedModuleVersion = 38;
+    // Adding or removing AST classes changes the sequential `ASTNodeType` values. We raise the
+    // minimum supported version when those values change so older modules are rejected before
+    // their node IDs can be decoded as different AST classes.
+    const static UInt k_minSupportedModuleVersion = 40;
+    const static UInt k_maxSupportedModuleVersion = 40;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

@@ -8111,10 +8111,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
 
-                    auto interpolationModeDecor =
-                        inst->findDecoration<IRInterpolationModeDecoration>();
-                    if (interpolationModeDecor &&
-                        interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                    if (hasInterpolationMode(inst, IRInterpolationMode::NoPerspective))
                     {
                         return getBuiltinGlobalVar(
                             inst->getFullType(),

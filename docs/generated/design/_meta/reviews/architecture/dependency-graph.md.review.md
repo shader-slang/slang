@@ -1,11 +1,11 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:17:14+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:27:47Z
 target_doc: architecture/dependency-graph.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: f7a15e0c6c76a34adccaa06e7b5b78d535a56cd4684735b60b3fa360f894a2de
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: c607137db619e7fb3fa941a06e151cddf9fdb533d8005452d73cf7e068cf805a
+source_commit: cd566e9f0e7783ebfbac93c6e9957b63c4f2e64e
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,35 +13,32 @@ checklist:
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 2
 severity_breakdown:
-  critical: 0
-  major: 1
-  minor: 2
+  critical: 1
+  major: 0
+  minor: 1
   nit: 0
 ---
 
 # Review report for architecture/dependency-graph.md
 
 ## Summary
-The page accurately captures the individual CMake target edges, but its diagram does not consistently honor the required subsystem granularity. Four nodes are build targets internal to `source/slang/`, not source subsystems or headings in the dependency `module-map.md`. Two smaller inaccuracies concern an overbroad target-ownership invariant and a stale root-CMake line citation.
+
+The document largely matches the current build configuration and satisfies the required structure. Its most important error describes `prelude` as an include-only dependency, although it supplies generated object code. The public-header invariant also cites a policy file that does not state the claimed rule.
 
 ## Items checked
-- Reviewed the target, `_common.md`, its per-document prompt, `architecture/module-map.md`, and all 11 watched CMake files resolved by `regenerate.py show` at `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Verified all 27 solid diagram edges against the recorded `LINK_WITH_PRIVATE` and `LINK_WITH_PUBLIC` declarations, plus the dashed `SLANG_RECORD_REPLAY_SYSTEM` source-inclusion edge.
-- Checked more than 10 additional factual claims, including the `standard-modules`, `slang-llvm`, mimalloc, `slang-rt`, embedded-core-module, tools-header, and `slang-common-objects` notes.
-- Re-derived all three line-number citations at the recorded source commit; both references to `source/slang/CMakeLists.txt:164-167` are exact, while the root-CMake citation is stale.
-- Resolved all 33 relative links (17 unique destinations) at the recorded commit and confirmed both generated peer pages are manifest entries.
-- Verified the required front-matter keys, the 64-character digest against `regenerate.py digest`, the required sections, Mermaid syntax, and the 10,661-byte size against the 16-KB cap.
+
+- Reviewed against the **current working tree** as requested; confirmed that `source/` has no diff against the document’s source commit and that HEAD matches the supplied review commit.
+- Read `_review.md`, `_common.md`, the document-specific prompt, and the resolved watched paths from `regenerate.py show architecture/dependency-graph.md`.
+- Spot-checked more than 20 claims, including all diagram link edges, generated capability targets, conditional record/replay inclusion, embedded-module selection, shared compiler objects, cache generation, runtime source reuse, allocator gates, glslang exports, and the tools-header dependency.
+- Verified all nine line-number citation occurrences: `source/slang/CMakeLists.txt` 184–200 twice and 292; root `CMakeLists.txt` 235–239, 471, 488, and 726–738; `source/slangc/CMakeLists.txt` 1–12 and 14–24. The LLVM option starts at 472–473 rather than 471, within the review’s tolerance.
+- Resolved all 40 relative links, covering 19 distinct destinations. Confirmed both referenced generated pages exist in the manifest; used `module-map.md` only for cross-reference and subsystem-coverage checks.
+- Checked required sections, all 14 subsystem nodes, Mermaid conventions, front-matter keys and formats, and the 15,363-byte document against its 16,384-byte cap.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Edges (intra-project only)`, lines 34-87 | The diagram claims subsystem granularity but introduces `slang-capability-defs`, `slang-capability-lookup`, `slang-lookup-tables`, and `slang-fiddle-output` as standalone nodes. These are CMake targets defined inside `source/slang/`, not source-subsystem directories or headings in `module-map.md`, so the graph mixes target-level and subsystem-level abstraction and does not satisfy the prompt's node-coverage rule. | `docs/generated/design/_meta/prompts/architecture-dependency-graph.md:20-25,42-44` requires one node per logical unit group and says each node must correspond to a source directory or `module-map.md` heading; `source/slang/CMakeLists.txt:56-65,119-143,198-210` defines the four targets within the `source/slang/` subsystem. | Remove the four standalone generated-target nodes from the subsystem diagram, represent their target-level details in prose, and describe any resulting cross-subsystem relationship between `source/slang/` and `source/slang-core-module/` explicitly. |
-| F-002 | minor | `## Notable invariants`, lines 184-188 | The statement that the main `slang` library is “the only target that pulls in the AST/IR/emit/check sources” is not true when `SLANG_EMBED_CORE_MODULE` is enabled: `slang-common-objects` compiles the directory sources, while both library targets use `NO_SOURCE` and link that object target. The later irregularities section partially acknowledges this, leaving the page internally inconsistent. | `source/slang/CMakeLists.txt:303-358` creates `slang-common-objects` from `.` and links it into `slang-without-embedded-core-module` and `slang`; the latter two declarations specify `NO_SOURCE`. | Replace “the only target” with subsystem-level wording, and state that the concrete source-owning target is `slang` in non-embedded builds or `slang-common-objects` in embedded builds. |
-| F-003 | minor | `## Edges (intra-project only)`, lines 104-108 | The citation says `SLANG_SLANG_LLVM_FLAVOR` is in root `CMakeLists.txt` “around line 366,” but the option starts at line 385 and the identifier is on line 386, twenty lines later. | `CMakeLists.txt:385-401` declares the option and begins its handling; line 366 instead declares `SLANG_ENABLE_RELEASE_DEBUG_INFO`. | Change “around line 366” to “lines 385-401” (or omit the line number and cite the file only). |
-
-## No-issues notes
-- The wasm edge now includes `slang-lookup-tables` in both the diagram and citation table.
-- The `slang-rt` note correctly distinguishes link independence from recompiling `source/core/` through `EXTRA_SOURCE_DIRS`.
-- The optional embedded-core-module and generated cache relationships match their generator expressions and build-order declarations.
+| F-001 | critical | `## Edge citations`, line 124 | The statement that `prelude` is “a private include dep, not a static link” misrepresents this dependency as header-only. The target compiles generated sources into an object library consumed by the compiler. | `prelude/CMakeLists.txt:9–20` generates `.cpp` files from prelude headers; lines 23–29 declare `OBJECT` with `EXPLICIT_SOURCE ${prelude_source}`. `source/slang/CMakeLists.txt:303–307` lists `prelude` under `LINK_WITH_PRIVATE`. | Replace the include-only explanation with “`prelude` is an object library containing generated embeddings of prelude headers, linked privately into the compiler.” Retain the diagram edge and cite `prelude/CMakeLists.txt`. |
+| F-002 | minor | `## Notable invariants`, lines 257–261 | The public-header rule is attributed to `CLAUDE.md`, but that file does not state that public headers must not include private source headers. Consequently, this invariant lacks the demonstrating build-file or header citation required by the prompt. | `CLAUDE.md:456–459` requires ABI and source compatibility, not the asserted include restriction. `source/slang/CMakeLists.txt:315` exposes `${slang_SOURCE_DIR}/include` publicly, which supports the intended public include boundary but does not establish the claimed policy quotation. | Remove the unsupported attribution to `CLAUDE.md`. Describe the public include boundary demonstrated by `source/slang/CMakeLists.txt:315` and cite it; distinguish that observed build interface from any broader project policy. |

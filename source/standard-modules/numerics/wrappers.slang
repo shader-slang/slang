@@ -560,6 +560,18 @@ public T modf<T : IFloatingPoint>(T value, out T integralPart)
     return value.fractionalPart(integralPart);
 }
 
+/// Splits `value` into same-shape integer and floating-point fractional parts.
+///
+/// Each whole part must be representable as `T.IntegerPart.Scalar`. The whole parts are truncated
+/// toward zero and written to `integralPart`; the fractional parts are returned in `T`.
+[__readNone]
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+public T modf<T : IFloatingPointWithIntegerPart>(T value, out T.IntegerPart integralPart)
+{
+    return value.fractionalPart(integralPart);
+}
+
 [__readNone]
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]

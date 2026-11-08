@@ -1,4 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,diag=diag):-E
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-E
+//TEST:SIMPLE(filecheck=CHECK):-E
 
 // Macro parameters must have unique names
 

@@ -162,14 +162,3 @@ docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-ope
 docs/generated/tests/design/cross-cutting/ir-instructions/decoration-builtin-requirement-key-ir.slang
 docs/generated/tests/design/ir-reference/decorations/builtin-requirement-key-decoration.slang
 docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-decoration.slang
-
-# Surfaced on nightly run 34310111817:
-# https://github.com/shader-slang/slang/actions/runs/34310111817
-# Diagnostic text drift rather than a compiler bug.
-# https://github.com/shader-slang/slang/pull/12616 merges type-flow sets
-# directly instead of through an intermediate hash set, so `E50102` now
-# reports "2 possible types: 'Square, Rect'" where the pinned text says
-# "'Rect, Square'". Remove once the expected text is regenerated — or once
-# the diagnostic sorts the list, which would make the text order-stable by
-# construction rather than a reflection of the merge order.
-docs/generated/tests/design/pipeline/05-ir-passes/typeflow-report-dynamic-dispatch-sites.slang

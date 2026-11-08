@@ -776,6 +776,10 @@ Extensions
 `spvBindlessTextureNV`
 > Represents the SPIR-V capability for the bindless texture.
 
+`spvComputeShaderDerivativesKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_compute_shader_derivatives extension
+> (also available as SPV_NV_compute_shader_derivatives).
+
 `spvCooperativeMatrixBlockLoadsNV`
 > Represents the SPIR-V capability for cooperative matrix 2
 
@@ -878,6 +882,15 @@ Extensions
 `spvMinLod`
 > Represents the SPIR-V capability for using minimum LOD operations.
 
+`spvNonSemanticInfoKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_non_semantic_info extension.
+
+`spvPhysicalStorageBufferEXT`
+> Represents the SPIR-V capability for using the SPV_EXT_physical_storage_buffer extension.
+
+`spvPhysicalStorageBufferKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_physical_storage_buffer extension.
+
 `spvQuadControlKHR`
 > Represents the SPIR-V capability for quad group control.
 
@@ -938,8 +951,17 @@ Extensions
 `spvSparseResidency`
 > Represents the SPIR-V capability for sparse residency.
 
+`spvSubgroupRotateKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_subgroup_rotate extension.
+
 `spvTensorAddressingNV`
 > Represents the SPIR-V capability for tensor addressing
+
+`spvUserTypeGOOGLE`
+> Represents the SPIR-V capability for using the SPV_GOOGLE_user_type extension.
+
+`spvVariablePointersKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_variable_pointers extension.
 
 `spvVulkanMemoryModelDeviceScopeKHR`
 > Represents the SPIR-V capability for vulkan memory model.
