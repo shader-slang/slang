@@ -7512,8 +7512,8 @@ $}
         {
         case hlsl: __intrinsic_asm ".InterlockedCompareExchangeFloatBitwise";
         default:
-            let buf = __getEquivalentStructuredBuffer<float>(this);
-            outOriginalValue = __atomic_compare_exchange(buf[byteAddress / 4], compareValue, value);
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            outOriginalValue = bit_cast<float>(__atomic_compare_exchange(buf[byteAddress / 4], bit_cast<uint>(compareValue), bit_cast<uint>(value)));
             return;
         }
     }
@@ -7578,8 +7578,8 @@ $}
         {
         case hlsl: __intrinsic_asm ".InterlockedCompareStoreFloatBitwise";
         default:
-            let buf = __getEquivalentStructuredBuffer<float>(this);
-            __atomic_compare_exchange(buf[byteAddress / 4], compareValue, value);
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __atomic_compare_exchange(buf[byteAddress / 4], bit_cast<uint>(compareValue), bit_cast<uint>(value));
             return;
         }
     }
