@@ -1051,6 +1051,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 FloatingPointMode::Precise)
                 break;
             const char* prefix = nullptr;
+            const char* suffix = "_rn(";
             switch (inst->getDataType()->getOp())
             {
             case kIROp_FloatType:
@@ -1060,7 +1061,10 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 prefix = "__d";
                 break;
             case kIROp_HalfType:
-                prefix = "__h";
+                // The prelude picks `__hadd_rn` and so on, or a float fallback for CUDA
+                // toolkits older than 11.6, which do not have them.
+                prefix = "_slang_precise_";
+                suffix = "(";
                 break;
             default:
                 break;
@@ -1072,7 +1076,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 inst->getOp() == kIROp_Add   ? "add"
                 : inst->getOp() == kIROp_Sub ? "sub"
                                              : "mul");
-            m_writer->emit("_rn(");
+            m_writer->emit(suffix);
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
