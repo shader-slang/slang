@@ -408,6 +408,11 @@ void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     {
         m_writer->emit("#define SLANG_CUDA_ENABLE_FAST_MATH 1\n");
     }
+    // The prelude's vector and matrix `+`, `-` and `*` then use the non-contracting intrinsics.
+    if (getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Precise)
+    {
+        m_writer->emit("#define SLANG_CUDA_PRECISE_FP 1\n");
+    }
 }
 
 void CUDASourceEmitter::emitLayoutSemanticsImpl(
@@ -1034,6 +1039,46 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+        {
+            // Under `-fp-mode precise`, write a scalar floating-point add, sub or mul as the
+            // CUDA intrinsic that NVCC never contracts into an FMA (`--fmad=true` is NVCC's
+            // default). Vectors and matrices get the same from the prelude operators, which the
+            // front matter switches with SLANG_CUDA_PRECISE_FP.
+            if (getTargetProgram()->getOptionSet().getFloatingPointMode() !=
+                FloatingPointMode::Precise)
+                break;
+            const char* prefix = nullptr;
+            switch (inst->getDataType()->getOp())
+            {
+            case kIROp_FloatType:
+                prefix = "__f";
+                break;
+            case kIROp_DoubleType:
+                prefix = "__d";
+                break;
+            case kIROp_HalfType:
+                prefix = "__h";
+                break;
+            default:
+                break;
+            }
+            if (!prefix)
+                break;
+            m_writer->emit(prefix);
+            m_writer->emit(
+                inst->getOp() == kIROp_Add   ? "add"
+                : inst->getOp() == kIROp_Sub ? "sub"
+                                             : "mul");
+            m_writer->emit("_rn(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
         {
