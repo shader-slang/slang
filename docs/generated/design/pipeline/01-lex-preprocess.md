@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 917048d00bf2ca8d602f020a3f3abf2e8a657faa21c329751eaa25597c3f0ed3
+model: claude-sonnet-5-5
+generated_at: 2026-11-02T21:19:11Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 25c315302bec8a98147ed08e896ab7b882f1e7ddd78ee373f4e252ec03861394
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -32,9 +32,8 @@ location encoding, literal-value extraction, or preprocessor directives.
   expansion, and conditional preprocessor directives already resolved.
 
 The preprocessor does **not** stream tokens to the parser. Phase 1
-runs to completion and produces a flat token list, after which phase 2
-(parsing) begins. This decoupling is what allows the parser to use
-arbitrary lookahead.
+runs to completion and produces a flat token list, after which parsing
+begins, which allows the parser arbitrary lookahead.
 
 ## Lexer
 
@@ -43,11 +42,11 @@ The lexer is implemented under
 
 - [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h) /
   [slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp) —
-  the `Lexer` struct and its `initialize` / lex driver.
+  the `Lexer` struct, its `initialize` / lex driver, and the
+  `TokenList`, `TokenSpan`, and `TokenReader` types.
 - [slang-token.h](../../../../source/compiler-core/slang-token.h) /
   [slang-token.cpp](../../../../source/compiler-core/slang-token.cpp) —
-  the `Token`, `TokenType`, `TokenFlags`, `TokenList`, `TokenSpan`,
-  and `TokenReader` data types.
+  the `Token`, `TokenType`, and `TokenFlags` data types.
 - [slang-token-defs.h](../../../../source/compiler-core/slang-token-defs.h)
   — X-macro list of every `TokenType` value.
 
@@ -64,9 +63,8 @@ Every token carries:
 - a small `TokenFlags` byte — `AtStartOfLine`, `AfterWhitespace`,
   `ScrubbingNeeded`, and `Name` (which discriminates the union).
 
-The complete token-kind catalog with categories is in
-[../syntax-reference/tokens.md](../syntax-reference/tokens.md); this
-document does not duplicate it.
+The token-kind catalog is in
+[../syntax-reference/tokens.md](../syntax-reference/tokens.md).
 
 ### Source-location encoding
 
@@ -76,9 +74,6 @@ Source locations are kept as a single `uint32_t` that the
 [slang-source-loc.cpp](../../../../source/compiler-core/slang-source-loc.cpp))
 decodes back into file / line / column on demand. The encoding is
 chosen so that every token carries one cheap field rather than three.
-`SourceLoc`'s copy constructor is explicitly `= default` rather than
-user-written, so the type stays trivially copyable for aggregates that
-embed it inside a union.
 
 ### Lexer flags and special-case rules
 
@@ -103,29 +98,27 @@ The lexer handles several C-isms:
   [slang-token-defs.h](../../../../source/compiler-core/slang-token-defs.h));
   the parser resolves the keyword status via lookup, as described in
   [02-parse-ast.md](02-parse-ast.md).
-- Numeric, string, and character literal text is kept verbatim in the
-  token's raw text. The lexer scans the literal's extent but does not
+- Numeric, string, and character literal text is kept undecoded in the
+  token's raw text (backslash-newline continuations are removed from
+  the content when `ScrubbingNeeded` is set). The lexer scans the literal's extent but does not
   decode its value; value extraction is deferred to the helpers below.
 - Non-ASCII input is decoded as UTF-8 by the byte-level `_advance`
   helper in
   [slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp),
   which folds a valid multi-byte sequence into a single code point that
   the identifier rule accepts. A malformed sequence is diagnosed as
-  `invalidUtf8ByteSequence` (with the offending bytes formatted in hex)
-  and then substituted with a space, so a bad byte terminates the
-  current token instead of derailing the rest of the scan. `_advance`
-  stops at the first byte that is not a valid continuation byte rather
-  than consuming it, which keeps the recovery point at the start of the
-  next character.
+  `invalidUtf8ByteSequence` (offending bytes in hex) and substituted
+  with a space, so a bad byte terminates the current token. `_advance`
+  stops at the first invalid continuation byte rather than consuming
+  it, so recovery resumes at the start of the next character.
 
 ### Literal scanning and value extraction
 
 The lexer separates *scanning* a literal (recording its extent as raw
-token text) from *decoding* its value, and the split is nearly clean:
-scanning does the minimum work needed to find where the literal ends
-plus a few purely syntactic checks (`invalidDigitForBase`,
-`octalLiteral`, `quoteCannotBeDelimiter`), while everything about the
-literal's *meaning* is deferred. Of those three checks only
+token text) from *decoding* its value. Scanning finds where the
+literal ends plus a few purely syntactic checks (`invalidDigitForBase`,
+`octalLiteral`, `quoteCannotBeDelimiter`), while the literal's *meaning*
+is deferred. Of those three checks only
 `octalLiteral` is a warning: scanning continues into
 `_lexNumber(lexer, 8)`, so `017` still yields a usable base-8 literal
 token ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
@@ -158,10 +151,12 @@ in [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h):
   case), and rounds the parsed value to that type's precision and
   range. The same enum reports the two malformed cases,
   `BadSignificand` and `BadSuffix`, with `outErrorContent` carrying the
-  offending text. All four out-parameters — `outLiteralType`,
-  `outIsOutOfRange`, `outPrecisionLost`, and `outErrorContent` — are
-  non-optional references. `outIsOutOfRange` means the result is `0`
-  (underflow) or `INFINITY` (overflow above the maximum for the
+  offending text; the parser's `parseFloatingPointLiteralExpr`
+  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+  9098) turns them into `InvalidFloatingPointLiteralNumber` and
+  `InvalidFloatingPointLiteralSuffix` (lines 9131-9143), the only
+  caller in the watched sources. `outIsOutOfRange` means the result is
+  `0` (underflow) or `INFINITY` (overflow above the maximum for the
   *literal type*, not for `double`); `outPrecisionLost` is reported
   only for hex floats and only when the value is in range.
 - `getStringLiteralTokenValue(token, sink)` — decodes escapes into the
@@ -183,45 +178,33 @@ double a = 1e300lf; // Double: stays finite
 float b = 1e300;    // Float: out of range, decodes to INFINITY
 ```
 
-`1e300` fits in a `double` but is far above the `float` maximum, so the
-suffix alone changes the decoded value
+`1e300` is far above the `float` maximum
 ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
 lines 1273-1284, and line 1331 for the `float` parse).
 
-The string/char helpers take a `DiagnosticSink*` because all
-literal-value errors are reported at decode time: out-of-range code
-units and code points, malformed escape syntax, and the character-count
-rule. Escape handling is centralized in `_decodeStringEscape`
+Literal-value errors are reported at decode time through the helpers'
+`DiagnosticSink*`. Escape handling is centralized in `_decodeStringEscape`
 ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
 line 1440), which takes the sink and the token's `SourceLoc` and
 diagnoses its own failures (`invalidStringEscape` for an unknown escape
 letter, a digitless or unterminated `\x{...}` / `\u{...}` form, or an
 overflowing value; `invalidUnicodeStringEscape` when `\u` does not have
 exactly 4 hex digits or `\U` does not have exactly 8) before returning
-`-1`. Its grammar follows
-[docs/language-reference/expressions-literal.md](../../../../docs/language-reference/expressions-literal.md):
-octal (`\NNN`), hex (`\xNN`, any number of digits), and the Unicode
+`-1`. The grammar is: octal (`\NNN`), hex (`\xNN`, any number of digits), and the Unicode
 escapes `\uNNNN` (4 hex digits), `\UNNNNNNNN` (8 hex digits), and
 `\u{...}` (braced, up to 32 bits). In string literals, `\xNN` maps to a
-single byte while Unicode code-point escapes are encoded as UTF-8 byte
-sequences (via `encodeUnicodePointToUTF8`). `getStringLiteralTokenValue`
-copies bare non-escape bytes through verbatim without re-checking
-UTF-8 well-formedness, because the lexer's `_advance` already
-diagnosed a malformed sequence while scanning the literal body. In
-character literals the body bytes are re-decoded with
-`getUnicodePointFromUTF8` and malformed UTF-8 is rejected a second
-time, so there is no practical difference between `\x` and `\u` there.
-The corresponding diagnostics
-(`invalidUtf8ByteSequence`, `invalidStringEscape`,
-`invalidUnicodeStringEscape`, `outOfRangeCodeUnit`,
-`outOfRangeCodePointForUtf8`) are defined in
+single byte while Unicode code-point escapes are encoded as UTF-8
+(via `encodeUnicodePointToUTF8`). `getStringLiteralTokenValue` copies
+bare non-escape bytes through without re-checking UTF-8, since
+`_advance` already diagnosed malformed sequences while scanning; in
+character literals the body is re-decoded with `getUnicodePointFromUTF8`
+and malformed UTF-8 is rejected again. The diagnostics are defined in
 [slang-lexer-diagnostic-defs.h](../../../../source/compiler-core/slang-lexer-diagnostic-defs.h).
 
 ### What the lexer does *not* do
 
 - It does not classify keywords (deferred to lookup).
-- It does not evaluate numeric literals during scanning; value
-  extraction is a separate, on-demand step (see above).
+- It does not evaluate literals during scanning (see above).
 - It does not skip whitespace or comments by default; `lexToken`
   emits them as their own token types, and the filtering is done by
   `lexAllSemanticTokens` and by the preprocessor's `ReadAllTokens`, so
@@ -243,26 +226,23 @@ takes:
 - an optional `IncludeSystem*` for `#include` resolution
   ([slang-include-system.h](../../../../source/compiler-core/slang-include-system.h)),
 - an optional `Dictionary<String, String>` of predefined macros,
-- an optional `PreprocessorHandler*` (a callback for events like
-  end-of-translation-unit and file dependencies — used by the build
-  to record include dependencies),
+- an optional `PreprocessorHandler*` (callbacks for
+  end-of-translation-unit and file-dependency events),
 - an optional `PreprocessorContentAssistInfo*`, used by the language
   server to collect code-assist information while preprocessing.
 
 ### Stack of input streams
 
-The preprocessor maintains a stack of input streams, with the original
-source file at the bottom and pushes for `#include`d files and macro
-expansions on top. As tokens flow upward they pass through directive
-recognition; each `#include`d file gets its own `InputFile` with its
-own lexer and its own stack of `Conditional` state, so conditional
-skipping and directive diagnostics are per-file and do not disturb the
-parent.
+The preprocessor maintains a stack of input streams: the original
+source file at the bottom, with `#include`d files and macro expansions
+pushed on top. Each `#include`d file gets its own `InputFile` with its
+own lexer and `Conditional` state, so conditional skipping and
+directive diagnostics are per-file.
 
 ### Macro expansion
 
-Macro definitions store an already-lexed token sequence, pre-chopped
-into `MacroDefinition::Op` entries; expansion "replays" those ops. A
+Macro definitions store a pre-lexed token sequence chopped into
+`MacroDefinition::Op` entries; expansion replays those ops. A
 parameter reference is compiled to a parameter op (`ExpandedParam`,
 `UnexpandedParam`, or `StringizedParam`) carrying the parameter index.
 At invocation, `MacroInvocation` replays the matching argument's token
@@ -284,29 +264,24 @@ A macro naming itself in its own body reaches the parser as a plain
 identifier, neither re-expanded nor diagnosed; the same list breaks
 mutual recursion across nested expansions.
 
-Inactive `#if` branches still flow through the lexer (so column /
-line accounting stays correct), but their contents are not expanded;
-only directives that may toggle the active / inactive state
-(`#if`, `#ifdef`, `#ifndef`, `#else`, `#elif`, `#endif`) are actually
-evaluated inside an
-inactive block.
+Inactive `#if` branches still flow through the lexer (so line
+accounting stays correct), but their contents are not expanded; only
+the conditional directives (`#if`, `#ifdef`, `#ifndef`, `#else`,
+`#elif`, `#endif`) are evaluated inside an inactive block.
 
 ### Preprocessor directives
 
-Directives are looked up by name in a callback table on the
-preprocessor state, so adding a directive (`#pragma`, custom
-extensions) is a matter of registering a new callback in
+Directives are looked up by name in a callback table, so adding one is
+a matter of registering a new callback in
 [slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp).
-The `kDirectives` table in
-[slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
-holds the C / HLSL-style set (`#if` and friends, `#include`,
+The `kDirectives` table holds the C / HLSL-style set (`#if` and friends, `#include`,
 `#define`, `#undef`, `#warning`, `#error`, `#line`, `#pragma`) plus
 the Slang language-selection directives `#language` / `#lang` and the
 GLSL directives `#version` / `#extension`.
 
 Every directive consumes its own line, so none contributes tokens to
 the output list. Of the four non-C entries, `#language` / `#lang`
-(`HandleLanguageDirective`, line 4536) take an optional `slang` name
+(`HandleLanguageDirective`, line 4593) take an optional `slang` name
 followed by a version —
 
 ```
@@ -314,19 +289,28 @@ followed by a version —
 #language [slang] <version>
 ```
 
-— and set the source language and version that `preprocessSource`
-returns through `outDetectedLanguage` / `outLanguageVersion`
+— and record the source language that `preprocessSource` returns
+through its `SourceLanguageDirective` out-parameter (language, the
+location of the first directive, and the Slang version) and the
+version through `outLanguageVersion`
 ([slang-preprocessor.h](../../../../source/slang/slang-preprocessor.h)).
-The version operand is resolved by name rather than by arithmetic:
-whether it arrived as an identifier or as an integer literal, its
-*text* is handed to `TypeTextUtil::findLanguageVersion`, which looks it
-up in one table where each version carries several accepted spellings —
-`legacy` / `default` / `2018`, `2025` / `202a`, `2026` / `202b` /
-`latest`, and `202c` / `next`. So `#lang 2026`, `#lang 202b` and
-`#lang latest` are the same directive, and a version this compiler does
-not know is simply absent from the table rather than being a number out
-of range. Note that only `slang` is accepted as the optional language
-name; the directive no longer recognizes `glsl`.
+Only the first selection in a source segment is kept:
+`_tryApplySourceLanguageDirective` (line 4516) diagnoses a later
+directive naming a different language
+(`ConflictingSourceLanguageDirectives`) or a different Slang version
+(`ConflictingSlangLanguageVersionDirectives`), returns false, and
+leaves the first selection and `languageVersion` in force. Combining
+the selections of separately preprocessed primary files is done by
+`_applySourceLanguageDirective` in
+[slang-compile-request.cpp](../../../../source/slang/slang-compile-request.cpp)
+(line 276), outside this document's scope.
+The version operand is resolved by name: whether it arrived as an
+identifier or an integer literal, its *text* is looked up by
+`TypeTextUtil::findLanguageVersion`, where each version has several
+spellings (`legacy` / `default` / `2018`, `2025` / `202a`, `2026` /
+`202b` / `latest`, `202c` / `next`). So `#lang 2026`, `#lang 202b` and
+`#lang latest` are the same directive. Only `slang` is accepted as the
+optional language name; `glsl` is no longer recognized.
 
 Which diagnostic an unusable operand produces depends on what the
 parser can still infer about it, which is why there are three:
@@ -337,9 +321,9 @@ parser can still infer about it, which is why there are three:
 | An unrecognized identifier, with no `slang` name given | `UnknownLanguage` — with the language unspecified, the lone identifier is read as an attempt to name one |
 | An unrecognized integer literal, or an unrecognized identifier *after* an explicit `slang` | `UnknownLanguageVersion` — the language is settled, so the token can only have been a version |
 
-`#version` (line 4501) takes an integer and switches the detected
-language to GLSL when it names a valid GLSL version; `#extension`
-(line 4496) is accepted and discarded.
+`#version` (line 4558) takes an integer and records GLSL as the
+source language (through the same first-selection rule) when it names a
+valid GLSL version; `#extension` (line 4496) is accepted and discarded.
 
 `#pragma` dispatches on a second name through `kPragmaDirectives`
 (line 4445), which holds two entries, `once` and `warning`.
@@ -350,17 +334,16 @@ returns early for a later `#include` resolving to that identity (line
 `findPragmaDirective` falls back to `handleUnknownPragmaDirective`
 (line 4242), which warns with `UnknownPragmaDirectiveIgnored` and skips
 the line — unlike an unknown `#`-directive, which
-`HandleInvalidDirective` (line 4614) reports as an error.
+`HandleInvalidDirective` (line 4677) reports as an error.
 
 `#if` and `#elif` conditions go through a recursive-descent evaluator
 whose value type is a plain signed `int` (`PreprocessorExpressionValue`,
-line 2984): no unsigned or 64-bit mode, and any non-zero result selects
-the branch. An identifier naming no object-like macro evaluates to `0`
-after the `UndefinedIdentifierInPreprocessorExpression` warning (line
-3117). `EvaluateInfixOp` (line 3194) applies the C++ operator directly
-and only `/` and `%` inspect their operands (a zero divisor is
-diagnosed and yields `0`), so overflow of `+`, `-`, `*`, or `<<` is
-neither detected nor diagnosed.
+line 2984); any non-zero result selects the branch. An identifier
+naming no object-like macro evaluates to `0` after the
+`UndefinedIdentifierInPreprocessorExpression` warning (line 3117).
+`EvaluateInfixOp` (line 3194) applies the C++ operator directly; only
+`/` and `%` check operands (a zero divisor is diagnosed and yields
+`0`), so overflow of `+`, `-`, `*`, or `<<` is not diagnosed.
 
 ### `#include` resolution
 
@@ -373,8 +356,7 @@ concatenates the raw tokens between `OpLess` and `OpGreater` into the
 path string and selects `IncludeSystem::Mode::System`; quoted includes
 take the path from a single `StringLiteral` token. Resolution returns a
 `SourceFile`; the preprocessor then pushes a fresh input stream for
-that file. The handler receives a `handleFileDependency` callback so
-the front-end can build dependency records for the build system.
+that file. The handler's `handleFileDependency` callback records dependencies.
 
 ### `#pragma warning` state across files
 
@@ -388,10 +370,9 @@ tracker carries a `persistedAbsoluteSourceLocCounter`: `preprocessSource`
 seeds its `absoluteSourceLocCounter` from the persisted value at entry
 and hands the advanced value back at exit, so the timeline's absolute
 axis stays globally monotonic across files instead of every pass
-restarting from 0 and colliding. A `SLANG_RELEASE_ASSERT` on the handed-
-back counter guards monotonicity (e.g. against `uint32_t` wrap on very
-large translation units), because a violation would silently mis-resolve
-`#pragma warning` state in shipping builds.
+restarting from 0 and colliding. A `SLANG_RELEASE_ASSERT` on the handed-back counter guards
+monotonicity (e.g. against `uint32_t` wrap), since a violation would
+silently mis-resolve `#pragma warning` state.
 
 ## Source-location preservation
 
@@ -428,10 +409,10 @@ source locations are chosen differently:
      `PathInfo::makeTokenPaste()` source view whose origin is the `##`
      token location (`tokenPasteLoc`).
 
-This split is what lets diagnostics (see
+This split lets diagnostics (see
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md))
-point inside the macro body when the macro itself is at fault, while
-argument tokens still point at the call site. Only the pasted-token
+point inside the macro body when the macro is at fault, while
+argument tokens point at the call site. Only the pasted-token
 case builds an initiating-location chain: when formatting a
 diagnostic, `DiagnosticSink` walks `getInitiatingSourceLoc` for as
 long as the view's `PathInfo::Type` is `TokenPaste`, emitting a
@@ -439,39 +420,30 @@ long as the view's `PathInfo::Type` is `TokenPaste`, emitting a
 
 ## Failure modes
 
-- Invalid characters and malformed numeric / string / character
-  literals raise diagnostics through the `DiagnosticSink`, split across
-  two phases. Scan-time errors go through the sink passed into the
-  lexer's `initialize`, and cover what the scanner can see without
-  interpreting the literal: an invalid character, a malformed UTF-8
-  sequence, end-of-file or newline inside a literal, a digit that is
-  invalid for the literal's base, a legacy octal literal, and a quote
-  used as a raw-string delimiter.
-  Everything about a literal's value is a decode-time error, reported
-  through the sink passed to the value-extraction helper:
-  `getStringLiteralTokenValue` and `getCharLiteralValue` report
-  ill-formed escape syntax, out-of-range code units and code points,
-  and (for character literals) the empty or multi-character body, while
+- Invalid characters and malformed literals raise diagnostics in two
+  phases. Scan-time errors go through the sink passed to the lexer's
+  `initialize` (invalid character, malformed UTF-8, end-of-file or
+  newline inside a literal, invalid digit for the base, legacy octal,
+  bad raw-string delimiter). Value errors are decode-time, reported
+  through the sink passed to the value-extraction helper: both `getStringLiteralTokenValue` and `getCharLiteralValue` report
+  ill-formed escape syntax; string decoding additionally reports
+  out-of-range code units and code points (`outOfRangeCodeUnit`,
+  `outOfRangeCodePointForUtf8`), and character decoding reports the
+  empty or multi-character body, while
   `getIntegerLiteralValue` reports
   `integerLiteralTooLargeForAnyType`. `getFloatingPointLiteralValue`
-  takes no sink at all — it
-  returns its errors as a `FloatingPointLiteralType` of
-  `BadSignificand` or `BadSuffix` plus the offending text, leaving the
-  caller to choose the diagnostic.
+  takes no sink; it returns `BadSignificand` / `BadSuffix` and the
+  parser chooses the diagnostic.
 - Both phases funnel through the file-local `diagnose` helper in
   [slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp),
   which drops a null sink and stops forwarding once the sink's error
   count exceeds `kMaxLexErrorCount` (100), so a pathologically
   malformed file cannot flood the sink.
-- With `kLexerFlag_SuppressDiagnostics` set, the lexer still emits
-  `TokenType::Invalid` tokens for malformed input but suppresses the
-  diagnostics — used inside skipped preprocessor blocks where the
-  tokens will be discarded by the inactive-branch filter. Because the
-  suppression works by handing out a null sink from
-  `Lexer::getDiagnosticSink`, it covers only the scan-time sites that
-  use that accessor (the malformed-UTF-8 case bypasses it); a
-  caller that later asks a value-extraction helper for a literal's
-  value passes its own sink and will see the decode-time diagnostics.
+- With `kLexerFlag_SuppressDiagnostics` set (see Lexer flags above),
+  the lexer still emits `TokenType::Invalid` tokens but suppresses
+  scan-time diagnostics, except malformed UTF-8. A caller that later
+  asks a value-extraction helper for a literal's value passes its own
+  sink and will see the decode-time diagnostics.
 - Preprocessor errors (unbalanced `#if`, unknown directive, missing
   include, cyclic include, a `#else` / `#elif` / `#endif` with no open
   conditional) likewise emit through the sink, and the preprocessor
@@ -481,12 +453,12 @@ long as the view's `PathInfo::Type` is `TokenPaste`, emitting a
   diagnosed once per still-open conditional at end-of-file, as
   `EndOfFileInPreprocessorConditional`
   ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
-  line 4773). The stray closer is a separate diagnostic,
+  line 4836). The stray closer is a separate diagnostic,
   `DirectiveWithoutIf` (line 3530); `CyclicInclude` fires
   when a resolved include is already open on the include stack (line
   3710), and that `#include` is skipped. The single `EndOfFile` token in
   the output is appended by `ReadAllTokens` only after the whole input
   stack has been popped.
 
-The detail of the diagnostic system is in
-[../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md).
+See [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)
+for the diagnostic system.

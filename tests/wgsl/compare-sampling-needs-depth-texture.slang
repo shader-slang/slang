@@ -1,12 +1,12 @@
 // WGSL's comparison sampling builtins take only texture_depth_* textures, so a comparison sample of
 // a Texture2D<float> is reported at compile time instead of emitting a textureSampleCompare call on
 // a texture_2d<f32>, which the WGSL validator rejects at pipeline creation.
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CMP):-target wgsl -stage compute -entry sampleCmpMain
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=GATHER):-target wgsl -stage compute -entry gatherCmpMain
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=GATHEROFF):-target wgsl -stage compute -entry gatherCmpOffsetMain
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=LZOFF):-target wgsl -stage compute -entry sampleCmpLevelZeroOffsetMain
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SCMP):-target wgsl -stage fragment -entry sampleCmpFragment
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SCMPOFF):-target wgsl -stage fragment -entry sampleCmpOffsetFragment
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CMP,exit-code=-1):-target wgsl -stage compute -entry sampleCmpMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=GATHER,exit-code=-1):-target wgsl -stage compute -entry gatherCmpMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=GATHEROFF,exit-code=-1):-target wgsl -stage compute -entry gatherCmpOffsetMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=LZOFF,exit-code=-1):-target wgsl -stage compute -entry sampleCmpLevelZeroOffsetMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SCMP,exit-code=-1):-target wgsl -stage fragment -entry sampleCmpFragment
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SCMPOFF,exit-code=-1):-target wgsl -stage fragment -entry sampleCmpOffsetFragment
 // A depth texture still compiles.
 //TEST:SIMPLE(filecheck=DEPTH):-target wgsl -stage compute -entry depthMain
 

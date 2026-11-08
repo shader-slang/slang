@@ -532,7 +532,7 @@ struct TypeTagContext
 
         // The compiler's resource type classes describe opaque values directly. Their builtin
         // declarations do not describe the fields that a compiled resource value would store.
-        if (as<UntypedBufferResourceType>(type))
+        if (as<TraceProgramDescriptorType>(type) || as<UntypedBufferResourceType>(type))
             return TypeTag::Opaque;
         if (as<ResourceType>(type))
             return TypeTag::Opaque;

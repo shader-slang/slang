@@ -4991,9 +4991,20 @@ ${
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
+
+        // The combined form has no sampler parameter, so its location is argument 1. CUDA keeps a
+        // combined texture-sampler as one texture object, so its `$0` goes to tex2Dgather as is.
+        const char* locationArg = isCombined ? "$1" : "$2";
+
+        // CUDA has no depth-compare gather: tex2Dgather takes no compare value and a
+        // SamplerComparisonState is a no-op placeholder there, so GatherCmp* is unavailable on
+        // CUDA, as SampleCmp* is. `isShadow` here selects the GatherCmp* overloads, not shadow
+        // textures. The `case cuda:` arm below is emitted only when `!isShadow`, because a
+        // `__target_switch` case that the `[require]` excludes is a capability error (E36101).
+        const char* gatherTargets = isShadow ? "glsl_hlsl_metal_spirv_wgsl" : "cuda_glsl_hlsl_metal_spirv_wgsl";
 $}
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require($(gatherTargets), texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5005,10 +5016,12 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow) { $}
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
+        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -5039,8 +5052,10 @@ $}
         }
     }
 
+    // tex2Dgather has no offset parameter, so the offset overloads leave CUDA out of [require], as
+    // the Sample* offset overloads do.
     [ForceInline]
-    [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5053,11 +5068,6 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
-        case cuda:
-            // CUDA tex2Dgather doesn't support offset - ignore offset parameter
-            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
-            static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -5888,6 +5898,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         __intrinsic_asm "imageStore($0, $1, $V2)";
     }
 
+    // Metal texture writes lower to `kIROp_ImageStore` (or to a texture atomic) rather than to an
+    // `__intrinsic_asm` string, because `insertMetalTextureFences` finds the writes it fences by
+    // that instruction.
     [require(metal, texture_sm_4_1)]
     __intrinsic_op($(kIROp_ImageStore))
     static void __metalImageStoreArray(This val, vector<uint, Shape.dimensions> location, T value, uint arrayIndex);
@@ -8102,7 +8115,7 @@ struct TriangleStream
 [require(cpp_hlsl)]
 void abort();
 
-/// The abs function returns the absolute value of x.
+/// The abs function returns the absolute value of x. For an unsigned x, the result is x.
 /// @param x The input value.
 /// @return The absolute value of x.
 /// @category math
@@ -8111,18 +8124,34 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
+    // `abs` of an unsigned value is the value itself, as in DXC and WGSL. The hlsl, metal and wgsl
+    // `abs` and the cpp/cuda prelude `U32_abs`/`U64_abs` already return it. The spirv and llvm
+    // cases lower to GLSL.std.450 `SAbs` and `llvm.abs`, which read their operand as signed, and
+    // GLSL has no unsigned `abs`, so the glsl, spirv and llvm cases return an unsigned `x` directly.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
     case cuda: __intrinsic_asm "$P_abs($0)";
     case cpp: __intrinsic_asm "$P_abs($0)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 SAbs $x
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$T = OpExtInst glsl450 SAbs $x
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
     // return x < 0 ? -x : x;
@@ -8134,16 +8163,30 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
+    // The glsl, spirv and llvm cases handle an unsigned `x` as in the scalar `abs` above; the
+    // matrix `abs` relies on them for its rows.
     __target_switch
     {
     case hlsl: __intrinsic_asm "abs";
-    case glsl: __intrinsic_asm "abs";
+    case glsl:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
-    case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
-    };
+    case spirv:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            return spirv_asm {
+                result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
+            };
     case wgsl: __intrinsic_asm "abs";
-    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
+    case llvm:
+        if (__isUnsignedInt<T>())
+            return x;
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -12777,7 +12820,11 @@ $}
 /// HLSL does not allow atomic operations on floating point types. For `InterlockedAdd`, consider using
 /// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
 /// On SPIR-V (Vulkan), all integer and floating point types are supported.
-/// On Metal and WGSL, all floating-point types are not supported.
+/// On Metal, `InterlockedAdd` and `InterlockedExchange` are the only functions in this family that
+/// accept a floating-point `T`, and only a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, floating-point types are not supported.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
@@ -12818,7 +12865,10 @@ $}
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, all floating-point types are not supported.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, floating-point types are not supported.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12840,7 +12890,9 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, `dest` must be in device memory, such as a `RWStructuredBuffer` element or a device
+/// pointer, not a texture, a `RWBuffer` or `groupshared` memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12866,7 +12918,10 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12894,7 +12949,10 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -14610,6 +14668,66 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
     default:
         MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
     }
+}
+
+/// Split into an `int` whole part and a floating-point fractional part.
+///
+/// Nonzero fractional parts have the same sign as `x`.
+/// The whole part must be representable as `int`.
+/// @param x The input value.
+/// @param[out] ip The whole part of `x`, truncated toward zero.
+/// @return The fractional part of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T modf(T x, out int ip)
+{
+    // We split in the input type before converting the whole part, so the fractional part
+    // follows the floating-point `modf` semantics on each target, including for negative inputs.
+    T wholePart;
+    T fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<int>(wholePart);
+    return fractionalPart;
+}
+
+/// Split each component into an `int` whole part and a floating-point fractional part.
+///
+/// Each whole part must be representable as `int`.
+/// @param x The input vector.
+/// @param[out] ip The whole parts of `x`, truncated toward zero.
+/// @return The fractional parts of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> modf(vector<T,N> x, out vector<int,N> ip)
+{
+    vector<T,N> wholePart;
+    vector<T,N> fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<vector<int,N>>(wholePart);
+    return fractionalPart;
+}
+
+/// Split each element into an `int` whole part and a floating-point fractional part.
+///
+/// Each whole part must be representable as `int`.
+/// @param x The input matrix.
+/// @param[out] ip The whole parts of `x`, truncated toward zero.
+/// @return The fractional parts of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<int,N,M,L> ip)
+{
+    matrix<T,N,M,L> wholePart;
+    matrix<T,N,M> fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<matrix<int,N,M,L>>(wholePart);
+    return fractionalPart;
 }
 
 /// Masked sum of absolute differences of byte alignments.
@@ -20855,7 +20973,7 @@ $}
                 {
                 case hlsl: __intrinsic_asm "($0)[$1] = $2";
                 case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
-                case metal: __intrinsic_asm "$0.write($2, $1)";
+                case metal: __metalImageStore(this, index, newValue);
                 case spirv: spirv_asm {
                         OpImageWrite $this $index __convertTexel(newValue);
                     };

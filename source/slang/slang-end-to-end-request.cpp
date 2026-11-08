@@ -1969,9 +1969,16 @@ SlangResult EndToEndCompileRequest::compile()
         {
             // If for some reason we didn't output any diagnostic, something is
             // going wrong, but we want to make sure we at least output something.
+            // Aborting without any prior diagnostic means the compiler gave up on
+            // its own (for example `SLANG_ABORT_COMPILATION("unsupported stage.")`
+            // in an emitter) rather than because of a problem in the user's code,
+            // so we report it as an internal compiler error. An abort that follows
+            // a diagnostic (such as a fatal "cyclic reference" error) is an
+            // ordinary compilation failure and keeps the `SLANG_FAIL` result.
             getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
+            res = SLANG_E_ABORT;
         }
     }
     catch (const Exception& e)
@@ -1983,6 +1990,7 @@ SlangResult EndToEndCompileRequest::compile()
         getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
             .exceptionType = typeid(e).name(),
             .exceptionMessage = e.Message});
+        res = SLANG_E_ABORT;
     }
     catch (...)
     {
@@ -1991,6 +1999,7 @@ SlangResult EndToEndCompileRequest::compile()
         // let the user know that we messed up, so they know to blame Slang
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
+        res = SLANG_E_ABORT;
     }
 #endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
@@ -2390,7 +2399,17 @@ SlangResult EndToEndCompileRequest::processCommandLineArguments(
     char const* const* args,
     int argCount)
 {
-    return parseOptions(this, argCount, args);
+    // We treat a request in command-line compiler mode as a complete slangc command line, to
+    // which nothing adds targets after the parse. slangc, and slang-test's slangc tool and test
+    // server, set the mode before this call and add no targets afterwards. An API caller that sets
+    // the mode and then adds targets still gets the slangc diagnostics, such as E00044 for a
+    // floating-point mode given with no `-target`.
+    return parseOptions(
+        this,
+        argCount,
+        args,
+        m_isCommandLineCompile ? CommandLineParsePurpose::CompleteCommandLine
+                               : CommandLineParsePurpose::CompileRequest);
 }
 
 SlangReflection* EndToEndCompileRequest::getReflection()

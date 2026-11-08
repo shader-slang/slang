@@ -59,6 +59,16 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// Return whether `newDecl` may shadow the same-named `oldDecl` as an HLSL loop initializer.
+///
+/// HLSL loop initializers belong to the enclosing scope, so successive loops can declare the
+/// same name. The permission applies to each variable in an initializer, including repeated
+/// names in `for (int i = 0, i = 1; ... )`. Only a new loop initializer has this permission:
+/// an ordinary `int i;` following `for (int i = 0; ... ) {}` remains a redeclaration error.
+/// Other declaration kinds and declarations from different containers do not participate.
+/// Checking and lookup use the same rule to permit the declarations and select their bindings.
+bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl);
+
 /// How `checkRedeclaration` reports two declarations of the same name that cannot coexist.
 enum class RedeclarationSeverity
 {
@@ -2600,7 +2610,8 @@ public:
     bool doesTypeSatisfyAssociatedTypeRequirement(
         Type* satisfyingType,
         DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-        RefPtr<WitnessTable> witnessTable);
+        RefPtr<WitnessTable> witnessTable,
+        SourceLoc satisfyingDeclLoc);
 
     // Does the given `memberDecl` work as an implementation
     // to satisfy the requirement `requiredMemberDeclRef`
@@ -3293,9 +3304,9 @@ public:
 
     /// Return the receiver parameter mode used for `decl` when no specifier is present.
     ///
-    /// Setters and non-synthesized HLSL methods default to `ParamPassingMode::BorrowInOut`;
-    /// other declarations use `ParamPassingMode::In`.
-    /// For a non-synthesized `FuncDecl`, requires the context for its owning translation unit.
+    /// Setters default to `ParamPassingMode::BorrowInOut`. Non-synthesized HLSL methods also
+    /// use that mode when `HLSLMethodsMutatingByDefault` is enabled; other declarations use `In`.
+    /// Selecting the HLSL default requires the context for `decl`'s owning translation unit.
     ParamPassingMode getDefaultReceiverParamMode(Decl* decl);
 
     /// Compute and attach the effective `this` parameter information owned by `decl`.
@@ -4153,6 +4164,14 @@ public:
 
     String getCallSignatureString(OverloadResolveContext& context);
 
+    // For a compound assignment `x op= y` (`expr`), whose `operator op=` did not apply: returns
+    // true, with the two operator names, when `x` is an l-value and `x op y` resolves to the type
+    // of `x`, so `x = x op y` is a replacement. Slang does not derive `op=` from `op`.
+    bool findBinaryOperatorForCompoundAssignment(
+        InvokeExpr* expr,
+        UnownedStringSlice& outCompoundOp,
+        UnownedStringSlice& outBinaryOp);
+
     Expr* ResolveInvoke(InvokeExpr* expr);
 
     void AddGenericOverloadCandidate(LookupResultItem baseItem, OverloadResolveContext& context);
@@ -4351,7 +4370,6 @@ public:
     SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
     SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
-
 
 inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)
 {
@@ -4610,9 +4628,12 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeclStmt(DeclStmt* stmt);
 
-    /// Check `decl`, a local declaration whose statement has been reached, make it
-    /// visible to the code that follows its declarator, and register the lambda
-    /// captures in its initializer.
+    /// Check `decl` and its initializer, make the local declaration visible afterward,
+    /// and register the lambda captures in its initializer.
+    ///
+    /// Earlier bindings remain available while the initializer is checked.
+    /// Once an HLSL loop variable is visible, lookup selects it over earlier locals of the same
+    /// name in its scope.
     void checkDeclAtDeclarationPoint(Decl* decl);
 
     void visitBlockStmt(BlockStmt* stmt);

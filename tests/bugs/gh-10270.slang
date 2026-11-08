@@ -1,5 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -spirv
-// CHECK-NOT: error 38029
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute
+// CHECK-NOT: E38029
+// CHECK: OpEntryPoint GLCompute
 
 interface IDeleter<T>
 {

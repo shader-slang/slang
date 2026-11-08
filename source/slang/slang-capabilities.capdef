@@ -781,6 +781,35 @@ def spvImageFootprintNV : SPV_NV_shader_image_footprint;
 def spvMinLod : _spirv_1_0;
 
 
+/// Represents the SPIR-V capability for using the SPV_KHR_variable_pointers extension.
+/// [EXT]
+def spvVariablePointersKHR : SPV_KHR_variable_pointers;
+
+/// Represents the SPIR-V capability for using the SPV_KHR_subgroup_rotate extension.
+/// [EXT]
+def spvSubgroupRotateKHR : SPV_KHR_subgroup_rotate;
+
+/// Represents the SPIR-V capability for using the SPV_KHR_compute_shader_derivatives extension
+/// (also available as SPV_NV_compute_shader_derivatives).
+/// [EXT]
+def spvComputeShaderDerivativesKHR : SPV_KHR_compute_shader_derivatives;
+
+/// Represents the SPIR-V capability for using the SPV_GOOGLE_user_type extension.
+/// [EXT]
+def spvUserTypeGOOGLE : SPV_GOOGLE_user_type;
+
+/// Represents the SPIR-V capability for using the SPV_EXT_physical_storage_buffer extension.
+/// [EXT]
+def spvPhysicalStorageBufferEXT : SPV_EXT_physical_storage_buffer;
+
+/// Represents the SPIR-V capability for using the SPV_KHR_physical_storage_buffer extension.
+/// [EXT]
+def spvPhysicalStorageBufferKHR : SPV_KHR_physical_storage_buffer;
+
+/// Represents the SPIR-V capability for using the SPV_KHR_non_semantic_info extension.
+/// [EXT]
+def spvNonSemanticInfoKHR : SPV_KHR_non_semantic_info;
+
 /// Represents the SPIR-V capability for using 8-bit floating point types.
 /// [EXT]
 def spvFloat8EXT : SPV_EXT_float8;
@@ -1491,33 +1520,47 @@ alias tesscontrol = hull;
 /// [Stage]
 alias tesseval = domain;
 
-/// Ray-Generation shader stage & ray-tracing capabilities
+// These stage names also describe logical roles in the portable ray-tracing API on Metal.
+// Native pipeline entry points and intrinsics additionally require `raytracing`.
+/// Ray-generation stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias raygen = _raygen + raytracing;
+alias raygen = _raygen + raytracing | _raygen + metal;
 
-/// Ray-Generation shader stage & ray-tracing capabilities
+/// Alias for the ray-generation stage.
 /// [Stage]
-alias raygeneration = _raygeneration + raytracing;
+alias raygeneration = raygen;
 
-/// Intersection shader stage & ray-tracing capabilities
+/// Intersection stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias intersection = _intersection + raytracing;
+alias intersection = _intersection + raytracing | _intersection + metal;
 
-/// Any-Hit shader stage & ray-tracing capabilities
+/// Any-hit stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias anyhit = _anyhit + raytracing;
+alias anyhit = _anyhit + raytracing | _anyhit + metal;
 
-/// Closest-Hit shader stage & ray-tracing capabilities
+/// Closest-hit stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias closesthit = _closesthit + raytracing;
+alias closesthit = _closesthit + raytracing | _closesthit + metal;
 
-/// Callable shader stage & ray-tracing capabilities
+/// Callable stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias callable = _callable + raytracing;
+alias callable = _callable + raytracing | _callable + metal;
 
-/// Ray-Miss shader stage & ray-tracing capabilities
+/// Miss stage, including its logical role in portable ray tracing on Metal.
 /// [Stage]
-alias miss = _miss + raytracing;
+alias miss = _miss + raytracing | _miss + metal;
+
+/// Stages that may invoke a callable shader through the portable ray-tracing API.
+/// [Compound]
+alias portable_raytracing_call_shader = cuda_glsl_hlsl_spirv + raygen
+                                       | cuda_glsl_hlsl_spirv + closesthit
+                                       | cuda_glsl_hlsl_spirv + miss
+                                       | cuda_glsl_hlsl_spirv + callable
+                                       | _raygen + metal
+                                       | compute + metal
+                                       | _closesthit + metal
+                                       | _miss + metal
+                                       | _callable + metal;
 
 /// Mesh shader stage & mesh shader capabilities
 /// [Stage]
@@ -1562,6 +1605,18 @@ alias anyhit_intersection = anyhit | intersection;
 /// Collection of shader stages
 /// [Compound]
 alias raygen_closesthit_miss = raygen | closesthit | miss;
+
+/// Stages that may trace a ray through the portable ray-tracing API.
+/// [Compound]
+alias portable_raytracing_trace = cuda_glsl_hlsl_spirv + raygen_closesthit_miss
+                                  | _raygen + metal
+                                  | _closesthit + metal
+                                  | _miss + metal;
+
+/// Instance motion available to the portable ray-tracing API. Metal encodes the requirement on
+/// its intersector type, while Vulkan and OptiX pass a ray time to their native trace operation.
+/// [Compound]
+alias portable_raytracing_instance_motion = metallib_2_4 | raytracing_motionblur;
 
 /// Collection of shader stages
 /// [Compound]
