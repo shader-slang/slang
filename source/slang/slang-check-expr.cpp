@@ -5022,31 +5022,33 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         }
     }
 
-    // A scalar `bool` left operand of a builtin shift is promoted to `int`, so `b << n` has type
-    // `int`. We promote it here rather than leaving the conversion to overload resolution because
-    // `bool` conforms to `ILogical`: its subtype witness costs less than the bool-to-int argument
-    // conversion of the builtin integer shift, so resolution alone would pick the generic
-    // `ILogical` shift and produce a `bool`.
+    // Shift operators do not promote to a common type: `a << b` keeps the type of `a`, and the
+    // shift amount `b` is converted independently. The exception is a scalar `bool` left operand,
+    // which we promote to `int` here so that `b << n` has type `int`. Overload resolution alone
+    // would not do that: `bool` conforms to `ILogical`, and the generic `ILogical` shift costs less
+    // for it than the bool-to-int conversion of the builtin integer shift, so it would produce a
+    // `bool`. The generic shift takes a scalar integer amount, which a `bool` amount converts to,
+    // so we promote only for a scalar integer or `bool` amount. The promoted operand stays on
+    // `expr` when a mixed-type pair such as `bool << uint` goes to overload resolution below. Only
+    // infix shifts reach this function, so an explicit `operator<<(b, n)` call and `b <<= n` bind
+    // the generic shift and keep the type `bool`.
     if (isShift)
     {
         auto leftBasicType = as<BasicExpressionType>(leftArg->type.type);
-        Type* rightElementType = rightArg->type.type;
-        if (auto rightVecType = as<VectorExpressionType>(rightElementType))
-            rightElementType = rightVecType->getElementType();
-        else if (auto rightMatType = as<MatrixExpressionType>(rightElementType))
-            rightElementType = rightMatType->getElementType();
-        if (leftBasicType && leftBasicType->getBaseType() == BaseType::Bool &&
-            classifyBuiltinArithmeticElementType(rightElementType).isKnown())
+        if (leftBasicType && leftBasicType->getBaseType() == BaseType::Bool)
         {
-            leftArg =
-                coerce(CoercionSite::Argument, m_astBuilder->getIntType(), leftArg, getSink());
-            expr->arguments[0] = leftArg;
+            auto amountFamily = classifyBuiltinArithmeticElementType(rightArg->type.type);
+            if (amountFamily.isInteger || amountFamily.isBool)
+            {
+                leftArg =
+                    coerce(CoercionSite::Argument, m_astBuilder->getIntType(), leftArg, getSink());
+                expr->arguments[0] = leftArg;
+            }
         }
     }
 
-    // Shift operators do not promote to a common type: `a << b` keeps the type of `a` (the
-    // shift amount `b` is converted independently). That asymmetry is not modeled by the
-    // common-type rule, so leave mixed-type shifts to overload resolution.
+    // The common-type rule below does not model the shift asymmetry, so mixed-type shifts go to
+    // overload resolution.
     if (isShift && !leftArg->type.type->equals(rightArg->type.type))
         return nullptr;
     // Promote mixed-type operands to the common operand type (and carry the coerced operands

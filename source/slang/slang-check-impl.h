@@ -4526,7 +4526,10 @@ private:
     // arithmetic/comparison/bitwise/unary ops on numeric scalars/vectors/matrices, and routing
     // each one through full generic `operator OP` overload resolution (candidate collection,
     // inference, coercion) is a large front-end cost. Handling them here lets the common case skip
-    // all of that and lower straight to the corresponding builtin IR op.
+    // all of that and lower straight to the corresponding builtin IR op. One rule here is more than
+    // a shortcut: a scalar `bool` left operand of `<<`/`>>` is promoted to `int`, because overload
+    // resolution alone binds the generic `ILogical` shift for it and produces a `bool`. That
+    // promotion stays on `expr` even when this function then returns null.
     //
     // Recognized: `+ - * / %`, `== != < > <= >=`, `& | ^ << >>`, and unary `- ! ~` on builtin
     // integer/floating-point/bool operands (same-type operands as-is; different builtin types
