@@ -1044,9 +1044,16 @@ struct ShaderInputLayoutParser
         for (auto& line : lines)
         {
             lineNum++;
-            if (!line.startsWith("//"))
+            // We accept the same comment prefixes as slang-test's `//TEST` scan, so an
+            // indented `//TEST_INPUT:` (e.g. next to an entry-point parameter) or a
+            // `///TEST_INPUT:` is a directive rather than being silently dropped.
+            UnownedStringSlice directive = line.getUnownedSlice().trimStart();
+            if (!directive.startsWith("//"))
                 continue;
-            line = line.getUnownedSlice().tail(2).trim();
+            directive = directive.tail(2);
+            while (directive.startsWith("/"))
+                directive = directive.tail(1);
+            line = directive.trim();
             if (line.startsWith("TEST_INPUT:"))
             {
                 auto lineContent = line.subString(11, line.getLength() - 11);
