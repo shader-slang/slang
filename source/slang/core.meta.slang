@@ -3971,8 +3971,12 @@ T operator ^=(in out T v0, T v1)
     return v0;
 }
 
-// The generic shift operators take a scalar builtin-integer shift amount, matching the
-// `shl(int)` and `shr(int)` requirements of `ILogical`.
+// The generic shift operators take any scalar builtin-integer shift amount `U`, so `x << 2u`
+// works in generic code, and narrow it to the `int` that the `shl` and `shr` requirements of
+// `ILogical` take. For builtin integer operands the intrinsic shifts above still win, because
+// `int : __BuiltinIntegerType` is a declared conformance and costs less than `int : ILogical`.
+// For a scalar `bool` these overloads would win over the integer shift and produce a `bool`, so
+// `convertToBuiltinArithmeticOp` promotes an infix `bool` left operand to `int` first.
 
 __generic<T : ILogical, U : __BuiltinIntegerType>
 [__unsafeForceInlineEarly]
@@ -4006,7 +4010,7 @@ T operator >>=(in out T v0, U v1)
 }
 
 // The operator overloads defined above already allows Enum types to be used
-// in logical operators, but we still provide overloads for __EnumTypes and map
+// in logical and shift operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
 // work on enum types.
 

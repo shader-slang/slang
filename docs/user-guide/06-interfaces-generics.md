@@ -1406,7 +1406,8 @@ They are not deprecated, and existing code does not need to migrate immediately.
   All builtin integer and floating-point scalar and vector types, and all builtin floating-point matrix types, implement it.
 - `ILogical` provides methods for bitwise, shift, and logical operations, plus explicit conversion from `int`.
   `bool`, enum types, and all builtin integer scalar and vector types implement it.
-  The shift amount has a builtin scalar integer type such as `int` or `uint`, so `x << n` shifts every element of an integer vector `x` by the same `n`.
+  In code generic over `ILogical`, `<<`, `>>`, `<<=` and `>>=` take a scalar builtin integer amount such as `int` or `uint`, so `x << n` shifts every element of a vector `x` by the same `n`.
+  With `T = bool` such a shift yields a `bool`, while a concrete `b << n` on a `bool` value yields an `int`.
 - `IInteger` combines `IArithmetic` and `ILogical` for builtin integer scalar and vector types.
 - `IFloat` combines `IArithmetic` and `IDifferentiable` for builtin floating-point scalar, vector, and matrix types, and provides conversions to and from `float`.
 
