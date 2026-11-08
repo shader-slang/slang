@@ -435,7 +435,14 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 // the `Global` and `UserPointer` address spaces, which the Metal emitter prints as `device`.
 static const char* getUnsupportedMetalFloatAtomicReason(IRAtomicOperation* atomic)
 {
-    switch (atomic->getOp())
+    // MSL texture atomics exist for `int` and `uint` texels only (and `ulong` min/max), so a
+    // `texture2d<float>` has no `atomic_fetch_add` or any other atomic member. Min and max get
+    // their own reason below.
+    const auto op = atomic->getOp();
+    if (isFloatingType(atomic->getDataType()) && op != kIROp_AtomicMin &&
+        op != kIROp_AtomicMax && getAtomicImageSubscript(atomic))
+        return "floating point atomic operation on a texture";
+    switch (op)
     {
     case kIROp_AtomicLoad:
     case kIROp_AtomicExchange:
@@ -449,12 +456,10 @@ static const char* getUnsupportedMetalFloatAtomicReason(IRAtomicOperation* atomi
     auto valueType = atomic->getDataType();
     if (!isFloatingType(valueType))
         return nullptr;
-    if (atomic->getOp() == kIROp_AtomicMin || atomic->getOp() == kIROp_AtomicMax)
+    if (op == kIROp_AtomicMin || op == kIROp_AtomicMax)
         return "floating point atomic min or max";
     if (valueType->getOp() != kIROp_FloatType)
         return "floating point atomic operation on a type other than 32-bit float";
-    if (getAtomicImageSubscript(atomic))
-        return "floating point atomic operation on a texture";
     auto destPtrType = cast<IRPtrTypeBase>(atomic->getPtr()->getDataType());
     switch (destPtrType->getAddressSpace())
     {

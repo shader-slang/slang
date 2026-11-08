@@ -390,25 +390,12 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
-    auto diagnoseFloatAtomic = [&]()
-    {
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "Unsupported floating point atomic operation",
-            .location = inst->sourceLoc});
-    };
     auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
     {
         emitInstResultDecl(inst);
         bool isImageOp = false;
         if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
         {
-            // MSL texture atomics exist for `int` and `uint` texels only (and `ulong` min/max),
-            // so `texture2d<float>` has no `atomic_fetch_add`. An exchange, min or max has
-            // already diagnosed a floating-point value for every destination.
-            const auto op = inst->getOp();
-            if (isFloatingType(inst->getDataType()) && op != kIROp_AtomicExchange &&
-                op != kIROp_AtomicMin && op != kIROp_AtomicMax)
-                diagnoseFloatAtomic();
             emitImageOperandWithAccessor(imageSubscript->getImage());
             m_writer->emit(imageFunc);
             m_writer->emit("(");
