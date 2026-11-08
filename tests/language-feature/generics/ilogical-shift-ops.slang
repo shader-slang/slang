@@ -28,6 +28,7 @@ static const bool kFlagSet = true;
 static const int kBoolShift = (kFlagSet << 0) | (true << 2);
 static const int kIntShift = 1u << 3;
 static const Flags kEnumShift = Flags.A << 3;
+static const Flags kEnumShiftRight = Flags.D >> 2;
 groupshared int gScratch[true << 3];
 
 T shlLogical<T : ILogical>(T value, uint amount)
@@ -82,7 +83,7 @@ int shlBool<T : __BuiltinIntegerType>(bool value, T amount)
 //TEST_INPUT:ubuffer(data=[1 2 3 -16 0x80000000], stride=4):name=inputBuffer
 StructuredBuffer<int> inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -99,11 +100,11 @@ void computeMain()
     // Signed and unsigned 32-bit scalars.
     outputBuffer[i++] = shlLogical(three, uint(two));                  // CHECK: 12
     outputBuffer[i++] = shrLogical(minusSixteen, uint(two));           // CHECK-NEXT: -4
-    outputBuffer[i++] = int(shrLogical(highBit, 31u));                 // CHECK-NEXT: 1
+    outputBuffer[i++] = int(shrLogical(highBit, 31u));                 // CHECK-NEXT: {{^}}1{{$}}
     outputBuffer[i++] = shlAssignLogical(one, three);                  // CHECK-NEXT: 8
     outputBuffer[i++] = shrAssignLogical(minusSixteen, int16_t(three)); // CHECK-NEXT: -2
     outputBuffer[i++] = shlInteger(three, two);                        // CHECK-NEXT: 12
-    outputBuffer[i++] = int(shrInteger(highBit, uint64_t(30)));        // CHECK-NEXT: 2
+    outputBuffer[i++] = int(shrInteger(highBit, uint64_t(30)));        // CHECK-NEXT: {{^}}2{{$}}
     outputBuffer[i++] = shlAssignInteger(three, uint(three));          // CHECK-NEXT: 24
     outputBuffer[i++] = shrAssignInteger(minusSixteen, int8_t(one));   // CHECK-NEXT: -8
 
@@ -134,6 +135,8 @@ void computeMain()
     Flags flag = Flags(one);
     outputBuffer[i++] = int(shlLogical(flag, uint(three)));            // CHECK-NEXT: 8
     outputBuffer[i++] = int(shrAssignLogical(Flags.D, int16_t(two)));  // CHECK-NEXT: 2
+    outputBuffer[i++] = int(Flags(uint(two * 4)) >> 2u);               // CHECK-NEXT: {{^}}2{{$}}
+    outputBuffer[i++] = int(kEnumShiftRight);                          // CHECK-NEXT: {{^}}2{{$}}
 
     // A `bool` left operand of a builtin shift is promoted to `int`, so the result is an `int`.
     bool flagSet = one != 0;
@@ -142,6 +145,15 @@ void computeMain()
     outputBuffer[i++] = (flagSet << 1) >> 1;                           // CHECK-NEXT: 1
     outputBuffer[i++] = shlBool(flagSet, uint(two));                   // CHECK-NEXT: 4
     outputBuffer[i++] = flagSet << flagSet;                            // CHECK-NEXT: 2
+
+    // Through the generic operators, or an explicit `operator<<` call, a `bool` stays a `bool`:
+    // `bool.shl` and `bool.shr` round-trip through `int` and convert back.
+    bool shiftedFlag = flagSet;
+    shiftedFlag <<= 1;
+    outputBuffer[i++] = int(shiftedFlag);                              // CHECK-NEXT: {{^}}1{{$}}
+    outputBuffer[i++] = int(shlLogical(flagSet, uint(two)));           // CHECK-NEXT: {{^}}1{{$}}
+    outputBuffer[i++] = int(shrLogical(flagSet, 1u));                  // CHECK-NEXT: {{^}}0{{$}}
+    outputBuffer[i++] = int(operator<<(flagSet, 1));                   // CHECK-NEXT: {{^}}1{{$}}
 
     int boolSized[kBoolShift];
     int intSized[kIntShift];
