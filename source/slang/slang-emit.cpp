@@ -71,6 +71,7 @@
 #include "slang/ir-passes/slang-ir-legalize-binary-operator.h"
 #include "slang/ir-passes/slang-ir-legalize-composite-select.h"
 #include "slang/ir-passes/slang-ir-legalize-empty-array.h"
+#include "slang/ir-passes/slang-ir-legalize-float-atomic-compare-exchange.h"
 #include "slang/ir-passes/slang-ir-legalize-global-values.h"
 #include "slang/ir-passes/slang-ir-legalize-image-subscript.h"
 #include "slang/ir-passes/slang-ir-legalize-matrix-types.h"
@@ -2846,6 +2847,11 @@ Result linkAndOptimizeIR(
     // Legalization keeps a void placeholder for `differential` to preserve field positions.
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
+
+    // SPIR-V and GLSL have integer atomic compare-exchange only. Run after inlining, so that the
+    // destination of each one is grounded in a global buffer parameter.
+    if (isKhronosTarget(targetRequest))
+        SLANG_PASS(legalizeFloatAtomicCompareExchange, targetRequest, sink);
 
     // Most targets need block parameters lowered to explicit temporary variables before emission.
     // Direct SPIR-V retains scalar and composite parameters so their incoming values remain
