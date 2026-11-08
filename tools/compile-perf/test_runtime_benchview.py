@@ -74,6 +74,14 @@ class RuntimeBenchViewTests(unittest.TestCase):
         self.manifest["commit"] = "c" * 40
         self.assertEqual(second, self.convert()[0]["observations"][0]["case"])
 
+    def test_optix_identity_survives_export_and_splits_contracts(self):
+        self.case['optix_version'] = 90000
+        first = self.convert()[0]['observations'][0]
+        self.assertEqual(first['metadata']['measurementContract']['workload']['optix_version'], 90000)
+        self.case['optix_version'] = 80100
+        second = self.convert()[0]['observations'][0]
+        self.assertNotEqual(first['case']['dimensions']['contract'], second['case']['dimensions']['contract'])
+
     def test_release_metadata_and_unknown_revision(self):
         self.manifest.update(kind="release", label="v2026.19")
         self.assertEqual(self.convert()[0]["run"]["metadata"]["release"]["label"], "v2026.19")

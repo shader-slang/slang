@@ -290,6 +290,26 @@ struct Benchmark
         if (!adapter)
             return false;
         desc.adapter = adapter;
+        slang::CompilerOptionEntry optixOption = {};
+        std::string optixInclude;
+        if (options.backend == "cuda" && options.caseName == "raytrace_pipeline")
+        {
+#ifdef RUNTIME_PERF_OPTIX_HEADERS
+            desc.requiredOptixVersion = 90000;
+            // Frontend search paths do not reach NVRTC's OptiX device includes.
+            optixInclude = std::string("-I") + RUNTIME_PERF_OPTIX_HEADERS;
+            optixOption.name = slang::CompilerOptionName::DownstreamArgs;
+            optixOption.value.kind = slang::CompilerOptionValueKind::String;
+            optixOption.value.stringValue0 = "nvrtc";
+            optixOption.value.stringValue1 = optixInclude.c_str();
+            desc.slang.compilerOptionEntries = &optixOption;
+            desc.slang.compilerOptionEntryCount = 1;
+#else
+            unsupported = true;
+            unsupportedReason = "CUDA ray pipelines require a runner built with OptiX 9.0";
+            return false;
+#endif
+        }
         const char* path = options.directory.c_str();
         desc.slang.searchPaths = &path;
         desc.slang.searchPathCount = 1;
@@ -309,12 +329,15 @@ struct Benchmark
         {
             Feature feature =
                 options.caseName == "raytrace_pipeline" ? Feature::RayTracing : Feature::RayQuery;
-            if ((options.backend != "vulkan" && options.backend != "d3d12") ||
-                !device->hasFeature(feature))
+            bool backendSupported =
+                options.backend == "vulkan" || options.backend == "d3d12" ||
+                (options.backend == "cuda" && options.caseName == "raytrace_pipeline");
+            if (!backendSupported || !device->hasFeature(feature))
             {
                 unsupported = true;
                 unsupportedReason =
-                    "Ray benchmark requires Vulkan/D3D12 and the requested ray-tracing feature";
+                    "Ray benchmark requires the requested feature: Vulkan/D3D12 ray queries or "
+                    "Vulkan/D3D12/CUDA-OptiX ray pipelines";
                 return false;
             }
             if (!scene.initialize(device, queue))
@@ -899,6 +922,13 @@ int main(int argc, char** argv)
         quote(RUNTIME_PERF_RHI_REV).c_str(),
         (unsigned long long)bench.device->getInfo().timestampFrequency);
     // These are single host wall-time observations. Nested intervals must not be summed.
+#ifdef RUNTIME_PERF_OPTIX_HEADERS
+    if (o.backend == "cuda" && o.caseName == "raytrace_pipeline")
+        printf(
+            "\"optix_version\":%u,\"optix_headers\":%s,",
+            bench.device->getInfo().optixVersion,
+            quote(RUNTIME_PERF_OPTIX_HEADERS).c_str());
+#endif
     if (isRayCase(o.caseName))
         printf("\"scene\":{\"version\":1,\"triangles\":2048,\"instances\":1,\"hit_fraction\":0.75,"
                "\"build_flags\":\"prefer_fast_trace\",\"opaque\":true},");

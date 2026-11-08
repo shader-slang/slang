@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import perf
 
@@ -78,6 +79,41 @@ class RuntimePerfTests(unittest.TestCase):
         a["environment"]["driver_id"] = ""
         with self.assertRaisesRegex(ValueError, "driver"):
             self.compare(a, a)
+
+    def test_optix_version_is_part_of_comparison_contract(self):
+        a = self.fixture()
+        a['runs'][0].update(workload='raytrace_pipeline', backend='cuda', optix_version=90000)
+        b = copy.deepcopy(a)
+        for version in (80100, None):
+            b['runs'][0]['optix_version'] = version
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, 'optix_version'):
+                self.compare(a, b)
+
+    def test_cuda_ray_paired_compile_uses_measured_headers_and_raygen_architecture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            headers = root / 'OptiX headers'
+            headers.mkdir()
+            for name in ('optix.h', 'optix_device.h'):
+                (headers / name).write_text('// pinned header')
+            (root / 'rayGenMain.target-code').write_text('.target sm_89')
+            source = dict(directory=str(root), files=['main.slang'])
+            with patch.object(perf.bench, 'run_spec', return_value={'ok': True}) as compile:
+                perf.compile_case('slangc', 'raytrace_pipeline', dict(perf.DEFAULTS, backend='cuda'),
+                                  source, root, dict(optix_headers=str(headers)))
+            spec = compile.call_args.args[1]
+            self.assertIn('-Xnvrtc', spec.extra_flags)
+            self.assertIn('-I' + str(headers), spec.extra_flags)
+            self.assertIn('cuda_sm_8_9', spec.extra_flags)
+            self.assertTrue(spec.downstream_required)
+            self.assertEqual(spec.name, 'runtime_raytrace_pipeline')
+
+    def test_cuda_ray_paired_compile_rejects_missing_headers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, 'measured OptiX headers'):
+                perf.compile_case('slangc', 'raytrace_pipeline', dict(perf.DEFAULTS, backend='cuda'),
+                                  dict(directory=directory, files=['main.slang']), root)
 
     def test_rejects_incomplete_and_nonfinite_samples(self):
         for samples in ([], [{"gpu_total_ms": float("nan")}], [{"gpu_total_ms": -1}],

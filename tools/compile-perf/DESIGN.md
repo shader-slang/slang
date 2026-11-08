@@ -46,10 +46,11 @@ so their measurements cannot overlap. No separate scheduled publisher is added.
 `tools/runtime-perf/nightly.py` archives immutable attempts under
 `daily/<label>/runtime/<run-id>-<attempt>/`. `run.json` records compiler and suite
 commits, expected backend coverage, selected calibration, commands, and failures.
-Vulkan and D3D12 require all 23 cases; CUDA requires the 20 compute cases (OptiX is
-outside this suite). The first run calibrates on its actual GPU. Later runs reuse
+Vulkan and D3D12 require all 23 cases; CUDA requires the 20 compute cases and the
+ray pipeline through OptiX 9.0. CUDA inline ray queries remain unsupported. The
+first run calibrates on its actual GPU. Later runs reuse
 compatible dimensions; runtime comparisons reject incompatible environments,
-workloads, harnesses, RHI versions, scene contracts, or measurement policies.
+workloads, harnesses, RHI/OptiX versions, scene contracts, or measurement policies.
 A setup failure produces a failed manifest rather than successful empty coverage.
 
 The existing `report.py` renders the **GPU runtime** section through

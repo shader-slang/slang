@@ -151,7 +151,7 @@ def check_calibration(saved, env, config, corpus):
             raise ValueError(f"calibration source mismatch: {case}")
 
 
-def compile_case(slangc, case, config, source, output):
+def compile_case(slangc, case, config, source, output, native_record=None):
     records = []
     target = dict(metal="metal", vulkan="spirv", cuda="ptx", d3d12="dxil")[config["backend"]]
     for filename in source["files"]:
@@ -159,7 +159,16 @@ def compile_case(slangc, case, config, source, output):
         name = "runtime_" + case + ("_" + stage if case == "image_pipeline" else "")
         flags = ["-target", target, "-profile", "sm_6_6", "-O3", "-matrix-layout-row-major"]
         if target == "ptx":
-            code = (Path(source["directory"]) / (stage + ".target-code")).read_bytes()
+            if case == "raytrace_pipeline":
+                header_path = (native_record or {}).get("optix_headers")
+                if not header_path:
+                    raise ValueError("CUDA ray paired compilation requires the measured OptiX headers")
+                headers = Path(header_path)
+                if not (headers / "optix_device.h").is_file() or not (headers / "optix.h").is_file():
+                    raise ValueError("CUDA ray paired compilation requires the measured OptiX headers")
+                flags += ["-Xnvrtc", "-I" + str(headers)]
+            code_stage = "rayGenMain" if case == "raytrace_pipeline" else stage
+            code = (Path(source["directory"]) / (code_stage + ".target-code")).read_bytes()
             architecture = re.search(rb"\.target\s+sm_(\d+)", code)
             if not architecture:
                 raise ValueError("native CUDA output has no PTX architecture")
@@ -225,6 +234,8 @@ def run(args):
                     raise ValueError("runner binary was built from different sources; rebuild it")
                 if not record.get("validated"):
                     raise ValueError("runner did not validate output")
+                if case == "raytrace_pipeline" and config["backend"] == "cuda" and record.get("optix_version") != 90000:
+                    raise ValueError("CUDA ray benchmark did not record the required OptiX 9.0 identity")
                 record["timers"] = aggregate(record["samples"])
                 record["relative_mad_by_phase"] = {}
                 for name, stat in record["timers"].items():
@@ -244,10 +255,14 @@ def run(args):
                 if saved and (record["adapter"] != saved["cases"][case]["adapter"] or
                               record["rhi_revision"] != saved["cases"][case]["rhi_revision"]):
                     raise ValueError("calibration adapter or RHI revision differs")
+                if saved and record.get("optix_version") != saved["cases"][case].get("optix_version"):
+                    raise ValueError("calibration OptiX version differs")
                 calibration["cases"][case] = {key: record[key] for key in ("elements", "batch", "adapter", "rhi_revision")}
                 calibration["cases"][case]["source_sha256"] = source["source_sha256"]
+                if "optix_version" in record:
+                    calibration["cases"][case]["optix_version"] = record["optix_version"]
                 if args.slangc:
-                    record["compile_runs"] = compile_case(Path(args.slangc).resolve(), case, config, source, output)
+                    record["compile_runs"] = compile_case(Path(args.slangc).resolve(), case, config, source, output, record)
                     if any(not r["ok"] or not r["got_timers"] for r in record["compile_runs"]):
                         raise ValueError("paired compile measurement failed")
             if record["status"] == "unsupported" and not config["allow_unsupported"]:
@@ -295,6 +310,8 @@ def compare_results(a, b):
             raise ValueError(f"{name}: missing correctness validation")
         if previous.get("scene") != current.get("scene"):
             raise ValueError(f"{name}: incompatible scene")
+        if previous.get("optix_version") != current.get("optix_version"):
+            raise ValueError(f"{name}: incompatible optix_version")
         for key in ("size", "elements", "width", "batch", "measurement_mode", "source_sha256", "adapter", "backend", "rhi_revision", "timestamp_frequency"):
             if previous[key] != current[key]:
                 raise ValueError(f"{name}: incompatible {key}")

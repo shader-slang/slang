@@ -151,8 +151,17 @@ Slang capability, rather than compiling a different default target.
 
 Three fixed cases run on Vulkan and D3D12: `rayquery_visibility` (terminate on
 first opaque hit), `rayquery_closest` (closest inline query), and
-`raytrace_pipeline` (raygen, closest-hit, and miss). CUDA coverage explicitly
-excludes these cases; there is no OptiX or software fallback.
+`raytrace_pipeline` (raygen, closest-hit, and miss). The same pipeline also runs
+on CUDA through OptiX 9.0. CUDA nightly coverage requires all 20 compute cases
+and this ray pipeline; inline ray queries remain unsupported on CUDA.
+
+Build with `-DSLANG_RHI_ENABLE_CUDA=ON -DSLANG_RHI_ENABLE_OPTIX=ON
+-DSLANG_RHI_OPTIX_VERSIONS=9_0`. The pinned RHI fetches the OptiX headers and the
+runner passes those same headers to NVRTC, without a separate SDK installation
+or environment variable. Paired CLI compilation reuses that include directory
+and the measured raygen PTX architecture. OptiX 9.0 support in the NVIDIA driver
+is required; missing support returns unsupported/exit 77, which fails required
+nightly coverage. There is no software fallback.
 
 The scene contains 2,048 opaque triangles in a 32-by-32 grid on two depth planes,
 with the farther triangles preceding the near triangles in primitive order. One
@@ -168,6 +177,17 @@ sampling and calibration, recorded as one `scene_setup_ms` host observation.
 boundaries still apply. Scene version/build flags are recorded and comparison
 rejects changed scene contracts. These are controlled traversal stability cases,
 not representative heavy material shaders or an acceleration-structure build benchmark.
+
+The actual OptiX API version is recorded and checked during calibration reuse,
+comparison and report/export grouping. Header paths are retained for paired
+compilation but are not comparison dimensions: separate compiler builds can
+have different build directories while using identical pinned headers.
+
+The minimal traversal case does not reproduce the Falcor Cornell CUDA slowdown
+between Slang 5311fe85 and 7036ae6d on the tested RTX 4090. That change forces
+shared vector-map loops to unroll and changes downstream inlining of a large
+material setup function. A representative material-shaped reproducer must be
+validated against that pair before claiming coverage of this regression.
 
 The pipeline archives code for all three entry points. Paired CLI compilation
 measures their shared source module; it is one compile module, not three

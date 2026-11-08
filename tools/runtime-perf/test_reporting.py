@@ -43,9 +43,10 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(delta, "—")
         self.assertIn("No previous", reason)
 
-    def test_cuda_excludes_only_raytracing(self):
+    def test_cuda_requires_pipeline_and_excludes_only_inline_queries(self):
         self.assertEqual(set(nightly.coverage("cuda")),
-                         {n for n, f in perf.workloads.CASES.items() if f != "raytracing"})
+                         {n for n, f in perf.workloads.CASES.items()
+                          if f != "raytracing" or n == "raytrace_pipeline"})
         self.assertEqual(set(nightly.coverage("d3d12")), set(perf.workloads.CASES))
 
     def test_empty_history_still_has_report(self):

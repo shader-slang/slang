@@ -32,10 +32,29 @@ set(SLANG_RHI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SLANG_RHI_BUILD_TESTS_WITH_GLFW OFF CACHE BOOL "" FORCE)
 set(SLANG_RHI_ENABLE_WGPU OFF CACHE BOOL "")
 set(SLANG_RHI_INSTALL OFF CACHE BOOL "" FORCE)
+set(SLANG_RHI_OPTIX_VERSIONS
+    "9_0"
+    CACHE STRING
+    "OptiX API versions built by the runtime runner"
+)
 add_subdirectory("${SLANG_RHI_SOURCE_DIR}" rhi)
 add_executable(slang-runtime-perf native/runner.cpp)
 target_compile_features(slang-runtime-perf PRIVATE cxx_std_17)
 target_link_libraries(slang-runtime-perf PRIVATE slang-rhi)
+# Use the same pinned headers and API version for NVRTC and the RHI backend.
+if(SLANG_RHI_ENABLE_OPTIX)
+    if(NOT "9_0" IN_LIST SLANG_RHI_OPTIX_VERSIONS)
+        message(
+            FATAL_ERROR
+            "The CUDA ray benchmark requires OptiX 9.0 in SLANG_RHI_OPTIX_VERSIONS"
+        )
+    endif()
+    target_compile_definitions(
+        slang-runtime-perf
+        PRIVATE
+            RUNTIME_PERF_OPTIX_HEADERS="${CMAKE_CURRENT_BINARY_DIR}/rhi/optix/9_0"
+    )
+endif()
 set_property(
     DIRECTORY
     APPEND

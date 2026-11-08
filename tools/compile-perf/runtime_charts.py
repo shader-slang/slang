@@ -34,7 +34,7 @@ def runtime_contract(event):
         policy=perf.policy(bundle["config"]),
         workload={key: case.get(key) for key in (
             "size", "source_sha256", "elements", "width", "batch", "measurement_mode", "adapter",
-            "backend", "rhi_revision", "timestamp_frequency", "scene")})
+            "backend", "rhi_revision", "timestamp_frequency", "scene", "optix_version")})
 
 
 def reference_contract(event):

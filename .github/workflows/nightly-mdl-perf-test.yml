@@ -261,7 +261,8 @@ jobs:
             -DSLANG_ROOT="$GITHUB_WORKSPACE/build/Release" \
             -DSLANG_INCLUDE_DIR="$GITHUB_WORKSPACE/include" \
             -DSLANG_RHI_ENABLE_VULKAN=ON -DSLANG_RHI_ENABLE_D3D12=ON \
-            -DSLANG_RHI_ENABLE_CUDA=ON -DSLANG_RHI_ENABLE_OPTIX=OFF
+            -DSLANG_RHI_ENABLE_CUDA=ON -DSLANG_RHI_ENABLE_OPTIX=ON \
+            -DSLANG_RHI_OPTIX_VERSIONS=9_0
           cmake --build build/runtime-perf-nightly --config Release --parallel 4
 
       - name: Collect runtime results for the same nightly

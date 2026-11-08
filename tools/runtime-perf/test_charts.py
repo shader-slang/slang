@@ -63,6 +63,14 @@ class ChartTests(unittest.TestCase):
             charts.measurement_graphs(events)
         self.assertEqual(graph.call_args_list[0].args[1][0][2], [10000, None, 10000])
 
+    def test_optix_changes_split_runtime_and_paired_compile_history(self):
+        first = self.event()
+        first['case'].update(workload='raytrace_pipeline', backend='cuda', optix_version=90000)
+        second = copy.deepcopy(first)
+        second['id'] = 'next'
+        second['case']['optix_version'] = 80100
+        self.assertEqual(len(charts.groups([first, second])), 2)
+
     def test_reference_graph_uses_its_matched_slang_not_full_suite_timing(self):
         event = self.event()
         event["references"] = dict(complete=True, measurement={"elements": 4194304}, environment={})

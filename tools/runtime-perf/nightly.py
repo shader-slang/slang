@@ -13,9 +13,9 @@ import perf
 
 
 def coverage(backend):
-    # OptiX is not part of the current suite. CUDA still requires every compute case.
+    # CUDA supports OptiX pipelines, but does not support inline ray queries.
     return [name for name, family in perf.workloads.CASES.items()
-            if backend != "cuda" or family != "raytracing"]
+            if backend != "cuda" or family != "raytracing" or name == "raytrace_pipeline"]
 
 
 def collect_references(args, output):
