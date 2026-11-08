@@ -3675,7 +3675,14 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
 /// Constant-buffer and parameter-block types are deliberately excluded. A cbuffer member such
 /// as `Value` in `cbuffer CB { float Value; }` is read through such a handle, and that read
 /// must stay a runtime value.
-static bool _isResourceHandleOnlyType(ASTBuilder* astBuilder, Type* type)
+///
+/// `activeTypes` holds the struct types currently being visited. A struct that contains itself
+/// by value, such as `struct R { Texture2D t; R r; }`, is invalid and is diagnosed elsewhere,
+/// so it does not qualify here.
+static bool _isResourceHandleOnlyTypeImpl(
+    ASTBuilder* astBuilder,
+    Type* type,
+    HashSet<Type*>& activeTypes)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
@@ -3683,25 +3690,45 @@ static bool _isResourceHandleOnlyType(ASTBuilder* astBuilder, Type* type)
         as<HLSLStructuredBufferTypeBase>(type) || as<UntypedBufferResourceType>(type))
         return true;
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return _isResourceHandleOnlyType(astBuilder, arrayType->getElementType());
+        return _isResourceHandleOnlyTypeImpl(astBuilder, arrayType->getElementType(), activeTypes);
     if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
         {
+            // Fields inherited from a base struct are not returned by `getFields`, so a
+            // struct with a base struct does not qualify.
+            if (findBaseStructType(astBuilder, structDeclRef))
+                return false;
+            if (!activeTypes.add(type))
+                return false;
             // Builtin scalar types such as `float` are structs with no fields in the core
             // module, so a struct must have at least one field to qualify.
             bool hasField = false;
+            bool allFieldsQualify = true;
             for (auto fieldDeclRef :
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
-                if (!_isResourceHandleOnlyType(astBuilder, getType(astBuilder, fieldDeclRef)))
-                    return false;
                 hasField = true;
+                if (!_isResourceHandleOnlyTypeImpl(
+                        astBuilder,
+                        getType(astBuilder, fieldDeclRef),
+                        activeTypes))
+                {
+                    allFieldsQualify = false;
+                    break;
+                }
             }
-            return hasField;
+            activeTypes.remove(type);
+            return hasField && allFieldsQualify;
         }
     }
     return false;
+}
+
+static bool _isResourceHandleOnlyType(ASTBuilder* astBuilder, Type* type)
+{
+    HashSet<Type*> activeTypes;
+    return _isResourceHandleOnlyTypeImpl(astBuilder, type, activeTypes);
 }
 
 /// Returns true if `expr` reads a resource or sampler handle out of a global shader parameter,
