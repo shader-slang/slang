@@ -816,6 +816,68 @@ static void unexportNonEmbeddableIR(IRModule* irModule, CodeGenTarget target)
     }
 }
 
+// Insert a `metalTextureFence` before and after every write to a texture that Metal declares
+// `access::read_write`.
+//
+// MSL makes a thread's write to an `access::read_write` texture visible to that thread's
+// later reads of the texture only after a `fence()` on it (MSL 4.1 section 6.13.17); HLSL,
+// SPIR-V and WGSL order these accesses implicitly. The fence after each write is that
+// specified requirement. The fence before each write is not in section 6.13.17: it keeps the
+// write from moving ahead of an earlier read of the same texel, a write-after-read failure that
+// Dawn observed on Apple M1 hardware while it already fenced after every write
+// (crbug.com/417296309).
+//
+// The pass sees every texture write because Metal texture stores in the core module lower to
+// `ImageStore` or to a texture atomic, never to an `__intrinsic_asm` string, and because it runs
+// after `legalizeImageSubscript` has turned a partial texel store such as `tex[p].x = 1` into a
+// read followed by an `ImageStore`. A write-only texture is emitted as `access::write`, which has
+// no `fence()` and cannot be read back.
+static void insertMetalTextureFences(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getModifiableChildren())
+            {
+                // Texture atomics other than loads also store to their texel, so they count as
+                // writes along with `ImageStore`.
+                IRInst* texture = nullptr;
+                IRImageSubscript* atomicSubscript = nullptr;
+                if (auto imageStore = as<IRImageStore>(inst))
+                    texture = imageStore->getImage();
+                else if (auto atomic = as<IRAtomicOperation>(inst);
+                         atomic && !as<IRAtomicLoad>(inst))
+                {
+                    atomicSubscript = getAtomicImageSubscript(atomic);
+                    if (atomicSubscript)
+                        texture = atomicSubscript->getImage();
+                }
+                if (!texture)
+                    continue;
+                auto textureType = as<IRTextureTypeBase>(texture->getDataType());
+                SLANG_RELEASE_ASSERT(textureType);
+                if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
+                    continue;
+
+                // A texture atomic is emitted together with its `ImageSubscript` address, so its
+                // leading fence goes before that address rather than between the two.
+                builder.setInsertBefore(atomicSubscript ? atomicSubscript : inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+
+                builder.setInsertAfter(inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+            }
+        }
+    }
+}
+
 // Add DenormPreserve and DenormFlushToZero decorations to all entry point functions
 static void addDenormalModeDecorations(IRModule* irModule, CodeGenContext* codeGenContext)
 {
@@ -2224,7 +2286,7 @@ Result linkAndOptimizeIR(
         // Depending on the target, we may decide to do
         // more aggressive translation that reduces the
         // load/store operations down to invididual scalars
-        // (splitting up vector ops).
+        // (splitting up vector and array ops).
         //
         switch (target)
         {
@@ -2233,8 +2295,9 @@ Result linkAndOptimizeIR(
             {
                 // We need to scalarize the loads on LLVM CPU targets, as
                 // ByteAddressBuffer loads & stores may only have an alignment
-                // of 4, meaning that vector loads / stores could be misaligned
-                // and cause crashes with SSE, AVX etc. SIMD instruction sets.
+                // of 4, meaning that vector or array loads / stores could be
+                // misaligned and cause crashes with SSE, AVX etc. SIMD
+                // instruction sets.
                 byteAddressBufferOptions.scalarizeVectorLoadStore = true;
             }
             break;
@@ -2481,7 +2544,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
-    // Legalize `ImageSubscript` loads.
+    // Legalize `ImageSubscript` loads and stores.
     switch (target)
     {
     case CodeGenTarget::MetalLibAssembly:
@@ -2492,6 +2555,11 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
         {
             SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
+
+            // On Metal, the texture fences go in afterwards,
+            // since the read-modify-writes that `legalizeImageSubscript` creates need them too.
+            if (isMetalTarget(targetRequest))
+                SLANG_PASS(insertMetalTextureFences);
         }
         break;
     default:

@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T13:38:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-03T12:00:00Z
 target_doc: glossary.md
 review_report: ../reviews/glossary.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 6
+  fixed: 8
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,33 +18,17 @@ actions:
 
 ## Summary
 
-All six findings were verified against source at
-`53b76e6d3009b8e6434d41573524c7ce5c499d23` and all six were fixed. The major
-item — the `syntax-decl` entry attributing `if`, `for`, `struct`, and `__init`
-to `core.meta.slang` — was confirmed wrong at the parser and rewritten around
-the actual split between direct lookaheads and the C++ `g_parseSyntaxEntries`
-table. The four minor items (`decoration`, `IRBuilder`, `mandatory optimization
-pass`, `no producer at HEAD`) and the entry-length nit were likewise confirmed
-and corrected. Nothing was rejected, deferred, or escalated; the page remains
-far under its 102,400-byte cap at 52,332 bytes.
+All eight findings were verified against the current source and fixed in the glossary with minimal edits. The front-matter digest and date were refreshed; source_commit is unchanged. F-007 was applied to the four named entries (capability atom, decl-ref, fossil format, target legalization driver); other entries were not audited for anchor count.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed in `source/slang/slang-parser.cpp`: `struct` is a `LookAheadToken` test in the type-specifier path, `if` and `for` are `LookAheadToken` tests in the statement parser, `__init` is a `_makeParseDecl` row in the C++ `g_parseSyntaxEntries` table, and `populateBaseLanguageModule` installs that table via `addBuiltinSyntaxImpl`. None of it comes from `core.meta.slang`. | `syntax-decl`: replaced the `core.meta.slang` attribution with the closed-grammar-lookahead versus `SyntaxParseInfo`-registration split and named `populateBaseLanguageModule`. |
-| F-002 | fixed | Confirmed in `source/slang/slang-ir-insts.lua`: the `Decoration` group contains `branch`, `loopControl`, `glslFragDepthGreater`, and `public`, whose `struct_name` values are `BranchDecoration`, `LoopControlDecoration`, `GLSLFragDepthGreaterDecoration`, and `PublicDecoration`. The suffix convention is on the wrapper, not the opcode. | `decoration`: replaced "(every opcode name ends in `Decoration`)" with a clause distinguishing wrapper naming from opcode naming, citing three counterexample opcodes. |
-| F-003 | fixed | Confirmed: `addHoistableInst` in `source/slang/slang-ir.cpp` only *starts* at `getModuleInst()` and then folds in each operand's parent and the result type's parent through `mergeCandidateParentsForHoistableInst`, so a dependent instruction lands in a deeper parent. | `IRBuilder`: changed "routes hoistable instructions to module scope automatically" to hoisting as far toward module scope as operand and result-type visibility permit, naming `addHoistableInst`. |
-| F-004 | fixed | Confirmed in `source/slang/slang-lower-to-ir.cpp`: `insertDebugValueStore` is guarded by `context->debugInfoLevel >= DebugInfoLevel::Standard`, and `simplifyCFG` / `peepholeOptimize` by `!minimumOptimizations` from `shouldPerformMinimumOptimizations()`; `invertLoops` is likewise conditional. "Runs unconditionally" contradicted the entry's own list. | `mandatory optimization pass`: redefined the term as the target-independent pre-link region, then separated its unconditional core from the three option-gated members and named their gates. |
-| F-005 | fixed | Confirmed volatile and unsupported: `docs/generated/design/ir-reference/index.md` is 161 lines at HEAD and states the column contract without enumerating which pages carry no-producer rows, so the glossary's "seven of the ten" count has no current source. | `no producer at HEAD`: dropped the page count and the "six differentiation opcodes" tally, pointing at `ir-reference/index.md` for the contract and the pages instead. |
-| F-006 | fixed | Confirmed against `docs/generated/design/_meta/prompts/glossary.md` lines 66-70, which require one short paragraph of 2-4 sentences per entry: `entry point` had five sentences, `lower-to-IR` one, `terminator instruction` six. | `entry point`: merged two sentences (now four). `lower-to-IR`: added a second sentence on the per-`TranslationUnitRequest` invocation. `terminator instruction`: merged the branch-argument and `yield` sentences and dropped the trailing catalog pointer already carried by the `See:` line (now four). |
-
-## Note for the operator: watched-path coverage
-
-Two facts this page now states are owned by files outside its `watched_paths`:
-`source/slang/slang-parser.cpp` (the `syntax-decl` lookahead/`g_parseSyntaxEntries`
-split, whose link was already on the page) and `source/slang/slang-ir.cpp` (the
-`addHoistableInst` hoisting rule; the entry still links only the watched
-`slang-ir.h`). No line numbers are cited for either, so nothing here will rot
-silently into a wrong line reference, but a change to those files will not mark
-the glossary stale. Adding both paths to the manifest entry would close the gap.
+| F-001 | fixed | docs/language-reference/glossary.md is absent; README.md line 3 says the reference moved to shader-slang/spec. | Conventions link now targets language-reference/README.md and notes the move. |
+| F-002 | fixed | source/slang/slang-ir.cpp lines 752-768 give argument access only for UnconditionalBranch and Loop; ifElse and switch have no destination args. | SSA, block parameter and terminator entries now name only unconditionalBranch and loop as argument-carrying. |
+| F-003 | fixed | slang-check-expr.cpp around line 4903 returns null for matrix operands in GLSL operator scope, so "never" is wrong. | Reworded as a fast path for supported operators with fallback to normal resolution; removed "never". |
+| F-004 | fixed | slang-check-conversion.cpp line 1656 takes one arg; slang-check-overload.cpp line 919 does the `conversionCostSum +=`. | Attributed summing to overload checking; helper described as adjusting one conversion. |
+| F-005 | fixed | source/standard-modules/CMakeLists.txt lines 54-64 add four module groups. | "Three exist" changed to "Four module groups exist". |
+| F-006 | fixed | Prompt requires alphabetical order; two entries were misplaced. | Moved standard module after specialization and link-time symbol alias before linkage. |
+| F-007 | fixed | Prompt allows one code anchor and 2-4 sentences per entry. | Trimmed the four named entries to one anchor each and shortened them. |
+| F-008 | fixed | Prompt forbids command-line options in the glossary. | Removed `-experimental-feature` and the E00104 spelling from standard module. |

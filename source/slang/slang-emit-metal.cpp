@@ -313,11 +313,6 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     }
 }
 
-static IRImageSubscript* isTextureAccess(IRInst* inst)
-{
-    return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
-}
-
 void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 {
     emitOperand(imageOperand, getInfo(EmitOp::Postfix));
@@ -335,49 +330,23 @@ void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
-    auto imageDataType = inst->getImage()->getDataType();
-    auto resourceType = as<IRResourceTypeBase>(imageDataType);
-
-    // If the image data type is a pointer, get the value type
-    if (!resourceType)
-    {
-        if (auto ptrType = as<IRPtrTypeBase>(imageDataType))
-        {
-            resourceType = as<IRResourceTypeBase>(ptrType->getValueType());
-        }
-    }
-
-    if (auto textureType = as<IRTextureType>(resourceType))
-    {
-        if (as<IRVectorType>(textureType->getElementType()))
-        {
-            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "atomic operation on non-scalar texture",
-                .location = inst->sourceLoc});
-        }
-    }
+    auto resourceType = getImageSubscriptResourceType(inst);
     bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
     {
+        // An array-texture subscript takes a vector coordinate whose last component is the array
+        // index.
+        auto coordType = as<IRVectorType>(inst->getCoord()->getDataType());
+        SLANG_RELEASE_ASSERT(coordType);
         emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
-        if (auto coordType = as<IRVectorType>(inst->getCoord()->getDataType()))
-        {
-            m_writer->emit(".");
-            const char* elements[] = {"x", "y", "z", "w"};
-            for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
-                m_writer->emit(elements[Math::Min(3, (int)i)]);
-            m_writer->emit(", ");
-            emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
-            m_writer->emit(".");
-            m_writer->emit(
-                elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
-        }
-        else
-        {
-            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "invalid image coordinate for atomic operation",
-                .location = inst->sourceLoc});
-        }
+        m_writer->emit(".");
+        const char* elements[] = {"x", "y", "z", "w"};
+        for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
+            m_writer->emit(elements[Math::Min(3, (int)i)]);
+        m_writer->emit(", ");
+        emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
+        m_writer->emit(".");
+        m_writer->emit(elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
     }
     else
     {
@@ -425,7 +394,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitInstResultDecl(inst);
         bool isImageOp = false;
-        if (auto imageSubscript = isTextureAccess(inst))
+        if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
         {
             emitImageOperandWithAccessor(imageSubscript->getImage());
             m_writer->emit(imageFunc);
@@ -450,12 +419,6 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(").x;\n");
         else
             m_writer->emit(");\n");
-    };
-    auto diagnoseFloatAtomic = [&]()
-    {
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "Unsupported floating point atomic operation",
-            .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {
@@ -488,12 +451,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicLoad:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_load(");
@@ -519,7 +479,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicStore:
         {
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_store(");
@@ -543,19 +503,13 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicExchange:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
             return true;
         }
     case kIROp_AtomicCompareExchange:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             bool isImageOp = false;
-            auto imageSubscript = isTextureAccess(inst);
+            auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst));
             isImageOp = (imageSubscript != nullptr);
 
             emitType(inst->getDataType(), getName(inst));
@@ -624,17 +578,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicMin:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
             return true;
         }
     case kIROp_AtomicMax:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
             return true;
         }
@@ -642,7 +590,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_fetch_add(");
@@ -670,7 +618,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_fetch_sub(");
@@ -713,17 +661,6 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_CoopMatMulAdd:
         {
             auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
-            if (auto satLit = as<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation()))
-            {
-                if (satLit->getValue())
-                {
-                    getSink()->diagnose(Diagnostics::Unimplemented{
-                        .feature = "saturating accumulation for Metal cooperative matrices "
-                                   "(simdgroup_matrix)",
-                        .location = inst->sourceLoc});
-                    return false;
-                }
-            }
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
             m_writer->emit("simdgroup_multiply_accumulate(");
@@ -1075,6 +1012,14 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MetalTextureFence:
+        {
+            ensurePrelude(kMetalBuiltinPreludeTextureFence);
+            m_writer->emit("_slang_textureFence(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MetalSetVertex:
         {
             auto setVertex = as<IRMetalSetVertex>(inst);
@@ -1297,32 +1242,6 @@ void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     emitType(type, name);
 }
 
-void MetalSourceEmitter::_validateCoopMatrixType(IRCoopMatrixType* coopType)
-{
-    auto rows = getIntVal(coopType->getRowCount());
-    auto cols = getIntVal(coopType->getColumnCount());
-    if (rows != 8 || cols != 8)
-    {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
-            .location = coopType->sourceLoc});
-    }
-    auto scope = getIntVal(coopType->getScope());
-    if (scope != (IRIntegerValue)MemoryScope::Subgroup)
-    {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "Metal cooperative matrices (simdgroup_matrix) only support Subgroup scope",
-            .location = coopType->sourceLoc});
-    }
-    auto elementType = coopType->getElementType();
-    if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
-    {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "Metal cooperative matrices only support half and float element types",
-            .location = coopType->sourceLoc});
-    }
-}
-
 void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
@@ -1495,7 +1414,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopMatrixType:
         {
             auto coopType = as<IRCoopMatrixType>(type);
-            _validateCoopMatrixType(coopType);
             // Metal's simdgroup_matrix<T, Cols, Rows> uses Cols, Rows order
             m_writer->emit("simdgroup_matrix<");
             emitType(coopType->getElementType());

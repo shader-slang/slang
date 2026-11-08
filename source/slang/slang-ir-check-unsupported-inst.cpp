@@ -426,8 +426,162 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
+// Return why MSL cannot express the floating-point atomic load, exchange, compare-exchange, min
+// or max `atomic`, or nullptr if it can. Other atomic operations, and atomics whose value is not
+// floating-point, also return nullptr. MSL has `atomic_float` load, exchange and compare-exchange
+// on device memory only (MSL 4.1 spec, section 6.16.4), no floating-point atomic min or max, and
+// integer-only texture atomics (section 6.13). For example, `Atomic<float>.load` through a device
+// pointer fits, but the same load on a `groupshared Atomic<float>` does not. Device memory means
+// the `Global` and `UserPointer` address spaces, which the Metal emitter prints as `device`.
+static const char* getUnsupportedMetalFloatAtomicReason(IRAtomicOperation* atomic)
+{
+    switch (atomic->getOp())
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        break;
+    default:
+        return nullptr;
+    }
+    auto valueType = atomic->getDataType();
+    if (!isFloatingType(valueType))
+        return nullptr;
+    if (atomic->getOp() == kIROp_AtomicMin || atomic->getOp() == kIROp_AtomicMax)
+        return "floating point atomic min or max";
+    if (valueType->getOp() != kIROp_FloatType)
+        return "floating point atomic operation on a type other than 32-bit float";
+    if (getAtomicImageSubscript(atomic))
+        return "floating point atomic operation on a texture";
+    auto destPtrType = cast<IRPtrTypeBase>(atomic->getPtr()->getDataType());
+    switch (destPtrType->getAddressSpace())
+    {
+    case AddressSpace::Global:
+    case AddressSpace::UserPointer:
+        return nullptr;
+    default:
+        return "floating point atomic operation outside device memory";
+    }
+}
+
+// Diagnose an atomic operation on the texture element `subscript` that MSL cannot express. The
+// MSL texture atomic members operate on one scalar texel, so a texture with a vector element type
+// has none. An array texture takes its array index from the last component of the coordinate, so
+// that coordinate must be a vector. Both diagnostics point at `subscript`, the texture access in
+// the user's code.
+static void checkUnsupportedMetalTextureAtomic(IRImageSubscript* subscript, DiagnosticSink* sink)
+{
+    auto resourceType = getImageSubscriptResourceType(subscript);
+    if (auto textureType = as<IRTextureType>(resourceType))
+    {
+        if (as<IRVectorType>(textureType->getElementType()))
+        {
+            sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "atomic operation on non-scalar texture",
+                .location = subscript->sourceLoc});
+        }
+    }
+    if (resourceType && getIntVal(resourceType->getIsArrayInst()) != 0 &&
+        !as<IRVectorType>(subscript->getCoord()->getDataType()))
+    {
+        sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "invalid image coordinate for atomic operation",
+            .location = subscript->sourceLoc});
+    }
+}
+
+// Diagnose a cooperative matrix type that the Metal emitter cannot express. The emitter writes a
+// cooperative matrix as a `simdgroup_matrix`, which it supports only as an 8x8 matrix of `half` or
+// `float` with subgroup scope.
+static void checkUnsupportedMetalCoopMatrixType(IRCoopMatrixType* coopType, DiagnosticSink* sink)
+{
+    auto rows = getIntVal(coopType->getRowCount());
+    auto cols = getIntVal(coopType->getColumnCount());
+    if (rows != 8 || cols != 8)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
+            .location = coopType->sourceLoc});
+    }
+    auto scope = getIntVal(coopType->getScope());
+    if (scope != (IRIntegerValue)MemoryScope::Subgroup)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support Subgroup scope",
+            .location = coopType->sourceLoc});
+    }
+    auto elementType = coopType->getElementType();
+    if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices only support half and float element types",
+            .location = coopType->sourceLoc});
+    }
+}
+
+// Diagnose a cooperative matrix multiply-add that requests saturating accumulation, which the
+// Metal emitter's `simdgroup_multiply_accumulate` cannot express.
+static void checkUnsupportedMetalCoopMatMulAdd(IRCoopMatMulAdd* mulAdd, DiagnosticSink* sink)
+{
+    auto saturatingLit = as<IRBoolLit>(mulAdd->getSaturatingAccumulation());
+    if (saturatingLit && saturatingLit->getValue())
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "saturating accumulation for Metal cooperative matrices (simdgroup_matrix)",
+            .location = mulAdd->sourceLoc});
+    }
+}
+
+// Diagnose the instructions in `module` that the Metal emitter cannot express: unsupported atomic
+// operations, cooperative matrix types, and saturating cooperative matrix multiply-adds. We visit
+// only top-level functions because those are the bodies that the Metal emitter emits: a generic
+// that remains at this point is not emitted, and its body can still hold pointers whose address
+// space was never specialized. Cooperative matrix types are hoisted, deduplicated global
+// instructions, so each one is checked once.
+static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto coopType = as<IRCoopMatrixType>(globalInst))
+        {
+            checkUnsupportedMetalCoopMatrixType(coopType, sink);
+            continue;
+        }
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (auto mulAdd = as<IRCoopMatMulAdd>(inst))
+                {
+                    checkUnsupportedMetalCoopMatMulAdd(mulAdd, sink);
+                    continue;
+                }
+                auto atomic = as<IRAtomicOperation>(inst);
+                if (!atomic)
+                    continue;
+                if (auto reason = getUnsupportedMetalFloatAtomicReason(atomic))
+                {
+                    sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                        .operation = reason,
+                        .location = atomic->sourceLoc});
+                }
+                if (auto subscript = getAtomicImageSubscript(atomic))
+                    checkUnsupportedMetalTextureAtomic(subscript, sink);
+            }
+        }
+    }
+}
+
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
+    if (isMetalTarget(target))
+        checkUnsupportedMetalInsts(module, sink);
+
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
     const bool supportsMultisampledTexture = !isCUDATarget(target);
