@@ -5,6 +5,8 @@
 // on these targets. `RWByteAddressBuffer` stores `uint` words, so its
 // `InterlockedCompareExchangeFloatBitwise` method compiles; see
 // tests/hlsl-intrinsic/atomic/byte-address-buffer-float-bitwise-cas.slang.
+// The check is part of `checkUnsupportedInst`, which `-minimum-slang-optimization` skips, so this
+// test has no minimum-optimization line.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -emit-spirv-via-glsl -entry computeMain -stage compute

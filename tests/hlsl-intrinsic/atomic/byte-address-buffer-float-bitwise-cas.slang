@@ -2,7 +2,8 @@
 // `InterlockedCompareStoreFloatBitwise` compare the stored bits with the bits of the comparand.
 // The buffer stores `uint` words, so SPIR-V, GLSL and CUDA run an integer compare-exchange on the
 // word and reinterpret the values. A stored -0.0 does not match a +0.0 comparand, although the
-// two compare equal as floats.
+// two compare equal as floats. The minimum-optimization line checks that the `uint` lowering is
+// valid without the optimizer.
 
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-directly -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-via-glsl -compute -shaderobj -output-using-type
@@ -43,6 +44,7 @@ void computeMain()
     outputBuffer[5] = buffer.Load(12);
 }
 
+// 1065353216 is 1.0f, 2147483648 is -0.0f and 1077936128 is 3.0f.
 // BUF: 0
 // BUF-NEXT: 1065353216
 // BUF-NEXT: 2147483648
