@@ -1044,9 +1044,12 @@ struct ShaderInputLayoutParser
         for (auto& line : lines)
         {
             lineNum++;
-            if (!line.startsWith("//"))
+            // Allow indentation before the directive, as slang-test does for `//TEST`, so
+            // that a `//TEST_INPUT:` placed next to an entry-point parameter is not skipped.
+            UnownedStringSlice directive = line.getUnownedSlice().trimStart();
+            if (!directive.startsWith("//"))
                 continue;
-            line = line.getUnownedSlice().tail(2).trim();
+            line = directive.tail(2).trim();
             if (line.startsWith("TEST_INPUT:"))
             {
                 auto lineContent = line.subString(11, line.getLength() - 11);
