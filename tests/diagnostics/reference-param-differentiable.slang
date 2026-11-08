@@ -9,6 +9,8 @@
 // against it. Naming a function without an attribute in `fwd_diff` or `bwd_diff` reports the
 // missing derivative, as it does for a function without a reference parameter. A function that is
 // neither differentiated nor given a derivative may take one.
+// `reference-param-func-extension.slang` covers the derivatives that a `__func_extension`
+// declares.
 //
 // Before, backward differentiation of a caller of a user-defined backward derivative with a
 // reference parameter could fail SPIR-V validation or report an internal compiler error, because
@@ -168,6 +170,36 @@ void backwardDerivativeOfNamed(__ref float a, inout DifferentialPair<float> x, f
     x = diffPair(x.p, a * dOut);
 }
 
+[ForwardDerivative(groupSharedForwardDerivativeOfNamed)]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^^ this requests a derivative; remove it if the function needs none
+*/
+float groupSharedForwardDerivativeNamed(uint tid, groupshared float s[N], float x)
+//CHECK:                                                            ^ error E38038
+{
+    return s[tid] * x;
+}
+
+DifferentialPair<float> groupSharedForwardDerivativeOfNamed(uint tid, no_diff float s[N], DifferentialPair<float> x)
+{
+    return diffPair(s[tid] * x.p, s[tid] * x.d);
+}
+
+[BackwardDerivative(groupSharedBackwardDerivativeOfNamed)]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^^^ this requests a derivative; remove it if the function needs none
+*/
+float groupSharedBackwardDerivativeNamed(uint tid, groupshared float s[N], float x)
+//CHECK:                                                             ^ error E38038
+{
+    return s[tid] * x;
+}
+
+void groupSharedBackwardDerivativeOfNamed(uint tid, no_diff float s[N], inout DifferentialPair<float> x, float dOut)
+{
+    x = diffPair(x.p, s[tid] * dOut);
+}
+
 [TreatAsDifferentiable]
 /*CHECK:
  ^^^^^^^^^^^^^^^^^^^^^ this requests a derivative; remove it if the function needs none
@@ -231,6 +263,21 @@ void byValueDerivativeOf(no_diff float a, inout DifferentialPair<float> x, float
     x = diffPair(x.p, a * dOut);
 }
 
+float groupSharedByValueDerivativePrimal(uint tid, groupshared float s[N], float x)
+//CHECK:                                                             ^ error E38038
+{
+    return s[tid] * x;
+}
+
+[ForwardDerivativeOf(groupSharedByValueDerivativePrimal)]
+/*CHECK:
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ a user-defined derivative is declared for it here
+*/
+DifferentialPair<float> groupSharedByValueDerivativeOf(uint tid, no_diff float s[N], DifferentialPair<float> x)
+{
+    return diffPair(s[tid] * x.p, s[tid] * x.d);
+}
+
 // --- Rejected: an interface requirement and a method ---
 
 interface IScale
@@ -268,6 +315,30 @@ float backwardDifferentiated(__ref float a, float x)
     return a * x;
 }
 
+// --- Differentiable callers of rejected functions ---
+
+// A call to a function that was rejected at its declaration adds no error, whether the function
+// has an attribute or a `...DerivativeOf` attribute names it.
+[Differentiable]
+float callRefParam(float x)
+{
+    float a = 1.0;
+    return refParam(a, x);
+}
+
+[Differentiable]
+float callForwardPrimal(float x)
+{
+    float a = 1.0;
+    return forwardPrimal(a, x);
+}
+
+[Differentiable]
+float callGroupSharedByValueDerivativePrimal(uint tid, float x)
+{
+    return groupSharedByValueDerivativePrimal(tid, sharedFloats, x);
+}
+
 // --- Accepted: a function that is not differentiable ---
 
 float notDifferentiable(__ref float a, groupshared float s[N], uint tid)
@@ -303,10 +374,39 @@ void computeMain(uint3 tid : SV_GroupThreadID)
     ^^^^^^^^ error E30027
     ^^^^^^^^ 'fwd_diff' is not a member of 'forwardPrimal'.
 */
+    bwd_diff(forwardPrimal)(a, x, 1.0);
+/*CHECK:
+    ^^^^^^^^ error E30027
+    ^^^^^^^^ 'bwd_diff' is not a member of 'forwardPrimal'.
+*/
+    fwd_diff(byValueDerivativePrimal)(a, diffPair(1.0, 1.0));
+/*CHECK:
+    ^^^^^^^^ error E30027
+    ^^^^^^^^ 'fwd_diff' is not a member of 'byValueDerivativePrimal'.
+*/
+    bwd_diff(byValueDerivativePrimal)(a, x, 1.0);
+/*CHECK:
+    ^^^^^^^^ error E30027
+    ^^^^^^^^ 'bwd_diff' is not a member of 'byValueDerivativePrimal'.
+*/
+    fwd_diff(groupSharedByValueDerivativePrimal)(tid.x, sharedFloats, diffPair(1.0, 1.0));
+/*CHECK:
+    ^^^^^^^^ error E30027
+    ^^^^^^^^ 'fwd_diff' is not a member of 'groupSharedByValueDerivativePrimal'.
+*/
+
 
     // A function with a differentiability attribute is already reported at its declaration, with
     // a note at the attribute, so naming it in `fwd_diff` or `bwd_diff` adds neither a second
-    // error nor a note here. The test is exhaustive, so either would fail it.
+    // error nor a note here, and neither does differentiating a caller of a rejected function. The
+    // test is exhaustive, so either would fail it.
     fwd_diff(refParam)(a, diffPair(1.0, 1.0));
     bwd_diff(refParam)(a, x, 1.0);
+    fwd_diff(groupSharedParam)(tid.x, sharedFloats);
+    bwd_diff(groupSharedParam)(tid.x, sharedFloats, 1.0);
+    fwd_diff(groupSharedForwardDerivativeNamed)(tid.x, sharedFloats, diffPair(1.0, 1.0));
+    bwd_diff(groupSharedBackwardDerivativeNamed)(tid.x, sharedFloats, x, 1.0);
+    fwd_diff(callRefParam)(diffPair(1.0, 1.0));
+    bwd_diff(callForwardPrimal)(x, 1.0);
+    bwd_diff(callGroupSharedByValueDerivativePrimal)(tid.x, x, 1.0);
 }

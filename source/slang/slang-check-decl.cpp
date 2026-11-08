@@ -17508,6 +17508,28 @@ void SemanticsDeclBasesVisitor::_funcExtensionApply(
     }
 }
 
+// Report each reference parameter of `primalFuncDecl` as a reason that it cannot be
+// differentiated, with a note at `derivativeLoc`, where a user-defined derivative names it as its
+// primal. A primal with a differentiability attribute has already been reported at that
+// attribute by `checkDifferentiableCallableSignature`, so we report nothing for it.
+//
+static void diagnoseReferenceParametersOfPrimal(
+    DiagnosticSink* sink,
+    CallableDecl* primalFuncDecl,
+    SourceLoc derivativeLoc)
+{
+    if (primalFuncDecl->findModifier<DifferentiableAttribute>())
+        return;
+    for (auto paramDecl : primalFuncDecl->getParameters())
+    {
+        if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            sink->diagnose(Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                .func = primalFuncDecl,
+                .param = paramDecl,
+                .derivativeOfLocation = derivativeLoc});
+    }
+}
+
 static void _moveModifiersToFunc(Decl* src, Decl* dst)
 {
     Modifier** link = &src->modifiers.first;
@@ -17681,8 +17703,29 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     // conformance or synthesized members that depend on the invalid signature.
     extensionDecl->addMember(innerFunc);
 
-    // Dispatch to the appropriate helper based on the higher-order expression type.
-    if (isForwardDiff)
+    // A function with a reference parameter cannot be differentiated. Consider this example:
+    //
+    //     float scale(__ref float a, float x) { return a * x; }
+    //
+    //     __func_extension bwd_diff(scale)(__ref float a, inout DifferentialPair<float> x,
+    //                                      float dOut) -> void { ... }
+    //
+    // Like a `[BackwardDerivativeOf(scale)]` attribute, the extension tries to give `scale` a
+    // derivative, so we report the error here, with a note where the extension names `scale`,
+    // unless an attribute on `scale` already reported it. In either case we then leave only the
+    // ownership shell, as for an invalid signature, so `scale` gets no derivative. The conformance
+    // and members that the helpers below add would otherwise be built from a derivative signature
+    // that drops the derivative of `a`, as `BwdDiffFuncType` explains. For `bwd_diff` and
+    // `__apply` they would also use a `BwdCallableFuncType`, which gives `a` an error type without
+    // a diagnostic, and lowering that to IR is an internal compiler error.
+    //
+    // Otherwise, we dispatch to the helper for the kind of higher-order expression.
+    //
+    auto primalFuncDecl = as<CallableDecl>(baseFuncDeclRef.getDecl());
+    SLANG_ASSERT(primalFuncDecl);
+    if (hasReferenceParameter(primalFuncDecl))
+        diagnoseReferenceParametersOfPrimal(getSink(), primalFuncDecl, diffExpr->baseFunction->loc);
+    else if (isForwardDiff)
         _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (isBackwardDiff)
         _funcExtensionBackwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
@@ -20907,19 +20950,10 @@ void checkDerivativeOfAttributeImpl(
     //
     if constexpr (!std::is_same_v<TDerivativeAttr, PrimalSubstituteAttribute>)
     {
-        if (hasReferenceParameter(primalFuncDecl) &&
-            !primalFuncDecl->findModifier<DifferentiableAttribute>())
-        {
-            for (auto paramDecl : primalFuncDecl->getParameters())
-            {
-                if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
-                    visitor->getSink()->diagnose(
-                        Diagnostics::ReferenceParameterOfDifferentiableFunction{
-                            .func = primalFuncDecl,
-                            .param = paramDecl,
-                            .derivativeOfLocation = higherOrderFuncExpr->loc});
-            }
-        }
+        diagnoseReferenceParametersOfPrimal(
+            visitor->getSink(),
+            primalFuncDecl,
+            higherOrderFuncExpr->loc);
     }
 
     if (auto existingModifier = _findModifier<TDerivativeAttr>(primalFuncDecl))

@@ -6073,7 +6073,13 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
         case ParamPassingMode::RefWriteOnly:
             {
                 // The derivative takes a reference parameter of the primal as is, with the same
-                // access, and does not differentiate the storage it refers to.
+                // access, and treats the storage it refers to as non-differentiable. As
+                // `BwdDiffFuncType::_resolveImplOverride` explains, that is not a correct
+                // derivative when the referenced type is differentiable, but no function with a
+                // reference parameter is ever differentiated, and semantic checking still needs
+                // the signature to resolve expressions like `bwd_diff(scale)`.
+                //
+                // TODO: Differentiate the storage that a reference parameter refers to.
                 //
                 paramTypes.add(getParamTypeWithModeWrapper(
                     m_astBuilder,
