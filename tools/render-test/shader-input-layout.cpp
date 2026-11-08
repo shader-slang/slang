@@ -1044,16 +1044,18 @@ struct ShaderInputLayoutParser
         for (auto& line : lines)
         {
             lineNum++;
-            // We accept the same comment prefixes as slang-test's `//TEST` scan, so an
-            // indented `//TEST_INPUT:` (e.g. next to an entry-point parameter) or a
-            // `///TEST_INPUT:` is a directive rather than being silently dropped.
-            UnownedStringSlice directive = line.getUnownedSlice().trimStart();
-            if (!directive.startsWith("//"))
+            // A directive line is optional spaces or tabs, `//`, any further `/`, then
+            // `TEST_INPUT:` after optional spaces or tabs. This is the prefix rule of the
+            // `//TEST` scan in slang-test's `_gatherTestsForFile`; a line the two scans
+            // disagree on is skipped here without a diagnostic. Slashes are skipped only
+            // before the spaces, so `// //TEST_INPUT:` stays an ordinary comment.
+            UnownedStringSlice commentText = line.getUnownedSlice().trimStart();
+            if (!commentText.startsWith("//"))
                 continue;
-            directive = directive.tail(2);
-            while (directive.startsWith("/"))
-                directive = directive.tail(1);
-            line = directive.trim();
+            commentText = commentText.tail(2);
+            while (commentText.startsWith("/"))
+                commentText = commentText.tail(1);
+            line = commentText.trim();
             if (line.startsWith("TEST_INPUT:"))
             {
                 auto lineContent = line.subString(11, line.getLength() - 11);
