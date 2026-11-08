@@ -12863,7 +12863,8 @@ $}
 /// @remarks When targeting HLSL, a call to this function with `T` being `float` will translate to a call to
 /// `InterlockedCompareExchangeFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`. SPIR-V and GLSL define
+/// compare-exchange only for integers, so a floating-point `T` is not supported on those targets.
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
@@ -12888,7 +12889,10 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
 /// @remarks When targeting HLSL, a call to this function will translate to a call to
 /// `InterlockedCompareExchangeFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V and GLSL, this function is not supported for a floating-point `dest`, because those
+/// targets define compare-exchange only for integers.
+/// `RWByteAddressBuffer.InterlockedCompareExchangeFloatBitwise` performs the same bitwise
+/// compare-exchange on buffer memory.
 ///
 /// On Metal, `dest` must be in device memory, such as a `RWStructuredBuffer` element or a device
 /// pointer, not a texture, a `RWBuffer` or `groupshared` memory.
@@ -12916,7 +12920,8 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 /// @remarks When targeting HLSL, a call to this function with `T` being `float` will translate to a call to
 /// `InterlockedCompareStoreFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`. SPIR-V and GLSL define
+/// compare-exchange only for integers, so a floating-point `T` is not supported on those targets.
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
@@ -12947,7 +12952,10 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
 /// @remarks When targeting HLSL, a call to this function will translate to a call to
 /// `InterlockedCompareStoreFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V and GLSL, this function is not supported for a floating-point `dest`, because those
+/// targets define compare-exchange only for integers.
+/// `RWByteAddressBuffer.InterlockedCompareStoreFloatBitwise` performs the same bitwise
+/// compare-exchange on buffer memory.
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
