@@ -5022,6 +5022,28 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         }
     }
 
+    // A scalar `bool` left operand of a builtin shift is promoted to `int`, so `b << n` has type
+    // `int`. We promote it here rather than leaving the conversion to overload resolution because
+    // `bool` conforms to `ILogical`: its subtype witness costs less than the bool-to-int argument
+    // conversion of the builtin integer shift, so resolution alone would pick the generic
+    // `ILogical` shift and produce a `bool`.
+    if (isShift)
+    {
+        auto leftBasicType = as<BasicExpressionType>(leftArg->type.type);
+        Type* rightElementType = rightArg->type.type;
+        if (auto rightVecType = as<VectorExpressionType>(rightElementType))
+            rightElementType = rightVecType->getElementType();
+        else if (auto rightMatType = as<MatrixExpressionType>(rightElementType))
+            rightElementType = rightMatType->getElementType();
+        if (leftBasicType && leftBasicType->getBaseType() == BaseType::Bool &&
+            classifyBuiltinArithmeticElementType(rightElementType).isKnown())
+        {
+            leftArg =
+                coerce(CoercionSite::Argument, m_astBuilder->getIntType(), leftArg, getSink());
+            expr->arguments[0] = leftArg;
+        }
+    }
+
     // Shift operators do not promote to a common type: `a << b` keeps the type of `a` (the
     // shift amount `b` is converted independently). That asymmetry is not modeled by the
     // common-type rule, so leave mixed-type shifts to overload resolution.
