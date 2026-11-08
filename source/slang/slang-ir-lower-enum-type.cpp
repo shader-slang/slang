@@ -149,6 +149,106 @@ struct EnumTypeLoweringContext
         }
     }
 
+    // Rewrite every `Lsh`/`Rsh` typed by `enumType`, for an enum whose tag type is `bool`, into
+    // `bool(int(x) << n)`. Consider `enum Mode : bool { Off, On }` and `m >> 1`: the core module's
+    // `__EnumType` shift intrinsics and the synthesized `shl`/`shr` produce `Rsh` on the enum, and
+    // the type swap in `processModule` would turn that into `Rsh` on `bool`, which no target can
+    // shift. We round-trip through `int` here, the same way `bool.shl`/`bool.shr` do in the core
+    // module, so a `bool`-tagged enum shifts like its tag type.
+    //
+    // The synthesized `shl`/`shr` witnesses of such an enum are body-less `intrinsicOp(Lsh/Rsh)`
+    // functions. A direct call is already an `Lsh`/`Rsh` inst here, but a call through a generic
+    // `T : ILogical` is only turned into one after specialization, when the enum type is gone, so
+    // we give those witnesses an equivalent body instead.
+    void lowerBoolTagShifts(IRInst* enumType)
+    {
+        // A shift's type may be rate-qualified (`@ConstExpr` for `Mode.Off << 1`), in which case
+        // its type operand is the rate-qualified type rather than `enumType`, so we search the
+        // module instead of walking the uses of `enumType`.
+        List<IRInst*> shifts;
+        List<IRFunc*> witnesses;
+        collectBoolTagShifts(module->getModuleInst(), enumType, shifts, witnesses);
+        for (auto shift : shifts)
+        {
+            IRBuilder builder(shift);
+            builder.setInsertBefore(shift);
+            auto result = emitBoolTagShift(
+                builder,
+                shift->getOp(),
+                shift->getRate(),
+                (IRType*)enumType,
+                shift->getOperand(0),
+                shift->getOperand(1));
+            shift->replaceUsesWith(result);
+            shift->removeAndDeallocate();
+        }
+        for (auto func : witnesses)
+        {
+            auto intrinsicOp = func->findDecoration<IRIntrinsicOpDecoration>();
+            auto funcType = as<IRFuncType>(func->getDataType());
+            SLANG_RELEASE_ASSERT(funcType && funcType->getParamCount() == 2);
+            IRBuilder builder(func);
+            builder.setInsertInto(func);
+            builder.emitBlock();
+            auto value = builder.emitParam(funcType->getParamType(0));
+            auto amount = builder.emitParam(funcType->getParamType(1));
+            builder.emitReturn(emitBoolTagShift(
+                builder,
+                intrinsicOp->getIntrinsicOp(),
+                nullptr,
+                (IRType*)enumType,
+                value,
+                amount));
+            intrinsicOp->removeAndDeallocate();
+        }
+    }
+
+    // Collect, under `inst`, the `Lsh`/`Rsh` insts whose data type is `enumType` and the
+    // body-less `intrinsicOp(Lsh/Rsh)` functions that return `enumType`.
+    void collectBoolTagShifts(
+        IRInst* inst,
+        IRInst* enumType,
+        List<IRInst*>& shifts,
+        List<IRFunc*>& witnesses)
+    {
+        if ((inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh) &&
+            inst->getDataType() == enumType)
+            shifts.add(inst);
+        if (auto func = as<IRFunc>(inst); func && !func->getFirstBlock())
+        {
+            auto intrinsicOp = func->findDecoration<IRIntrinsicOpDecoration>();
+            if (intrinsicOp && func->getResultType() == enumType &&
+                (intrinsicOp->getIntrinsicOp() == kIROp_Lsh ||
+                 intrinsicOp->getIntrinsicOp() == kIROp_Rsh))
+                witnesses.add(func);
+        }
+        for (auto child : inst->getChildren())
+            collectBoolTagShifts(child, enumType, shifts, witnesses);
+    }
+
+    // Emit `enumType(int(value) OP amount)`, where `OP` is `Lsh` or `Rsh`, with every result
+    // qualified by `rate` when it is non-null.
+    IRInst* emitBoolTagShift(
+        IRBuilder& builder,
+        IROp op,
+        IRRate* rate,
+        IRType* enumType,
+        IRInst* value,
+        IRInst* amount)
+    {
+        IRType* intType = builder.getIntType();
+        IRType* resultType = enumType;
+        if (rate)
+        {
+            intType = builder.getRateQualifiedType(rate, intType);
+            resultType = builder.getRateQualifiedType(rate, resultType);
+        }
+        auto intValue = builder.emitIntrinsicInst(intType, kIROp_IntCast, 1, &value);
+        auto intResult = op == kIROp_Lsh ? builder.emitShl(intType, intValue, amount)
+                                         : builder.emitShr(intType, intValue, amount);
+        return builder.emitIntrinsicInst(resultType, kIROp_IntCast, 1, &intResult);
+    }
+
     void processInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -191,7 +291,10 @@ struct EnumTypeLoweringContext
             // `IRBoolLit`; the type-operand swap alone would leave a non-canonical `IRIntLit`
             // of `bool` type (see canonicalizeBoolTagConstants).
             if (value->loweredType->getOp() == kIROp_BoolType)
+            {
                 canonicalizeBoolTagConstants(key);
+                lowerBoolTagShifts(key);
+            }
             key->replaceUsesWith(value->loweredType);
         }
     }
