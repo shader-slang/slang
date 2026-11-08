@@ -3342,6 +3342,15 @@ private:
                     layout);
                 if (flattenedStruct != structType)
                 {
+                    // A struct shared with the vertex stage carries `invariant` from its output
+                    // fields, but the qualifier is only valid on outputs.
+                    for (auto field : flattenedStruct->getFields())
+                    {
+                        if (auto invariant =
+                                field->getKey()->findDecoration<IRInvariantDecoration>())
+                            invariant->removeAndDeallocate();
+                    }
+
                     // Replace the 'old IRParam type' with a 'new IRParam type'
                     param->setFullType(flattenedStruct);
 

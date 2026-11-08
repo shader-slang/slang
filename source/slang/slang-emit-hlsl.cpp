@@ -2235,15 +2235,17 @@ static bool doesHLSLSemanticAcceptIndex(UnownedStringSlice semanticName)
 
 void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
+    // HLSL has no equivalent of `invariant`, so the qualifier is dropped. The check comes before
+    // the semantic lookup because an entry point return value gets its semantic from the layout.
+    if (inst->findDecoration<IRInvariantDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::InvariantQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = inst->sourceLoc});
+    }
+
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {
-        // HLSL has no equivalent of `invariant`, so the qualifier is dropped.
-        if (inst->findDecoration<IRInvariantDecoration>())
-        {
-            getSink()->diagnose(Diagnostics::InvariantQualifierUnsupportedOnTarget{
-                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
-                .location = inst->sourceLoc});
-        }
         m_writer->emit(" : ");
         auto semanticName = semanticDecoration->getSemanticName();
         m_writer->emit(semanticName);
