@@ -1,13 +1,13 @@
 //TEST_IGNORE_FILE:
 
 // Derivatives for functions with reference parameters from other modules, for
-// `reference-derivative-library.slang`. Each derivative is rejected, so this module fails to
+// `derivative-library.slang`. Each derivative is rejected, so this module fails to
 // compile.
 
-module "cross-module-reference-derivative";
+module "cross-module-derivative";
 
-import "cross-module-reference-primal";
-__exported import "cross-module-exported-reference-primal";
+import "cross-module-primal";
+__exported import "cross-module-exported-primal";
 
 [ForwardDerivativeOf(referenceForwardPrimal)]
 public DifferentialPair<float> referenceForwardDerivative(float a, DifferentialPair<float> x)

@@ -1,10 +1,10 @@
 //TEST_IGNORE_FILE:
 
 // Functions with reference parameters declared together with `__func_extension` derivatives, for
-// `func-extension-reference-library.slang`. Each extension is rejected, so this module fails to
+// `func-extension-library.slang`. Each extension is rejected, so this module fails to
 // compile.
 
-module "cross-module-reference-extension-library";
+module "cross-module-extension-library";
 
 public float referenceForwardExtended(__ref float a, float x) { return a * x * x; }
 

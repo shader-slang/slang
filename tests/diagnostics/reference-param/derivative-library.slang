@@ -4,13 +4,13 @@
 // from another module is rejected, whether it imports that module with a plain or an
 // `__exported import`, and importing it then fails. The error is located at the function's
 // reference parameter in the module that declares the function, and its note at the attribute.
-// `func-extension-reference-derivative-library.slang` covers the derivatives that a
+// `func-extension-derivative-library.slang` covers the derivatives that a
 // `__func_extension` declares.
 
-import "cross-module-reference-derivative";
+import "cross-module-derivative";
 /*CHECK:
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ error E39999
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ import of module 'cross-module-reference-derivative' failed because of a compilation error
+       ^^^^^^^^^^^^^^^^^^^^^^^^^ error E39999
+       ^^^^^^^^^^^^^^^^^^^^^^^^^ import of module 'cross-module-derivative' failed because of a compilation error
 */
 
 RWStructuredBuffer<float> outputBuffer;

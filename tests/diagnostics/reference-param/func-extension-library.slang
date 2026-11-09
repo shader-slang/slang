@@ -1,15 +1,15 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
-// A module that declares a `__func_extension` derivative for a function with a reference
-// parameter from another module is rejected, whether it imports that module with a plain or an
-// `__exported import`, and importing it then fails, as for the attributes in
-// `reference-derivative-library.slang`. The error is located at the function's reference
-// parameter in the module that declares the function, and its note at the extension.
+// A module that declares `__func_extension` derivatives for functions with reference parameters
+// is rejected in the same way when another module imports it as when it is compiled on its own,
+// and the import then fails, as for the attributes in `library.slang`. Each extension
+// is rejected at the function's reference parameter, with a note that the extension declares a
+// derivative.
 
-import "cross-module-reference-extension-derivative";
+import "cross-module-extension-library";
 /*CHECK:
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ error E39999
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ import of module 'cross-module-reference-extension-derivative' failed because of a compilation error
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ error E39999
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ import of module 'cross-module-extension-library' failed because of a compilation error
 */
 
 RWStructuredBuffer<float> outputBuffer;
@@ -26,12 +26,14 @@ void computeMain()
 //
 //CHECK: 'referenceForwardExtended' cannot be differentiated, because parameter 'a' is passed by reference
 //CHECK: a user-defined derivative is declared for it here
+//CHECK: 'groupSharedForwardExtended' cannot be differentiated, because parameter 'a' is passed by reference
+//CHECK: a user-defined derivative is declared for it here
+//CHECK: 'referenceBackwardExtended' cannot be differentiated, because parameter 'a' is passed by reference
+//CHECK: a user-defined derivative is declared for it here
 //CHECK: 'groupSharedBackwardExtended' cannot be differentiated, because parameter 'a' is passed by reference
 //CHECK: a user-defined derivative is declared for it here
 //CHECK: 'referenceApplyExtended' cannot be differentiated, because parameter 'a' is passed by reference
 //CHECK: a user-defined derivative is declared for it here
-//CHECK: 'exportedReferenceApplyExtended' cannot be differentiated, because parameter 'a' is passed by reference
-//CHECK: a user-defined derivative is declared for it here
-//CHECK: 'exportedGroupSharedBackwardExtended' cannot be differentiated, because parameter 'a' is passed by reference
+//CHECK: 'groupSharedApplyExtended' cannot be differentiated, because parameter 'a' is passed by reference
 //CHECK: a user-defined derivative is declared for it here
 //CHECK: compilation ceased

@@ -3,14 +3,14 @@
 // A `__func_extension` in this module that declares a forward derivative, a backward derivative or
 // a custom forward pass for a function with a reference parameter from another module is
 // rejected, whether that module is imported with a plain or an `__exported import`, as for the
-// attributes in `reference-primal-elsewhere.slang`. Unlike for a function without a reference
+// attributes in `primal-elsewhere.slang`. Unlike for a function without a reference
 // parameter, an extension that declares a backward derivative reports no error about a plain
 // import, because the extension gives the function no derivative. Naming such a function in
 // `fwd_diff` or `bwd_diff` then reports the missing derivative, and differentiating a caller of it
 // adds no error.
 
-import "cross-module-reference-primal";
-__exported import "cross-module-exported-reference-primal";
+import "cross-module-primal";
+__exported import "cross-module-exported-primal";
 
 groupshared float sharedFloat;
 

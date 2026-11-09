@@ -9,7 +9,7 @@
 // against it. Naming a function without an attribute in `fwd_diff` or `bwd_diff` reports the
 // missing derivative, as it does for a function without a reference parameter. A function that is
 // neither differentiated nor given a derivative may take one.
-// `reference-param-func-extension.slang` covers the derivatives that a `__func_extension`
+// `func-extension.slang` covers the derivatives that a `__func_extension`
 // declares.
 //
 // Before, backward differentiation of a caller of a user-defined backward derivative with a

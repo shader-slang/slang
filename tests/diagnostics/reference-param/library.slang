@@ -4,13 +4,13 @@
 // same way when another module imports it as when it is compiled on its own, and the import then
 // fails. Each request is rejected at the function's reference parameter. The note for a
 // differentiability or derivative attribute says that it requests a derivative, and the note for
-// a `...DerivativeOf` attribute says that it declares one. `func-extension-reference-library.slang`
+// a `...DerivativeOf` attribute says that it declares one. `func-extension-library.slang`
 // covers the derivatives that a `__func_extension` declares.
 
-import "cross-module-reference-library";
+import "cross-module-library";
 /*CHECK:
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ error E39999
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ import of module 'cross-module-reference-library' failed because of a compilation error
+       ^^^^^^^^^^^^^^^^^^^^^^ error E39999
+       ^^^^^^^^^^^^^^^^^^^^^^ import of module 'cross-module-library' failed because of a compilation error
 */
 
 RWStructuredBuffer<float> outputBuffer;

@@ -1,9 +1,9 @@
 //TEST_IGNORE_FILE:
 
 // Functions with reference parameters declared together with requests for their derivatives, for
-// `reference-library.slang`. Each request is rejected, so this module fails to compile.
+// `library.slang`. Each request is rejected, so this module fails to compile.
 
-module "cross-module-reference-library";
+module "cross-module-library";
 
 [Differentiable]
 public float referenceSynthesized(__ref float a, float x) { return a * x * x; }

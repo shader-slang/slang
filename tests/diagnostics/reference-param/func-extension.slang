@@ -2,7 +2,7 @@
 // `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute does. In a `__func_extension`,
 // `fwd_diff(f)`, `bwd_diff(f)` or `__apply(f)` names the derivative of `f` that the body declares;
 // it does not invoke one. A function with a reference parameter cannot be differentiated, so we
-// reject such a function when an extension names it, as `reference-param-differentiable.slang`
+// reject such a function when an extension names it, as `differentiable.slang`
 // does when an attribute names it. The extension is not checked against the function and gives it
 // no derivative, so naming the function in `fwd_diff` or `bwd_diff` reports the missing
 // derivative, and differentiating a caller of it adds no error.

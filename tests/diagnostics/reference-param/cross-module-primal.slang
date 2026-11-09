@@ -3,7 +3,7 @@
 // Functions with reference parameters and no derivatives, for tests that try to give them
 // derivatives in a module that imports this one with a plain `import`.
 
-module "cross-module-reference-primal";
+module "cross-module-primal";
 
 public float referenceForwardPrimal(__ref float a, float x) { return a * x * x; }
 

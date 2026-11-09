@@ -1,13 +1,13 @@
 //TEST_IGNORE_FILE:
 
 // `__func_extension` derivatives for functions with reference parameters from other modules, for
-// `func-extension-reference-derivative-library.slang`. Each extension is rejected, so this module
+// `func-extension-derivative-library.slang`. Each extension is rejected, so this module
 // fails to compile.
 
-module "cross-module-reference-extension-derivative";
+module "cross-module-extension-derivative";
 
-import "cross-module-reference-primal";
-__exported import "cross-module-exported-reference-primal";
+import "cross-module-primal";
+__exported import "cross-module-exported-primal";
 
 __func_extension fwd_diff(referenceForwardExtended)(__ref float a, DifferentialPair<float> x) -> DifferentialPair<float>
 {

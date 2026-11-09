@@ -6,11 +6,11 @@
 // with a plain import reports no error about the import, because the derivative is never attached
 // to the function. Naming such a function in `fwd_diff` or `bwd_diff` then reports the missing
 // derivative, and differentiating a caller of it adds no error.
-// `func-extension-reference-primal-elsewhere.slang` covers the derivatives that a
+// `func-extension-primal-elsewhere.slang` covers the derivatives that a
 // `__func_extension` declares.
 
-import "cross-module-reference-primal";
-__exported import "cross-module-exported-reference-primal";
+import "cross-module-primal";
+__exported import "cross-module-exported-primal";
 
 groupshared float sharedFloat;
 
