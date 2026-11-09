@@ -4862,7 +4862,7 @@ err(
     "reference-parameter-of-user-defined-derivative",
     38044,
     "user-defined derivative '~func:Decl' cannot have parameter '~param:Decl', because it is passed by reference",
-    span { loc = "param:Decl", message = "consider accessing the 'groupshared' variable directly instead of passing it as a parameter" },
+    span { loc = "param:Decl", message = "consider passing it by value, or accessing the argument directly if it is a global" },
     note { message = "this declares the function as a user-defined derivative", span { loc = "attributeLocation" } }
 )
 

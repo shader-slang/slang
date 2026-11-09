@@ -225,7 +225,7 @@ float forwardPrimal(__ref float a, float x)
 */
 DifferentialPair<float> forwardDerivativeOf(__ref float a, DifferentialPair<float> x)
 //CHECK:                                                ^ error E38044
-//CHECK:                                                ^ consider accessing the 'groupshared' variable directly instead of passing it as a parameter
+//CHECK:                                                ^ consider passing it by value, or accessing the argument directly if it is a global
 {
     return diffPair(a * x.p, a * x.d);
 }
@@ -243,7 +243,7 @@ float backwardPrimal(uint tid, const groupshared float s[N], float x)
 */
 void backwardDerivativeOf(uint tid, no_diff const groupshared float s[N], inout DifferentialPair<float> x, float dOut)
 //CHECK:                                                            ^ error E38044
-//CHECK:                                                            ^ consider accessing the 'groupshared' variable directly instead of passing it as a parameter
+//CHECK:                                                            ^ consider passing it by value, or accessing the argument directly if it is a global
 {
     x = diffPair(x.p, s[tid] * dOut);
 }
