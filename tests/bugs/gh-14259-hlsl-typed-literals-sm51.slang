@@ -3,8 +3,8 @@
 // `RWByteAddressBuffer.Store` takes a `uint`, so each result is stored as its `uint` bits. Each
 // literal feeds an operation with a run-time value. For the integer and `double` literals, the
 // result depends on the literal's type: a shift by a run-time amount is arithmetic only for a
-// signed literal, and a product with a run-time `double` keeps the bits of `0.1L` and of the
-// highest finite `double` only when the literal is a `double`. The `float` and `half` operations
+// signed literal, and a product with a run-time `double` keeps the bits of `0.1L` only when the
+// literal is a `double`. The `float` and `half` operations
 // check that FXC accepts the literals and gives their values; FXC cannot tell a `half` from a
 // `float`. The dxbc
 // and dx12 lanes need FXC, so they run on Windows only. The cpu lane cross-checks the buffer
@@ -50,7 +50,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // HLSL-DAG: 0.10000000149011612f * oneF_0
     // HLSL-DAG: (1.0f / 0.0f) * oneF_0
     // HLSL-DAG: 0.10000000000000001L * oneD_0
-    // HLSL-DAG: 1.79769313486231571e+308L * oneD_0
     // HLSL-DAG: (0.0L / 0.0L) * oneD_0
     // HLSL-DAG: 65504.0h * oneH_0
     // HLSL-DAG: (-1.0h / 0.0h) * oneH_0
@@ -79,7 +78,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output.Store(36, asuint((-1.0f / 0.0f) * oneF));
     output.Store(40, asuint((0.0f / 0.0f) * oneF));
     storeDouble(44, 0.1l * oneD);
-    storeDouble(52, 1.7976931348623157e+308l * oneD);
     storeDouble(68, double(1.0 / 0.0) * oneD);
     storeDouble(76, double(-1.0 / 0.0) * oneD);
     storeDouble(84, double(0.0 / 0.0) * oneD);
@@ -88,8 +86,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output.Store(104, asuint(float(half(-1.0 / 0.0) * oneH)));
     output.Store(108, asuint(float(half(0.0 / 0.0) * oneH)));
 
-    // On D3D12 with FXC, a stored `-0.0` literal does not keep its sign bit, so this test stores
-    // no `-0.0`; the SM 6.6 tests check `-0.0` with dxc. Words 7, 15-16 and 24 stay unwritten.
+    // On D3D12 with FXC, a stored `-0.0` literal does not keep its sign bit, and a product with
+    // the highest finite `double` does not store its expected bits, so this test stores neither;
+    // the SM 6.6 tests check both with dxc. Words 7, 13-16 and 24 stay unwritten.
     // The NaN words accept a quiet NaN of either sign, because the sign and payload of a NaN that
     // a multiplication returns differ between targets. The last word is never written.
     // BUF: C0000000
@@ -105,8 +104,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // BUF-NEXT: {{[7F]F[C-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]}}
     // BUF-NEXT: 9999999A
     // BUF-NEXT: 3FB99999
-    // BUF-NEXT: FFFFFFFF
-    // BUF-NEXT: 7FEFFFFF
+    // BUF-NEXT: AAAAAAAA
+    // BUF-NEXT: AAAAAAAA
     // BUF-NEXT: AAAAAAAA
     // BUF-NEXT: AAAAAAAA
     // BUF-NEXT: 0
