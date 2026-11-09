@@ -1,5 +1,3 @@
-// gh-14259-hlsl-double-literal-suffix.slang
-
 // The HLSL emitter writes a finite `double` literal with the `L` suffix, and a NaN or infinity as
 // a division in `L` literals. HLSL reads an unsuffixed floating-point literal as a 32-bit `float`,
 // so a template argument deduced from it, such as the `T` of `RWByteAddressBuffer.Store<T>`, would

@@ -1,9 +1,12 @@
 // At SM 5.1 the HLSL emitter writes the same typed literals as at SM 6.6, and FXC compiles them.
 // FXC has no 16-bit or 64-bit integers, its `half` is a 32-bit `float`, and its
 // `RWByteAddressBuffer.Store` takes a `uint`, so each result is stored as its `uint` bits. Each
-// literal feeds an operation whose result depends on the literal's type: a shift by a run-time
-// amount is arithmetic only for a signed literal, and a product with a run-time `double` keeps the
-// bits of `0.1L` and of the highest finite `double` only when the literal is a `double`. The dxbc
+// literal feeds an operation with a run-time value. For the integer and `double` literals, the
+// result depends on the literal's type: a shift by a run-time amount is arithmetic only for a
+// signed literal, and a product with a run-time `double` keeps the bits of `0.1L` and of the
+// highest finite `double` only when the literal is a `double`. The `float` and `half` operations
+// check that FXC accepts the literals and gives their values; FXC cannot tell a `half` from a
+// `float`. The dxbc
 // and dx12 lanes need FXC, so they run on Windows only. The cpu lane cross-checks the buffer
 // words; a vk lane cannot, because Vulkan does not require a multiplication to preserve an
 // infinity, a NaN or the sign of `-0.0` unless the shader asks for it.
@@ -54,7 +57,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
     // The DXBC lines check that FXC accepts the typed literals and compiles signed and unsigned
     // shifts and `double` products; they cannot tie an instruction to one literal. The buffer words
-    // of the dx12 lane are the check that FXC gives each literal its type.
+    // of the dx12 lane check the signedness of the integer literals and the precision of the
+    // `double` literals.
     // DXBC-DAG: ishr
     // DXBC-DAG: ushr
     // DXBC-DAG: dmul
