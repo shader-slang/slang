@@ -286,19 +286,16 @@ backward pass, gradient allocation, and output.
 ## Rough edges
 
 **Conservative resource access.** Treat general writable resource use as read/write for
-dependency and performance planning; precise per-kernel access inference is incomplete.
-Explicit read-only resource types exist, so this is not a promise that every resource
-has writable shader semantics.
+dependency and performance planning; precise per-kernel access flags is still work-in-progress.
+Some read-only resource types are provided (e.g., `StructuredBuffer`), but only partially.
 
-**Allocation flags.** Buffer/texture helpers largely choose fixed usage flags. Broader flags
-and conservative synchronization can be considerably slower than carefully tuned native
-allocations. More allocation controls and access analysis are areas for future improvement.
+**Allocation flags.** Buffer/texture helpers largely choose fixed usage flags (which are much broader than generally necessary). Broader flags and conservative synchronization can be considerably slower than carefully tuned native allocations. More allocation controls and access analysis are areas for future improvement.
 
 **External values.** Bindless use inside Slang is broader than the current external API:
 only supported resource types can cross into Python/JS/C++. Check the
 [interop resource limits](interoperability.md#rough-edges).
 
-Tensor execution currently requires bindless descriptors, which are supported on newer graphics APIs (D3D12, Vulkan, CUDA, Metal) & hardware. One notable exception is WebGPU.
+Tensor execution currently requires bindless descriptors, which are only supported on newer graphics APIs (D3D12, Vulkan, CUDA, Metal) & hardware. One notable exception is WebGPU.
 
 Sources: [Tensor and tensor operations](../../source/standard-modules/host/tensor.slang),
 [differentiable tensors](../../source/standard-modules/host/tensor/differentiable.slang).
