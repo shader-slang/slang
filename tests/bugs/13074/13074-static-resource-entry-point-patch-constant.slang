@@ -1,9 +1,15 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry hullMain -stage hull -entry constants -stage hull -O0 -validate-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry hullMain -stage hull -entry constants -stage hull -O0 -validate-ir
 
 // `constants` is both an entry point and the patch-constant function for `hullMain`.
 // Resource-global legalization can create and initialize a local for its normal entry-point
 // invocation. `IRPatchConstantFuncDecoration` causes an additional invocation without an `IRCall`
 // argument list that the pass can extend.
+//
+// A function is an entry point only in a compile that selects it as one. SPIR-V compiles both
+// entry points together, so `constants` is an entry point in the compile that also uses it as
+// `hullMain`'s patch-constant function. HLSL compiles each entry point separately; in the compile
+// for `hullMain`, `constants` is an ordinary patch-constant function, which
+// `13074-static-resource-patch-constant.slang` covers.
 
 Texture2D<float4> texture;
 static Texture2D<float4> cachedTexture = texture;
