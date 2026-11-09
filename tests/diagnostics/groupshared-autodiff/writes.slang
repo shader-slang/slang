@@ -5,8 +5,8 @@
 // differentiable function without a custom derivative. A whole-variable write and an atomic stay
 // in place; they are in silent.slang. A call that takes part of shared memory as an `out` or
 // `inout` argument, including a `[mutating]` receiver, writes that part back when it returns, so
-// it is reported whatever the callee. A write in a helper's own body is in
-// write-in-force-inline-helper.slang.
+// it is reported whatever the callee. A write in a non-differentiable helper's own body is not
+// reported, even when the helper is `[ForceInline]` and so becomes part of the differentiated body.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
 
