@@ -1,5 +1,5 @@
-// Companion module for gh-12392: a function that is itself an entry point.
-// Imported and called by `outer.slang`'s entry point, which is the trigger for the crash.
+// Companion module for `outer.slang`: a compute entry point that `outer.slang` imports and calls as
+// an ordinary function.
 module inner;
 
 [shader("compute")]

@@ -1,5 +1,3 @@
-// Regression test for the #12392 cascade fix in `getAllEntryPointsNoOverride`.
-//
 // The GLSL module-scope `layout(derivative_group_quadsNV) in;` qualifier decorates every *entry
 // point* of the module. `helper` below carries `[numthreads]` but is NOT an entry point (it is only
 // called, and is not the function we compile). It must not receive the derivative-group decoration,
