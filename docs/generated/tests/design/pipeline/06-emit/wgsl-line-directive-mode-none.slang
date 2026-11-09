@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#emit-dispatcher
-//META: doc_section_digest=f136369c763a469783c526b150d8baf5d8f6435a816fbf58504eaa5c871b9d36
+//META: doc_section_digest=43c38a0587cf3d983ec7efa66dcd9cfd7dc6f5aade52374f3c6f3a0c7b491e81
 //META: purpose=WGSL targets resolve to the `None` line-directive mode because WGSL has no line directives, so the emitted WGSL contains no `#line` markers at all.
 //META: intent=negative
 //META: pipeline_stage=emit

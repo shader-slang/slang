@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#eliminatephis-with-spir-v-specific-options
-//META: doc_section_digest=b36f8fb17f73698f8db16cbc260b4d3068995c13f2e365b125cbcf5423d67537
+//META: doc_section_digest=d24ab0e588fa17f2c29cc16641383960cb11035aa720553ae8556874d223464a
 //META: purpose=Deeply nested if/else branches (6 distinct assigned values) all funnel into a single Function-storage OpVariable via OpStore; no OpPhi survives because eliminatePhis runs with useRegisterAllocation=true.
 //META: intent=stress
 //META: pipeline_stage=ir-pass

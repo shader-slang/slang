@@ -15,7 +15,7 @@
 // + `store`, while indexing the struct-field array value uses
 // `getElement` directly.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct S
 {

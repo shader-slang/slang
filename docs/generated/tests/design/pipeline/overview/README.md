@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: 490dd1c9588fe1f513be42fbc0bf878dd784bfef04737d0e8c3366c97180a1dd
+model: gpt-6
+generated_at: 2026-09-29T07:48:53+00:00
+source_commit: 3bb522221d5db85fbdf8dcf441c05ffc3b801358
+watched_paths_digest: dd09620b5d063076c1114b0c1aa11fd1e30d216a2ba4522874620c4a948833dd
 source_doc: docs/generated/design/pipeline/overview.md
-source_doc_digest: 34d4cbcc71c2d9088ec50f94fd57774b0eece28660e4cb42f30dbba96a942be8
+source_doc_digest: 68de969f14d030acd4661b1ca75c7150c209c30bdf772f70e5d673521ab9038f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -36,6 +36,9 @@ target-sensitive pass list exists at all. Boundary probes sit on the two
 axes the doc's own claims imply: the minimum program (an empty entry
 point) and control-flow nesting depth. One `INTERPRET` test covers the
 non-source dispatch path, which has no target text to FileCheck.
+
+The loop probe checks target-specific headers (`loop` in WGSL and `for(;;)`
+on the other source backends) followed by the explicit exit `break`.
 
 ## Functional coverage
 

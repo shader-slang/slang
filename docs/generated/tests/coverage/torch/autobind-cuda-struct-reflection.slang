@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T16:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerbuiltintypesforkernelentrypoints-removetorchkernels-handleautobindnames
-//META: doc_section_digest=8395af4f0b26d3fcc84d23080f14f58fbfb44b12a02306327f726485b8a8edae
+//META: doc_section_digest=1b4008e777a39c271b0416d939d21f6b248cfe804bde82afe67b956117c6cf82
 //META: purpose=An [AutoPyBindCUDA] kernel taking a struct of builtin types generates a host wrapper plus a __typeinfo__<Struct> reflection function.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-pytorch-cpp-binding.cpp

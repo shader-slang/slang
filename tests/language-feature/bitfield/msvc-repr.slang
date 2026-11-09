@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compile-arg -msvc-style-bitfield-packing
 
-// MSVC style packs from MSB to LSB
+// The deprecated -msvc-style-bitfield-packing option packs from MSB to LSB.
+// Actual MSVC packing on little-endian platforms runs from LSB to MSB.
 // struct S { uint a:4; uint b:8; uint c:4; uint d:16; }
 // Memory layout (32-bit):
 // bits 28-31: a (0x5)

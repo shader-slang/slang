@@ -13,7 +13,7 @@
 // power-of-two wave size the attribute accepts; the CHECK pins the exact
 // operand so a clamp to a smaller hardware wave size would fail here.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

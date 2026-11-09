@@ -20,7 +20,8 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: "2"
-      - id: filter
+      - name: Diff changed files
+        id: diff
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
@@ -32,23 +33,22 @@ jobs:
             BASE=HEAD^1
           fi
 
-          shouldRun=true
-          if files="$(git diff --name-only "${BASE}...HEAD")"; then
-            # Git diff succeeded, check if non-documentation files were changed
-            if echo "$files" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a4-02-reference-capability-atoms.md)'; then
-              echo "Generated reference document changed, running checks"
-              shouldRun=true
-            elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|.*\.md$|\.coderabbit\.yaml$)'; then
-              shouldRun=true
-            else
-              echo "Only documentation files changed, skipping remaining steps"
-              shouldRun=false
-            fi
+          filesPath="${RUNNER_TEMP}/changed-files.txt"
+          if git diff --name-only "${BASE}...HEAD" > "$filesPath"; then
+            echo "files-path=$filesPath" >> "$GITHUB_OUTPUT"
+            echo "diff-ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "Git diff failed, conservatively running tests"
-            shouldRun=true
+            echo "diff-ok=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "should-run=$shouldRun" >> "$GITHUB_OUTPUT"
+      - id: filter_docs
+        if: steps.diff.outputs.diff-ok == 'true'
+        uses: ./.github/actions/docs-only-filter
+        with:
+          files-path: ${{ steps.diff.outputs.files-path }}
+      - id: filter
+        run: |
+          echo "should-run=${{ steps.diff.outputs.diff-ok == 'false' || steps.filter_docs.outputs.should-run }}" >> "$GITHUB_OUTPUT"
 
   # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
   # only nv-slang-bot[bot] workflow_dispatch runs can ever yield. Those are the
@@ -200,6 +200,7 @@ jobs:
       os: linux
       compiler: gcc
       platform: wasm
+      build-llvm: false
       config: release
       runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 
@@ -256,6 +257,25 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["macos-latest"]'
+
+  # Exercise the default macOS DXC source-build path on macOS 27, which catches
+  # host-specific failures such as #13077 where DXC's clang-tblgen is not
+  # executable. macos-latest currently uses macOS 26.
+  build-macos-27-release-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["xcode-27"]'
+      build-llvm: false
+      artifact-name-suffix: -macos-27
 
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
@@ -413,9 +433,25 @@ jobs:
   # `environment:` (GitHub only allows name/uses/with/secrets/needs/if/
   # permissions on such jobs), so the approval gate has to live on this
   # plain job instead, with the build depending on it.
+  #
+  # Skipped on `merge_group`: every commit reaching the merge queue already
+  # passed this same gate as a `pull_request` run (`check-ci`, which
+  # includes `test-falcor`, is a required status check, so a PR cannot
+  # become mergeable -- and therefore cannot enter the queue -- without an
+  # allowlisted actor or reviewer having already released this gate once).
+  # The merge-queue run only recompiles the PR's already-vetted commits
+  # merged onto a newer `master`; it introduces no code that has not
+  # already cleared Falcor approval. Skipping here avoids asking an
+  # approver to re-click a gate whose outcome is already determined,
+  # without weakening the gate for its actual purpose: keeping unvetted,
+  # first-look PR code off internal Falcor compute.
+  #
+  # A skipped job here does NOT by itself let the build below proceed --
+  # see the `if` on build-windows-release-cl-x86_64-gpu-falcor, which
+  # explicitly opts back in to running after a skip.
   falcor-build-approval-gate:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: needs.filter.outputs.should-run == 'true' && github.event_name != 'merge_group'
     environment: falcor-ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -448,9 +484,23 @@ jobs:
   # known, accepted cost: a real Falcor regression needing a code fix
   # already forces a full re-run via a new commit, so this only affects
   # the narrower case of a transient retry with no code change.
+  #
+  # On `merge_group`, falcor-build-approval-gate above is skipped rather
+  # than run. GitHub Actions does NOT treat a skipped `needs` job as
+  # satisfying a dependent job by default -- "If a job fails or is
+  # skipped, all jobs that need it are skipped unless the jobs use a
+  # conditional expression that causes the job to continue" (GitHub Actions
+  # docs). So this job's `if` must explicitly opt back in with `always()`
+  # and then re-check the gate's own result: proceed when the gate
+  # succeeded (the ordinary pull_request path) or was itself skipped
+  # (the merge_group path added above), but still stop if the gate ran
+  # and failed or was cancelled.
   build-windows-release-cl-x86_64-gpu-falcor:
     needs: [filter, falcor-build-approval-gate]
-    if: needs.filter.outputs.should-run == 'true'
+    if: >-
+      always() && needs.filter.outputs.should-run == 'true' &&
+      (needs.falcor-build-approval-gate.result == 'success' ||
+      needs.falcor-build-approval-gate.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -521,7 +571,9 @@ jobs:
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
       cpu-only: true
+      slang-user-skills: true
       server-count: 4
+      run-via-glsl: false
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -536,6 +588,8 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
+      run-via-glsl: false
 
   test-macos-debug-clang-aarch64-rhi:
     needs: [filter, build-macos-debug-clang-aarch64]
@@ -560,6 +614,8 @@ jobs:
       runs-on: '["macos-latest"]'
       full-gpu-tests: true
       server-count: 3
+      # Vulkan is not available on macOS, so the via-glsl pass (-api vk) cannot run here.
+      run-via-glsl: false
 
   test-macos-release-clang-aarch64-rhi:
     needs: [filter, build-macos-release-clang-aarch64]
@@ -584,6 +640,7 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      run-via-glsl: false
 
   test-linux-release-gcc-aarch64:
     needs: [filter, build-linux-release-gcc-aarch64]
@@ -596,6 +653,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      run-via-glsl: false
 
   # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
   # hosted image).
@@ -617,6 +675,7 @@ jobs:
       # platform, so restrict directly to cpu+llvm via cpu-only instead of
       # relying on it.
       cpu-only: true
+      run-via-glsl: false
 
   test-windows-release-cl-aarch64:
     needs: [filter, build-windows-release-cl-aarch64]
@@ -630,14 +689,10 @@ jobs:
       runs-on: '["windows-11-vs2026-arm"]'
       full-gpu-tests: false
       cpu-only: true
+      run-via-glsl: false
 
-  # Windows GPU tests (self-hosted).
-  # Each config is split into three parallel jobs to reduce wall-clock time:
-  #   -gpu-dx:   dx11+dx12+wgpu
-  #   -gpu-vk:   vk+cpu+llvm + no-API tests
-  #   -gpu-cuda: cuda
-  # The three jobs run concurrently on separate runners.
-  test-windows-debug-cl-x86_64-gpu-dx:
+  # Windows GPU tests (self-hosted)
+  test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -648,36 +703,8 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
       gpu-tier: t4
-
-  test-windows-debug-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-
-  test-windows-debug-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
-      gpu-tier: t4
+      run-via-glsl: true
 
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
@@ -690,7 +717,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu-dx:
+  test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -701,36 +728,8 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
       gpu-tier: t4
-
-  test-windows-release-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-
-  test-windows-release-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
-      gpu-tier: t4
+      run-via-glsl: true
 
   test-windows-release-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -786,7 +785,7 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
           mkdir -p temp
           # Capture stdout+stderr to match how the golden file is produced by
-          # regenerate-cmdline-ref.yml; otherwise stray stderr output would be
+          # slash-regenerate-cmdline-ref.yml; otherwise stray stderr output would be
           # baked into the reference but missing here, causing a spurious diff.
           artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
 
@@ -848,6 +847,12 @@ jobs:
             exit 1
           fi
 
+  # Deliberately NOT added to check-ci's required needs list below: the
+  # Falcor 1 bridge (vet/approve flow, KVM environment, approval gate) is
+  # still being tuned, so it still runs and reports status on every PR that
+  # runs CI at all (see the `filter` job above for what skips CI entirely),
+  # but its result does not yet block merge. Promote it back to required
+  # once the vet/approve balance has settled.
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu-falcor]
     if: needs.filter.outputs.should-run == 'true'
@@ -911,18 +916,15 @@ jobs:
         build-linux-release-gcc-aarch64,
         build-macos-debug-clang-aarch64,
         build-macos-release-clang-aarch64,
+        build-macos-27-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
         static-unit-test-linux-debug-gcc-aarch64,
         static-unit-test-macos-debug-clang-aarch64,
         static-unit-test-windows-debug-cl-x86_64,
-        test-windows-release-cl-x86_64-gpu-dx,
-        test-windows-release-cl-x86_64-gpu-vk,
-        test-windows-release-cl-x86_64-gpu-cuda,
+        test-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu-dx,
-        test-windows-debug-cl-x86_64-gpu-vk,
-        test-windows-debug-cl-x86_64-gpu-cuda,
+        test-windows-debug-cl-x86_64-gpu,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,
@@ -940,7 +942,6 @@ jobs:
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
         check-capability-atoms-ref,
-        test-falcor,
         test-falcor-perf,
         test-compile-regression,
         test-benchmark,
@@ -978,39 +979,3 @@ jobs:
           fi
 
           echo "All CI jobs completed successfully!"
-
-  # Automatically retry GPU health check failures by dispatching ci-retry.yml,
-  # which watches this run until it completes, then reruns only failed jobs.
-  # Capped at 2 automatic retries via run_attempt check.
-  retry-on-gpu-failure:
-    needs: [check-ci]
-    if: failure() && github.event_name == 'merge_group' && fromJSON(github.run_attempt) < 3
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Check for GPU health check failures and dispatch retry
-        env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-            --jq '[.jobs[]
-              | select(.conclusion == "failure")
-              | select(any(.steps[]?;
-                  (.name == "GPU health check" and .conclusion == "failure") or
-                  (.name == "GPU post-test diagnostics" and .conclusion == "failure")
-                ))
-            ] | length' \
-            || echo "0")
-          gpu_failures=${gpu_failures:-0}
-          if ! [[ "$gpu_failures" =~ ^[0-9]+$ ]]; then
-            gpu_failures=0
-          fi
-
-          if [ "$gpu_failures" -gt 0 ]; then
-            echo "Found $gpu_failures GPU failure(s) — dispatching retry workflow..."
-            gh workflow run ci-retry.yml -F run_id=${{ github.run_id }}
-          else
-            echo "No GPU failures — not retrying."
-          fi

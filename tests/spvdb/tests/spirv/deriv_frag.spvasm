@@ -1,0 +1,33 @@
+; deriv_frag.spvasm
+; Fragment shader: computes dPdx of input color and stores it.
+; In single-invocation mode, dPdx returns zero; this tests that
+; the derivative instruction handler doesn't panic.
+
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %in_color %out_color
+               OpExecutionMode %main OriginUpperLeft
+
+               OpName %in_color  "in_color"
+               OpName %out_color "out_color"
+
+               OpDecorate %in_color  Location 0
+               OpDecorate %out_color Location 0
+
+       %void = OpTypeVoid
+      %vfunc = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+ %ptr_in_v4  = OpTypePointer Input  %v4float
+ %ptr_out_v4 = OpTypePointer Output %v4float
+
+   %in_color = OpVariable %ptr_in_v4  Input
+  %out_color = OpVariable %ptr_out_v4 Output
+
+       %main = OpFunction %void None %vfunc
+      %entry = OpLabel
+        %val = OpLoad %v4float %in_color
+        %ddx = OpDPdx %v4float %val
+               OpStore %out_color %ddx
+               OpReturn
+               OpFunctionEnd

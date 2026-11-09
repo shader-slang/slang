@@ -735,6 +735,19 @@ local insts = {
 				},
 			},
 			{
+				TraceProgramDescriptor = {
+					-- An opaque structural ray-tracing program descriptor. Its operands retain the
+					-- schema type argument and conformance witness without exposing any
+					-- target-specific resource representation in source or IR.
+					struct_name = "TraceProgramDescriptorType",
+					operands = {
+						{ "schema", "IRType" },
+						{ "schemaWitness" },
+					},
+					hoistable = true,
+				},
+			},
+			{
 				struct = {
 					-- A user-defined structure declaration at the IR level.
 					-- Unlike in the AST where there is a distinction between
@@ -1215,12 +1228,16 @@ local insts = {
 	-- has no operands; its source position is carried on the standard
 	-- per-instruction `sourceLoc` field, which is always preserved and
 	-- never stripped by `stripDebugInfo`. The coverage-instrument IR pass
-	-- later rewrites each coverage marker into an atomic add on the IR-
-	-- synthesized `__slang_coverage` buffer. The current line/function/
-	-- branch producers assign one direct counter per marker; future
-	-- source-region coverage can keep using marker metadata without
-	-- preserving that one-to-one lowering. Host-side tooling reads
-	-- source coverage entries and projects them to LCOV records.
+	-- later rewrites coverage markers into an atomic add on the IR-
+	-- synthesized `__slang_coverage` buffer, or a plain store under
+	-- `-trace-coverage-boolean`. Line markers that provably execute
+	-- together -- same basic block, nothing between them that can abandon
+	-- the invocation -- are coalesced onto a single counter, and only the
+	-- last marker of such a region emits the runtime update; the rest are
+	-- removed without emitting one. The lowering is therefore not
+	-- one-to-one, though each marker still produces its own source
+	-- entry. Host-side tooling reads source
+	-- coverage entries and projects them to LCOV records.
 	-- Inherent side-effect semantics keep the optimizer from deleting or
 	-- hoisting these ops.
 	{ IncrementCoverageCounter = {} },
@@ -1380,6 +1397,9 @@ local insts = {
 	{ metalSetPrimitive = { operands = { { "index" }, { "elementValue" } } } },
 	{ metalSetIndices = { operands = { { "index" }, { "elementValue" } } } },
 	{ MetalCastToDepthTexture = { operands = { { "texture" } } } },
+	-- Order this thread's accesses to an `access::read_write` texture across this point
+	-- (MSL `texture.fence()`); `insertMetalTextureFences` puts one before and after each write.
+	{ metalTextureFence = { operands = { { "texture" } } } },
 	-- Construct a vector from a scalar
 	-- %dst = MakeVectorFromScalar %T %N %val
 	-- where
@@ -1657,6 +1677,38 @@ local insts = {
 	-- Operand 0: register index (int literal)
 	-- Operand 1: value to write (uint32)
 	{ setOptiXPayloadRegister = { min_operands = 2 } },
+	-- Write side of a portable `ReportHit(tHit, hitKind, attributes)` call for OptiX.
+	-- Operand 0: tHit (float). Operand 1: hitKind (uint). The remaining operands are the
+	-- aggregate's scalar attribute leaves, produced by the CUDA varying-param legalization
+	-- pass, which flattens `attributes` field-wise (one operand per OptiX attribute register)
+	-- mirroring the read side (`emitOptiXAttributeFetch`). The CUDA emitter renders this as a
+	-- single `optixReportIntersection(tHit, hitKind, a0..aN)`.
+	{ reportOptiXIntersection = { min_operands = 2 } },
+	{
+		metalTraceRay = {
+			-- The two internal Metal trace functions lower to this instruction through
+			-- ordinary __intrinsic_op calls. No time operand means no motion; a present
+			-- time, including zero, means motion. The descriptor type retains the schema
+			-- and its witness, including the selected motion model, while the payload
+			-- pointer retains its concrete type. Later Metal lowering consumes this
+			-- operation before native entry-point legalization and emission.
+			operands = {
+				{ "accelerationStructure" },
+				{ "descriptor" },
+				{ "rayFlags" },
+				{ "instanceMask" },
+				{ "sbtOffset" },
+				{ "sbtStride" },
+				{ "missIndex" },
+				{ "rayOrigin" },
+				{ "rayTMin" },
+				{ "rayDirection" },
+				{ "rayTMax" },
+				{ "payload" },
+				{ "time", optional = true },
+			},
+		},
+	},
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{
@@ -1876,6 +1928,20 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
+			-- Lowering adds this marker when the AST declaration is either a file- or namespace-scope
+			-- mutable `static` variable or a mutable uniform-parameter shadow. The marker records
+			-- membership in that combined category, not which kind the declaration has or what storage
+			-- rate it uses. Static data members also use `IRGlobalVar`, but are outside the category.
+			{ fileOrNamespaceScopeMutableVar = { struct_name = "FileOrNamespaceScopeMutableVarDecoration" } },
+			-- The pre-link module-wide uninitialized-global check found a possible write and
+			-- therefore could not prove that every read is uninitialized. We preserve that result
+			-- because entry-point linking may remove the writer before a later analysis revisits the
+			-- global.
+			{
+				uninitializedGlobalCheckFoundPossibleWrite = {
+					struct_name = "UninitializedGlobalCheckFoundPossibleWriteDecoration",
+				},
+			},
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
@@ -1923,6 +1989,7 @@ local insts = {
 			{ vulkanCallablePayload = { struct_name = "VulkanCallablePayloadDecoration" } },
 			{ vulkanCallablePayloadIn = { struct_name = "VulkanCallablePayloadInDecoration" } },
 			{ earlyDepthStencil = { struct_name = "EarlyDepthStencilDecoration" } },
+			{ postDepthCoverage = { struct_name = "PostDepthCoverageDecoration" } },
 			-- Marks a fragment entry point whose `gl_FragDepth` output is constrained to
 			-- only ever increase / decrease the fixed-function depth (HLSL
 			-- SV_DepthGreaterEqual / SV_DepthLessEqual). Carried on the entry point so the
@@ -1940,6 +2007,7 @@ local insts = {
 			{
 				patchConstantFunc = { struct_name = "PatchConstantFuncDecoration", operands = { { "func", "IRInst" } } },
 			},
+			{ glslPatch = { struct_name = "GLSLPatchDecoration" } },
 			{
 				maxTessFactor = {
 					struct_name = "MaxTessFactorDecoration",
@@ -2056,10 +2124,10 @@ local insts = {
 				availableInDownstreamIR = { struct_name = "AvailableInDownstreamIRDecoration", min_operands = 1 },
 			},
 			{
+				-- Added to an entry point's input parameter, and copied onto the entry-point function
 				GeometryInputPrimitiveTypeDecoration = {
 					{
 						pointPrimitiveType = {
-							-- Added to IRParam parameters to an entry point
 							struct_name = "PointInputPrimitiveTypeDecoration",
 						},
 					},
@@ -2360,11 +2428,11 @@ local insts = {
 			},
 			{ noRefInline = { struct_name = "NoRefInlineDecoration" } },
 			{
-				DerivativeGroupQuad = {
-					struct_name = "DerivativeGroupQuadDecoration",
+				DerivativeGroupDecoration = {
+					{ DerivativeGroupQuad = { struct_name = "DerivativeGroupQuadDecoration" } },
+					{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 				},
 			},
-			{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 			{
 				MaximallyReconverges = {
 					struct_name = "MaximallyReconvergesDecoration",
@@ -2514,6 +2582,11 @@ local insts = {
 			{ loopCounterUpdateDecoration = {} },
 			{ ParamsContextDecoration = { operands = {"value"} } },
 			{
+				AutodiffParameterContextTypeDecoration = {
+					-- Marks a context whose fields are captured primal parameters.
+				},
+			},
+			{
 				AutodiffInstDecoration = {
 					-- Auto-diff inst decorations
 					{
@@ -2648,9 +2721,9 @@ local insts = {
 			},
 			{
 				DebugLocation = {
-					-- Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+					-- Source, line, column, and an optional declaration scope for variables/parameters.
 					struct_name = "DebugLocationDecoration",
-					operands = { { "source" }, { "line" }, { "col" } },
+					operands = { { "source" }, { "line" }, { "col" }, { "scope", optional = true } },
 				},
 			},
 			{
@@ -2692,7 +2765,11 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Marks a module as an experimental module
+					-- Marks a module as experimental in serialized IR.
+					--
+					-- Retained as derived metadata because the AST-gate refactor left
+					-- `IRModule::k_maxSupportedModuleVersion` unchanged, so compatible
+					-- pre-refactor readers still inspect this marker to emit E00104.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},
@@ -2812,6 +2889,7 @@ local insts = {
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },
+	{ IsBindlessTextureNVEncodable = { operands = { { "value" } } } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
 	{ TranslateBase = {
 		hoistable = true,
@@ -2977,7 +3055,11 @@ local insts = {
 			min_operands = 5,
 		},
 	},
-	{ DebugVar = { operands = { { "name" }, { "type" }, { "scope" }, { "location" } } } },
+	{
+		DebugVar = {
+			min_operands = 5,
+		},
+	},
 	{
 		DebugValue = {
 			min_operands = 2,
@@ -2989,13 +3071,18 @@ local insts = {
 			min_operands = 5,
 		},
 	},
+	{
+		DebugLexicalBlock = {
+			operands = { { "source" }, { "line" }, { "col" }, { "parentScope" } },
+		},
+	},
 	{ DebugInlinedVariable = { min_operands = 2 } },
 	{
 		DebugScope = {
-			min_operands = 2,
+			min_operands = 1,
 		},
 	},
-	{ DebugNoScope = { min_operands = 1 } },
+	{ DebugNoScope = { min_operands = 0 } },
 	{
 		DebugBuildIdentifier = {
 			min_operands = 2,

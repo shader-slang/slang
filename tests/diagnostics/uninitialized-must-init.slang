@@ -139,6 +139,92 @@ float while_loop_init_no_warn()
     return d.value;
 }
 
+// Regression tests for https://github.com/shader-slang/slang/issues/12545.
+//
+// `WaveReadLaneFirst()` broadcasts from the first active lane -- the same lane for which
+// `WaveIsFirstLane()` is true. So a store inside `if (WaveIsFirstLane()) { ... }`, read back
+// only via `WaveReadLaneFirst()`, is not actually reachable while uninitialized: the elected
+// lane is guaranteed to have executed the store. These four cases pin down exactly how narrow
+// that relaxation is -- it must not spill over into any of the neighboring shapes that are
+// still genuine must-init bugs.
+
+RWByteAddressBuffer gWaveCounterBuffer;
+
+// The exact shape from the issue's repro: guarded store, broadcast read. Must NOT warn.
+uint wave_elect_broadcast_no_warn(uint2 dispatchThreadID, bool bIsAlive)
+{
+    uint nBaseIndex;
+    if (WaveIsFirstLane())
+    {
+        gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
+    }
+    return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
+}
+
+// Same shape, but broadcasting a vector -- exercises the `vector<T,N> WaveReadLaneFirst`
+// overload rather than the scalar one, locking in that all overloads carry the
+// `[KnownBuiltin(...)]` annotation the relaxation relies on to recognize the call. Must NOT
+// warn.
+uint2 wave_elect_broadcast_vector_no_warn(uint2 dispatchThreadID)
+{
+    uint2 nBaseIndex;
+    if (WaveIsFirstLane())
+    {
+        nBaseIndex = dispatchThreadID;
+    }
+    return WaveReadLaneFirst(nBaseIndex);
+}
+
+// Guard is negated: the store executes on the *non*-elected lanes, so the lane that
+// `WaveReadLaneFirst` broadcasts from (the elected lane) never executed it. A genuine
+// must-init bug -- must still warn.
+uint wave_elect_negated_guard_warn(bool bIsAlive)
+{
+    uint nBaseIndex;
+    if (!WaveIsFirstLane())
+    {
+        gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
+    }
+    return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
+//CHK: E41035
+//CHK: variable 'nBaseIndex' may be uninitialized on some paths
+}
+
+// Same guarded store as the no-warn case above, but read back directly instead of through
+// `WaveReadLaneFirst()`. Without the broadcast, a non-elected lane really can observe
+// `nBaseIndex` uninitialized -- must still warn.
+uint wave_elect_plain_read_warn(bool bIsAlive)
+{
+    uint nBaseIndex;
+    if (WaveIsFirstLane())
+    {
+        gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
+    }
+    return nBaseIndex + WavePrefixCountBits(bIsAlive);
+//CHK: E41035
+//CHK: variable 'nBaseIndex' may be uninitialized on some paths
+}
+
+// The store is nested inside a further conditional *within* the `WaveIsFirstLane()` guard, so
+// even the elected lane is not guaranteed to have executed it (e.g. when `bIsAlive` is false
+// on the elected lane). This is exactly the shape that requires the relaxation to check
+// reachability scoped to the guard's own sub-CFG rather than whole-function dominance -- must
+// still warn.
+uint wave_elect_nested_conditional_store_warn(bool bIsAlive)
+{
+    uint nBaseIndex;
+    if (WaveIsFirstLane())
+    {
+        if (bIsAlive)
+        {
+            gWaveCounterBuffer.InterlockedAdd(0, WaveActiveCountBits(bIsAlive), nBaseIndex);
+        }
+    }
+    return WaveReadLaneFirst(nBaseIndex) + WavePrefixCountBits(bIsAlive);
+//CHK: E41035
+//CHK: variable 'nBaseIndex' may be uninitialized on some paths
+}
+
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)

@@ -1,6 +1,8 @@
 #ifndef SLANG_IR_COVERAGE_INSTRUMENT_H
 #define SLANG_IR_COVERAGE_INSTRUMENT_H
 
+#include "slang-ir-insts.h"
+
 namespace Slang
 {
 struct IRModule;
@@ -27,10 +29,12 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // layout so the buffer participates in
 // `collectGlobalUniformParameters` packaging on targets that need it
 // (CPU, CUDA), and rewrites coverage marker ops into atomic adds. The
-// current line/function/branch producers assign one direct counter slot
-// per marker op; the metadata keeps entry count and counter count
-// separate so later source-region coverage can use shared or derived
-// counters. Marker kind selects the emitted source-entry metadata:
+// line producer coalesces markers that provably execute together onto
+// one counter slot and one runtime probe, so counter count is never
+// larger than entry count, and smaller whenever a straight-line region
+// is coalesced; function and branch producers keep one dedicated slot
+// per marker, so the two counts are equal when only those modes are
+// enabled. Marker kind selects the emitted source-entry metadata:
 // line, function, branch, and later region coverage all share this
 // path. The pass writes the resulting source coverage entries and the
 // chosen buffer binding into
@@ -116,6 +120,42 @@ void finalizeCoverageInstrumentationMetadata(
     IRVarLayout* globalScopeVarLayout,
     TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata);
+
+// Assign a counter slot to every collected marker op, coalescing line
+// markers that provably execute together. This is the coalescing core of
+// `instrumentCoverage`; it is declared here (rather than kept file-local) so
+// `slang-static-unit-test` can drive it directly on hand-built IR and assert
+// on the slot assignment — the precise, emission-independent way to observe
+// some of its guarantees (notably which marker of a coalesced region emits the
+// probe; see `outEmitsProbe` below).
+//
+// `markerOps` must list the markers of each basic block contiguously and in
+// instruction order: coalescing only ever joins two markers that share a
+// block, and it does so by scanning forward from the earlier one to the
+// later, so the later marker must be reachable by that scan. Markers of
+// *different* blocks may appear in any relative
+// order — a cross-block pair never coalesces — so block and function groups
+// need not be globally sorted. `collectCoverageMarkerOps` produces markers
+// grouped by function, then block, then position, which satisfies this.
+//
+// Line markers in the same basic block, with nothing between them that can
+// abandon the invocation, all execute exactly the same number of times, so
+// they can share one counter and one runtime probe. That sharing is what
+// shrinks emitted shader code: probe count, not counter width, is what
+// scales SPIR-V size.
+//
+// `outSlots[i]` is the counter index assigned to `markerOps[i]`.
+// `outEmitsProbe[i]` selects the single marker per group that emits the
+// runtime counter update; it is placed at the *last* marker of the group so
+// that reaching it proves every earlier marker in the group executed
+// (placing it first would over-report a group entered but abandoned
+// partway). `outCounterCount` is the number of distinct slots assigned.
+// Function and branch markers always take a dedicated slot.
+void assignCoverageCounterSlots(
+    List<IRInst*> const& markerOps,
+    List<UInt>& outSlots,
+    List<bool>& outEmitsProbe,
+    UInt& outCounterCount);
 
 } // namespace Slang
 

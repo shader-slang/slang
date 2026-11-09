@@ -28,18 +28,36 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           sparse-checkout: .github/cmake-options-matrix.json
           sparse-checkout-cone-mode: false
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/cmake-options-matrix.json
+          sparse-checkout-cone-mode: false
+
       - id: set-matrix
         run: |
           {
             echo "matrix<<MATRIX_EOF"
-            cat .github/cmake-options-matrix.json
+            jq '{include: [.include[] | select(.macos_only != "true")]}' \
+              .github/cmake-options-matrix.json
             echo "MATRIX_EOF"
-          } >> $GITHUB_OUTPUT
+          } >> "$GITHUB_OUTPUT"
 
   build:
     needs: setup
@@ -49,7 +67,7 @@ jobs:
       contents: read
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
       # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is
       # writable by UID/GID 1001. The published image has no named non-root user.
       options: --user 1001:1001
@@ -63,7 +81,24 @@ jobs:
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           submodules: "recursive"
@@ -211,6 +246,28 @@ jobs:
         if: matrix.install_test == 'true' && matrix.windows_only != 'true'
         run: |
           cmake --install build --config "$cmake_config" --prefix install
+          # The monolithic standard-module library must be installed *in place of*
+          # the loose module tree: the single library is present and no loose
+          # *.slang-module files are installed. Exclusivity is checked on the
+          # install prefix: the build tree intentionally contains both forms, so
+          # the absence of loose modules is only meaningful after install.
+          # See SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY.
+          if [ "${{ matrix.option }}" = "SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY" ]; then
+            loose=$(find install -name '*.slang-module')
+            if [ -n "$loose" ]; then
+              echo "ERROR: loose .slang-module files were installed alongside the monolithic library:"
+              echo "$loose"
+              exit 1
+            fi
+            lib=$(find install \( -name 'slang-standard-modules*.dll' -o -name 'libslang-standard-modules*.so' -o -name 'libslang-standard-modules*.dylib' \))
+            if [ -z "$lib" ]; then
+              echo "ERROR: the monolithic standard-modules library was not installed"
+              find install -iname '*standard-modules*' || true
+              exit 1
+            fi
+            echo "Monolithic install OK: loose modules absent, library present:"
+            echo "$lib"
+          fi
           # Minimal consumer that resolves the exported slang::slang target.
           mkdir -p consumer
           cat >consumer/CMakeLists.txt <<'EOF'
@@ -226,3 +283,39 @@ jobs:
           # (`cmake` on Windows, `${CMAKE_INSTALL_LIBDIR}/cmake/slang`
           # elsewhere; see SLANG_CMAKE_CONFIG_DIR in CMakeLists.txt).
           cmake -S consumer -B consumer/build -DCMAKE_PREFIX_PATH="$PWD/install"
+
+      # Compile a shader that imports standard modules (slang.numerics,
+      # slang.functional) with the *installed* compiler, so the modules are
+      # resolved through the monolithic library -- exercising its lookup, LZ4
+      # decompression, and IR deserialization end to end. The install-prefix
+      # file checks above prove presence/absence but cannot catch an incomplete
+      # payload, an export mismatch, or a decompression failure; this does. The
+      # negative case removes the library and requires the same import to fail,
+      # proving the library (not a stray loose file) was the source. This
+      # container is native x86_64 Linux, so the built compiler always runs.
+      - name: Verify monolithic library import at runtime (${{ matrix.option }})
+        if: matrix.option == 'SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY'
+        run: |
+          slangc="install/bin/slangc"
+          export PATH="$PWD/install/bin:$PATH"
+          export LD_LIBRARY_PATH="$PWD/install/lib:$PWD/install/bin:${LD_LIBRARY_PATH:-}"
+          shader="tests/functional/numerics-interoperability.slang"
+          args=(-target hlsl -entry computeMain -stage compute -experimental-feature)
+
+          echo "== positive: standard-module import must succeed through the installed library =="
+          "$slangc" "$shader" "${args[@]}" -o "$RUNNER_TEMP/monolithic-positive.hlsl"
+
+          lib=$(find install -name 'libslang-standard-modules*.so' | head -n1)
+          if [ -z "$lib" ]; then
+            echo "ERROR: could not locate the installed monolithic library for the negative test"
+            exit 1
+          fi
+          echo "== negative: with $lib removed, the same import must fail =="
+          mv "$lib" "$lib.disabled"
+          if "$slangc" "$shader" "${args[@]}" -o "$RUNNER_TEMP/monolithic-negative.hlsl" 2>/dev/null; then
+            echo "ERROR: import unexpectedly succeeded with the monolithic library removed"
+            mv "$lib.disabled" "$lib"
+            exit 1
+          fi
+          mv "$lib.disabled" "$lib"
+          echo "Runtime import check passed: import works via the library and fails without it."

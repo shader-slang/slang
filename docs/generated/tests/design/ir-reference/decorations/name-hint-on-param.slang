@@ -14,7 +14,7 @@
 // the `param %tid` line it precedes, which is the shape a backend relies on
 // when it names the emitted variable after the source parameter.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

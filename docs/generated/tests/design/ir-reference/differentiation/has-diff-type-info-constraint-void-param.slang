@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#opcodes-with-no-producer-at-head
-//META: doc_section_digest=2c918d154de28073fe1591f11040486a5209f2074ed76e85a18eb3170c74b205
+//META: doc_section_digest=b305d45dce49ac799097e7d952919c0edcce75eeea9a36ad08940dcdf70cf10c
 //META: purpose=The __hasDiffTypeInfo constraint lowers to a void generic parameter satisfied by a void value, so no DiffTypeInfo inst is ever built.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -22,7 +22,7 @@
 // pattern out of the preamble, and the bracketing `CHECK-NOT`s require that no
 // `DiffTypeInfo` inst exists in the section even though the feature was used.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

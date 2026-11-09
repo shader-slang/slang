@@ -425,9 +425,10 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                 // The `continue` label warrants a bit more careful explanation,
                 // because it will *not* refer to the block that was regsitered
                 // as the continue target in the IR `loop` instruction. This
-                // is because we will always emit our loops as `for(;;) { ... }`
-                // with no continue clause at all, so that a `continue` in
-                // the output code will always refer to the top of the loop.
+                // is because we will always emit an unconditional loop with no
+                // continue clause at all (`for(;;)` in C-like targets, `loop` in
+                // WGSL), so that a `continue` in the output code will always refer
+                // to the top of the loop.
                 //
                 // This means that the `continue` label for the purposes of
                 // structured control flow will be the start of the loop body:

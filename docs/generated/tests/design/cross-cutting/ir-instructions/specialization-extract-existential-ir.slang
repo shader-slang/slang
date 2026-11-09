@@ -18,7 +18,7 @@
 // shows the existential is a packed triple rather than an opaque value the
 // callee dispatches on directly.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IShape { float area(); }
 struct Sq : IShape { float s; float area() { return s * s; } }

@@ -1,6 +1,7 @@
 // diagnostic-annotation-util.cpp
 #include "diagnostic-annotation-util.h"
 
+#include "core/slang-char-util.h"
 #include "core/slang-string-util.h"
 
 namespace Slang
@@ -71,6 +72,26 @@ static bool checkAnnotations(
     bool exhaustive,
     List<String>& outMissingAnnotations);
 
+// Recognizes annotation comments such as //METAL: and /*HLSL: regardless of the active prefix.
+// Checks for another test run must not become the source line of the next active annotation.
+static bool isAnnotationStart(
+    const UnownedStringSlice& line,
+    const UnownedStringSlice& commentMarker)
+{
+    if (!line.startsWith(commentMarker))
+        return false;
+    auto content = line.tail(commentMarker.getLength());
+    Index colon = content.indexOf(':');
+    if (colon <= 0)
+        return false;
+    for (Index i = 0; i < colon; ++i)
+    {
+        if (!CharUtil::isAlphaOrDigit(content[i]) && content[i] != '_' && content[i] != '-')
+            return false;
+    }
+    return true;
+}
+
 static SlangResult parseAnnotations(
     const UnownedStringSlice& sourceText,
     const UnownedStringSlice& prefix,
@@ -101,12 +122,28 @@ static SlangResult parseAnnotations(
 
     int lastNonAnnotationLine = -1;
     bool inBlockComment = false;
+    bool inInactiveAnnotationBlock = false;
     int blockCommentSourceLine = -1;
 
     for (Index i = 0; i < lines.getCount(); ++i)
     {
         const auto& line = lines[i];
         UnownedStringSlice trimmedLine = line.trim();
+
+        if (inInactiveAnnotationBlock)
+        {
+            if (trimmedLine.startsWith(UnownedStringSlice::fromLiteral("*/")))
+                inInactiveAnnotationBlock = false;
+            continue;
+        }
+        if (!inBlockComment &&
+            isAnnotationStart(trimmedLine, UnownedStringSlice::fromLiteral("/*")) &&
+            !trimmedLine.startsWith(blockStart.getUnownedSlice()))
+        {
+            inInactiveAnnotationBlock =
+                trimmedLine.indexOf(UnownedStringSlice::fromLiteral("*/")) == -1;
+            continue;
+        }
 
         // Check for block comment start
         if (!inBlockComment && trimmedLine.startsWith(blockStart.getUnownedSlice()))
@@ -233,7 +270,9 @@ static SlangResult parseAnnotations(
                 outAnnotations.add(annotation);
             }
         }
-        else if (trimmedLine.getLength() > 0)
+        else if (
+            trimmedLine.getLength() > 0 &&
+            !isAnnotationStart(trimmedLine, UnownedStringSlice::fromLiteral("//")))
         {
             // Track the last non-empty, non-annotation line
             lastNonAnnotationLine = int(i);

@@ -269,8 +269,8 @@ accepts whitespace-separated decimal values instead.
 
 Line coverage is one of three modes. `-trace-function-coverage` adds one entry per
 function. `-trace-branch-coverage` adds one entry per branch arm — `if`/`else` arms,
-loop-condition outcomes, and `switch` arms; `&&`, `||`, and `?:` are not instrumented — so a
-report can give true/false counts per condition. The modes are independent. The converter
+loop-condition outcomes, `switch` arms, and the true/false arms of `?:` conditions and of the
+left operands of `&&` and `||` — so a report can give true/false counts per condition. The modes are independent. The converter
 emits `FN:`/`FNDA:` and `BRDA:` records for them. `-trace-coverage-boolean` replaces atomic
 counting with a plain store of 1 in whichever modes are enabled; it enables no mode by
 itself. Use it when hit/not-hit is enough.
@@ -282,6 +282,19 @@ Hosts that compile shaders at runtime through the C++ API read the same informat
 entry point metadata (`slang::ISyntheticResourceMetadata`: binding location;
 `slang::ICoverageTracingMetadata`: counters and source attribution) instead of a sidecar
 file.
+
+## Coverage integration options
+
+| Your host                             | Start here                                                       | Binding demonstrated                                                     |
+| ------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Uses slang-rhi                        | [Image pipeline](../../examples/shader-coverage-image-pipeline/) | Compiler-assigned placement, registered with RHI before program creation |
+| Uses slang-rhi and needs a fixed slot | [BVH traversal](../../examples/shader-coverage-bvh-traversal/)   | Explicit placement, registered and bound through the same RHI API        |
+| Owns its runtime, without slang-rhi   | [Selectable backends](../../examples/shader-coverage-backends/)  | Native CPU/CUDA/Vulkan/Metal binding from compiler metadata              |
+| Loads a precompiled CPU shader        | [CPU tutorial](../../examples/shader-coverage-tutorial/)         | Standalone host using a sidecar manifest                                 |
+
+Both RHI examples currently run on Vulkan. RHI's synthetic-resource API supports
+Vulkan and CUDA; native coverage also works on CPU and Metal. Automatic versus
+explicit placement is independent of whether the host uses RHI.
 
 For details:
 
@@ -301,14 +314,14 @@ For details:
   produce identical counter values for the same inputs. The place to start when moving from
   the tutorial's CPU dispatch to your own target.
 - [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline) —
-  Vulkan, in-process API, auto-allocated binding: the compiler picks the coverage slot and
+  Vulkan via slang-rhi, in-process API, auto-allocated binding: the compiler picks the coverage slot and
   the host reads it back from the metadata after compilation. Multi-stage image kernels
   (denoise, tone map, gamma) with many-armed switches; a smoke-vs-full run shows branch and
   function coverage catching switch arms that line coverage alone marks covered. Also
   demonstrates count vs boolean recording modes and counter-width selection.
 - [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal) —
-  Vulkan, in-process API, explicit binding: the host pins the coverage slot up front with
-  `TraceCoverageBinding` so the pipeline layout is fixed before compilation. BVH ray
+  Vulkan via slang-rhi, in-process API, explicit binding: the host pins the coverage slot up front with
+  `TraceCoverageBinding`, then supplies the resulting metadata to RHI. BVH ray
   traversal where branch coverage surfaces input-shape gaps in the test scene: degenerate
   triangles, the traversal-stack-overflow fallback, and material-dispatch arms the default
   mesh never fires.

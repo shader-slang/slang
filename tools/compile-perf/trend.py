@@ -23,6 +23,7 @@ compares only against same-runner points.
     python3 trend.py --results <dir> --window 7 --rel 1.10 --abs 2.0
 """
 import argparse
+from dataclasses import asdict, dataclass
 import json
 import os
 import statistics
@@ -36,6 +37,31 @@ from lib import analyze, manifest
 # stay stdlib-only, and importing them from there is what keeps the producer
 # and the classifier from drifting apart.
 from slack_status import EXIT_CANNOT_EVALUATE, EXIT_REGRESSION
+
+
+@dataclass(frozen=True)
+class MetricChange:
+    """One workload counter's measured value compared with a frozen baseline median.
+
+    Candidate archives store these four named fields as a JSON object. In a
+    candidate, value is the first batch's median; in a confirmed change, it is
+    the rerun's median. Ratio and delta are derived so they cannot drift from
+    the measurements they describe. Units follow the counter (ms or KiB).
+    """
+    workload: str
+    counter: str
+    baseline: float
+    value: float
+
+    @property
+    def ratio(self):
+        """Return the measured value relative to the positive baseline."""
+        return self.value / self.baseline
+
+    @property
+    def delta(self):
+        """Return the increase in the counter's native unit."""
+        return self.value - self.baseline
 
 
 def abort(msg):
@@ -143,6 +169,59 @@ def check_threshold_order(rel, warn_rel):
               f"every warning-level change to an error")
 
 
+def point_runner(point, history_runner):
+    """The runner fingerprint for `point`, or "" when it is unknown.
+
+    Release points deliberately omit a per-point runner because they all use
+    the release-sweep runner recorded at series level. Daily points do not
+    share that invariant: an absent runner means the legacy point's machine is
+    unknown, so inheriting `history_runner` would make unrelated measurements
+    look comparable.
+    """
+    if point.get("kind") == "release":
+        return history_runner
+    return point.get("runner", "")
+
+
+def comparable_metric_values(current, points, key, provenance_keys):
+    """Values for `key` whose complete provenance matches `current`.
+
+    Missing provenance is never evidence of equality. In particular, two
+    legacy points that both predate a marker must not match merely because
+    their dictionary lookups both return None.
+    """
+    current_provenance = tuple(current["metrics"].get(k) for k in provenance_keys)
+    if any(value is None for value in current_provenance):
+        return []
+
+    values = []
+    for point in points:
+        if key not in point.get("metrics", {}):
+            continue
+        point_provenance = tuple(point["metrics"].get(k) for k in provenance_keys)
+        if (all(value is not None for value in point_provenance)
+                and point_provenance == current_provenance):
+            values.append(point["metrics"][key])
+    return values
+
+
+def save_candidates(args, current, window, regressions, warnings, notes, judged_count):
+    """Freeze the first comparison before confirmation can change any measurements.
+
+    MetricChange objects retain the baseline median and the first batch's value.
+    Saving the window labels and thresholds makes the remote
+    reporting job independent of changes to the rolling history after this run.
+    """
+    with analyze.open_output(args.candidates) as fh:
+        json.dump({"label": current["label"], "runner": current.get("runner", ""),
+                   "baseline_labels": [p["label"] for p in window],
+                   "thresholds": {"rel": args.rel, "warn_rel": args.warn_rel, "abs": args.abs},
+                   "regressions": [asdict(change) for change in regressions],
+                   "warnings": [asdict(change) for change in warnings], "notes": notes,
+                   "judged_count": judged_count},
+                  fh, indent=2)
+
+
 def main():
     # The Windows runner's Python defaults to a cp1252 console encoding, which
     # cannot encode this report's non-ASCII table headers — and the flag table
@@ -189,7 +268,11 @@ def main():
     # the label it registered so the right point is judged unconditionally.
     ap.add_argument("--label", default=None,
                     help="judge the point with this label instead of the last point")
+    ap.add_argument("--candidates", metavar="JSON",
+                    help="save the baseline and candidate changes for a confirmation run; "
+                         "do not emit performance alarms")
     args = ap.parse_args()
+    notes = []
 
     # argparse cannot express a relation between two options, so the gate's
     # central precondition is checked here. See check_threshold_order.
@@ -201,7 +284,10 @@ def main():
     series = analyze.read_json(tpath)
     pts = series.get("points", [])
     if len(pts) < 2:
-        print("not enough points to trend (need >= 2)")
+        msg = "not enough points to trend (need >= 2)"
+        print(msg)
+        if args.candidates:
+            save_candidates(args, pts[-1] if pts else {"label": args.label}, [], [], [], [msg], 0)
         return
 
     hist_runner = series.get("runner", "")
@@ -214,26 +300,60 @@ def main():
         cur_idx = len(pts) - 1
     current = pts[cur_idx]
     earlier = pts[:cur_idx]
-    # Release points carry no per-point runner field by design: they are all built
-    # by the release-sweep job on the machine recorded in runner.json (hist_runner).
-    # The `or hist_runner` below is not defensive fallback — it is that data-model
-    # invariant: a missing runner field means "this is a release point, use hist_runner".
-    cur_runner = current.get("runner") or hist_runner
+    cur_runner = point_runner(current, hist_runner)
 
     print(f"trend: current={current['label']} ({current['date']}, {current['kind']})  "
           f"runner={cur_runner or 'unset'}")
 
-    # Restrict the baseline to points on the same runner, strictly before the
-    # judged point in series order.
-    prior = [p for p in earlier if (p.get("runner") or hist_runner) == cur_runner]
     # Baseline defaults to DAILY points only: release points are official
     # prebuilt binaries while dailies are runner-built with matched flags but a
     # different MSVC toolset — a build-provenance offset (uniform few-%, and
     # 30%+ on single hot loops) that is not a code regression. Judging tonight
     # against recent nights keeps the baseline provenance-consistent; use
     # --baseline-kind any for ad-hoc cross-kind comparisons.
+    #
+    # In that default mode the candidates come from daily/ on disk rather than
+    # from the tracking series, because the series deliberately keeps only the
+    # dailies dated after the last release (`assemble`). That truncation is the
+    # right shape for the rendered line — release history, then the current tail
+    # — but reusing it as the ALERTING baseline means every release erases the
+    # comparable nights alerting depends on: with --min-baseline 3, the three
+    # nights after a release judge nothing at all. v2026.18 shipped 2026-09-15
+    # and the 09-16/09-17/09-18 nightlies each printed "only N comparable
+    # trailing point(s) (need 3); skipping trend judgement" and passed green —
+    # which is how #13008's regression went unreported on the night it landed.
+    # The points are on disk the whole time; only the series had dropped them.
+    #
+    # --baseline-kind any still reads the series, since mixing kinds is an
+    # explicit ad-hoc request and the series is the only place release points
+    # carry comparable metrics.
+    def _order(p):
+        """Series order: date, then the commit's full timestamp for same-date
+        siblings, then the label as a deterministic last resort."""
+        return (p["date"], p.get("commit_time") or "", p["label"])
+
     if args.baseline_kind == "daily":
-        prior = [p for p in prior if p.get("kind") == "daily"]
+        # The UNION of the series' daily points and every daily sweep on disk,
+        # deduped by label. The on-disk point wins a collision because it is
+        # reconstructed through point_metrics() and therefore carries the
+        # current provenance markers; tracking.json may have been written by an
+        # older tool and lack them. The series remains the fallback when daily/
+        # is absent.
+        by_label = {p["label"]: p for p in earlier if p.get("kind") == "daily"}
+        for p in analyze.daily_series_points(args.results):
+            by_label[p["label"]] = p
+        cur_order = _order(current)
+        candidates = sorted((p for p in by_label.values() if _order(p) < cur_order),
+                            key=_order)
+    else:
+        candidates = list(earlier)
+
+    # Restrict the baseline to points on the same known runner. A legacy daily
+    # point with no runner is unknown provenance, not a release point that can
+    # inherit the series-level release-sweep runner.
+    prior = [p for p in candidates
+             if cur_runner and point_runner(p, hist_runner) == cur_runner]
+
     window = prior[-args.window:]
 
     if hist_runner and cur_runner and cur_runner != hist_runner:
@@ -241,29 +361,77 @@ def main():
                f"was built on '{hist_runner}'. Comparing against same-runner points "
                f"only; re-run perf-compile-release-sweep (force=true) to resync the "
                f"history to this machine.")
+        notes.append(msg)
         print(f"WARNING: {msg}")
-        emit_gha_command(f"::warning title=Perf runner mismatch::{msg}")
+        if not args.candidates:
+            emit_gha_command(f"::warning title=Perf runner mismatch::{msg}")
 
     if len(window) < args.min_baseline:
         msg = (f"only {len(window)} comparable trailing point(s) "
                f"(need {args.min_baseline}); skipping trend judgement.")
         print(msg)
-        emit_gha_command(f"::warning title=Perf trend::{msg}")
+        if args.candidates:
+            save_candidates(args, current, window, [], [], notes + [msg], 0)
+        else:
+            emit_gha_command(f"::warning title=Perf trend::{msg}")
         return
 
     base_labels = f"{window[0]['label']}..{window[-1]['label']}"
     regressions = []
     warnings = []
+    provenance_skipped = set()
+    judged_count = 0
     for key, cur in sorted(current.get("metrics", {}).items()):
         wl, _, counter = key.partition("|")
         if not judged(wl, counter):
             continue
-        baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
+        # Per-workload provenance axes, alongside the runner fingerprint and the
+        # point kind that the window was already filtered on. These are checked
+        # HERE rather than on the window because they vary PER WORKLOAD within a
+        # single point, so dropping whole points would discard good baselines to
+        # repair bad ones:
+        #
+        #   timer schema — decides how the compiler ATTRIBUTES time, not merely
+        #     how many counters it reports. The same unchanged compile read
+        #     `specializeModule` at 16.4 ms coarse and 33.1 ms detailed, with
+        #     `wall_ms` unmoved and the sub-timers summing past their parent.
+        #     api-mode workloads are permanently coarse (their driver takes no
+        #     such flag) while target/module/link went detailed in #13009, so one
+        #     point legitimately holds both.
+        #
+        #   workload size — canonical_runs() falls back to an off-default size
+        #     when no default-size row exists, so a point swept before a resize
+        #     publishes the SAME metric key measured at the old size.
+        #
+        # Those two were live on the 2026-09-20 nightly, which flagged 25 regressions
+        # against a commit identical to the night before: 7 from the schema
+        # change, 12 from #13035's resizes. Neither is a code change.
+        #
+        # Sampling strategy also matters: ABC ABC ABC spaces a workload's
+        # samples differently from AAA BBB CCC, changing cache/host exposure.
+        # A switch to interleaving must fill a compatible baseline instead of
+        # attributing that measurement-method change to the compiler.
+        #
+        # An absent marker (data predating the field) counts as NOT matching
+        # rather than as a wildcard — the same refusal the runner check makes.
+        # Admitting unknown provenance risks a false alert; excluding it costs a
+        # few nights of reduced coverage while the window refills.
+        prov_keys = (f"{wl}|{analyze.SCHEMA_MARKER}", f"{wl}|{analyze.SIZE_MARKER}",
+                     f"{wl}|{analyze.SAMPLING_MARKER}")
+        present = [p for p in window if key in p.get("metrics", {})]
+        baseline = comparable_metric_values(current, present, key, prov_keys)
         if len(baseline) < args.min_baseline:
+            # Only counts as provenance-skipped when the counter WAS present in
+            # enough trailing points and the provenance filter is what removed
+            # them — otherwise this is the ordinary "not enough history yet"
+            # case (a new workload), which is not worth reporting.
+            if len(present) >= args.min_baseline:
+                provenance_skipped.add(wl)
             continue
         med = statistics.median(baseline)
         if med <= 0:
             continue
+        judged_count += 1
         ratio = cur / med
         delta = cur - med
         # The floor is PER COUNTER, not the flat --abs: this series carries
@@ -275,46 +443,76 @@ def main():
         verdict = classify_metric(ratio, delta, args.rel, args.warn_rel,
                                   abs_floor_for(counter, args.abs))
         if verdict == "error":
-            regressions.append((wl, counter, med, cur, ratio, delta))
+            regressions.append(MetricChange(wl, counter, med, cur))
         elif verdict == "warning":
-            warnings.append((wl, counter, med, cur, ratio, delta))
+            warnings.append(MetricChange(wl, counter, med, cur))
 
-    regressions.sort(key=lambda r: -r[4])
-    warnings.sort(key=lambda r: -r[4])
+    # Surfaced rather than silent: a workload dropping out of judgement looks
+    # identical to a workload that passed, and the whole point of the schema
+    # filter is that it trades coverage for correctness — the reader has to be
+    # able to see which side of that trade a given run landed on.
+    if provenance_skipped:
+        shown = sorted(provenance_skipped)
+        listed = ", ".join(shown[:6]) + (f", +{len(shown) - 6} more" if len(shown) > 6 else "")
+        msg = (f"{len(shown)} workload(s) not judged: their trailing points were "
+               f"measured with different or unknown timer schema, size, or sampling "
+               f"strategy ({listed}). A measurement-method change is not a "
+               f"regression; judgement resumes once the window refills with "
+               f"comparable points.")
+        notes.append(msg)
+        print(f"WARNING: {msg}")
+        if not args.candidates:
+            emit_gha_command(f"::warning title=Perf measurement provenance::{msg}")
+
+    if args.candidates:
+        save_candidates(args, current, window, regressions, warnings, notes, judged_count)
+        return
+    report_changes(args, current["label"], cur_runner, base_labels, len(window),
+                   regressions, warnings, judged_count)
+
+
+def report_changes(limits, label, cur_runner, base_labels, window_count,
+                   regressions, warnings, judged_count):
+    """Render a classified comparison and publish its warning count and exit code.
+
+    The nightly confirmation reader uses this same renderer after checking the
+    second batch against the saved baseline; ad-hoc trend checks use it directly.
+    limits supplies rel/warn_rel ratio thresholds, abs (the ms floor), and
+    no_fail (whether to suppress the regression exit). label identifies the
+    measured point; regressions and warnings contain MetricChange objects.
+    judged_count counts metrics compared in the original batch, including those
+    below the alert thresholds; zero means no performance verdict is available.
+    """
+    regressions.sort(key=lambda change: -change.ratio)
+    warnings.sort(key=lambda change: -change.ratio)
 
     # The absolute floor is quoted per unit, and read back out of
     # abs_floor_for rather than restated: the memory floor is not --abs, so a
-    # single "{args.abs} ms" would misreport the gate every memory counter is
+    # single "{limits.abs} ms" would misreport the gate every memory counter is
     # actually judged against.
-    mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", args.abs))
-    print(f"baseline: trailing {len(window)} point(s) [{base_labels}], "
-          f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
-          f">= {args.warn_rel}, both gated on an absolute delta of "
-          f">= {args.abs} ms for timers / {mem_floor} for memory counters\n")
+    mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", limits.abs))
+    print(f"baseline: trailing {window_count} point(s) [{base_labels}], "
+          f"median per metric; ERROR at ratio >= {limits.rel}, WARNING at "
+          f">= {limits.warn_rel}, both gated on an absolute delta of "
+          f">= {limits.abs} ms for timers / {mem_floor} for memory counters\n")
 
-    # `warnings` is the ONLY key the workflow reads, and the only one it
-    # needs: the Slack step distinguishes a warnings-only night from a clean
-    # one, which the exit code alone cannot do since warnings deliberately do
-    # not fail the job. A regression is already carried by the exit code
-    # (EXIT_REGRESSION), so an `errors` key would be a second
-    # spelling of the same fact — one that no reader would notice going stale.
-    #
-    # This write must stay AHEAD of every path that leaves main() below — the
-    # clean-night `return` and the regression `SystemExit(EXIT_REGRESSION)`.
-    # Both are exits
-    # the workflow still reads the output on, and an unwritten key falls back
-    # to the step's `|| '0'`, which reports a warnings-only night as clean:
-    # the one state this key exists to distinguish. Classify, emit, then
-    # report — do not move reporting logic above this block.
+    # Publish both outputs before any return or regression exit. Zero candidates
+    # can mean either a clean comparison or no comparable history at all.
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a", encoding="utf-8") as fh:
-            fh.write(f"warnings={len(warnings)}\n")
+            fh.write(f"warnings={len(warnings)}\njudged_count={judged_count}\n")
+
+    if judged_count == 0:
+        message = "Insufficient comparable history — no metrics judged."
+        print(message)
+        write_step_summary(f"### Compile-perf trend — {label}\n\n{message}")
+        return
 
     if not regressions and not warnings:
-        print(f"OK — no compile-perf regression in {current['label']} vs trailing median.")
-        write_step_summary(f"### Compile-perf trend — {current['label']}\n\n"
-                f"OK — no regression vs trailing {len(window)}-point median "
+        print(f"OK — no compile-perf regression in {label} vs trailing median.")
+        write_step_summary(f"### Compile-perf trend — {label}\n\n"
+                f"OK — no regression vs trailing {window_count}-point median "
                 f"(`{base_labels}`).")
         return
 
@@ -326,15 +524,18 @@ def main():
     # 200 MB peak as "204800.0 ms". The column headers say "median"/"Δ"
     # without a unit for the same reason — fmt_qty puts the unit on each value.
     print(f"{'workload':20s}{'counter':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
-    rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + current["label"],
-            f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
-            f"runner `{cur_runner}`. ERROR ≥ {args.rel}×, WARNING ≥ {args.warn_rel}×.\n"]
+    rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + label,
+            f"\nvs trailing {window_count}-point median (`{base_labels}`), "
+            f"runner `{cur_runner}`. ERROR ≥ {limits.rel}×, WARNING ≥ {limits.warn_rel}×.\n"]
 
     def table(items, kind, gha):
         rows.append(f"\n**{kind}** ({len(items)}):\n")
         rows.append("| workload | counter | median | current | ratio | Δ |")
         rows.append("|---|---|--:|--:|--:|--:|")
-        for wl, counter, med, cur, ratio, delta in items:
+        for change in items:
+            wl, counter = change.workload, change.counter
+            med, cur = change.baseline, change.value
+            ratio, delta = change.ratio, change.delta
             print(f"{wl:20s}{counter:26s}{analyze.fmt_qty(counter, med):>12s}"
                   f"{analyze.fmt_qty(counter, cur):>12s}{ratio:7.2f}x"
                   f"{analyze.fmt_qty(counter, delta, signed=True):>12s}")
@@ -354,7 +555,7 @@ def main():
     write_step_summary("\n".join(rows))
 
     print(f"\n{len(regressions)} regression(s), {len(warnings)} warning(s) flagged.")
-    if regressions and not args.no_fail:
+    if regressions and not limits.no_fail:
         raise SystemExit(EXIT_REGRESSION)
 
 
@@ -367,6 +568,44 @@ assert not judged("minimal", "emitEntryPointsSourceFromIR"), \
     "non-primary ms timers are not judged for workloads that do not list them"
 assert abs_floor_for("peakRssKb", 2.0) == 1024.0, "memory floor is 1 MiB"
 assert abs_floor_for("compileInner", 2.0) == 2.0, "time floor is --abs"
+
+# Runner provenance differs by point kind: only releases inherit the runner
+# recorded for the release history. A daily point with no runner is legacy data
+# from an unknown machine and must stay unknown.
+assert point_runner({"kind": "release"}, "r1") == "r1"
+assert point_runner({"kind": "daily"}, "r1") == ""
+assert point_runner({"kind": "daily", "runner": "r2"}, "r1") == "r2"
+
+# Complete, equal per-workload provenance admits a metric. Missing any
+# marker on either side admits nothing — most importantly, two missing values
+# do not become a false match through None == None.
+_PROV_KEYS = (f"minimal|{analyze.SCHEMA_MARKER}",
+              f"minimal|{analyze.SIZE_MARKER}",
+              f"minimal|{analyze.SAMPLING_MARKER}")
+_KNOWN_METRICS = {"minimal|compileInner": 100.0,
+                  _PROV_KEYS[0]: 1.0, _PROV_KEYS[1]: 64.0, _PROV_KEYS[2]: 1.0}
+_CURRENT = {"metrics": dict(_KNOWN_METRICS)}
+assert comparable_metric_values(
+    _CURRENT, [{"metrics": dict(_KNOWN_METRICS)}],
+    "minimal|compileInner", _PROV_KEYS) == [100.0]
+_MISMATCHED_METRICS = dict(_KNOWN_METRICS)
+_MISMATCHED_METRICS[_PROV_KEYS[1]] = 128.0
+assert comparable_metric_values(
+    _CURRENT, [{"metrics": _MISMATCHED_METRICS}],
+    "minimal|compileInner", _PROV_KEYS) == [], \
+    "complete but unequal provenance must not enter the baseline"
+for _missing in _PROV_KEYS:
+    _legacy_current = {"metrics": dict(_KNOWN_METRICS)}
+    del _legacy_current["metrics"][_missing]
+    assert comparable_metric_values(
+        _legacy_current, [{"metrics": dict(_KNOWN_METRICS)}],
+        "minimal|compileInner", _PROV_KEYS) == []
+    _legacy_point = {"metrics": dict(_KNOWN_METRICS)}
+    del _legacy_point["metrics"][_missing]
+    assert comparable_metric_values(
+        _CURRENT, [_legacy_point], "minimal|compileInner", _PROV_KEYS) == []
+del _PROV_KEYS, _KNOWN_METRICS, _MISMATCHED_METRICS, _CURRENT
+del _missing, _legacy_current, _legacy_point
 
 # The two gates compose, and that composition is what the merge of the
 # two-tier gate and the unit-aware floor had to get right: a kb counter must
@@ -487,6 +726,12 @@ def _warnings_output_selfcheck():
     import tempfile
 
     def point(label, date, metrics):
+        metrics = dict(metrics)
+        workloads = {key.partition("|")[0] for key in metrics}
+        for workload in workloads:
+            metrics[f"{workload}|{analyze.SCHEMA_MARKER}"] = 1.0
+            metrics[f"{workload}|{analyze.SIZE_MARKER}"] = 64.0
+            metrics[f"{workload}|{analyze.SAMPLING_MARKER}"] = 1.0
         return {"label": label, "date": date, "kind": "daily",
                 "runner": "r1", "metrics": metrics}
 
@@ -565,6 +810,39 @@ def _warnings_output_selfcheck():
                     (f"trend fixture: {metrics} expected the step summary to lead "
                      f"with {want_header}, got {md.splitlines()[0]!r} — a run with "
                      f"any regression must not be headed by the warning icon")
+
+        # A real provenance transition: minimal is present throughout the
+        # trailing window but changes size tonight, while newcomer has no
+        # history at all. Only minimal is a provenance skip, it must not be
+        # classified as a regression, and Actions must receive the warning.
+        current_metrics = {
+            "minimal|compileInner": BASE * 1.20,
+            "parse|compileInner": BASE,
+            "newcomer|compileInner": BASE * 1.20,
+        }
+        current = point("2026-01-09-zzzzzzzzz", "2026-01-09", current_metrics)
+        current["metrics"][f"minimal|{analyze.SIZE_MARKER}"] = 128.0
+        with analyze.open_output(tpath) as fh:
+            json.dump({"runner": "r1", "points": history + [current]}, fh)
+        for f in (gho, summary):
+            with analyze.open_output(f) as fh:
+                fh.write("")
+        os.environ["GITHUB_ACTIONS"] = "true"
+        sys.argv = ["trend.py", "--results", d, "--label", current["label"]]
+        stdout = io.StringIO()
+        code = 0
+        with contextlib.redirect_stdout(stdout):
+            try:
+                main()
+            except SystemExit as e:
+                code = e.code or 0
+        report = stdout.getvalue()
+        assert code == 0 and "OK — no compile-perf regression" in report, \
+            "a size transition must suppress comparison, not become a regression"
+        assert "Perf measurement provenance" in report and "(minimal)" in report, \
+            "a provenance skip must emit an Actions warning naming the workload"
+        assert "newcomer" not in report, \
+            "a new workload with too little history is not a provenance skip"
     finally:
         sys.argv = saved_argv
         for k, v in saved_env.items():
@@ -577,6 +855,97 @@ def _warnings_output_selfcheck():
 
 _warnings_output_selfcheck()
 del _warnings_output_selfcheck
+
+
+def _daily_baseline_selfcheck():
+    """Exercise the on-disk daily union, collision rule, and current cutoff.
+
+    The tracking series intentionally contains only one stale baseline point;
+    daily/ contributes the two pre-release nights the rendered series dropped
+    and replaces the stale shared label with a provenance-bearing point. Two
+    future points ensure the current-point cutoff is also load-bearing.
+    """
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="trend_daily_baseline_selfcheck_")
+    saved_argv = sys.argv
+    saved_env = {k: os.environ.get(k)
+                 for k in ("GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "GITHUB_ACTIONS")}
+    try:
+        os.makedirs(os.path.join(d, "tracking"))
+        shared_label = "2026-01-03-ccccccccc"
+        current_label = "2026-01-04-ddddddddd"
+        stale_shared = {
+            "label": shared_label, "date": "2026-01-03", "kind": "daily",
+            "runner": "r1", "metrics": {"minimal|compileInner": 100.0},
+        }
+        current = {
+            "label": current_label, "date": "2026-01-04", "kind": "daily",
+            "runner": "r1", "metrics": {
+                "minimal|compileInner": 120.0,
+                f"minimal|{analyze.SCHEMA_MARKER}": 1.0,
+                f"minimal|{analyze.SIZE_MARKER}": 64.0,
+                f"minimal|{analyze.SAMPLING_MARKER}": 1.0,
+            },
+        }
+        with analyze.open_output(os.path.join(d, "tracking", "tracking.json")) as fh:
+            json.dump({"runner": "r1", "points": [stale_shared, current]}, fh)
+
+        def write_daily(label, date, value):
+            path = os.path.join(d, "daily", label)
+            os.makedirs(path)
+            with analyze.open_output(os.path.join(path, "results.json")) as fh:
+                json.dump([{
+                    "workload": "minimal", "size": 64,
+                    "timer_schema": "detailed",
+                    "sampling_strategy": "interleaved",
+                    "timers": {"compileInner": {"median": value}},
+                }], fh)
+            with analyze.open_output(os.path.join(path, "meta.json")) as fh:
+                json.dump({"date": date, "commit": label[-9:],
+                           "commit_time": f"{date}T00:00:00Z", "runner": "r1"}, fh)
+
+        for label, date, value in (
+                ("2026-01-01-aaaaaaaaa", "2026-01-01", 100.0),
+                ("2026-01-02-bbbbbbbbb", "2026-01-02", 100.0),
+                (shared_label, "2026-01-03", 100.0),
+                ("2026-01-05-eeeeeeeee", "2026-01-05", 1000.0),
+                ("2026-01-06-fffffffff", "2026-01-06", 1000.0)):
+            write_daily(label, date, value)
+
+        for key in saved_env:
+            os.environ.pop(key, None)
+        sys.argv = ["trend.py", "--results", d, "--label", current_label,
+                    "--window", "3"]
+        stdout = io.StringIO()
+        code = 0
+        with contextlib.redirect_stdout(stdout):
+            try:
+                main()
+            except SystemExit as e:
+                code = e.code or 0
+        report = stdout.getvalue()
+        assert code == EXIT_REGRESSION and "1 regression(s)" in report, \
+            "three restored on-disk baselines must make the 1.20x rise judgeable"
+        assert "trailing 3 point(s)" in report, \
+            "the shared label must be deduplicated and both omitted nights restored"
+        assert "2026-01-01-aaaaaaaaa..2026-01-03-ccccccccc" in report, \
+            "future on-disk points must not cross the current-point cutoff"
+    finally:
+        sys.argv = saved_argv
+        for key, value in saved_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_daily_baseline_selfcheck()
+del _daily_baseline_selfcheck
 
 
 def _abort_exit_code_selfcheck():

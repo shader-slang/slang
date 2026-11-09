@@ -447,6 +447,8 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     // Create the context type first (since the rest depend on it).
     auto minimalContextType = builder.createStructType();
     auto fullContextType = builder.createStructType();
+    // This adapter captures only original parameters, without a separate parameter context.
+    builder.addDecoration(fullContextType, kIROp_AutodiffParameterContextTypeDecoration);
 
     auto applyFunc = builder.createFunc();
     auto rematFunc = builder.createFunc();
@@ -502,7 +504,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
     auto rematCtxParam = rematFuncBuilder.emitParam(minimalContextType);
     rematFuncBuilder.addNameHintDecoration(rematCtxParam, UnownedStringSlice("minCtx"));
-    auto rematContextVar = rematFuncBuilder.emitVar((IRType*)fullContextType);
+    List<IRInst*> rematContextValues;
 
     IRBuilder contextTypeBuilder(builder.getModule());
     contextTypeBuilder.setInsertInto(builder.getModule());
@@ -566,10 +568,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
             }
             contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
 
-            rematFuncBuilder.emitStore(
-                rematFuncBuilder
-                    .emitFieldAddress(builder.getPtrType(structFieldType), rematContextVar, key),
-                rematContextValue);
+            rematContextValues.add(rematContextValue);
 
             if (as<IRVoidType>(bwdPropParam->getDataType()))
             {
@@ -696,7 +695,10 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
             applyFuncBuilder.emitMakeStruct(minimalContextType, List<IRInst*>()));
     }
 
-    rematFuncBuilder.emitReturn(rematFuncBuilder.emitLoad(rematContextVar));
+    // Preserve capture operands as SSA values, so expanding internal context
+    // arguments does not leave an unnecessary aggregate memory round trip.
+    rematFuncBuilder.emitReturn(
+        rematFuncBuilder.emitMakeStruct(fullContextType, rematContextValues));
 
     if ((Index)legacyBwdDiffFuncType->getParamCount() > bwdDiffFuncArgs.getCount())
     {

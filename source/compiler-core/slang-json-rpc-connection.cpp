@@ -231,6 +231,15 @@ SlangResult JSONRPCConnection::sendResult(
     return SLANG_OK;
 }
 
+SlangResult JSONRPCConnection::sendNullResult(const JSONValue& id)
+{
+    JSONResultResponse response;
+    response.id = id;
+    response.result = JSONValue::makeNull();
+
+    return sendRPC(&response);
+}
+
 SlangResult JSONRPCConnection::sendCall(
     const UnownedStringSlice& method,
     const RttiInfo* argsRttiInfo,

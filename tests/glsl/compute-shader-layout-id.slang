@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/compute-shader-layout-id.slang -target spirv -stage compute -entry main
 #version 450
 
 [vk::constant_id(1)]

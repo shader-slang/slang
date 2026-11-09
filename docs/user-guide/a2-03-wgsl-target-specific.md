@@ -56,6 +56,10 @@ The system-value semantics are translated to the following WGSL code.
 | SV_VulkanSamplePosition | *Not supported* |
 | SV_VulkanVertexID | `@builtin(vertex_index)` |
 
+_Note_ that `@builtin(instance_index)` counts from `firstInstance`, so `SV_InstanceID` includes the
+base instance on WGSL, unlike on D3D, SPIR-V and Metal. WGSL has no base-instance builtin to
+subtract, and `SV_StartInstanceLocation` is not supported.
+
 
 Supported HLSL features when targeting WGSL
 -------------------------------------------
@@ -159,8 +163,8 @@ WGSL requires explicit address space qualifiers. Slang automatically assigns app
 | Group Shared          | `workgroup`         |
 | Parameter Blocks      | `uniform`           |
 
-Module-scope `static const` globals are emitted as a WGSL `const` (a compile-time value) when their type is a scalar, vector, or matrix.
-A `static const` global of **array** type is instead emitted as a `var<private>` (with the same initializer), because a WGSL `const` is a compile-time value that may only be indexed by a const-expression, whereas a `var<private>` is addressable and so can be indexed by a runtime value (for example `positions[vertexID]`).
+Module-scope `static const` globals are emitted as a WGSL `const` (a compile-time value), including arrays.
+WGSL allows a concrete array value to be indexed by a runtime value (for example `positions[vertexID]`), and a `const` is not a variable, so a constant table does not count against WGSL's 8192-byte minimum-supported limit on private variables (WebKit enforces that limit).
 
 
 Matrix type translation

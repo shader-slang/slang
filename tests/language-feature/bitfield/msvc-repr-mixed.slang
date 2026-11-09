@@ -1,13 +1,12 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compile-arg -msvc-style-bitfield-packing
+//TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -msvc-style-bitfield-packing
+//TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -bitfield-packing-rules -compile-arg msvc
 
-// MSVC creates separate backing fields for different type sizes
+// The deprecated option creates separate backing fields for different type sizes,
+// like MSVC, but packs the fields within each backing integer MSB-first.
 // struct MixedSizes { uint8_t a:4; uint8_t b:4; uint16_t c:8; uint16_t d:8; }
-// First backing (uint8_t):  a=0xA (bits 4-7), b=0xB (bits 0-3) => 0xAB
-// Second backing (uint16_t): c=0xCD (bits 8-15), d=0xEF (bits 0-7) => 0xCDEF
-// Memory layout: [0xAB, padding, 0xCDEF] or [0xAB, padding, 0xEF, 0xCD] depending on endianness
-
-// CHECK: AB
-// CHECK-NEXT: CDEF
+// With the legacy flag, the uint8_t backing is 0xAB and the uint16_t backing is 0xCDEF.
+// With -bitfield-packing-rules msvc, their LSB-first values are 0xBA and 0xEFCD.
+// The two backing fields are separate under both modes because the type size changes.
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -15,7 +14,7 @@ RWStructuredBuffer<uint> outputBuffer;
 struct MixedSizes {
     uint8_t a : 4;   // First backing field (uint8_t)
     uint8_t b : 4;   // Same backing field
-    uint16_t c : 8;  // New backing field (uint16_t) due to type change
+    uint16_t c : 8;  // New backing field (uint16_t) due to type-size change
     uint16_t d : 8;  // Same backing field
 };
 

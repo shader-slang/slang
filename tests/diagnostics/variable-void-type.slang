@@ -5,7 +5,7 @@ void foo()
 {
 	void a;
 /*diag:
- ^^^^ invalid type 'void'
+ ^^^^ error E30009
  ^^^^ invalid type 'void'.
 */
 }

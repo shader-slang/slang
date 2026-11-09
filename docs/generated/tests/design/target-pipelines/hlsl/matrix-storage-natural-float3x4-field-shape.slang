@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices
-//META: doc_section_digest=8041b8729de3f94a856ac55d2d8461ddffd491518349fcd47c2422a784e25a3a
+//META: doc_section_digest=b6892a07f20e1bed38c81e547c6032137e43442412b027b4add1d9d062142325
 //META: purpose=A `row_major float3x4` field of a `ConstantBuffer` element struct becomes `struct _MatrixStorage_float3x4natural_<N> { float4 data_<M>[int(3)]; }` — the layout rule spells `natural` on HLSL and the storage field is an array of one row-vector per row.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

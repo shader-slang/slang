@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination
-//META: doc_section_digest=0e5b4c31fb3cb504b87417d8391d1c84f2175e1be41f81660fa7556568fce3ac
+//META: doc_section_digest=bb59c558aea3b3f33ef4607369f4d1671792112713a398501cfc6cf4c6c7ec6d
 //META: purpose=A DXR closesthit entry point with an inout Payload exercises replaceLocationIntrinsicsWithRaytracingObject — the payload parameter lowers to an IncomingRayPayloadKHR global variable and the SPIR-V emit declares OpCapability RayTracingKHR.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

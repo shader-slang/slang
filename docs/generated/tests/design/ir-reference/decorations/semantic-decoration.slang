@@ -14,7 +14,7 @@
 // with no index, and the CHECK pins `-1` as the second operand, which is
 // how "no explicit index" is encoded.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

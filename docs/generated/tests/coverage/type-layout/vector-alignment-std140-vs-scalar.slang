@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T17:00:00Z
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#global-scope-type-layout
-//META: doc_section_digest=e885f1a92beacc0053db90ae24923135a05a098bfc3c282c2580a971645fcec9
+//META: doc_section_digest=cb9b7a613d39760a93548dfbce14e96da09e14aa0f49313bd097e522bedd9206
 //META: purpose=Verifies a float3/float2/float struct lays out at offsets 0/16/24 under std140 vector power-of-two alignment but 0/12/20 under scalar layout natural packing.
 //META: intent=characterization
 //META: covers=source/slang/slang-type-layout.cpp

@@ -1325,13 +1325,22 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
         Type* thisParamType = diffTypeInfoWitness->getThisParamType();
         auto thisDiffWitness = diffTypeInfoWitness->getThisTypeDiffWitness();
 
-
-        if (thisParamType && thisDiffWitness)
+        if (thisParamType)
         {
-            auto originalThisParamType = thisParamType;
-            auto originalThisDiffWitness = thisDiffWitness;
-            thisParamType = makeDiffPairType(originalThisParamType, originalThisDiffWitness);
-            thisDiffWitness = makeDiffPairWitness(originalThisParamType, originalThisDiffWitness);
+            auto [thisParamValueType, thisParamMode] =
+                getParamInfoFromTypeWithModeWrapper(thisParamType);
+            auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamMode);
+            if (thisDiffWitness)
+            {
+                auto originalThisParamValueType = thisParamValueType;
+                auto originalThisDiffWitness = thisDiffWitness;
+                thisParamValueType =
+                    makeDiffPairType(originalThisParamValueType, originalThisDiffWitness);
+                thisDiffWitness =
+                    makeDiffPairWitness(originalThisParamValueType, originalThisDiffWitness);
+            }
+            thisParamType =
+                getParamTypeWithModeWrapper(astBuilder, thisParamValueType, differentiatedThisMode);
         }
 
         SubtypeWitness* resultDiffWitness = diffTypeInfoWitness->getReturnTypeDiffWitness();
@@ -3226,19 +3235,11 @@ Val* WitnessLookupIntVal::_substituteImplOverride(
 
 Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key)
 {
-    // Check if we can find an entry for this key.
-    auto unspecializedEntry = getUnspecializedLookupRec(astBuilder, key, witness);
-
-    // If we found a relevant entry, try to specialize it.
-    switch (unspecializedEntry.getFlavor())
+    auto lookedUpEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
+    switch (lookedUpEntry.getFlavor())
     {
     case RequirementWitness::Flavor::val:
-        {
-            auto specializedEntry = specializeLookedUpRec(astBuilder, witness, unspecializedEntry);
-            SLANG_ASSERT(specializedEntry.getFlavor() == RequirementWitness::Flavor::val);
-            return specializedEntry.getVal();
-        }
-        break;
+        return lookedUpEntry.getVal();
     default:
         break;
     }

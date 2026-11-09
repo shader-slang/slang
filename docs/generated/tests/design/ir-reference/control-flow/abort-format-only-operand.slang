@@ -16,7 +16,7 @@
 // pack's id and closing the paren right after it in the Abort match
 // rejects any operands beyond the documented format+pack pair.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int g;
 uniform RWStructuredBuffer<int> buf;

@@ -98,6 +98,10 @@
       "title": "[slangi] countof(fixed-size local array) returns byte width, not element count",
       "url": "https://github.com/shader-slang/slang/issues/11317"
     },
+    "countof-on-array-returns-element-size": {
+      "fixed_at": "9f55ec61a25834c304d71fd1e9a58bf72b3864b3",
+      "title": "[expressions] countof(array) folds to the element size, not the element count"
+    },
     "cpu-get-string-hash-slang-test-segfault": {
       "fixed_at": "6122d03def",
       "note": "the committed test passes 1/1 under slang-test where it previously took the process down with SIGSEGV",

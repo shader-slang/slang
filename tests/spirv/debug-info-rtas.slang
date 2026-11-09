@@ -29,6 +29,8 @@ void main()
              payload);
 }
 
-// CHECK: %[[TYPENAME:[0-9]+]] = OpString "RaytracingAccelerationStructure"
-// CHECK: %[[TYPE:[0-9]+]] = OpExtInst %void %{{[a-zA-Z0-9_]+}} DebugTypeComposite %[[TYPENAME]]
+// CHECK-DAG: %[[DEBUG_INFO_NONE:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugInfoNone
+// CHECK-DAG: %[[TYPENAME:[0-9]+]] = OpString "RaytracingAccelerationStructure"
+// CHECK-DAG: %[[LINKAGE_NAME:[0-9]+]] = OpString "@RaytracingAccelerationStructure"
+// CHECK-DAG: %[[TYPE:[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugTypeComposite %[[TYPENAME]] %uint_0 %{{[0-9]+}} %uint_0 %uint_0 %{{[0-9]+}} %[[LINKAGE_NAME]] %[[DEBUG_INFO_NONE]] %uint_131072{{$}}
 // CHECK: OpExtInst %void %{{[0-9]+}} DebugGlobalVariable %{{[0-9]+}} %[[TYPE]] %{{.*}} %rtas

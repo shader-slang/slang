@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#type-and-value-legalization
-//META: doc_section_digest=3e3c1fa508130c56014c50d7c74ee56f2e557c277dfbc86c712dbb9373bf794a
+//META: doc_section_digest=be338458e89c71e229e00d5eae5f44da20b6937edb6e9cd44c679913a4082adf
 //META: purpose=The legalize-binary-operator pass adjusts a shift's RHS so it matches the target's signedness rules — on WGSL the shift count is a `u32`.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

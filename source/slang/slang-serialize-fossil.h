@@ -21,30 +21,8 @@ namespace Slang
 namespace Fossil
 {
 
-// Deserializing data is an important place where security issues
-// can arise, so it is usually important to perform validation
-// checks throughout the process, and fail fast rather than
-// risk reading mal-formed data.
-//
-// However, validation typically comes at a performance cost,
-// and one of the key cases for serialization in Slang is loading
-// the core module from the `slang.dll` binary itself. In order
-// to measure how much performance is being lost to validation
-// checks, we provide a define that is intended to enable or
-// disable validation during deserialization.
-//
-#define SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS 1
-
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
-#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
-    do                                                                         \
-    {                                                                          \
-        if (!(CONDITION))                                                      \
-            SLANG_UNEXPECTED("invalid format encountered in serialized data"); \
-    } while (0)
-#else
-#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) SLANG_ASSERT(CONDITION)
-#endif
+// `SLANG_ENABLE_VALIDATION_FOSSIL` and `SLANG_SERIALIZE_FOSSIL_VALIDATE` are
+// defined in `slang-fossil.h`, so the accessors there share this switch.
 
 // A commonly-occuring kind of validation check when reading
 // data in fossil format is asserting that some expected
@@ -54,7 +32,7 @@ namespace Fossil
 template<typename T>
 SLANG_FORCE_INLINE ValPtr<T> expectNonNullValOfType(AnyValPtr valPtr)
 {
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
     if (auto resultPtr = as<T>(valPtr))
         return resultPtr;
     SLANG_UNEXPECTED("invalid format encountered in serialized data");
@@ -72,7 +50,7 @@ SLANG_FORCE_INLINE ValPtr<T> expectNonNullValOfType(AnyValPtr valPtr)
 template<typename T>
 SLANG_FORCE_INLINE ValPtr<T> expectPossiblyNullValOfType(AnyValPtr valPtr)
 {
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
     auto layout = valPtr.getLayout();
     if (!layout || !T::isMatchingKind(layout->kind))
     {

@@ -1574,8 +1574,9 @@ IRType* getTypeForLocalStorage(
     IRType* storageType,
     const List<IndexTrackingInfo>& defBlockIndices)
 {
-    for (auto& index : defBlockIndices)
+    for (Index i = defBlockIndices.getCount() - 1; i >= 0; --i)
     {
+        auto& index = defBlockIndices[i];
         SLANG_ASSERT(index.status == IndexTrackingInfo::CountStatus::Static);
         SLANG_ASSERT(index.maxIters >= 0);
 

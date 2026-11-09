@@ -15,7 +15,7 @@
 // parentheses; the second requires the conformance table for it to print as a
 // childless declaration terminated by `;`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int seed;
 uniform RWStructuredBuffer<int> buf;

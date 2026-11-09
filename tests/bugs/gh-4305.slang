@@ -1,9 +1,14 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute  -entry computeMain -target glsl -allow-glsl -DQUAD -DMODIFIER
-//TEST:SIMPLE(filecheck=CHECK): -stage compute  -entry computeMain -target glsl -allow-glsl -DMODIFIER
-//TEST:SIMPLE(filecheck=CHECK): -stage compute  -entry computeMain -target glsl -allow-glsl -DQUAD
-//TEST:SIMPLE(filecheck=CHECK): -stage compute  -entry computeMain -target glsl -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -allow-glsl -xslang -DQUAD
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -allow-glsl
+// The first two invocations compile the `MODIFIER` branch as Slang/HLSL-style source. The next four
+// compile the same physical file as GLSL to compare the equivalent `layout(...)` spelling without
+// duplicating the shader body. An explicit source language therefore intentionally overrides this
+// file's `.slang` extension for those GLSL invocations.
+
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl -DQUAD -DMODIFIER
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target glsl -DMODIFIER
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/bugs/gh-4305.slang -stage compute -entry computeMain -target glsl -DQUAD
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/bugs/gh-4305.slang -stage compute -entry computeMain -target glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl -xslang -DQUAD
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl -source-language glsl
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;

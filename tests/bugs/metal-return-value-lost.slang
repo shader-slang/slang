@@ -82,7 +82,7 @@ void computeMain(uint tid : SV_GroupIndex)
 // CPP: passed_0 = ((&[[RET]])->data_0[int(1)]) == 70.0f;
 
 // WGSL: var [[RET:_S[0-9]+]] : Vec_0;
-// WGSL: for(;;)
+// WGSL: loop
 // WGSL: [[RET]].data_0 = output_0.data_0;
 // WGSL: if(([[RET]].data_0[i32(0)]) == 30.0f)
 // WGSL: passed_0 = ([[RET]].data_0[i32(1)]) == 70.0f;

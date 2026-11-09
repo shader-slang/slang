@@ -194,7 +194,7 @@ public:
             type,
             interfaceType,
             outId);
-        // Same reasoning as GlobalSessionProxy::getDownstreamCompilerVersion (issue #11865): the
+        // Same reasoning as GlobalSessionProxy::getDownstreamCompilerPath (issue #11865): the
         // actual API returns SLANG_FAIL without writing *outId, so redirect to the zeroed temporary
         // from PREPARE_POINTER_OUTPUT and record a defined 0 rather than reading uninitialized
         // caller memory, while keeping the fixed record schema.

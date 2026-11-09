@@ -27,6 +27,11 @@ RefPtr<EntryPoint> EntryPoint::create(
     RefPtr<EntryPoint> entryPoint =
         new EntryPoint(linkage, funcDeclRef.getName(), profile, funcDeclRef);
     entryPoint->m_mangledName = getMangledName(linkage->getASTBuilder(), funcDeclRef);
+    // Seed with the function declaration's own requirements; `validateEntryPoint` replaces this
+    // with the fuller entry-point set (adding stage-dependent contributions like `SV_` semantic
+    // capabilities). The seed keeps the field non-null for paths that skip validation.
+    entryPoint->m_inferredCapabilityRequirements =
+        funcDeclRef.getDecl()->inferredCapabilityRequirements;
     return entryPoint;
 }
 
@@ -123,6 +128,8 @@ String EntryPoint::getEntryPointNameOverride(Index index)
     SLANG_UNUSED(index);
     SLANG_ASSERT(index == 0);
 
+    if (m_entryPointNameOverride.getLength() != 0)
+        return m_entryPointNameOverride;
     return m_name ? m_name->text : "";
 }
 

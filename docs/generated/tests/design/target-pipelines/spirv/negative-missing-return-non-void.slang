@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=daa747c870d798716cbdacfc1bb54e1466b0de4791e055a44205e8e6a56cbf91
+//META: doc_section_digest=9902d7e466f9696b4f0fb73f4520b1f3fc6869537527dfa5661338e7fb05772f
 //META: purpose=Phase B's checkForMissingReturns (table row 24, gated on reqSet.missingReturn) fires for a non-void function that does not return on every path — the error fires before SPIR-V emit.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

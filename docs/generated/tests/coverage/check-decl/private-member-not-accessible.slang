@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T12:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#modifier-validation
-//META: doc_section_digest=9163d71b0ed4735c5c28e2877570515476519666c5a6da87256143a8fab12f94
+//META: doc_section_digest=cf9986ac73585feb8d7138003d7be69083848e024e0c79dad6db42132ddad3fe
 //META: purpose=Verifies a `private` struct member is not accessible from a free function even within the same source file (E30600).
 //META: intent=characterization
 //META: covers=source/slang/slang-check-decl.cpp

@@ -65,10 +65,10 @@ RWStructuredBuffer<float> outputBuffer;
 // CHECK-DAG: %[[PHYSICAL_140]] = OpTypePointer PhysicalStorageBuffer %[[V2]]
 // CHECK-DAG: %[[PHYSICAL_430]] = OpTypePointer PhysicalStorageBuffer %[[V2]]
 
-// OpTypePointer to a sized array uses the whole array object stride, not the
-// array element stride.
-// CHECK-DAG: OpDecorate %[[PHYSICAL_ARRAY_140:_ptr_PhysicalStorageBuffer__arr_v2float[A-Za-z0-9_]*]] ArrayStride 32
-// CHECK-DAG: OpDecorate %[[PHYSICAL_ARRAY_430:_ptr_PhysicalStorageBuffer__arr_v2float[A-Za-z0-9_]*]] ArrayStride 16
+// OpTypePointer to a sized array carries the array element stride, matching
+// the ArrayStride of the pointee array type.
+// CHECK-DAG: OpDecorate %[[PHYSICAL_ARRAY_140:_ptr_PhysicalStorageBuffer__arr_v2float[A-Za-z0-9_]*]] ArrayStride 16
+// CHECK-DAG: OpDecorate %[[PHYSICAL_ARRAY_430:_ptr_PhysicalStorageBuffer__arr_v2float[A-Za-z0-9_]*]] ArrayStride 8
 // CHECK-DAG: %[[PHYSICAL_ARRAY_140]] = OpTypePointer PhysicalStorageBuffer %[[ARRAY_140]]
 // CHECK-DAG: %[[PHYSICAL_ARRAY_430]] = OpTypePointer PhysicalStorageBuffer %[[ARRAY_430]]
 

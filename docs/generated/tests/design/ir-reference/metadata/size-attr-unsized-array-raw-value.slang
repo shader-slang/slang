@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#size-and-offset
-//META: doc_section_digest=4c5526c573a01002c5664c82dafecd90b68ec6487726865d6f3eb388eabf2bf3
+//META: doc_section_digest=c9513e1455ac8d0e90436e3db8230754dc3be3e0a40bcd7e4c788a745e88d3e7
 //META: purpose=An unbounded resource array records a non-finite extent in the size attribute's raw LayoutSize operand rather than a finite count.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
@@ -15,7 +15,7 @@
 // case alongside an ordinary finite size elsewhere in the same module, so a
 // regression that collapsed the two forms would fail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o - -entry main -stage compute
 
 Texture2D gTex[] : register(t0);
 SamplerState gSamp;

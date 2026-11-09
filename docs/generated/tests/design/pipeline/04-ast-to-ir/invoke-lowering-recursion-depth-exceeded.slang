@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#diagnostics-during-lowering
-//META: doc_section_digest=90444c4cb9fc02bd4dc517a83c3f36f04807193346a8cbe99ca628ff372a49b8
+//META: doc_section_digest=d106903ed4eec245d4e488a4a2d41a81530c17518a4ef12b1bffba1ce9a9c681
 //META: purpose=A chain of 129 nested ordinary calls exhausts the invoke-lowering recursion budget and reports `fatal error[E39997]: maximum type nesting level exceeded` instead of overflowing the native stack.
 //META: intent=stress
 //META: pipeline_stage=lower

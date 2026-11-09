@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#literals-constant-group
-//META: doc_section_digest=a21e27fcb958e56d332244ee6c703427ccee0763e9b85ea940b9fe964f929d86
+//META: doc_section_digest=2af74fe101592dfb5656c7a6b5028e47c5e6545eef68c317594cf05d217a39d6
 //META: purpose=A `StringLiteralExpr` becomes a `string_constant` whose bytes are stored inline on the instruction, so the literal prints as its quoted text at the use site rather than as a separately-named operand line.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // together those show the bytes ride on the instruction instead of the
 // operand list.
 
-//TEST:SIMPLE(filecheck=IR):-target cpp -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target cpp -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

@@ -46,6 +46,7 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
         SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPath(slang::IBlob** outPath) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -80,6 +81,7 @@ protected:
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
     glslang_FreeDisassemblyFunc m_freeDisassembly = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
+    glslang_FreeLinkResultFunc m_freeLinkResult = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 
@@ -100,6 +102,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_freeDisassembly =
         (glslang_FreeDisassemblyFunc)library->findFuncByName("glslang_freeDisassembly");
     m_link = (glslang_LinkSPIRVFunc)library->findFuncByName("glslang_linkSPIRV");
+    m_freeLinkResult =
+        (glslang_FreeLinkResultFunc)library->findFuncByName("glslang_freeLinkResult");
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr &&
         m_compile_1_3 == nullptr)
@@ -441,6 +445,12 @@ SlangResult GlslangDownstreamCompiler::link(
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
     artifact->addRepresentationUnknown(
         Slang::RawBlob::create(request.linkResult, request.linkResultSize * sizeof(uint32_t)));
+    // A library that predates the export keeps the buffer: it was allocated in that module, so we
+    // cannot free it here.
+    if (m_freeLinkResult)
+    {
+        m_freeLinkResult(request.linkResult);
+    }
 
     *outArtifact = artifact.detach();
     return SLANG_OK;
@@ -528,6 +538,26 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
     ComPtr<ISlangBlob> version = StringBlob::create(timestampString.getBuffer());
     *outVersionString = version.detach();
     return SLANG_OK;
+}
+
+SlangResult GlslangDownstreamCompiler::getPath(slang::IBlob** outPath)
+{
+    // All four m_compile_1_x symbols live in the same shared library, so any resolved one yields
+    // the same path; this fallback only needs to pick a non-null symbol -- the order is immaterial
+    // for path recovery (unlike in _invoke, where it selects the best compile ABI).
+    void* symbol = nullptr;
+    if (m_compile_1_3)
+        symbol = (void*)m_compile_1_3;
+    else if (m_compile_1_2)
+        symbol = (void*)m_compile_1_2;
+    else if (m_compile_1_1)
+        symbol = (void*)m_compile_1_1;
+    else if (m_compile_1_0)
+        symbol = (void*)m_compile_1_0;
+    else
+        return SLANG_E_NOT_AVAILABLE;
+
+    return getPathFromSymbol(symbol, outPath);
 }
 
 static SlangResult locateGlslangSpirvDownstreamCompiler(

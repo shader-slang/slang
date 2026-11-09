@@ -14,7 +14,7 @@
 // CHECK-DAG lines pin both mode integers (0 and 1), so a lowering that
 // attached the first hint to both loops would fail.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

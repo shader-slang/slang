@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#compiler-dictionary-and-late-capability-requirements
-//META: doc_section_digest=fc0d5f50b673be2d3dcdb59c6ba77ed859daa9fda1a7df05cc36a96f62f883dd
+//META: doc_section_digest=8fe2b25357681940905a4c43a715bc7eeb41e2b31d7befb0de0e6e72806d95f4
 //META: purpose=A `__requireCapability(...)` statement also emits a `LateRequireCapability` inst whose single operand is the encoded capability set.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // inst takes exactly one `%`-named operand — the set built by the capability
 // encoding above it.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

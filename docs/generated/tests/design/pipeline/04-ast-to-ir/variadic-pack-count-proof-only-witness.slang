@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#variadic-pack-count-witnesses
-//META: doc_section_digest=27de2c3f4422e88c12831854004fb0c605b318f0f9e5ce8e1fd3e5ab1ae208f4
+//META: doc_section_digest=617f31a1c1d108faed9b835d59d3465b6e2ae86f1e216d071baad626bcb64680
 //META: purpose=A `where countof(T) == N` constraint on a variadic generic lowers as a proof-only witness: the generic's parameter list ends with a hidden `param %w : witness_table_t(Void)`, the module holds one `witness_table %t : witness_table_t(Void)(Void);`, and the call site reads `call specialize(%sum, 2 : Int, TypePack(Int, Int), %t)(...)`.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // that table across as the last specialization argument alongside the value
 // `2 : Int` and the deduced `TypePack(Int, Int)`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

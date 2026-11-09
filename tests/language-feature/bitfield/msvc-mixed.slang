@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -compile-arg -msvc-style-bitfield-packing
 
-// MSVC packing with mixed type sizes
+// Legacy MSB-first packing with MSVC-style backing fields for mixed type sizes.
 // CHECK:      15
 // CHECK-NEXT: 255
 // CHECK-NEXT: 4095

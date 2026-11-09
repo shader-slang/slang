@@ -15,7 +15,7 @@
 // `func`). CHECK pins `func %addPair : Func(Int, Int, Int)` and then the two
 // `param` lines that follow inside the body.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int b;

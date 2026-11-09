@@ -15,7 +15,7 @@
 // `100` in the post-Phase-D snapshot, and the CHECK-NOT asserts the
 // `defer` opcode itself is gone so no later pass has to model it.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<int> buf;
 

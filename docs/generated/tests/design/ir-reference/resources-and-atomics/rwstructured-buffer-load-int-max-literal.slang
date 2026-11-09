@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#buffer-load-and-store
-//META: doc_section_digest=26d469b87d05f8d3b2e0539d080d7839ae84df294d66110dd1541682d63c62d1
+//META: doc_section_digest=d777e7e545183b84ac14d2cc8d732d7c0b1b01910e752fb92143872dd884e3ce
 //META: purpose=`RWStructuredBuffer::Load(INT_MAX)` (largest positive `int` literal) still surfaces the `rwstructuredBufferLoad` opcode with the literal carried as `2147483647 : Int`.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // argument. The documented opcode shape is unchanged; the operand
 // just carries the maximum positive 32-bit signed integer value.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> rwbuf;
 

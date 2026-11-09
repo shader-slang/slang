@@ -1,0 +1,25 @@
+name: Slash Cleanup
+
+# The slash commands push their result to `<command>/pr-<N>` (see
+# slash-regenerate-publish.yml). We delete those branches when the PR closes, because
+# they only carry the change to the compare link. The workflow checks out nothing
+# and runs no PR code.
+on:
+  pull_request_target:
+    types: [closed]
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    if: github.repository == 'shader-slang/slang'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete slash-command branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # A missing branch is the normal case, so a failed delete is not an error.
+          for command in format regenerate-toc regenerate-cmdline-ref; do
+            gh api -X DELETE "/repos/${GITHUB_REPOSITORY}/git/refs/heads/${command}/pr-${PR_NUMBER}" || true
+          done

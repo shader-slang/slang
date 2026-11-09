@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
-//META: doc_section_digest=84a14c8c06fb62977462b222065d70ef81479ad93846db3d8c9e968027e956d2
+//META: doc_section_digest=687130475ff4ddc8d392b53fafb20c7efbd82d162c595dcf4113ef5f326b0274
 //META: purpose=A builtin `==` on `bool` operands is fast-pathed like numeric operands and lowers to a single pure `cmpEQ` inst — no call instruction precedes it in the body.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // skipped). The compared result feeds an `if` so the value escapes
 // through an int buffer without any bool storage or cast.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform bool a;
 uniform bool b;

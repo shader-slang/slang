@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#decl-keywords
-//META: doc_section_digest=7254bc97bdcca63414dccb33e42076b021a7d40c0c49b389b0e55a42e9d38e5e
+//META: doc_section_digest=b49700d31492527c686bc2846076b0dd0110de840c0102148f8bbf876b2bcdb4
 //META: purpose=`functype` is accepted by the type-specifier parser through plain identifier lookahead rather than a syntax-table registration, and it parses the following parenthesised parameter list plus `->` result into a function type.
 //META: intent=functional
 //META: pipeline_stage=parse

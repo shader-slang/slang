@@ -10,6 +10,17 @@ slangc -h
 # To generate this file
 slangc -help-style markdown -h
 ```
+
+```
+Exit codes:
+  0   Success.
+  1   The command line was invalid, or the tool failed to run.
+  -1  The compilation failed because of errors in the input.
+  -2  The compiler hit an unexpected failure: an internal compiler error, an
+      assertion, an exception or an abort. This is a bug in the compiler.
+Where the exit status has only 8 bits (for example on Linux and macOS), -1 is
+reported as 255 and -2 as 254.
+```
 ### Quick Links
 
 * [General](#general)
@@ -32,6 +43,7 @@ slangc -help-style markdown -h
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
 * [file-system-type](#file-system-type)
+* [bitfield-packing-rules](#bitfield-packing-rules)
 * [source-embed-style](#source-embed-style)
 * [target](#target-1)
 * [stage](#stage)
@@ -260,6 +272,14 @@ all - Treat all warnings as errors.
 Disable specific warnings, given by numeric id or name. A numeric id that this compiler version does not recognize is silently ignored, so one option value can be shared across compiler versions that do not all define the warning; an unrecognized warning name is still reported as an error. 
 
 
+<a id="notes-disable"></a>
+### -notes-disable
+
+**-notes-disable &lt;id&gt;\[,&lt;id&gt;...\]**
+
+Disable specific notes, given by numeric id or name. 
+
+
 <a id="wall"></a>
 ### -Wall, -Wextra, -Wpedantic
 
@@ -316,7 +336,7 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
+Instrument the shader with per-statement line coverage counters. Statements that provably execute together share one counter and one runtime probe, which keeps instrumented shader code small without changing reported per-line results; the manifest therefore reports no more counters than source entries, and fewer whenever a straight-line region is coalesced. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
 
 
 <a id="trace-function-coverage"></a>
@@ -326,7 +346,7 @@ Instrument the shader with per-function-entry coverage counters. Shares the synt
 
 <a id="trace-branch-coverage"></a>
 ### -trace-branch-coverage
-Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths, and for the true/false arms of scalar `?:` conditions and short-circuiting `&amp;&amp;` / `||` left operands. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
 <a id="trace-coverage-boolean"></a>
@@ -445,9 +465,17 @@ Include additional type conformance during linking for dynamic dispatch.
 Emit reflection data in JSON format to a file. 
 
 
+<a id="bitfield-packing-rules-1"></a>
+### -bitfield-packing-rules
+
+**-bitfield-packing-rules &lt;[bitfield-packing-rules](#bitfield-packing-rules)&gt;**
+
+Select the rules to use for packing bitfields. The value must be one of the [&lt;bitfield-packing-rules&gt;](#bitfield-packing-rules) documented below. Cannot be combined with [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). 
+
+
 <a id="msvc-style-bitfield-packing"></a>
 ### -msvc-style-bitfield-packing
-Pack bitfields according to MSVC rules (msb first, new field when underlying type size changes) rather than gcc-style (lsb first) 
+Deprecated. Uses the same packing rules as [-bitfield-packing-rules](#bitfield-packing-rules-1) legacy-msb-first-msvc. Use [-bitfield-packing-rules](#bitfield-packing-rules-1) msvc for MSVC's bit order and type-size grouping on little-endian platforms. Cannot be combined with [-bitfield-packing-rules](#bitfield-packing-rules-1). 
 
 
 
@@ -735,12 +763,12 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 
-<a id="none-version"></a>
-### -&lt;compiler&gt;-version
+<a id="get-none-path"></a>
+### -get-&lt;compiler&gt;-path
 
-**-&lt;[compiler](#compiler)&gt;-version**
+**-get-&lt;[compiler](#compiler)&gt;-path**
 
-Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
+Print the on-disk path of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located, or "not available" if it has no recoverable shared-library path. Takes no value. 
 
 
 
@@ -982,12 +1010,22 @@ Perform uniformity validation analysis.
 
 <a id="allow-glsl"></a>
 ### -allow-glsl
-Enable GLSL as an input language. 
+Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name extension or `-lang glsl` for each GLSL input instead. 
 
 
 <a id="enable-experimental-passes"></a>
 ### -enable-experimental-passes
 Enable experimental compiler passes 
+
+
+<a id="gec"></a>
+### -Gec
+Enable additional backwards-compatibility features for legacy HLSL inputs. See the user guide's HLSL backwards compatibility section for the supported behavior. 
+
+
+<a id="fhlsl-methods-mutating-by-default"></a>
+### -fhlsl-methods-mutating-by-default
+Use `inout` for the implicit `this` parameter of HLSL methods by default. Has no effect on Slang or GLSL inputs. 
 
 
 <a id="enable-experimental-dynamic-dispatch"></a>
@@ -1013,6 +1051,14 @@ Enable experimental rich diagnostics with enhanced formatting and details
 <a id="enable-machine-readable-diagnostics"></a>
 ### -enable-machine-readable-diagnostics
 Enable machine-readable diagnostic output in tab-separated format 
+
+
+<a id="diagnostic-format"></a>
+### -diagnostic-format
+
+**-diagnostic-format &lt;default|vs&gt;**
+
+Select diagnostic formatting. 'default' preserves normal output; 'vs' uses Visual Studio headers and uncolored, indented source details. Machine-readable diagnostics take precedence. 
 
 
 <a id="diagnostic-color"></a>
@@ -1264,6 +1310,15 @@ File System Type
 * `load-file` : Just implements loadFile interface, so will be wrapped with CacheFileSystem internally. 
 * `os` : Use the OS based file system directly (without file system caching) 
 
+<a id="bitfield-packing-rules"></a>
+## bitfield-packing-rules
+
+Bitfield Packing Rules 
+
+* `default` : Bits are packed LSB-first; fields with different underlying type sizes may share a storage unit. 
+* `msvc` : Bits are packed LSB-first, and a new storage unit starts when the underlying type size changes. Use for MSVC-compatible bitfield packing on little-endian platforms. Zero-width bitfields are not supported. 
+* `legacy-msb-first-msvc` : Bits are packed MSB-first, and a new storage unit starts when the underlying type size changes. Not recommended; use only when the layout produced by [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing) is required. This bit order differs from MSVC on little-endian platforms. 
+
 <a id="source-embed-style"></a>
 ## source-embed-style
 
@@ -1392,49 +1447,6 @@ A capability describes an optional feature that a target may or may not support.
 * `domain` 
 * `geometry` 
 * `dispatch` 
-* `SPV_EXT_fragment_shader_interlock` : enables the SPV_EXT_fragment_shader_interlock extension 
-* `SPV_EXT_physical_storage_buffer` : enables the SPV_EXT_physical_storage_buffer extension 
-* `SPV_KHR_physical_storage_buffer` : enables the SPV_KHR_physical_storage_buffer extension 
-* `SPV_EXT_fragment_fully_covered` : enables the SPV_EXT_fragment_fully_covered extension 
-* `SPV_EXT_descriptor_indexing` : enables the SPV_EXT_descriptor_indexing extension 
-* `SPV_EXT_shader_atomic_float_add` : enables the SPV_EXT_shader_atomic_float_add extension 
-* `SPV_EXT_shader_atomic_float16_add` : enables the SPV_EXT_shader_atomic_float16_add extension 
-* `SPV_EXT_shader_atomic_float_min_max` : enables the SPV_EXT_shader_atomic_float_min_max extension 
-* `SPV_EXT_mesh_shader` : enables the SPV_EXT_mesh_shader extension 
-* `SPV_EXT_demote_to_helper_invocation` : enables the SPV_EXT_demote_to_helper_invocation extension 
-* `SPV_KHR_maximal_reconvergence` : enables the SPV_KHR_maximal_reconvergence extension 
-* `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
-* `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
-* `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
-* `SPV_KHR_abort` : enables the SPV_KHR_abort extension 
-* `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
-* `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
-* `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
-* `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
-* `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
-* `SPV_KHR_shader_clock` : enables the SPV_KHR_shader_clock extension 
-* `SPV_NV_shader_subgroup_partitioned` : enables the SPV_NV_shader_subgroup_partitioned extension 
-* `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
-* `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
-* `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
-* `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
-* `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
-* `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
-* `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
-* `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
-* `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
-* `SPV_EXT_replicated_composites` : enables the SPV_EXT_replicated_composites extension 
-* `SPV_KHR_vulkan_memory_model` : enables the SPV_KHR_vulkan_memory_model extension 
-* `SPV_NV_cooperative_vector` : enables the SPV_NV_cooperative_vector extension 
-* `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
-* `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
-* `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
-* `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
-* `SPV_EXT_float8` : enables the SPV_EXT_float8 extension 
-* `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
-* `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
-* `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
-* `SPV_EXT_shader_64bit_indexing` : enables the SPV_EXT_shader_64bit_indexing extension 
 * `spvAbort` 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
@@ -1450,6 +1462,13 @@ A capability describes an optional feature that a target may or may not support.
 * `spvSparseResidency` 
 * `spvImageFootprintNV` 
 * `spvMinLod` 
+* `spvVariablePointersKHR` 
+* `spvSubgroupRotateKHR` 
+* `spvComputeShaderDerivativesKHR` 
+* `spvUserTypeGOOGLE` 
+* `spvPhysicalStorageBufferEXT` 
+* `spvPhysicalStorageBufferKHR` 
+* `spvNonSemanticInfoKHR` 
 * `spvFloat8EXT` 
 * `spvBFloat16KHR` 
 * `spvFragmentShaderPixelInterlockEXT` 
@@ -1512,6 +1531,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_cuda_spirv_llvm` 
 * `cpp_cuda_metal_spirv` 
 * `cpp_cuda_metal_spirv_llvm` 
+* `cpp_cuda_metal_wgsl` 
 * `cuda_spirv` 
 * `cuda_metal_spirv` 
 * `cpp_cuda_glsl_spirv` 
@@ -1557,7 +1577,6 @@ A capability describes an optional feature that a target may or may not support.
 * `glsl_spirv` 
 * `glsl_spirv_wgsl` 
 * `hlsl_spirv` 
-* `SPV_NV_compute_shader_derivatives` : enables the SPV_NV_compute_shader_derivatives extension 
 * `spvShaderInvocationReorderMotionNV` 
 * `spvShaderInvocationReorderMotionEXT` 
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
@@ -1671,6 +1690,7 @@ A capability describes an optional feature that a target may or may not support.
 * `closesthit` 
 * `callable` 
 * `miss` 
+* `portable_raytracing_call_shader` 
 * `mesh` 
 * `task` 
 * `amplification` 
@@ -1681,6 +1701,8 @@ A capability describes an optional feature that a target may or may not support.
 * `anyhit_closesthit` 
 * `anyhit_intersection` 
 * `raygen_closesthit_miss` 
+* `portable_raytracing_trace` 
+* `portable_raytracing_instance_motion` 
 * `anyhit_closesthit_intersection` 
 * `anyhit_closesthit_intersection_miss` 
 * `raygen_closesthit_miss_callable` 
@@ -1872,6 +1894,7 @@ A capability describes an optional feature that a target may or may not support.
 * `rayquery_position` 
 * `ser_raygen` 
 * `ser_raygen_closesthit_miss` 
+* `ser_position_raygen_closesthit_miss` 
 * `ser_nv_raygen` 
 * `ser_nv_raygen_closesthit_miss` 
 * `ser_nv_motion_raygen_closesthit_miss` 
@@ -1944,6 +1967,7 @@ Available help categories for the [-h](#h) option
 * `optimization-level` : Optimization Level 
 * `debug-level` : Debug Level 
 * `file-system-type` : File System Type 
+* `bitfield-packing-rules` : Bitfield Packing Rules 
 * `source-embed-style` : Source Embed Style 
 * `target` : Target 
 * `stage` : Stage 

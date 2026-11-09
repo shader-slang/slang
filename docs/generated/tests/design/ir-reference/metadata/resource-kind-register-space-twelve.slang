@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#size-and-offset
-//META: doc_section_digest=4c5526c573a01002c5664c82dafecd90b68ec6487726865d6f3eb388eabf2bf3
+//META: doc_section_digest=c9513e1455ac8d0e90436e3db8230754dc3be3e0a40bcd7e4c788a745e88d3e7
 //META: purpose=A ParameterBlock consumes a whole register space, recorded as LayoutResourceKind 12 in operand 0 of an offset attribute on its container var layout.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -18,7 +18,7 @@
 // dump also shows an ordinary slot offset of kind 9 further in, so the two
 // kinds are visibly distinct rather than interchangeable.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 struct Material
 {

@@ -17,7 +17,7 @@
 // `DiffPair(Float, ...)` result type that identifies the value-typed flavour
 // of the family as opposed to the pointer-typed `MakeDiffRefPair`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

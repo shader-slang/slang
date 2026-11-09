@@ -52,13 +52,13 @@
 // CHECK-NEXT: 23.000000
 // CHECK-NEXT: 39.000000
 // CHECK-NEXT: 9.000000
-// CHECK-NEXT: 16.000000
 // CHECK-NEXT: 25.000000
-// CHECK-NEXT: 36.000000
+// CHECK-NEXT: 81.000000
+// CHECK-NEXT: 289.000000
 // CHECK-NEXT: 6.000000
-// CHECK-NEXT: 80.000000
-// CHECK-NEXT: 1000.000000
-// CHECK-NEXT: 12000.000000
+// CHECK-NEXT: 100.000000
+// CHECK-NEXT: 1800.000000
+// CHECK-NEXT: 34000.000000
 // CHECK-NEXT: 7.500000
 // CHECK-NEXT: 8.000000
 // CHECK-NEXT: 19.000000
@@ -120,13 +120,13 @@
 // CHECK-NEXT: 15.4075
 // CHECK-NEXT: 20.5433
 // CHECK-NEXT: 9.000000
-// CHECK-NEXT: 16.000000
 // CHECK-NEXT: 25.000000
-// CHECK-NEXT: 36.000000
+// CHECK-NEXT: 81.000000
+// CHECK-NEXT: 289.000000
 // CHECK-NEXT: 6.000000
-// CHECK-NEXT: 16.000000
-// CHECK-NEXT: 30.000000
-// CHECK-NEXT: 48.000000
+// CHECK-NEXT: 20.000000
+// CHECK-NEXT: 54.000000
+// CHECK-NEXT: 136.000000
 // CHECK-NEXT: 7.500000
 // CHECK-NEXT: 8.000000
 // CHECK-NEXT: 19.000000
@@ -201,6 +201,8 @@ FloatCoopVec4 testForwardArithmetic(FloatCoopVec4 x, FloatCoopVec4 y)
 
 // Reuses the same CoopVec value on both sides of each arithmetic operation, guarding
 // against AD paths dropping one of the two contributions.
+// Callers use powers of two so the two quotient-rule contributions for x / x are exactly
+// representable and cancel without backend-dependent rounding in the exact output checks.
 [Differentiable]
 FloatCoopVec4 testSameOperandArithmetic(FloatCoopVec4 x)
 {
@@ -320,7 +322,7 @@ void computeMain()
 
     {
         // Same-operand reverse-mode arithmetic catches accidental loss of one input path.
-        let x = FloatCoopVec4(2.0, 3.0, 4.0, 5.0);
+        let x = FloatCoopVec4(2.0, 4.0, 8.0, 16.0);
         let dOut = FloatCoopVec4(1.0, 10.0, 100.0, 1000.0);
 
         let primal = testSameOperandArithmetic(x);
@@ -432,7 +434,7 @@ void computeMain()
 
     {
         // Forward-mode mirror for same-operand arithmetic checks shared primal use in JVP.
-        let x = FloatCoopVec4(2.0, 3.0, 4.0, 5.0);
+        let x = FloatCoopVec4(2.0, 4.0, 8.0, 16.0);
         let xT = FloatCoopVec4(1.0, 2.0, 3.0, 4.0);
 
         let result = fwd_diff(testSameOperandArithmetic)(diffPair(x, xT));

@@ -12,7 +12,7 @@
 // Smallest-rank integer comparison. The doc admits one `cmpEQ`
 // opcode regardless of operand rank.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int8_t a;
 uniform int8_t b;

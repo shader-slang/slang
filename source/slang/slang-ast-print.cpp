@@ -929,6 +929,10 @@ void ASTPrinter::addExpr(Expr* expr)
     {
         sb << "This";
     }
+    else if (as<HLSLUnsignedTypeExpr>(expr))
+    {
+        sb << "unsigned int";
+    }
     else if (const auto andTypeExpr = as<AndTypeExpr>(expr))
     {
         if (andTypeExpr->left.type)
@@ -1559,27 +1563,9 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                 {
                     ScopePart scopePart(this, Part::Type::ParamType);
 
-                    // Seems these apply to parameters/VarDeclBase and are not part of the 'type'
-                    // but seems more appropriate to put in the Type Part
-
-                    if (paramDecl->hasModifier<InOutModifier>())
-                    {
-                        sb << toSlice("inout ");
-                    }
-                    else if (paramDecl->hasModifier<OutModifier>())
-                    {
-                        sb << toSlice("out ");
-                    }
-                    else if (paramDecl->hasModifier<InModifier>())
-                    {
-                        sb << toSlice("in ");
-                    }
-
-                    // And this to params/variables (not the type)
-                    if (paramDecl->hasModifier<ConstModifier>())
-                    {
-                        sb << toSlice("const ");
-                    }
+                    // The passing mode belongs to the parameter declaration rather than its type,
+                    // but we print it in the type part so that it stays next to the type.
+                    printParamPassingModePrefix(sb, getParamPassingMode(paramDecl));
 
                     addType(type);
                 }
@@ -1626,6 +1612,11 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
     else
     {
     }
+
+    if (maybeGetInner(declRef.getDecl())->hasModifier<CppStyleTrailingReceiverParamConstModifier>())
+    {
+        sb << " const";
+    }
 }
 
 void ASTPrinter::addDeclKindPrefix(Decl* decl)
@@ -1636,6 +1627,11 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     }
     for (auto modifier : decl->modifiers)
     {
+        // We omit trailing `const` because this loop prints prefix modifiers. For example,
+        // `int read() const` must not be displayed as `const func read() -> int`.
+        if (as<CppStyleTrailingReceiverParamConstModifier>(modifier))
+            continue;
+
         if (modifier->getKeywordName())
         {
             if (m_optionFlags & OptionFlag::NoInternalKeywords)

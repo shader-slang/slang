@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#forwarddifferentiate
-//META: doc_section_digest=c21b0ae05c57902d66f656e2476fa3282420702de64bd927d7d6f0471493563c
+//META: doc_section_digest=e53f314361a478e96b60cbc0243f436e03b658c6e5abee660cbe7f78e96b4285
 //META: purpose=__fwd_diff(f) lowers to a single-operand ForwardDifferentiate whose operand is the base function and whose result type is the JVP function type over differential pairs.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // the call inside `func %main` to target exactly that value, which is what
 // makes the request the callee rather than `%f` itself.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

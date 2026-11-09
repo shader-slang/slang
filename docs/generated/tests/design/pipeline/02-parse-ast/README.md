@@ -318,6 +318,12 @@ tested.
 
 ## Doc gaps observed
 
+(none) — no gaps remain open against this bundle's source document.
+
+Every gap previously listed here was fixed on the documentation side and
+recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
+are now in the source document itself.
+
 The eight gap rows this bundle previously recorded have all been filled by
 the current revision of the page — the `float3` / `vector<float, 3>` type-
 identity consequence of interning, the recovery sets used outside a block,
@@ -328,10 +334,3 @@ surface of the `Val` family, and the wider "generic, function, or type"
 body-stage rule are all present now — so they are retired here. The rows
 below are what re-reading the filled page and running the new tests turned
 up.
-
-| Anchor | Kind | Gap | Suggested addition |
-| ------ | ---- | --- | ------------------ |
-| [#angle-bracket-annotations](../../../../design/pipeline/02-parse-ast.md#angle-bracket-annotations) | missing-example | The section describes both skips precisely but shows no source for either, so a reader cannot see what an annotation clause looks like or how it differs from a generic argument list. The distinguishing feature — a `;` inside the angle brackets — is stated only in prose. | Add a two-line example of each form: a declarator-level `Texture2D tex <string uiName = "Tex"; int uiOrder = 3;>;` under `-enable-effect-annotations`, and a semantic-level `float4 pos : SV_Position <string ann = "hello";>;` which needs no flag. |
-| [#angle-bracket-annotations](../../../../design/pipeline/02-parse-ast.md#angle-bracket-annotations) | undocumented-behavior | The section says the declarator-level skip "is opt-in" but never says what happens to the same source without the flag. Running it produces E20001 "unexpected ';', expected '>'", because the clause is then read as a generic argument list — a considerably more confusing failure than "annotations are disabled". | State the without-flag outcome explicitly: the clause falls back to the generic-argument reading and the first `;` inside it is reported as an unexpected token (E20001). |
-| [#failure-modes](../../../../design/pipeline/02-parse-ast.md#failure-modes) | drift-from-source | The bullet says the statement parser keeps an `AggTypeDecl` and parenthesises that as "`struct`, `class`, `enum`, `interface`", but only `struct` is actually accepted inside a function body. `class` and `enum` are rejected with E30102 — the same code the bullet gives for `namespace` — and `interface` is rejected with a different code, E31400 "declaration not allowed in this context". A reader following the bullet would expect all four to work. | Narrow the parenthesised list to the form that really is kept (`struct`), and add a sentence naming what happens to the others: `class` and `enum` draw E30102 and `interface` draws E31400. |
-| [#modifier-parsing](../../../../design/pipeline/02-parse-ast.md#modifier-parsing) | missing-surface | The language-version gate on `struct [attr] Name` is described in terms of the years 2025 and 2026 but names no way to select a version, so a reader cannot reproduce any of the three outcomes. The CLI spelling is `-std 2018` / `-std 2025` / `-std 2026`. | Name the `-std <language-version>` option next to the gate, with the three values that select the silently-accepted, deprecated, and rejected arms. |

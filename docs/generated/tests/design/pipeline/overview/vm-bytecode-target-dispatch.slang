@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/overview.md#emit
-//META: doc_section_digest=244236b868f771e25853f0063ebf0ce241c2c1af2fde156ad5b70a5ed4f242f6
+//META: doc_section_digest=ec92aab933866d45742dab42ee88fd4f9ff1052fdfb27a5d070989b057e8a88b
 //META: purpose=Non-source targets are dispatched away from the C-like source emitters, so the same front end plus IR passes also feed the VM bytecode path that the interpreter executes.
 //META: intent=functional
 //META: pipeline_stage=emit

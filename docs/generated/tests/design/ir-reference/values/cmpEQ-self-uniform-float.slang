@@ -14,7 +14,7 @@
 // verifies that even the self-compare form (used as a NaN
 // predicate at runtime) is not folded out before IR.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<int> buf;

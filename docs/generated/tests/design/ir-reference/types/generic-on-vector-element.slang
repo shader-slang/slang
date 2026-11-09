@@ -14,7 +14,7 @@
 // is instantiated at a non-trivial type (`float3` here), the generic-
 // param's kind in the IR dump is `type_t`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 T pass<T>(T x) { return x; }
 

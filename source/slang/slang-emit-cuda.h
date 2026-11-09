@@ -76,6 +76,7 @@ protected:
     {
         return m_target == CodeGenTarget::CUDAHeader;
     }
+    virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
         char const* uniformSemanticSpelling,

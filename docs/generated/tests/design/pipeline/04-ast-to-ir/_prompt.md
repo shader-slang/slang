@@ -174,11 +174,11 @@ Lowering claims are best observed through `-dump-ir`. The standard
 form used here is:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 ```
 
 Per the universal `_common.md` rule: combine `-dump-ir` with
-**`-target <text-target>`** AND **`-o /dev/null`** so the IR dump
+**`-target <text-target>`** AND **`-o -`** so the IR dump
 goes to stdout uncontaminated by target text.
 
 Useful conventions when writing CHECK patterns:
@@ -243,7 +243,10 @@ These are restated from `_common.md` because they bite hard in
 lowering tests:
 
 - `-dump-ir` requires `-target <X>` (else compile stops early) and
-  `-o /dev/null` (else target text mixes with IR on stdout).
+  `-o -` (an absolute path such as `/dev/null` is rejected as
+  non-portable; the target text lands in the trailing `standard
+  output` block, after the IR dump, so it cannot disturb an ordered
+  `CHECK`).
 - Constant folding collapses literal arithmetic before any IR is
   emitted — to observe `add(%a, %b)` use `uniform` operands.
 - Trivial locals are eliminated during lowering. The `var` opcode

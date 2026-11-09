@@ -203,6 +203,8 @@ Internal-source facts (enum values, modifier classes, and helper plumbing; no in
 
 ## Doc gaps observed
 
-| Anchor | Kind | Gap | Suggested addition |
-| ------ | ---- | --- | ------------------ |
-| [#defaults-by-language-version](../../../../design/name-resolution/visibility.md#defaults-by-language-version) | missing-example | The `public module M; internal struct Counter { int n; } void f() { Counter c; }` snippet is annotated as producing only `error 30604`. Compiling it also produces E30601 on the field `n` — under the public module default the unannotated field is `public` inside an `internal` struct — so a reader copying the snippet sees two errors, not the one the comment names. | Annotate the field in the example as `internal int n;` (or add a second `// error 30601` comment on the field line) so the snippet isolates the function-local rule it is meant to illustrate. |
+(none) — no gaps remain open against this bundle's source document.
+
+Every gap previously listed here was fixed on the documentation side and
+recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
+are now in the source document itself.

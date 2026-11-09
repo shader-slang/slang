@@ -203,13 +203,23 @@ Slang tracks two version numbers:
 
 ### Version Checking
 
-During deserialization:
+Before deserializing the AST, debug information, or IR:
 
 ```cpp
-if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+if (fossilizedModuleInfo->serializationVersion !=
+    IRModuleInfo::kSupportedSerializationVersion)
     return SLANG_FAIL;
 
-// Later, after loading instructions:
+if (!IRModule::isModuleVersionSupported(fossilizedModuleInfo->module->m_version))
+    return SLANG_FAIL;
+```
+
+Metadata inspection intentionally does not enforce the semantic module-version range, so callers
+can use `-get-module-info` to inspect an incompatible module.
+
+After deserializing the instructions:
+
+```cpp
 if (hasUnrecognizedInsts)
     return SLANG_FAIL;
 ```

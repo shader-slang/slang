@@ -132,6 +132,16 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit(">");
 }
 
+// Return the resource type of a `DescriptorHandle<T>`, or `type` itself otherwise.
+// A handle is bindless on Metal and has T's layout, so binding attributes are
+// chosen from T.
+static IRType* unwrapDescriptorHandle(IRType* type)
+{
+    if (auto handleType = as<IRDescriptorHandleType>(type))
+        return handleType->getResourceType();
+    return type;
+}
+
 void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -145,18 +155,26 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     if (!layout)
         return;
 
-    // DescriptorHandle<T> is bindless on Metal and has T's layout, so unwrap
-    // it before the per-kind type tests below.
-    IRType* paramType = param->getDataType();
-    if (auto handleType = as<IRDescriptorHandleType>(paramType))
-        paramType = handleType->getResourceType();
+    IRType* paramType = unwrapDescriptorHandle(param->getDataType());
+
+    // MSL accepts a fixed-size array of textures or samplers as an entry-point
+    // argument and binds it to consecutive slots from one base index (MSL 4.1
+    // section 2.12.1), so the texture and sampler cases test the element type
+    // of such an array. We unwrap only one sized array level, because the
+    // element of an MSL resource array must itself be a texture or sampler and
+    // an unsized array has no direct argument form. Nested and unsized arrays
+    // get no attribute: neither has a correct direct spelling in MSL.
+    IRType* textureOrSamplerType = paramType;
+    if (auto arrayType = as<IRArrayType>(paramType))
+        textureOrSamplerType = unwrapDescriptorHandle(arrayType->getElementType());
 
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(paramType) || as<IRTextureBufferType>(paramType))
+            if (as<IRTextureTypeBase>(textureOrSamplerType) ||
+                as<IRTextureBufferType>(textureOrSamplerType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -164,6 +182,9 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
+            // MSL has no direct kernel-argument form for an array of buffers, so
+            // we test the whole parameter type and leave buffer arrays unbound
+            // until they are routed through an argument buffer (#12291).
             if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
                 as<IRByteAddressBufferTypeBase>(paramType) ||
                 as<IRUniformParameterGroupType>(paramType) ||
@@ -175,7 +196,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(paramType))
+            if (as<IRSamplerStateTypeBase>(textureOrSamplerType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
@@ -292,11 +313,6 @@ void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
     }
 }
 
-static IRImageSubscript* isTextureAccess(IRInst* inst)
-{
-    return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
-}
-
 void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 {
     emitOperand(imageOperand, getInfo(EmitOp::Postfix));
@@ -314,49 +330,23 @@ void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
 
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
-    auto imageDataType = inst->getImage()->getDataType();
-    auto resourceType = as<IRResourceTypeBase>(imageDataType);
-
-    // If the image data type is a pointer, get the value type
-    if (!resourceType)
-    {
-        if (auto ptrType = as<IRPtrTypeBase>(imageDataType))
-        {
-            resourceType = as<IRResourceTypeBase>(ptrType->getValueType());
-        }
-    }
-
-    if (auto textureType = as<IRTextureType>(resourceType))
-    {
-        if (as<IRVectorType>(textureType->getElementType()))
-        {
-            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "atomic operation on non-scalar texture",
-                .location = inst->sourceLoc});
-        }
-    }
+    auto resourceType = getImageSubscriptResourceType(inst);
     bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
     {
+        // An array-texture subscript takes a vector coordinate whose last component is the array
+        // index.
+        auto coordType = as<IRVectorType>(inst->getCoord()->getDataType());
+        SLANG_RELEASE_ASSERT(coordType);
         emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
-        if (auto coordType = as<IRVectorType>(inst->getCoord()->getDataType()))
-        {
-            m_writer->emit(".");
-            const char* elements[] = {"x", "y", "z", "w"};
-            for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
-                m_writer->emit(elements[Math::Min(3, (int)i)]);
-            m_writer->emit(", ");
-            emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
-            m_writer->emit(".");
-            m_writer->emit(
-                elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
-        }
-        else
-        {
-            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "invalid image coordinate for atomic operation",
-                .location = inst->sourceLoc});
-        }
+        m_writer->emit(".");
+        const char* elements[] = {"x", "y", "z", "w"};
+        for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
+            m_writer->emit(elements[Math::Min(3, (int)i)]);
+        m_writer->emit(", ");
+        emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
+        m_writer->emit(".");
+        m_writer->emit(elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
     }
     else
     {
@@ -404,7 +394,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         emitInstResultDecl(inst);
         bool isImageOp = false;
-        if (auto imageSubscript = isTextureAccess(inst))
+        if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
         {
             emitImageOperandWithAccessor(imageSubscript->getImage());
             m_writer->emit(imageFunc);
@@ -429,12 +419,6 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(").x;\n");
         else
             m_writer->emit(");\n");
-    };
-    auto diagnoseFloatAtomic = [&]()
-    {
-        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-            .operation = "Unsupported floating point atomic operation",
-            .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {
@@ -467,12 +451,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicLoad:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_load(");
@@ -498,7 +479,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_AtomicStore:
         {
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_store(");
@@ -522,19 +503,13 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicExchange:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitAtomicOp("atomic_exchange", "atomic_exchange_explicit");
             return true;
         }
     case kIROp_AtomicCompareExchange:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             bool isImageOp = false;
-            auto imageSubscript = isTextureAccess(inst);
+            auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst));
             isImageOp = (imageSubscript != nullptr);
 
             emitType(inst->getDataType(), getName(inst));
@@ -603,17 +578,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicMin:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitAtomicOp("atomic_fetch_min", "atomic_fetch_min_explicit");
             return true;
         }
     case kIROp_AtomicMax:
         {
-            if (isFloatingType(inst->getDataType()))
-                diagnoseFloatAtomic();
-
             emitAtomicOp("atomic_fetch_max", "atomic_fetch_max_explicit");
             return true;
         }
@@ -621,7 +590,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_fetch_add(");
@@ -649,7 +618,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             emitInstResultDecl(inst);
             bool isImageOp = false;
-            if (auto imageSubscript = isTextureAccess(inst))
+            if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
                 emitImageOperandWithAccessor(imageSubscript->getImage());
                 m_writer->emit("atomic_fetch_sub(");
@@ -692,17 +661,6 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_CoopMatMulAdd:
         {
             auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
-            if (auto satLit = as<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation()))
-            {
-                if (satLit->getValue())
-                {
-                    getSink()->diagnose(Diagnostics::Unimplemented{
-                        .feature = "saturating accumulation for Metal cooperative matrices "
-                                   "(simdgroup_matrix)",
-                        .location = inst->sourceLoc});
-                    return false;
-                }
-            }
             emitType(inst->getDataType(), getName(inst));
             m_writer->emit(";\n");
             m_writer->emit("simdgroup_multiply_accumulate(");
@@ -785,12 +743,19 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         {
             if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
             {
-                // Metal does not support negate operator on matrices,
-                // we should emit "(matrix(0) - op0)" instead.
+                // Metal has no unary '-' on matrices, so lower matrix negation to
+                // "(matrix(0) - op0)". The explicit parentheses wrap the whole subtraction, so its
+                // outer context is effectively lowest-precedence: pass EmitOp::General (not the
+                // incoming outerPrec) and emit op0 as the subtraction's right-hand side. This wraps
+                // an operand that binds no tighter than '-' -- the additive "m1 + m2" (its
+                // left-associative RHS, at equal precedence) -- but not a tighter operand or an
+                // atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }
@@ -854,19 +819,27 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt64:
         {
             // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(ulong)(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_CastUInt64ToDescriptorHandle:
         {
             // Metal: cast integer back to pointer type.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(");
             emitType(inst->getDataType());
             m_writer->emit(")(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_BitCast:
@@ -881,12 +854,18 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             if (toIsPointer || fromIsPointer)
             {
-                // C-style cast for pointer conversions
+                // C-style cast for pointer conversions. A cast is a prefix expression
+                // and binds looser than a postfix member access, so wrap it by
+                // precedence; otherwise `(T*)p->field` binds `->` to `p`, not the cast
+                // result, and Metal rejects it (#12732).
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
                 m_writer->emit("(");
                 emitType(toType);
                 m_writer->emit(")(");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
+                maybeCloseParens(needClose);
             }
             else
             {
@@ -1033,6 +1012,14 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MetalTextureFence:
+        {
+            ensurePrelude(kMetalBuiltinPreludeTextureFence);
+            m_writer->emit("_slang_textureFence(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MetalSetVertex:
         {
             auto setVertex = as<IRMetalSetVertex>(inst);
@@ -1056,21 +1043,30 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_MetalSetIndices:
         {
             auto setIndices = as<IRMetalSetIndices>(inst);
-            const auto indices = as<IRVectorType>(setIndices->getElementValue()->getDataType());
-            UInt numIndices = as<IRIntLit>(indices->getElementCount())->getValue();
-            for (UInt i = 0; i < numIndices; ++i)
+            auto value = setIndices->getElementValue();
+            // Scalar for point topology, uint2/uint3 for lines/triangles.
+            auto vectorType = as<IRVectorType>(value->getDataType());
+            SLANG_ASSERT(vectorType || as<IRBasicType>(value->getDataType()));
+            IRIntegerValue numIndices = vectorType ? getIntVal(vectorType->getElementCount()) : 1;
+            for (IRIntegerValue i = 0; i < numIndices; ++i)
             {
                 m_writer->emit("_slang_mesh.set_index(");
-                emitOperand(setIndices->getIndex(), getInfo(EmitOp::General));
+                emitOperand(
+                    setIndices->getIndex(),
+                    leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Mul)));
                 m_writer->emit("*");
-                m_writer->emitUInt64(numIndices);
+                m_writer->emitInt64(numIndices);
                 m_writer->emit("+");
-                m_writer->emitUInt64(i);
-                m_writer->emit(",(");
-                emitOperand(setIndices->getElementValue(), getInfo(EmitOp::General));
-                m_writer->emit(")[");
-                m_writer->emitUInt64(i);
-                m_writer->emit("]);\n");
+                m_writer->emitInt64(i);
+                m_writer->emit(",");
+                emitOperand(value, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+                if (vectorType)
+                {
+                    m_writer->emit("[");
+                    m_writer->emitInt64(i);
+                    m_writer->emit("]");
+                }
+                m_writer->emit(");\n");
             }
             return true;
         }
@@ -1167,8 +1163,15 @@ void MetalSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
 
 void MetalSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
-    // Does not apply to metal.
-    SLANG_UNUSED(decoration);
+    switch (decoration->getOp())
+    {
+    case kIROp_NoInlineDecoration:
+        m_writer->emit("__attribute__((noinline))\n");
+        break;
+
+    default:
+        break;
+    }
 }
 
 void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
@@ -1237,32 +1240,6 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 void MetalSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     emitType(type, name);
-}
-
-void MetalSourceEmitter::_validateCoopMatrixType(IRCoopMatrixType* coopType)
-{
-    auto rows = getIntVal(coopType->getRowCount());
-    auto cols = getIntVal(coopType->getColumnCount());
-    if (rows != 8 || cols != 8)
-    {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
-            .location = coopType->sourceLoc});
-    }
-    auto scope = getIntVal(coopType->getScope());
-    if (scope != (IRIntegerValue)MemoryScope::Subgroup)
-    {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "Metal cooperative matrices (simdgroup_matrix) only support Subgroup scope",
-            .location = coopType->sourceLoc});
-    }
-    auto elementType = coopType->getElementType();
-    if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
-    {
-        getSink()->diagnose(Diagnostics::Unimplemented{
-            .feature = "Metal cooperative matrices only support half and float element types",
-            .location = coopType->sourceLoc});
-    }
 }
 
 void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
@@ -1377,7 +1354,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
-            if (type->getOp() == kIROp_BorrowInParamType)
+            if (type->getOp() == kIROp_BorrowInParamType ||
+                (type->getOp() == kIROp_RefParamType &&
+                 ptrType->getAccessQualifier() == AccessQualifier::Read))
             {
                 m_writer->emit("const ");
             }
@@ -1435,7 +1414,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopMatrixType:
         {
             auto coopType = as<IRCoopMatrixType>(type);
-            _validateCoopMatrixType(coopType);
             // Metal's simdgroup_matrix<T, Cols, Rows> uses Cols, Rows order
             m_writer->emit("simdgroup_matrix<");
             emitType(coopType->getElementType());
@@ -1735,26 +1713,6 @@ void MetalSourceEmitter::emitPostDeclarationAttributesForType(IRInst* type)
     }
 }
 
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
-{
-    switch (mode)
-    {
-    case IRInterpolationMode::PerVertex:
-    case IRInterpolationMode::NoInterpolation:
-        return UnownedStringSlice::fromLiteral("[[flat]]");
-    case IRInterpolationMode::NoPerspective:
-        return UnownedStringSlice::fromLiteral("[[center_no_perspective]]");
-    case IRInterpolationMode::Linear:
-        return UnownedStringSlice::fromLiteral("[[sample_no_perspective]]");
-    case IRInterpolationMode::Sample:
-        return UnownedStringSlice::fromLiteral("[[sample_perspective]]");
-    case IRInterpolationMode::Centroid:
-        return UnownedStringSlice::fromLiteral("[[center_perspective]]");
-    default:
-        return UnownedStringSlice();
-    }
-}
-
 void MetalSourceEmitter::emitInterpolationModifiersImpl(
     IRInst* varInst,
     IRType* valueType,
@@ -1763,20 +1721,59 @@ void MetalSourceEmitter::emitInterpolationModifiersImpl(
     SLANG_UNUSED(layout);
     SLANG_UNUSED(valueType);
 
+    // MSL takes one interpolation attribute that combines the sampling (center, centroid,
+    // sample) and the perspective correction: [[center_perspective]] (the default),
+    // [[centroid_no_perspective]], ..., or [[flat]]. HLSL `linear` is perspective-correct
+    // interpolation; HLSL `noperspective` is the no_perspective one.
+    bool isFlat = false;
+    bool hasInterpolation = false;
+    bool noPerspective = false;
+    const char* sampling = "center";
     for (auto dd : varInst->getDecorations())
     {
         if (dd->getOp() != kIROp_InterpolationModeDecoration)
             continue;
 
         auto decoration = (IRInterpolationModeDecoration*)dd;
-
-        UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
-        if (modeText.getLength() > 0)
+        switch (decoration->getMode())
         {
-            m_writer->emit(modeText);
-            m_writer->emitChar(' ');
+        case IRInterpolationMode::PerVertex:
+        case IRInterpolationMode::NoInterpolation:
+            isFlat = true;
+            break;
+        case IRInterpolationMode::NoPerspective:
+            noPerspective = true;
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Linear:
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Sample:
+            sampling = "sample";
+            hasInterpolation = true;
+            break;
+        case IRInterpolationMode::Centroid:
+            sampling = "centroid";
+            hasInterpolation = true;
+            break;
+        default:
+            break;
         }
     }
+
+    if (isFlat)
+    {
+        m_writer->emit("[[flat]] ");
+        return;
+    }
+    // Perspective-correct center interpolation is the default.
+    if (!hasInterpolation || (!noPerspective && strcmp(sampling, "center") == 0))
+        return;
+
+    m_writer->emit("[[");
+    m_writer->emit(sampling);
+    m_writer->emit(noPerspective ? "_no_perspective" : "_perspective");
+    m_writer->emit("]] ");
 }
 
 void MetalSourceEmitter::emitPackOffsetModifier(

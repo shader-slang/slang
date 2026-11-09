@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
-//META: doc_section_digest=4be4c15ea47b77fa5c11493f84e33669d7c20c2d179310e3570700407b2ebc9f
+//META: doc_section_digest=f6cc1906090c3a2ff4445cfbcbe2318b867549d8261d32762ca2f8abf427d1bf
 //META: purpose=An Atomic<T> field surfaces the Atomic opcode parameterised by its element type in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // element type in the IR dump. A struct field of type `Atomic<uint>`
 // surfaces an `Atomic(UInt)` operand on the field row in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Counter { Atomic<uint> n; }
 

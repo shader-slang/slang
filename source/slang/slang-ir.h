@@ -2242,24 +2242,22 @@ public:
     IRCompilerDictionary* getTranslationDict() { return m_translationDict; }
     void setTranslationDict(IRCompilerDictionary* dict) { m_translationDict = dict; }
 
+    // Binary module loading checks this range before decoding serialized AST and IR.
+    // Adding an IR instruction requires a new writer version. Earlier modules can remain
+    // supported when their AST and IR representations are compatible with the reader.
     //
-    // The range of module versions this compiler supports
-    //
-    // This will need to be updated if for example an instruction is removed,
-    // the max supported version should be incremented and the min supported
-    // version set to above the last version an instance of that instruction
-    // could be found
-    //
-    // Additionally this should be updated when new instructions are added,
-    // however only k_maxSupportedModuleVersion needs to be incremented in that
-    // case
-    //
-    // It represents the version of module regarding semantics and doesn't have
-    // anything to do with serialization format
-    //
-    const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 28;
+    // Adding or removing AST classes changes the sequential `ASTNodeType` values. We raise the
+    // minimum supported version when those values change so older modules are rejected before
+    // their node IDs can be decoded as different AST classes.
+    const static UInt k_minSupportedModuleVersion = 40;
+    const static UInt k_maxSupportedModuleVersion = 40;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
+
+    /// Returns whether `version` is in the inclusive range this compiler can load.
+    static bool isModuleVersionSupported(UInt64 version)
+    {
+        return version >= k_minSupportedModuleVersion && version <= k_maxSupportedModuleVersion;
+    }
 
 private:
     friend struct IRSerialReadContext;

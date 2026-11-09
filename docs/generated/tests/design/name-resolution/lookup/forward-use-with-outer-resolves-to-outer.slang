@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#block-local-shadowing
-//META: doc_section_digest=fff04d2b441a5ad2e4ef387152ddc76216942a0668864eb5cdfb1c9b98e7e532
+//META: doc_section_digest=19552959c89804d1cb5ac77ef527a84d295279a3c993890fc132c3d69082efd2
 //META: purpose=A local is hidden from lookup until its own declaration statement is reached, so a reference earlier in the block binds to a same-named outer decl instead.
 //META: intent=functional
 //META: pipeline_stage=check

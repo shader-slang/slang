@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#append-and-consume-buffers
-//META: doc_section_digest=9b3916f6b072d28628147b6bbc63ceda33f37e485011da27f65d136633a21691
+//META: doc_section_digest=c3eeb3e0997e1c247e69158701167cf8e76357c6737ebdd1ee7577346eec31dc
 //META: purpose=`AppendStructuredBuffer<int>::Append(0)` (literal zero element) still surfaces the documented `StructuredBufferAppend(%buf, 0 : Int)` opcode shape.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -12,7 +12,7 @@
 // Boundary probe: append a literal-zero element. The opcode shape
 // is preserved regardless of value.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform AppendStructuredBuffer<int> abuf;
 uniform RWStructuredBuffer<int> rwbuf;

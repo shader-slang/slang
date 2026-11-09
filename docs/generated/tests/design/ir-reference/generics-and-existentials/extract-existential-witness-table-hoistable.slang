@@ -12,7 +12,7 @@
 // same existential need two different requirement keys but the same table; the
 // CHECK captures the projection once and asserts both `lookupWitness` sites
 // take that same captured value as their first operand.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); int walk(int x); };
 struct A : IFoo

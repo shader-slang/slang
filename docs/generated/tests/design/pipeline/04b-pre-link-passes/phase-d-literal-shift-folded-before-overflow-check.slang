@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-d-non-essential-validation-stripping-and-finalization
-//META: doc_section_digest=de3af7e62fdf97582267b3c674b87776ce5d49cf79a3d54ae3a770a3c679cad0
+//META: doc_section_digest=e3c7922976a98da21daee6faebad4ef0647c4f9a2febd876436b3aaff10a665f
 //META: purpose=An all-literal oversized shift is folded to a constant by Phase C, so no Lsh instruction is left for the Phase D shift-overflow validator to flag.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
@@ -17,7 +17,7 @@
 // a stored constant zero and no shift instruction remains anywhere in the
 // dump, and no overflow warning was reported.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

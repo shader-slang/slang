@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-lookup
-//META: doc_section_digest=4508b8b8f3e8d47f0f2bbf47badad9a2eb49539f2f7232d58154356ce8e2226a
+//META: doc_section_digest=6c61b4e515a4e1bf42983ad116fbe334a776d5950c9a60023a94f9856935e81c
 //META: purpose=The result type of lookupWitness is the requirement's function type, including the receiver as the second parameter.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // binding's declared type and asserts it is `Func(Int, %T, Int)` — return
 // type, the still-abstract receiver type parameter, then the declared
 // parameter.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 interface IFoo { int run(int x); };
 struct A : IFoo { int run(int x) { return x + 1; } };

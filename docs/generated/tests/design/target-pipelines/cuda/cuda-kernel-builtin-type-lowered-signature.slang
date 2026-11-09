@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerbuiltintypesforkernelentrypoints-removetorchkernels-handleautobindnames
-//META: doc_section_digest=246bf07ed71d14a356c41520656ee728c1a0baf7965fc4757d0ec6a3ff4a4a0c
+//META: doc_section_digest=1b4008e777a39c271b0416d939d21f6b248cfe804bde82afe67b956117c6cf82
 //META: purpose=lowerBuiltinTypesForKernelEntryPoints rewrites a [CudaKernel] parameter whose type is a Slang builtin aggregate into a CUDA-representable storage struct and calls the generated convertLoweredToOriginal at the top of the kernel body.
 //META: intent=functional
 //META: pipeline_stage=emit

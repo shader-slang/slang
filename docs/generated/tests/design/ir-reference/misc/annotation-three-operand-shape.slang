@@ -17,7 +17,7 @@
 // *different* kind values over that same target, which is only meaningful if
 // the kind operand is the key.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<float> outputBuffer;
 

@@ -37,7 +37,7 @@ is `linkAndOptimizeIR` … this document reflects categories, not
 order." The testable consequences of each row are:
 
 - **"Pass X removes opcode Y"** — compile with
-  `-dump-ir-before X -dump-ir-after X -target <text-target> -o /dev/null`
+  `-dump-ir-before X -dump-ir-after X -target <text-target> -o -`
   and FileCheck that Y appears in `### BEFORE X:` but not in
   `### AFTER X:`.
 - **"Pass X is target-specific to target T"** — compile to a text
@@ -192,11 +192,13 @@ This is the richest category for observable consequences.
 - **WGSL legalize** (`slang-ir-wgsl-legalize.cpp`) inserts
   `@binding(N) @group(N)` and `@compute @workgroup_size(...)`.
 - **CUDA immutable load** (`slang-ir-cuda-immutable-load.cpp`)
-  wraps reads from uniform globals in `__ldg(&...)` on CUDA.
-  Observation: CHECK for `__ldg`. Per `_common.md`, compound
-  expressions over `uniform` operands on CUDA factor into
-  temporaries; derive any binary expression you also want to
-  observe from `SV_DispatchThreadID` not from uniforms.
+  wraps eligible global-memory reads, such as
+  `StructuredBuffer<T>` and `ConstantBuffer<T>` contents, in
+  `__ldg(&...)` on CUDA. It must not wrap a top-level `uniform`:
+  CUDA emits `SLANG_globalParams` in `__constant__` memory, while
+  `__ldg` lowers to the global-memory-only `ld.global.nc`.
+  Observation: use a buffer for a positive `CHECK: __ldg`, and a
+  top-level `uniform` for the `CHECK-NOT: __ldg` boundary.
 
 #### `#instrumentation` and `#other-passes`
 
@@ -285,7 +287,7 @@ Two primary modes, plus diagnostic tests for validation passes.
 1. **Pass-effect observation via `-dump-ir-before/-dump-ir-after`**:
 
    ```
-   //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-before <pass> -dump-ir-after <pass> -o /dev/null -stage compute -entry main
+   //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir-before <pass> -dump-ir-after <pass> -o - -stage compute -entry main
    ```
 
    Anchor `CHECK` patterns to `### BEFORE <pass>:` and
@@ -293,7 +295,7 @@ Two primary modes, plus diagnostic tests for validation passes.
 <pass>:` with a `CHECK: <opcode>` that should be present, and
    `CHECK-LABEL: ### AFTER <pass>:` with a `CHECK-NOT: <opcode>`
    that should be removed (or vice versa). Per `_common.md`, use
-   `-o /dev/null` so target text does not mix with the IR dump.
+   `-o -` so target text does not mix with the IR dump.
 
 2. **Pass-consequence observation in emit text**:
 
@@ -369,17 +371,18 @@ These are in addition to the universal lessons in `_common.md`.
   (`_slang_Optional_int_0` on HLSL). The shape token is
   `hasValue`.
 - **CUDA `__ldg`** is the CUDA-immutable-load pass's footprint.
-  CUDA reads of `uniform` globals appear as `__ldg(&...)` in the
-  emit text. To observe a binary expression on CUDA, derive
-  operands from `SV_DispatchThreadID` (CUDA factors `__ldg(&u)`
-  into a temporary that splits compound expressions over uniforms).
+  Eligible global-memory reads from `StructuredBuffer<T>` or
+  `ConstantBuffer<T>` appear as `__ldg(&...)` in the emitted CUDA
+  text. Direct reads of top-level `uniform` values do not: they are
+  rooted in the `__constant__` `SLANG_globalParams` object and stay
+  plain field accesses.
 
 ## Quality checklist (in addition to `_common.md`'s)
 
 - [ ] Every test's `doc_ref` resolves to an anchor in
       `pipeline/05-ir-passes.md` (or one of the listed secondary
       docs).
-- [ ] `-dump-ir`-based tests use `-target <text-target> -o /dev/null`
+- [ ] `-dump-ir`-based tests use `-target <text-target> -o -`
       per CLAUDE.md.
 - [ ] Multi-target SIMPLE tests use a distinct `filecheck=<NAME>`
       label per target and per-target CHECK prefixes.

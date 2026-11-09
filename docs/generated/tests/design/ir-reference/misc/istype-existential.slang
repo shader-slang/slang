@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#istype
-//META: doc_section_digest=96c88cd229bf1685831b41b4f853c066f396c97bc43dfff2bd5daafb4bb81fe0
+//META: doc_section_digest=ffc9e77453a84cc69808ca8c517ed6753fa872688d7fcb5edcccf0212d481d46
 //META: purpose=The `is` operator on an existential value lowers to a four-operand `IsType(value, valueWitness, typeOperand, targetWitness)` inst whose result type is `bool`.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // position and a `Bool` result, so a three-operand or type-only encoding would
 // not match.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IShape { float area(); }
 struct Circle : IShape { float r; float area() { return r * r; } }

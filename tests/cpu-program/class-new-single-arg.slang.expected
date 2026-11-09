@@ -1,0 +1,14 @@
+result code = 0
+standard error = {
+}
+standard output = {
+one=8
+scalar=6
+two=9
+list=14
+wi=5
+wf=102
+copy=1005
+castParen=8
+castCall=8
+}

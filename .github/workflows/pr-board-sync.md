@@ -28,11 +28,18 @@ For each open PR the workflow:
 5. Assigns still-unassigned **linked (closing) issues** to the PR owner.
 6. Co-assigns the **community author** on Community PRs (best-effort, after the
    owner is set).
-7. Unrequests **ignored reviewers** (e.g. `bmillsNV`) on onboarding and when
-   freshly assigning an owner — not on every sweep pass for already-assigned PRs.
+7. Unrequests **ignored reviewers** (members of `default_reviewer_team`, plus any
+   `ignored_reviewers` logins) on onboarding and when freshly assigning an
+   owner — not on every sweep pass for already-assigned PRs.
 
-All GitHub API calls use the org-level `SLANG_PR_BOT_TOKEN` PAT. Callers and the
-reusable workflow set `permissions: {}` so the ambient `GITHUB_TOKEN` is unused.
+Repo-scoped writes use the run's `GITHUB_TOKEN`, so assignee changes, review
+requests, and comments appear as `github-actions[bot]`. Calling jobs grant
+`issues: write` and `pull-requests: write`. The org-level
+`SLANG_PR_BOT_TOKEN` PAT remains mandatory for org-team reads and ProjectsV2
+writes, which `GITHUB_TOKEN` cannot do, and is a compatibility fallback for
+assignment/reviewer writes while existing cross-repo callers adopt the grants.
+Comments never fall back to the PAT; see
+[below](#the-comment-does-not-leave-a-human-watching-the-pr).
 
 ## Architecture
 
@@ -57,7 +64,8 @@ flowchart TB
   forkBridge -->|workflow_run| forkApply
 
   engine --> board[(Slang PR Tracking board)]
-  engine --> gh[GitHub API via SLANG_PR_BOT_TOKEN]
+  engine --> repo[Repo writes via GITHUB_TOKEN]
+  engine --> org[Org teams + ProjectsV2 via SLANG_PR_BOT_TOKEN]
 ```
 
 ### Callers in `shader-slang/slang`
@@ -118,7 +126,8 @@ merge-queued PRs.
    `Scope:` includes this repo — the same criteria used for Source Internal).
 2. Top **committer-signal** owner from changed files (still gated by the owners
    team: `pr-owners` for Community, `bot-pr-owners` for Bot).
-3. Maintainer team member (or `fallback_assignee`).
+3. Maintainer team member, else `default_reviewer_team` member, else
+   `fallback_assignee` (empty by default).
 
 Linked-issue inheritance and committer-signal use different allowlists on
 purpose: an Internal person who owns the issue should shepherd the PR even when
@@ -131,11 +140,45 @@ reviewer for a human to consider, but is never `requestReviewers`'d — so they 
 not notified unless someone follows up. The comment is labeled as an automated
 notice and asks recipients not to reply.
 
+### The comment does not leave a human watching the PR
+
+GitHub auto-subscribes whoever comments on a thread. The workflow still needs
+`SLANG_PR_BOT_TOKEN` for org-team and ProjectsV2 access, but commenting with
+that PAT would make its human owner watch every PR the workflow greets. There
+is no comment-API flag to skip that subscription.
+
+Repo-scoped writes therefore go through `actionsWrite`, which `fetch`es the
+assignee, review-request, and comment endpoints with the run's `GITHUB_TOKEN`.
+Their visible actor is `github-actions[bot]`. This is a raw `fetch` rather than
+the `github` client because `actions/github-script` provides exactly one
+authenticated Octokit and it is bound to the PAT.
+
+Consequences worth knowing:
+
+- Calling jobs grant `permissions: issues: write` for assignee/comment endpoints
+  and `pull-requests: write` for review-request endpoints. A called workflow can
+  never hold more permission than its caller granted.
+- During the cross-repo rollout, a 403 from an assignment or review-request
+  write falls back to the PAT, preserving existing behavior. A comment never
+  falls back because doing so would recreate the human-watcher bug; it is
+  skipped with a warning naming the missing permission.
+- For the same reason this workflow deliberately declares **no** `permissions:`
+  block of its own. Declaring write permissions here would make GitHub reject
+  the run at startup for every caller that had not added the grants, taking down
+  its board sync completely. Inheriting keeps the rollout incremental.
+- Comments made with `GITHUB_TOKEN` do not trigger further workflow runs, which
+  removes any recursion risk from this greeting.
+
 **Community PRs** also co-assign the external author (separate API call, best-effort).
 
-**Ignored reviewers** (`bmillsNV`, …) are unrequested when a new owner is assigned
-and on `opened`/`reopened` onboarding. Already-assigned PRs are not re-scanned
-for ignored reviewers on sweep.
+**Ignored reviewers** are the members of `default_reviewer_team`
+(`shader-slang/default-reviewer`, whom GitHub auto-requests on new PRs) plus any
+explicit `ignored_reviewers` logins. Changing the default reviewer is a team
+membership change; no workflow edit is needed. They are unrequested when a new
+owner is assigned and on `opened`/`reopened` onboarding, and never count as a
+real existing reviewer, so the shepherd is requested instead. Already-assigned
+PRs are not re-scanned for ignored reviewers on sweep. Reading the team uses
+`SLANG_PR_BOT_TOKEN`; the unrequest itself is made as `github-actions[bot]`.
 
 ## Committer signal
 
@@ -147,15 +190,16 @@ per-file LOC tiebreak runs only when the top two are close.
 
 The ranking/selection logic is inlined in `pr-board-sync.yml` (between
 `extract-js:assignment:begin/end` markers); Source classification helpers live
-in `extract-js:classify:begin/end`. Unit tests extract those blocks at run time.
-Wiring outside the extract markers (`reconcileAssignment`,
-`postAssignmentComment`, and the `requestReviewers` call site) is not covered by
-those unit tests and is verified manually / after merge.
+in `extract-js:classify:begin/end`; the GITHUB_TOKEN write/fallback adapter lives
+in `extract-js:actions-write:begin/end`. Unit tests extract those blocks at run
+time. The call-site wiring in `reconcileAssignment` and
+`postAssignmentComment` is verified manually / after merge.
 
 ```bash
 node .github/scripts/pr-signal.test.js
 node .github/scripts/pr-assign.test.js
 node .github/scripts/pr-classify.test.js
+node .github/scripts/pr-write-identity.test.js
 ```
 
 ## CI rollup
@@ -186,7 +230,9 @@ When `SLANG_PR_BOT_TOKEN` is unavailable, privileged steps skip cleanly (`HAS_TO
 ## Required secret
 
 **`SLANG_PR_BOT_TOKEN`** (org-level): Projects read+write, Members read; repo
-Contents read, Pull requests write, Issues write, Metadata read.
+Contents read, Pull requests write, Issues write, Metadata read. The repo write
+permissions support the temporary compatibility fallback; org-team and
+ProjectsV2 access are why this token remains mandatory.
 
 ## Safety
 

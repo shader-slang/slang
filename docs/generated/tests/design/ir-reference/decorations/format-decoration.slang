@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#interpolation-and-shader-io
-//META: doc_section_digest=9dcc3971ffe320daffa3155aa97909cc164f7f1f53867e82746329293f4841f5
+//META: doc_section_digest=53ad1d566b89727f915f7a684edad14e039800bbbb1330d913ea0c67195afd17
 //META: purpose=A [format("...")] attribute on a UAV global lowers to a format decoration carrying the image format as a constant operand.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // matches `[format(N : Int)]` with the tag wildcarded - the mapping from
 // format name to tag is not published, which is recorded as a doc gap.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 [format("rgba32f")]
 uniform RWTexture2D<float4> tex;

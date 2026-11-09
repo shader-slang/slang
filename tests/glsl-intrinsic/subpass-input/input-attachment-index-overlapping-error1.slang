@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage fragment -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/subpass-input/input-attachment-index-overlapping-error1.slang -target glsl -stage fragment -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/subpass-input/input-attachment-index-overlapping-error1.slang -target spirv -emit-spirv-directly -stage fragment -entry main
 #version 450
 // CHECK: warning{{.*}}39001
 buffer MyBlockName

@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T12:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#reverse-mode
-//META: doc_section_digest=b30cf23342891bc8437eb7a877a66ba2f5425da67381c5828e9114f9f947e7fb
+//META: doc_section_digest=50d50fc11cd5cf0d2c306ba5b1a1d9c8f2003b1c2a912a6b97e3c47bfd1c314a
 //META: purpose=Verifies bwd_diff propagates the seed gradient through the taken branch of an if/else, accumulating into the input pair derivative.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-autodiff-transpose.cpp

@@ -21,8 +21,8 @@ interface ICOMExample
     void setValue(float v);
 }
 
-// CHECK-NOT: error 52010{{.*}}ICOMExample
-// CHECK-NOT: error 52010{{.*}}COMContainer
+// CHECK-NOT: E52010{{.*}}ICOMExample
+// CHECK-NOT: E52010{{.*}}COMContainer
 
 // Vtable dispatch: __ref to a COM interface is a direct pointer to
 // the object, so reference semantics work correctly.

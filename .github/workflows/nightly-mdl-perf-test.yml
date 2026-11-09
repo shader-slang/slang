@@ -198,6 +198,7 @@ jobs:
           # (daily labels share the swept commit's DATE, so several points can
           # share a date and series order alone cannot identify this run's).
           echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+          echo "PERF_OBSERVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
           # Also a job OUTPUT, not only job-scoped env: the analyze job runs on
           # a different machine and cannot see this job's $GITHUB_ENV.
           echo "perf_label=$LABEL" >> "$GITHUB_OUTPUT"
@@ -231,6 +232,27 @@ jobs:
               --commit-time "$COMMIT_TIME"
           fi
 
+      # Confirmation must reuse this host and compiler, before publishing. A
+      # failed confirmation still needs to be archived and pushed; the analyze
+      # job reports it as an evaluation failure, never as a cleared regression.
+      - name: Confirm warning and regression candidates
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SUITE"
+          python3 confirm.py measure --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
+
+      - name: Archive original and confirmation measurements
+        if: always() && env.PUBLISH == 'true' && steps.sweep.outputs.perf_label != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: perf-confirmation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: perf-results/daily/${{ steps.sweep.outputs.perf_label }}/
+          if-no-files-found: warn
+
       - name: Upload results artifact (publish=false)
         if: always() && env.PUBLISH != 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -239,13 +261,40 @@ jobs:
           path: bench-results/
           if-no-files-found: ignore
 
+      - name: Check BenchView tooling support
+        id: benchview_tools
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "daily=false" >> "$GITHUB_OUTPUT"
+          echo "releases=false" >> "$GITHUB_OUTPUT"
+          if [[ ! -f "$SUITE/benchview.py" ]]; then
+            echo "::warning::Selected suite has no BenchView exporter; release discovery is deferred."
+            exit 0
+          fi
+          help=$(python3 "$SUITE/benchview.py" --help)
+          if [[ "$help" != *"--output"* || "$help" != *"--branch"* ]]; then
+            echo "::warning::Selected suite lacks host-collector export support; release discovery is deferred."
+            exit 0
+          fi
+          echo "daily=true" >> "$GITHUB_OUTPUT"
+          release_help=$(python3 "$SUITE/new_release_check.py" --help)
+          if [[ "$help" == *"--completed-releases"* && "$release_help" == *"--completed"* ]]; then
+            echo "releases=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Selected suite supports daily export only; release discovery is deferred."
+          fi
+
       # New releases (majors + patch releases from v2026.13 on) are swept into
-      # the tracked history the night they ship, riding the same results push
-      # below. continue-on-error: a failing new-release sweep must not cost the
+      # the tracked history on non-sweep runs with release-export support.
+      # Deferring keeps tags new until a capable nightly can measure and export them.
+      # continue-on-error: a failing new-release sweep must not cost the
       # night's own point — the script removes partial baselines and the next
       # nightly retries.
       - name: Sweep newly published releases
-        if: env.PUBLISH == 'true'
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.releases == 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -255,7 +304,8 @@ jobs:
           set -euo pipefail
           cd "$SUITE"
           python3 new_release_check.py --results "$GITHUB_WORKSPACE/perf-results" \
-            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
+            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES" \
+            --completed "$GITHUB_WORKSPACE/benchview-completed-releases.json"
 
       - name: Push results
         if: env.PUBLISH == 'true'
@@ -269,6 +319,48 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
           git push
+
+      # The benchmark host owns collection, credentials and delivery.
+      # Complexity sweeps stay in the existing reports, not BenchView.
+      - name: Export nightly results for BenchView
+        id: benchview
+        if: env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview_tools.outputs.daily == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          EXPORT_RELEASES: ${{ steps.benchview_tools.outputs.releases }}
+        run: |
+          set -euo pipefail
+          # Use the measured checkout's branch, not the workflow or suite ref.
+          # Detached commits and tags have no unambiguous branch.
+          branch=$(git -C "$GITHUB_WORKSPACE" symbolic-ref --quiet --short HEAD || true)
+          args=()
+          if [[ -n "$branch" ]]; then args+=(--branch "$branch"); fi
+          if [[ "$EXPORT_RELEASES" == "true" ]]; then
+            args+=(--completed-releases "$GITHUB_WORKSPACE/benchview-completed-releases.json"
+                   --release-results "$GITHUB_WORKSPACE/perf-results/releases")
+          fi
+          python3 "$SUITE/benchview.py" \
+            --results "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/results.json" \
+            --meta "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL/meta.json" \
+            --os Windows --observed-at "$PERF_OBSERVED_AT" \
+            --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            "${args[@]}" \
+            --output "$GITHUB_WORKSPACE/benchview-export"
+
+      - name: Archive BenchView submission payloads
+        if: always() && env.PUBLISH == 'true' && github.event.inputs.sweep != 'true' && steps.benchview.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: benchview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ github.workspace }}/benchview-export/
+          if-no-files-found: warn
+
+      - name: Report BenchView export failure
+        if: always() && steps.benchview.outcome == 'failure'
+        shell: bash
+        run: echo "::warning::BenchView export failed; see the BenchView step and payload artifact"
 
       # Remove the PAT credential that actions/checkout baked into perf-results'
       # .git/config — on a persistent self-hosted runner this would otherwise
@@ -397,6 +489,10 @@ jobs:
     # always(): a failed sweep is exactly when the notification matters most.
     if: always() && needs.nightly.result != 'skipped'
     runs-on: ubuntu-latest
+    # actions: read lets the real-or-noise step see whether a bisect is running.
+    permissions:
+      contents: read
+      actions: read
     env:
       # PERF_RESULTS_REPO and PUBLISH are workflow-level and inherited; only
       # the label has to cross the job boundary, because it is computed during
@@ -422,32 +518,20 @@ jobs:
           repository: ${{ env.PERF_RESULTS_REPO }}
           path: "perf-results"
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+          # This job only reads the results; nothing here pushes. Without this
+          # the write PAT would sit in perf-results/.git/config for every later
+          # step of the job.
+          persist-credentials: false
 
-      # Runs AFTER the push so the data is stored even when this step fails the
-      # job. trend.py exits non-zero (job red + ::error:: annotations) when a
-      # primary timer drifts past threshold vs the trailing median. --label
-      # pins the judgement to the point THIS run registered: daily labels are
-      # keyed by the swept commit's date, so several points can share a date
-      # and the series' last point may be a sibling, not this run's.
-      - name: Check trend (fail on regression)
+      # Read the archived confirmation against its frozen baseline. Only a
+      # counter that crosses the threshold in both batches can raise an alarm.
+      # Missing, failed or stale confirmation is an evaluation failure.
+      - name: Report confirmed trend (fail on confirmed regression)
         id: trend
-        # The label gate is load-bearing, not belt-and-braces. A step `if`
-        # carries an implicit success() over the steps BEFORE it IN THIS JOB —
-        # which are only the checkouts here, so it no longer means "the sweep
-        # succeeded" the way it did when this step lived in the nightly job.
-        # Without the gate, a night that fails before the sweep reaches
-        # `trend.py --label ""`, which aborts on the empty value; that makes
-        # steps.trend.outcome 'failure'.
-        #
-        # The gate covers a MISSING label, not an unusable one: a sweep can
-        # mint a label and still die before registering its point, and this
-        # step then runs and aborts on a label that resolves to nothing. So
-        # the gate cannot be the only thing standing between an operational
-        # failure and a regression alert.
-        #
-        # exit_code below is what carries that distinction. steps.trend.outcome
-        # collapses every non-zero exit to 'failure'; only trend.py's
-        # EXIT_REGRESSION means a comparison ran and a metric moved.
+        # A failed sweep can publish a label without completing confirmation.
+        # Report that as an evaluation failure. Only EXIT_REGRESSION from the
+        # shared renderer means a change was confirmed in both valid batches;
+        # the step outcome alone cannot distinguish it from an operational error.
         if: env.PUBLISH == 'true' && needs.nightly.outputs.perf_label != ''
         shell: bash
         run: |
@@ -456,10 +540,39 @@ jobs:
           set -uo pipefail
           cd "$GITHUB_WORKSPACE/tools/compile-perf"
           code=0
-          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" \
+          python3 confirm.py report --results "$GITHUB_WORKSPACE/perf-results" \
             --label "${PERF_LABEL:?}" || code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           exit "$code"
+
+      # One extra line for the message below: whether the confirmed change
+      # looks real or like host noise, judged from the samples already in the
+      # results repo (perf_bisect.py triage). It measures nothing, and like
+      # slack_status.py it is report-only: if it fails or times out, the
+      # message goes out without the line. `targets` makes the same choice the
+      # bisect workflow's gate will, so the message links the bisect only on a
+      # night that starts one.
+      - name: Judge real or noise
+        id: triage
+        if: always() && steps.trend.outputs.exit_code == '3'
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          python3 perf_bisect.py triage --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" || echo "::warning title=Real-or-noise skipped::perf_bisect.py triage failed"
+          python3 perf_bisect.py targets --night "$GITHUB_WORKSPACE/perf-results/daily/$PERF_LABEL" \
+            --nights-root "$GITHUB_WORKSPACE/perf-results/daily" --out "$RUNNER_TEMP/targets.json" \
+            >/dev/null || echo "::warning title=Bisect link skipped::perf_bisect.py targets failed"
+          # The bisect gate also refuses while another bisect is in flight; the
+          # same check here keeps the link off a night whose bisect it will refuse.
+          busy=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/claude-perf-bisect.yml/runs?per_page=50" \
+            --jq '[.workflow_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo 1)
+          echo "pool_free=$([ "$busy" = 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack
         if: always() && (github.event_name == 'schedule' || github.event.inputs['notify-slack'] == 'true')
@@ -473,6 +586,7 @@ jobs:
           # quiet "trend did not run" line only when the job also succeeded,
           # so the failed-sweep case still reports as a job failure.
           TREND_OUTCOME: ${{ steps.trend.outcome }}
+          TREND_JUDGED_COUNT: ${{ steps.trend.outputs.judged_count }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
           # Empty when the trend step was skipped, or when it died before
           # publishing a code. Only trend.py's EXIT_REGRESSION produces the
@@ -491,6 +605,12 @@ jobs:
           # sweep itself fail", which now happens in a different job.
           JOB_STATUS: ${{ needs.nightly.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Empty unless the triage step ran and succeeded. The bisect that a
+          # red scheduled night starts (claude-perf-bisect.yml) does not exist
+          # yet when this message is sent, so the message links its run list,
+          # and only on a night whose targets will proceed.
+          TRIAGE_LINE: ${{ steps.triage.outputs.line }}
+          BISECT_URL: ${{ (github.event_name == 'schedule' && steps.triage.outputs.proceed == 'true' && steps.triage.outputs.pool_free == 'true') && format('{0}/{1}/actions/workflows/claude-perf-bisect.yml', github.server_url, github.repository) || '' }}
         run: |
           if [ -z "$SLACK_WEBHOOK" ]; then
             echo "SLACK_WEBHOOK_COMPILE_PERF not set; skipping Slack notification"
@@ -516,10 +636,14 @@ jobs:
           export STATUS="${CLASSIFIED#*$'\n'}"
           python3 -c "
           import json, os, urllib.request
+          triage = os.environ.get('TRIAGE_LINE', '')
+          bisect = os.environ.get('BISECT_URL', '')
+          extra = (f'• {triage}\n' if triage else '') + (f'• Bisect: {bisect}\n' if bisect else '')
           payload = {
               'text': (
                   f'{os.environ[\"ICON\"]} *Compile-perf nightly — {os.environ[\"DATE\"]}*\n'
                   f'{os.environ[\"STATUS\"]}\n'
+                  + extra +
                   f'• Run: {os.environ[\"RUN_URL\"]}\n'
                   f'• Report: https://shader-slang.org/slang-compile-perf/'
               )

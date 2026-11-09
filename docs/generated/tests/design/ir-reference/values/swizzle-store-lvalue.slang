@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#swizzle-swizzleset-swizzledstore
-//META: doc_section_digest=4d65a5f477addb92a25c5896b6cb496d8436da7a5ccfb3b367db94c8861a7ee9
+//META: doc_section_digest=d1da3e17144b1181125647a41f45bc77bf033878ec635adafe5eb5de985e8006
 //META: purpose=A swizzle in lvalue position (`dst.xy = ...`) lowers to `swizzledStore` mutating memory in place.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // float2(fa, fa)`) lowers to `swizzledStore(%dst, ..., 0 : Int,
 // 1 : Int)` in the IR.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4 v;
 uniform float fa;

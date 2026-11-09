@@ -67,29 +67,22 @@ local leafInst = function(name, args)
 				local operandName = operand[1]
 				local operandType = operand[2]
 				local getterName = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2)
-				local returnType = "IRInst"
+				local returnType = operandType or "IRInst"
+				local value = "getOperand(" .. (i - 1) .. ")"
 				if operandType then
-					returnType = operandType
-					result = result
-						.. "\n    "
-						.. returnType
-						.. "* "
-						.. getterName
-						.. "() { return ("
-						.. returnType
-						.. "*)getOperand("
-						.. (i - 1)
-						.. "); }"
-				else
-					result = result
-						.. "\n    "
-						.. returnType
-						.. "* "
-						.. getterName
-						.. "() { return getOperand("
-						.. (i - 1)
-						.. "); }"
+					value = "(" .. operandType .. "*)" .. value
 				end
+				if operand.optional then
+					value = "getOperandCount() > " .. (i - 1) .. " ? " .. value .. " : nullptr"
+				end
+				result = result
+					.. "\n    "
+					.. returnType
+					.. "* "
+					.. getterName
+					.. "() { return "
+					.. value
+					.. "; }"
 			end
 		end
 	end

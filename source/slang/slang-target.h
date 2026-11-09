@@ -71,6 +71,9 @@ class TargetRequest;
 bool isD3DTarget(TargetRequest* targetReq);
 bool isD3DTarget(CodeGenTarget target);
 
+// Test whether code generation for `target` emits HLSL, directly or for a downstream compiler.
+bool isHLSLBasedTarget(CodeGenTarget target);
+
 // Are we generating code for Metal?
 bool isMetalTarget(TargetRequest* targetReq);
 bool isMetalTarget(CodeGenTarget target);

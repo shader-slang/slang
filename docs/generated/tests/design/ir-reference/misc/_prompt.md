@@ -31,7 +31,7 @@ Three observation points, chosen by what the claim is *about*.
 **1. The platform-neutral IR — for "this opcode exists with this shape".**
 
 ```
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 ```
 
 Anchor patterns at a user-named function and keep operands symbolic — behind a

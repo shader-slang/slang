@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#arrays
-//META: doc_section_digest=c077a7ede5d6d5b6b14b9cd00c6b8c5162dbde144a6ae57c354c39ace0febb74
+//META: doc_section_digest=9dceac67990e87c52cd34a468863d86ce004f41ad1f40482a90f8aeac1862aaa
 //META: purpose=Boundary: minimum non-trivial array size (1) appears as Array(Int, 1 : Int) in the IR.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -13,7 +13,7 @@
 // the IR. The smallest nontrivial extent (1) surfaces as `Array(Int, 1
 // : Int)` on the dumped field.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Holder { int data[1]; }
 uniform Holder s;

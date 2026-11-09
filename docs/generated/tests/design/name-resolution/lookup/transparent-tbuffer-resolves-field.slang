@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#transparent-members
-//META: doc_section_digest=32382a9ebef19c50b9e06793af48bd9784fb821c105edada1ca8660859a10b64
+//META: doc_section_digest=3c2bf5c87121d9b38f4db23004a220e344b4a4d7037f34c06984152d5c067a8a
 //META: purpose=A tbuffer is the second buffer-block keyword that produces a transparent member, so an unqualified reference to its inner field resolves through the same transparent-plus-dereference navigation chain.
 //META: intent=boundary
 //META: pipeline_stage=check

@@ -1,0 +1,44 @@
+name: Docs-only filter
+
+description: >
+  Classify a list of changed file paths as documentation-only or not, so
+  callers can skip expensive build/test/dispatch work for PRs that only
+  touch documentation. Shared by ci.yml (which supplies the list via `git
+  diff`) and ci-slangpy-trigger-test.yml (which supplies the list via the
+  GitHub API, since it runs under pull_request_target and must not check
+  out fork-controlled code).
+
+inputs:
+  files:
+    description: "Newline-separated list of changed file paths"
+    required: false
+    default: ""
+  files-path:
+    description: "Path to a newline-separated list of changed file paths. Prefer this for large changes."
+    required: false
+    default: ""
+
+outputs:
+  should-run:
+    description: "'false' if the change set is documentation-only, 'true' otherwise"
+    value: ${{ steps.filter_from_path.outputs.should-run || steps.filter_from_input.outputs.should-run }}
+
+runs:
+  using: composite
+  steps:
+    - id: filter_from_path
+      if: inputs.files-path != ''
+      shell: bash
+      env:
+        FILES_PATH: ${{ inputs.files-path }}
+      run: |
+        bash "$GITHUB_ACTION_PATH/filter.sh" "$FILES_PATH"
+    - id: filter_from_input
+      if: inputs.files-path == ''
+      shell: bash
+      env:
+        FILES: ${{ inputs.files }}
+      run: |
+        filesPath="${RUNNER_TEMP:-.}/docs-only-filter-files.txt"
+        printf '%s\n' "$FILES" > "$filesPath"
+        bash "$GITHUB_ACTION_PATH/filter.sh" "$filesPath"

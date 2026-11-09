@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#severity-levels
-//META: doc_section_digest=a2c5b6b64f38a8b7fd3692290be87fe1f26f4a31a5f12e076913b5c584acc7f3
+//META: doc_section_digest=c2dc29952382274ed0bbb3fd75b8dda850859c3b85a57e5b07f0cbaf0a1abf4b
 //META: purpose=A diagnostic declared at `Severity::Warning` renders with the user-facing severity name `warning`.
 //META: intent=functional
 //META: pipeline_stage=check

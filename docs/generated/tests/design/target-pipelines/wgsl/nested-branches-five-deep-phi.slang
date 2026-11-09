@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#eliminatephis-with-default-options
-//META: doc_section_digest=eb6e4ad57bb10594712ad290cd6326a84fdfeebf2a72ce386e23ab677001f9b3
+//META: doc_section_digest=00630d7ff82aa522d00a339c906354e4fd298540af7004da0b72e30be204ab2f
 //META: purpose=Five-level nested if/else with a merged value still lowers via the var+per-branch-assignment pattern of eliminatePhis
 //META: intent=stress
 //META: pipeline_stage=ir-pass

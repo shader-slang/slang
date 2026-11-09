@@ -140,6 +140,7 @@ enum class ValueCategory
     VulkanShift,
     SourceEmbedStyle,
     LanguageVersion,
+    BitfieldPackingRules,
 
     CountOf,
 };
@@ -168,6 +169,7 @@ SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
 SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
 SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedUtil::Style)
 SLANG_GET_VALUE_CATEGORY(Language, SourceLanguage)
+SLANG_GET_VALUE_CATEGORY(BitfieldPackingRules, slang::BitfieldPackingRules)
 
 } // namespace
 
@@ -304,6 +306,13 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(
             CategoryKind::Value,
+            "bitfield-packing-rules",
+            "Bitfield Packing Rules",
+            UserValue(ValueCategory::BitfieldPackingRules));
+        options.addValues(TypeTextUtil::getBitfieldPackingRulesInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
             "source-embed-style",
             "Source Embed Style",
             UserValue(ValueCategory::SourceEmbedStyle));
@@ -368,7 +377,16 @@ void initCommandOptions(CommandOptions& options)
             {
                 continue;
             }
-            else if (name.startsWith("GL_") || name.startsWith("SPV_") || name.startsWith("GLSL_"))
+            // A name starting with "SPV_" spells a SPIR-V extension exactly as the SPIR-V
+            // registry does. Such an atom only records which `OpExtension` a feature needs, and
+            // the `spv<Feature>` capability that implies it is the name users are meant to write.
+            // We omit the "SPV_" names here so that the help does not present two spellings for
+            // one feature. `-capability SPV_...` is still accepted for existing command lines.
+            else if (name.startsWith("SPV_"))
+            {
+                continue;
+            }
+            else if (name.startsWith("GL_") || name.startsWith("GLSL_"))
             {
                 // We'll assume it is an extension..
                 StringBuilder buf;
@@ -589,6 +607,10 @@ void initCommandOptions(CommandOptions& options)
          "version does not recognize is silently ignored, so one option value can be shared across "
          "compiler versions that do not all define the warning; an unrecognized warning name is "
          "still reported as an error."},
+        {OptionKind::DisableNotes,
+         "-notes-disable",
+         "-notes-disable <id>[,<id>...]",
+         "Disable specific notes, given by numeric id or name."},
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
@@ -627,6 +649,11 @@ void initCommandOptions(CommandOptions& options)
          "-trace-coverage",
          nullptr,
          "Instrument the shader with per-statement line coverage counters. "
+         "Statements that provably execute together share one counter and one "
+         "runtime probe, which keeps instrumented shader code small without "
+         "changing reported per-line results; the manifest therefore reports "
+         "no more counters than source entries, and fewer whenever a "
+         "straight-line region is coalesced. "
          "When writing compiled output to a file, slangc also emits "
          "`<output>.coverage-manifest.json` mapping source coverage entries to counters."},
         {OptionKind::TraceFunctionCoverage,
@@ -639,8 +666,8 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-branch-arm coverage counters for "
          "if/else, loop-condition, switch case/default arms, and switch no-match "
-         "default paths. Expression-level short-circuit and ternary branches are "
-         "not instrumented by this mode yet. "
+         "default paths, and for the true/false arms of scalar `?:` conditions and "
+         "short-circuiting `&&` / `||` left operands. "
          "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
         {OptionKind::TraceCoverageBoolean,
          "-trace-coverage-boolean",
@@ -764,11 +791,19 @@ void initCommandOptions(CommandOptions& options)
          "-reflection-json",
          "-reflection-json <path>",
          "Emit reflection data in JSON format to a file."},
+        {OptionKind::BitfieldPackingRules,
+         "-bitfield-packing-rules",
+         "-bitfield-packing-rules <bitfield-packing-rules>",
+         "Select the rules to use for packing bitfields. The value must be one of the "
+         "<bitfield-packing-rules> documented below. Cannot be combined with "
+         "-msvc-style-bitfield-packing."},
         {OptionKind::UseMSVCStyleBitfieldPacking,
          "-msvc-style-bitfield-packing",
          nullptr,
-         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
-         "changes) rather than gcc-style (lsb first)"}};
+         "Deprecated. Uses the same packing rules as -bitfield-packing-rules "
+         "legacy-msb-first-msvc. Use -bitfield-packing-rules msvc for MSVC's bit order and "
+         "type-size grouping on little-endian platforms. Cannot be combined with "
+         "-bitfield-packing-rules."}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -1050,19 +1085,19 @@ void initCommandOptions(CommandOptions& options)
         StringBuilder names;
         for (auto name : namesList)
         {
-            names << "-" << name << "-version,";
+            names << "-get-" << name << "-path,";
         }
         // remove last ,
         names.reduceLength(names.getLength() - 1);
 
         options.add(
             names.getBuffer(),
-            "-<compiler>-version",
-            "Print the version of the downstream <compiler> that Slang would load for that "
-            "pass-through, then continue. Reports \"not found\" if the compiler cannot be "
-            "located. Takes no value.\n",
-            UserValue(OptionKind::CompilerVersion),
-            "-<compiler>-version");
+            "-get-<compiler>-path",
+            "Print the on-disk path of the downstream <compiler> that Slang would load for that "
+            "pass-through, then continue. Reports \"not found\" if the compiler cannot be located, "
+            "or \"not available\" if it has no recoverable shared-library path. Takes no value.\n",
+            UserValue(OptionKind::GetCompilerPath),
+            "-get-<compiler>-path");
     }
 
     const Option downstreamOpts[] = {
@@ -1230,11 +1265,25 @@ void initCommandOptions(CommandOptions& options)
          "-validate-uniformity",
          nullptr,
          "Perform uniformity validation analysis."},
-        {OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language."},
+        {OptionKind::AllowGLSL,
+         "-allow-glsl",
+         nullptr,
+         "Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name extension "
+         "or `-lang glsl` for each GLSL input instead."},
         {OptionKind::EnableExperimentalPasses,
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
+        {OptionKind::EnableExtendedHLSLBackwardsCompatibility,
+         "-Gec",
+         nullptr,
+         "Enable additional backwards-compatibility features for legacy HLSL inputs. See the "
+         "user guide's HLSL backwards compatibility section for the supported behavior."},
+        {OptionKind::HLSLMethodsMutatingByDefault,
+         "-fhlsl-methods-mutating-by-default",
+         nullptr,
+         "Use `inout` for the implicit `this` parameter of HLSL methods by default. Has no effect "
+         "on Slang or GLSL inputs."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
@@ -1255,6 +1304,12 @@ void initCommandOptions(CommandOptions& options)
          "-enable-machine-readable-diagnostics",
          nullptr,
          "Enable machine-readable diagnostic output in tab-separated format"},
+        {OptionKind::DiagnosticFormat,
+         "-diagnostic-format",
+         "-diagnostic-format <default|vs>",
+         "Select diagnostic formatting. 'default' preserves normal output; 'vs' uses Visual Studio "
+         "headers and uncolored, indented source details. Machine-readable diagnostics take "
+         "precedence."},
         {OptionKind::DiagnosticColor,
          "-diagnostic-color",
          "-diagnostic-color <always|never|auto>",
@@ -1462,18 +1517,28 @@ struct OptionsParser
         bool writeAsSourceBytes = false;
     };
 
-    int addTranslationUnit(SlangSourceLanguage language, Stage impliedStage);
+    /// Add matching raw/API translation-unit records and preserve explicit-language provenance.
+    int addTranslationUnit(
+        SlangSourceLanguage language,
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
-    void addInputSlangPath(String const& path);
+    /// Add a path to the shared Slang translation unit, preserving an explicit override if present.
+    void addInputSlangPath(
+        String const& path,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
+    /// Add a foreign-language path in its own translation unit with its extension-implied stage.
     void addInputForeignShaderPath(
         String const& path,
         SlangSourceLanguage language,
-        Stage impliedStage);
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
-    SlangResult addInputStdin(SlangSourceLanguage sourceLanguage);
+    /// Add standard input using the required explicitly selected source language.
+    SlangResult addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     SlangResult addInputPath(
         char const* inPath,
@@ -1502,9 +1567,17 @@ struct OptionsParser
 
     void setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode mode);
 
-    SlangResult parse(SlangCompileRequest* compileRequest, int argc, char const* const* argv);
+    SlangResult parse(
+        SlangCompileRequest* compileRequest,
+        int argc,
+        char const* const* argv,
+        CommandLineParsePurpose purpose);
 
     SlangResult _parse(int argc, char const* const* argv);
+
+    SlangResult _resolveEntryPoints();
+    void _resolveOutputPaths(const Dictionary<CodeGenTarget, int>& mapFormatToTargetIndex);
+    void _bindOutputsToTargets();
 
     static bool _passThroughRequiresStage(PassThroughMode passThrough);
 
@@ -1568,6 +1641,7 @@ struct OptionsParser
     }
 
     void _appendUsageTitle(StringBuilder& out);
+    void _appendExitCodes(StringBuilder& out);
     void _appendMinimalUsage(StringBuilder& out);
     void _outputMinimalUsage();
 
@@ -1582,6 +1656,8 @@ struct OptionsParser
 
     SlangSession* m_session = nullptr;
     SlangCompileRequest* m_compileRequest = nullptr;
+
+    CommandLineParsePurpose m_purpose = CommandLineParsePurpose::CompleteCommandLine;
 
     Slang::EndToEndCompileRequest* m_requestImpl = nullptr;
 
@@ -1639,10 +1715,17 @@ struct OptionsParser
     String m_currentOptionName;
 };
 
-int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage impliedStage)
+int OptionsParser::addTranslationUnit(
+    SlangSourceLanguage language,
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     auto translationUnitIndex = m_rawTranslationUnits.getCount();
     auto translationUnitID = m_compileRequest->addTranslationUnit(language, nullptr);
+
+    auto translationUnit = m_frontEndReq->getTranslationUnit(translationUnitID);
+    translationUnit->sourceLanguageExplicitlyRequested =
+        SourceLanguage(sourceLanguageExplicitlyRequested);
 
     // As a sanity check: the API should be returning the same translation
     // unit index as we maintain internally. This invariant would only
@@ -1661,17 +1744,28 @@ int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage implie
     return int(translationUnitIndex);
 }
 
-void OptionsParser::addInputSlangPath(String const& path)
+void OptionsParser::addInputSlangPath(
+    String const& path,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     // All of the input .slang files will be grouped into a single logical translation unit,
     // which we create lazily when the first .slang file is encountered.
     if (m_slangTranslationUnitIndex == -1)
     {
         m_translationUnitCount++;
-        m_slangTranslationUnitIndex =
-            addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+        m_slangTranslationUnitIndex = addTranslationUnit(
+            SLANG_SOURCE_LANGUAGE_SLANG,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
+    auto translationUnit = m_frontEndReq->getTranslationUnit(
+        m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID);
+    if (sourceLanguageExplicitlyRequested != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        translationUnit->sourceLanguageExplicitlyRequested =
+            SourceLanguage(sourceLanguageExplicitlyRequested);
+    }
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID,
         path.begin());
@@ -1683,10 +1777,12 @@ void OptionsParser::addInputSlangPath(String const& path)
 void OptionsParser::addInputForeignShaderPath(
     String const& path,
     SlangSourceLanguage language,
-    Stage impliedStage)
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     m_translationUnitCount++;
-    m_currentTranslationUnitIndex = addTranslationUnit(language, impliedStage);
+    m_currentTranslationUnitIndex =
+        addTranslationUnit(language, impliedStage, sourceLanguageExplicitlyRequested);
 
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
@@ -1734,6 +1830,8 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     static const Entry entries[] = {
         {".slang.md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
         {".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
+        // Literate Slang historically accepts any Markdown path, not only `.slang.md`.
+        {".md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
 
         {".hlsl", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
         {".fx", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
@@ -1795,7 +1893,7 @@ SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
     SLANG_UNREACHABLE("unexpected stdin read result");
 }
 
-SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
+SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     if (m_stdinConsumed)
     {
@@ -1803,7 +1901,7 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
         return SLANG_FAIL;
     }
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_sink->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = kStdinDisplayPath});
         return SLANG_FAIL;
@@ -1814,20 +1912,29 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
     List<Byte> source;
     SLANG_RETURN_ON_FAIL(_readStdin(source));
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         if (m_slangTranslationUnitIndex == -1)
         {
             m_translationUnitCount++;
-            m_slangTranslationUnitIndex =
-                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+            m_slangTranslationUnitIndex = addTranslationUnit(
+                SLANG_SOURCE_LANGUAGE_SLANG,
+                Stage::Unknown,
+                sourceLanguageExplicitlyRequested);
         }
+        m_frontEndReq
+            ->getTranslationUnit(
+                m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID)
+            ->sourceLanguageExplicitlyRequested = SourceLanguage(sourceLanguageExplicitlyRequested);
         m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
     }
     else
     {
         m_translationUnitCount++;
-        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+        m_currentTranslationUnitIndex = addTranslationUnit(
+            sourceLanguageExplicitlyRequested,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
     const char* sourceBegin =
@@ -1842,21 +1949,74 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
     return SLANG_OK;
 }
 
+// Return whether `optionSet` holds an option other than the profile, which has its own
+// diagnostics when it applies to no target. `optionSet` is the option set of a raw target, which
+// holds only target options, so every other key it holds is a target option.
+static bool hasTargetOptionOtherThanProfile(const CompilerOptionSet& optionSet)
+{
+    for (auto& option : optionSet.options)
+    {
+        if (option.key != CompilerOptionName::Profile)
+            return true;
+    }
+    return false;
+}
+
+// Return whether a parse for `purpose` configures a compilation, and so loads its positional
+// input paths (source files, stdin, and `.slang-module` or `.slang-lib` files) and resolves its
+// entry points and output paths. A session description carries none of these, so its parse skips
+// that work and the diagnostics that come with it. A module given with `-r` is loaded for every
+// purpose, and a session description keeps it as a `ReferenceModule` option.
+static bool parsesForCompilation(CommandLineParsePurpose purpose)
+{
+    switch (purpose)
+    {
+    case CommandLineParsePurpose::CompleteCommandLine:
+    case CommandLineParsePurpose::CompileRequest:
+        return true;
+    case CommandLineParsePurpose::SessionDescription:
+        return false;
+    }
+    SLANG_UNREACHABLE("unknown CommandLineParsePurpose");
+}
+
+// Return whether targets can be added after a parse for `purpose`: through `addCodeGenTarget`
+// for a compile request, or through `SessionDesc::targets` for a session description. Such
+// targets inherit a floating-point mode given with no `-target`, so we report that mode as
+// ignored only when this returns false. A profile given with no `-target` is reported for every
+// purpose.
+static bool canAddTargetsAfterParse(CommandLineParsePurpose purpose)
+{
+    switch (purpose)
+    {
+    case CommandLineParsePurpose::CompleteCommandLine:
+        return false;
+    case CommandLineParsePurpose::CompileRequest:
+    case CommandLineParsePurpose::SessionDescription:
+        return true;
+    }
+    SLANG_UNREACHABLE("unknown CommandLineParsePurpose");
+}
+
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride)
 {
-    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    if (!parsesForCompilation(m_purpose))
+        return SLANG_OK;
+
+    SlangSourceLanguage sourceLanguageExplicitlyRequested = SlangSourceLanguage(langOverride);
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         auto linkage = m_requestImpl->getLinkage();
         if (linkage->m_optionSet.hasOption(CompilerOptionName::Language))
         {
-            sourceLanguage = linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
-                CompilerOptionName::Language);
+            sourceLanguageExplicitlyRequested =
+                linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
+                    CompilerOptionName::Language);
         }
     }
 
     if (strcmp(inPath, kStdinCommandLinePath) == 0)
-        return addInputStdin(sourceLanguage);
+        return addInputStdin(sourceLanguageExplicitlyRequested);
 
     // look at the extension on the file name to determine
     // how we should handle it.
@@ -1866,19 +2026,30 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (
-        path.endsWith(".slang") || hasLiterateFileExtension(path) ||
-        langOverride == SourceLanguage::Slang)
+    Stage stageImpliedByFileExtension = Stage::Unknown;
+    SlangSourceLanguage sourceLanguageImpliedByFileExtension =
+        findSourceLanguageFromPath(path, stageImpliedByFileExtension);
+    SlangSourceLanguage sourceLanguage = sourceLanguageExplicitlyRequested;
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+        sourceLanguage = sourceLanguageImpliedByFileExtension;
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         // Plain old slang code
-        addInputSlangPath(path);
+        addInputSlangPath(path, sourceLanguageExplicitlyRequested);
         return SLANG_OK;
     }
 
     Stage impliedStage = Stage::Unknown;
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    // A stage-bearing extension belongs to the source-language convention that defined it.
+    // Consider `shader.vert -lang hlsl`: `.vert` means both GLSL and vertex input, but once the
+    // explicit HLSL selection overrides GLSL, carrying over only the vertex half would combine
+    // incompatible provenance. Require an explicit `-stage` instead; a matching or inferred
+    // language may continue to use the extension-implied stage.
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN ||
+        sourceLanguageExplicitlyRequested == sourceLanguageImpliedByFileExtension)
     {
-        sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
+        impliedStage = stageImpliedByFileExtension;
     }
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
@@ -1886,7 +2057,11 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         return SLANG_FAIL;
     }
 
-    addInputForeignShaderPath(path, sourceLanguage, impliedStage);
+    addInputForeignShaderPath(
+        path,
+        sourceLanguage,
+        impliedStage,
+        sourceLanguageExplicitlyRequested);
 
     return SLANG_OK;
 }
@@ -2232,6 +2407,20 @@ SlangResult OptionsParser::_dumpDiagnostics(Severity originalSeverity)
 void OptionsParser::_appendUsageTitle(StringBuilder& out)
 {
     out << "Usage: slangc [options...] [--] <input files>\n\n";
+}
+
+// Describes the exit code of `slangc`. The values come from `ToolReturnCode` in
+// `slang-test-tool-util.h`, which `slangc` returns from `main`.
+void OptionsParser::_appendExitCodes(StringBuilder& out)
+{
+    out << "Exit codes:\n";
+    out << "  0   Success.\n";
+    out << "  1   The command line was invalid, or the tool failed to run.\n";
+    out << "  -1  The compilation failed because of errors in the input.\n";
+    out << "  -2  The compiler hit an unexpected failure: an internal compiler error, an\n";
+    out << "      assertion, an exception or an abort. This is a bug in the compiler.\n";
+    out << "Where the exit status has only 8 bits (for example on Linux and macOS), -1 is\n";
+    out << "reported as 255 and -2 as 254.\n";
 }
 
 void OptionsParser::_outputMinimalUsage()
@@ -2583,6 +2772,8 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
         if (m_helpStyle == CommandOptionsWriter::Style::Text)
         {
             _appendUsageTitle(buf);
+            _appendExitCodes(buf);
+            buf << "\n";
         }
         else
         {
@@ -2597,6 +2788,10 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";
             buf << "slangc -help-style markdown -h\n";
+            buf << "```\n";
+            buf << "\n";
+            buf << "```\n";
+            _appendExitCodes(buf);
             buf << "```\n";
         }
 
@@ -2732,6 +2927,434 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     return SLANG_OK;
 }
 
+// Resolve the entry points named on the command line (or implied by a stage and a single
+// translation unit) and add them to the compile request. The result is a failure only when an
+// entry point cannot be associated with a translation unit. Other errors, such as conflicting
+// stages, go to the sink and fail the parse through its error count.
+SlangResult OptionsParser::_resolveEntryPoints()
+{
+    // As a compatibility feature, if the user didn't list any explicit entry
+    // point names, *and* they are compiling a single translation unit, *and* they
+    // have either specified a stage, or we can assume one from the naming
+    // of the translation unit, then we assume they wanted to compile a single
+    // entry point named `main`.
+    //
+    if (m_rawEntryPoints.getCount() == 0 && m_rawTranslationUnits.getCount() == 1 &&
+        (m_defaultEntryPoint.stage != Stage::Unknown ||
+         m_rawTranslationUnits[0].impliedStage != Stage::Unknown))
+    {
+        RawEntryPoint entry;
+        entry.name = "main";
+        entry.translationUnitIndex = 0;
+        m_rawEntryPoints.add(entry);
+    }
+
+    // If the user (manually or implicitly) specified only a single entry point,
+    // then we allow the associated stage to be specified either before or after
+    // the entry point. This means that if there is a stage attached
+    // to the "default" entry point, we should copy it over to the
+    // explicit one.
+    //
+    if (m_rawEntryPoints.getCount() == 1)
+    {
+        if (m_defaultEntryPoint.stage != Stage::Unknown)
+        {
+            setStage(getCurrentEntryPoint(), m_defaultEntryPoint.stage);
+        }
+
+        if (m_defaultEntryPoint.redundantStageSet)
+            getCurrentEntryPoint()->redundantStageSet = true;
+        if (m_defaultEntryPoint.conflictingStagesSet)
+            getCurrentEntryPoint()->conflictingStagesSet = true;
+    }
+    else
+    {
+        // If the "default" entry point has had a stage (or
+        // other state, if we add other per-entry-point state)
+        // specified, but there is more than one entry point,
+        // then that state doesn't apply to anything and we
+        // should issue an error to tell the user something
+        // funky is going on.
+        //
+        if (m_defaultEntryPoint.stage != Stage::Unknown)
+        {
+            if (m_rawEntryPoints.getCount() == 0)
+            {
+                m_sink->diagnose(Diagnostics::StageSpecificationIgnoredBecauseNoEntryPoints{});
+            }
+            else
+            {
+                m_sink->diagnose(
+                    Diagnostics::StageSpecificationIgnoredBecauseBeforeAllEntryPoints{});
+            }
+        }
+    }
+
+    // Slang requires that every explicit entry point indicate the translation
+    // unit it comes from. If there is only one translation unit specified,
+    // then implicitly all entry points come from it.
+    //
+    if (m_translationUnitCount == 1)
+    {
+        for (auto& entryPoint : m_rawEntryPoints)
+        {
+            entryPoint.translationUnitIndex = 0;
+        }
+    }
+    else if (
+        m_frontEndReq->additionalLoadedModules &&
+        m_frontEndReq->additionalLoadedModules->getCount() == 0)
+    {
+        // Otherwise, we require that all entry points be specified after
+        // the translation unit to which they belong.
+        bool anyEntryPointWithoutTranslationUnit = false;
+        for (auto& entryPoint : m_rawEntryPoints)
+        {
+            // Skip entry points that are already associated with a translation unit...
+            if (entryPoint.translationUnitIndex != -1)
+                continue;
+
+            anyEntryPointWithoutTranslationUnit = true;
+        }
+        if (anyEntryPointWithoutTranslationUnit)
+        {
+            m_sink->diagnose(Diagnostics::EntryPointsNeedToBeAssociatedWithTranslationUnits{});
+            return SLANG_FAIL;
+        }
+    }
+
+    // Now that entry points are associated with translation units,
+    // we can make one additional pass where if an entry point has
+    // no specified stage, but the naming of its translation unit
+    // implies a stage, we will use that (a manual `-stage` annotation
+    // will always win out in such a case).
+    //
+    for (auto& rawEntryPoint : m_rawEntryPoints)
+    {
+        // Skip entry points that already have a stage.
+        if (rawEntryPoint.stage != Stage::Unknown)
+            continue;
+
+        // Sanity check: don't process entry points with no associated translation unit.
+        if (rawEntryPoint.translationUnitIndex == -1)
+            continue;
+
+        auto impliedStage = m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].impliedStage;
+        if (impliedStage != Stage::Unknown)
+            rawEntryPoint.stage = impliedStage;
+    }
+
+    // Note: it is possible that some entry points still won't have associated
+    // stages at this point, but we don't want to error out here, because
+    // those entry points might get stages later, as part of semantic checking,
+    // if the corresponding function has a `[shader("...")]` attribute.
+
+    // Now that we've tried to establish stages for entry points, we can
+    // issue diagnostics for cases where stages were set redundantly or
+    // in conflicting ways.
+    //
+    for (auto& rawEntryPoint : m_rawEntryPoints)
+    {
+        if (rawEntryPoint.conflictingStagesSet)
+        {
+            m_sink->diagnose(
+                Diagnostics::ConflictingStagesForEntryPoint{.entryPoint = rawEntryPoint.name});
+        }
+        else if (rawEntryPoint.redundantStageSet)
+        {
+            m_sink->diagnose(Diagnostics::SameStageSpecifiedMoreThanOnce{
+                .stage = getStageName(rawEntryPoint.stage),
+                .entryPoint = rawEntryPoint.name});
+        }
+        else if (rawEntryPoint.translationUnitIndex != -1)
+        {
+            // As a quality-of-life feature, if the file name implies a particular
+            // stage, but the user manually specified something different for
+            // their entry point, give a warning in case they made a mistake.
+
+            auto& rawTranslationUnit = m_rawTranslationUnits[rawEntryPoint.translationUnitIndex];
+            if (rawTranslationUnit.impliedStage != Stage::Unknown &&
+                rawEntryPoint.stage != Stage::Unknown &&
+                rawTranslationUnit.impliedStage != rawEntryPoint.stage)
+            {
+                m_sink->diagnose(Diagnostics::ExplicitStageDoesntMatchImpliedStage{
+                    .entryPoint = rawEntryPoint.name,
+                    .specifiedStage = getStageName(rawEntryPoint.stage),
+                    .impliedStage = getStageName(rawTranslationUnit.impliedStage)});
+            }
+        }
+    }
+
+    // If the user is requesting code generation via pass-through,
+    // then any entry points they specify need to have a stage set,
+    // because fxc/dxc/glslang don't have a facility for taking
+    // a named entry point and pulling its stage from an attribute.
+    //
+    if (_passThroughRequiresStage(m_requestImpl->m_passThrough))
+    {
+        for (auto& rawEntryPoint : m_rawEntryPoints)
+        {
+            if (rawEntryPoint.stage == Stage::Unknown)
+            {
+                m_sink->diagnose(Diagnostics::NoStageSpecifiedInPassThroughMode{
+                    .entryPoint = rawEntryPoint.name});
+            }
+        }
+    }
+
+    // We now have inferred enough information to add the
+    // entry points to our compile request.
+    //
+    for (auto& rawEntryPoint : m_rawEntryPoints)
+    {
+        if (rawEntryPoint.translationUnitIndex < 0)
+            continue;
+
+        auto translationUnitID =
+            m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
+
+        List<const char*> specializationArgs;
+        for (auto& arg : rawEntryPoint.specializationArgs)
+            specializationArgs.add(arg.getBuffer());
+
+        int entryPointID = m_compileRequest->addEntryPointEx(
+            translationUnitID,
+            rawEntryPoint.name.begin(),
+            SlangStage(rawEntryPoint.stage),
+            (int)specializationArgs.getCount(),
+            specializationArgs.getBuffer());
+
+        rawEntryPoint.entryPointID = entryPointID;
+    }
+
+    return SLANG_OK;
+}
+
+// Associate each output with the target and entry point it is for, diagnosing outputs that cannot
+// be matched, and decide which outputs are whole-program outputs. Besides the `-o` paths,
+// the outputs include a pathless output that we add when there is no `-o` and a single target
+// whose output is obvious (for example SPIR-V, Metal, CUDA, host C++ or a host-callable target).
+void OptionsParser::_resolveOutputPaths(
+    const Dictionary<CodeGenTarget, int>& mapFormatToTargetIndex)
+{
+    // If there is only a single entry point, then that is automatically
+    // the entry point that should be associated with all outputs.
+    //
+    if (m_rawEntryPoints.getCount() == 1)
+    {
+        for (auto& rawOutput : m_rawOutputs)
+        {
+            rawOutput.entryPointIndex = 0;
+        }
+    }
+    //
+    // Similarly, if there is only one target, then all outputs must
+    // implicitly appertain to that target.
+    //
+    if (m_rawTargets.getCount() == 1)
+    {
+        for (auto& rawOutput : m_rawOutputs)
+        {
+            rawOutput.targetIndex = 0;
+        }
+    }
+
+    // If we don't have any raw outputs but do have a raw target,
+    // add an empty rawOutput for certain targets where the expected behavior is obvious.
+    if (m_rawOutputs.getCount() == 0 && m_rawTargets.getCount() == 1 &&
+        (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
+         m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
+         m_rawTargets[0].format == CodeGenTarget::CUDASource ||
+         m_rawTargets[0].format == CodeGenTarget::CUDAHeader ||
+         m_rawTargets[0].format == CodeGenTarget::SPIRV ||
+         m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
+         m_rawTargets[0].format == CodeGenTarget::Metal ||
+         m_rawTargets[0].format == CodeGenTarget::MetalLib ||
+         m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
+         ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind ==
+             ArtifactKind::HostCallable))
+    {
+        RawOutput rawOutput;
+        rawOutput.impliedFormat = m_rawTargets[0].format;
+        rawOutput.targetIndex = 0;
+        m_rawOutputs.add(rawOutput);
+    }
+
+    // Consider the output files specified via `-o` and try to figure
+    // out how to deal with them.
+    //
+    for (auto& rawOutput : m_rawOutputs)
+    {
+        // For now, most output formats need to be tightly bound to
+        // both a target and an entry point.
+
+        // If an output doesn't have a target associated with
+        // it, then search for the target with the matching format.
+        if (rawOutput.targetIndex == -1)
+        {
+            auto impliedFormat = rawOutput.impliedFormat;
+            int targetIndex = -1;
+
+            if (impliedFormat == CodeGenTarget::Unknown)
+            {
+
+                // If we hit this case, then it means that we need to pick the
+                // target to associate with this output based on its implied
+                // format, but the file path doesn't directly imply a format
+                // (it doesn't have a suffix like `.spv` that tells us what to write).
+                //
+                m_sink->diagnose(
+                    Diagnostics::CannotDeduceOutputFormatFromPath{.path = rawOutput.path});
+            }
+            else if (mapFormatToTargetIndex.tryGetValue(rawOutput.impliedFormat, targetIndex))
+            {
+                rawOutput.targetIndex = targetIndex;
+            }
+            else
+            {
+                m_sink->diagnose(Diagnostics::CannotMatchOutputFileToTarget{
+                    .path = rawOutput.path,
+                    .format = TypeTextUtil::getCompileTargetName(
+                        SlangCompileTarget(rawOutput.impliedFormat))});
+            }
+        }
+
+        if (rawOutput.targetIndex != -1 &&
+            m_rawTargets[rawOutput.targetIndex].optionSet.getBoolOption(
+                CompilerOptionName::GenerateWholeProgram))
+        {
+            // `-whole-program` emits one target-level artifact, even when the command line
+            // names a single entry point. Keep `-o` aligned with the artifact that
+            // `generateOutput()` will actually write.
+            rawOutput.isWholeProgram = true;
+        }
+
+        // We won't do any searching to match an output file
+        // with an entry point, since the case of a single entry
+        // point was handled above, and the user is expected to
+        // follow the ordering rules when using multiple entry points.
+        if (rawOutput.entryPointIndex == -1)
+        {
+            if (rawOutput.targetIndex != -1)
+            {
+                auto outputFormat = m_rawTargets[rawOutput.targetIndex].format;
+                // Here we check whether the given output format supports multiple entry points
+                // When we add targets with support for multiple entry points,
+                // we should update this switch with those new formats
+                switch (outputFormat)
+                {
+                case CodeGenTarget::CPPSource:
+                case CodeGenTarget::CPPHeader:
+                case CodeGenTarget::PTX:
+                case CodeGenTarget::CUDASource:
+                case CodeGenTarget::CUDAHeader:
+
+                case CodeGenTarget::HostHostCallable:
+                case CodeGenTarget::ShaderHostCallable:
+                case CodeGenTarget::HostExecutable:
+                case CodeGenTarget::ShaderSharedLibrary:
+                case CodeGenTarget::HostSharedLibrary:
+                case CodeGenTarget::PyTorchCppBinding:
+                case CodeGenTarget::DXIL:
+                case CodeGenTarget::MetalLib:
+                case CodeGenTarget::MetalLibAssembly:
+                case CodeGenTarget::Metal:
+                case CodeGenTarget::WGSL:
+                case CodeGenTarget::HostVM:
+                case CodeGenTarget::HostObjectCode:
+                case CodeGenTarget::ShaderObjectCode:
+                case CodeGenTarget::HostLLVMIR:
+                case CodeGenTarget::ShaderLLVMIR:
+                    rawOutput.isWholeProgram = true;
+                    break;
+                case CodeGenTarget::SPIRV:
+                case CodeGenTarget::SPIRVAssembly:
+                    if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())
+                    {
+                        rawOutput.isWholeProgram = true;
+                        break;
+                    }
+                    else if (m_rawEntryPoints.getCount() != 0)
+                    {
+                        rawOutput.entryPointIndex = (int)m_rawEntryPoints.getCount() - 1;
+                        break;
+                    }
+                    [[fallthrough]];
+                default:
+                    if (rawOutput.path.getLength() != 0)
+                    {
+                        m_sink->diagnose(
+                            Diagnostics::CannotMatchOutputFileToEntryPoint{.path = rawOutput.path});
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
+// Record each resolved output path on its target, and select whole-program code generation for a
+// target that has a whole-program output. Each target that an output is bound to also takes the
+// full option set of its raw target, including the stage of its profile. A compile target with no
+// output keeps only what the setters in `_parse`'s target-declaration loop apply.
+void OptionsParser::_bindOutputsToTargets()
+{
+    for (auto& rawOutput : m_rawOutputs)
+    {
+        if (rawOutput.targetIndex == -1)
+            continue;
+        auto targetID = m_rawTargets[rawOutput.targetIndex].targetID;
+        auto target = m_requestImpl->getLinkage()->targets[targetID];
+        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
+        if (!m_requestImpl->m_targetInfos.tryGetValue(target, targetInfo))
+        {
+            targetInfo = new EndToEndCompileRequest::TargetInfo();
+            m_requestImpl->m_targetInfos[target] = targetInfo;
+        }
+        target->getOptionSet().overrideWith(m_rawTargets[rawOutput.targetIndex].optionSet);
+        if (rawOutput.isWholeProgram)
+        {
+            if (targetInfo->wholeTargetOutputPath != "")
+            {
+                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForTarget{
+                    .target = TypeTextUtil::getCompileTargetName(
+                        SlangCompileTarget(target->getTarget()))});
+            }
+            else
+            {
+                target->getOptionSet().addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
+                targetInfo->wholeTargetOutputPath = rawOutput.path;
+            }
+        }
+        else
+        {
+            if (rawOutput.entryPointIndex == -1)
+                continue;
+
+            auto entryPoint = m_rawEntryPoints[rawOutput.entryPointIndex];
+            Int entryPointID = entryPoint.entryPointID;
+            if (entryPointID == -1)
+            {
+                m_sink->diagnose(Diagnostics::EntryPointFunctionNotFound{.name = entryPoint.name});
+                continue;
+            }
+            auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
+
+            if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
+            {
+                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForEntryPointAndTarget{
+                    .entryPoint = entryPointReq->getName(),
+                    .target = TypeTextUtil::getCompileTargetName(
+                        SlangCompileTarget(target->getTarget()))});
+            }
+            else
+            {
+                targetInfo->entryPointOutputPaths[entryPointID] = rawOutput.path;
+            }
+        }
+    }
+}
+
 SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 {
     // Set up the args
@@ -2759,6 +3382,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     }
 
     m_reader.init(&args, m_sink);
+
+    // A compile request can inherit packing options from its session. A named rule in the option
+    // set makes the deprecated CLI flag ineffective, so we reject that flag. An inherited
+    // deprecated bool can be overridden by a named CLI rule. We track whether the deprecated flag
+    // appears in this argument list so that the two CLI spellings also conflict in either order.
+    bool hasLegacyBitfieldPackingOptionInArgs = false;
 
     while (m_reader.hasArg())
     {
@@ -2792,10 +3421,40 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
         switch (optionKind)
         {
+        case OptionKind::AllowGLSL:
+            // Unlike ordinary compiler options, this deprecated spelling governs only the input
+            // translation units of the current compile request. Keeping it off the linkage avoids
+            // silently changing the language of source modules loaded by an `import`.
+            m_requestImpl->setLegacyAllowGLSLInput(true);
+            break;
+        case OptionKind::UseMSVCStyleBitfieldPacking:
+            if (!hasLegacyBitfieldPackingOptionInArgs)
+                m_sink->diagnose(Diagnostics::DeprecatedMsvcStyleBitfieldPacking{});
+            if (linkage->m_optionSet.hasOption(CompilerOptionName::BitfieldPackingRules))
+            {
+                m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
+                return SLANG_FAIL;
+            }
+            hasLegacyBitfieldPackingOptionInArgs = true;
+            linkage->m_optionSet.set(optionKind, true);
+            break;
+        case OptionKind::BitfieldPackingRules:
+            {
+                if (hasLegacyBitfieldPackingOptionInArgs)
+                {
+                    m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
+                    return SLANG_FAIL;
+                }
+                slang::BitfieldPackingRules rules = slang::BitfieldPackingRules::Default;
+                SLANG_RETURN_ON_FAIL(_expectValue(rules));
+                linkage->m_optionSet.set(optionKind, rules);
+                break;
+            }
         case OptionKind::NoMangle:
         case OptionKind::ValidateUniformity:
-        case OptionKind::AllowGLSL:
         case OptionKind::EnableExperimentalPasses:
+        case OptionKind::EnableExtendedHLSLBackwardsCompatibility:
+        case OptionKind::HLSLMethodsMutatingByDefault:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
@@ -2840,7 +3499,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::LoopInversion:
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
-        case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
             linkage->m_optionSet.set(optionKind, true);
             break;
@@ -2868,6 +3526,26 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 sink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
             }
             break;
+        case OptionKind::DiagnosticFormat:
+            {
+                CommandLineArg formatArg;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(formatArg));
+                SlangDiagnosticFormat format = SLANG_DIAGNOSTIC_FORMAT_DEFAULT;
+                if (formatArg.value == "vs")
+                    format = SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO;
+                else if (formatArg.value != "default")
+                {
+                    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
+                        .option = m_currentOptionName,
+                        .validValues = "default, vs"});
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(optionKind, (int)format);
+                // Apply immediately so errors in subsequent options use the requested format.
+                for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                    sink->setDiagnosticFormat(format);
+                break;
+            }
         case OptionKind::DiagnosticColor:
             {
                 CommandLineArg colorArg;
@@ -3082,6 +3760,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.add(
                     OptionKind::DisableWarnings,
                     operand.value.getUnownedSlice());
+                break;
+            }
+        case OptionKind::DisableNotes:
+            {
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                linkage->m_optionSet.add(OptionKind::DisableNotes, operand.value.getUnownedSlice());
                 break;
             }
         case OptionKind::DisableWarning:
@@ -3813,52 +4498,57 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
-        case OptionKind::CompilerVersion:
+        case OptionKind::GetCompilerPath:
             {
-                // `-<compiler>-version` is a print-and-continue query option. It has the same
-                // "-<compiler>-..." shape as -<compiler>-path, but instead of consuming a value it
-                // prints the version of the downstream compiler Slang would actually load for that
-                // pass-through, then lets parsing continue (like -version). Recover <compiler> as
-                // the text between the leading '-' and the trailing "-version", exactly as the
-                // CompilerPath case recovers the name before "-path".
-                const Index index = argValue.lastIndexOf('-');
-                if (index >= 0)
+                // `-get-<compiler>-path` is a print-and-continue query option: it prints the
+                // resolved on-disk path of the downstream compiler Slang would load for that
+                // pass-through, then lets parsing continue (like -version). Recover <compiler> by
+                // stripping the fixed "-get-" prefix and "-path" suffix, which -- unlike a
+                // lastIndexOf('-') scan -- also handles compiler names that contain '-' (e.g.
+                // spirv-dis).
+                const UnownedStringSlice getPrefix = UnownedStringSlice("-get-");
+                const UnownedStringSlice pathSuffix = UnownedStringSlice("-path");
+                const UnownedStringSlice argSlice = argValue.getUnownedSlice();
+                const UnownedStringSlice passThroughSlice =
+                    argSlice.tail(getPrefix.getLength())
+                        .head(
+                            argSlice.getLength() - getPrefix.getLength() - pathSuffix.getLength());
+
+                SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
                 {
-                    UnownedStringSlice passThroughSlice =
-                        argValue.getUnownedSlice().head(index).tail(1);
-
-                    SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
-                    {
-                        m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
-                            .compiler = passThroughSlice,
-                            .location = arg.loc});
-                        return SLANG_FAIL;
-                    }
-
-                    // getDownstreamCompilerVersion shares the same lazy-discovery funnel used
-                    // during compilation, so the reported version is the library that would
-                    // actually be used for this pass-through (it honors -<compiler>-path and the
-                    // standard search order). It returns SLANG_OK once the compiler is located and
-                    // loaded -- major/minor are then valid, and a loaded-but-versionless compiler
-                    // such as glslang reports 0.0 -- and SLANG_E_NOT_FOUND when it cannot be
-                    // loaded (e.g. the toolchain is not installed).
-                    int major = 0;
-                    int minor = 0;
-                    StringBuilder versionStr;
-                    versionStr << passThroughSlice << " version: ";
-                    if (SLANG_SUCCEEDED(
-                            m_session->getDownstreamCompilerVersion(passThrough, &major, &minor)))
-                    {
-                        versionStr << major << "." << minor;
-                    }
-                    else
-                    {
-                        versionStr << "not found";
-                    }
-                    versionStr << "\n";
-                    m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
+                    m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
+                        .compiler = passThroughSlice,
+                        .location = arg.loc});
+                    return SLANG_FAIL;
                 }
+
+                // getDownstreamCompilerPath shares the same lazy-discovery funnel used during
+                // compilation, so the reported path is the library that would actually be used for
+                // this pass-through (it honors -<compiler>-path and the standard search order). It
+                // returns SLANG_OK with the resolved shared-library path, SLANG_E_NOT_AVAILABLE
+                // when the compiler is loaded but has no recoverable on-disk path (an
+                // executable-backed command-line compiler, or a target without shared-library
+                // introspection), and SLANG_E_NOT_FOUND when it cannot be located or loaded.
+                ComPtr<ISlangBlob> pathBlob;
+                const SlangResult pathResult =
+                    m_session->getDownstreamCompilerPath(passThrough, pathBlob.writeRef());
+                StringBuilder pathStr;
+                pathStr << passThroughSlice << " path: ";
+                if (SLANG_SUCCEEDED(pathResult) && pathBlob)
+                {
+                    pathStr << (const char*)pathBlob->getBufferPointer();
+                }
+                else if (pathResult == SLANG_E_NOT_AVAILABLE)
+                {
+                    pathStr << "not available";
+                }
+                else
+                {
+                    pathStr << "not found";
+                }
+                pathStr << "\n";
+                m_sink->diagnoseRaw(Severity::Note, pathStr.getUnownedSlice());
                 break;
             }
         case OptionKind::InputFilesRemain:
@@ -4144,206 +4834,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     // of the loop work if they are after -load-repro
     if (!m_hasLoadedRepro)
     {
-        // As a compatability feature, if the user didn't list any explicit entry
-        // point names, *and* they are compiling a single translation unit, *and* they
-        // have either specified a stage, or we can assume one from the naming
-        // of the translation unit, then we assume they wanted to compile a single
-        // entry point named `main`.
-        //
-        if (m_rawEntryPoints.getCount() == 0 && m_rawTranslationUnits.getCount() == 1 &&
-            (m_defaultEntryPoint.stage != Stage::Unknown ||
-             m_rawTranslationUnits[0].impliedStage != Stage::Unknown))
-        {
-            RawEntryPoint entry;
-            entry.name = "main";
-            entry.translationUnitIndex = 0;
-            m_rawEntryPoints.add(entry);
-        }
-
-        // If the user (manually or implicitly) specified only a single entry point,
-        // then we allow the associated stage to be specified either before or after
-        // the entry point. This means that if there is a stage attached
-        // to the "default" entry point, we should copy it over to the
-        // explicit one.
-        //
-        if (m_rawEntryPoints.getCount() == 1)
-        {
-            if (m_defaultEntryPoint.stage != Stage::Unknown)
-            {
-                setStage(getCurrentEntryPoint(), m_defaultEntryPoint.stage);
-            }
-
-            if (m_defaultEntryPoint.redundantStageSet)
-                getCurrentEntryPoint()->redundantStageSet = true;
-            if (m_defaultEntryPoint.conflictingStagesSet)
-                getCurrentEntryPoint()->conflictingStagesSet = true;
-        }
-        else
-        {
-            // If the "default" entry point has had a stage (or
-            // other state, if we add other per-entry-point state)
-            // specified, but there is more than one entry point,
-            // then that state doesn't apply to anything and we
-            // should issue an error to tell the user something
-            // funky is going on.
-            //
-            if (m_defaultEntryPoint.stage != Stage::Unknown)
-            {
-                if (m_rawEntryPoints.getCount() == 0)
-                {
-                    m_sink->diagnose(Diagnostics::StageSpecificationIgnoredBecauseNoEntryPoints{});
-                }
-                else
-                {
-                    m_sink->diagnose(
-                        Diagnostics::StageSpecificationIgnoredBecauseBeforeAllEntryPoints{});
-                }
-            }
-        }
-
-        // Slang requires that every explicit entry point indicate the translation
-        // unit it comes from. If there is only one translation unit specified,
-        // then implicitly all entry points come from it.
-        //
-        if (m_translationUnitCount == 1)
-        {
-            for (auto& entryPoint : m_rawEntryPoints)
-            {
-                entryPoint.translationUnitIndex = 0;
-            }
-        }
-        else if (
-            m_frontEndReq->additionalLoadedModules &&
-            m_frontEndReq->additionalLoadedModules->getCount() == 0)
-        {
-            // Otherwise, we require that all entry points be specified after
-            // the translation unit to which tye belong.
-            bool anyEntryPointWithoutTranslationUnit = false;
-            for (auto& entryPoint : m_rawEntryPoints)
-            {
-                // Skip entry points that are already associated with a translation unit...
-                if (entryPoint.translationUnitIndex != -1)
-                    continue;
-
-                anyEntryPointWithoutTranslationUnit = true;
-            }
-            if (anyEntryPointWithoutTranslationUnit)
-            {
-                m_sink->diagnose(Diagnostics::EntryPointsNeedToBeAssociatedWithTranslationUnits{});
-                return SLANG_FAIL;
-            }
-        }
-
-        // Now that entry points are associated with translation units,
-        // we can make one additional pass where if an entry point has
-        // no specified stage, but the nameing of its translation unit
-        // implies a stage, we will use that (a manual `-stage` annotation
-        // will always win out in such a case).
-        //
-        for (auto& rawEntryPoint : m_rawEntryPoints)
-        {
-            // Skip entry points that already have a stage.
-            if (rawEntryPoint.stage != Stage::Unknown)
-                continue;
-
-            // Sanity check: don't process entry points with no associated translation unit.
-            if (rawEntryPoint.translationUnitIndex == -1)
-                continue;
-
-            auto impliedStage =
-                m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].impliedStage;
-            if (impliedStage != Stage::Unknown)
-                rawEntryPoint.stage = impliedStage;
-        }
-
-        // Note: it is possible that some entry points still won't have associated
-        // stages at this point, but we don't want to error out here, because
-        // those entry points might get stages later, as part of semantic checking,
-        // if the corresponding function has a `[shader("...")]` attribute.
-
-        // Now that we've tried to establish stages for entry points, we can
-        // issue diagnostics for cases where stages were set redundantly or
-        // in conflicting ways.
-        //
-        for (auto& rawEntryPoint : m_rawEntryPoints)
-        {
-            if (rawEntryPoint.conflictingStagesSet)
-            {
-                m_sink->diagnose(
-                    Diagnostics::ConflictingStagesForEntryPoint{.entryPoint = rawEntryPoint.name});
-            }
-            else if (rawEntryPoint.redundantStageSet)
-            {
-                m_sink->diagnose(Diagnostics::SameStageSpecifiedMoreThanOnce{
-                    .stage = getStageName(rawEntryPoint.stage),
-                    .entryPoint = rawEntryPoint.name});
-            }
-            else if (rawEntryPoint.translationUnitIndex != -1)
-            {
-                // As a quality-of-life feature, if the file name implies a particular
-                // stage, but the user manually specified something different for
-                // their entry point, give a warning in case they made a mistake.
-
-                auto& rawTranslationUnit =
-                    m_rawTranslationUnits[rawEntryPoint.translationUnitIndex];
-                if (rawTranslationUnit.impliedStage != Stage::Unknown &&
-                    rawEntryPoint.stage != Stage::Unknown &&
-                    rawTranslationUnit.impliedStage != rawEntryPoint.stage)
-                {
-                    m_sink->diagnose(Diagnostics::ExplicitStageDoesntMatchImpliedStage{
-                        .entryPoint = rawEntryPoint.name,
-                        .specifiedStage = getStageName(rawEntryPoint.stage),
-                        .impliedStage = getStageName(rawTranslationUnit.impliedStage)});
-                }
-            }
-        }
-
-        // (`-trace-coverage` + `-pass-through` rejection moved to
-        // `EndToEndCompileRequest::executeActionsInner` so that C++
-        // API callers using `setPassThrough()` are also covered;
-        // this option-parser path is CLI-only.)
-
-        // If the user is requesting code generation via pass-through,
-        // then any entry points they specify need to have a stage set,
-        // because fxc/dxc/glslang don't have a facility for taking
-        // a named entry point and pulling its stage from an attribute.
-        //
-        if (_passThroughRequiresStage(m_requestImpl->m_passThrough))
-        {
-            for (auto& rawEntryPoint : m_rawEntryPoints)
-            {
-                if (rawEntryPoint.stage == Stage::Unknown)
-                {
-                    m_sink->diagnose(Diagnostics::NoStageSpecifiedInPassThroughMode{
-                        .entryPoint = rawEntryPoint.name});
-                }
-            }
-        }
-
-        // We now have inferred enough information to add the
-        // entry points to our compile request.
-        //
-        for (auto& rawEntryPoint : m_rawEntryPoints)
-        {
-            if (rawEntryPoint.translationUnitIndex < 0)
-                continue;
-
-            auto translationUnitID =
-                m_rawTranslationUnits[rawEntryPoint.translationUnitIndex].translationUnitID;
-
-            List<const char*> specializationArgs;
-            for (auto& arg : rawEntryPoint.specializationArgs)
-                specializationArgs.add(arg.getBuffer());
-
-            int entryPointID = m_compileRequest->addEntryPointEx(
-                translationUnitID,
-                rawEntryPoint.name.begin(),
-                SlangStage(rawEntryPoint.stage),
-                (int)specializationArgs.getCount(),
-                specializationArgs.getBuffer());
-
-            rawEntryPoint.entryPointID = entryPointID;
-        }
+        if (parsesForCompilation(m_purpose))
+            SLANG_RETURN_ON_FAIL(_resolveEntryPoints());
 
         // We are going to build a mapping from target formats to the
         // target that handles that format.
@@ -4474,9 +4966,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
         else
         {
-            // If the "default" target has had a profile (or other state)
-            // specified, but there is != 1 taget, then that state doesn't
-            // apply to anythign and we should give the user an error.
+            // With zero or several targets, state given for the "default" target may apply to
+            // no target. Whether we report it depends on the option and the parse purpose:
+            //
+            // - A profile is reported for every purpose: E00042 with no target, and E00043
+            //   before several targets. With no `-target`, a session description cannot keep
+            //   it, because `Linkage::addTarget` sets each target's profile from its
+            //   `TargetDesc`.
+            // - A floating-point mode is reported before several targets for every purpose
+            //   (E00045). With no target, it is reported (E00044) only when no target can be
+            //   added after the parse.
+            // - Any other target option is reported before several targets only for a session
+            //   description (E00045). With no target, it is not reported: a compile request
+            //   and a session description keep it for the targets added later, and a complete
+            //   command line drops it, for compatibility with existing slangc command lines.
             //
             if (m_defaultTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
             {
@@ -4495,16 +4998,28 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
             }
 
-            if (defaultTargetFloatingPointMode != FloatingPointMode::Default)
+            if (m_rawTargets.getCount() > 1)
             {
-                if (m_rawTargets.getCount() == 0)
-                {
-                    m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseNoTargets{});
-                }
-                else
-                {
+                // A compile reports only the floating-point mode here, for compatibility with
+                // existing slangc command lines that give other target options before several
+                // targets. A session description rejects any such option, as
+                // `parseCommandLineArguments` documents.
+                const bool reportsAnyTargetOption = !parsesForCompilation(m_purpose);
+                if (defaultTargetFloatingPointMode != FloatingPointMode::Default ||
+                    (reportsAnyTargetOption &&
+                     hasTargetOptionOtherThanProfile(m_defaultTarget.optionSet)))
                     m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseBeforeAllTargets{});
-                }
+            }
+            else if (
+                !canAddTargetsAfterParse(m_purpose) &&
+                defaultTargetFloatingPointMode != FloatingPointMode::Default)
+            {
+                // A floating-point mode with no `-target` is ignored only when no target can be
+                // added after parsing. Otherwise targets keep it: targets already on the linkage
+                // inherit it below, targets added later inherit it from
+                // `m_optionSetForDefaultTarget`, and `parseCommandLineArguments` returns it as a
+                // session option.
+                m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseNoTargets{});
             }
         }
         for (auto& rawTarget : m_rawTargets)
@@ -4662,228 +5177,31 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 m_compileRequest->setTargetEmbedDownstreamIR(targetID, true);
             }
-        }
 
-        // Next we need to sort out the output files specified with `-o`, and
-        // figure out which entry point and/or target they apply to.
-        //
-        // If there is only a single entry point, then that is automatically
-        // the entry point that should be associated with all outputs.
-        //
-        if (m_rawEntryPoints.getCount() == 1)
-        {
-            for (auto& rawOutput : m_rawOutputs)
+            // A compile gives a target its full option set only when it binds an output to the
+            // target (see `_bindOutputsToTargets`), for compatibility with existing slangc
+            // command lines. A compile target with no output gets only what the setters above
+            // apply: the profile's version, capabilities, floating-point mode, layout options,
+            // whole-program and embedded downstream IR. Its entry points supply their stages.
+            // A session description binds no outputs, so its targets take every option given
+            // after their `-target` here, except that the profile also keeps only its version:
+            // the caller's entry points supply their stages, and a stage in the target profile
+            // would restrict every module the session loads to that stage.
+            if (!parsesForCompilation(m_purpose))
             {
-                rawOutput.entryPointIndex = 0;
-            }
-        }
-        //
-        // Similarly, if there is only one target, then all outputs must
-        // implicitly appertain to that target.
-        //
-        if (m_rawTargets.getCount() == 1)
-        {
-            for (auto& rawOutput : m_rawOutputs)
-            {
-                rawOutput.targetIndex = 0;
+                auto& targetOptionSet = linkage->targets[targetID]->getOptionSet();
+                targetOptionSet.overrideWith(rawTarget.optionSet);
+                if (rawTarget.optionSet.getProfileVersion() != ProfileVersion::Unknown)
+                    targetOptionSet.setProfile(Profile(rawTarget.optionSet.getProfileVersion()));
             }
         }
 
-        // If we don't have any raw outputs but do have a raw target,
-        // add an empty' rawOutput for certain targets where the expected behavior is obvious.
-        if (m_rawOutputs.getCount() == 0 && m_rawTargets.getCount() == 1 &&
-            (m_rawTargets[0].format == CodeGenTarget::HostCPPSource ||
-             m_rawTargets[0].format == CodeGenTarget::PyTorchCppBinding ||
-             m_rawTargets[0].format == CodeGenTarget::CUDASource ||
-             m_rawTargets[0].format == CodeGenTarget::CUDAHeader ||
-             m_rawTargets[0].format == CodeGenTarget::SPIRV ||
-             m_rawTargets[0].format == CodeGenTarget::SPIRVAssembly ||
-             m_rawTargets[0].format == CodeGenTarget::Metal ||
-             m_rawTargets[0].format == CodeGenTarget::MetalLib ||
-             m_rawTargets[0].format == CodeGenTarget::MetalLibAssembly ||
-             ArtifactDescUtil::makeDescForCompileTarget(asExternal(m_rawTargets[0].format)).kind ==
-                 ArtifactKind::HostCallable))
-        {
-            RawOutput rawOutput;
-            rawOutput.impliedFormat = m_rawTargets[0].format;
-            rawOutput.targetIndex = 0;
-            m_rawOutputs.add(rawOutput);
-        }
-
-        // Consider the output files specified via `-o` and try to figure
-        // out how to deal with them.
-        //
-        for (auto& rawOutput : m_rawOutputs)
-        {
-            // For now, most output formats need to be tightly bound to
-            // both a target and an entry point.
-
-            // If an output doesn't have a target associated with
-            // it, then search for the target with the matching format.
-            if (rawOutput.targetIndex == -1)
-            {
-                auto impliedFormat = rawOutput.impliedFormat;
-                int targetIndex = -1;
-
-                if (impliedFormat == CodeGenTarget::Unknown)
-                {
-
-                    // If we hit this case, then it means that we need to pick the
-                    // target to assocaite with this output based on its implied
-                    // format, but the file path doesn't direclty imply a format
-                    // (it doesn't have a suffix like `.spv` that tells us what to write).
-                    //
-                    m_sink->diagnose(
-                        Diagnostics::CannotDeduceOutputFormatFromPath{.path = rawOutput.path});
-                }
-                else if (mapFormatToTargetIndex.tryGetValue(rawOutput.impliedFormat, targetIndex))
-                {
-                    rawOutput.targetIndex = targetIndex;
-                }
-                else
-                {
-                    m_sink->diagnose(Diagnostics::CannotMatchOutputFileToTarget{
-                        .path = rawOutput.path,
-                        .format = TypeTextUtil::getCompileTargetName(
-                            SlangCompileTarget(rawOutput.impliedFormat))});
-                }
-            }
-
-            if (rawOutput.targetIndex != -1 &&
-                m_rawTargets[rawOutput.targetIndex].optionSet.getBoolOption(
-                    CompilerOptionName::GenerateWholeProgram))
-            {
-                // `-whole-program` emits one target-level artifact, even when the command line
-                // names a single entry point. Keep `-o` aligned with the artifact that
-                // `generateOutput()` will actually write.
-                rawOutput.isWholeProgram = true;
-            }
-
-            // We won't do any searching to match an output file
-            // with an entry point, since the case of a single entry
-            // point was handled above, and the user is expected to
-            // follow the ordering rules when using multiple entry points.
-            if (rawOutput.entryPointIndex == -1)
-            {
-                if (rawOutput.targetIndex != -1)
-                {
-                    auto outputFormat = m_rawTargets[rawOutput.targetIndex].format;
-                    // Here we check whether the given output format supports multiple entry points
-                    // When we add targets with support for multiple entry points,
-                    // we should update this switch with those new formats
-                    switch (outputFormat)
-                    {
-                    case CodeGenTarget::CPPSource:
-                    case CodeGenTarget::CPPHeader:
-                    case CodeGenTarget::PTX:
-                    case CodeGenTarget::CUDASource:
-                    case CodeGenTarget::CUDAHeader:
-
-                    case CodeGenTarget::HostHostCallable:
-                    case CodeGenTarget::ShaderHostCallable:
-                    case CodeGenTarget::HostExecutable:
-                    case CodeGenTarget::ShaderSharedLibrary:
-                    case CodeGenTarget::HostSharedLibrary:
-                    case CodeGenTarget::PyTorchCppBinding:
-                    case CodeGenTarget::DXIL:
-                    case CodeGenTarget::MetalLib:
-                    case CodeGenTarget::MetalLibAssembly:
-                    case CodeGenTarget::Metal:
-                    case CodeGenTarget::WGSL:
-                    case CodeGenTarget::HostVM:
-                    case CodeGenTarget::HostObjectCode:
-                    case CodeGenTarget::ShaderObjectCode:
-                    case CodeGenTarget::HostLLVMIR:
-                    case CodeGenTarget::ShaderLLVMIR:
-                        rawOutput.isWholeProgram = true;
-                        break;
-                    case CodeGenTarget::SPIRV:
-                    case CodeGenTarget::SPIRVAssembly:
-                        if (getCurrentTarget()->optionSet.shouldEmitSPIRVDirectly())
-                        {
-                            rawOutput.isWholeProgram = true;
-                            break;
-                        }
-                        else if (m_rawEntryPoints.getCount() != 0)
-                        {
-                            rawOutput.entryPointIndex = (int)m_rawEntryPoints.getCount() - 1;
-                            break;
-                        }
-                        [[fallthrough]];
-                    default:
-                        if (rawOutput.path.getLength() != 0)
-                        {
-                            m_sink->diagnose(Diagnostics::CannotMatchOutputFileToEntryPoint{
-                                .path = rawOutput.path});
-                        }
-                        break;
-                    }
-                }
-            }
-        }
+        if (parsesForCompilation(m_purpose))
+            _resolveOutputPaths(mapFormatToTargetIndex);
     }
 
-    // Now that we've diagnosed the output paths, we can add them
-    // to the compile request at the appropriate locations.
-    //
-    // We will consider the output files specified via `-o` and try to figure
-    // out how to deal with them.
-    //
-    for (auto& rawOutput : m_rawOutputs)
-    {
-        if (rawOutput.targetIndex == -1)
-            continue;
-        auto targetID = m_rawTargets[rawOutput.targetIndex].targetID;
-        auto target = m_requestImpl->getLinkage()->targets[targetID];
-        RefPtr<EndToEndCompileRequest::TargetInfo> targetInfo;
-        if (!m_requestImpl->m_targetInfos.tryGetValue(target, targetInfo))
-        {
-            targetInfo = new EndToEndCompileRequest::TargetInfo();
-            m_requestImpl->m_targetInfos[target] = targetInfo;
-        }
-        target->getOptionSet().overrideWith(m_rawTargets[rawOutput.targetIndex].optionSet);
-        if (rawOutput.isWholeProgram)
-        {
-            if (targetInfo->wholeTargetOutputPath != "")
-            {
-                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForTarget{
-                    .target = TypeTextUtil::getCompileTargetName(
-                        SlangCompileTarget(target->getTarget()))});
-            }
-            else
-            {
-                target->getOptionSet().addTargetFlags(SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
-                targetInfo->wholeTargetOutputPath = rawOutput.path;
-            }
-        }
-        else
-        {
-            if (rawOutput.entryPointIndex == -1)
-                continue;
-
-            auto entryPoint = m_rawEntryPoints[rawOutput.entryPointIndex];
-            Int entryPointID = entryPoint.entryPointID;
-            if (entryPointID == -1)
-            {
-                m_sink->diagnose(Diagnostics::EntryPointFunctionNotFound{.name = entryPoint.name});
-                continue;
-            }
-            auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
-
-            // String outputPath;
-            if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
-            {
-                m_sink->diagnose(Diagnostics::DuplicateOutputPathsForEntryPointAndTarget{
-                    .entryPoint = entryPointReq->getName(),
-                    .target = TypeTextUtil::getCompileTargetName(
-                        SlangCompileTarget(target->getTarget()))});
-            }
-            else
-            {
-                targetInfo->entryPointOutputPaths[entryPointID] = rawOutput.path;
-            }
-        }
-    }
+    if (parsesForCompilation(m_purpose))
+        _bindOutputsToTargets();
 
 
     // Copy all settings from linkage to targets.
@@ -4973,8 +5291,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 SlangResult OptionsParser::parse(
     SlangCompileRequest* compileRequest,
     int argc,
-    char const* const* argv)
+    char const* const* argv,
+    CommandLineParsePurpose purpose)
 {
+    m_purpose = purpose;
     m_compileRequest = compileRequest;
 
     // Set up useful members
@@ -5013,7 +5333,8 @@ SlangResult OptionsParser::parse(
         // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
         // parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
         m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
-        // Copy color and unicode settings from the request sink
+        // Copy diagnostic presentation settings from the request sink.
+        m_parseSink.setDiagnosticFormat(requestSink->getDiagnosticFormat());
         m_parseSink.setDiagnosticColorMode(requestSink->getDiagnosticColorMode());
         m_parseSink.setEnableUnicode(requestSink->getEnableUnicode());
     }
@@ -5035,10 +5356,14 @@ SlangResult OptionsParser::parse(
     return res;
 }
 
-SlangResult parseOptions(SlangCompileRequest* inCompileRequest, int argc, char const* const* argv)
+SlangResult parseOptions(
+    SlangCompileRequest* inCompileRequest,
+    int argc,
+    char const* const* argv,
+    CommandLineParsePurpose purpose)
 {
     OptionsParser parser;
-    return parser.parse(inCompileRequest, argc, argv);
+    return parser.parse(inCompileRequest, argc, argv, purpose);
 }
 
 

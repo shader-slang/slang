@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-filesystem.cpp
 // Comprehensive tests for file system replay functionality
 
@@ -751,3 +752,4 @@ SLANG_UNIT_TEST(replayFileSystemProxyLargeFile)
     // Clean up
     ctx().reset();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

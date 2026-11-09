@@ -40,6 +40,24 @@ static IRInst* _getDiffTypeFromPairType(
         SLANG_UNEXPECTED("Unexpected differential pair type");
 }
 
+// Return the instruction the lowered pair struct must be inserted after so its
+// definition follows both field types it references. The struct is built in
+// `diffType`'s block, so anchor after `diffType`, or after the primal type
+// `origBaseType` when it shares that block and is defined later. Returns null when
+// `diffType` is module-scoped, where out-of-order references are permitted.
+static IRInst* getPairStructInsertAnchor(IRInst* origBaseType, IRInst* diffType)
+{
+    if (!as<IRBlock>(diffType->getParent()))
+        return nullptr;
+
+    if (origBaseType->getParent() == diffType->getParent())
+        for (auto inst = diffType->getNextInst(); inst; inst = inst->getNextInst())
+            if (inst == origBaseType)
+                return origBaseType;
+
+    return diffType;
+}
+
 
 struct DifferentialPairTypeBuilder
 {
@@ -226,7 +244,13 @@ struct DifferentialPairTypeBuilder
         }
 
         IRBuilder builder(sharedContext->moduleInst);
-        builder.setInsertBefore(diffType);
+        // The struct's only potentially block-local operands are its two field types
+        // (the struct keys are module-scoped and the name hint is a string literal),
+        // so anchoring after the later-defined of them satisfies every same-block operand.
+        if (auto anchor = getPairStructInsertAnchor(origBaseType, diffType))
+            setInsertAfterOrdinaryInst(&builder, anchor);
+        else
+            builder.setInsertBefore(diffType);
 
         auto pairStructType = builder.createStructType();
         StringBuilder nameBuilder;

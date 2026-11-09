@@ -974,7 +974,8 @@ struct ExtractPrimalFuncContext
         IRBuilder& builder,
         IRStructKey* baseKey,
         IRInst* inst,
-        IRInst* intermediateOutput)
+        IRInst* intermediateOutput,
+        List<IRInst*>* capturedValues = nullptr)
     {
         auto field = addIntermediateContextField(inst->getDataType(), intermediateOutput);
         field->sourceLoc = inst->sourceLoc;
@@ -982,6 +983,13 @@ struct ExtractPrimalFuncContext
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
             cloneDecoration(nameHint, key);
         builder.addPrimalValueStructKeyDecoration(inst, baseKey, key);
+        if (capturedValues)
+        {
+            capturedValues->add(inst);
+            // Checkpoint reporting needs an address; normal captures remain SSA values.
+            if (!shouldReportCheckpoints || !originalFunc)
+                return;
+        }
         auto fieldAddr = builder.emitFieldAddress(
             builder.getPtrType(inst->getFullType()),
             intermediateOutput,
@@ -1077,6 +1085,7 @@ struct ExtractPrimalFuncContext
         builder.setInsertBefore(paramBlock->getFirstOrdinaryInst());
         auto outMinimalContextVar = builder.emitVar((IRType*)minimalContextType);
         auto outParamContextVar = rematFuncBuilder.emitVar((IRType*)paramsContextType);
+        List<IRInst*> capturedParameterValues;
 
         List<IRBlock*> primalBlocksList;
 
@@ -1109,12 +1118,7 @@ struct ExtractPrimalFuncContext
                                     outParamContextVar);
                                 field->sourceLoc = inst->sourceLoc;
 
-                                rematFuncBuilder.emitStore(
-                                    rematFuncBuilder.emitFieldAddress(
-                                        builder.getPtrType(valToStore->getFullType()),
-                                        outParamContextVar,
-                                        field->getKey()),
-                                    valToStore);
+                                capturedParameterValues.add(valToStore);
 
                                 rematFuncBuilder.addPrimalValueStructKeyDecoration(
                                     inst,
@@ -1167,7 +1171,8 @@ struct ExtractPrimalFuncContext
                                 rematFuncBuilder,
                                 paramsContextKey,
                                 primalToRematFuncMapping.mapOldValToNew[inst],
-                                outParamContextVar);
+                                outParamContextVar,
+                                &capturedParameterValues);
                         }
                         else
                         {
@@ -1235,7 +1240,9 @@ struct ExtractPrimalFuncContext
         rematFuncBuilder.emitReturn(rematFuncBuilder.emitMakeStruct(
             (IRType*)fullContextType,
             List<IRInst*>(
-                rematFuncBuilder.emitLoad(outParamContextVar),
+                // Field stores prevent SSA promotion and hide the original arguments
+                // from context expansion and aggregate parameter copy elision.
+                rematFuncBuilder.emitMakeStruct(paramsContextType, capturedParameterValues),
                 rematFuncMinimalContextParam)));
 
         return unzippedFunc;
@@ -1486,7 +1493,8 @@ IRFunc* splitApplyAndPropFuncs(
     // FieldAddress -> GetElementPtr and FieldExtract -> GetTupleElement.
     //
     auto convertStructToNamedTuple = [&](IRStructType* structType,
-                                         UnownedStringSlice nameSuffix) -> IRInst*
+                                         UnownedStringSlice nameSuffix,
+                                         bool isParameterContext = false) -> IRInst*
     {
         List<IRType*> fieldTypes;
         Dictionary<IRInst*, UInt> keyToIndex;
@@ -1498,6 +1506,8 @@ IRFunc* splitApplyAndPropFuncs(
 
         auto tupleNameType = builder.getTupleNameType(builder.getStringValue(nameSuffix));
         builder.addDecoration(tupleNameType, kIROp_OptimizableTypeDecoration);
+        if (isParameterContext)
+            builder.addDecoration(tupleNameType, kIROp_AutodiffParameterContextTypeDecoration);
         fieldTypes.add((IRType*)tupleNameType);
 
         auto tupleType = builder.getTupleType(fieldTypes);
@@ -1566,7 +1576,8 @@ IRFunc* splitApplyAndPropFuncs(
     String paramTypeName = String("s_paramCtx_") + intermediateTypeName;
     paramsContextType = convertStructToNamedTuple(
         cast<IRStructType>(paramsContextType),
-        paramTypeName.getUnownedSlice());
+        paramTypeName.getUnownedSlice(),
+        true);
 
     fullContextType =
         convertStructToNamedTuple(cast<IRStructType>(fullContextType), intermediateTypeName);

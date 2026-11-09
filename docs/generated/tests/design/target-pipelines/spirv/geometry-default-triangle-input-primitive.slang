@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements
-//META: doc_section_digest=f52a7151fb266a0395ad9852aa535a328de8a8e0c05ff15ae8b0008b93f3fcaf
+//META: doc_section_digest=2a5194c459ed95b6dfdeca1a6bc72af8d96c833b655ce928b16267ebca672dcb
 //META: purpose=A geometry entry point that declares no input primitive qualifier falls back to the triangle default, emitting OpExecutionMode Triangles.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

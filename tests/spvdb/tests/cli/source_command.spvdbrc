@@ -1,0 +1,3 @@
+# Tests the 'source' command itself by sourcing a second script.
+# Verifies: source command dispatches correctly and output is echoed.
+source @CLI_TEST_DIR@/basic_run.spvdbrc

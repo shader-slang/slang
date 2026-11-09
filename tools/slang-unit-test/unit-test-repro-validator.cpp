@@ -1225,8 +1225,10 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
 
     container[requestPtr]->translationUnits = translationUnits;
     container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[0]].sourceFiles = tu0SourceFiles;
     container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[1]].sourceFiles = tu1SourceFiles;
 
     container[tu0SourceFiles[0]] = tu0SourceFile;
@@ -1254,6 +1256,83 @@ SLANG_UNIT_TEST(reproExtractFilesUsesSourceFileElementIndex)
     SLANG_CHECK(tu1AIndex < tu1BIndex);
 }
 
+SLANG_UNIT_TEST(reproExtractFilesPreservesExplicitSourceLanguage)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(2);
+    auto explicitSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto inferredSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto explicitSourceFile = addSourceFileState(container, "explicit-language.slang");
+    auto inferredSourceFile = addSourceFileState(container, "inferred-language.slang");
+
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceFiles = explicitSourceFiles;
+    container[explicitSourceFiles[0]] = explicitSourceFile;
+    container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
+    container[translationUnits[1]].sourceFiles = inferredSourceFiles;
+    container[inferredSourceFiles[0]] = inferredSourceFile;
+
+    OffsetBase& base = container.asBase();
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::extractFiles(base, base.asRaw(requestPtr), fileSystem)));
+
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(fileSystem->loadFile("manifest.txt", manifestBlob.writeRef())));
+
+    // The first serialized path deliberately has a `.slang` extension. Omitting `-lang glsl` would
+    // parse it under the wrong language. That option remains active, so the following inferred
+    // Slang translation unit needs an explicit reset in the extracted command even though binary
+    // replay preserves its inferred provenance.
+    String manifest = StringUtil::getString(manifestBlob);
+    SLANG_CHECK(
+        manifest.indexOf(UnownedStringSlice(
+            "-lang glsl explicit-language.slang -lang slang inferred-language.slang")) >= 0);
+}
+
+SLANG_UNIT_TEST(reproExtractFilesPreservesLegacyAllowGLSLInput)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(1);
+    auto sourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+    auto sourceFile = addSourceFileState(container, "legacy-glsl-input.slang");
+
+    container[requestPtr]->legacyAllowGLSLInput = true;
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceFiles = sourceFiles;
+    container[sourceFiles[0]] = sourceFile;
+
+    OffsetBase& base = container.asBase();
+    ComPtr<ISlangMutableFileSystem> fileSystem(new MemoryFileSystem);
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(ReproUtil::extractFiles(base, base.asRaw(requestPtr), fileSystem)));
+
+    ComPtr<ISlangBlob> manifestBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(fileSystem->loadFile("manifest.txt", manifestBlob.writeRef())));
+
+    // The compatibility bit is request-local rather than a serialized linkage option. Preserve it
+    // before the `.slang` input so an extracted command line selects GLSL just like binary replay.
+    String manifest = StringUtil::getString(manifestBlob);
+    SLANG_CHECK(manifest.indexOf(UnownedStringSlice("-allow-glsl legacy-glsl-input.slang")) >= 0);
+}
+
 SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 {
     typedef ReproUtil::RequestState RequestState;
@@ -1270,9 +1349,11 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     auto tu1SourceFileB = addSourceFileState(container, "load-tu1-b.slang");
 
     container[requestPtr]->translationUnits = translationUnits;
-    container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].language = SourceLanguage::GLSL;
+    container[translationUnits[0]].sourceLanguageExplicitlyRequested = SourceLanguage::GLSL;
     container[translationUnits[0]].sourceFiles = tu0SourceFiles;
     container[translationUnits[1]].language = SourceLanguage::Slang;
+    container[translationUnits[1]].sourceLanguageExplicitlyRequested = SourceLanguage::Unknown;
     container[translationUnits[1]].sourceFiles = tu1SourceFiles;
 
     container[tu0SourceFiles[0]] = tu0SourceFile;
@@ -1310,6 +1391,13 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 
     SLANG_CHECK_ABORT(loadedTu0.sourceFiles.getCount() == 1);
     SLANG_CHECK_ABORT(loadedTu1.sourceFiles.getCount() == 2);
+    // Binary replay must preserve whether each language came from an explicit request. The first
+    // translation unit deliberately uses GLSL with a `.slang` path, while the second relies on
+    // inference, so changing either provenance would alter how a subsequent replay is interpreted.
+    SLANG_CHECK(loadedTu0.language == SourceLanguage::GLSL);
+    SLANG_CHECK(loadedTu0.sourceLanguageExplicitlyRequested == SourceLanguage::GLSL);
+    SLANG_CHECK(loadedTu1.language == SourceLanguage::Slang);
+    SLANG_CHECK(loadedTu1.sourceLanguageExplicitlyRequested == SourceLanguage::Unknown);
     SLANG_CHECK(
         strcmp(
             getTranslationUnitSourceFilePath(loadedBase, loadedRequestState, 0, 0),

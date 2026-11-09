@@ -11,7 +11,10 @@ Pipeline:
        `-trace-coverage-counter-width 32` is passed (e.g. for
        runtime drivers that lack 64-bit shader atomic add).
        Counter slots are assigned according to the coverage metadata.
-       The current line/function/branch modes use one direct counter
+       Line coverage coalesces entries that execute together onto a
+       shared counter, so several entries may name the same slot and
+       there are fewer counters than entries. Accumulate per entry.
+       Function and branch modes use one direct counter
        per marker op, but consumers must treat the manifest as
        authoritative.
     2. Read the `.coverage-manifest.json` sidecar describing each
@@ -71,23 +74,33 @@ def load_counters_binary(path, count, stride):
     needed = count * stride
     with open(path, "rb") as f:
         raw = f.read()
-    if len(raw) < needed:
+    # Require an exact match rather than a lower bound. A buffer that is
+    # larger than the manifest expects is not harmless padding: it means
+    # the counters were read back for a *different* compile of the shader,
+    # and since slot indices are per-compile, silently using the first
+    # `needed` bytes produces plausible but wrong hit counts. Coalescing
+    # makes this the likely failure mode, because counter_count now drops
+    # sharply between an old and a new compile of the same source.
+    if len(raw) != needed:
         sys.exit(
             f"error: counter file '{path}' is {len(raw)} bytes; "
-            f"manifest expects at least {needed} ({count} slots * {stride} bytes)"
+            f"manifest expects exactly {needed} ({count} slots * {stride} bytes). "
+            f"The counter buffer and the manifest must come from the same compile."
         )
-    return list(struct.unpack(f"<{count}{code}", raw[:needed]))
+    return list(struct.unpack(f"<{count}{code}", raw))
 
 
 def load_counters_text(src, count):
     data = sys.stdin.read() if src == "-" else open(src).read()
     values = [int(tok) for tok in data.split() if tok.strip()]
-    if len(values) < count:
+    # Exact match, for the same reason as the binary path above.
+    if len(values) != count:
         sys.exit(
             f"error: found {len(values)} counter values; "
-            f"manifest expects at least {count}"
+            f"manifest expects exactly {count}. "
+            f"The counter values and the manifest must come from the same compile."
         )
-    return values[:count]
+    return values
 
 
 def get_manifest_version(manifest):
@@ -231,7 +244,8 @@ def main():
         counters = load_counters_text(args.counters_text, total)
 
     # Aggregate by (file, line). Multiple counter slots may map to the
-    # same line because the compiler assigns one slot per counter op;
+    # same line, and one slot may also serve several lines once the
+    # compiler coalesces markers that execute together;
     # LCOV wants line-oriented reporting, so sum them here.
     #
     # GCOV/LCOV-style output only admits real source files and positive

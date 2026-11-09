@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#deferstmt
-//META: doc_section_digest=9d7a17de2e7a4cacf7a44eefe78eaa8bea0a9a617b555cc1e20d4e784f62d6bf
+//META: doc_section_digest=ae58a0705686d2536ceeecf3a6010bf0d4e6ed4ee88f39a743e2e7f29decc218
 //META: purpose=A DeferStmt's inner statement runs when the enclosing scope exits rather than at the position the `defer` is written.
 //META: intent=functional
 //META: pipeline_stage=check

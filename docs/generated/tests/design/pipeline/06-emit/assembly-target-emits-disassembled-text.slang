@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#emit-dispatcher
-//META: doc_section_digest=931b6be8623259835eb4a857276a2ea3e6c3d0ca8f46230a8f6b9a1c92951550
+//META: doc_section_digest=43c38a0587cf3d983ec7efa66dcd9cfd7dc6f5aade52374f3c6f3a0c7b491e81
 //META: purpose=An `*Assembly` target such as `spirv-asm` is served by compiling the corresponding binary target and then disassembling it, so the output is disassembler text rather than emitter-authored source.
 //META: intent=functional
 //META: pipeline_stage=emit

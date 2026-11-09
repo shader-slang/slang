@@ -18,7 +18,7 @@
 // non-trivial `ForwardDifferentiate(%g)` spelling within the LOWER-TO-IR
 // section, which is what distinguishes the two rows.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#pre-link-mandatory-passes
-//META: doc_section_digest=5bba61a76153063b8f5fcca3dfc0394ae8fb3e1c8ed03e1852e561d6fe1ee9b3
+//META: doc_section_digest=f3be9705adaba00c166c4c4eb1f2b3db4b7e22926b5ec3e600da34fe99b70618
 //META: purpose=The pre-link passes are plain function calls rather than SLANG_PASS-wrapped ones, so no AFTER-pass dump block appears before the LOWER-TO-IR snapshot.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -19,7 +19,7 @@
 // the trailing CHECK confirms the post-link headings do start afterwards,
 // so the CHECK-NOT is not vacuously passing on an empty dump.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 uniform int a;

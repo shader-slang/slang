@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -compile-arg -msvc-style-bitfield-packing
 
-// With MSVC packing, bitfields are packed from MSB to LSB
-// and new backing fields start when type sizes change
+// The deprecated option packs bitfields from MSB to LSB and starts a new backing field
+// when the underlying type size changes. Actual MSVC bit order is LSB-first.
 // CHECK:      123
 // CHECK-NEXT: 4567
 // CHECK-NEXT: 0

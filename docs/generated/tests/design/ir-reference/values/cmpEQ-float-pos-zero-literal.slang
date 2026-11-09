@@ -12,7 +12,7 @@
 // Comparison against the positive-zero edge surfaces the `cmpEQ`
 // opcode with the literal payload directly on the operand.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform RWStructuredBuffer<int> buf;

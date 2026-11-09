@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#untypedresourcehandle-and-untypedsamplerhandle
-//META: doc_section_digest=75ee899053793b3043363438c88abda61127a16198c9bd25ae6ca84b91201696
+//META: doc_section_digest=9374348b9ca5a912468bef811769cdeebd5aede8863383ca3bf56653657248b4
 //META: purpose=Indexing ResourceDescriptorHeap yields a value of the nullary IR type UntypedResourceHandle, carrying no operand.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // call, and for the concrete buffer type appearing only on the following
 // conversion — the handle type itself never names an element type.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 uniform uint heapIndex;
 RWStructuredBuffer<uint> outputBuffer;

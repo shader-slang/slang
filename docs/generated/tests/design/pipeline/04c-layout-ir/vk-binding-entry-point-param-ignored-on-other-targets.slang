@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#explicit-vkbinding-on-entry-point-parameters
-//META: doc_section_digest=d594d25adb697c7a448d8fd4e5af2ada74a9ee315fdd20515276d88cbf22323f
+//META: doc_section_digest=bf32037fa507cbeb6ecd1bff82b6f0089c3bf4c3ba27b7837b9aa2e5aef0aa85
 //META: purpose=On targets outside the Khronos/WGPU gate the vk::binding on an entry-point parameter is ignored and the parameter is placed positionally instead.
 //META: intent=negative
 //META: pipeline_stage=layout

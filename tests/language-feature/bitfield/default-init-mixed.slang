@@ -5,7 +5,7 @@
 // that mixes bitfields with a trailing normal field must zero-initialize the hidden
 // bitfield backing storage. The defect is in front-end constructor synthesis and is
 // therefore target-independent, so a -cpu run is sufficient (the local environment has
-// no GPU); the second directive re-runs the same shader under MSVC bit-packing to cover
+// no GPU); the second directive re-runs the same shader under legacy MSB-first packing to cover
 // that backing-layout path. The deterministic, backend-robust gates for this fix are the
 // emit-level companion (default-init-mixed-emit.slang) and the E41021 diagnostic test
 // (default-init-mixed-diagnostic.slang); this test additionally exercises the 32-bit,

@@ -56,3 +56,21 @@ so they are not tagged `characterization-unverified`.
 ## Doc gaps observed
 
 NA
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 2 commits touched its watched paths in between; all
+8 existing tests still pass.
+
+One diagnostic new since the base commit is raised from
+`slang-ir-pytorch-cpp-binding.cpp`: E55103, for a bodyless `[TorchEntryPoint]`
+function, added by #12514 to replace a crash. It already has a hand-written test
+(`tests/autodiff/torch-entrypoint-bodyless.slang`). No test was added.
+
+The other commit in the window, #12508, fixes a crash after the
+`UnableToAutoMapCudaTypeToHostType` diagnostic -- the same SIGSEGV recorded in
+`Unreachable gaps` below as the reason E56001 is filed as a finding rather than
+pinned as a test. That row should be re-checked when the finding is next
+triaged; it was left as-is here because confirming it needs the finding's repro,
+not a drift review.

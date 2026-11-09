@@ -27,7 +27,7 @@ appears somewhere" are deliberately avoided; they cannot detect the failure
 mode the doc warns about.
 
 The observation point throughout is `-dump-ir` paired with a text target and
-`-o /dev/null`, because every opcode on this page is either created by
+`-o -`, because every opcode on this page is either created by
 AST-to-IR lowering (the layout, attribute and inline-asm families) or by an
 early IR pass (the remaining `Debug*` records) and is therefore present in the
 platform-neutral snapshot. Three tests that observe records the inliner
@@ -112,7 +112,7 @@ appears in exactly one of the two tables that follow.
 31. No `Debug*` opcode exists unless debug information is requested, and the requested `DebugInfoLevel` selects which of them exist.
 32. `-g` with no suffix is `Standard`, and `-g0`..`-g3` name the level explicitly.
 33. At `None` (`-g0`) lowering emits nothing.
-34. `Minimal` (`-g1`) produces `DebugSource` with an empty text operand, `DebugLine`, `DebugFunction`, and — once the inliner has run — `DebugScope`, `DebugNoScope` and `DebugInlinedAt`.
+34. `Minimal` (`-g1`) produces `DebugSource` with an empty text operand, `DebugLine`, `DebugFunction`, and — once the inliner has run — `DebugScope` and `DebugInlinedAt`.
 35. `Standard` (`-g`, `-g2`) and `Maximal` (`-g3`) additionally give `DebugSource` the file's text and give each non-included source file a `DebugCompilationUnit`.
 36. `DebugVar` and `DebugValue` never appear at `-g1`.
 37. `-debug-info-include-source` embeds the source text into `DebugSource` even at `Minimal`.
@@ -125,8 +125,8 @@ appears in exactly one of the two tables that follow.
 44. `DebugInlinedAt` carries line, column, file, the debug function inlined into, and an optional outer frame.
 45. `DebugFunction` carries name, line, column, file, debug type and an optional parent scope, and the owning function links to it by `DebugFuncDecoration`.
 46. `DebugInlinedVariable` has no producer at HEAD.
-47. `DebugScope` carries a scope in operand 0 and an inlining context in operand 1.
-48. `DebugNoScope` is emitted with zero operands.
+47. `DebugScope` carries a scope in operand 0 and, when it has one, an inlining context in operand 1.
+48. `DebugNoScope` has no producer at HEAD: the inliner closes an inlined region by restoring the caller's scope with a `DebugScope` instead.
 49. `DebugBuildIdentifier` carries a build identifier and a flags operand, and is created only under `-separate-debug-info`.
 50. `EmbeddedDownstreamIR` carries an integer `CodeGenTarget` operand and an `IRBlobLit` payload.
 
@@ -222,8 +222,8 @@ appears in exactly one of the two tables that follow.
 
 ### Notable opcodes — `DebugScope`
 
-105. `DebugScope` operand 0 references the enclosing scope — a `DebugFunction` for a function-level scope, or another `DebugScope` for a nested block — and operand 1 records the inlining context.
-106. `DebugNoScope` is declared with `min_operands = 1` but emitted with zero operands, so its scope accessor must not be called on an instruction from that emitter.
+105. `DebugScope` operand 0 references the enclosing scope — a `DebugFunction` for a function-level scope, or another `DebugScope` for a nested block — and operand 1, when present, records the inlining context.
+106. The `DebugScope` that restores an ordinary caller scope after an inlined call carries only the caller's `DebugFunction`, with no inlining-context operand.
 
 ### Notable opcodes — `SPIRVAsmOperand` printed forms
 
@@ -281,7 +281,7 @@ appears in exactly one of the two tables that follow.
 | C104: Lowering emits no DebugLine markers inside a Slang-synthesized constructor, so a debugger cannot step into compiler-generated code. | negative | [#debugline](../../../../design/ir-reference/metadata.md#debugline) | [`debug-line-skips-synthesized-constructor.slang`](debug-line-skips-synthesized-constructor.slang) |
 | C41: DebugLine pins an instruction to a source range with five operands: the source file, the start and end lines, and the start and end columns. | functional | [#debugline](../../../../design/ir-reference/metadata.md#debugline) | [`debug-line-five-operand-range.slang`](debug-line-five-operand-range.slang) |
 | C47, C105: A DebugScope opens a lexical scope whose operand 0 references the enclosing scope, a DebugFunction for a function-level scope, and whose operand 1 records the inlining context. | functional | [#debugscope](../../../../design/ir-reference/metadata.md#debugscope) | [`debug-scope-references-debug-function.slang`](debug-scope-references-debug-function.slang) |
-| C48, C106: DebugNoScope is emitted with zero operands, so its declared scope accessor must not be called on an instruction from that emitter. | boundary | [#debugscope](../../../../design/ir-reference/metadata.md#debugscope) | [`debug-no-scope-emitted-without-operands.slang`](debug-no-scope-emitted-without-operands.slang) |
+| C48, C106: An inlined region is closed by a DebugScope that restores the caller's function scope with the caller's DebugFunction as its only operand, not by DebugNoScope. | boundary | [#debugscope](../../../../design/ir-reference/metadata.md#debugscope) | [`debug-no-scope-replaced-by-caller-scope-restore.slang`](debug-no-scope-replaced-by-caller-scope-restore.slang) |
 | C98: Compiling at -g1 leaves the DebugSource text operand an empty string, so the record carries the path without a copy of the file. | boundary | [#debugsource](../../../../design/ir-reference/metadata.md#debugsource) | [`debug-source-text-operand-empty-at-minimal.slang`](debug-source-text-operand-empty-at-minimal.slang) |
 | C42, C101: A DebugVar for an ordinary local omits the argument-index operand, and the variable's own type is the pointee of the instruction's pointer result type rather than an operand. | boundary | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | [`debug-var-local-result-type-is-pointer.slang`](debug-var-local-result-type-is-pointer.slang) |
 | C42: A DebugVar for an entry-point parameter carries the optional argument-index operand after source, line and column. | boundary | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | [`debug-var-param-carries-arg-index.slang`](debug-var-param-carries-arg-index.slang) |
@@ -348,7 +348,9 @@ appears in exactly one of the two tables that follow.
 
 ## Doc gaps observed
 
-(none) — no new gaps were observed in this pass.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#debugscope](../../../../design/ir-reference/metadata.md#debugscope) | drift-from-source | The section says `DebugNoScope` is declared with `min_operands = 1`, is read through `IRDebugNoScope::getScope()` and is produced by `slang-ir-inline.cpp`, and lists `DebugScope`'s operands as `scope, inlinedAt`; the same producer claim appears under [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) in the producer list and the `-g1` record list. Since #13175 nothing creates `DebugNoScope`: `IRBuilder::emitDebugNoScope` has no caller, and the opcode is `min_operands = 0` with no accessor. The dump after `performForceInlining` instead shows the inlined body closed by a one-operand `DebugScope` naming the caller's `DebugFunction`. | Give `DebugScope`'s operands as `scope, inlinedAt?` and describe the one-operand form as the caller-scope restore that follows an inlined call. Mark `DebugNoScope` as having no producer at HEAD, as the page already does for `DebugInlinedVariable`, and drop it from the inliner's producer list and the `-g1` record list. |
 
 All fourteen gaps previously listed here were fixed on the documentation side
 (`docs/generated/design/_meta/doc-gap-state.json`) and the answers are now in

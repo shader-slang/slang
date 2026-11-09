@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#conversions
-//META: doc_section_digest=e048ee63e8d3331531d544e35ff8c335c38d075b516814b79f5d10d0602ac72a
+//META: doc_section_digest=fd36e77aadaffc9bfb74e35c83d2c6e2a74c726d09922af2aa3a95ce43fcac0c
 //META: purpose=`castFloatToInt` lowers to `OpConvertFToS`/`OpConvertFToU` keyed by the target integer's signedness, and `castIntToFloat` lowers to `OpConvertSToF`/`OpConvertUToF` keyed by the source integer's signedness.
 //META: intent=expansion
 //META: pipeline_stage=emit

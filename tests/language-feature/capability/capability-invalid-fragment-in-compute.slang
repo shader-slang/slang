@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -emit-spirv-directly -entry computeMain -stage compute -allow-glsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_IGNORE_CAPS): -target hlsl -emit-spirv-directly -entry computeMain -stage compute -allow-glsl -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -emit-spirv-directly -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_IGNORE_CAPS): -target hlsl -emit-spirv-directly -entry computeMain -stage compute -ignore-capabilities
 // non-exhaustive: cascading notes from internal hlsl.meta.slang file
 
 // CHECK_IGNORE_CAPS-NOT: error

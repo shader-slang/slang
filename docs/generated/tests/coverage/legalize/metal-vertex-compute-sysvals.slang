@@ -1,8 +1,8 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-05T00:00:00+00:00
-//META: source_commit=5634a0ea1b
-//META: purpose=Characterizes the Metal system-value mapping for the vertex and compute stages, including that SV_GroupIndex has no Metal attribute and is instead synthesized from the thread position within the threadgroup.
+//META: source_commit=48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+//META: purpose=Characterizes the Metal system-value mapping for the vertex and compute stages, including that SV_InstanceID is rebased by subtracting [[base_instance]] and that SV_GroupIndex has no Metal attribute and is instead synthesized from the thread position within the threadgroup.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-legalize-varying-params.cpp
 //META: pipeline_stage=ir-pass
@@ -20,6 +20,12 @@
 // attribute mappings appear in the parameter lists, while the group index
 // appears only as the `(z*Y + y)*X + x` expression built from the
 // threadgroup-local id — with X and Y baked in from `[numthreads(4,2,1)]`.
+//
+// `SV_InstanceID` is a third shape again. Metal's `[[instance_id]]` counts
+// from the draw's base instance, whereas HLSL's `SV_InstanceID` counts from
+// zero, so the legalizer adds a `[[base_instance]]` parameter the shader
+// never asked for and subtracts it at each use. Both halves are asserted:
+// the extra parameter in the signature, and the subtraction in the body.
 //TEST:SIMPLE(filecheck=VERT):-target metal -entry vertMain -stage vertex
 //TEST:SIMPLE(filecheck=COMP):-target metal -entry computeMain -stage compute
 
@@ -58,7 +64,9 @@ void computeMain(
 //VERT-DAG: float4 pos_0 {{\[\[}}position]];
 //VERT-DAG: float psize_0 {{\[\[}}point_size]];
 //VERT-DAG: uint layer_0 {{\[\[}}render_target_array_index]];
-//VERT: {{\[\[}}vertex]] vertMain_Result_0 vertMain(uint vid_0 {{\[\[}}vertex_id]], uint iid_0 {{\[\[}}instance_id]])
+//VERT: {{\[\[}}vertex]] vertMain_Result_0 vertMain(uint vid_0 {{\[\[}}vertex_id]], uint iid_0 {{\[\[}}instance_id]], uint base_instance_0 {{\[\[}}base_instance]])
+// The declared SV_InstanceID value is the attribute minus the base instance.
+//VERT: iid_0 - base_instance_0
 
 // The three id vectors map directly; SV_GroupIndex does not appear as a
 // parameter at all.

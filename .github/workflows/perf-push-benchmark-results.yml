@@ -11,6 +11,11 @@ concurrency:
 jobs:
   build:
     runs-on: [Windows, self-hosted, benchmark]
+    # Use Git Bash rather than PowerShell: the common-setup action writes LLVM_DIR and
+    # Clang_DIR as MSYS paths (/c/...), which only Git Bash converts when it launches cmake.exe.
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -48,14 +53,13 @@ jobs:
           token: ${{ secrets.SLANG_MDL_BENCHMARK_RESULTS_PAT }}
       - name: Push results
         run: |
-          cp tools/benchmark/benchmarks.json external\slang-material-modules-benchmark
-          echo $(Invoke-Expression "git log -1 --pretty=%s") > external\slang-material-modules-benchmark\commit
-          echo $(Invoke-Expression "git log -1 --pretty=%H") > external\slang-material-modules-benchmark\commit-hash
-          echo $(Invoke-Expression "git log -1 --pretty=%s") > external\slang-material-modules-benchmark\current
-          echo $(Invoke-Expression "git log -1 --pretty=%H") >> external\slang-material-modules-benchmark\current
-          cd external\slang-material-modules-benchmark
+          commit_subject="$(git log -1 --pretty=%s)"
+          commit_hash="$(git log -1 --pretty=%H)"
+          cp tools/benchmark/benchmarks.json external/slang-material-modules-benchmark/
+          printf '%s\n%s\n' "${commit_subject}" "${commit_hash}" > external/slang-material-modules-benchmark/current
+          cd external/slang-material-modules-benchmark
           ls
           git add benchmarks.json current
-          git commit -m "$(cat commit)" -m "https://github.com/shader-slang/slang/commit/$(cat commit-hash)"
+          git commit -m "${commit_subject}" -m "https://github.com/shader-slang/slang/commit/${commit_hash}"
           git log
           git push

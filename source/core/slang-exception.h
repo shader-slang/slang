@@ -4,6 +4,19 @@
 #include "slang-common.h"
 #include "slang-string.h"
 
+// Macroizes the opening `try` of an exception-guarded block. The matching `catch` clauses must
+// still be wrapped in `#if SLANG_HAS_EXCEPTIONS` directly: once the `try` is elided under
+// -fno-exceptions a `catch` is ill-formed, so the whole clause is removed by the preprocessor (this
+// applies even to an empty `catch (...) {}`). With exceptions disabled these guarded bodies are
+// never reached from Slang's own error path — an internal abort terminates in handleSignal()
+// instead of throwing — so the graceful recovery they provide (diagnostics, fallback returns,
+// language-server survival) is intentionally forfeited in that build.
+#if SLANG_HAS_EXCEPTIONS
+#define SLANG_EXCEPTION_TRY try
+#else
+#define SLANG_EXCEPTION_TRY
+#endif
+
 namespace Slang
 {
 // NOTE!

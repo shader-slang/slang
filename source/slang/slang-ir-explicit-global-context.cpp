@@ -275,7 +275,9 @@ struct IntroduceExplicitGlobalContextPass
                     // that represent entry points.
                     //
                     auto func = cast<IRFunc>(inst);
-                    if (!func->findDecoration<IREntryPointDecoration>())
+                    // Each shader or CUDA launch creates per-invocation global storage. Ordinary
+                    // clones instead receive their caller's context through the direct call.
+                    if (!isShaderOrCudaKernelEntryPoint(func))
                         continue;
 
                     m_entryPoints.add(func);
@@ -439,6 +441,8 @@ struct IntroduceExplicitGlobalContextPass
         //
         auto key = builder.createStructKey();
         builder.createStructField(m_contextStructType, key, fieldDataType);
+
+        key->sourceLoc = originalInst->sourceLoc;
 
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;

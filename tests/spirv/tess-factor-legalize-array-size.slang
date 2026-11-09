@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull -allow-glsl
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull
 
 // When targeting SPIRV, the tessellation factors should be an array with size 4 or 2.
 

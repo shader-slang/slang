@@ -8,7 +8,7 @@
 
 RWStructuredBuffer<int> outputBuffer;
 
-// CHECK-DAG: {{^}}__device__ __noinline__ int helperFunc
+// CHECK-DAG: {{^}}static __device__ __noinline__ int helperFunc
 [noinline]
 int helperFunc(int x)
 {
@@ -28,7 +28,7 @@ int exportedFunc(int x)
 
 // A function without the attribute must not pick up the qualifier, so the emitted
 // specifier is driven by the decoration rather than applied to every device function.
-// CHECK-DAG: {{^}}__device__ int plainHelper
+// CHECK-DAG: {{^}}static __device__ int plainHelper
 int plainHelper(int x)
 {
     return x * 2;

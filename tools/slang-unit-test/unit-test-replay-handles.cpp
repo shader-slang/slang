@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-handles.cpp
 // Unit tests for object handle tracking and TypeReflection serialization
 
@@ -525,3 +526,4 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
     // We messed with the stream, so clear context before it tries to clean itself up
     ctx().reset();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

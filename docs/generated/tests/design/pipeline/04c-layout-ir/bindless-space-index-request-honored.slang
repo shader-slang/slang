@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#option-gates
-//META: doc_section_digest=63756e9b904331b7718487c59d597877a0dcc3f4a93b4e57d04bde502f4ebb16
+//META: doc_section_digest=67700ee159aa3a09f0fc1c47b040c5b8bd8c9d6aa6d258f760a983fd7ebd6f70
 //META: purpose=The -bindless-space-index option places the system bindless resource heap in the requested descriptor space when that space is unused.
 //META: intent=functional
 //META: pipeline_stage=layout

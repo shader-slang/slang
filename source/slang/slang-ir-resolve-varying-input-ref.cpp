@@ -82,10 +82,13 @@ void resolveVaryingInputRef(IRFunc* func)
 
 void resolveVaryingInputRef(IRModule* module)
 {
+    // An ordinary clone of an entry point has no entry-point decoration but can still contain
+    // interpolation operations. We resolve references in every module-scope function, including
+    // operations exposed when resource specialization inlines a helper into its caller.
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (globalInst->findDecoration<IREntryPointDecoration>())
-            resolveVaryingInputRef((IRFunc*)globalInst);
+        if (auto function = as<IRFunc>(globalInst))
+            resolveVaryingInputRef(function);
     }
 }
 

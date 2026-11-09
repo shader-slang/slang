@@ -17,26 +17,12 @@ namespace renderer_test
 {
 using namespace Slang;
 
-// Helper function to check if a feature name is valid
-static bool isValidFeatureName(
-    const UnownedStringSlice& featureName,
-    DiagnosticSink* sink,
-    SourceLoc loc)
+// Returns whether `featureName` is a recognized -render-feature name (an entry in
+// SLANG_RHI_FEATURES), not whether the current device supports it. A recognized-but-
+// unsupported feature is not rejected here: render-test-main.cpp returns
+// SLANG_E_NOT_AVAILABLE at device creation and the harness skips the test.
+static bool isValidFeatureName(const UnownedStringSlice& featureName)
 {
-    // WAR: Accept cooperative-matrix-2 sub-features until RHI backend supports them
-    // These features will be gracefully skipped at runtime if hardware doesn't support them
-    if (featureName.startsWith("cooperative-matrix-"))
-    {
-        if (sink)
-        {
-            sink->diagnoseRaw(
-                Severity::Warning,
-                "Using cooperative-matrix-2 feature that is not yet fully supported "
-                "in RHI backend. "
-                "Test will be skipped if hardware doesn't support it.");
-        }
-        return true;
-    }
 #define SLANG_RHI_FEATURES_X(id, name) name,
     static const char* kValidFeatureNames[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
 #undef SLANG_RHI_FEATURES_X
@@ -161,8 +147,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
 
             for (const auto& value : values)
             {
-                // Validate that the feature name is recognized
-                if (!isValidFeatureName(value, &sink, featuresArg.loc))
+                if (!isValidFeatureName(value))
                 {
                     sink.diagnose(
                         featuresArg.loc,

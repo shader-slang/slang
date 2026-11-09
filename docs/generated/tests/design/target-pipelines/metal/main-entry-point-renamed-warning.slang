@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#entry-point-shape
-//META: doc_section_digest=6840c04e5449d96826b3b300b825e82111aff2cddc60c36c5c9944110ef35fdf
+//META: doc_section_digest=27c98476eacf1aa69354e7c15ce32accdae39eea29937e504490cde8d6401552
 //META: purpose=An entry point named exactly `main` is renamed on Metal and the rename is reported as warning E40100 rather than applied silently.
 //META: intent=negative
 //META: pipeline_stage=emit

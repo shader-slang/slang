@@ -17,7 +17,7 @@
 // The `[^n]` guard is what keeps the pattern from firing on the `n` that ends
 // `unconditionalBranch`, which is present on nearly every block here.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int a;
 uniform int n;

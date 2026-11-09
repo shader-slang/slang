@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#finalize-phase-completeoverloadcandidate
-//META: doc_section_digest=a916857bbe07c220fc4b183b2a1794d39a799be9e41fa992dc6a49d37be94635
+//META: doc_section_digest=90d8366fb34b230a0bf9d002a41000fb52e4433f1d99750051158a6784953ce9
 //META: purpose=When no focused reason is recorded the inference failure falls through to the blanket could-not-specialize-generic diagnostic naming the argument types.
 //META: intent=negative
 //META: pipeline_stage=check

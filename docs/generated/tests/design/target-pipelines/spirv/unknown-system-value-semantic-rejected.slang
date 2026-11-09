@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name
-//META: doc_section_digest=3c3c8f77c7e1de8cb96354a3387d70417eaefe0edb55f1e0d96b67d31d068296
+//META: doc_section_digest=f8f9c6c9ed941a5154d83b06809c18c71fb5d69313dfbb7b6096dcb44af0485e
 //META: purpose=Negative: a semantic the `SV_*` name-match chain does not recognize falls through to error E49999, so an unrecognized system-value semantic fails the SPIR-V compile inside the entry-point legalization rather than at emit.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

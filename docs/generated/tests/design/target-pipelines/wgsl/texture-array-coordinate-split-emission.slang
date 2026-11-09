@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#texture-sampler-and-texture-intrinsic-spellings
-//META: doc_section_digest=bee397eb1a949a5d6416f53600e9ef89b5d2fc0ce8a121e809afa3f538c2fd12
+//META: doc_section_digest=77a074c7e7847717f3ccfe52a6a23b59aee5098224e0d9db89e62750445a9d59
 //META: purpose=For an array texture the intrinsic template splits the coordinate rather than passing it whole: the trailing component becomes a separate layer argument spelled i32(...).
 //META: intent=functional
 //META: pipeline_stage=emit

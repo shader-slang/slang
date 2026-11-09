@@ -243,7 +243,7 @@ struct UsedRanges
             const auto& rr = ranges[i];
             if (index >= rr.begin && index < rr.end)
             {
-                return index;
+                return i;
             }
         }
         return -1;
@@ -2340,9 +2340,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
 // Diagnose that the current target provides no type-layout rules for a
 // ray-tracing entry-point parameter (payload or hit attributes) of `stage`.
 // Some targets do not support ray tracing at all (e.g. Metal, whose payload,
-// callable-payload, and hit-attribute rules are all null) or lack rules for a
-// specific parameter kind (e.g. CUDA callable payload); reporting this keeps
-// callers from dereferencing a null rules pointer during type layout.
+// callable-payload, and hit-attribute rules are all null) or may lack rules for
+// a specific parameter kind; reporting this keeps callers from dereferencing a
+// null rules pointer during type layout.
 static void diagnoseUnsupportedRayTracingParameter(
     ParameterBindingContext* context,
     Stage stage,
@@ -2607,7 +2607,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = meshOutputType;
 
             // TODO: Ellie, this is probably not the right place to handle this
             // On GLSL the indices type is built in and as such doesn't consume
@@ -2639,7 +2639,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
-            arrayTypeLayout->type = arrayType;
+            arrayTypeLayout->type = patchType;
 
             for (auto rr : elementTypeLayout->resourceInfos)
             {
@@ -3370,6 +3370,9 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     entryPointLayout->profile = entryPoint->getProfile();
     entryPointLayout->name = entryPoint->getName();
     entryPointLayout->nameOverride = entryPointNameOverride;
+    entryPointLayout->inferredCapabilityRequirements =
+        specializationInfo ? specializationInfo->inferredCapabilityRequirements
+                           : entryPoint->getInferredCapabilityRequirements();
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
@@ -3744,7 +3747,7 @@ struct CollectParametersVisitor : ComponentTypeVisitor
     }
 
     ParameterBindingContext* m_context;
-    String m_currentEntryPointNameOverride;
+    RenamedEntryPointComponentType* m_currentRenamedEntryPoint = nullptr;
 
     void visitComposite(
         CompositeComponentType* composite,
@@ -3787,10 +3790,13 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         ParameterBindingContext contextData = *m_context;
         auto context = &contextData;
         context->stage = entryPoint->getStage();
+        // Selecting SkyMiss supplies SkyMiss_miss even without renameEntryPoint(). An explicit
+        // rename, including an empty one, takes precedence over that default target name.
         collectEntryPointParameters(
             context,
             entryPoint,
-            m_currentEntryPointNameOverride,
+            m_currentRenamedEntryPoint ? m_currentRenamedEntryPoint->getEntryPointNameOverride(0)
+                                       : entryPoint->getEntryPointNameOverride(0),
             specializationInfo);
     }
 
@@ -3798,10 +3804,10 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         RenamedEntryPointComponentType* renamedEntryPoint,
         EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
-        auto lastNameOverride = m_currentEntryPointNameOverride;
-        m_currentEntryPointNameOverride = renamedEntryPoint->getEntryPointNameOverride(0);
+        auto lastRenamedEntryPoint = m_currentRenamedEntryPoint;
+        m_currentRenamedEntryPoint = renamedEntryPoint;
         renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
-        m_currentEntryPointNameOverride = lastNameOverride;
+        m_currentRenamedEntryPoint = lastRenamedEntryPoint;
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
@@ -4849,10 +4855,16 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 
     if (!m_layout)
     {
+        auto errorCountBefore = sink->getErrorCount();
         m_layout = generateParameterBindings(this, sink);
-        if (sink->getErrorCount() != 0)
-            return nullptr;
+        if (sink->getErrorCount() != errorCountBefore)
+            m_layoutHasErrors = true;
     }
+
+    // Layout generation reported errors on an earlier call (to a different sink, or this one).
+    // Don't hand out the layout of an invalid program, or build IR for it.
+    if (m_layoutHasErrors)
+        return nullptr;
 
     if (m_layout && !m_irModuleForLayout)
     {

@@ -290,6 +290,15 @@ class BuiltinOperatorExpr : public ExprWithArgsBase
 {
     FIDDLE(...)
     FIDDLE() BuiltinOperationKind op;
+
+    // Whether the operand element type belongs to the floating-point family, resolved once by
+    // `SemanticsExprVisitor::convertToBuiltinArithmeticOp` (from a concrete `BasicExpressionType`
+    // or from a generic parameter's `__BuiltinFloatingPointType` constraint) and read back by
+    // `lowerBuiltinOperatorExpr` to choose `FRem` over `IRem` for `Mod`. IR lowering cannot
+    // re-derive this the way checking did: the element type may still be an abstract, unspecialized
+    // generic parameter at that point, which carries no concrete `BaseType` to inspect. Meaningless
+    // for every other operator kind.
+    FIDDLE() bool elementTypeIsFloatingPoint = false;
 };
 
 FIDDLE()
@@ -917,6 +926,16 @@ class ThisTypeExpr : public Expr
     FIDDLE(...)
 
     Scope* scope = nullptr;
+};
+
+/// An HLSL type expression written as `unsigned` or `unsigned int`.
+///
+/// This syntax always denotes the built-in `uint` type, even if ordinary name lookup would find a
+/// declaration named `uint` in the surrounding scope.
+FIDDLE()
+class HLSLUnsignedTypeExpr : public Expr
+{
+    FIDDLE(...)
 };
 
 

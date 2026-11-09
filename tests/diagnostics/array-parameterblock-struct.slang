@@ -20,5 +20,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 uniform StructWithParameterBlock arrayOfStructWithPB[3];
 //CHECK:                         ^^^^^^^^^^^^^^^^^^^ arrays of non-addressable type not allowed
 //CHECK:                         ^^^^^^^^^^^^^^^^^^^ Arrays of non-addressable type 'StructWithParameterBlock' are not allowed
-//CHECK:                         ^^^^^^^^^^^^^^^^^^^ arrays of non-addressable type not allowed
-//CHECK:                         ^^^^^^^^^^^^^^^^^^^ Arrays of non-addressable type 'StructWithParameterBlock' are not allowed

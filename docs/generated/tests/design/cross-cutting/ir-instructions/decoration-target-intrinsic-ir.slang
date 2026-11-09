@@ -18,7 +18,7 @@
 // spelling is what reaches the emitted code, so the decoration is the
 // IR-to-target mapping the row describes rather than inert metadata.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target hlsl -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
 
 groupshared uint sdata[4];

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#associated-type-bounds
-//META: doc_section_digest=71d487355c4bcb7872fbd2df16f024978d48bf90eba4da3f6bd6ba782dd68d15
+//META: doc_section_digest=e581ee12dbcf3d743086ff2ab64116df452d3fc89feb7dda14e837949d7cc5f6
 //META: purpose=An interface-level subtype constraint (`interface IDerived : IBase`) lowers as its own requirement entry whose requirement value is a WitnessTableType — `interface_req_entry(%key, witness_table_t(%IBase))`.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // interface's entry list is typed witness_table_t of the base
 // interface (a conforming type must supply a witness table for IBase).
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IBase
 {

@@ -1,0 +1,191 @@
+name: Regenerate Publish
+
+# Shared back half of the slash commands that change files in a PR (`/format`,
+# `/regenerate-toc`, `/regenerate-cmdline-ref`). The caller generates the change
+# in a job without secrets, uploads it as the `regen-patch` artifact and calls
+# this workflow. Two jobs run here:
+#
+#   1. `publish` validates the patch and pushes it to `<command>/pr-<N>` in this
+#      repository with the repository `GITHUB_TOKEN`. It never runs PR code.
+#      A maintainer opens the PR from the compare link, because `GITHUB_TOKEN`
+#      cannot push to a contributor's fork.
+#   2. `report`  comments on the PR and reacts to the command with the
+#      repository `GITHUB_TOKEN`, so a failure of the earlier stages is still
+#      reported.
+#
+# `publish` skips the branch push and leaves only the patch when a commit that
+# the PR adds, or the patch itself, touches `.github/workflows/`. `GITHUB_TOKEN`
+# has no `workflows` permission, so GitHub rejects a push that creates or updates
+# a workflow file. A push made with `GITHUB_TOKEN` does not start workflow runs,
+# so the pushed branch does not run any workflow code.
+#
+# The PR is described by `github.event.client_payload`, which a called workflow
+# inherits from the `repository_dispatch` event of its caller.
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: "Slash command name without the slash, such as `format`. It also names the pushed branch."
+        required: true
+        type: string
+      commit-message:
+        description: "Commit message of the pushed change."
+        required: true
+        type: string
+      generate-result:
+        description: "Result of the caller's generate jobs: `success` or anything else for a failure."
+        required: true
+        type: string
+      changed:
+        description: "`true` if the caller uploaded a non-empty `regen-patch` artifact."
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: inputs.generate-result == 'success' && inputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      mode: ${{ steps.publish.outputs.mode }}
+      compare_url: ${{ steps.publish.outputs.compare_url }}
+    steps:
+      # A full clone is needed so that `origin/<base>..<head>` lists exactly the
+      # commits the PR adds, and so the push is not made from a shallow clone.
+      - name: Checkout this repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: shader-slang/slang
+          ref: ${{ github.event.client_payload.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Download patch
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: regen-patch
+          path: ${{ runner.temp }}/patch
+
+      - name: Publish branch
+        id: publish
+        env:
+          COMMAND: ${{ inputs.command }}
+          COMMIT_MESSAGE: ${{ inputs.commit-message }}
+          PR_NUMBER: ${{ github.event.client_payload.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.client_payload.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.client_payload.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          PR_BASE_REF: ${{ github.event.client_payload.pull_request.base.ref }}
+          PATCH: ${{ runner.temp }}/patch/regen.patch
+        run: |
+          set -euo pipefail
+          branch="${COMMAND}/pr-${PR_NUMBER}"
+
+          # The patch was made against PR_HEAD_SHA. If the PR has moved on, the
+          # pushed result would revert the contributor's newer commits.
+          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head"
+          current_sha=$(git rev-parse FETCH_HEAD)
+          if [ "$current_sha" != "$PR_HEAD_SHA" ]; then
+            echo "The PR head moved from ${PR_HEAD_SHA} to ${current_sha}." >&2
+            echo "mode=stale" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          # GITHUB_TOKEN cannot push a commit that changes a workflow file. A
+          # generator can also edit those files, so the patch is checked too.
+          # Pull requests that touch workflows get the patch only.
+          git fetch --no-tags origin "$PR_BASE_REF"
+          touched=$(git log "origin/${PR_BASE_REF}..${PR_HEAD_SHA}" --no-merges --name-only --format= -- .github/workflows)
+          touched+=$(git apply --numstat "$PATCH" | cut -f3 | grep -E '^\.github/workflows/' || true)
+          if [ -n "$touched" ]; then
+            echo "The PR or the patch touches .github/workflows/; the branch is not pushed."
+            echo "mode=patch-only" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config commit.gpgsign false
+
+          git checkout -B "$branch" "$PR_HEAD_SHA"
+          git apply --index "$PATCH"
+          git commit -m "$COMMIT_MESSAGE"
+
+          # Update an existing branch only if nobody else changed it.
+          old_sha=$(git ls-remote origin "refs/heads/${branch}" | cut -f1)
+          git push --force-with-lease="refs/heads/${branch}:${old_sha}" origin "refs/heads/${branch}"
+
+          # The PR goes to the contributor's branch. For a fork, GitHub accepts
+          # `shader-slang:<branch>` as the compare head because the fork and this
+          # repository share a fork network.
+          ref_path=$(jq -rn --arg r "$PR_HEAD_REF" '$r | @uri' | sed 's/%2F/\//g')
+          if [ "$PR_HEAD_REPO" = "${GITHUB_REPOSITORY}" ]; then
+            compare="https://github.com/${GITHUB_REPOSITORY}/compare/${ref_path}...${branch}"
+          else
+            compare="https://github.com/${PR_HEAD_REPO}/compare/${ref_path}...${GITHUB_REPOSITORY_OWNER}:${branch}"
+          fi
+          compare="${compare}?expand=1&title=$(jq -rn --arg t "${COMMAND}: PR #${PR_NUMBER}" '$t | @uri')"
+          echo "mode=branch" >> "$GITHUB_OUTPUT"
+          echo "compare_url=${compare}" >> "$GITHUB_OUTPUT"
+
+  report:
+    needs: publish
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Compose message
+        id: message
+        env:
+          COMMAND: ${{ inputs.command }}
+          GENERATE_RESULT: ${{ inputs.generate-result }}
+          CHANGED: ${{ inputs.changed }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+          MODE: ${{ needs.publish.outputs.mode }}
+          COMPARE_URL: ${{ needs.publish.outputs.compare_url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          success=false
+          if [ "$GENERATE_RESULT" != "success" ]; then
+            body="❌ \`/${COMMAND}\` failed. Please check the [workflow run](${RUN_URL})."
+          elif [ "$CHANGED" != "true" ]; then
+            body="✅ \`/${COMMAND}\`: nothing to change in this PR."
+            success=true
+          elif [ "$PUBLISH_RESULT" = "success" ] && [ "$MODE" = "branch" ]; then
+            body="🌈 \`/${COMMAND}\` has changes. [Open a pull request with them](${COMPARE_URL}) and merge it into this PR's branch. The patch is also in the [workflow run](${RUN_URL}) as the \`regen-patch\` artifact."
+            success=true
+          elif [ "$PUBLISH_RESULT" = "success" ] && [ "$MODE" = "patch-only" ]; then
+            body="🌈 \`/${COMMAND}\` has changes, but this PR changes \`.github/workflows/\`, so the branch is not pushed. Download the \`regen-patch\` artifact from the [workflow run](${RUN_URL}) and apply it with \`git apply regen.patch\`."
+            success=true
+          elif [ "$MODE" = "stale" ]; then
+            body="❌ The PR branch changed while \`/${COMMAND}\` ran. Please run it again. ([workflow run](${RUN_URL}))"
+          else
+            body="❌ \`/${COMMAND}\` could not publish its changes. The patch is in the \`regen-patch\` artifact of the [workflow run](${RUN_URL}); apply it with \`git apply regen.patch\`."
+          fi
+          {
+            echo "success=${success}"
+            echo "body<<EOF"
+            echo "$body"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Comment on PR
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
+        with:
+          token: ${{ github.token }}
+          repository: shader-slang/slang
+          issue-number: ${{ github.event.client_payload.pull_request.number }}
+          body: ${{ steps.message.outputs.body }}
+
+      - name: Add reaction
+        if: steps.message.outputs.success == 'true'
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
+        with:
+          token: ${{ github.token }}
+          repository: shader-slang/slang
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          reactions-edit-mode: replace
+          reactions: hooray

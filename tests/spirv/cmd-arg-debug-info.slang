@@ -35,6 +35,31 @@
 // CHECK_XW-SAME: -Xspirv-opt -O
 // CHECK_XW-SAME: -trace-coverage-counter-width 32
 
+// The target's option set is re-inherited from the session several times during slangc option
+// processing, so a `-X` argument must still appear exactly once in the command line reconstructed
+// from the target program's options.
+//TEST:SIMPLE(filecheck=CHECK_XN): -target spirv -g3 -Xnvrtc --fmad=false -emit-spirv-directly
+// CHECK_XN:  OpString "-target spirv
+// CHECK_XN-SAME: -Xnvrtc --fmad=false
+// CHECK_XN-NOT: -Xnvrtc
+// CHECK_XN-SAME: -stage compute
+
+//TEST:SIMPLE(filecheck=CHECK_XD): -target spirv -g3 -Xnvrtc -D -Xnvrtc FOO=1 -Xnvrtc -D -Xnvrtc BAR=2 -emit-spirv-directly
+// CHECK_XD:  OpString "-target spirv
+// CHECK_XD-SAME: -Xnvrtc -D -Xnvrtc FOO=1 -Xnvrtc -D -Xnvrtc BAR=2
+// CHECK_XD-SAME: -stage compute
+
+//TEST:SIMPLE(filecheck=CHECK_XG): -target spirv -g3 -Xnvrtc... --fmad=true --fmad=false -X. -emit-spirv-directly
+// CHECK_XG:  OpString "-target spirv
+// CHECK_XG-SAME: -Xnvrtc --fmad=true -Xnvrtc --fmad=false
+// CHECK_XG-SAME: -stage compute
+
+// The HLSL receiver option is recorded even when the current input uses the Slang dialect.
+// It must remain present when the descriptive command line is reconstructed from stored options.
+//TEST:SIMPLE(filecheck=CHECK_HLSL_METHODS): -target spirv -g3 -fhlsl-methods-mutating-by-default -emit-spirv-directly
+// CHECK_HLSL_METHODS: OpString "-target spirv
+// CHECK_HLSL_METHODS-SAME: -fhlsl-methods-mutating-by-default
+
 [numthreads(1,1,1)]
 void computeMain()
 {}
