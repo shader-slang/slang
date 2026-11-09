@@ -15493,8 +15493,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         auto loweredFunc = getSimpleVal(context, ensureDecl(context, entryPoint->getFuncDecl()));
         // A generic entry point lowers to an `IRGeneric`, and its `[numthreads]` operands stay
         // generic parameters until specialization, so `visitEmptyDecl` cannot validate its
-        // thread counts here. We do not record it; the emit-time derivative-group check sees the
-        // specialized entry point.
+        // thread counts here. We do not record it, so it does not receive the module-scope
+        // derivative-group decoration. When the specialized entry point is emitted,
+        // `inferDerivativeGroupMode` chooses a mode from its thread counts, which are then
+        // checked against that mode.
         if (as<IRGeneric>(loweredFunc))
             continue;
         // The same function can be requested as an entry point more than once (e.g. duplicate
