@@ -406,7 +406,7 @@ Skips spirv validation.
 
 <a id="validate-with-downstream-compiler"></a>
 ### -validate-with-downstream-compiler
-After emitting code, compile or validate it with the downstream compiler that matches the target: the SPIR-V validator for `spirv`, the Metal compiler for `metal`, DXC for `hlsl`, glslang for `glsl`, Tint for `wgsl`, NVRTC for `cuda`, and the C++ compiler for `cpp`. The exit code is not 0 if the downstream tool is not available, cannot run, or reports an error, or if the target has no downstream tool. `-skip-spirv-validation` has priority over this option for SPIR-V targets. 
+After emitting code, compile or validate it with the downstream compiler that matches the target: the SPIR-V validator for `spirv`, the Metal compiler for `metal`, DXC for `hlsl` with shader model 6.0 or higher and FXC below that, glslang for `glsl`, Tint for `wgsl`, NVRTC for `cuda`, and the C++ compiler for `cpp`. The exit code is not 0 if the downstream tool is not available, cannot run, or reports an error, or if the target has no downstream tool. `-skip-spirv-validation` has priority over this option for SPIR-V targets. 
 
 
 <a id="source-embed-style-1"></a>

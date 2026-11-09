@@ -1719,9 +1719,21 @@ static SlangCompileTarget _findTargetInArgs(const List<String>& args)
 ///
 /// The test names the shader model in `-profile` (for example `sm_6_0` or `cs_6_6`) or in
 /// `-capability` (for example `sm_6_6`). Without any of them, an HLSL target uses the shader
-/// model 5.1, as `slangc` does.
+/// model 5.1, as `slangc` does. A ray tracing `-stage` raises the shader model to 6.3, as
+/// `getEffectiveProfile` does. A stage that only a `[shader(...)]` attribute names is not seen
+/// here.
 static bool _usesShaderModel6OrHigher(const List<String>& args)
 {
+    const Index stageIndex = args.indexOf("-stage");
+    if (stageIndex != Index(-1) && stageIndex + 1 < args.getCount())
+    {
+        for (const char* stage :
+             {"raygeneration", "intersection", "closesthit", "anyhit", "miss", "callable"})
+        {
+            if (args[stageIndex + 1] == stage)
+                return true;
+        }
+    }
     for (Index i = 0; i + 1 < args.getCount(); i++)
     {
         if (args[i] != "-profile" && args[i] != "-capability")

@@ -1265,6 +1265,7 @@ SlangResult CodeGenContext::validateEmittedSourceWithDownstream(CodeGenTarget so
     // We call `emitWithDownstreamForEntryPoints` directly instead of `_emitEntryPoints`, because
     // the latter emits SPIR-V without a downstream compiler when the user chooses that.
     CodeGenContext validationContext(this, binaryTarget);
+    validationContext.m_targetProfile = m_targetProfile;
     ComPtr<IArtifact> binaryArtifact;
     return validationContext.emitWithDownstreamForEntryPoints(binaryArtifact);
 }
@@ -1320,10 +1321,11 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::ShaderLLVMIR:
         {
             // Most of these targets come out of a downstream compiler already, so emitting them
-            // validates them. The VM and LLVM IR targets are produced by Slang itself.
+            // validates them. Slang itself produces the VM and LLVM IR targets, and with the LLVM
+            // backend it produces the CPU binary targets too, so no downstream tool checks them.
             if (shouldValidateWithDownstreamCompiler() &&
                 (target == CodeGenTarget::HostVM || target == CodeGenTarget::HostLLVMIR ||
-                 target == CodeGenTarget::ShaderLLVMIR))
+                 target == CodeGenTarget::ShaderLLVMIR || isCPUTargetViaLLVM(getTargetReq())))
             {
                 getSink()->diagnose(Diagnostics::ValidateWithDownstreamCompilerUnsupportedTarget{
                     .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});

@@ -175,7 +175,7 @@ With this option, `slangc` runs the downstream compiler or validator for the tar
 | -------------------- | ----------------------------------------------------------------- |
 | `spirv`, `spirv-asm` | SPIR-V validator (also runs without `SLANG_RUN_SPIRV_VALIDATION`) |
 | `metal`              | Metal compiler                                                    |
-| `hlsl`               | DXC                                                               |
+| `hlsl`               | DXC for shader model 6.0 or higher, FXC below that                |
 | `glsl`               | glslang                                                           |
 | `wgsl`               | Tint                                                              |
 | `cuda`               | NVRTC                                                             |

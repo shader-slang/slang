@@ -24,6 +24,8 @@ struct ValidationCase
 {
     const char* name;
     SlangCompileTarget target;
+    // The tool that validates the emitted code. The default shader model of HLSL is 5.1, so the
+    // HLSL case needs FXC and not DXC.
     SlangPassThrough tool;
     // The target intrinsic that the invalid source calls, so that the emitted code has text that no
     // downstream compiler accepts.
@@ -196,7 +198,7 @@ SLANG_UNIT_TEST(ValidateWithDownstreamCompiler)
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     static const ValidationCase cases[] = {
-        {"hlsl", SLANG_HLSL, SLANG_PASS_THROUGH_DXC, "hlsl"},
+        {"hlsl", SLANG_HLSL, SLANG_PASS_THROUGH_FXC, "hlsl"},
         {"glsl", SLANG_GLSL, SLANG_PASS_THROUGH_GLSLANG, "glsl"},
         {"metal", SLANG_METAL, SLANG_PASS_THROUGH_METAL, "metal"},
         {"wgsl", SLANG_WGSL, SLANG_PASS_THROUGH_TINT, "wgsl"},
