@@ -225,6 +225,18 @@ void WGSLSourceEmitter::emitEntryPointAttributesImpl(
                 }
                 m_writer->emit(")\n");
             }
+
+            // `[WaveSize(N)]` maps to `@subgroup_size(N)`, which needs both the `subgroups` and
+            // the `subgroup_size_control` extensions.
+            Int waveSize = 0;
+            if (getComputeWaveSize(irFunc, &waveSize))
+            {
+                _requireExtension(toSlice("subgroups"));
+                _requireExtension(toSlice("subgroup_size_control"));
+                m_writer->emit("@subgroup_size(");
+                m_writer->emit(waveSize);
+                m_writer->emit(")\n");
+            }
         }
         break;
 
@@ -857,20 +869,6 @@ static bool isStaticConst(IRInst* inst)
 
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
-    // A module-scope `static const` array is emitted as `var<private>`, not `const`: a WGSL
-    // `const` value of array type may only be indexed by a const-expression, so a constant array
-    // indexed by a runtime value (e.g. `positions[SV_VertexID]`) is rejected by the validator. A
-    // `var<private>` takes the same const-expression initializer but, being addressable, is
-    // runtime-indexable. Only arrays are converted -- a scalar/vector/matrix *value* is already
-    // runtime-indexable in WGSL. The type-based conversion is safe because constant-indexed reads
-    // fold away before emit (see the PR description). The `!= kIROp_GlobalParam` guard is
-    // load-bearing: this predicate is reused in the address-space chain below, where a
-    // `GlobalParam` array (e.g. a descriptor array) must keep its own address space, not
-    // `<private>`.
-    const bool emitModuleScopeArrayConstAsPrivateVar = isStaticConst(varDecl) &&
-                                                       varDecl->getOp() != kIROp_GlobalParam &&
-                                                       type->getOp() == kIROp_ArrayType;
-
     switch (varDecl->getOp())
     {
     case kIROp_GlobalParam:
@@ -887,12 +885,11 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         }
         break;
     default:
-        // When this emits `var`, the matching `<private>` address space is emitted by the
-        // storage-space chain below (the two must stay in lockstep — a module-scope `var`
-        // without an address space is invalid WGSL).
-        if (emitModuleScopeArrayConstAsPrivateVar)
-            m_writer->emit("var");
-        else if (isStaticConst(varDecl))
+        // A module-scope value is a constant, so (as for HLSL's `static const`) it is emitted as
+        // a WGSL `const` whatever its type. A WGSL `const` array may be indexed by a run-time
+        // value, and a `const` is not a variable, so it does not count against the 8192-byte
+        // limit on private variables that some implementations (e.g. WebKit) enforce.
+        if (isStaticConst(varDecl))
             m_writer->emit("const");
         else
             m_writer->emit("var");
@@ -950,11 +947,9 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         m_writer->emit("storage, read");
         m_writer->emit(">");
     }
-    else if (varDecl->getOp() == kIROp_GlobalVar || emitModuleScopeArrayConstAsPrivateVar)
+    else if (varDecl->getOp() == kIROp_GlobalVar)
     {
-        // Global ("module-scope") non-handle variables need to specify storage space. This also
-        // covers an array constant converted to `var<private>` above (which is not a GlobalVar
-        // but is likewise emitted as a module-scope private variable).
+        // Global ("module-scope") non-handle variables need to specify storage space.
 
         // https://www.w3.org/TR/WGSL/#var-decls
         // "
@@ -1748,7 +1743,20 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), leftSide(outerPrec, info));
             m_writer->emit(" ");
 
-            m_writer->emit(info.op);
+            // WGSL defines `^` only for integer scalars and vectors. `|` and `&` are also
+            // defined for `bool` and `vecN<bool>`, but for those types the exclusive-or is the
+            // not-equal comparison `!=`, which is component-wise on vectors.
+            // https://www.w3.org/TR/WGSL/#bit-expr
+            // https://www.w3.org/TR/WGSL/#comparison-expr
+            if (inst->getOp() == kIROp_BitXor &&
+                as<IRBoolType>(getVectorElementType(inst->getDataType())))
+            {
+                m_writer->emit(getInfo(EmitOp::Neq).op);
+            }
+            else
+            {
+                m_writer->emit(info.op);
+            }
 
             m_writer->emit(" (");
             emitOperand(inst->getOperand(1), rightSide(outerPrec, info));

@@ -1,7 +1,0 @@
-result code = -1
-standard error = {
-(0): warning 30: the stage 'vertex' was specified more than once for entry point 'vsMain'
-tests/diagnostics/command-line/entry-point-redundant-stage.slang(6): error 38000: no function found matching entry point name 'vsMain'
-}
-standard output = {
-}

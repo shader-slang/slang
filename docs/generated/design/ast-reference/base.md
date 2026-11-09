@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 85e583e53ed8d931bc87c6cb39ccb6606f8ffbaa5a87844f8b33905d1acaa77f
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: ed4d65bac6747895fa0684522c80c4fd43cc432937a1a9a770725bc86e145560
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -140,9 +140,10 @@ static const int P = 3, Q = 4;
 ```
 
 Each of these lines declares two independent `Decl`s — `a` and `b`,
-`P` and `Q`. Because the group node is itself a
-`ModifiableSyntaxNode`, the modifiers written once in front of the
-group apply to every name it declares: `P` and `Q` are both
+`P` and `Q`. A declaration that names a single variable (`int c = 5;`)
+is not wrapped: the parser returns the plain `Decl`, and only a
+declarator list with more than one name produces the group. `DeclGroupBuilder` attaches the modifiers written once in front of the
+group to each member through `CompleteDecl`, so `P` and `Q` are both
 `static const`. A struct's fields group the same way (`int x, y;`).
 
 Fields declared at this level:
@@ -220,7 +221,11 @@ Fields declared at this level:
   checker; null on freshly-parsed expressions. A `QualType` is more
   than a `Type*`: its `isLeftValue` flag records whether the
   expression denotes storage, which is what makes `f() = 5` a
-  *left of `=` is not an l-value* error rather than a type error.
+  *left of `=` is not an l-value* error (E30011) rather than a type
+  error. `QualType` also carries `hasReadOnlyOnTarget`, `isWriteOnly`
+  (GLSL `writeonly` storage) and `isReadOnlyMemoryLocation` (for
+  example a `__ref_readonly` parameter; never set together with
+  `isLeftValue`); see the `QualType` row below.
 - `checked: bool` — flag set when the checker has finished with this
   expression.
 
@@ -238,8 +243,9 @@ Fields declared at this level:
 - `keywordName: Name*` — the keyword (or attribute name) that
   introduced this modifier. The spelling is retained rather than
   reduced to an anonymous node, and it is the spelling an attribute
-  diagnostic quotes back (`unknown attribute 'NoSuchAttributeXyz'`);
-  `getKeywordNameAndLoc()` pairs it with the modifier's own `loc`.
+  diagnostic quotes back (`unknown attribute 'NoSuchAttributeXyz'`;
+  the attribute checker passes `keywordName` as the diagnostic's
+  `attrName`); `getKeywordNameAndLoc()` pairs it with the modifier's own `loc`.
 
 Family page: [modifiers.md](modifiers.md)
 
@@ -281,23 +287,23 @@ Family page: [types.md](types.md)
 
 ## Support types
 
-These non-node types are declared in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
-and appear pervasively in the AST API. They are not `NodeBase`
-subclasses; they are helpers that wrap or describe nodes.
+These helpers wrap or describe nodes and appear pervasively in the AST API.
+Most are non-node types declared in
+[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h);
+`Scope`, a `NodeBase` subclass declared in the base header, is the exception.
 
 | Name | Header | Purpose |
 | --- | --- | --- |
 | `DeclRef<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Typed wrapper around `DeclRefBase*`; the API instantiates it at the concrete declaration classes catalogued in [declarations.md](declarations.md). |
 | `Modifiers` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Intrusive linked list of modifiers attached to a `ModifiableSyntaxNode`. |
-| `QualType` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A `Type*` together with l-value/r-value and qualifier information; the type carried by `Expr`. |
+| `QualType` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A `Type*` together with value-category and access flags: `isLeftValue`, `hasReadOnlyOnTarget`, `isWriteOnly` and `isReadOnlyMemoryLocation`. The last is never set together with `isLeftValue`; a `__ref_readonly` parameter is one. This is the type carried by `Expr`. |
 | `SubstitutionSet` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | The set of generic / existential substitutions used to specialize a `Val`. Holds the substituting `declRef: DeclRefBase*`, a `packExpansionIndex: int` for substituting inside an `expand each T` pattern, and a `substitutionCache: SubstitutionCache*` that memoizes one substitution operation (see the note below the table). |
 | `LookupResult`, `LookupResultItem` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Result of a name lookup; can hold zero, one, or several decl-refs together with how each was reached. |
 | `NameLoc` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Pairs a `Name*` with the `SourceLoc` where it appeared; used directly by `Decl::nameAndLoc`. |
 | `TypeExp` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A type expression as written by the user (an `Expr` plus the resolved `Type*`). |
 | `WitnessTable` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A compile-time table of interface-requirement-to-implementation mappings; see the entry in [../glossary.md](../glossary.md). |
-| `SyntaxClass<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Reflection-style handle to a concrete AST class, used by the visitor and `as<T>()` infrastructure. |
-| `KnownBuiltinDeclName` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum of built-in declaration names. At `source_commit` it holds thirteen entries before its `COUNT` sentinel, spanning geometry streams (`GeometryStreamAppend`, `GeometryStreamRestart`), mesh and per-vertex shading (`DispatchMesh`, `GetAttributeAtVertex`), cooperation (`saturated_cooperation`, `saturated_cooperation_using`), the differentiable-interface family, `NullDifferential`, `OperatorAddressOf`, and the wave intrinsics `WaveIsFirstLane` and `WaveReadLaneFirst`. New names are appended before `COUNT`. The core module tags each such declaration with its enumerator using the `[KnownBuiltin(n)]` attribute (`attribute_syntax [KnownBuiltin(name : int)]` in [core.meta.slang](../../../../source/slang/core.meta.slang)), so the compiler locates the declaration by enum comparison rather than by string comparison. Membership is not only a lookup speed-up — it gates behavior: `isDifferentiableInterfaceBuiltin` is the authoritative definition of the differentiable-interface family (`IDifferentiable`, `IDifferentiablePtr`, `IForwardDifferentiable`, `IBackwardDifferentiable`, `IBwdCallable`), whose conformance witness-table entries the linker defers when a program does not use auto-diff. `getKnownBuiltinDeclNameFromString` maps a spelling to the enumerator. |
+| `SyntaxClass<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Reflection-style handle to an AST class, including abstract bases, used by the visitor and `as<T>()` infrastructure. |
+| `KnownBuiltinDeclName` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum of built-in declaration names. At `source_commit` it holds seventeen entries before its `COUNT` sentinel, spanning geometry streams (`GeometryStreamAppend`, `GeometryStreamRestart`), mesh and per-vertex shading (`DispatchMesh`, `GetAttributeAtVertex`), cooperation (`saturated_cooperation`, `saturated_cooperation_using`), the differentiable-interface family, `NullDifferential`, `OperatorAddressOf`, the wave intrinsics `WaveIsFirstLane` and `WaveReadLaneFirst`, and the ray-tracing intrinsics `CallShader` and `ReportHit` (declared `ReportHit = 16`). New names are appended before `COUNT`. The core module tags each such declaration with its enumerator using the `[KnownBuiltin(n)]` attribute (`attribute_syntax [KnownBuiltin(name : int)]` in [core.meta.slang](../../../../source/slang/core.meta.slang)), so the compiler locates the declaration by enum comparison rather than by string comparison. Membership is not only a lookup speed-up — it gates behavior. During checking, `OperatorAddressOf` selects an extra invalid-pointer-taking diagnostic when an argument cannot be bound as an l-value, and `GetAttributeAtVertex` triggers its per-vertex-input argument check; lowering copies the tag onto the IR as a `KnownBuiltin` decoration that later passes compare (for example the ray-tracing legalization of `CallShader` and `ReportHit`). `isDifferentiableInterfaceBuiltin` is the authoritative definition of the differentiable-interface family (`IDifferentiable`, `IDifferentiablePtr`, `IForwardDifferentiable`, `IBackwardDifferentiable`, `IBwdCallable`), whose conformance witness-table entries the linker defers when a program does not use auto-diff. `getKnownBuiltinDeclNameFromString` maps a spelling to the enumerator. |
 | `BuiltinOperationKind` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum tagging a builtin operator (`Add`, `Sub`, `Less`, ...) recognized by the operator fast path. Stored on the synthesized builtin-operator expression node (see [expressions.md](expressions.md)) and on its constant-folded counterpart (see [values.md](values.md)); mapped from operator-name + `OperatorArity` by `getBuiltinOperationKindFromString`. Integer values are part of the serialized/mangled form (append-only). |
 | `printDiagnosticArg` / `getDiagnosticPos` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Free-function diagnostic helpers: `printDiagnosticArg` overloads format a `Decl` / `Type` / `TypeExp` / `QualType` / `Val` / `DeclRefBase` into a diagnostic message, and `getDiagnosticPos` overloads recover the `SourceLoc` to anchor a diagnostic at. |
 | `Scope` | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) | Name-lookup data structure; technically a `NodeBase` but used as a helper rather than a syntax node. Created during parsing and attached to container declarations. |

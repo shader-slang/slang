@@ -3,7 +3,7 @@
 // This ensures that if IOpaqueDescriptor conformance rules change, CI catches
 // whether ParameterBlock would then need to be handled in the legalize pass.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -capability spvDescriptorHeapEXT
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry main -stage compute -capability spvDescriptorHeapEXT
 
 struct Uniforms { uint x; }
 

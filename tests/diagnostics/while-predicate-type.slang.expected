@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/while-predicate-type.slang(9): error 30019: expected an expression of type 'bool', got 'S'
-    while(s) {break;}
-          ^
-}
-standard output = {
-}

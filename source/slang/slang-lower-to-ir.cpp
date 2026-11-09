@@ -9717,9 +9717,10 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
     return nullptr;
 }
 
-// Source braces and scoped loop initializers introduce declaration scopes. HLSL's unscoped
+// Blocks and scoped loop initializers introduce declaration scopes. HLSL's unscoped
 // for initializer remains in the enclosing scope, matching semantic lookup.
-// Other control-flow statements get lexical blocks from their braced bodies, not the statement.
+// Other control-flow statements get lexical blocks from their bodies, including implicit HLSL
+// blocks, rather than from the control-flow statement itself.
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
 {
     if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
@@ -14575,9 +14576,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
                 subContext->irBuilder->setInsertBefore(irFunc);
-                getBuilder()->addWaveSizeDecoration(
+                auto waveSizeDecor = getBuilder()->addWaveSizeDecoration(
                     irFunc,
                     getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
+                waveSizeDecor->sourceLoc = waveSizeAttr->loc;
             }
             else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(modifier))
             {
@@ -15363,7 +15365,7 @@ static void lowerFrontEndEntryPointToIR(
 
     {
 
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
+        Name* entryPointName = entryPoint->getName();
         builder->addEntryPointDecoration(
             instToDecorate,
             entryPoint->getProfile(),

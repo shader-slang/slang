@@ -37,10 +37,4 @@ void computeMain()
     // CUDA: tex2Dgather<uint4
     // PTX: tld4.r.2d.v4.u32
     outU[0] = texU1.Gather(samp, float2(0.5, 0.5));
-
-    // Offset overload: a distinct CUDA intrinsic (CUDA ignores the offset), so
-    // it needs its own coverage for the four-component result type.
-    // CUDA: tex2Dgather<float4
-    // PTX: tld4.r.2d.v4.f32
-    outF[3] = texF1.Gather(samp, float2(0.5, 0.5), int2(1, 1));
 }

@@ -1,52 +1,48 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:17:03+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:56:19Z
 target_doc: ast-reference/base.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: ee1fb3c40342ae89da97ad9ebe3c1853ce01e7825a3528db059959204e5a2fc6
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: ed4d65bac6747895fa0684522c80c4fd43cc432937a1a9a770725bc86e145560
+source_commit: 56b1b0b83fb96f88f36da7e37cd9c2c7f27af70c
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 4
+finding_count: 3
 severity_breakdown:
   critical: 0
   major: 0
   minor: 3
-  nit: 1
+  nit: 0
 ---
 
 # Review report for ast-reference/base.md
 
 ## Summary
 
-The page is largely accurate and structurally complete, with no critical or major findings. The main factual issue is that it calls `Scope` “not parsed,” although the parser creates scopes and attaches them to parsed declarations. Three smaller findings concern explicit requirements in the per-document prompt.
+The document satisfies its page-specific structure and accurately describes the principal AST roots, fields, and support types. Three small inaccuracies remain; the most consequential attributes shared declaration modifiers to the group's inheritance rather than the parser's explicit attachment to each declaration.
 
 ## Items checked
 
-- Verified 32 factual claims against the three watched headers at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including every hierarchy edge, all ten root field summaries, and 11 support-type/API descriptions.
-- Confirmed the document body contains no line-number citations; therefore there were no numbered citations requiring individual re-derivation.
-- Resolved all 50 relative-link occurrences (14 unique targets) and confirmed all nine generated-doc targets are manifest entries.
-- Read the `pipeline/02-parse-ast.md` dependency and checked parser-related claims against its recorded source context.
-- Recomputed the watched-path digest as `ee1fb3c40342ae89da97ad9ebe3c1853ce01e7825a3528db059959204e5a2fc6`, matching the target front matter.
-- Compared section order, root order, support-type coverage, and page scope against `_common.md` and `ast-reference-base.md`.
+- Read `_review.md`, `_common.md`, and the document-specific prompt identified by `regenerate.py show ast-reference/base.md`.
+- Verified against the **current working tree**. `git diff 2518a942d59b1228fc8cc70a37739baab82b6002 -- source/` returned no differences, confirming the supplied source-equivalence condition.
+- Checked all 11 hierarchy edges and the ten required root subsections against `source/slang/slang-ast-base.h`.
+- Spot-checked more than 20 claims, including node tags and casts, builder ownership, source locations, modifier fields, declaration check-state monotonicity, expression fields, value operands, reflection ownership, scope creation, declaration grouping, `QualType` flags, substitution fields, builtin enumeration membership, and diagnostic helper signatures.
+- Checked builtin attribute syntax, lowering of builtin tags, ray-tracing tag consumers, and substitution-cache behavior against their source implementations.
+- Resolved all 56 Markdown link occurrences, covering 15 unique targets; all nine referenced generated pages have manifest entries. Read the parsing dependency only for cross-reference checks.
+- Found no line-number citations in the target document's body.
+- Checked required front-matter keys and formats, section order, root field lists, family links, support-table columns, Mermaid conventions, and Liquid safety. The document is 18,449 bytes, below its 49,152-byte cap.
+- No files were written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Root hierarchy`, lines 72-74; `## Support types`, line 261 | The page says `Scope` “does not appear in the parsed AST” and is “not parsed.” `Scope` is not a syntax node, but the parser does create it and stores it on parsed `ContainerDecl` nodes, so the unqualified wording is inaccurate. | `source/slang/slang-parser.cpp:144-150` creates a `Scope` in `Parser::PushScope` and assigns it to `containerDecl->ownedScope`; `source/slang/slang-ast-decl.h:141` declares that field. | Replace both claims with “not a syntax node; created during parsing to support lookup and attached to container declarations.” |
-| F-002 | minor | `### DeclBase (ModifiableSyntaxNode)`, line 133 | The page gives `DeclBase` the family line `[declarations.md](declarations.md)`, but the per-document prompt explicitly classifies `DeclBase` as having no dedicated family page. | `docs/generated/design/_meta/prompts/ast-reference-base.md:42-46` requires `(no dedicated family page)` for `DeclBase`. | Change the `DeclBase` family line to `Family page: (no dedicated family page)`. |
-| F-003 | minor | `### DeclBase`, lines 123-127; `## Support types`, lines 249 and 259 | The page names concrete leaf nodes such as `DeclGroup`, `FuncDecl`, `StructDecl`, `BuiltinOperatorExpr`, and `BuiltinOperationIntVal`, despite the prompt’s explicit rule that concrete leaves belong in family pages rather than this abstract-root page. | `docs/generated/design/_meta/prompts/ast-reference-base.md:61-62` forbids concrete leaves; `source/slang/slang-ast-decl.h:18-22` and `source/slang/slang-ast-expr.h:288-293` show `DeclGroup` and `BuiltinOperatorExpr` are concrete `FIDDLE()` classes. | Remove concrete class examples from the root prose and support table, or replace them with generic descriptions and links to the relevant family pages. |
-| F-004 | nit | `### NodeBase`, lines 78-100; `### Stmt`, lines 166-174 | Each of these root callouts has only one prose sentence describing the class, while the required structure asks for 2-4 sentences per root. | `docs/generated/design/_meta/prompts/ast-reference-base.md:32-41` defines the required callout form and sentence count. | Add one concise role sentence to each callout, moving existing non-field detail from the `NodeBase` bullets into prose where practical. |
-
-## No-issues notes
-
-- Every inheritance edge in the Mermaid diagram matches an immediate `: public` relationship in `source/slang/slang-ast-base.h`.
-- The ten required root subsections are present in the required order, and their declared field names and types match the source.
-- The front matter has every mandatory key, a valid full SHA and hex digest, and the exact required warning.
+| F-001 | minor | `### DeclBase (ModifiableSyntaxNode)`, lines 145–148 | The explanation that modifiers apply to every declaration `Because the group node is itself a ModifiableSyntaxNode` gives the wrong mechanism. The parser explicitly completes each member with the shared modifier list; inheritance does not propagate the group's modifiers. | `source/slang/slang-parser.cpp:2954–2985`: `DeclGroupBuilder::beginGroup` inserts a shared-modifier marker, and `addToGroup` calls `CompleteDecl(parser, newDecl, containerDecl, modifiers, nullptr)`. At line 6324, the parser states that a group's members have already been completed. | Replace the inheritance-based explanation with a sentence explaining that `DeclGroupBuilder` attaches the shared modifiers to each member through `CompleteDecl`, making both `P` and `Q` static and const. |
+| F-002 | minor | `## Support types`, lines 291–294 | The introduction says all listed helpers are declared in `slang-ast-support-types.h` and `are not NodeBase subclasses`, but the table includes `Scope`, correctly identified in its own row as a node declared in another header. | `source/slang/slang-ast-base.h:111–112`: `FIDDLE()` followed by `class Scope : public NodeBase`. | Qualify the introduction: most entries are non-node helpers declared in the support-types header; `Scope` is the explicit exception, declared in the base header. Keep the existing `Scope` row. |
+| F-003 | minor | `## Support types`, `SyntaxClass<T>` row, line 306 | Calling this a handle to a `concrete AST class` unnecessarily excludes abstract classes. The casting machinery also uses metadata handles for abstract bases. | `source/slang/slang-ast-support-types.h:791–801`: `isSubClassOf<U>()` obtains `getSyntaxClass<U>()` without restricting `U` to concrete classes. `source/slang/slang-ast-base.h:65–67` uses that operation for node casts. | Change the purpose to “Reflection-style handle to an AST class, including abstract bases, used by the visitor and casting infrastructure.” |
