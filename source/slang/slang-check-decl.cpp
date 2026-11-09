@@ -3668,6 +3668,26 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
+/// Returns true if `type` is a single resource or sampler handle: a texture or other
+/// `ResourceType`, a sampler, a structured buffer, or a byte-address buffer. A shader parameter
+/// of one of these types is bound once for the whole dispatch, so its value does not change
+/// while the shader runs.
+///
+/// Constant-buffer and parameter-block types are handles too, but they are not included,
+/// because the data read through them is ordinary uniform data rather than another handle.
+static bool _isSingleResourceHandleType(Type* type)
+{
+    if (as<ResourceType>(type))
+        return true;
+    if (as<SamplerStateType>(type))
+        return true;
+    if (as<HLSLStructuredBufferTypeBase>(type))
+        return true;
+    if (as<UntypedBufferResourceType>(type))
+        return true;
+    return false;
+}
+
 /// Returns true if every value of `type` is an opaque resource or sampler handle: a texture,
 /// buffer resource or sampler, or a non-empty struct or array made only of those. For example,
 /// `Texture2D`, `SamplerState[2]` and `struct S { Texture2D t; SamplerState s; }` qualify,
@@ -3687,8 +3707,7 @@ static bool _isResourceHandleOnlyTypeImpl(
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
-    if (as<ResourceType>(type) || as<SamplerStateType>(type) ||
-        as<HLSLStructuredBufferTypeBase>(type) || as<UntypedBufferResourceType>(type))
+    if (_isSingleResourceHandleType(type))
         return true;
     if (auto arrayType = as<ArrayExpressionType>(type))
         return _isResourceHandleOnlyTypeImpl(astBuilder, arrayType->getElementType(), activeTypes);
@@ -3700,8 +3719,11 @@ static bool _isResourceHandleOnlyTypeImpl(
             // struct with a base struct does not qualify.
             if (findBaseStructType(astBuilder, structDeclRef))
                 return false;
-            if (!activeTypes.add(type))
+            // If this struct is already being visited, it contains itself by value.
+            if (activeTypes.contains(type))
                 return false;
+            activeTypes.add(type);
+
             // Builtin scalar types such as `float` are structs with no fields in the core
             // module, so a struct must have at least one field to qualify.
             bool hasField = false;
