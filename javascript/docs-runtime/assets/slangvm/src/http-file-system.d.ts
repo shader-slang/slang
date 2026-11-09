@@ -5,6 +5,10 @@ export interface PreloadOptions {
     signal?: AbortSignal;
 }
 export interface HTTPFileSystemOptions {
+    /** Exact virtual file paths this instance may fetch. Omit for unrestricted reads;
+     * an empty iterable denies all reads. Unlisted paths return null synchronously.
+     * Paths are normalized and copied at construction; directories are not prefixes. */
+    allowedPaths?: Iterable<string>;
     fetch?: typeof globalThis.fetch;
     /** Cache HTTP 404 and 410 responses. Defaults to false. */
     cacheNotFound?: boolean;

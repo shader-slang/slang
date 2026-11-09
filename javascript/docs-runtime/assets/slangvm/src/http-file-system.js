@@ -10,9 +10,16 @@ export class HTTPSlangFileSystem {
     #fetch;
     #cache = new Map();
     #missing;
+    #allowedPaths;
 
     constructor(baseURL, { fetch: fetchFile = globalThis.fetch, cacheNotFound = false,
-        missingFileCache = new Set() } = {}) {
+        missingFileCache = new Set(), allowedPaths } = {}) {
+        if (allowedPaths !== undefined) {
+            if (typeof allowedPaths === "string" || typeof allowedPaths?.[Symbol.iterator] !== "function") {
+                throw new TypeError("allowedPaths must be an iterable of file paths");
+            }
+            this.#allowedPaths = new Set(Array.from(allowedPaths, normalizePath));
+        }
         this.#baseURL = new URL(baseURL);
         if (!this.#baseURL.pathname.endsWith("/")) this.#baseURL.pathname += "/";
         this.#baseURL.search = this.#baseURL.hash = "";
@@ -29,6 +36,8 @@ export class HTTPSlangFileSystem {
     loadFile(path, { signal } = {}) {
         signal?.throwIfAborted();
         const name = normalizePath(path);
+        // Reject import search candidates immediately, without an HTTP request or suspension.
+        if (this.#allowedPaths && !this.#allowedPaths.has(name)) return null;
         const url = this.#url(name);
         if (this.#cache.has(name)) return waitForFile(this.#cache.get(name), signal);
         if (this.#missing?.has(url)) return null;

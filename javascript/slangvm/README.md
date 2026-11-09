@@ -112,6 +112,22 @@ or other request configuration. Keep the filesystem alive to reuse downloads acr
 Closing one VM cancels its own reads; shared HTTP downloads can finish and populate the cache.
 `clearCache()` drops downloaded bytes, without changing files already loaded into a VM.
 
+Set `allowedPaths` to a fixed inventory to avoid network probes during import resolution:
+
+```js
+const files = new HTTPSlangFileSystem(baseURL, {
+  allowedPaths: ["main.slang", "helpers.slang", "data/input.bin"],
+});
+await files.preload(["main.slang", "helpers.slang"]);
+files.loadFile("missing.slang"); // null immediately; no HTTP request or async suspension
+```
+
+Only exact normalized file paths are allowed; a directory entry does not allow its children.
+The inventory is copied at construction. An empty inventory denies all reads; omitting the
+option retains unrestricted HTTP loading. Listed files may load on demand or be preloaded;
+unlisted required preloads reject. Include dependencies and any runtime data files in the
+inventory. To expose newly added files, construct a new filesystem with an updated inventory.
+
 HTTP 404/410 caching is **off by default**. Set `cacheNotFound: true` to remember misses for that
 filesystem's lifetime. Optionally supply `missingFileCache`, an object with synchronous `has(url)`
 and `add(url)` methods, to share misses across filesystem instances or forward them to a parent
@@ -119,8 +135,9 @@ page. Supplying a cache alone does not enable caching. A `Set` works; clear it o
 filesystem to retry previously missing URLs. `clearCache()` only clears successful downloads.
 Other HTTP errors, network failures, and cancellation never count as missing files.
 
-The docs explicitly enable `cacheNotFound`, retain misses across replacement workers, and clear
-them on page reload. In-memory editor files still take precedence over cached misses.
+The docs use the standard-module inventory to allow only shipped binaries and sources, so
+unknown import candidates fail synchronously even on the first run. They also enable
+`cacheNotFound` for listed files missing from the server. In-memory editor files take precedence.
 
 ## Preloading
 

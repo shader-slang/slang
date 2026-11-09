@@ -176,6 +176,56 @@ test("preload bounds concurrency, deduplicates paths, and directory selection re
     assert.equal(requested.length, 4);
 });
 
+test("fixed HTTP inventory rejects unlisted paths synchronously and snapshots normalized names", async () => {
+    const allowed = new Set(["./runtime/../runtime/module.slang-module", "data.bin"]);
+    const requests = [];
+    const files = new HTTPSlangFileSystem("https://example.test/", {
+        allowedPaths: allowed,
+        fetch: async url => { requests.push(url); return new Response("bytes"); },
+    });
+    allowed.add("other.slang");
+    allowed.delete("data.bin");
+    for (const name of ["other.slang", "runtime", "runtime/module.slang", "runtime/nested/module.slang-module"]) {
+        assert.equal(files.loadFile(name), null, name);
+    }
+    assert.deepEqual(requests, []);
+    await files.preload(["runtime\\module.slang-module", "/data.bin"]);
+    assert.equal(decode(files.loadFile("/runtime/module.slang-module")), "bytes");
+    assert.equal(requests.length, 2);
+    files.clearCache();
+    assert.equal(files.loadFile("other.slang"), null);
+    await assert.rejects(files.preload(["other.slang"]), /missing file/);
+    assert.equal(requests.length, 2);
+    const overlay = new OverlaySlangFileSystem([
+        new MemorySlangFileSystem({ "edited.slang": "editor" }), files,
+    ]);
+    assert.equal(decode(overlay.loadFile("edited.slang")), "editor");
+});
+
+test("empty HTTP inventories deny all reads and inventory arguments are validated", () => {
+    const files = new HTTPSlangFileSystem("https://example.test/", {
+        allowedPaths: [], fetch: () => { throw new Error("must not fetch"); },
+    });
+    assert.equal(files.loadFile("anything"), null);
+    for (const allowedPaths of [null, "file.slang", {}, ["../escape"]]) {
+        assert.throws(() => new HTTPSlangFileSystem("https://example.test/", { allowedPaths }));
+    }
+});
+
+test("listed HTTP files retain retry and cancellation behavior", async () => {
+    let requests = 0;
+    const files = new HTTPSlangFileSystem("https://example.test/", {
+        allowedPaths: ["module.slang"],
+        fetch: async () => ++requests === 1 ? new Response(null, { status: 404 }) : new Response("ready"),
+    });
+    assert.equal(await files.loadFile("module.slang"), null);
+    assert.equal(decode(await files.loadFile("module.slang")), "ready");
+    assert.equal(requests, 2);
+    const controller = new AbortController();
+    controller.abort();
+    assert.throws(() => files.loadFile("unlisted", { signal: controller.signal }), { name: "AbortError" });
+});
+
 test("preload reports missing files and supports cancellation without cancelling shared cache fills", async () => {
     const missing = new HTTPSlangFileSystem("https://example.test/", {
         fetch: async () => new Response(null, { status: 404 }),

@@ -118,10 +118,12 @@ On the first press of ![Run](images/snippet-run.svg "Run"), the page preloads `s
 using that inventory. Subsequent Runs reuse the bytes, including through snapshots sent to
 replacement workers. Unrelated standard modules remain on demand; slangd still loads sources.
 
-HTTP missing-file caching is off by default in the package. The docs explicitly set
-`cacheNotFound: true`. Missing import candidates (HTTP 404/410) are remembered across Runs on the current
-page, including replacement workers. Reload after adding a previously missing file
-on the server. Edited in-memory source still overrides cached misses.
+The docs pass the shipped binary/source inventory as `HTTPSlangFileSystem`'s
+`allowedPaths`, including in replacement workers. Unknown import candidates return
+`null` synchronously without HTTP requests, including on the first Run. Other shipped
+modules can still load on demand. Update the inventory when adding packaged files.
+The docs also set `cacheNotFound: true` to remember HTTP 404/410 responses for listed
+assets until page reload. Edited in-memory source takes precedence over the library.
 
 Before committing a refreshed snapshot, select it explicitly and run the local checks
 (PowerShell environment-variable syntax shown):

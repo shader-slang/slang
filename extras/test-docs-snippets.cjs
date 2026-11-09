@@ -174,15 +174,12 @@ const { checkSdfTutorial } = require("./sdf-tutorial-checks.cjs");
             /\/slang\/runtime(?:\/.*)?\.slang-module$/.test(url));
         const afterFirstPreload = runtimeBinaryRequests().length;
         assert.ok(afterFirstPreload > 1, "The page must preload runtime implementation modules");
-        const firstRunMisses = new Set(missingRequests);
-        assert.ok(firstRunMisses.size, "The first run must probe missing import candidates");
-        const afterFirstRun = missingRequests.length;
+        assert.deepEqual(missingRequests, [], "The first run must not fetch unknown import candidates");
         await edit(original.replace("scale = 2.0", "scale = 3.0"));
         await run("769.000000", true);
         assert.equal(runtimeBinaryRequests().length, afterFirstPreload,
             "A replacement worker must reuse preloaded runtime bytes without downloading them again");
-        assert.deepEqual(missingRequests.slice(afterFirstRun).filter(url => firstRunMisses.has(url)), [],
-            "A fresh worker must reuse the page's missing-file cache");
+        assert.deepEqual(missingRequests, [], "Fresh workers must reject unknown candidates without HTTP");
         await card.screenshot({ path: path.join(root, "../snippet-desktop.png") });
 
         // A second editor on the same page owns its source, worker, and result panel.
@@ -222,14 +219,12 @@ const { checkSdfTutorial } = require("./sdf-tutorial-checks.cjs");
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Mobile overflow");
         await card.screenshot({ path: path.join(root, "../snippet-mobile.png") });
         assert.deepEqual(errors, []);
-        const beforeReload = missingRequests.length;
         await page.reload();
         await editor.waitFor({ state: "attached" });
         await editor.focus();
         await run("513.000000", true);
-        assert.ok(missingRequests.slice(beforeReload).some(url => firstRunMisses.has(url)),
-            "Reloading the page must discard its missing-file cache");
-        console.log(`PASS: ${firstRunMisses.size} missing URLs reused across workers; reload clears the cache`);
+        assert.deepEqual(missingRequests, [], "A cold page must also reject unknown candidates without HTTP");
+        console.log("PASS: zero missing import requests on first run, replacement workers, and reload");
         await context.close();
 
         // Exercise every packaged module, including tensor/numerics imports that

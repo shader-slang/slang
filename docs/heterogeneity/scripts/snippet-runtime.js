@@ -1,6 +1,6 @@
 // Shared compilation/output path. Canvas runs use the DOM; text runs call this from a worker.
 export async function runSnippet({ source, filename = "main.slang", sources = { [filename]: source },
-  backend = "webgpu", canvas, sizeCanvas, missingFileURLs = [], preloadedFiles = {} }, send, signal) {
+  backend = "webgpu", canvas, sizeCanvas, missingFileURLs = [], preloadedFiles = {}, allowedPaths = [] }, send, signal) {
   const missingFiles = new Set(missingFileURLs);
   let vm;
   let window;
@@ -62,6 +62,7 @@ export async function runSnippet({ source, filename = "main.slang", sources = { 
     signal?.throwIfAborted();
     status(backend === "webgpu" ? "Initializing compiler and WebGPU…" : "Initializing compiler…");
     const libraries = new HTTPSlangFileSystem(new URL("../assets/slangvm/slang/", import.meta.url), {
+      allowedPaths,
       cacheNotFound: true,
       missingFileCache: {
         has: url => missingFiles.has(url),

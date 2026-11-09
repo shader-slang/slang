@@ -7,8 +7,8 @@
   const mappingURL = new URL("snippet-files.json", document.currentScript.src);
   const filesystemURL = new URL("snippet-filesystem.js", document.currentScript.src);
   const loadRuntimeFiles = () => import(filesystemURL.href).then(module => module.preloadRuntime());
-  // Runs use fresh workers, but import candidates missing from this page's package
-  // need only be probed once. Reloading the page starts a new cache.
+  // Keep HTTP misses for inventoried assets across fresh workers. Unknown import
+  // candidates are rejected locally by the filesystem's fixed inventory.
   const missingFileURLs = new Set();
   const cells = new Map();
   const sourceSnapshot = () => Object.fromEntries(
@@ -245,8 +245,8 @@
             status.textContent = "Loading timed out; stopping…";
             controller.abort(new Error("Loading exceeded two minutes. Try running again."));
           }, 120000);
-          Promise.all([import(runtimeURL.href), loadRuntimeFiles()]).then(([{ runSnippet }, preloadedFiles]) => runSnippet(
-            { filename, sources: runSources, backend, canvas, sizeCanvas, preloadedFiles, missingFileURLs: [...missingFileURLs] },
+          Promise.all([import(runtimeURL.href), loadRuntimeFiles()]).then(([{ runSnippet }, runtimeFiles]) => runSnippet(
+            { filename, sources: runSources, backend, canvas, sizeCanvas, ...runtimeFiles, missingFileURLs: [...missingFileURLs] },
             data => { if (canvasRun === controller) receive(data); },
             controller.signal,
           )).catch(error => {
@@ -268,9 +268,9 @@
           if (worker === current) failure("Could not receive the worker's result.");
         };
         timeout = setTimeout(() => failure("Execution exceeded two minutes. Try a smaller program."), 120000);
-        loadRuntimeFiles().then(preloadedFiles => {
+        loadRuntimeFiles().then(runtimeFiles => {
           if (worker === current) current.postMessage({
-            filename, sources: runSources, backend, preloadedFiles, missingFileURLs: [...missingFileURLs],
+            filename, sources: runSources, backend, ...runtimeFiles, missingFileURLs: [...missingFileURLs],
           });
         }).catch(error => {
           if (worker === current) failure(String(error.message || error));
