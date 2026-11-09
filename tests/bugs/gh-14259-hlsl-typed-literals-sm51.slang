@@ -75,22 +75,24 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output.Store(16, uint.maxValue >> s);
     output.Store(20, 12345U >> s);
     output.Store(24, asuint(0.1f * oneF));
-    output.Store(28, asuint(-0.0f * oneF));
+    output.Store(28, asuint(s == 1 ? -0.0f : oneF));
     output.Store(32, asuint((1.0f / 0.0f) * oneF));
     output.Store(36, asuint((-1.0f / 0.0f) * oneF));
     output.Store(40, asuint((0.0f / 0.0f) * oneF));
     storeDouble(44, 0.1l * oneD);
     storeDouble(52, 1.7976931348623157e+308l * oneD);
-    storeDouble(60, -0.0l * oneD);
+    storeDouble(60, s == 1 ? -0.0l : oneD);
     storeDouble(68, double(1.0 / 0.0) * oneD);
     storeDouble(76, double(-1.0 / 0.0) * oneD);
     storeDouble(84, double(0.0 / 0.0) * oneD);
     output.Store(92, asuint(float(half(65504.0) * oneH)));
-    output.Store(96, asuint(float(half(-0.0) * oneH)));
+    output.Store(96, asuint(float(s == 1 ? half(-0.0) : oneH)));
     output.Store(100, asuint(float(half(1.0 / 0.0) * oneH)));
     output.Store(104, asuint(float(half(-1.0 / 0.0) * oneH)));
     output.Store(108, asuint(float(half(0.0 / 0.0) * oneH)));
 
+    // Each `-0.0` word comes from a choice between the literal and a run-time value rather than
+    // from a multiplication, so the word reads the sign bit of the `-0.0` literal itself.
     // The NaN words accept a quiet NaN of either sign, because the sign and payload of a NaN that
     // a multiplication returns differ between targets. The last word is never written.
     // BUF: C0000000
