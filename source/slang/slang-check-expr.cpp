@@ -6077,12 +6077,13 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
                 //
                 // TODO: Differentiate the storage that a reference parameter refers to.
                 //
-                paramTypes.add(getParamTypeWithModeWrapper(
-                    m_astBuilder,
-                    m_astBuilder->getModifiedType(
-                        paramValType,
-                        {m_astBuilder->getNoDiffModifierVal()}),
-                    paramPassingMode));
+                auto noDiffType = doesTypeHaveNoDiffModifier(paramValType)
+                                      ? paramValType
+                                      : m_astBuilder->getModifiedType(
+                                            paramValType,
+                                            {m_astBuilder->getNoDiffModifierVal()});
+                paramTypes.add(
+                    getParamTypeWithModeWrapper(m_astBuilder, noDiffType, paramPassingMode));
                 break;
             }
         }
