@@ -1760,50 +1760,88 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
+    case kIROp_IntLit:
+        {
+            // The `L` suffix types an `int` constant without a cast. dxc types `0L` as `uint`, so
+            // zero keeps the cast, and the minimum is an expression of in-range literals, as for
+            // `int64_t`.
+            IRConstant* constantInst = static_cast<IRConstant*>(inst);
+            auto basicType = as<IRBasicType>(constantInst->getDataType());
+            if (!basicType || basicType->getBaseType() != BaseType::Int)
+                break;
+            int32_t value = int32_t(constantInst->value.intVal);
+            if (value == 0)
+            {
+                m_writer->emit("int(0)");
+            }
+            else if (value == INT32_MIN)
+            {
+                m_writer->emit("(-2147483647L - 1L)");
+            }
+            else
+            {
+                m_writer->emit(value);
+                m_writer->emit("L");
+            }
+            return;
+        }
+
     case kIROp_FloatLit:
         {
+            // HLSL types an unsuffixed floating-point literal as `float`, and dxc deduces template
+            // arguments such as the `T` of `RWByteAddressBuffer.Store<T>` from the literal, so
+            // every constant carries the suffix of its type, NaN and infinities included.
+            // `BFloat16`, `FloatE4M3` and `FloatE5M2` have no HLSL type, so their constants keep
+            // the `float` spellings.
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
-            IRConstant::FloatKind kind = constantInst->getFloatKind();
-            switch (kind)
+            const char* suffix = nullptr;
+            switch (constantInst->getDataType()->getOp())
+            {
+            case kIROp_HalfType:
+                suffix = "h";
+                break;
+            case kIROp_FloatType:
+                suffix = "f";
+                break;
+            case kIROp_DoubleType:
+                suffix = "L";
+                break;
+            default:
+                break;
+            }
+
+            const char* specialNumerator = nullptr;
+            switch (constantInst->getFloatKind())
             {
             case IRConstant::FloatKind::Nan:
-                {
-                    m_writer->emit("(0.0f / 0.0f)");
-                    return;
-                }
+                specialNumerator = "0.0";
+                break;
             case IRConstant::FloatKind::PositiveInfinity:
-                {
-                    m_writer->emit("(1.0f / 0.0f)");
-                    return;
-                }
+                specialNumerator = "1.0";
+                break;
             case IRConstant::FloatKind::NegativeInfinity:
-                {
-                    m_writer->emit("(-1.0f / 0.0f)");
-                    return;
-                }
+                specialNumerator = "-1.0";
+                break;
             default:
-                {
-                    m_writer->emit(constantInst->value.floatVal);
-                    // HLSL treats an unsuffixed floating-point literal as a 32-bit `float` by
-                    // default, and dxc deduces `float` from one for a template argument such as the
-                    // `T` of `RWByteAddressBuffer.Store<T>`. A finite `float` literal therefore
-                    // takes `f` and a finite `double` literal takes `L`. A `half` literal stays
-                    // bare, because the `h` suffix needs 16-bit types to be enabled; that and the
-                    // `float`-typed NaN/Inf spellings above are known remaining gaps.
-                    switch (constantInst->getDataType()->getOp())
-                    {
-                    case kIROp_FloatType:
-                        m_writer->emit("f");
-                        break;
-                    case kIROp_DoubleType:
-                        m_writer->emit("L");
-                        break;
-                    default:
-                        break;
-                    }
-                    return;
-                }
+                break;
             }
+
+            if (specialNumerator)
+            {
+                const char* specialSuffix = suffix ? suffix : "f";
+                m_writer->emit("(");
+                m_writer->emit(specialNumerator);
+                m_writer->emit(specialSuffix);
+                m_writer->emit(" / 0.0");
+                m_writer->emit(specialSuffix);
+                m_writer->emit(")");
+                return;
+            }
+
+            m_writer->emit(constantInst->value.floatVal);
+            if (suffix)
+                m_writer->emit(suffix);
+            return;
         }
 
     default:

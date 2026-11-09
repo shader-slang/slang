@@ -17,7 +17,7 @@
 
 // CHECK-HLSL: default:
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(3):
+// CHECK-HLSL: case 3L:
 
 // CHECK:      64
 // CHECK-NEXT: C8
