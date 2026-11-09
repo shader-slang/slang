@@ -6872,6 +6872,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SpvDecorationPerVertexKHR);
             break;
         case kIROp_OutputControlPointsDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             requireSPIRVExecutionMode(
                 decoration,
                 dstID,
@@ -6880,6 +6882,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_DomainDecoration:
             {
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
+                    break;
                 auto domain = cast<IRDomainDecoration>(decoration);
                 SpvExecutionMode mode = SpvExecutionModeMax;
                 auto domainName = as<IRStringLit>(domain->getDomain());
