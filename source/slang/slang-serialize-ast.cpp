@@ -414,6 +414,8 @@ struct ContainerDeclDirectMemberDeclsInfo
 %   "BuiltinOperationKind",
 %   "ImageFormat",
 %   "ParamPassingMode",
+%   "ExprValueCategory",
+%   "ExprAccess",
 %   "PreferRecomputeAttribute::SideEffectBehavior",
 %   "TreatAsDifferentiableExpr::Flavor",
 %   "LogicOperatorShortCircuitExpr::Flavor",
@@ -491,7 +493,7 @@ SLANG_DECLARE_FOSSILIZED_AS($T, FossilUInt);
 % -- template like this is in the global scope.
 %
 %astStructTypes = {
-%   Slang.QualType,
+%   Slang.ExprInfo,
 %   Slang.ParamInfo,
 %   Slang.SPIRVAsmOperand,
 %   Slang.DeclAssociation,

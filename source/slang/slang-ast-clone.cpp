@@ -217,9 +217,9 @@ Val* ASTCloner::rewriteValImpl(Val* val)
     return m_context.astBuilder->_getOrCreateImpl(_Move(desc));
 }
 
-QualType ASTCloner::rewriteQualType(QualType const& type)
+ExprInfo ASTCloner::rewriteExprInfo(ExprInfo const& type)
 {
-    QualType result = type;
+    ExprInfo result = type;
     result.type = rewriteType(type.type);
     return result;
 }
@@ -232,9 +232,9 @@ TypeExp ASTCloner::cloneTypeExp(TypeExp const& typeExp)
     return result;
 }
 
-void ASTCloner::cloneField(QualType& dst, QualType const& src)
+void ASTCloner::cloneField(ExprInfo& dst, ExprInfo const& src)
 {
-    dst = rewriteQualType(src);
+    dst = rewriteExprInfo(src);
 }
 
 void ASTCloner::cloneField(ParamInfo& dst, ParamInfo const& src)
@@ -331,7 +331,7 @@ Expr* GenericSignatureCloner::createGenericArgExpr(Decl* decl)
     auto expr = m_astCloner.getContext().astBuilder->create<VarExpr>();
     expr->declRef = declRef;
     if (auto varDecl = as<VarDeclBase>(decl))
-        expr->type = QualType(varDecl->type.type);
+        expr->type = ExprInfo(varDecl->type.type);
     else
         expr->type = getTypeForDeclRef(m_astCloner.getContext().astBuilder, declRef, SourceLoc());
     return expr;

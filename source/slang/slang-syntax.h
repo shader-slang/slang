@@ -648,13 +648,17 @@ std::optional<ParamInfo> findEffectiveThisParamInfo(ASTBuilder* astBuilder, Decl
 /// the declaration-derived mode is invariant under those substitutions.
 ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
-/// Returns whether a `this` expression in `callableDeclRef`'s body is writable.
+/// Get the info of a `this` expression in `callableDeclRef`'s body, whose effective `this`
+/// parameter is `thisParamInfo`.
 ///
-/// The effective parameter mode normally determines this property. A class setter is the one
-/// exception: its effective `this` parameter has `In` mode, but the class value still names an
-/// object whose fields the setter body is expected to mutate. This exception affects expression
-/// checking only; it does not change the effective parameter mode used for calls or lowering.
-bool isThisExprWritable(DeclRef<CallableDecl> callableDeclRef, ParamInfo const& thisParamInfo);
+/// The effective parameter mode normally determines the info, as for any other parameter. A
+/// class setter is the one exception: its effective `this` parameter has `In` mode, but the class
+/// value still names an object whose fields the setter body is expected to mutate, so `this` is
+/// writable. This exception affects expression checking only; it does not change the effective
+/// parameter mode used for calls or lowering.
+ExprInfo getExprInfoOfThisExpr(
+    DeclRef<CallableDecl> callableDeclRef,
+    ParamInfo const& thisParamInfo);
 
 /// Returns true if `type` or one of its modified-type bases carries `no_diff`.
 bool doesTypeHaveNoDiffModifier(Type* type);

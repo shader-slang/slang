@@ -130,7 +130,7 @@ struct BasicTypeKey
     uint32_t dim2 : 8;
     uint32_t knownConstantBitCount : 6;
     uint32_t knownNegative : 1;
-    uint32_t isLValue : 1;
+    uint32_t isWritableStorageLocation : 1;
     uint32_t reserved : 3;
     uint32_t getRaw() const
     {
@@ -146,7 +146,7 @@ SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(
     BaseType baseType,
     IntegerLiteralValue dim1 = 0,
     IntegerLiteralValue dim2 = 0,
-    bool inIsLValue = false)
+    bool isWritableStorageLocation = false)
 {
     SLANG_ASSERT(dim1 >= 0 && dim2 >= 0);
     return BasicTypeKey{
@@ -155,11 +155,11 @@ SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(
         uint8_t(dim2),
         0,
         0,
-        (inIsLValue ? 1u : 0u),
+        (isWritableStorageLocation ? 1u : 0u),
         0};
 }
 
-inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
+inline BasicTypeKey makeBasicTypeKey(ExprInfo typeIn, Expr* exprIn = nullptr)
 {
     if (auto basicType = as<BasicExpressionType>(typeIn))
     {
@@ -172,7 +172,7 @@ inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
             }
             rs.knownConstantBitCount = getIntValueBitSize(constInt->value);
         }
-        rs.isLValue = typeIn.isLeftValue ? 1u : 0u;
+        rs.isWritableStorageLocation = typeIn.isWritableStorageLocation() ? 1u : 0u;
         return rs;
     }
     else if (auto vectorType = as<VectorExpressionType>(typeIn))
@@ -185,7 +185,7 @@ inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
                     elemBasicType->getBaseType(),
                     elemCount->getValue(),
                     0,
-                    typeIn.isLeftValue);
+                    typeIn.isWritableStorageLocation());
             }
         }
     }
@@ -201,7 +201,7 @@ inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
                         elemBasicType->getBaseType(),
                         elemCount1->getValue(),
                         elemCount2->getValue(),
-                        typeIn.isLeftValue);
+                        typeIn.isWritableStorageLocation());
                 }
             }
         }
@@ -853,7 +853,7 @@ struct ImplicitCastMethod
 struct ImplicitCastMethodKey
 {
     Type* fromType; // nullptr means default construct.
-    bool isLValue;
+    bool isWritableStorageLocation;
     Type* toType;
     uint64_t constantVal;
     bool isConstant;
@@ -864,27 +864,45 @@ struct ImplicitCastMethodKey
             Slang::getHashCode(toType),
             Slang::getHashCode(constantVal),
             (HashCode32)isConstant,
-            (HashCode32)isLValue);
+            (HashCode32)isWritableStorageLocation);
     }
     bool operator==(const ImplicitCastMethodKey& other) const
     {
         return fromType == other.fromType && toType == other.toType &&
                isConstant == other.isConstant && constantVal == other.constantVal &&
-               isLValue == other.isLValue;
+               isWritableStorageLocation == other.isWritableStorageLocation;
     }
     ImplicitCastMethodKey() = default;
-    ImplicitCastMethodKey(QualType fromType, Type* toType, Expr* fromExpr)
+    ImplicitCastMethodKey(ExprInfo fromType, Type* toType, Expr* fromExpr)
         : fromType(fromType)
         , toType(toType)
         , constantVal(0)
         , isConstant(false)
-        , isLValue(fromType.isLeftValue)
+        , isWritableStorageLocation(fromType.isWritableStorageLocation())
     {
         if (auto constInt = as<IntegerLiteralExpr>(fromExpr))
         {
             constantVal = constInt->value;
             isConstant = true;
         }
+    }
+};
+
+/// The key of a cached conversion cost: the two types, and whether the source is a writable
+/// storage location. Converting a writable storage location through an initializer costs more,
+/// because a call that writes back to it needs a temporary that is converted back afterward.
+struct ConversionCostKey
+{
+    TypePair types;
+    bool isFromWritableStorageLocation;
+    HashCode getHashCode() const
+    {
+        return combineHash(types.getHashCode(), (HashCode32)isFromWritableStorageLocation);
+    }
+    bool operator==(const ConversionCostKey& other) const
+    {
+        return types == other.types &&
+               isFromWritableStorageLocation == other.isFromWritableStorageLocation;
     }
 };
 
@@ -1027,7 +1045,7 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
-    Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+    Dictionary<ConversionCostKey, ConversionCost> m_typeConversionCostCache;
 
     Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 
@@ -2043,8 +2061,26 @@ public:
         SourceLoc loc,
         Expr* originalExpr);
 
+    /// Get the info of a reference to the instance member `memberDeclRef` through the checked
+    /// `baseExpr`, given the info `memberInfo` that the member's own declaration provides.
+    ///
+    /// Consider this example:
+    ///
+    /// ```
+    /// struct S { int x; let y : int; property p : int { get; set; } }
+    /// void f(__ref_readonly S s, inout S t) { s.x; s.y; t.p; }
+    /// ```
+    ///
+    /// `s.x` is a read-only memory location, because a mutable field is part of its base.
+    /// `s.y` is a read-only pure value, because an immutable field is one on any base. `t.p` is
+    /// a writable storage location, because the setter writes it but it has no address.
+    ExprInfo getExprInfoOfMember(
+        Expr* baseExpr,
+        DeclRef<Decl> memberDeclRef,
+        ExprInfo const& memberInfo);
+
     Expr* ConstructDerefExpr(Expr* base, SourceLoc loc);
-    Expr* constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc);
+    Expr* constructDerefExpr(Expr* base, Type* elementType, SourceLoc loc);
 
     InvokeExpr* constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments);
 
@@ -2479,7 +2515,7 @@ public:
         CoercionSite site,
         Type* toType,
         Expr** outToExpr,
-        QualType fromType,
+        ExprInfo fromType,
         Expr* fromExpr,
         DiagnosticSink* sink,
         ConversionCost* outCost,
@@ -2501,7 +2537,7 @@ public:
     ///
     /// If conversion is not possible, returns `false`.
     ///
-    bool canCoerce(Type* toType, QualType fromType, Expr* fromExpr, ConversionCost* outCost = 0);
+    bool canCoerce(Type* toType, ExprInfo fromType, Expr* fromExpr, ConversionCost* outCost = 0);
 
     TypeCastExpr* createImplicitCastExpr();
 
@@ -3482,9 +3518,11 @@ public:
         Val* val = nullptr;
 
         // Only used by `OrdinaryArgConstraint` when `decl` names a type
-        // parameter. It records whether the constraint came from an l-value
-        // parameter use so the merged type keeps the correct value category.
-        bool isUsedAsLValue = false;
+        // parameter. It records the value category and access of the use that
+        // produced the constraint, so the merged type keeps them. The type
+        // argument itself is `val`, which may be substituted before use.
+        ExprValueCategory valueCategory = ExprValueCategory::Value;
+        ExprAccess access = ExprAccess::ReadOnly;
 
         // True when the solver has no more work for this constraint. Ordinary
         // constraints stay satisfied once their value has been applied; default
@@ -3525,7 +3563,7 @@ public:
             ConstraintPriority priority,
             OrdinaryArgMergeMode mergeMode,
             Index indexInPack = 0,
-            bool isUsedAsLValue = false,
+            ExprInfo const& argInfo = ExprInfo(),
             bool potentiallyDependent = false)
         {
             SolverConstraint constraint;
@@ -3533,7 +3571,8 @@ public:
             constraint.decl = paramDecl;
             constraint.indexInPack = indexInPack;
             constraint.val = arg;
-            constraint.isUsedAsLValue = isUsedAsLValue;
+            constraint.valueCategory = argInfo.valueCategory;
+            constraint.access = argInfo.access;
             constraint.priority = priority;
             constraint.ordinaryArgMergeMode = mergeMode;
             constraint.potentiallyDependent = potentiallyDependent;
@@ -3726,11 +3765,10 @@ public:
     Expr* createModifierCastExpr(Type* toType, Expr* fromExpr); // General modifier cast expr.
 
     /// Does there exist an implicit conversion from `fromType` to `toType`?
-    bool canConvertImplicitly(Type* toType, QualType fromType);
 
     bool canConvertImplicitly(ConversionCost cost);
 
-    ConversionCost getConversionCost(Type* toType, QualType fromType);
+    ConversionCost getConversionCost(Type* toType, ExprInfo fromType);
 
     Type* _tryJoinTypeWithInterface(
         GenericInferenceContext* constraints,
@@ -3746,8 +3784,8 @@ public:
     // fabricated enum->tag join would wrongly constrain a type parameter.
     Type* TryJoinTypes(
         GenericInferenceContext* constraints,
-        QualType left,
-        QualType right,
+        ExprInfo left,
+        ExprInfo right,
         bool allowEnumScalarJoin = false);
 
     // Try to solve the ordinary and witness arguments for one generic
@@ -3765,6 +3803,16 @@ public:
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost);
 
+
+    /// A parameter of an overload candidate, as overload resolution matches arguments to it.
+    ///
+    /// Unlike a `ParamInfo`, `type` has semantic type modifiers such as `no_diff` removed,
+    /// because modifiers do not take part in overload resolution.
+    struct OverloadParam
+    {
+        Type* type = nullptr;
+        ParamPassingMode mode = ParamPassingMode::In;
+    };
 
     // State related to overload resolution for a call
     // to an overloaded symbol
@@ -3821,7 +3869,7 @@ public:
         };
         bool matchArgumentsToParams(
             SemanticsVisitor* semantics,
-            const List<QualType>& params,
+            const List<OverloadParam>& params,
             bool computeTypes,
             ShortList<MatchedArg>& outMatchedArgs);
 
@@ -4038,36 +4086,38 @@ public:
         bool equalityConstraint = false;
     };
 
-    // Try to find a unification for two values
+    // Try to find a unification for two values. When the values are generic arguments of
+    // types being unified, `fstOuterInfo` and `sndOuterInfo` are the infos of those types, and
+    // unifying two type arguments keeps their value categories and access.
     bool TryUnifyVals(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
         Val* fst,
-        bool fstLVal,
+        ExprInfo const& fstOuterInfo,
         Val* snd,
-        bool sndLVal);
+        ExprInfo const& sndOuterInfo);
 
     bool tryUnifyDeclRef(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
         DeclRefBase* fst,
-        bool fstLVal,
+        ExprInfo const& fstOuterInfo,
         DeclRefBase* snd,
-        bool sndLVal);
+        ExprInfo const& sndOuterInfo);
 
     bool tryUnifyGenericAppDeclRef(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
         GenericAppDeclRef* fst,
-        bool fstLVal,
+        ExprInfo const& fstOuterInfo,
         GenericAppDeclRef* snd,
-        bool sndLVal);
+        ExprInfo const& sndOuterInfo);
 
     bool TryUnifyTypeParam(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
         GenericTypeParamDeclBase* typeParamDecl,
-        QualType type);
+        ExprInfo type);
 
     bool TryUnifyIntParam(
         GenericInferenceContext& constraints,
@@ -4096,27 +4146,26 @@ public:
     bool TryUnifyTypesByStructuralMatch(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
-        QualType fst,
-        QualType snd);
+        ExprInfo fst,
+        ExprInfo snd);
 
     bool TryUnifyTypes(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
-        QualType fst,
-        QualType snd);
+        ExprInfo fst,
+        ExprInfo snd);
 
     bool TryUnifyConjunctionType(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
-        QualType fst,
-        QualType snd);
+        ExprInfo fst,
+        ExprInfo snd);
 
     bool tryAddOptionalIntParamConstraintIfUnconstrained(
         GenericInferenceContext& constraints,
         UnificationOptions unificationOptions,
         IntVal* param,
-        IntVal* arg,
-        bool paramIsLVal);
+        IntVal* arg);
 
     // Is the candidate extension declaration actually applicable to the given type
     DeclRef<ExtensionDecl> applyExtensionToType(
@@ -4148,7 +4197,7 @@ public:
         OverloadResolveContext& context,
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
-        List<QualType>* innerParameterTypes = nullptr,
+        List<OverloadParam>* innerParameterTypes = nullptr,
         GenericArgumentInferenceFailure* outFailure = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
@@ -4237,7 +4286,7 @@ public:
     void settlePendingTryCoverage(Expr* checkedExpr, List<InvokeExpr*> const& pendingCalls);
 
     // Get the type to use when referencing a declaration
-    QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
+    ExprInfo GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
 
     //
     //
@@ -4304,7 +4353,7 @@ public:
 
     Expr* lookupMemberResultFailure(
         DeclRefExpr* expr,
-        QualType const& baseType,
+        ExprInfo const& baseType,
         bool supressDiagnostic = false);
 
     /// Called after member lookup on `expr` has failed with `baseType` as the base. If the base is
@@ -4317,7 +4366,7 @@ public:
     /// inferred.
     void maybeSuggestMissingGenericConstraintForMemberLookup(
         DeclRefExpr* expr,
-        QualType const& baseType);
+        ExprInfo const& baseType);
 
     /// Return true if looking up `name` from `scope` (default lookup mask, keeping only results
     /// visible from `scope`) finds exactly one distinct declaration and it is `decl`. A diagnostic

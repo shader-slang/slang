@@ -866,7 +866,7 @@ local function process_diagnostics(diagnostics_table)
             if part.type == "interpolation" and not part.member_name then
               local param_type = seen_params[part.param_name]
               -- Only add pointer types that don't have null-safe conversion functions.
-              -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+              -- Exclude: string, int (not pointers), type/exprinfo/name/modifier (have null-safe converters)
               -- Include: decl, expr, stmt, val (would crash if null)
               if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
                 if not required_set[part.param_name] then
@@ -944,7 +944,7 @@ local function process_diagnostics(diagnostics_table)
           if part.type == "interpolation" and not part.member_name then
             local param_type = seen_params[part.param_name]
             -- Only add pointer types that don't have null-safe conversion functions.
-            -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+            -- Exclude: string, int (not pointers), type/exprinfo/name/modifier (have null-safe converters)
             -- Include: decl, expr, stmt, val (would crash if null)
             if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
               table.insert(main_required, part.param_name)
@@ -967,7 +967,7 @@ local function process_diagnostics(diagnostics_table)
             if part.type == "interpolation" and not part.member_name then
               local param_type = seen_params[part.param_name]
               -- Only add pointer types that don't have null-safe conversion functions.
-              -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+              -- Exclude: string, int (not pointers), type/exprinfo/name/modifier (have null-safe converters)
               -- Include: decl, expr, stmt, val (would crash if null)
               if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
                 -- Avoid duplicates

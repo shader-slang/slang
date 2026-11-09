@@ -51,7 +51,7 @@ LookupResult lookUpDirectAndTransparentMembers(
 
 // TODO: this belongs somewhere else
 
-QualType getTypeForDeclRef(
+ExprInfo getTypeForDeclRef(
     ASTBuilder* astBuilder,
     SemanticsVisitor* sema,
     DiagnosticSink* sink,
@@ -59,7 +59,7 @@ QualType getTypeForDeclRef(
     Type** outTypeResult,
     SourceLoc loc);
 
-QualType getTypeForDeclRef(ASTBuilder* astBuilder, DeclRef<Decl> declRef, SourceLoc loc);
+ExprInfo getTypeForDeclRef(ASTBuilder* astBuilder, DeclRef<Decl> declRef, SourceLoc loc);
 
 /// Add a found item to a lookup result
 void AddToLookupResult(LookupResult& result, LookupResultItem item);

@@ -1664,7 +1664,7 @@ bool isGlobalShaderParameter(VarDeclBase* decl)
 }
 
 // Get the type to use when referencing a declaration
-QualType getTypeForDeclRef(
+ExprInfo getTypeForDeclRef(
     ASTBuilder* astBuilder,
     SemanticsVisitor* sema,
     DiagnosticSink* sink,
@@ -1691,54 +1691,52 @@ QualType getTypeForDeclRef(
     // what we found.
     if (auto varDeclRef = declRef.as<VarDeclBase>())
     {
-        QualType qualType;
-        qualType.type = getType(astBuilder, varDeclRef);
+        // A variable names a read-write memory location unless something below restricts it.
+        ExprInfo info(
+            getType(astBuilder, varDeclRef),
+            ExprValueCategory::MemoryLocation,
+            ExprAccess::ReadWrite);
 
-        bool isLValue = true;
+        // Several kinds of variable are immutable. A reference to one that would otherwise be
+        // writable is a read-only pure value rather than a location, so it cannot be bound to a
+        // reference parameter either. Consider this example:
+        //
+        // ```
+        // void f(const groupshared int a[4]);
+        // ```
+        //
+        // The parameter `a` is passed as `__ref_readonly`, so a reference to it is already a
+        // read-only memory location, and `const` leaves it one.
+        bool isImmutable = false;
         if (auto shadowVar = as<UniformParameterShadowVarDecl>(varDeclRef.getDecl()))
         {
             // Header checking applies the mutable-global type restriction to a shadow.
             // We make references immutable when the shadow must alias its parameter instead.
-            isLValue = !shadowVar->shouldBeImmutableAlias;
+            isImmutable = shadowVar->shouldBeImmutableAlias;
         }
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
-            isLValue = false;
+            isImmutable = true;
 
-        bool isReadOnlyMemoryLocation = false;
         if (auto paramDecl = as<ParamDecl>(varDeclRef.getDecl()))
         {
-            // Function parameters declared in the "modern" style
-            // are immutable unless their passing mode is meant to be written.
-            const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
+            // The effective passing mode decides how the body may use a parameter.
+            auto mode = getParamPassingMode(paramDecl);
+            auto paramInfo = getExprInfoOfParamReference(info.type, mode);
+            info.valueCategory = paramInfo.valueCategory;
+            info.access = paramInfo.access;
 
-            // The effective passing mode decides whether the body may write a parameter.
-            switch (getParamPassingMode(paramDecl))
+            // A legacy (C-style) `in` parameter is a mutable local copy.
+            //
+            // TODO(#13833): A borrow is an immutable borrow of its argument, so its body should
+            // not be able to write it, and code that does is already incorrect. Making it
+            // read-only is a bug fix that requires updating existing tests, so we leave it to a
+            // separate change. Until then, a borrow follows the rule for `in`.
+            const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
+            if (!isModernParam &&
+                (mode == ParamPassingMode::In || mode == ParamPassingMode::BorrowIn))
             {
-            case ParamPassingMode::In:
-                // A legacy (C-style) `in` parameter is a mutable local copy.
-                if (isModernParam)
-                    isLValue = false;
-                break;
-            case ParamPassingMode::BorrowIn:
-                // TODO(#13833): A borrow is an immutable borrow of its argument, so its body should
-                // not be able to write it, and code that does is already incorrect. Making it
-                // read-only is a bug fix that requires updating existing tests, so we leave it to a
-                // separate change. Until then, a borrow follows the rule for `in`.
-                if (isModernParam)
-                    isLValue = false;
-                break;
-            case ParamPassingMode::Out:
-            case ParamPassingMode::BorrowInOut:
-            case ParamPassingMode::RefReadWrite:
-            case ParamPassingMode::RefWriteOnly:
-                // These parameters are meant to be written.
-                break;
-            case ParamPassingMode::RefReadOnly:
-                isLValue = false;
-                isReadOnlyMemoryLocation = true;
-                break;
-            default:
-                SLANG_UNEXPECTED("unhandled parameter-passing mode");
+                info.valueCategory = ExprValueCategory::MemoryLocation;
+                info.access = ExprAccess::ReadWrite;
             }
         }
 
@@ -1749,15 +1747,15 @@ QualType getTypeForDeclRef(
         // within the shader. The underlying parameter remains immutable in either mode.
         //
         if (isGlobalShaderParameter(varDeclRef.getDecl()))
-            isLValue = false;
+            isImmutable = true;
 
         // Variables declared with `let` are always immutable.
         if (varDeclRef.is<LetDecl>())
-            isLValue = false;
+            isImmutable = true;
 
         // Generic value parameters are always immutable
         if (isGenericValueParam(varDeclRef))
-            isLValue = false;
+            isImmutable = true;
 
         // An explicit `readonly` or `writeonly` qualifier still restricts parameter uses in
         // compatibility mode. The parser keeps these modifiers on the underlying parameter,
@@ -1766,22 +1764,23 @@ QualType getTypeForDeclRef(
         if (auto shadow = as<UniformParameterShadowVarDecl>(declForMemoryQualifier))
             declForMemoryQualifier = shadow->uniformParameter;
 
-        bool isWriteOnly = false;
         if (auto collection = declForMemoryQualifier->findModifier<MemoryQualifierSetModifier>())
         {
             if (collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kReadOnly)
             {
-                isLValue = false;
-                qualType.hasReadOnlyOnTarget = true;
+                isImmutable = true;
+                info.hasReadOnlyOnTarget = true;
             }
             if (collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kWriteOnly)
-                isWriteOnly = true;
+                info.isWriteOnly = true;
         }
 
-        qualType.isLeftValue = isLValue;
-        qualType.isReadOnlyMemoryLocation = isReadOnlyMemoryLocation;
-        qualType.isWriteOnly = isWriteOnly;
-        return qualType;
+        if (isImmutable && info.canWrite())
+        {
+            info.valueCategory = ExprValueCategory::Value;
+            info.access = ExprAccess::ReadOnly;
+        }
+        return info;
     }
     else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
     {
@@ -1789,60 +1788,56 @@ QualType getTypeForDeclRef(
         // access to a variable/field, except that it
         // is mediated through accessors (getters, seters, etc.).
 
-        QualType qualType;
-        qualType.type = getType(astBuilder, propertyDeclRef);
-
-        bool isLValue = false;
-
-        // If the property has any declared accessors that
-        // can be used to set the property, then the resulting
-        // expression behaves as an l-value.
+        // If the property has any declared accessors that can be used to set the property,
+        // then the resulting expression is a writable storage location. It is a memory
+        // location only if it has a ref accessor, which yields the address of the value.
         //
-        if (propertyDeclRef.getDecl()->getMembersOfType<SetterDecl>().isNonEmpty())
-            isLValue = true;
-        if (propertyDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>().isNonEmpty())
-            isLValue = true;
-
-        qualType.isLeftValue = isLValue;
-        return qualType;
+        ExprInfo info(getType(astBuilder, propertyDeclRef));
+        bool hasRefAccessor =
+            propertyDeclRef.getDecl()->getMembersOfType<RefAccessorDecl>().isNonEmpty();
+        if (hasRefAccessor ||
+            propertyDeclRef.getDecl()->getMembersOfType<SetterDecl>().isNonEmpty())
+        {
+            info.valueCategory = hasRefAccessor ? ExprValueCategory::MemoryLocation
+                                                : ExprValueCategory::StorageLocation;
+            info.access = ExprAccess::ReadWrite;
+        }
+        return info;
     }
     else if (auto enumCaseDeclRef = declRef.as<EnumCaseDecl>())
     {
         sema->ensureDecl(declRef.declRefBase, DeclCheckState::DefinitionChecked);
-        QualType qualType;
-        qualType.type = getType(astBuilder, enumCaseDeclRef);
-        qualType.isLeftValue = false;
-        return qualType;
+        return ExprInfo(getType(astBuilder, enumCaseDeclRef));
     }
     else if (auto typeAliasDeclRef = declRef.as<TypeDefDecl>())
     {
         auto type = getNamedType(astBuilder, typeAliasDeclRef);
         *outTypeResult = type;
-        return QualType(astBuilder->getTypeType(type));
+        return ExprInfo(astBuilder->getTypeType(type));
     }
     else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
     {
         auto type = DeclRefType::create(astBuilder, aggTypeDeclRef);
         *outTypeResult = type;
-        return QualType(astBuilder->getTypeType(type));
+        return ExprInfo(astBuilder->getTypeType(type));
     }
     else if (auto simpleTypeDeclRef = declRef.as<SimpleTypeDecl>())
     {
         auto type = DeclRefType::create(astBuilder, simpleTypeDeclRef);
         *outTypeResult = type;
-        return QualType(astBuilder->getTypeType(type));
+        return ExprInfo(astBuilder->getTypeType(type));
     }
     else if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
         auto type = getGenericDeclRefType(astBuilder, genericDeclRef);
         *outTypeResult = type;
-        return QualType(astBuilder->getTypeType(type));
+        return ExprInfo(astBuilder->getTypeType(type));
     }
     else if (auto funcDeclRef = declRef.as<CallableDecl>())
     {
         if (hasDirectFuncType(funcDeclRef))
         {
-            return QualType(
+            return ExprInfo(
                 as<Type>(funcDeclRef.getDecl()
                              ->funcType.type->substitute(astBuilder, SubstitutionSet(declRef))
                              ->resolve()));
@@ -1850,7 +1845,7 @@ QualType getTypeForDeclRef(
         else
         {
             auto type = getFuncType(astBuilder, funcDeclRef);
-            return QualType(type);
+            return ExprInfo(type);
         }
     }
     else if (auto constraintDeclRef = declRef.as<TypeConstraintDecl>())
@@ -1859,12 +1854,12 @@ QualType getTypeForDeclRef(
         // we are conceptually performing a "cast" to the given super-type,
         // with the declaration showing that such a cast is legal.
         auto type = getSup(astBuilder, constraintDeclRef);
-        return QualType(type);
+        return ExprInfo(type);
     }
     else if (auto namespaceDeclRef = declRef.as<NamespaceDeclBase>())
     {
         auto type = getNamespaceType(astBuilder, namespaceDeclRef);
-        return QualType(type);
+        return ExprInfo(type);
     }
     if (sink)
     {
@@ -1888,10 +1883,10 @@ QualType getTypeForDeclRef(
         sink->diagnose(
             Diagnostics::UndefinedIdentifier{.name = declRef.getName(), .location = loc});
     }
-    return QualType(astBuilder->getErrorType());
+    return ExprInfo(astBuilder->getErrorType());
 }
 
-QualType getTypeForDeclRef(ASTBuilder* astBuilder, DeclRef<Decl> declRef, SourceLoc loc)
+ExprInfo getTypeForDeclRef(ASTBuilder* astBuilder, DeclRef<Decl> declRef, SourceLoc loc)
 {
     Type* typeResult = nullptr;
     return getTypeForDeclRef(astBuilder, nullptr, nullptr, declRef, &typeResult, loc);
@@ -3632,7 +3627,7 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     else
     {
         auto* defaultCall = visitor->getASTBuilder()->create<DefaultConstructExpr>();
-        defaultCall->type = QualType(varDecl->type);
+        defaultCall->type = ExprInfo(varDecl->type);
         return defaultCall;
     }
 }
@@ -3985,7 +3980,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         overloadContext.args = &argExprs;
 
         auto type = varDecl->getType();
-        ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
+        ImplicitCastMethodKey key = ImplicitCastMethodKey(ExprInfo(), type, nullptr);
         auto ctorMethod = getShared()->tryGetImplicitCastMethod(key);
         if (ctorMethod)
         {
@@ -7326,8 +7321,9 @@ static void _configureSynthesizedEffectiveThisParam(
         addModifier(callableDecl, noDiffThisModifier);
     }
 
-    thisExpr->type.isLeftValue =
-        isThisExprWritable(makeDeclRef(callableDecl).as<CallableDecl>(), paramInfo);
+    auto thisInfo = getExprInfoOfThisExpr(makeDeclRef(callableDecl).as<CallableDecl>(), paramInfo);
+    thisExpr->type.valueCategory = thisInfo.valueCategory;
+    thisExpr->type.access = thisInfo.access;
 }
 
 static void populateParams(
@@ -7351,9 +7347,7 @@ static void populateParams(
         // Create an expression that references the parameter for use in arguments.
         auto synArg = astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(paramDecl);
-        synArg->type.type = paramInfo.type;
-        synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
-        synArg->type.isReadOnlyMemoryLocation = paramInfo.mode == ParamPassingMode::RefReadOnly;
+        synArg->type = getExprInfoOfParamReference(paramInfo.type, paramInfo.mode);
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
@@ -7726,7 +7720,8 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         }
         else
         {
-            synThis->type.isLeftValue = true;
+            synThis->type.valueCategory = ExprValueCategory::MemoryLocation;
+            synThis->type.access = ExprAccess::ReadWrite;
         }
     }
 
@@ -7829,7 +7824,6 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
     for (auto paramDeclRef : getParameters(m_astBuilder, requirement))
     {
         auto paramInfo = getParamInfo(m_astBuilder, paramDeclRef);
-        auto paramType = QualType(paramInfo.type);
 
         // For each parameter of the requirement, we create a matching
         // parameter (same name and type) for the synthesized method.
@@ -7843,12 +7837,21 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         //
         synthesized->addMember(synParamDecl);
 
-        // The parameter variable itself is usable as an l-value except when it is an immutable
-        // borrow. This expression property describes uses inside the wrapper body; its ABI remains
-        // the independently stored `paramInfo.mode`.
-        paramType.isLeftValue = true;
-        if (paramInfo.mode == ParamPassingMode::BorrowIn)
-            paramType.isLeftValue = false;
+        // The wrapper forwards each of its parameters to the candidate member, and the check
+        // of the synthesized call below compares the passing modes of the two parameters with
+        // `matchParamDirection`. That check reports a mismatch such as a `__ref` member for a
+        // `__ref_readonly` requirement, so a use of the parameter in the wrapper body is a
+        // read-write memory location for every mode but an immutable borrow; the call then
+        // type-checks and the mismatch is reported as one. This expression property describes
+        // uses inside the wrapper body; its ABI remains the independently stored
+        // `paramInfo.mode`.
+        auto paramType =
+            paramInfo.mode == ParamPassingMode::BorrowIn
+                ? ExprInfo(paramInfo.type)
+                : ExprInfo(
+                      paramInfo.type,
+                      ExprValueCategory::MemoryLocation,
+                      ExprAccess::ReadWrite);
 
         // The synthesized declaration's passing mode is copied above, but a `groupshared`
         // parameter also requires its argument to be thread-group-shared memory. The wrapper
@@ -7877,8 +7880,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
                 auto synMemberExpr = m_astBuilder->create<SwizzleExpr>();
                 synMemberExpr->base = synArg;
                 synMemberExpr->elementIndices.add((uint32_t)i);
-                synMemberExpr->type = elementType;
-                synMemberExpr->type.isLeftValue = paramType.isLeftValue;
+                synMemberExpr->type = paramType.withType(elementType);
                 synMemberExpr->checked = true;
                 synArgs.add(synMemberExpr);
             }
@@ -8983,8 +8985,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             //
             auto synArg = m_astBuilder->create<VarExpr>();
             synArg->declRef = makeDeclRef(synParamDecl);
-            synArg->type.type = paramInfo.type;
-            synArg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(paramInfo.mode);
+            synArg->type = getExprInfoOfParamReference(paramInfo.type, paramInfo.mode);
             synArgs.add(synArg);
         }
 
@@ -13746,7 +13747,7 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
 
             IntegerLiteralExpr* tagValExpr = m_astBuilder->create<IntegerLiteralExpr>();
             tagValExpr->loc = caseDecl->loc;
-            tagValExpr->type = QualType(tagType);
+            tagValExpr->type = ExprInfo(tagType);
             tagValExpr->value = defaultTag;
             caseDecl->tagExpr = tagValExpr;
             caseDecl->tagVal = m_astBuilder->getIntVal(enumType, defaultTag);
@@ -15333,7 +15334,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
         // TODO(tfoley): Rather than actually changing the modifiers
         // on the parameter itself, this kind of logic should probably
-        // be folded into whatever logic computes the `QualType` for a
+        // be folded into whatever logic computes the `ExprInfo` for a
         // parameter, and ensure that parameter packs are never treated
         // as l-values.
         //
@@ -15536,7 +15537,7 @@ AssignExpr* SemanticsDeclBodyVisitor::createMemberAssignmentExpr(
     memberExpr->name = member->getName();
     memberExpr->type = GetTypeForDeclRef(member->getDefaultDeclRef(), member->loc);
 
-    if (!memberExpr->type.isLeftValue)
+    if (!memberExpr->type.isWritableStorageLocation())
         return nullptr;
 
     auto assign = m_astBuilder->create<AssignExpr>();
@@ -16779,7 +16780,7 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
                 auto typeExpr = getCurrentASTBuilder()->create<SharedTypeExpr>();
                 typeExpr->loc = decl->loc;
                 typeExpr->base.type = funcAsLookupType;
-                typeExpr->type = QualType(getCurrentASTBuilder()->getTypeType(funcAsLookupType));
+                typeExpr->type = ExprInfo(getCurrentASTBuilder()->getTypeType(funcAsLookupType));
 
                 constraintDecl->sub.type = funcAsLookupType;
                 constraintDecl->sub.exp = typeExpr;
@@ -16827,7 +16828,7 @@ void SemanticsDeclHeaderVisitor::checkCallableConstraints(CallableDecl* decl)
 
             typeExpr->loc = decl->loc;
             typeExpr->base.type = lookupFuncDeclRefType;
-            typeExpr->type = QualType(m_astBuilder->getTypeType(lookupFuncDeclRefType));
+            typeExpr->type = ExprInfo(m_astBuilder->getTypeType(lookupFuncDeclRefType));
 
             genericTypeConstraint->sub.exp = typeExpr;
         }
@@ -17781,11 +17782,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     {
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        auto paramMode = getParamPassingMode(param);
-        arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
-                                paramMode == ParamPassingMode::BorrowInOut ||
-                                isByReferenceParamPassingMode(paramMode);
-        arg->type.type = param->getType();
+        arg->type = getExprInfoOfParamReference(param->getType(), getParamPassingMode(param));
         arg->loc = decl->loc;
         fakeArgs.add(arg);
     }
@@ -17810,10 +17807,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 auto thisArg = astBuilder->create<VarExpr>();
                 auto [thisArgType, thisArgDirection] = getParamInfoFromTypeWithModeWrapper(
                     applyFuncType->getParamTypeWithModeWrapper(0));
-                thisArg->type.type = thisArgType;
-                thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
-                                            thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            isByReferenceParamPassingMode(thisArgDirection);
+                thisArg->type = getExprInfoOfParamReference(thisArgType, thisArgDirection);
                 thisArg->loc = decl->loc;
                 fakeArgs.insert(0, thisArg);
             }
@@ -18935,7 +18929,7 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
     return extDeclRef;
 }
 
-QualType SemanticsVisitor::GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc)
+ExprInfo SemanticsVisitor::GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc)
 {
     Type* typeResult = nullptr;
     return getTypeForDeclRef(m_astBuilder, this, getSink(), declRef, &typeResult, loc);
@@ -20526,10 +20520,10 @@ void checkDerivativeAttributeImpl(
     // If left value is true, then convert the
     // inner type to an BorrowInOutParamType.
     //
-    auto qualTypeToString = [&](QualType qualType) -> String
+    auto qualTypeToString = [&](ExprInfo qualType) -> String
     {
         Type* type = qualType.type;
-        if (qualType.isLeftValue)
+        if (qualType.isWritableStorageLocation())
         {
             type = ctx.getASTBuilder()->getBorrowInOutParamType(type);
         }
@@ -20781,8 +20775,7 @@ ArgsWithDirectionInfo getImaginaryArgsToFunc(
         auto direction = getParamPassingMode(param);
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        arg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(direction);
-        arg->type.type = param->getType();
+        arg->type = getExprInfoOfParamReference(param->getType(), direction);
         arg->loc = loc;
         imaginaryArguments.add(arg);
         directions.add(direction);
@@ -20807,9 +20800,7 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
         {
             thisArgExpr = astBuilder->create<VarExpr>();
             thisTypeDirection = getDifferentiatedThisParamMode(thisParamInfo->mode);
-            thisArgExpr->type.type = pairType;
-            thisArgExpr->type.isLeftValue =
-                doesParamPassingModeIndicateWritableStorage(thisTypeDirection);
+            thisArgExpr->type = getExprInfoOfParamReference(pairType, thisTypeDirection);
             thisArgExpr->loc = loc;
         }
     }
@@ -20826,8 +20817,7 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
         auto direction = getParamPassingMode(param);
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        arg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(direction);
-        arg->type.type = paramType;
+        arg->type = getExprInfoOfParamReference(paramType, direction);
         arg->loc = loc;
         if (!param->findModifier<NoDiffModifier>())
         {
@@ -20875,8 +20865,8 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
             if (as<DifferentialPairType>(pairType) && thisTypeDirection == ParamPassingMode::In)
                 thisTypeDirection = ParamPassingMode::BorrowInOut;
 
-            thisArgExpr->type.isLeftValue =
-                doesParamPassingModeIndicateWritableStorage(thisTypeDirection);
+            thisArgExpr->type =
+                getExprInfoOfParamReference(thisArgExpr->type.type, thisTypeDirection);
             thisArgExpr->loc = loc;
         }
     }
@@ -20896,8 +20886,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
         bool isOutParam = direction == ParamPassingMode::Out;
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        arg->type.isLeftValue = doesParamPassingModeIndicateWritableStorage(direction);
-        arg->type.type = paramType;
+        arg->type = getExprInfoOfParamReference(paramType, direction);
         arg->loc = loc;
 
         bool isDiffParam = (!param->findModifier<NoDiffModifier>());
@@ -20906,16 +20895,15 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
             auto diffPair = visitor->tryGetDifferentialPairType(paramType);
             if (auto pairType = as<DifferentialPairType>(diffPair))
             {
-                arg->type.type = pairType;
-                arg->type.isLeftValue = true;
+                arg->type =
+                    ExprInfo(pairType, ExprValueCategory::MemoryLocation, ExprAccess::ReadWrite);
 
                 if (isOutParam)
                 {
                     // out T : IDifferentiable -> in T.Differential
-                    arg->type.isLeftValue = false;
-                    arg->type.type = visitor->tryGetDifferentialType(
+                    arg->type = ExprInfo(visitor->tryGetDifferentialType(
                         visitor->getASTBuilder(),
-                        pairType->getPrimalType());
+                        pairType->getPrimalType()));
 
                     direction = ParamPassingMode::In;
                 }
@@ -20957,8 +20945,7 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
     if (auto diffReturnType = visitor->tryGetDifferentialType(astBuilder, returnType))
     {
         auto arg = astBuilder->create<InitializerListExpr>();
-        arg->type.isLeftValue = false;
-        arg->type.type = diffReturnType;
+        arg->type = ExprInfo(diffReturnType);
         arg->loc = loc;
         imaginaryArguments.add(arg);
         expectedParamDirections.add(ParamPassingMode::In);
@@ -21979,7 +21966,7 @@ bool SemanticsDeclAttributesVisitor::collectInitializableMembers(
                 continue;
 
             auto type = GetTypeForDeclRef(varDeclRef, varDecl->loc);
-            if (!type.isLeftValue)
+            if (!type.isWritableStorageLocation())
                 continue;
 
             resultMembers.add(varDecl);
@@ -22273,7 +22260,7 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             // whereas a `DefaultConstructExpr` emits `= {}` only for CPP/CUDA and would not
             // zero the scalar on HLSL-class backends.
             auto zeroBackingInit = m_astBuilder->create<IntegerLiteralExpr>();
-            zeroBackingInit->type = QualType(backingMember->type.type);
+            zeroBackingInit->type = ExprInfo(backingMember->type.type);
             zeroBackingInit->value = 0;
             zeroBackingInit->loc = structDecl->loc;
             backingMember->initExpr = zeroBackingInit;

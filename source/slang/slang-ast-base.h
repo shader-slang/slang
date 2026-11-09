@@ -816,7 +816,7 @@ class Expr : public SyntaxNode
 {
     FIDDLE(...)
 
-    FIDDLE() QualType type;
+    FIDDLE() ExprInfo type;
 
     bool checked = false;
 };

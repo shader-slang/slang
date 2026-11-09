@@ -36,7 +36,7 @@ FIDDLE() namespace Slang
     class SyntaxNode;
 
     class Decl;
-    struct QualType;
+    struct ExprInfo;
     class Type;
     struct TypeExp;
     class Val;
@@ -57,7 +57,7 @@ FIDDLE() namespace Slang
     void printDiagnosticArg(StringBuilder & sb, Decl * decl);
     void printDiagnosticArg(StringBuilder & sb, Type * type);
     void printDiagnosticArg(StringBuilder & sb, TypeExp const& type);
-    void printDiagnosticArg(StringBuilder & sb, QualType const& type);
+    void printDiagnosticArg(StringBuilder & sb, ExprInfo const& type);
     void printDiagnosticArg(StringBuilder & sb, Val * val);
     void printDiagnosticArg(StringBuilder & sb, DeclRefBase * declRefBase);
     void printDiagnosticArg(StringBuilder & sb, ASTNodeType nodeType);
@@ -633,46 +633,104 @@ FIDDLE() namespace Slang
 
     void removeModifier(ModifiableSyntaxNode * syntax, Modifier * modifier);
 
+    /// What a checked expression denotes: a value, or a place that holds one.
+    enum class ExprValueCategory : uint8_t
+    {
+        /// A pure value (an r-value), such as `a + b` or the result of most calls. It names no
+        /// storage, so it cannot be assigned or bound to an `out`, `inout`, or `__ref`
+        /// parameter.
+        Value,
+
+        /// An abstract storage location that is not known to be a memory location, such as a
+        /// reference to a `property`, or a vector swizzle like `v.xz` whose elements are not
+        /// adjacent. It can be read or written through its accessors, but it has no address.
+        StorageLocation,
+
+        /// A memory location, such as a variable, a field of one, or a `__ref` parameter. Every
+        /// memory location is also a storage location.
+        MemoryLocation,
+    };
+
+    /// The operations that a checked expression permits on the value or place it denotes.
+    enum class ExprAccess : uint8_t
+    {
+        ReadOnly,
+        WriteOnly,
+        ReadWrite,
+    };
+
+    /// The facts that semantic checking knows about a checked expression: its type, its value
+    /// category, and the access it permits.
+    ///
+    /// Consider this example:
+    ///
+    /// ```
+    /// void f(inout int4 v, __ref_readonly int r)
+    /// {
+    ///     v.xy;  // a read-write memory location
+    ///     v.xz;  // a read-write storage location, because `x` and `z` are not adjacent
+    ///     v.xx;  // a read-only pure value, because it repeats an element
+    ///     r;     // a read-only memory location
+    ///     r + 1; // a read-only pure value
+    /// }
+    /// ```
+    ///
+    /// Consumers derive what they need from these facts. An assignment target must be a
+    /// writable storage location, and an argument for a `__ref` parameter must be a memory
+    /// location.
     FIDDLE()
-    struct QualType
+    struct ExprInfo
     {
         FIDDLE(...)
 
         FIDDLE() Type* type = nullptr;
-        FIDDLE() bool isLeftValue = false;
+        FIDDLE() ExprValueCategory valueCategory = ExprValueCategory::Value;
+        FIDDLE() ExprAccess access = ExprAccess::ReadOnly;
+
+        /// The expression denotes storage declared with the GLSL `readonly` memory qualifier.
         FIDDLE() bool hasReadOnlyOnTarget = false;
 
         /// The expression denotes storage declared with the GLSL `writeonly` memory qualifier.
         FIDDLE() bool isWriteOnly = false;
 
-        /// The expression denotes a memory location that it cannot write, such as a
-        /// `__ref_readonly` parameter, or a field or element of one. A `__constref` parameter is
-        /// not one, because a borrow may be a temporary holding the argument's value. It is never
-        /// set together with `isLeftValue`, which means a writable abstract storage location
-        /// (a property with a setter is one, but not a memory location). Together the two
-        /// flags play the role of C++'s modifiable and non-modifiable l-values, so an argument
-        /// for a `__ref_readonly` parameter may be either.
-        ///
-        /// TODO: This flag combines two properties of an expression that we want to record
-        /// independently: its value category (a pure value, an abstract storage location such
-        /// as a `property` reference, or a memory location) and the access it permits
-        /// (read-only, write-only, or read-write). `isLeftValue` and `isWriteOnly` each encode
-        /// part of the same two properties. We expect `QualType` to become an `ExprInfo` that
-        /// stores the value category and the access as separate fields. We added only this flag
-        /// because restructuring `QualType` is a larger change than adding `__ref_readonly`
-        /// needs.
-        FIDDLE() bool isReadOnlyMemoryLocation = false;
+        ExprInfo() = default;
 
-        QualType() = default;
-
-        QualType(Type* type);
-
-        QualType(Type* type, bool isLVal)
-            : QualType(type)
+        /// Make the info of a read-only pure value of type `type`.
+        ExprInfo(Type* type)
+            : type(type)
         {
-            isLeftValue = isLVal;
         }
 
+        /// Make the info of an expression of type `type` with the given value category and
+        /// access. A pure value is always read-only, because there is no storage to write.
+        ExprInfo(Type* type, ExprValueCategory valueCategory, ExprAccess access)
+            : type(type), valueCategory(valueCategory), access(access)
+        {
+            SLANG_ASSERT(
+                valueCategory != ExprValueCategory::Value || access == ExprAccess::ReadOnly);
+        }
+
+        /// Returns whether the expression names storage, either an abstract storage location
+        /// or a memory location.
+        bool isStorageLocation() const { return valueCategory != ExprValueCategory::Value; }
+
+        bool isMemoryLocation() const { return valueCategory == ExprValueCategory::MemoryLocation; }
+
+        bool canRead() const { return access != ExprAccess::WriteOnly; }
+
+        bool canWrite() const { return access != ExprAccess::ReadOnly; }
+
+        /// Returns whether the expression names storage that it may write, as an assignment
+        /// target or an argument for an `out` or `inout` parameter must.
+        bool isWritableStorageLocation() const { return isStorageLocation() && canWrite(); }
+
+        /// Returns these facts for a value of type `newType` instead of `type`.
+        ExprInfo withType(Type* newType) const
+        {
+            ExprInfo result = *this;
+            result.type = newType;
+            return result;
+        }
 
         Type* Ptr() { return type; }
 
@@ -680,6 +738,12 @@ FIDDLE() namespace Slang
         Type* operator->() { return type; }
         explicit operator bool() const { return type != nullptr; }
     };
+
+    class ExplicitRefType;
+
+    /// Get the info of the place that a reference of type `refType` refers to, such as the
+    /// read-only memory location of type `T` for a `Ref<T, Access.Read>`.
+    ExprInfo getExprInfoOfRefTarget(ExplicitRefType * refType);
 
     class ASTBuilder;
 
@@ -2016,6 +2080,110 @@ FIDDLE() namespace Slang
 
         default:
             SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(false);
+        }
+    }
+
+    /// Get the info of a reference, inside a function body, to a modern-style parameter of type
+    /// `type` and passing mode `mode`.
+    ///
+    /// Consider this example:
+    ///
+    /// ```
+    /// func f(a : int, b : inout int, c : __ref_readonly int) { ... }
+    /// ```
+    ///
+    /// In the body of `f`, `a` is a read-only pure value, `b` is a read-write memory location,
+    /// and `c` is a read-only memory location. A legacy-style `in` parameter differs, because it
+    /// is a mutable local copy; `getTypeForDeclRef` handles that case.
+    inline ExprInfo getExprInfoOfParamReference(Type * type, ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+            return ExprInfo(type);
+
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::RefReadWrite:
+            return ExprInfo(type, ExprValueCategory::MemoryLocation, ExprAccess::ReadWrite);
+
+        case ParamPassingMode::RefWriteOnly:
+            return ExprInfo(type, ExprValueCategory::MemoryLocation, ExprAccess::WriteOnly);
+
+        case ParamPassingMode::RefReadOnly:
+            return ExprInfo(type, ExprValueCategory::MemoryLocation, ExprAccess::ReadOnly);
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(ExprInfo(type));
+        }
+    }
+
+    /// Get the info that an argument with info `argInfo` has as a parameter of mode `mode`
+    /// binds it.
+    ///
+    /// An `out`, `inout`, or `__ref` parameter binds the argument's storage, so the argument
+    /// keeps its own info. An `in` or borrow parameter receives a copy of the argument's value,
+    /// so the argument is bound as a read-only pure value. Overload resolution uses the result
+    /// to charge for a conversion that must be written back to the argument after the call.
+    inline ExprInfo getExprInfoOfArgBoundToParam(ExprInfo const& argInfo, ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::In:
+        case ParamPassingMode::BorrowIn:
+            return ExprInfo(argInfo.type);
+
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            return argInfo;
+
+        default:
+            SLANG_UNEXPECTED("unhandled parameter-passing mode");
+            UNREACHABLE_RETURN(ExprInfo(argInfo.type));
+        }
+    }
+
+    /// Return whether an argument with info `argInfo` can be passed to a parameter with mode
+    /// `mode` that binds the argument's storage.
+    ///
+    /// An `out` or `inout` parameter writes its result back to the argument, so the argument
+    /// must be a storage location the caller can write. A reference parameter refers to the
+    /// argument's storage directly, so the argument must be a memory location, which the caller
+    /// can write unless the parameter is `__ref_readonly`. Reading an argument that the caller
+    /// cannot read, such as a `__ref_writeonly` parameter passed to `__ref`, is a separate
+    /// error that the check for reads of write-only storage reports. Consider this example,
+    /// where `v` is a read-write memory location of type `int4`:
+    ///
+    /// ```
+    /// void rw2(__ref int2 x);
+    /// void io2(inout int2 x);
+    ///
+    /// io2(v.xz); // allowed: `v.xz` is a read-write storage location
+    /// rw2(v.xz); // rejected: `v.xz` has no single address
+    /// rw2(v.yz); // allowed: `v.yz` is a read-write memory location
+    /// ```
+    inline bool canArgBeBoundToStorageParam(ExprInfo const& argInfo, ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::Out:
+        case ParamPassingMode::BorrowInOut:
+            return argInfo.isWritableStorageLocation();
+
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefWriteOnly:
+            return argInfo.isMemoryLocation() && argInfo.canWrite();
+        case ParamPassingMode::RefReadOnly:
+            return argInfo.isMemoryLocation();
+
+        default:
+            SLANG_UNEXPECTED("parameter-passing mode does not bind storage");
             UNREACHABLE_RETURN(false);
         }
     }

@@ -359,29 +359,29 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     // trailing), so an explicit list shorter than this under-fills a required
     // parameter, while one no longer than `paramTypes.getCount()` can have the
     // remainder filled from defaults.
-    List<QualType> paramTypes;
+    List<OverloadParam> paramTypes;
     Index requiredCount = 0;
     for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
     {
         if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
         {
-            paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
+            paramTypes.add(OverloadParam{DeclRefType::create(m_astBuilder, typeParamRef)});
             if (!typeParamRef.getDecl()->initType.type)
                 requiredCount = paramTypes.getCount();
         }
         else if (auto valPackParam = memberRef.as<GenericValuePackParamDecl>())
         {
-            paramTypes.add(getType(m_astBuilder, valPackParam));
+            paramTypes.add(OverloadParam{getType(m_astBuilder, valPackParam)});
         }
         else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
         {
-            paramTypes.add(getType(m_astBuilder, valParamRef));
+            paramTypes.add(OverloadParam{getType(m_astBuilder, valParamRef)});
             if (!valParamRef.getDecl()->initExpr)
                 requiredCount = paramTypes.getCount();
         }
         else if (auto typePackParam = memberRef.as<GenericTypePackParamDecl>())
         {
-            paramTypes.add(DeclRefType::create(m_astBuilder, typePackParam));
+            paramTypes.add(OverloadParam{DeclRefType::create(m_astBuilder, typePackParam)});
         }
     }
 
@@ -757,54 +757,33 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     return success;
 }
 
-static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> param)
+static SemanticsVisitor::OverloadParam getOverloadParam(
+    ASTBuilder* astBuilder,
+    DeclRef<ParamDecl> param)
 {
-    auto paramType = getType(astBuilder, param);
-    bool isLVal = false;
-    switch (getParamPassingMode(param.getDecl()))
-    {
-    case ParamPassingMode::BorrowInOut:
-    case ParamPassingMode::Out:
-    case ParamPassingMode::RefReadWrite:
-    case ParamPassingMode::RefReadOnly:
-    case ParamPassingMode::RefWriteOnly:
-        isLVal = true;
-        break;
-    }
-    return QualType(paramType, isLVal);
+    SemanticsVisitor::OverloadParam result;
+    result.type = getType(astBuilder, param);
+    result.mode = getParamPassingMode(param.getDecl());
+    return result;
 }
 
-static QualType getParamQualType(Type* paramType)
+static SemanticsVisitor::OverloadParam getOverloadParam(Type* paramTypeWithModeWrapper)
 {
-    // TODO(tfoley): This function probably shouldn't exist, and instead
-    // the accessors for the parameters of a `FuncType` should
-    // directly return a `QualType` for each parameter rather than
-    // a plain `Type` that potentially includes a wrapping
-    // `ParamPassingModeType`.
-    //
-    // In addition, the determination of what value category a reference
-    // to a parameter should be (and thus what the `QualType` sould be)
-    // should be driven by computing the `ParamPassingMode` first,
-    // and then using the direction to determine the value category
-    // (so as to isolate the code that needs to care about the wrapper
-    // types to just the computation of the dirction).
-    //
-    // Note the large amount of duplication between this function and
-    // the other `getParamQualType()` above.
-    //
-    bool isLVal = false;
-    Type* valueType = paramType;
-    if (auto paramDirType = as<ParamPassingModeType>(paramType))
-    {
-        valueType = unwrapModifiedType(paramDirType->getValueType());
-        if (as<BorrowInOutParamType>(paramDirType))
-            isLVal = true;
-        if (as<OutParamType>(paramDirType))
-            isLVal = true;
-        if (as<RefParamTypeBase>(paramDirType))
-            isLVal = true;
-    }
-    return QualType(unwrapModifiedType(valueType), isLVal);
+    auto paramInfo = getParamInfoFromTypeWithModeWrapper(paramTypeWithModeWrapper);
+
+    SemanticsVisitor::OverloadParam result;
+    result.type = unwrapModifiedType(paramInfo.type);
+    result.mode = paramInfo.mode;
+    return result;
+}
+
+/// Get the info of an argument `argExpr` whose type, as overload resolution sees it, is
+/// `argType`. The type can differ from the expression's, for example when modifiers are
+/// unwrapped for inference, so only the expression's value category and access are kept.
+/// An argument without an expression, such as one given only by its type, is a pure value.
+static ExprInfo getExprInfoOfOverloadArg(Expr* argExpr, Type* argType)
+{
+    return argExpr ? argExpr->type.withType(argType) : ExprInfo(argType);
 }
 
 bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
@@ -813,7 +792,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
 {
     Index argCount = context.getArgCount();
 
-    List<QualType> paramTypes;
+    List<OverloadParam> params;
     List<DeclRef<ParamDecl>> paramDecls;
     switch (candidate.flavor)
     {
@@ -823,7 +802,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                  candidate.item.declRef.as<CallableDecl>()))
         {
             paramDecls.add(param);
-            paramTypes.add(getParamQualType(m_astBuilder, param));
+            params.add(getOverloadParam(m_astBuilder, param));
         }
         break;
 
@@ -832,10 +811,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             auto funcType = candidate.funcType;
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
-            {
-                auto paramType = getParamQualType(funcType->getParamTypeWithModeWrapper(i));
-                paramTypes.add(paramType);
-            }
+                params.add(getOverloadParam(funcType->getParamTypeWithModeWrapper(i)));
         }
         break;
 
@@ -881,20 +857,21 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     // mismatch) has its own dedicated diagnostics; recording it here would
     // produce a confusing "expected 'T', got 'T'" note that names only the bare
     // types.
-    auto recordArgMismatch = [&](QualType paramType, QualType argType)
+    auto recordArgMismatch = [&](Type* paramType, Type* argType)
     {
-        if (candidate.argMismatchArgIndex < 0 && paramType.type && argType.type &&
-            !paramType.type->equals(argType.type))
+        if (candidate.argMismatchArgIndex < 0 && paramType && argType &&
+            !paramType->equals(argType))
         {
             candidate.argMismatchArgIndex = argIndex - 1;
-            candidate.argMismatchExpectedType = paramType.type;
-            candidate.argMismatchActualType = argType.type;
+            candidate.argMismatchExpectedType = paramType;
+            candidate.argMismatchActualType = argType;
         }
     };
 
-    auto coerceArgToParam = [&](Arg arg, QualType paramType) -> Arg
+    auto coerceArgToParam = [&](Arg arg, OverloadParam param) -> Arg
     {
-        auto argType = QualType(arg.type, paramType.isLeftValue);
+        auto paramType = param.type;
+        auto argType = arg.type;
         if (!paramType)
             return {nullptr, nullptr};
         if (!argType)
@@ -911,7 +888,13 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     return {nullptr, nullptr};
                 }
             }
-            else if (!canCoerce(paramType, argType, arg.argExpr, &cost))
+            else if (!canCoerce(
+                         paramType,
+                         getExprInfoOfArgBoundToParam(
+                             getExprInfoOfOverloadArg(arg.argExpr, argType),
+                             param.mode),
+                         arg.argExpr,
+                         &cost))
             {
                 recordArgMismatch(paramType, argType);
                 return {nullptr, nullptr};
@@ -923,8 +906,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
             // Check if concrete-to-interface coercion caused loss of l-valueness.
-            if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
-                !isInterfaceType(arg.type) && isInterfaceType(paramType.type))
+            if (coercedExpr && !coercedExpr->type.isWritableStorageLocation() &&
+                doesParamPassingModeIndicateWritableStorage(param.mode) &&
+                !isInterfaceType(arg.type) && isInterfaceType(paramType))
             {
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
@@ -940,7 +924,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
                         .paramName = name,
                         .argType = arg.type,
-                        .paramType = paramType.type,
+                        .paramType = paramType,
                         .location = context.loc});
                 }
                 return {nullptr, nullptr};
@@ -951,18 +935,18 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     };
     ShortList<Expr*> resultArgs;
 
-    while (paramIndex < paramTypes.getCount())
+    while (paramIndex < params.getCount())
     {
-        auto paramType = paramTypes[paramIndex];
-        if (auto paramTypePack = as<ConcreteTypePack>(paramType))
+        auto param = params[paramIndex];
+        if (auto paramTypePack = as<ConcreteTypePack>(param.type))
         {
             ShortList<Expr*> innerArgs;
             for (Index i = 0; i < paramTypePack->getTypeCount(); i++)
             {
                 auto arg = readArg();
-                auto coercedArg = coerceArgToParam(
-                    arg,
-                    QualType(paramTypePack->getElementType(i), paramType.isLeftValue));
+                OverloadParam elementParam = param;
+                elementParam.type = paramTypePack->getElementType(i);
+                auto coercedArg = coerceArgToParam(arg, elementParam);
                 if (!coercedArg.type)
                 {
                     return false;
@@ -975,7 +959,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                 auto packArg = m_astBuilder->create<PackExpr>();
                 for (auto aa : innerArgs)
                     packArg->args.add(aa);
-                packArg->type = paramType;
+                packArg->type = param.type;
                 resultArgs.add(packArg);
             }
 
@@ -994,7 +978,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                 // the number of arguments was correct in `TryCheckOverloadCandidateArity`.
                 break;
             }
-            auto coercedArg = coerceArgToParam(arg, paramType);
+            auto coercedArg = coerceArgToParam(arg, param);
             if (!coercedArg.type)
             {
                 return false;
@@ -1090,7 +1074,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     {
         if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
-            if (context.baseExpr && !context.baseExpr->type.isLeftValue)
+            if (context.baseExpr && !context.baseExpr->type.isWritableStorageLocation())
             {
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
                 {
@@ -1676,13 +1660,25 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 if (IsErrorExpr(baseExpr))
                     return CreateErrorExpr(callExpr);
 
-                callExpr->type = QualType(candidate.resultType);
+                callExpr->type = ExprInfo(candidate.resultType);
 
                 // A call may yield an l-value, and we should take a look at the candidate to be
                 // sure
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
                     const auto& decl = subscriptDeclRef.getDecl();
+
+                    // A writable subscript call is an abstract storage location. A ref
+                    // accessor yields the address of the element, so with one the call is a
+                    // memory location.
+                    const bool hasRefAccessor =
+                        decl->getMembersOfType<RefAccessorDecl>().isNonEmpty();
+                    const ExprInfo writableInfo(
+                        candidate.resultType,
+                        hasRefAccessor ? ExprValueCategory::MemoryLocation
+                                       : ExprValueCategory::StorageLocation,
+                        ExprAccess::ReadWrite);
+
                     for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
                         if (as<SetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
@@ -1703,14 +1699,14 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                                         AccessQualifier(accessQualifier->getValue()) ==
                                             AccessQualifier::ReadWrite)
                                     {
-                                        callExpr->type.isLeftValue = true;
+                                        callExpr->type = writableInfo;
                                     }
                                     break;
                                 }
 
-                                if (base->type.isLeftValue)
+                                if (base->type.isWritableStorageLocation())
                                 {
-                                    callExpr->type.isLeftValue = true;
+                                    callExpr->type = writableInfo;
                                     break;
                                 }
                             }
@@ -1722,7 +1718,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             if (thisParamInfo &&
                                 !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
                             {
-                                callExpr->type.isLeftValue = true;
+                                callExpr->type = writableInfo;
                                 break;
                             }
                         }
@@ -1748,7 +1744,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 }
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
-                callExpr->type = QualType(candidate.resultType);
+                callExpr->type = ExprInfo(candidate.resultType);
                 callExpr->functionExpr = candidate.exprVal;
                 return callExpr;
             }
@@ -2783,13 +2779,11 @@ void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
                 auto varExpr = m_astBuilder->create<VarExpr>();
                 varExpr->declRef = varDecl;
                 varExpr->type = expr->type.type;
-                varExpr->type.isLeftValue = false;
                 for (Index i = 0; i < typePack->getTypeCount(); i++)
                 {
                     auto expandedArg = m_astBuilder->create<SwizzleExpr>();
                     expandedArg->base = varExpr;
                     expandedArg->type = typePack->getElementType(i);
-                    expandedArg->type.isLeftValue = false;
                     expandedArg->elementIndices.add((uint32_t)i);
                     result.add(expandedArg);
                 }
@@ -2806,7 +2800,7 @@ void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
 
 bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     SemanticsVisitor* semantics,
-    const List<QualType>& params,
+    const List<OverloadParam>& params,
     bool computeTypes,
     ShortList<MatchedArg>& outMatchedArgs)
 {
@@ -2914,7 +2908,7 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
     OverloadResolveContext& context,
     ArrayView<Val*> providedOrdinaryArgs,
     ConversionCost& outBaseCost,
-    List<QualType>* innerParameterTypes,
+    List<OverloadParam>* innerParameterTypes,
     GenericArgumentInferenceFailure* outFailure)
 {
     // The call site may have already provided some ordinary generic arguments,
@@ -2954,7 +2948,7 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         DeclRef<CallableDecl> funcDeclRef =
             m_astBuilder->getMemberDeclRef(genericDeclRef, innerCallableDecl);
 
-        List<QualType> paramTypes;
+        List<OverloadParam> paramTypes;
         if (!innerParameterTypes)
         {
             // Most callers let this routine compute parameter types from the
@@ -2963,7 +2957,7 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             auto params = getParametersForCallableSignature(m_astBuilder, funcDeclRef);
             for (auto param : params)
             {
-                paramTypes.add(getParamQualType(m_astBuilder, param));
+                paramTypes.add(getOverloadParam(m_astBuilder, param));
             }
             innerParameterTypes = &paramTypes;
         }
@@ -3019,17 +3013,18 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             // can still affect type coercion checks later on (post-generic-inference)
             //
             auto argType = unwrapModifiedType(matchedArgs[aa].argType);
-            auto paramType = (*innerParameterTypes)[aa];
+            auto param = (*innerParameterTypes)[aa];
+            auto argInfo = getExprInfoOfOverloadArg(matchedArgs[aa].argExpr, argType);
             auto canUnify = TryUnifyTypes(
                 inferenceContext,
                 UnificationOptions(),
-                QualType(argType, paramType.isLeftValue),
-                paramType);
+                getExprInfoOfArgBoundToParam(argInfo, param.mode),
+                ExprInfo(param.type));
 
             // A type-pack parameter has no later scalar coercion step that can
             // repair a failed pack unification, so fail immediately in that
             // case.
-            if (!canUnify && isTypePack(paramType))
+            if (!canUnify && isTypePack(param.type))
             {
                 return DeclRef<Decl>();
             }
@@ -3397,10 +3392,10 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
             SLANG_ASSERT(diffFuncType);
 
             // Extract parameter list from processed type.
-            List<QualType> paramTypes;
+            List<OverloadParam> paramTypes;
 
             for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
-                paramTypes.add(getParamQualType(diffFuncType->getParamTypeWithModeWrapper(ii)));
+                paramTypes.add(getOverloadParam(diffFuncType->getParamTypeWithModeWrapper(ii)));
 
             // Try to infer generic arguments, based on the updated context.
             OverloadResolveContext subContext = context;
@@ -3530,7 +3525,7 @@ bool SemanticsVisitor::findBinaryOperatorForCompoundAssignment(
         return false;
 
     // `x = x op y` needs `x` to be assignable; when it is not, that is the problem to fix.
-    if (!left->type.isLeftValue)
+    if (!left->type.isWritableStorageLocation())
         return false;
 
     // Build `x op y` from the checked operands, looking `op` up in the scope where `x op= y`
@@ -4106,7 +4101,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         }
     }
     getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
-    expr->type = QualType(m_astBuilder->getErrorType());
+    expr->type = ExprInfo(m_astBuilder->getErrorType());
     return expr;
 }
 
