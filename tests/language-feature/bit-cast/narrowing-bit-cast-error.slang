@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -emit-spirv-directly -stage compute -entry computeMain
 
 uniform StructuredBuffer<uint64_t> in;
 uniform RWStructuredBuffer<uint32_t> out;

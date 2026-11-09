@@ -8,6 +8,7 @@ struct IRBuilder;
 struct IRCloneEnv;
 struct IRInst;
 struct IRModule;
+enum class CodeGenTarget;
 
 struct GlobalInstInliningContextGeneric
 {
@@ -48,7 +49,13 @@ struct GlobalInstInliningContextGeneric
 // For global constant values that are resource typed or struct containing resource types,
 // we need to inline their uses to concrete function bodies so they can be legalized during
 // resource legalization.
-void inlineGlobalConstantsForLegalization(IRModule* module);
+//
+// Module-scope calls to member-wise synthesized constructors are first folded into
+// `makeStruct`, so that a `static const` struct table can stay a global constant.
+//
+// For CUDA, a global constant whose type contains `half` is also inlined, because CUDA
+// emits a `half` literal as a constructor call, which is a dynamic initializer.
+void inlineGlobalConstantsForLegalization(IRModule* module, CodeGenTarget target);
 
 
 } // namespace Slang

@@ -10,6 +10,17 @@ slangc -h
 # To generate this file
 slangc -help-style markdown -h
 ```
+
+```
+Exit codes:
+  0   Success.
+  1   The command line was invalid, or the tool failed to run.
+  -1  The compilation failed because of errors in the input.
+  -2  The compiler hit an unexpected failure: an internal compiler error, an
+      assertion, an exception or an abort. This is a bug in the compiler.
+Where the exit status has only 8 bits (for example on Linux and macOS), -1 is
+reported as 255 and -2 as 254.
+```
 ### Quick Links
 
 * [General](#general)
@@ -1012,6 +1023,11 @@ Enable experimental compiler passes
 Enable additional backwards-compatibility features for legacy HLSL inputs. See the user guide's HLSL backwards compatibility section for the supported behavior. 
 
 
+<a id="fhlsl-methods-mutating-by-default"></a>
+### -fhlsl-methods-mutating-by-default
+Use `inout` for the implicit `this` parameter of HLSL methods by default. Has no effect on Slang or GLSL inputs. 
+
+
 <a id="enable-experimental-dynamic-dispatch"></a>
 ### -enable-experimental-dynamic-dispatch
 Enable experimental dynamic dispatch features 
@@ -1431,49 +1447,6 @@ A capability describes an optional feature that a target may or may not support.
 * `domain` 
 * `geometry` 
 * `dispatch` 
-* `SPV_EXT_fragment_shader_interlock` : enables the SPV_EXT_fragment_shader_interlock extension 
-* `SPV_EXT_physical_storage_buffer` : enables the SPV_EXT_physical_storage_buffer extension 
-* `SPV_KHR_physical_storage_buffer` : enables the SPV_KHR_physical_storage_buffer extension 
-* `SPV_EXT_fragment_fully_covered` : enables the SPV_EXT_fragment_fully_covered extension 
-* `SPV_EXT_descriptor_indexing` : enables the SPV_EXT_descriptor_indexing extension 
-* `SPV_EXT_shader_atomic_float_add` : enables the SPV_EXT_shader_atomic_float_add extension 
-* `SPV_EXT_shader_atomic_float16_add` : enables the SPV_EXT_shader_atomic_float16_add extension 
-* `SPV_EXT_shader_atomic_float_min_max` : enables the SPV_EXT_shader_atomic_float_min_max extension 
-* `SPV_EXT_mesh_shader` : enables the SPV_EXT_mesh_shader extension 
-* `SPV_EXT_demote_to_helper_invocation` : enables the SPV_EXT_demote_to_helper_invocation extension 
-* `SPV_KHR_maximal_reconvergence` : enables the SPV_KHR_maximal_reconvergence extension 
-* `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
-* `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
-* `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
-* `SPV_KHR_abort` : enables the SPV_KHR_abort extension 
-* `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
-* `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
-* `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
-* `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
-* `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
-* `SPV_KHR_shader_clock` : enables the SPV_KHR_shader_clock extension 
-* `SPV_NV_shader_subgroup_partitioned` : enables the SPV_NV_shader_subgroup_partitioned extension 
-* `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
-* `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
-* `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
-* `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
-* `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
-* `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
-* `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
-* `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
-* `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
-* `SPV_EXT_replicated_composites` : enables the SPV_EXT_replicated_composites extension 
-* `SPV_KHR_vulkan_memory_model` : enables the SPV_KHR_vulkan_memory_model extension 
-* `SPV_NV_cooperative_vector` : enables the SPV_NV_cooperative_vector extension 
-* `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
-* `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
-* `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
-* `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
-* `SPV_EXT_float8` : enables the SPV_EXT_float8 extension 
-* `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
-* `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
-* `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
-* `SPV_EXT_shader_64bit_indexing` : enables the SPV_EXT_shader_64bit_indexing extension 
 * `spvAbort` 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
@@ -1489,6 +1462,13 @@ A capability describes an optional feature that a target may or may not support.
 * `spvSparseResidency` 
 * `spvImageFootprintNV` 
 * `spvMinLod` 
+* `spvVariablePointersKHR` 
+* `spvSubgroupRotateKHR` 
+* `spvComputeShaderDerivativesKHR` 
+* `spvUserTypeGOOGLE` 
+* `spvPhysicalStorageBufferEXT` 
+* `spvPhysicalStorageBufferKHR` 
+* `spvNonSemanticInfoKHR` 
 * `spvFloat8EXT` 
 * `spvBFloat16KHR` 
 * `spvFragmentShaderPixelInterlockEXT` 
@@ -1597,7 +1577,6 @@ A capability describes an optional feature that a target may or may not support.
 * `glsl_spirv` 
 * `glsl_spirv_wgsl` 
 * `hlsl_spirv` 
-* `SPV_NV_compute_shader_derivatives` : enables the SPV_NV_compute_shader_derivatives extension 
 * `spvShaderInvocationReorderMotionNV` 
 * `spvShaderInvocationReorderMotionEXT` 
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
@@ -1711,6 +1690,7 @@ A capability describes an optional feature that a target may or may not support.
 * `closesthit` 
 * `callable` 
 * `miss` 
+* `portable_raytracing_call_shader` 
 * `mesh` 
 * `task` 
 * `amplification` 
@@ -1721,6 +1701,8 @@ A capability describes an optional feature that a target may or may not support.
 * `anyhit_closesthit` 
 * `anyhit_intersection` 
 * `raygen_closesthit_miss` 
+* `portable_raytracing_trace` 
+* `portable_raytracing_instance_motion` 
 * `anyhit_closesthit_intersection` 
 * `anyhit_closesthit_intersection_miss` 
 * `raygen_closesthit_miss_callable` 

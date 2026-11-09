@@ -1095,6 +1095,20 @@ err(
 )
 
 err(
+    "structural-ray-tracing-stage-runtime-value",
+    20025,
+    "runtime use of a structural ray-tracing stage type",
+    span { loc = "location", message = "structural ray-tracing stage type '~type:type' has no runtime representation" }
+)
+
+err(
+    "structural-ray-tracing-input-storage",
+    20026,
+    "storage of a structural ray-tracing stage input",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' may only be used as an 'in' parameter or an initialized local copy" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -2883,6 +2897,13 @@ err(
 )
 
 err(
+    "unknown-builtin-name",
+    31166,
+    "unknown builtin name",
+    span { loc = "location", message = "unknown builtin name '~name'" }
+)
+
+err(
     "non-positive-num-threads",
     31102,
     "invalid 'numthreads' value",
@@ -4371,6 +4392,16 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Attached to "no overload for 'op=' applicable" when the binary operator `op` applies to the
+-- same arguments and its result converts to the left operand's type: Slang does not derive a
+-- compound assignment from the binary operator (issue #14038).
+standalone_note(
+    "compound-assignment-binary-operator-applies",
+    40026,
+    "'~binaryOp:String' applies to these arguments, but '~compoundOp:String' is not derived from it: declare 'operator~compoundOp' with an 'inout' first parameter, or write 'x = x ~binaryOp y'",
+    span { loc = "location" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,
@@ -4576,6 +4607,56 @@ err(
     "no stage specified for entry point",
     span { loc = "location", message = "no stage specified for entry point '~entryPoint'; use either a '[shader(\"name\")]' function attribute or the '-stage <name>' command-line option to specify a stage" }
 )
+
+err(
+    "structural-ray-tracing-entry-point-not-stage",
+    38058,
+    "invalid structural ray-tracing entry point",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement an executable structural ray-tracing stage interface" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-stage-mismatch",
+    38093,
+    "structural ray-tracing entry point stage mismatch",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement the selected '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-stage",
+    38055,
+    "ambiguous structural ray-tracing entry point stage",
+    span { loc = "stageType:Decl", message = "struct '~stageType' implements more than one executable ray-tracing stage; use '-stage <name>' to select one" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-implementation",
+    38092,
+    "ambiguous structural ray-tracing stage implementation",
+    span { loc = "stageType:Decl", message = "struct '~stageType' has multiple 'invoke' implementations for the '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-input-in-native-entry-point",
+    38057,
+    "invalid native entry point signature",
+    span { loc = "location", message = "structural ray-tracing input type '~type:Type' cannot be used in a native entry point signature" }
+)
+
+err(
+    "structural-ray-tracing-stage-implementation-must-be-struct",
+    38091,
+    "invalid structural ray-tracing stage implementation",
+    span { loc = "location", message = "structural ray-tracing stage implementation '~stageType:Type' must be declared as a struct" }
+)
+
+err(
+    "duplicate-structural-ray-tracing-entry",
+    38074,
+    "duplicate structural ray-tracing entry",
+    span { loc = "location", message = "~section entry '~entry:Type' is listed more than once in schema '~schema:Type'" }
+)
+
 
 err(
     "specialization-parameter-of-name-not-specialized",

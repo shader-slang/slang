@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 068f9d82ffea81ef7eb8f39d8eeafe61acfc014329bee9f4e8206d02f37891c9
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 54044eb3a9d484849c1128c33d7651a3aea9a35572b9f63732a574fb1e3db24d
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -105,9 +105,9 @@ Where each root is documented:
 | [declarations.md](declarations.md) | `Decl`, `DeclBase` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) | ~65 |
 | [expressions.md](expressions.md) | `Expr` | [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h) | ~95 |
 | [statements.md](statements.md) | `Stmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) | ~30 |
-| [types.md](types.md) | `Type` (itself a `Val`) | [slang-ast-type.h](../../../../source/slang/slang-ast-type.h) | ~120 |
-| [values.md](values.md) | `Val` (non-`Type`) | [slang-ast-val.h](../../../../source/slang/slang-ast-val.h) | ~65 |
-| [modifiers.md](modifiers.md) | `Modifier` (incl. `AttributeBase`) | [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h) | ~265 |
+| [types.md](types.md) | `Type` (itself a `Val`) | [slang-ast-type.h](../../../../source/slang/slang-ast-type.h) | ~125 |
+| [values.md](values.md) | `Val` (non-`Type`) | [slang-ast-val.h](../../../../source/slang/slang-ast-val.h) | ~60 |
+| [modifiers.md](modifiers.md) | `Modifier` (incl. `AttributeBase`) | [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h) | ~270 |
 
 Each count is the number of `FIDDLE()`-declared concrete classes in that
 owning header at the `source_commit` in this file's front-matter, rounded

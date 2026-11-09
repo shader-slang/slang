@@ -399,9 +399,28 @@ static void reportCheckpointIntermediates(
 
 struct LinkingAndOptimizationOptions
 {
+    // Run existential and resource type legalization. It is false when the downstream
+    // compiler (C/C++, NVRTC, or LLVM) handles those types.
     bool shouldLegalizeExistentialAndResourceTypes = true;
+
+    // The target can emit a global constant's initializer. If it is false, global
+    // constants are inlined. Set it with `canTargetEmitGlobalInitializers`.
+    bool targetCanEmitGlobalInitializer = true;
+
     CLikeSourceEmitter* sourceEmitter = nullptr;
 };
+
+// Return true if the target can emit a global constant's initializer. It returns false for:
+// - CUDA: NVRTC rejects dynamic initialization of a `__device__` variable.
+// - CPU in kernel mode: a global constant can use global shader parameters, which
+//   cannot be emitted as constants. Host-style CPU targets do not have this problem.
+static bool canTargetEmitGlobalInitializers(CodeGenContext* codeGenContext)
+{
+    auto target = codeGenContext->getTargetFormat();
+    bool isUnsupported = target == CodeGenTarget::CUDASource ||
+                         (isCPUTarget(codeGenContext->getTargetReq()) && isKernelTarget(target));
+    return !isUnsupported;
+}
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
 // on the instructions we see.
@@ -792,6 +811,68 @@ static void unexportNonEmbeddableIR(IRModule* irModule, CodeGenTarget target)
                 {
                     dec->removeAndDeallocate();
                 }
+            }
+        }
+    }
+}
+
+// Insert a `metalTextureFence` before and after every write to a texture that Metal declares
+// `access::read_write`.
+//
+// MSL makes a thread's write to an `access::read_write` texture visible to that thread's
+// later reads of the texture only after a `fence()` on it (MSL 4.1 section 6.13.17); HLSL,
+// SPIR-V and WGSL order these accesses implicitly. The fence after each write is that
+// specified requirement. The fence before each write is not in section 6.13.17: it keeps the
+// write from moving ahead of an earlier read of the same texel, a write-after-read failure that
+// Dawn observed on Apple M1 hardware while it already fenced after every write
+// (crbug.com/417296309).
+//
+// The pass sees every texture write because Metal texture stores in the core module lower to
+// `ImageStore` or to a texture atomic, never to an `__intrinsic_asm` string, and because it runs
+// after `legalizeImageSubscript` has turned a partial texel store such as `tex[p].x = 1` into a
+// read followed by an `ImageStore`. A write-only texture is emitted as `access::write`, which has
+// no `fence()` and cannot be read back.
+static void insertMetalTextureFences(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getModifiableChildren())
+            {
+                // Texture atomics other than loads also store to their texel, so they count as
+                // writes along with `ImageStore`.
+                IRInst* texture = nullptr;
+                IRImageSubscript* atomicSubscript = nullptr;
+                if (auto imageStore = as<IRImageStore>(inst))
+                    texture = imageStore->getImage();
+                else if (auto atomic = as<IRAtomicOperation>(inst);
+                         atomic && !as<IRAtomicLoad>(inst))
+                {
+                    atomicSubscript = getAtomicImageSubscript(atomic);
+                    if (atomicSubscript)
+                        texture = atomicSubscript->getImage();
+                }
+                if (!texture)
+                    continue;
+                auto textureType = as<IRTextureTypeBase>(texture->getDataType());
+                SLANG_RELEASE_ASSERT(textureType);
+                if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
+                    continue;
+
+                // A texture atomic is emitted together with its `ImageSubscript` address, so its
+                // leading fence goes before that address rather than between the two.
+                builder.setInsertBefore(atomicSubscript ? atomicSubscript : inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
+
+                builder.setInsertAfter(inst);
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_MetalTextureFence, 1, &texture);
             }
         }
     }
@@ -1964,18 +2045,10 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(legalizeVectorTypes, sink);
 
-    // For CUDA targets, always inline global constants to avoid dynamic initialization
-    // of __device__ variables rejected by NVRTC. This runs independently of the broader
-    // resource/existential type legalization, which remains disabled for CUDA.
-    //
-    // We also need this pass on the CPU targets in shader mode, as global
-    // constants may reference global parameters, which can't be emitted as
-    // constants.
-    if (target == CodeGenTarget::CUDASource ||
-        (isCPUTarget(targetRequest) && isKernelTarget(target)) ||
-        options.shouldLegalizeExistentialAndResourceTypes)
+    if (options.shouldLegalizeExistentialAndResourceTypes ||
+        !options.targetCanEmitGlobalInitializer)
     {
-        SLANG_PASS(inlineGlobalConstantsForLegalization);
+        SLANG_PASS(inlineGlobalConstantsForLegalization, target);
     }
 
     // We don't need the legalize pass for C/C++ based types
@@ -2213,7 +2286,7 @@ Result linkAndOptimizeIR(
         // Depending on the target, we may decide to do
         // more aggressive translation that reduces the
         // load/store operations down to invididual scalars
-        // (splitting up vector ops).
+        // (splitting up vector and array ops).
         //
         switch (target)
         {
@@ -2222,8 +2295,9 @@ Result linkAndOptimizeIR(
             {
                 // We need to scalarize the loads on LLVM CPU targets, as
                 // ByteAddressBuffer loads & stores may only have an alignment
-                // of 4, meaning that vector loads / stores could be misaligned
-                // and cause crashes with SSE, AVX etc. SIMD instruction sets.
+                // of 4, meaning that vector or array loads / stores could be
+                // misaligned and cause crashes with SSE, AVX etc. SIMD
+                // instruction sets.
                 byteAddressBufferOptions.scalarizeVectorLoadStore = true;
             }
             break;
@@ -2470,7 +2544,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
-    // Legalize `ImageSubscript` loads.
+    // Legalize `ImageSubscript` loads and stores.
     switch (target)
     {
     case CodeGenTarget::MetalLibAssembly:
@@ -2481,6 +2555,11 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRVAssembly:
         {
             SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
+
+            // On Metal, the texture fences go in afterwards,
+            // since the read-modify-writes that `legalizeImageSubscript` creates need them too.
+            if (isMetalTarget(targetRequest))
+                SLANG_PASS(insertMetalTextureFences);
         }
         break;
     default:
@@ -3096,6 +3175,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         LinkingAndOptimizationOptions linkingAndOptimizationOptions;
 
         linkingAndOptimizationOptions.sourceEmitter = sourceEmitter;
+        linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+            canTargetEmitGlobalInitializers(this);
 
         switch (sourceLanguage)
         {
@@ -3874,6 +3955,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
     linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    linkingAndOptimizationOptions.targetCanEmitGlobalInitializer =
+        canTargetEmitGlobalInitializers(codeGenContext);
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 

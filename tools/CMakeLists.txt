@@ -118,6 +118,7 @@ generator(slang-embed)
 generator(slang-generate-monolithic-standard-module-library)
 generator(slang-core-module-cache)
 generator(slang-generate USE_FEWER_WARNINGS)
+
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-spirv-embed-generator LINK_WITH_PRIVATE compiler-core)
@@ -362,7 +363,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+    add_dependencies(
+        slang-test
+        slang-neural-module
+        slang-portable-raytracing-module
+        slang-workgraph-module
+    )
     add_dependencies(slang-test slang-numerics-modules)
 
     set_property(

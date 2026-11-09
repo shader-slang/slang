@@ -36,13 +36,14 @@ class LabelStmt : public Stmt
     FIDDLE() Stmt* innerStmt;
 };
 
-// The simplest kind of scope statement: just a `{...}` block
+// A lexical block, written with braces or implicit in an HLSL control-flow body.
 FIDDLE()
 class BlockStmt : public ScopeStmt
 {
     FIDDLE(...)
     /// TODO(JS): Having ranges of sourcelocs might be a good addition to AST nodes in general.
-    SourceLoc closingSourceLoc; ///< The source location of the closing brace
+    /// The closing brace, or the next token after a body with an implicit block scope.
+    SourceLoc closingSourceLoc;
 
     FIDDLE() Stmt* body = nullptr;
 };
