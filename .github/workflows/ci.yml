@@ -326,6 +326,22 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
 
+  # Release coverage for the same tests. A release build compiles out SLANG_ASSERT and enables
+  # optimizations, which a debug build cannot check.
+  static-linux-release-gcc-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+
   static-macos-debug-clang-aarch64:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -352,6 +368,34 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
+      runs-on: '["windows-2022"]'
+
+  static-macos-release-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+
+  static-windows-release-cl-x86_64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
       runs-on: '["windows-2022"]'
 
   # Windows builds (self-hosted)
@@ -920,6 +964,9 @@ jobs:
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
         static-linux-debug-gcc-aarch64,
+        static-linux-release-gcc-aarch64,
+        static-macos-release-clang-aarch64,
+        static-windows-release-cl-x86_64,
         static-macos-debug-clang-aarch64,
         static-windows-debug-cl-x86_64,
         test-windows-release-cl-x86_64-gpu,
