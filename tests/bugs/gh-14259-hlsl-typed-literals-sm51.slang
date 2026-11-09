@@ -15,6 +15,10 @@
 //TEST:SIMPLE(filecheck=DXBC):-target dxbc-assembly -entry computeMain -stage compute -profile cs_5_1
 //TEST:SIMPLE(filecheck=DXBCDIV):-target dxbc-assembly -entry computeMain -stage compute -profile cs_5_1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H23):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H25):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H26):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H27):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA], stride=4):out,name=output
@@ -120,4 +124,111 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // BUF-NEXT: FF800000
     // BUF-NEXT: {{[7F]F[C-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]}}
     // BUF-NEXT: AAAAAAAA
+    // Each Hn lane checks `half` word n on its own, so one run reports every `half` mismatch even
+    // when an earlier word fails. Words 24 and 28 are never written.
+    // H23: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: {{[0-9A-F]+}}
+    // H23-NEXT: 477FE000
+    // H25: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: {{[0-9A-F]+}}
+    // H25-NEXT: 7F800000
+    // H26: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: {{[0-9A-F]+}}
+    // H26-NEXT: FF800000
+    // H27: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[0-9A-F]+}}
+    // H27-NEXT: {{[7F]F[C-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]}}
 }
