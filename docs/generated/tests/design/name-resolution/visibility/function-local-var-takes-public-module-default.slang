@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#defaults-by-language-version
-//META: doc_section_digest=c379bb058f7b82877b61882f1b415d5c5814f8262a30cc7e4db473cf77aaab6e
+//META: doc_section_digest=f3a6042185df9067ba5bb4f98e85b57b0d4b871f2819527ab4a27a2cd9500936
 //META: purpose=Nothing in the visibility fall-back chain is conditioned on membership, so a function-local VarDecl in a `public module` takes the `public` default and a local whose type is `internal` is rejected with use-of-less-visible-type (E30604).
 //META: intent=negative
 //META: pipeline_stage=check

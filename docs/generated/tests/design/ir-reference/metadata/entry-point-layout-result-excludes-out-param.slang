@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#varlayout-and-entrypointlayout
-//META: doc_section_digest=a05fb260f7d47ee1abd511a8a11324bf04dda1c08576336dd8e39bd0213adba4
+//META: doc_section_digest=5cbe87346946724d08129ff2f93252193d7269b1f14a4dffa311d86ced5d988b
 //META: purpose=An EntryPointLayout's result layout covers only the return value, so an out parameter is laid out in the parameters layout instead.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
+//META: model=claude-sonnet-5-5
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#vm
-//META: doc_section_digest=3b6fb1cbe9c8a2b4b01aaf52a471708c8e3aacefa39368dec68f464717d7ccde
+//META: doc_section_digest=28fbfadd0c1d3fb05d731111f2b9fcbbd0a88edd7de1c77813ea07b4283d0a9a
 //META: purpose=The VM bytecode emitter detects any function that references a global shader parameter and reports the interpreter-unsupported diagnostic once per parameter instead of handing back malformed bytecode.
 //META: intent=negative
 //META: pipeline_stage=emit
@@ -17,7 +17,7 @@
 // code E52013 and then CHECK-NOT forbids a second occurrence. The non-zero
 // result code confirms the emitter returned a failure rather than continuing.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 RWStructuredBuffer<float> inputs;
 

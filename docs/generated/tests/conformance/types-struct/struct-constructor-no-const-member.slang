@@ -13,7 +13,7 @@
 // The diagnostic test compiles HasConst whose __init tries to write `c`; CHECK-DAG
 // asserts the compiler emits an E30011 l-value error.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 struct HasConst
 {

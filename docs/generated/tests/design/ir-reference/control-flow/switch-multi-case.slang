@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-switches
-//META: doc_section_digest=8cd18c4acb5c23465732d94445db3874f3f31fc0b0c4cc5c089482214037eeb6
+//META: doc_section_digest=4f92d597f0ab99ac7a5bb1f36c4e428d75a654eb5563d9d14d56b9d5fbda6ec7
 //META: purpose=A switch statement lowers to switch(value, breakLabel, defaultLabel, caseVal1, caseBlock1, ...) — scrutinee, break label, default label, then (caseValue, caseBlock) pairs.
 //META: intent=functional
 //META: pipeline_stage=lower

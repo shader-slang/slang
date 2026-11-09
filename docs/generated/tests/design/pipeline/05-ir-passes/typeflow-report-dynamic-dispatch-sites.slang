@@ -3,7 +3,7 @@
 //META: generated_at=2026-11-02T14:19:54+00:00
 //META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#specialization-and-generics
-//META: doc_section_digest=ad41019b62f65b8926fb421c96faf20ade0eadeccc6562a5b0ee3bfcf86755bd
+//META: doc_section_digest=40b8147969c5ae28bced29b8f878d348a9ab8fbecb2e6e6b023518b00ca90017
 //META: purpose=The type-flow specialization pass emits no code of its own; its one direct user surface is the dynamic-dispatch-site report, which names each call site it could not resolve statically.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

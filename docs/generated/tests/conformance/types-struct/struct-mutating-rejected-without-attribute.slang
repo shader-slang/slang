@@ -12,7 +12,7 @@
 // Verifies that writing to a non-static member field in a non-`[mutating]` function is rejected.
 // badWrite() assigns to `a` without the attribute; CHECK-DAG asserts E30011 (l-value) fires.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 struct TestStruct
 {

@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=65f08914985a50130a091e887bcde6c389181de7e60c13d0a4a79ec5ce135cba
+//META: doc_section_digest=b1a772cd52d2040f30154ab240611958fb152ee42151e424dc0b33db4c29e97f
 //META: purpose=Boundary: a standalone ConsumeStructuredBuffer survives HLSL emit with `.Consume()` method intact.
 //META: intent=boundary
 //META: pipeline_stage=emit
