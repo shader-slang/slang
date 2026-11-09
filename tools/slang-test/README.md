@@ -131,7 +131,7 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 
 ### Exit code of tests
 
-A `SIMPLE`, `INTERPRET` or `REFLECTION` test with the `filecheck=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines. The test fails if the exit code is not the expected one. The expected exit code is 0 by default.
+A `SIMPLE`, `INTERPRET` or `REFLECTION` test checks the exit code of the tool, in addition to its output. This is true for tests with the `filecheck=PREFIX` option, tests with the `diag=PREFIX` option and tests that compare the output with an `.expected` file. The test fails if the exit code is not the expected one. The expected exit code is 0 by default.
 
 A test that must fail sets the expected exit code with the `exit-code=N` option:
 
@@ -146,7 +146,11 @@ The common exit codes of `slangc` are:
 
 A test with an expected failure should also have a `CHECK` line for the diagnostic that it wants to see, for example `// CHECK: error[E30015]`. Without it, the test can pass for an unrelated error. A `CHECK-NOT` line alone cannot detect a failed compilation, because the error output does not contain the text that it rejects. Use the diagnostic code, such as `E36107`, and not only the word `error`. The word `error` is also part of the header `standard error` in the FileCheck input.
 
-The `diag=PREFIX` option of `DIAGNOSTIC_TEST` does not check the exit code yet (#14266). See [diagnostics](../../docs/diagnostics.md).
+The exception is a test with the `diag=PREFIX` option (see [diagnostics](../../docs/diagnostics.md)): its expected exit code is `-1` by default, because a diagnostic test usually checks an error. A diagnostic test that has only warnings must say `exit-code=0`:
+
+```
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
+```
 
 ## Language server tests
 

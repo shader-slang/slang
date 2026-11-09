@@ -116,6 +116,7 @@ Test files can verify expected diagnostics using inline annotations. The test ru
 Options:
 - `diag=PREFIX` - Use PREFIX for annotation comments (e.g., `CHECK`)
 - `non-exhaustive` - Only check annotated diagnostics (default: all diagnostics must be annotated)
+- `exit-code=N` - Expected exit code of the tool (default: `-1`, a failed compilation). A test that has only warnings uses `exit-code=0`. A command-line error returns `1`.
 
 ## Annotation Syntax
 

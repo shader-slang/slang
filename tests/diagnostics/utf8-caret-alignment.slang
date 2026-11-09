@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(exit-code=-1):-target hlsl -stage compute -entry computeMain
 
 // Regression test for https://github.com/shader-slang/slang/issues/5219
 // The caret/underline in rich diagnostics must be positioned and sized by the

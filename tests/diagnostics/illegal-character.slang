@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(exit-code=-1):
 // illegal character
 
 `

@@ -11,7 +11,7 @@
 // caught from diagnostic-only output without ASAN/MSAN; the value-pinning
 // path through `-dump-ast` is a follow-up.
 
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(exit-code=-1):
 
 // (1) Top-of-loop bound check: `while (cursor < end)` exits before
 // trying to read the missing closing quote.

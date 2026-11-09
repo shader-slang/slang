@@ -8,6 +8,6 @@
 // The file intentionally ends mid-literal — there is no terminating
 // newline after the trailing `\\`. Do not let an editor add one.
 
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(exit-code=-1):
 
 String s = "abc\

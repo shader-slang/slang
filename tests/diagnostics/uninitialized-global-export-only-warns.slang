@@ -10,7 +10,7 @@
 // downstream pass (cpu/cuda/llvm), so the same E41017 is emitted several times; we assert the one
 // annotated caret, not the per-pass multiplicity.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cpp
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target cpp
 
 interface IThing
 {

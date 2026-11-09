@@ -3437,12 +3437,15 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
-/// Checks the exit code of the tool under test for a FileCheck test.
+/// Checks the exit code of the tool under test.
 ///
-/// A FileCheck test only looks at the text of the output, so it does not notice when the tool
-/// fails. A test that expects a failure says so with `exit-code=N`. Tests that compare with an
-/// `.expected` file already check the result code, because it is a part of the text they compare.
-/// Diagnostic tests (`diag=`) do not check it yet (#14266).
+/// A test that compares the output only as text does not notice when the tool fails, or when it
+/// does not fail. The expected exit code is 0 by default, and -1 (a failed compilation) for a
+/// diagnostic test (`diag=`), because a diagnostic test usually checks an error. A test that
+/// expects another value says so with `exit-code=N`, for example a diagnostic test that has only
+/// warnings uses `exit-code=0`, and a test that must fail uses `exit-code=-1`. The check applies
+/// to every test that calls this function: FileCheck tests, diagnostic tests and tests that
+/// compare with an `.expected` file.
 ///
 /// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
 /// exit code is not the expected one, after it reports the mismatch.
@@ -3455,14 +3458,11 @@ static bool _checkExpectedExitCode(
     outMismatch = false;
 
     String diagPrefix;
-    String fileCheckPrefix;
-    if (input.testOptions->getDiagTestPrefix(diagPrefix) ||
-        !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
-        return true;
+    const bool isDiagTest = input.testOptions->getDiagTestPrefix(diagPrefix);
 
     auto reporter = context->getTestReporter();
 
-    int expectedExitCode = 0;
+    int expectedExitCode = isDiagTest ? -1 : 0;
     String exitCodeOption;
     if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
     {
