@@ -3,12 +3,10 @@
 //TEST:SIMPLE: -experimental-feature -entry Stages.main.invoke -stage closesthit -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Stages.main.invoke -no-codegen
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry Stages.main -stage closesthit -dump-ir -no-codegen
-//TEST:SIMPLE(filecheck=METHOD): -experimental-feature -entry Stages.main.invoke -stage closesthit -dump-ir -no-codegen
 
-// Both spellings use the struct's checked `invoke` function as the entry point. The entry-point
-// decoration retains the requested source name.
-// IR: [entryPoint({{.*}}"Stages.main"
-// METHOD: [entryPoint({{.*}}"Stages.main.invoke"
+// Both spellings use the struct's checked `invoke` function as the entry point. Module lowering
+// does not mark entry points; a compile adds the entry-point decoration when it links the entry
+// points it selects.
 // The selected static method has exactly one parameter, input. No stage object is passed as this.
 // IR: [nameHint("Stages.main.invoke")]
 // IR-NEXT: func {{.*}} : Func(Void, specialize({{.*}}))
