@@ -6293,6 +6293,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return sb.produceString();
     }
 
+    // Report whether `func` is emitted as an `OpEntryPoint` in this compile. An execution mode
+    // targets an `OpEntryPoint`, and we emit one only for a function that carries
+    // `IREntryPointDecoration`. A function can carry an entry-point attribute and still be only a
+    // callee here. Consider an imported `[shader("compute")] [numthreads(32, 1, 1)] void k(...)`
+    // that the selected entry point calls: `k` keeps `IRNumThreadsDecoration` and any
+    // `[QuadDerivatives]` or `[MaximallyReconverges]` decoration, but it has no `OpEntryPoint`,
+    // so its execution-mode decorations do not apply to this compile.
+    static bool isEmittedAsEntryPoint(IRInst* func)
+    {
+        return func->findDecoration<IREntryPointDecoration>() != nullptr;
+    }
+
     /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and
     /// possible.
     ///
@@ -6533,13 +6545,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // [3.6. Execution Mode]: LocalSize
         case kIROp_NumThreadsDecoration:
             {
-                // `LocalSize` is an entry-point execution mode. A `[numthreads]` function that is
-                // only *called* (not selected as the entry point) reaches here as an ordinary
-                // callee still carrying `IRNumThreadsDecoration`; emitting an `OpExecutionMode`
-                // against its id would target a non-`OpEntryPoint` and produce invalid SPIR-V.
-                // We therefore emit the mode only when the parent is an entry point, as the
-                // sibling `OutputTopologyDecoration` case below does.
-                if (!decoration->getParent()->findDecoration<IREntryPointDecoration>())
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
                     break;
                 auto numThreads = cast<IRNumThreadsDecoration>(decoration);
                 if (numThreads->getXSpecConst() || numThreads->getYSpecConst() ||
@@ -6616,6 +6622,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_InstanceDecoration:
             {
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
+                    break;
                 auto decor = as<IRInstanceDecoration>(decoration);
                 auto count = int32_t(getIntVal(decor->getCount()));
                 requireSPIRVExecutionMode(
@@ -6635,6 +6643,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
+                    break;
                 for (auto inputDecor : decoration->getParent()->getDecorations())
                 {
                     switch (inputDecor->getOp())
@@ -6697,20 +6707,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             break;
         case kIROp_MaximallyReconvergesDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeMaximallyReconvergesKHR);
             break;
         case kIROp_QuadDerivativesDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
             requireSPIRVCapability(SpvCapabilityQuadControlKHR);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeQuadDerivativesKHR);
             break;
         case kIROp_RequireFullQuadsDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
             requireSPIRVCapability(SpvCapabilityQuadControlKHR);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeRequireFullQuadsKHR);
             break;
         case kIROp_Shader64BitIndexingDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_64bit_indexing"));
             requireSPIRVCapability(SpvCapabilityShader64BitIndexingEXT);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeShader64BitIndexingEXT);
