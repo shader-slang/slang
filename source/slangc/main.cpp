@@ -42,14 +42,16 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
         res = spCompile(compileRequest);
         // If the compilation failed, then get out of here...
         // Turn into an internal Result -> such that return code can be used to vary result to match
-        // previous behavior
-        res = SLANG_FAILED(res) ? SLANG_E_INTERNAL_FAIL : res;
+        // previous behavior. `SLANG_E_ABORT` is kept as it is, because it reports an internal
+        // compiler error, which has its own return code.
+        if (SLANG_FAILED(res) && res != SLANG_E_ABORT)
+            res = SLANG_E_INTERNAL_FAIL;
     }
 #ifndef _DEBUG
     catch (const Exception& e)
     {
         StdWriters::getOut().print("internal compiler error: %S\n", e.Message.toWString().begin());
-        res = SLANG_FAIL;
+        res = SLANG_E_ABORT;
     }
 #endif
 

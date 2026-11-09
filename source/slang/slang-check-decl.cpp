@@ -17,6 +17,7 @@
 #include "slang-ast-iterator.h"
 #include "slang-ast-print.h"
 #include "slang-ast-synthesis.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
@@ -799,8 +800,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
                                            public DeclVisitor<SemanticsDeclRedeclarationVisitor>
 {
-    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer)
-        : SemanticsDeclVisitorBase(outer)
+    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer, RedeclarationSeverity severity)
+        : SemanticsDeclVisitorBase(outer), m_severity(severity)
     {
     }
 
@@ -808,15 +809,17 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
 
 #define CASE(TYPE) \
-    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
+    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl, m_severity); }
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
-    CASE(VarDeclBase)
     CASE(SimpleTypeDecl)
     CASE(AggTypeDecl)
+    CASE(VarDeclBase)
 
 #undef CASE
+
+    RedeclarationSeverity m_severity;
 };
 
 
@@ -2091,6 +2094,20 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
             subContext = subContext.withOuterScope(outerScope);
         _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
+        // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
+        // the header visitor infers the type of `x` and marks `x` as `DefinitionChecked`. Of the
+        // skipped steps, only `ReadyForReference` compares `decl` with other declarations, so we
+        // still run it; without it, `int x; let x = 1;` would be accepted while
+        // `let x = 1; int x;` is not. Earlier compiler releases skipped it, so a conflict that it
+        // finds is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+        //
+        if (nextState < DeclCheckState::ReadyForReference &&
+            decl->checkState.getState() >= DeclCheckState::ReadyForReference)
+        {
+            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::Warning)
+                .dispatch(decl);
+        }
+
         // In the common case, the visitor will have done the necessary
         // checking, but will *not* have updated the `checkState` on
         // `decl`. In that case we will do the update here, to save
@@ -3081,6 +3098,12 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         validateArraySizeForVariable(varDecl);
     }
 
+    // Inferred variables and initialized unsized arrays finish here and skip body checking.
+    // Therefore, the body visitor will not check them for invalid RT builtin type use.
+    // Run that check here instead, now that their types and initializers are known.
+    if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
+        PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
+
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
 
@@ -3840,6 +3863,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         //
         OverloadResolveContext overloadContext;
         overloadContext.loc = varDecl->nameAndLoc.loc;
+        // The implicit call has no written callee. Attribute its constructor reference to the
+        // variable too, so diagnostics on the selected constructor have a source location.
+        overloadContext.funcLoc = varDecl->nameAndLoc.loc;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
         overloadContext.sourceScope = m_outerScope;
 
@@ -3918,6 +3944,10 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
+
+    // Check after initialization and type inference: `let copy = input` is valid, while
+    // `MissInput<C> fresh;` has no initializer and must be rejected.
+    PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -6744,7 +6774,8 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     Type* satisfyingType,
     DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    SourceLoc satisfyingDeclLoc)
 {
     if (auto declRefType = as<DeclRefType>(satisfyingType))
     {
@@ -6753,6 +6784,14 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
         if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
             return false;
     }
+
+    PortableRT::diagnoseDuplicateSchemaEntries(
+        getASTBuilder(),
+        getSink(),
+        satisfyingType,
+        requiredAssociatedTypeDeclRef.getDecl(),
+        witnessTable->witnessedType,
+        satisfyingDeclLoc);
 
     // Register the satisfying type to the witness table. Any constraints
     // written on this associated type are sibling interface requirements, and
@@ -6865,7 +6904,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                subAggTypeDeclRef.getDecl()->loc);
         }
     }
     else if (auto typedefDeclRef = memberDeclRef.as<TypeDefDecl>())
@@ -6880,7 +6920,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                typedefDeclRef.getDecl()->loc);
         }
     }
     else if (auto propertyDeclRef = memberDeclRef.as<PropertyDecl>())
@@ -11719,6 +11760,11 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
+    PortableRT::checkStageRestrictions(
+        this,
+        superInterfaceDeclRef,
+        witnessTable,
+        inheritanceDecl->loc);
     return witnessTable;
 }
 
@@ -14818,7 +14864,22 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
-Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
+bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl)
+{
+    auto newVarDecl = as<VarDecl>(newDecl);
+    if (!newVarDecl)
+        return false;
+    if (!newVarDecl->findModifier<HLSLForLoopInitializerAttribute>())
+        return false;
+    if (newDecl->parentDecl != oldDecl->parentDecl)
+        return false;
+    return isLocalVar(oldDecl);
+}
+
+Result SemanticsVisitor::checkRedeclaration(
+    Decl* newDecl,
+    Decl* oldDecl,
+    RedeclarationSeverity severity)
 {
     // If either of the declarations being looked at is generic, then
     // we want to consider the "inner" declaration instead when
@@ -14854,6 +14915,27 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
         return SLANG_OK;
     }
 
+    // We allow HLSL loop-initializer variables to shadow earlier locals. Lookup uses this same
+    // rule to omit an older candidate after finding a visible initializer of the same name.
+    if (isHLSLForLoopInitializerRedeclaration(newDecl, oldDecl))
+        return SLANG_OK;
+
+    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The alias `Mode` that the parser adds
+    // for the case conflicts with the enum, but lookup tells the type and the value apart by where
+    // the name is used, and DXC and earlier Slang releases accept the code, so we warn; Slang 202c
+    // may make it an error (shader-slang/slang#13956). The failure result stops the caller's loop,
+    // so a conflict with an older declaration is reported at the enum. The case is null when user
+    // code attaches the modifier through `syntax`.
+    if (auto aliasModifier = newDecl->findModifier<UnscopedEnumCaseAliasModifier>())
+    {
+        auto caseDecl = aliasModifier->enumCaseDecl;
+        if (caseDecl && caseDecl->parentDecl == oldDecl)
+        {
+            getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
+            return SLANG_FAIL;
+        }
+    }
+
 
     // For all other flavors of declaration, we do not
     // allow duplicate declarations with the same name.
@@ -14868,16 +14950,19 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     //   if their generic parameter lists are sufficient to
     //   tell them apart at a use site.
 
-    // We will diagnose a redeclaration error at the new declaration,
+    // We will diagnose a redeclaration at the new declaration,
     // and point to the old declaration for context.
     //
-    getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
+    if (severity == RedeclarationSeverity::Warning)
+        getSink()->diagnose(Diagnostics::RedeclarationCompatibilityWarning{.decl = newDecl});
+    else
+        getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
     getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
     return SLANG_FAIL;
 }
 
 
-void SemanticsVisitor::checkForRedeclaration(Decl* decl)
+void SemanticsVisitor::checkForRedeclaration(Decl* decl, RedeclarationSeverity severity)
 {
     // We want to consider a "new" declaration in the context
     // of some parent/container declaration, and compare it
@@ -14922,7 +15007,7 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         // whether the redeclaration should be allowed,
         // and emit an appropriate diagnostic if not.
         //
-        Result checkResult = checkRedeclaration(newDecl, oldDecl);
+        Result checkResult = checkRedeclaration(newDecl, oldDecl, severity);
 
         // The `checkRedeclaration` function will return a failure
         // status (whether or not it actually emitted a diagnostic)
@@ -14931,6 +15016,103 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         //
         if (SLANG_FAILED(checkResult))
             break;
+    }
+}
+
+/// Return whether `decl` has an earlier declaration of the same name in `containerDecl` other
+/// than the module's own `module` declaration. `checkForRedeclaration` compares `decl` with
+/// each such declaration.
+///
+static bool hasEarlierSameNameNonModuleSibling(ContainerDecl* containerDecl, Decl* decl)
+{
+    for (auto prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(decl); prevDecl;
+         prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(prevDecl))
+    {
+        if (!as<ModuleDeclarationDecl>(prevDecl))
+            return true;
+    }
+    return false;
+}
+
+/// Return the aggregate type whose members lookup finds through the transparent variable
+/// `varDecl`, or null if its type names none. As for any member lookup, lookup takes the
+/// variable's checked type and looks through a pointer-like type such as `ConstantBuffer<T>`
+/// (see `_lookUpMembersInValue` and `_lookUpMembersInSuperTypeImpl`).
+///
+static AggTypeDecl* getAggTypeDeclVisibleThroughTransparentVar(VarDeclBase* varDecl)
+{
+    Type* type = varDecl->getType();
+    if (auto pointedToType = getPointedToTypeIfCanImplicitDeref(type))
+        type = pointedToType;
+    return isDeclRefTypeOf<AggTypeDecl>(type).getDecl();
+}
+
+/// Compare `decl` with the nearest earlier declaration of its name in `visibleDecls`, unless
+/// `checkForRedeclaration` compares it with an earlier sibling, and record `decl` as visible.
+///
+static void compareWithNearestVisibleDecl(
+    SemanticsVisitor* visitor,
+    Dictionary<Name*, Decl*>& visibleDecls,
+    Decl* decl,
+    bool hasEarlierSiblingOfSameName)
+{
+    Decl* prevDecl = nullptr;
+    if (!hasEarlierSiblingOfSameName && visibleDecls.tryGetValue(decl->getName(), prevDecl) &&
+        prevDecl != decl)
+    {
+        visitor->checkRedeclaration(decl, prevDecl, RedeclarationSeverity::Warning);
+    }
+    visibleDecls[decl->getName()] = decl;
+}
+
+/// Check the declarations that lookup in `containerDecl` finds through its transparent
+/// variables against the other declarations that lookup finds there.
+///
+/// Consider this example:
+///
+///     static const int x = 1;
+///     cbuffer CB { int x; }
+///
+/// Lookup of `x` finds both declarations, but the member `x` is not a direct member of the
+/// scope, so `checkForRedeclaration` does not compare them. We treat the members of the type
+/// of each transparent variable as declared at that variable, and compare each declaration
+/// with the nearest earlier one of its name. Earlier compiler releases did not compare these
+/// pairs, so a conflict is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+///
+void SemanticsVisitor::checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl)
+{
+    if (containerDecl->getTransparentDirectMemberDecls().getCount() == 0)
+        return;
+
+    // For each name, the most recent declaration so far that lookup in `containerDecl` finds.
+    Dictionary<Name*, Decl*> visibleDecls;
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        if (memberDecl->getName() && !as<ModuleDeclarationDecl>(memberDecl) &&
+            DeclPassesLookupMask(memberDecl, LookupMask::Default))
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                memberDecl,
+                hasEarlierSameNameNonModuleSibling(containerDecl, memberDecl));
+        }
+
+        auto varDecl = as<VarDeclBase>(memberDecl);
+        if (!varDecl || !varDecl->hasModifier<TransparentModifier>())
+            continue;
+        ensureDecl(varDecl, DeclCheckState::CanUseTypeOfValueDecl);
+        auto aggTypeDecl = getAggTypeDeclVisibleThroughTransparentVar(varDecl);
+        if (!aggTypeDecl)
+            continue;
+        for (auto aggMemberDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                aggMemberDecl,
+                aggTypeDecl->getPrevDirectMemberDeclWithSameName(aggMemberDecl) != nullptr);
+        }
     }
 }
 
@@ -16670,7 +16852,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
+        PortableRT::diagnoseInvalidVariableType(getSink(), paramDecl);
     }
+
+    PortableRT::diagnoseInvalidReturnType(getSink(), decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -17712,21 +17897,26 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
     if (as<SetterDecl>(decl))
         return ParamPassingMode::BorrowInOut;
 
-    // Declarations other than `FuncDecl`s default to `in`.
-    if (!as<FuncDecl>(decl))
-        return ParamPassingMode::In;
+    // We require an explicit opt-in because existing shaders call unannotated methods on
+    // immutable receivers, such as members of a `cbuffer`.
+    if (getOptionSet().getBoolOption(CompilerOptionName::HLSLMethodsMutatingByDefault))
+    {
+        // Declarations other than `FuncDecl`s default to `in`.
+        if (!as<FuncDecl>(decl))
+            return ParamPassingMode::In;
 
-    // We default synthesized functions to `in` rather than adopting the surrounding HLSL default.
-    // For example, `visitLambdaExpr` synthesizes an `operator()` that must satisfy core `IFunc`'s
-    // `in` receiver requirement.
-    if (decl->hasModifier<SynthesizedModifier>())
-        return ParamPassingMode::In;
+        // We default synthesized functions to `in` rather than adopting the surrounding HLSL
+        // default. For example, `visitLambdaExpr` synthesizes an `operator()` that must satisfy
+        // core `IFunc`'s `in` receiver requirement.
+        if (decl->hasModifier<SynthesizedModifier>())
+            return ParamPassingMode::In;
 
-    // Imported modules finish signature checking in their own semantic context before import.
-    // Reflection and specialization read the attached mode, so this language query runs while
-    // checking a written method in its owning translation unit.
-    if (getSourceLanguage() == SourceLanguage::HLSL)
-        return ParamPassingMode::BorrowInOut;
+        // The compiler checks each imported module in its own semantic context. Reflection and
+        // specialization read the attached mode, so this language query runs while checking a
+        // written method in its owning translation unit.
+        if (getSourceLanguage() == SourceLanguage::HLSL)
+            return ParamPassingMode::BorrowInOut;
+    }
     return ParamPassingMode::In;
 }
 
@@ -18103,6 +18293,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
+    PortableRT::diagnoseInvalidPropertyType(getSink(), decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }
@@ -19405,7 +19596,7 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
                 SemanticsDeclHeaderVisitor(shared).synthesizeDifferentiabilityRequirements(
                     functionDecl);
             }
-            SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
+            SemanticsDeclRedeclarationVisitor(shared, RedeclarationSeverity::Error).dispatch(decl);
         }
         break;
 
@@ -19429,6 +19620,11 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 
     case DeclCheckState::DefinitionChecked:
         SemanticsDeclBodyVisitor(shared).dispatch(decl);
+        // Lookup in a container also finds the members of its transparent variables, which
+        // `checkForRedeclaration` does not compare. We compare them once per container, after
+        // its own members are checked.
+        if (auto containerDecl = as<ContainerDecl>(decl))
+            SemanticsVisitor(shared).checkForRedeclarationOfTransparentMembers(containerDecl);
         break;
 
     case DeclCheckState::CapabilityChecked:
@@ -22163,6 +22359,34 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // Collect the capabilities of the individual conformances in a type-pack proof.
+    // Consider this example:
+    //
+    //     [require(metal)] interface IMetalItem {}
+    //     struct Items<each T> where expand each T : IMetalItem
+    //     {
+    //         static const int count = countof(T);
+    //     }
+    //     [require(hlsl)] export int emptyCount() { return Items<>.count; }
+    //
+    // SemanticsVisitor::isSubtype uses getSubtypeWitnessPack to represent the empty pack's
+    // vacuously satisfied constraint. That canonical witness retains IMetalItem as its
+    // supertype, but has no element conformances requiring Metal. Visiting every operand
+    // would incorrectly restrict emptyCount to Metal. Visit the element witnesses instead:
+    // nonempty packs still propagate each conformance's capabilities, while an empty pack
+    // contributes none. General declaration-reference collection still visits the supertype
+    // because it remains part of the proof's identity.
+    void visitTypePackSubtypeWitness(TypePackSubtypeWitness* witness)
+    {
+        // Skip this witness if this capability checker has already visited it.
+        if (!this->visitedVals.add(witness))
+            return;
+
+        // Collect requirements from each element's conformance. getCount() excludes the pack
+        // type and constraint interface, so an empty pack adds no capability requirements.
+        for (Index i = 0; i < witness->getCount(); i++)
+            this->dispatchIfNotNull(witness->getWitness(i));
+    }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is
     // essential rather than cosmetic: the core module differentiates its own builtins
@@ -22523,6 +22747,35 @@ void visitReferencedDecls(
         visitor.dispatchIfNotNull(expr);
     if (auto decl = as<Decl>(node))
         visitor.dispatchIfNotNull(decl);
+}
+
+CapabilitySet getDeclRefCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    DeclRef<Decl> declRef,
+    List<Decl*>& outReferencedDecls)
+{
+    // Consider this example:
+    //     [require(metal)] struct MetalOnly {}
+    //     void main<T>() {}
+    // Selecting main<MetalOnly> retains MetalOnly in the checked reference even though the body
+    // never uses T. Use the ordinary reference walk so selection has the same requirements as
+    // calling main<MetalOnly>() in a function body. As in visitDeclRefExpr, include the selected
+    // declaration itself as well as its operands.
+    CapabilitySet requirements{declRef.getDecl()->inferredCapabilityRequirements};
+    visitReferencedDecls(
+        *visitor,
+        declRef.declRefBase,
+        declRef.getDecl()->loc,
+        nullptr,
+        [&](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc)
+        {
+            requirements.join(nodeCaps);
+            if (auto decl = as<Decl>(node);
+                decl && decl != declRef.getDecl() && nodeCaps && !nodeCaps->isEmpty())
+                outReferencedDecls.add(decl);
+        },
+        [](DiagnosticCategory) {});
+    return requirements;
 }
 
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
@@ -23175,6 +23428,13 @@ bool isOpaqueHandleType(Type* type)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
+    // Logical RT inputs are supplied by the compiler, like patch and stream inputs/outputs.
+    // Include them in the ordinary opaque-type checks so Optional cannot store them either.
+    if (PortableRT::getStageInputKind(isDeclRefTypeOf<AggTypeDecl>(type).getDecl()) !=
+        Stage::Unknown)
+        return true;
+    if (as<TraceProgramDescriptorType>(type))
+        return true;
     if (as<ResourceType>(type))
         return true;
     if (as<SamplerStateType>(type))

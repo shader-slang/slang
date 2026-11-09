@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T09:58:38+00:00
-//META: source_commit=57fb63455095efe1465661001ad147b24b968932
+//META: model=claude-sonnet-5-5
+//META: generated_at=2026-11-02T10:45:10+00:00
+//META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
 //META: doc_ref=docs/language-reference/basics-memory-model-address-spaces.md#address-spaces
 //META: doc_section_digest=3851dfb34bba532778d07931eed37a5ffb7720f62c8acf95efe83c116ec49a46
 //META: purpose=`[vk::push_constant]`-annotated struct belongs to the Push constant address space; SPIRV emits it with `PushConstant` storage class.
@@ -37,8 +37,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // CHECK: %pushConst = OpVariable {{.*}} PushConstant
 // Metal has no push-constant concept; [vk::push_constant] lowers to a constant* buffer parameter.
 // METAL: constant* pushConst_
-// WGSL has no push-constant concept; [vk::push_constant] lowers to var<uniform>.
-// WGSL: var<uniform> pushConst_
+// WGSL spells push constants as the `immediate` address space; [vk::push_constant] lowers to var<immediate>.
+// WGSL: var<immediate> pushConst_
 // GLSL emits the Push-constant address space as a `layout(push_constant)` uniform block.
 // GLSL: layout(push_constant)
 // GLSL: }pushConst_

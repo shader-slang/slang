@@ -1,8 +1,0 @@
-result code = 0
-standard error = {
-tests/preprocessor/warning.slang(9): warning 15901: #warning: You wouldn't like me when I'm angry...
-#warning You wouldn't like me when I'm angry...
- ^~~~~~~
-}
-standard output = {
-}

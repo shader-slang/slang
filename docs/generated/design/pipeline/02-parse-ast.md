@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 2e66ea46f1511d1d5d8abf21d419092bccefbb93c2bb3964dff4fe6e121dfb2a
+model: claude-sonnet-5-5
+generated_at: 2026-11-02T21:21:54Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 4246bb60e01045efde01e27a0e773a37c259f70db6c6e96b5162994eb761d09a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -58,7 +58,7 @@ Slang parses in two stages:
    but when the parser reaches a `{ ... }` function body it does not
    recurse into it; instead, `parseOptBody`
    ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-   2219) tracks brace nesting and copies the enclosed tokens into an
+   2297) tracks brace nesting and copies the enclosed tokens into an
    `UnparsedStmt` AST node, which also records the scopes the body was
    written in (`currentScope`, `outerScope`).
 2. **Body-parse stage.** When semantic checking encounters an
@@ -89,18 +89,17 @@ This two-stage scheme exists primarily to disambiguate `<` between a
 generic argument list and a less-than comparison: at body-parse time
 `tryParseGenericApp`
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
-2951-2995) can hand the expression before the `<` to the checker's
+3079-3205) can hand the expression before the `<` to the checker's
 `CheckTerm` and act on what it names. The test is wider than "is this
 a generic": a base that resolves to a `GenericDecl`, to a
 `FunctionDeclBase`, *or* to an `AggTypeDeclBase` all commit to the
 generic reading, because a function or type name can never legally
 precede a `<` in a comparison and the generic reading yields the
 better diagnostic; an overloaded base commits if any candidate is one
-of those three. Only a base that resolves to something else — an
-ordinary variable, say — forces the comparison reading. The historical
-narrative and details are in
-[../../../design/parsing.md](../../../design/parsing.md); this document
-does not duplicate it.
+of those three. A base whose checked type is a `DeclRefType` (a value such as the
+swizzle `uv.y`) or that resolves to anything else — an ordinary
+variable, say — forces the comparison reading. The historical narrative is in
+[../../../design/parsing.md](../../../design/parsing.md).
 
 ### Syntax-as-declaration
 
@@ -123,26 +122,39 @@ ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos();
 
 The table itself is the static array `g_parseSyntaxEntries[]` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) (line
-10700), whose rows are built by the small helpers `_makeParseDecl`,
-`_makeParseModifier`, and `_makeParseExpr` (lines 10688-10722);
-`getSyntaxParseInfos()` (line 10894) hands the array out as a
+11106), whose rows are built by the small helpers `_makeParseDecl`,
+`_makeParseModifier`, and `_makeParseExpr` (lines 11069-11104);
+`getSyntaxParseInfos()` (line 11278) hands the array out as a
 `ConstArrayView`.
 
 When the parser sees an identifier it looks it up in the active scope
-chain (`tryLookUpSyntaxDecl`, line 1123); if the lookup yields a
+chain (`tryLookUpSyntaxDecl`, line 1165); if the lookup yields a
 `SyntaxDecl` registered through this table, `tryParseUsingSyntaxDecl`
-(line 1210) invokes the associated callback. That is the first thing
-`ParseDeclWithModifiers` (line 5819) tries for an identifier-initial
+(line 1252) invokes the associated callback. That is the first thing
+`ParseDeclWithModifiers` (line 6175) tries for an identifier-initial
 declaration, and the same mechanism dispatches modifier keywords from
-`ParseModifiers` (line 1237). Most language modifier keywords are
+`ParseModifiers` (line 1279). Most language modifier keywords are
 populated this way at startup (`populateBaseLanguageModule`, line
-10874) and the core module's `*.meta.slang` files contribute additional
+11283) and the core module's `*.meta.slang` files contribute additional
 entries. The inventory of keywords is in
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md).
 
 The practical consequence: adding a new modifier keyword in Slang is
 typically a matter of registering it in the syntax table, not of
 touching the lexer or parser core.
+
+### Other declaration-parsing details
+
+- `DeclGroupBuilder` (line 2919) completes each declarator of a
+  multi-declarator declaration as it joins the `DeclGroup`, so later
+  declarators see it, as in `int j = buf[0], k = j < 2;`.
+- An HLSL `class` is parsed with the struct grammar into an
+  `HLSLClassDecl`; Slang `class` produces a `ClassDecl`.
+- `parseOptionalCppStyleTrailingReceiverParamConstModifier` (line 2417)
+  attaches `CppStyleTrailingReceiverParamConstModifier` for `int f() const`.
+- With extended HLSL backwards compatibility enabled,
+  `createUniformParameterShadowVarIfNeeded` (line 5946) pairs a mutable
+  global uniform parameter with a `UniformParameterShadowVarDecl`.
 
 ### Angle-bracket annotations
 
@@ -153,9 +165,9 @@ reaches the AST.
 
 The *declarator-level* skip, in `parseDirectAbstractDeclarator`
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
-2640-2681), is opt-in: it runs only when
+2729-2772), is opt-in: it runs only when
 `ParserOptions::enableEffectAnnotations` is set, which
-`-enable-effect-annotations` does (lines 9988 and 10020, one per parse
+`-enable-effect-annotations` does (lines 10369 and 10398, one per parse
 entry point). Because a `<` after a
 declarator is otherwise a generic argument list, it disambiguates
 first — `<let` and a `< X :` prefix are still generic argument lists —
@@ -164,7 +176,7 @@ the next `>`. Finding one identifies the clause as an annotation, so
 the parser commits the scratch reader and reads the `>`; finding none
 leaves the tokens for the generic-argument path.
 
-The *semantic-level* skip, in `_parseOptSemantics` (lines 3980-3992),
+The *semantic-level* skip, in `_parseOptSemantics` (lines 4215-4228),
 is unconditional. After a semantic such as `: SV_Position`, a
 following `<` is always treated as an annotation: every token up to
 the next `>` is advanced past, with no flag and no disambiguation.
@@ -197,46 +209,49 @@ being disabled.
 
 When the parser hits an unexpected token, `Unexpected`
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
-322-367) emits a diagnostic through the `DiagnosticSink` (see
+372-419) emits a diagnostic through the `DiagnosticSink` (see
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)) and
 sets `Parser::isRecovering`. That flag is what suppresses a cascade:
 while it is set no further "unexpected token" diagnostic is reported,
 and it is cleared as soon as a token the parser was waiting for turns
-up.
+up. The `TokenType` overload also remembers `lastErrorLoc` and reports
+at most once per source location.
 
-Resynchronization is done by `TryRecover` (line 491), which takes a
+Resynchronization is done by `TryRecover` (line 525), which takes a
 *recover-before* set (tokens to stop in front of, leaving them
 unconsumed) and a *recover-after* set (tokens to consume and then
 continue past). The default strategy used inside `{ ... }` blocks
-(line 636) is recover-before `}` and recover-after `;`. Skipping is
-done a *balanced group* at a time by `SkipBalancedToken` (line 389), so
+(line 670) is recover-before `}` and recover-after `;`. Skipping is
+done a *balanced group* at a time by `SkipBalancedToken` (line 423), so
 a bracketed or braced region is stepped over whole rather than
 token-by-token, and `TryRecover` refuses to skip past a closing token
-(`)`, `]`, `}`, end-of-file — see `IsClosingToken`, line 428) unless a
+(`)`, `]`, `}`, end-of-file — see `IsClosingToken`, line 462) unless a
 closing token is itself what it is looking for. The AST is built
 best-effort even after errors so that downstream tools can still operate
 on a partial tree.
 
 That block strategy is the *only* place a recover-after set is used.
-Every other recovery site goes through `TryRecoverBefore` (line 621),
-which passes a single recover-before token and no recover-after set at
-all, so outside a block the parser resynchronizes on a closing token
-rather than on a separator. There are two such sites:
+Every other recovery site goes through `TryRecoverBefore` (line 663),
+which takes a single recover-before token and no recover-after set.
+It has two callers:
 
-- `Parser::readTokenImpl` (line 643) recovers before the token it was
-  expecting — but only once `isRecovering` is already set, or when the
+- `Parser::readTokenImpl` (line 677) recovers before whatever token it was
+  expecting (a separator included) — but only once `isRecovering` is already set, or when the
   expected token is a `}` / `)` / `]` read through `ReadMatchingToken`.
   A first unexpected token in a `ReadToken` call is reported and left
-  in place.
-- `AdvanceIfMatch` (line 813), which drives every `( ... )`,
+  in place; a counter (`kMaxTokenPeekCount`, 64) bounds repeated
+  peeks of one token so a loop around `ReadToken` still advances.
+  The identifier overload `ReadToken(const char*)` (line 479) does not
+  use it: it skips balanced tokens until the identifier or a closing token.
+- `AdvanceIfMatch` (line 847), which drives every `( ... )`,
   `[ ... ]`, `{ ... }` and file-scope list, recovers before that
   region's closing token. If the next token is instead in the region's
   *bail* set — `}` or end-of-file for `( ... )` and `[ ... ]`,
   end-of-file alone for `{ ... }` and file scope
-  (`kMatchedTokenInfos`, line 791) — it abandons the search and lets
+  (`kMatchedTokenInfos`, line 825) — it abandons the search and lets
   the enclosing construct close instead.
 
-So a parameter list, an initializer list, and a declaration position
+So a parameter list, initializer list, and declaration position
 do not have recovery sets of their own: they inherit the closing
 token of whichever matched region encloses them.
 
@@ -299,7 +314,7 @@ lists them all):
   `VectorExpressionType::getElementCount` returns, and the `4` in
   `int a[4]` is the one `ArrayExpressionType::getElementCount` returns
   ([slang-ast-type.h](../../../../source/slang/slang-ast-type.h) lines
-  583 and 751).
+  747 and 583).
 
 In a freshly-parsed AST, both types and expressions use `Expr`
 representation (since at parse time `A(B)` could resolve to a function
@@ -308,7 +323,9 @@ call or a type construction); the semantic checker
 them. The checker may also rewrite a parsed node into a more
 specialized one: for example, an `InvokeExpr` whose callee is a builtin
 arithmetic / comparison / bitwise / shift / unary operator over builtin
-scalar, vector, or matrix operands is converted to a
+scalar, vector, or matrix operands (or operands whose element type is a
+generic parameter constrained to a sealed builtin marker interface) is
+converted to a
 `BuiltinOperatorExpr`
 ([slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)) by
 `convertToBuiltinArithmeticOp`
@@ -357,15 +374,14 @@ entirely when the operand already has the target type, rather than
 always producing a fresh `TypeCastIntVal` wrapper.
 
 Interning is visible from Slang source as type identity. The core
-module declares `typedef vector<float,3> float3;`
-([core.meta.slang](../../../../source/slang/core.meta.slang) line
-2594), and because both spellings intern to the same `Type*`,
-`int probe(float3 v)` and `int probe(vector<float, 3> v)` are one
-signature: the second is a redeclaration of the first, not a second
-overload.
-
-Because `ASTBuilder*` is needed to construct any AST node, the builder
-pointer is threaded through every parsing helper that produces a node.
+module declares `typedef vector<float,3> float3;`, emitted by the
+scalar-type loop in
+[core.meta.slang](../../../../source/slang/core.meta.slang) (lines
+2678-2685), and and both spellings have the same canonical type (`getNamedType`
+interns a separate `NamedExpressionType` wrapper; `getCanonicalType()`
+resolves it), so `int probe(float3 v)` and
+`int probe(vector<float, 3> v)` are one signature: a redeclaration, not
+an overload.
 
 ## Generics ambiguity
 
@@ -378,7 +394,7 @@ speculative parse is error-free and the token that follows the closing
 `>` is in the generic-application FOLLOW set — `::`, `.`, `(`, `)`,
 `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`, `>`, `>>`, or end-of-file
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
-3033-3052), the same list given in
+3181-3200), the same list given in
 [grammar.md's `<` disambiguation section](../syntax-reference/grammar.md#-disambiguation)
 — does it reparse the generic application on the real parser.
 Otherwise the `<` is still unread and ordinary infix parsing takes
@@ -452,7 +468,7 @@ constraints — whether written as an inheritance clause
 `InterfaceDecl` so that they become interface-level requirements,
 siblings of the associated type. `parseAssocType`
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-4293) detects the enclosing interface through `parser->currentScope` and
+4551) detects the enclosing interface through `parser->currentScope` and
 passes it as the `constraintTarget`. This yields the same representation
 as the `__constraint` syntax-as-declaration form:
 
@@ -463,13 +479,13 @@ interface IDerived : IBase { __constraint DataType == This; }
 The `__constraint` keyword is registered in the syntax-parse table
 (`g_parseSyntaxEntries` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp), line
-10730) and handled by `parseInterfaceConstraintDecl` (line 4349), which
+11111) and handled by `parseInterfaceConstraintDecl` (line 4593), which
 builds a `GenericTypeConstraintDecl`, parsing the subject type, then
 either `==` (setting `isEqualityConstraint`) or `:` (a subtype
 requirement), then the bound type. Where a `__constraint` is legal is
-enforced centrally by `isDeclAllowed` (line 5360), which permits a
-`GenericTypeConstraintDecl` only as a member of an `InterfaceDecl` or a
-`GenericDecl`.
+enforced centrally by `isDeclAllowed` (line 5638), which permits a
+`GenericTypeConstraintDecl` or `GenericVariadicPackCountConstraintDecl`
+only as a member of an `InterfaceDecl` or a `GenericDecl`.
 
 The deeper treatment of the disambiguation strategy lives in
 [../../../design/parsing.md](../../../design/parsing.md).
@@ -480,10 +496,10 @@ Modifiers (`in`, `out`, `static`, `const`, ...) and attributes
 (`[unroll]`, `[shader("compute")]`, ...) attach to a `Decl` through
 the `Modifier` chain rooted at `ModifiableSyntaxNode`. `ParseModifiers`
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-1237) collects modifier tokens before the declaration keyword and
+1279) collects modifier tokens before the declaration keyword and
 attaches them as `Modifier` nodes — keyword modifiers through the same
 syntax-decl lookup described above, and `[...]` groups through
-`ParseSquareBracketAttributes` (line 1004). Semantic checking later
+`ParseSquareBracketAttributes` (line 1038). Semantic checking later
 validates them against the kind of declaration they modify
 (see [03-semantic-check.md](03-semantic-check.md)). That split is
 where the parse-stage / check-stage boundary sits: `[unroll]` written
@@ -493,7 +509,7 @@ checker's `Diagnostics::AttributeNotApplicable` (E31002, "attribute
 'unroll' is not valid here").
 
 One placement rule is enforced by the parser itself rather than
-deferred. `Parser::ParseStruct` (line 6384) still parses a bracketed
+deferred. `Parser::ParseStruct` (line 6719) still parses a bracketed
 attribute list written *after* the `struct` keyword
 (`struct [attr] Name`), but gates it on the module's language version:
 silently accepted before 2025, reported as
@@ -504,7 +520,7 @@ and as `Diagnostics::InvalidBracketAttributesPlacement` (E31205) from
 The version the gate reads is `currentModule->languageVersion`, which
 is set either from the command line — `-std <language-version>`
 ([slang-options.cpp](../../../../source/slang/slang-options.cpp) line
-577), so `-std 2018`, `-std 2025` and `-std 2026` select the silently
+586), so `-std 2018`, `-std 2025` and `-std 2026` select the silently
 accepted, deprecated and rejected arms respectively — or per-file by a
 `#lang` / `#language` directive, whose accepted version spellings are
 listed in
@@ -531,19 +547,19 @@ as an expression statement).
 - Some constructs parse cleanly but are still diagnosed because they
   could never be referenced. `maybeDiagnoseKeywordUsedAsName`
   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-  2529) warns (`Diagnostics::KeywordUsedAsName`) when a declarator name
+  2626) warns (`Diagnostics::KeywordUsedAsName`) when a declarator name
   is a reserved type keyword (`struct`, `class`, `enum`, `typealias`,
-  `typedef`; see `isReservedKeywordName`, line 2518). Both this check
+  `typedef`; see `isReservedKeywordName`, line 2607). Both this check
   and the operator-name rule below run from the shared declarator path,
   so they cover `var`, `let`, parameter, field, and `typedef`
   declarations uniformly.
 - An `operator <op>` name is only legal for a function. The rule is
-  enforced in `UnwrapDeclarator` (line 2760), the single point every
+  enforced in `UnwrapDeclarator` (line 2841), the single point every
   C-style declarator passes through on its way to a declaration: the
   `isOperatorName` flag that `parseDirectAbstractDeclarator` recorded is
   reported as `Diagnostics::OperatorNameOnNonFunction` unless the caller
   opted in with `allowOperatorName`, which only the function branch of
-  `ParseDeclaratorDecl` (line 3598) does, at line 3711 — the branch
+  `ParseDeclaratorDecl` (line 3823) does, at line 3939 — the branch
   reached once a parameter list or generic `<` has confirmed the
   declarator is a function. So `V operator+(V a, V b) { ... }` is
   accepted, while `int operator+ = 3;` — the same name on a variable
@@ -553,26 +569,28 @@ as an expression statement).
   A malformed `operator <garbage>` is not flagged twice — it has
   already produced `Diagnostics::InvalidOperator`.
 - The statement parser accepts only a subset of declaration forms.
-  `Parser::parseVarDeclrStatement` (line 7279) parses a declaration
+  `Parser::parseVarDeclrStatement` (line 7630) parses a declaration
   through the ordinary declaration path and then keeps it only if it is
   a variable (`VarDeclBase`), a `DeclGroup`, an aggregate type
   (`AggTypeDecl`, which covers `struct`, `class`, `enum` and
   `interface` alike — the test is on the base class, so the parser
   makes no distinction between them), a
   `typedef` / `typealias` (`TypeDefDecl`), or a `using`.
-  Being kept here is *not* acceptance overall, and only `struct` is
-  usable in a function body in practice: a second, independent nesting
+  Being kept here is *not* acceptance overall: a second, independent nesting
   validation runs during semantic checking
   (`validateDeclNesting` in
   [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-  line 304), which consults its own child/parent rule table and reports
+  line 317), which consults its own child/parent rule table and reports
   `Diagnostics::DeclNotAllowedInContext` (E31400, "declaration not
   allowed in this context") for a pair the table disallows. The two
   layers are aware of each other: the checker skips its diagnostic when
   `decl->nestingAlreadyDiagnosed` is set, which is exactly what the
   parser sets when it has already complained. See
   [03-semantic-check.md](03-semantic-check.md) for which pairs that
-  table admits. Anything else
+  table admits (its table lets `struct` / `class` and `enum` into a
+  function body but not `interface`). Only `struct` (and HLSL `class`) after modifiers is routed here
+  (`isLookaheadADeclKeywordAllowedInStmtContexts`, line 7507).
+  Anything else
   written inside a function body — a `namespace`, for example — is
   reported with `Diagnostics::DeclNotAllowed` (E30102,
   "namespace is not allowed here."). This is a separate mechanism from
@@ -580,7 +598,7 @@ as an expression statement).
   written inside another declaration.
 - Literal *expressions* are where token text finally becomes a value, so
   some literal diagnostics are parse-time rather than lex-time.
-  `parseFloatingPointLiteralExpr` (line 8740) asks
+  `parseFloatingPointLiteralExpr` (line 9098) asks
   `getFloatingPointLiteralValue` for a value plus a
   `FloatingPointLiteralType` classification
   ([slang-lexer.h](../../../../source/compiler-core/slang-lexer.h)), and
@@ -589,7 +607,7 @@ as an expression statement).
   (`InvalidFloatingPointLiteralNumber` for a bad significand,
   `InvalidFloatingPointLiteralSuffix` for an unrecognized suffix). Range
   and precision problems are reported by the same helper's
-  `outIsOutOfRange` / `outPrecisionLost` flags, which the parser turns
+  out-of-range and precision-lost flags, which the parser turns
   into `FloatLiteralTooSmall`, `FloatLiteralUnrepresentable`, or
   `FloatHexLiteralPrecisionLost`. The parser reports at most one of
   these per literal: a single `diagnosed` flag guards the later arms,
@@ -604,20 +622,27 @@ as an expression statement).
   lexer-side half of this split (scanning versus decoding) is described
   in [01-lex-preprocess.md](01-lex-preprocess.md).
 - Integer literals are decoded on the same schedule.
-  `parseIntegerLiteralExpr` (line 8633) splits the suffix into a width
+  `parseIntegerLiteralExpr` (line 8991) splits the suffix into a width
   part (`l` / `L`, `ll` / `LL`, `z` / `Z`) and an unsigned part
   (`u` / `U`) — repeating either draws
   `Diagnostics::InvalidIntegerLiteralSuffix` — and
-  `_determineIntegerLiteralType` (line 8511) maps the pair plus the
-  magnitude onto a base type. The pointer-width suffix `z` selects
+  `_determineIntegerLiteralType` (line 8869) maps the pair plus the
+  magnitude onto a base type; a value that overflowed 64 bits skips it
+  and is typed `uint64_t`. The pointer-width suffix `z` selects
   `intptr_t`, or `uintptr_t` when `u` is also present; for a
   non-decimal literal it does so without consulting the magnitude at
   all, so `0xFFz` is `intptr_t`. For a decimal `z` (or `ll`) literal
   with no `u`, a value up to `INT64_MAX` is signed; exactly
   `INT64_MAX + 1` is typed unsigned but marked
   `signedMinimumIntException`, which lets a surrounding unary `-` in
-  `parsePrefixExpr` (line 9860) rewrite the type back to `intptr_t` /
+  `parsePrefixExpr` (line 10085) rewrite the type back to `intptr_t` /
   `int64_t`; and `INT64_MAX + 2` and above warns
   `Diagnostics::IntegerLiteralTooLarge` (W40004) and stays unsigned.
+- In HLSL input only, a type specifier starting with `unsigned` or
+  `signed` goes through `parseHLSLTraditionalIntegerTypeSpecifier`
+  (reached from `_parseSimpleTypeSpec` and `parseAtomicExpr`). `unsigned`
+  or `unsigned int` yields an `HLSLUnsignedTypeExpr`; a `signed` spelling draws `Diagnostics::SignedTypeNameInHlsl`, and a
+  `char` / `short` / `long` width draws
+  `Diagnostics::UnsupportedTraditionalIntegerTypeNameInHlsl`.
 - The grammar that the parser actually accepts is reverse-engineered
   in [../syntax-reference/grammar.md](../syntax-reference/grammar.md).
