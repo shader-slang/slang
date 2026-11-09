@@ -1762,9 +1762,11 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     {
     case kIROp_IntLit:
         {
-            // The `L` suffix types an `int` constant without a cast. dxc types `0L` as `uint`, so
-            // zero keeps the cast, and the minimum is an expression of in-range literals, as for
-            // `int64_t`.
+            // The `L` suffix types an `int` constant without a cast, as `U`, `LL` and `ULL` type
+            // the other integer constants that the base emitter writes. Two values keep another
+            // form. dxc types `0L` as `uint`, so zero stays the cast `int(0)`. `2147483648` does
+            // not fit in an `int`, so the minimum is written as an expression of in-range literals,
+            // as the base emitter writes the `int64_t` minimum.
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
             auto basicType = as<IRBasicType>(constantInst->getDataType());
             if (!basicType || basicType->getBaseType() != BaseType::Int)
@@ -1790,9 +1792,11 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         {
             // HLSL types an unsuffixed floating-point literal as `float`, and dxc deduces template
             // arguments such as the `T` of `RWByteAddressBuffer.Store<T>` from the literal, so
-            // every constant carries the suffix of its type, NaN and infinities included.
-            // `BFloat16`, `FloatE4M3` and `FloatE5M2` have no HLSL type, so their constants keep
-            // the `float` spellings.
+            // every constant carries the suffix of its type. The `h` suffix needs no 16-bit types:
+            // without them, `half` is a 32-bit type and `1.5h` is a 32-bit value. A NaN or infinity
+            // is a division by zero in literals of its type, which dxc and FXC fold to the
+            // constant. `BFloat16`, `FloatE4M3` and `FloatE5M2` have no HLSL scalar type, so their
+            // constants keep the unsuffixed and `float` spellings.
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
             const char* suffix = nullptr;
             switch (constantInst->getDataType()->getOp())
@@ -1810,30 +1814,30 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 break;
             }
 
-            const char* specialNumerator = nullptr;
+            const char* nonFiniteNumerator = nullptr;
             switch (constantInst->getFloatKind())
             {
             case IRConstant::FloatKind::Nan:
-                specialNumerator = "0.0";
+                nonFiniteNumerator = "0.0";
                 break;
             case IRConstant::FloatKind::PositiveInfinity:
-                specialNumerator = "1.0";
+                nonFiniteNumerator = "1.0";
                 break;
             case IRConstant::FloatKind::NegativeInfinity:
-                specialNumerator = "-1.0";
+                nonFiniteNumerator = "-1.0";
                 break;
             default:
                 break;
             }
 
-            if (specialNumerator)
+            if (nonFiniteNumerator)
             {
-                const char* specialSuffix = suffix ? suffix : "f";
+                const char* nonFiniteSuffix = suffix ? suffix : "f";
                 m_writer->emit("(");
-                m_writer->emit(specialNumerator);
-                m_writer->emit(specialSuffix);
+                m_writer->emit(nonFiniteNumerator);
+                m_writer->emit(nonFiniteSuffix);
                 m_writer->emit(" / 0.0");
-                m_writer->emit(specialSuffix);
+                m_writer->emit(nonFiniteSuffix);
                 m_writer->emit(")");
                 return;
             }
