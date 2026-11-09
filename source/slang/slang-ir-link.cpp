@@ -1264,27 +1264,24 @@ IRFunc* specializeIRForEntryPoint(
         if (!nameOverride.getLength())
             nameOverride = getUnownedStringSliceText(entryPoint->getName());
 
-        // The `IREntryPointDecoration` we are about to build records the owning module's name as
-        // its third operand. Most entry points can supply that name directly, but an entry point
-        // that was created for a precompiled (`-r`) module is a dummy: it is built by
-        // `EntryPoint::createDummyForDeserialize` (and the pass-through variant) with an empty
-        // `DeclRef<FuncDecl>()`, so `EntryPoint::getModule()` — which resolves the module from that
-        // decl-ref — returns null. A dummy entry legitimately has no `FuncDecl` and hence no owning
-        // module, and other consumers already tolerate it by gating on `getFuncDeclRef()`
-        // (parameter binding and layout), so we correspondingly fall back to an empty module name
-        // here rather than dereferencing null. The operand is purely informational and has no
-        // downstream reader for a freshly-constructed decoration.
-        auto entryPointModule = entryPoint->getModule();
-        UnownedStringSlice moduleName = entryPointModule
-                                            ? UnownedStringSlice(entryPointModule->getName())
-                                            : UnownedStringSlice();
-        IRInst* operands[] = {
-            context->builder->getIntValue(
-                context->builder->getIntType(),
-                entryPoint->getProfile().raw),
-            context->builder->getStringValue(nameOverride),
-            context->builder->getStringValue(moduleName)};
-        context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
+        // The decoration records the owning module's name. A dummy entry point for a precompiled
+        // (`-r`) module, built by `EntryPoint::createDummyForDeserialize` or its pass-through
+        // variant, has no `FuncDecl` and so no owning module to name. Parameter binding and layout
+        // already recognize such an entry by testing `getFuncDeclRef()`, and we test the same
+        // condition here. The dummy's decoration gets an empty module name; nothing reads that
+        // operand from a decoration built at link time.
+        UnownedStringSlice moduleName;
+        if (entryPoint->getFuncDeclRef())
+        {
+            auto entryPointModule = entryPoint->getModule();
+            SLANG_ASSERT(entryPointModule);
+            moduleName = UnownedStringSlice(entryPointModule->getName());
+        }
+        context->builder->addEntryPointDecoration(
+            clonedFunc,
+            entryPoint->getProfile(),
+            nameOverride,
+            moduleName);
     }
 
     // Make layout directly available on native entry-point parameters. A structural `invoke`
