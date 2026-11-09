@@ -6451,6 +6451,77 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     return false;
 }
 
+// Returns true when `_validateOutput` would compare the output of a test line with a `.expected`
+// file. A line with `filecheck=` or `diag=` checks its output with FileCheck or with the
+// diagnostic annotations, and a disabled line does not run, so none of them reads the file.
+static bool _readsExpectedFile(const TestOptions& options)
+{
+    String prefix;
+    return options.isEnabled && !options.getFileCheckPrefix(prefix) &&
+           !options.getDiagTestPrefix(prefix);
+}
+
+// Returns true when a test line has both `filecheck=` and `diag=`.
+//
+// `_validateOutput` runs only the `diag=` check for such a line, so the `CHECK` lines of
+// `filecheck=` are never run. Consider a preprocessor test:
+//
+//     //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,diag=diag):-E
+//
+// The `diag=` check looks only at the diagnostics in the standard error. The text that `-E` writes
+// to the standard output is never checked, and a wrong `CHECK` line stays unnoticed. We report the
+// line as an error. A test that needs both checks uses one test line for each of them.
+static bool _hasBothFileCheckAndDiag(const TestOptions& options)
+{
+    String prefix;
+    return options.getFileCheckPrefix(prefix) && options.getDiagTestPrefix(prefix);
+}
+
+// Returns the path of the `.expected` file that belongs to the test line `subTestIndex` of
+// `filePath`, when that line has `filecheck=` or `diag=` and so never reads the file.
+// Returns an empty string when there is no such file.
+//
+// Consider a file with two test lines:
+//
+//     //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//
+// Output of line 1 is checked with the annotations, and `foo.slang.1.expected` is never read. The
+// file is dead, and it can show an old output format that misleads people.
+//
+// For line 0 the stem is `filePath` itself, so `foo.slang.expected` is also the shared file that
+// `_readTestFile` falls back to for any other line that has no file of its own. We do not report
+// the file when such a line exists, because the file is in use.
+static String _findUnusedExpectedFile(
+    const String& filePath,
+    Index subTestIndex,
+    const FileTestList& testList)
+{
+    // A disabled line may be enabled again later, and then it reads the file.
+    const TestOptions& options = testList.tests[subTestIndex].options;
+    if (!options.isEnabled || _readsExpectedFile(options))
+        return String();
+
+    StringBuilder stem;
+    stem << filePath;
+    if (subTestIndex != 0)
+        stem << "." << subTestIndex;
+    String expectedPath = stem.produceString() + ".expected";
+    if (!File::exists(expectedPath))
+        return String();
+
+    if (subTestIndex == 0)
+    {
+        for (Index i = 1; i < testList.tests.getCount(); i++)
+        {
+            if (_readsExpectedFile(testList.tests[i].options) &&
+                !File::exists(filePath + "." + String(i) + ".expected"))
+                return String();
+        }
+    }
+    return expectedPath;
+}
+
 // Insert a subtest index into a test name, after the file path but before any suffix.
 // e.g., "foo.slang (vk)" with index 0 -> "foo.slang.0 (vk)"
 static String insertSubtestIndex(const String& testName, int index)
@@ -6732,11 +6803,37 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
             TestResult testResult = TestResult::Fail;
 
+            // A `.expected` file that the test line never reads is an error, so that
+            // such files do not stay in the repository.
+            const String unusedExpectedFile =
+                testDetails.options.isSynthesized
+                    ? String()
+                    : _findUnusedExpectedFile(filePath, subTestIndex, testList);
+
             // If this test can be ignored
             if (_canIgnore(context, testDetails))
             {
                 testResult = TestResult::Ignored;
                 context->getTestReporter()->addResult(testResult);
+            }
+            else if (_hasBothFileCheckAndDiag(testDetails.options))
+            {
+                context->getTestReporter()->message(
+                    TestMessageType::TestFailure,
+                    "'filecheck=' and 'diag=' cannot be used on the same test line, because only "
+                    "the 'diag=' check runs. Use one test line for each of them.\n");
+                context->getTestReporter()->addResult(TestResult::Fail);
+                context->reportTestFailure();
+            }
+            else if (unusedExpectedFile.getLength())
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::TestFailure,
+                    "'%s' is never read, because this test line uses 'filecheck=' or 'diag='. "
+                    "Remove the file, or remove 'filecheck=' or 'diag=' from the test line.\n",
+                    unusedExpectedFile.getBuffer());
+                context->getTestReporter()->addResult(TestResult::Fail);
+                context->reportTestFailure();
             }
             else
             {

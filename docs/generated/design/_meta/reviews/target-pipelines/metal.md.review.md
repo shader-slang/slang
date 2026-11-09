@@ -1,50 +1,50 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:06:54+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T20:08:09Z
 target_doc: target-pipelines/metal.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 3bfc164e382505a7acce894d60950a1812eb10280d5da247c705758df95dccb7
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: aede24230ce39b7bd26f5c9691dcc18345d10b4564888b02e08b241529a399de
+source_commit: f40a5af1027e6fd524a5855f77d62bddffd998c9
 checklist:
   factual_accuracy: partial
-  cross_references: pass
+  cross_references: partial
   completeness: partial
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: partial
+  front_matter_validity: pass
 finding_count: 7
 severity_breakdown:
-  critical: 0
+  critical: 2
   major: 2
-  minor: 5
+  minor: 3
   nit: 0
 ---
 
 # Review report for target-pipelines/metal.md
 
 ## Summary
-The page is unusually thorough and its main Metal ordering, legalization, emitter, and downstream-chain descriptions agree with the source. It nevertheless misses a reachable `SLANG_PASS` despite the target-pipeline coverage rule, and its recorded watched-path digest does not match the watched files at the recorded source commit. Five smaller contract and factual issues remain in the phase table, opcode count, introduction, gate labeling, and See-also list.
+
+The document provides extensive, mostly accurate coverage of the Metal pipeline, but its diagrams need correction before they can serve as a control-flow reference. Most importantly, Phase B reverses a deliberately enforced cleanup/validation ordering, while Phase C presents four conditional passes as unconditional. The remaining findings concern required summaries and inaccurate navigation or explanatory claims.
 
 ## Items checked
-- Ran `regenerate.py show target-pipelines/metal.md`; inspected the target, `_common.md`, the per-document prompt, all nine resolved watched files, and all five dependency documents.
-- Verified every line-number citation against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including all cited regions in `slang-emit.cpp`, the Metal emitter/legalizers, downstream codegen, diagnostics, core-module intrinsics, and IR-builder factories.
-- Spot-checked more than 10 factual claims: target transitions, required-pass scans, coverage-width capping, Metal byte-address options, three buffer-element policies, parameter fallthrough, subpass and varying-output legalization, address-space specialization, descriptor-handle bindings, `printf`, `precise`, literal suffixes, Metal opcode producers, and Apple-tool flags.
-- Ran the generated-doc linter, resolved every markdown link, checked peer generated pages against the manifest, and recomputed the watched-path digest.
-- Compared all four phase diagrams and tables with reachable Metal call sites and checked the required section order, loop statement, Mermaid conventions, size cap, warning string, and front-matter keys.
+
+- Verified against the **current working tree**, which matches the document’s `source_commit` for all of `source/`; the source comparison produced no differences.
+- Read `_review.md`, `_common.md`, and the document-specific prompt; ran `regenerate.py show target-pipelines/metal.md`.
+- Checked more than 20 behavioral claims, including intermediate-target selection, accumulating lowering flags, coverage-width clamping, output-parameter wrappers, decoration retargeting, resource bindings, packed vectors, address spaces, opcode producers, logging, literal suffixes, and downstream compiler flags.
+- Inspected all 225 explicit line-citation expressions, including repeated references and their associated ranges, against the cited working-tree files.
+- Compared Phase A–C pass ordering and gates with `linkAndOptimizeIR`, and Phase D with source emission and downstream dispatch.
+- Resolved all 222 Markdown link occurrences (122 distinct destinations), checked the three local heading anchors, and confirmed all 12 referenced generated pages are manifest entries. Dependency documents were consulted only for cross-reference checks.
+- Checked required front-matter fields, section structure, diagrams, and Liquid safety. The document is 95,941 bytes, within its 98,304-byte cap.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | Front matter, line 6 | The recorded `watched_paths_digest` is `3bfc164e...dccb7`, but recomputing the SHA-256 over the resolved watched files at the recorded source commit produces `efe89af9...5af1`. Because `source_commit` equals HEAD and the watched source files are clean, this is not worktree drift. | `docs/generated/design/_meta/regenerate.py:441-457` defines the digest over resolved watched-file paths, sizes, and contents; `regenerate.py digest target-pipelines/metal.md` returned `efe89af9797e1b4513603c9cb5e2d6d902ddb4a58cb88ad67f7d706be8145af1`. | Replace the front-matter digest with `efe89af9797e1b4513603c9cb5e2d6d902ddb4a58cb88ad67f7d706be8145af1` when remediating the generated page, then use the normal freshness workflow to record the same value. |
-| F-002 | major | Phase B, lines 507-512; Option-set toggles, line 850 | The page explicitly excludes `addUserTypeHintDecorations` from the ordered Phase B diagram/table because it has no Metal-specific behavior, even though the call is reachable on Metal whenever `VulkanEmitReflection` is set. The contract requires every reachable `SLANG_PASS` call to appear in exactly one phase table. | `source/slang/slang-emit.cpp:1774-1777` calls `SLANG_PASS(addUserTypeHintDecorations)` based only on the option; `docs/generated/design/_meta/prompts/_common.md:364-368` requires every reachable call in a phase table. | Add an option-gated `addUserTypeHintDecorations` node and Phase B row after `lowerCombinedTextureSamplers`, and keep its option in the consolidated gate table. Delete the rationale for omitting it. |
-| F-003 | minor | Phase B diagram and table, lines 345-348, 382-384, 399-403, 429, 461-463, 482 | The companion table is not one row per diagram pass node: it combines `finalizeAutoDiffPass` with `stripAutoDiffDecorations`, omits the diagram's `dce4` / direct `eliminateDeadCode`, and combines the final alternative `simplifyIR` and `eliminateDeadCode` nodes. | `source/slang/slang-emit.cpp:1446-1453`, `1654`, and `1938-1941` contain the distinct calls; `docs/generated/design/_meta/prompts/_common.md:329-338` requires one table row per pass node. | Split rows 9 and 62 into one row per alternative pass, add the missing `eliminateDeadCode` row between `checkGetStringHashInsts` and `lowerTuples`, and renumber Phase B. |
-| F-004 | minor | Phase C table row 22, line 629 | The Gate cell says `isMetalTarget` selects `lowerBufferElementTypeToStorageType`, but this invocation is unconditional; `isMetalTarget` only selects the `Metal` policy configuration. | `source/slang/slang-emit.cpp:2463-2479` selects a policy at lines 2470-2472 and calls the pass unconditionally at lines 2476-2479. | Change the Gate cell to `(always)` and move `isMetalTarget` / `BufferElementTypeLoweringPolicyKind::Metal` into Notes. |
-| F-005 | minor | `### Where the Metal-specific opcodes come from`, lines 1114-1146 | The text says `Four opcodes in the IR are Metal-only`, then names five: three `metalSet*` ops, `MetalCastToDepthTexture`, and `MetalAtomicCast`. Its later producer analysis correctly distinguishes four reachable opcodes from the unproduced fifth. | `source/slang/slang-ir-insts.lua:1379-1382` declares the first four, and line 1679 declares `MetalAtomicCast`. | Say that the subsection covers five Metal-specific value/resource opcodes: four have producers at this commit, while `MetalAtomicCast` has no producer. |
-| F-006 | minor | Introduction, lines 12-40 | The required one-paragraph introduction is split across multiple paragraphs and never identifies the intended reader, despite the per-document prompt naming that audience. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first paragraph to state coverage and intended reader; `docs/generated/design/_meta/prompts/target-pipelines-metal.md:12-14` defines the audience; the page's first paragraph at lines 12-33 states only scope and behavior. | Consolidate the target values and the `05-ir-passes.md` relationship into one opening paragraph and add that it is for compiler developers locating Metal pass order, gates, and emitter cooperation. |
-| F-007 | minor | `## See also`, lines 1185-1199 | The See-also list omits the existing user-facing Metal target page, which the target-pipeline contract requires when one exists. | `docs/user-guide/a2-02-metal-target-specific.md` exists; `docs/generated/design/_meta/prompts/_common.md:355-362` requires the relevant user-facing target documentation. | Add a relative link to `../../../user-guide/a2-02-metal-target-specific.md` with a one-clause description. |
-
-## No-issues notes
-- All source and generated-peer links resolve, all cited peer pages are manifest entries, and the generated-doc linter reports no errors.
-- The public `MetalLibAssembly` route is now described correctly as Metal source to `MetalLib` followed by `metal-objdump --disassemble`.
-- The source-backed descriptions of Metal legalization, pointer lowering, emitter extension tracking, coverage capping, and downstream language-version/logging flags are accurate.
+| F-001 | critical | Phase B diagram, lines 422–425 | The diagram runs `checkGetStringHashInsts` before the direct `eliminateDeadCode` call. This reverses the actual dependency and contradicts the correctly ordered table rows 42–43. | `source/slang/slang-emit.cpp:1800–1811` explicitly says DCE “Must run before the getStringHash check below” because leftover callees can otherwise cause legal code to be rejected. DCE runs at 1804; validation runs at 1811. | Route `performTypeInlining` through the direct DCE node first, then through the nonessential-validation diamond and optional `checkGetStringHashInsts`, before `lowerTuples`. |
+| F-002 | critical | Phase C diagram, lines 643–649 | The diagram makes `simplifyIR`, `collectCooperativeMetadata`, `unexportNonEmbeddableIR`, and `checkUnsupportedInst` unconditional. Their runtime gates are material to the page’s stated purpose and are already acknowledged in its table. | `source/slang/slang-emit.cpp:2738–2742` gates simplification on `!minimalOptimization`; 2930–2936 gates cooperative metadata on capabilities; 2940–2942 gates unexporting on `EmbedDownstreamIR`; 2960–2961 gates unsupported-instruction checks on `!shouldPerformMinimumOptimizations()`. | Add four gate diamonds with true and bypass edges, preserving the source order and matching Phase C rows 24, 36, 37, and 40. |
+| F-003 | major | Conditional gates, lines 930–1019 | The required consolidated gate table is split into four tables and omits `shouldLegalizeExistentialAndResourceTypes`, despite that predicate controlling a substantial branch in the Phase B diagram. The validation-options row also omits `checkForMissingReturns`. | `docs/generated/design/_meta/prompts/_common.md:374–378` requires one table covering every diagram gate. `source/slang/slang-emit.cpp:1982–2074` implements the omitted legalization branch; 1693–1705 nests missing-return checking under nonessential validation. | Consolidate the tables, retaining grouped rows. Add the existential/resource legalization predicate and its controlled passes, and include `checkForMissingReturns` under both of its gates. |
+| F-004 | major | Phase A–C diagram endings, lines 176, 454, 650 | All required summaries of `validateIRModuleIfEnabled` checkpoints are absent. Consequently, the phase diagrams omit this required aspect of the pipeline contract entirely. | `docs/generated/design/_meta/prompts/_common.md:361–362` requires a comment beneath each diagram summarizing these calls. Examples occur at `source/slang/slang-emit.cpp:1080`, 1717, 2039, 2067, 2568, 2836, and 2912. | Add concise comments beneath the affected phase diagrams identifying the validation checkpoints omitted from the nodes. |
+| F-005 | minor | Phase C row 21, line 674; Resource-type spellings, lines 923–927 | Two implementation pointers are inaccurate: the table locates `specializeAddressSpaceForMetal` in the generic specialization file, and the depth-texture discussion attributes its statement-emission case to `tryEmitInstExprImpl`. | `source/slang/slang-ir-metal-legalize.cpp:458–461` defines the Metal specialization wrapper. `source/slang/slang-emit-metal.cpp:422` starts `tryEmitInstStmtImpl`, whose depth-texture case is at 697–712. | Change row 21’s File link to `slang-ir-metal-legalize.cpp`; change the depth-texture discussion to `tryEmitInstStmtImpl`. |
+| F-006 | minor | Notable passes: parameter transformations, lines 1252–1256 | The claim that the source does not explain Metal’s grouping with CPU/CUDA “for either pass” is false for `transformParamsToConstRef`. | `source/slang/slang-emit.cpp:2676–2681` states that struct/array parameters use const references for performance on Metal, C++, and CUDA, and explains that Metal requires array parameters created by matrix legalization to be passed by reference. | Replace the blanket absence claim with this documented rationale and ordering constraint. Limit any remaining uncertainty to `undoParameterCopy`. |
+| F-007 | minor | Logging discussion, lines 770–772; downstream discussion, final paragraph | The document says `cross-cutting/targets.md` describes `metallib_3_2` and the individual Metal version atoms. That page discusses capability infrastructure but does not describe those atoms. The links resolve, but promise content absent from their destination. | `docs/generated/design/cross-cutting/targets.md:176–186` instead directs readers to the capability-atoms reference and `source/slang/slang-capabilities.capdef`; the page contains no `metallib_3_1`, `metallib_3_2`, or `metallib_4_0` descriptions. | Link the atom-specific claims directly to `source/slang/slang-capabilities.capdef`, retaining the targets-page link only for general capability-system context. |

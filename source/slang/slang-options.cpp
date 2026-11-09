@@ -377,7 +377,16 @@ void initCommandOptions(CommandOptions& options)
             {
                 continue;
             }
-            else if (name.startsWith("GL_") || name.startsWith("SPV_") || name.startsWith("GLSL_"))
+            // A name starting with "SPV_" spells a SPIR-V extension exactly as the SPIR-V
+            // registry does. Such an atom only records which `OpExtension` a feature needs, and
+            // the `spv<Feature>` capability that implies it is the name users are meant to write.
+            // We omit the "SPV_" names here so that the help does not present two spellings for
+            // one feature. `-capability SPV_...` is still accepted for existing command lines.
+            else if (name.startsWith("SPV_"))
+            {
+                continue;
+            }
+            else if (name.startsWith("GL_") || name.startsWith("GLSL_"))
             {
                 // We'll assume it is an extension..
                 StringBuilder buf;
@@ -1270,6 +1279,11 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Enable additional backwards-compatibility features for legacy HLSL inputs. See the "
          "user guide's HLSL backwards compatibility section for the supported behavior."},
+        {OptionKind::HLSLMethodsMutatingByDefault,
+         "-fhlsl-methods-mutating-by-default",
+         nullptr,
+         "Use `inout` for the implicit `this` parameter of HLSL methods by default. Has no effect "
+         "on Slang or GLSL inputs."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
@@ -3440,6 +3454,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ValidateUniformity:
         case OptionKind::EnableExperimentalPasses:
         case OptionKind::EnableExtendedHLSLBackwardsCompatibility:
+        case OptionKind::HLSLMethodsMutatingByDefault:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
