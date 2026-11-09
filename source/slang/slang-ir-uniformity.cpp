@@ -366,7 +366,7 @@ struct ValidateUniformityContext
                                             }
                                             else
                                             {
-                                                key.nonUniformParams.add(i);
+                                                key.nonUniformParams.add(argi);
                                             }
                                         }
                                     }
