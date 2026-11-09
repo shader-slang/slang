@@ -1,6 +1,7 @@
 // slang-ir-clone.cpp
 #include "slang-ir-clone.h"
 
+#include "core/slang-crypto.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -157,25 +158,24 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     return newInst;
 }
 
-static void getSpecializedLinkageName(StringBuilder& strBuilder, IRSpecialize* specInst)
+// Preserve the existing code-linkage behavior for operands outside the concrete identity
+// encoder (for example, unresolved witnesses). This is never used for runtime type identity.
+static String getLegacySpecializationLinkageName(IRSpecialize* specialize)
 {
-    DigestBuilder<SHA1> digestBuilder;
-    for (UInt i = 0; i < specInst->getArgCount(); ++i)
+    DigestBuilder<SHA1> digest;
+    for (UInt i = 0; i < specialize->getArgCount(); ++i)
     {
-        auto arg = specInst->getArg(i);
-        if (auto typeLinkage = arg->findDecoration<IRLinkageDecoration>())
-        {
-            digestBuilder.append(typeLinkage->getMangledName());
-        }
+        auto argument = specialize->getArg(i);
+        if (auto linkage = argument->findDecoration<IRLinkageDecoration>())
+            digest.append(linkage->getMangledName());
         else
         {
-            StringBuilder typeNameHint;
-            getTypeNameHint(typeNameHint, arg);
-            digestBuilder.append(typeNameHint.getUnownedSlice());
+            StringBuilder hint;
+            getTypeNameHint(hint, argument);
+            digest.append(hint.getUnownedSlice());
         }
     }
-
-    strBuilder.append(digestBuilder.finalize().toString());
+    return digest.finalize().toString();
 }
 
 // Copy the linkage decoration of oldInst (if present) and specialize it for target.
@@ -184,6 +184,28 @@ static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, I
     auto gen = as<IRGeneric>(oldInst->getBase());
     if (gen)
     {
+        IRSpecialize* specializationProvider = oldInst;
+        if (auto targetAsSpec = as<IRSpecialize>(target))
+            specializationProvider = targetAsSpec;
+
+        if (auto identity = gen->findDecoration<IRRuntimeTypeIdentityDecoration>())
+        {
+            List<IRInst*> operands;
+            for (UInt i = 0; i < identity->getOperandCount(); ++i)
+                operands.add(identity->getOperand(i));
+            operands.add(
+                builder->getIntValue(builder->getIntType(), specializationProvider->getArgCount()));
+            for (UInt i = 0; i < specializationProvider->getArgCount(); ++i)
+                operands.add(specializationProvider->getArg(i));
+            if (auto previous = target->findDecoration<IRRuntimeTypeIdentityDecoration>())
+                previous->removeAndDeallocate();
+            builder->addDecoration(
+                target,
+                kIROp_RuntimeTypeIdentityDecoration,
+                operands.getBuffer(),
+                operands.getCount());
+        }
+
         auto genLinkage = gen->findDecoration<IRLinkageDecoration>();
         if (genLinkage)
         {
@@ -191,13 +213,9 @@ static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, I
             StringBuilder sb;
             sb.append(genLinkage->getMangledName());
             sb.append("G");
-            IRSpecialize* specializationProvider = oldInst;
-            if (auto targetAsSpec = as<IRSpecialize>(target))
-            {
-                specializationProvider = targetAsSpec;
-            }
-            StringBuilder specLinkName;
-            getSpecializedLinkageName(specLinkName, specializationProvider);
+            String specLinkName;
+            if (!getSpecializationArgumentIdentity(specializationProvider, specLinkName))
+                specLinkName = getLegacySpecializationLinkageName(specializationProvider);
             sb.append(specLinkName);
 
             if (auto previousLinkage = target->findDecoration<IRLinkageDecoration>())

@@ -31,7 +31,8 @@ public struct ReLU<T> : IActivation<T>
     public __init() {}
 
     [NoDiffThis]
-    [Differentiable]
+    [HasTrivialForwardDerivative]
+    [BackwardDerivative(evalBackward)]
     public Vector eval<Vector>(Vector input)
         where Vector : IVector<T>
     {
@@ -40,6 +41,105 @@ public struct ReLU<T> : IActivation<T>
         for (int i = 0; i < Vector.Size; i++)
             output[i] = max(input[i], T(0));
         return output;
+    }
+
+    [NoDiffThis]
+    public void evalBackward<Vector>(
+        inout DifferentialPair<Vector> input,
+        Vector.Differential outputGradient)
+        where Vector : IVector<T>
+        where Vector.Differential : IVector<T>
+    {
+        Vector.Differential inputGradient = Vector.Differential();
+        [ForceUnroll]
+        for (int i = 0; i < Vector.Size; i++)
+            inputGradient[i] = input.p[i] > T(0) ? outputGradient[i] : T(0);
+        input = DifferentialPair<Vector>(input.p, inputGradient);
+    }
+}
+
+/**
+FP16 ReLU activation that checkpoints one sign bit per vector element.
+
+This activation is useful when reverse-mode differentiation would otherwise retain the complete
+pre-activation vector. Its forward and backward operations are identical to `ReLU<half>`; only the
+representation of the reverse-mode context differs.
+*/
+public struct CompactReLUContext<Vector : IVector<half>>
+{
+    public static const int MaskWordCount = (Vector.Size + 31) / 32;
+    public uint positiveMask[MaskWordCount];
+
+    public void operator()(
+        out Vector.Differential inputGradient,
+        Vector.Differential outputGradient)
+    {
+        inputGradient = Vector.Differential();
+        [ForceUnroll]
+        for (int i = 0; i < Vector.Size; ++i)
+        {
+            bool positive =
+                (positiveMask[uint(i) >> 5] & (1u << (uint(i) & 31))) != 0;
+            inputGradient[i] = positive ? outputGradient[i] : 0.0h;
+        }
+    }
+}
+
+/// Evaluates an FP16 ReLU. Its `__apply` extension supplies a compact reverse-mode context.
+public Vector compactReLU<Vector : IVector<half>>(Vector input)
+{
+    Vector output = Vector();
+    [ForceUnroll]
+    for (int i = 0; i < Vector.Size; ++i)
+        output[i] = max(input[i], 0.0h);
+    return output;
+}
+
+public __func_extension<Vector : IVector<half>>
+fwd_diff(compactReLU<Vector>)(DifferentialPair<Vector> input)
+    -> DifferentialPair<Vector>
+{
+    Vector primal = Vector();
+    Vector.Differential differential = Vector.Differential();
+    [ForceUnroll]
+    for (int i = 0; i < Vector.Size; ++i)
+    {
+        primal[i] = max(input.p[i], 0.0h);
+        differential[i] = input.p[i] > 0.0h ? input.d[i] : 0.0h;
+    }
+    return diffPair(primal, differential);
+}
+
+public __func_extension<Vector : IVector<half>>
+__apply(compactReLU<Vector>)(Vector input) -> Tuple<Vector, CompactReLUContext<Vector>>
+{
+    Vector output = Vector();
+    CompactReLUContext<Vector> context = {};
+    [ForceUnroll]
+    for (int i = 0; i < Vector.Size; ++i)
+    {
+        half value = input[i];
+        bool positive = value > 0.0h;
+        output[i] = max(value, 0.0h);
+        if (positive)
+            context.positiveMask[uint(i) >> 5] |= 1u << (uint(i) & 31);
+    }
+    return makeTuple(output, context);
+}
+
+/**
+FP16 ReLU activation with a bit-packed reverse-mode checkpoint.
+*/
+public struct CompactReLU : IActivation<half>
+{
+    public __init() {}
+
+    [NoDiffThis]
+    [Differentiable]
+    public Vector eval<Vector>(Vector input)
+        where Vector : IVector<half>
+    {
+        return compactReLU<Vector>(input);
     }
 }
 

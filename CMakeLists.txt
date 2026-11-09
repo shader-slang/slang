@@ -66,6 +66,12 @@ endif()
 #
 enable_language(C CXX)
 
+# Browser artifacts are distributed with the documentation. Keep __FILE__ and debug
+# paths relative to the checkout, including in third-party libraries compiled below.
+if(EMSCRIPTEN)
+    add_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}/=")
+endif()
+
 include(FindPackageHandleStandardArgs)
 include(CMakeDependentOption)
 include(GNUInstallDirs)
@@ -226,6 +232,10 @@ option(
     "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
 )
+if(SLANG_ENABLE_TESTS)
+    # Register tests from both tools and optional language bindings at the build root.
+    include(CTest)
+endif()
 option(
     SLANG_ENABLE_EXAMPLES
     "Enable example targets (most require SLANG_ENABLE_SLANG_RHI)"
@@ -468,6 +478,58 @@ set(SLANG_GENERATORS_PATH
     CACHE PATH
     "An optional path to the outputs of the all-generators target compiled for the build platform, used when cross-compiling"
 )
+
+if(SLANG_GENERATORS_PATH)
+    if(CMAKE_HOST_WIN32)
+        set(slang_host_executable_suffix ".exe")
+    else()
+        set(slang_host_executable_suffix "")
+    endif()
+    set(slang_bootstrap_path
+        "${SLANG_GENERATORS_PATH}/slang-bootstrap${slang_host_executable_suffix}"
+    )
+    if(NOT EXISTS "${slang_bootstrap_path}")
+        message(
+            FATAL_ERROR
+            "SLANG_GENERATORS_PATH does not contain slang-bootstrap: ${slang_bootstrap_path}"
+        )
+    endif()
+    execute_process(
+        COMMAND "${slang_bootstrap_path}" -version
+        RESULT_VARIABLE slang_bootstrap_version_result
+        OUTPUT_VARIABLE slang_bootstrap_version_stdout
+        ERROR_VARIABLE slang_bootstrap_version_stderr
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_STRIP_TRAILING_WHITESPACE
+        TIMEOUT 30
+    )
+    if(NOT slang_bootstrap_version_result EQUAL 0)
+        message(
+            FATAL_ERROR
+            "Could not query the Slang host-generator version from ${slang_bootstrap_path}: "
+            "${slang_bootstrap_version_stderr}"
+        )
+    endif()
+    if(slang_bootstrap_version_stdout)
+        set(slang_bootstrap_version "${slang_bootstrap_version_stdout}")
+    else()
+        # `slang-bootstrap -version` uses the command-line diagnostic writer, which is stderr.
+        set(slang_bootstrap_version "${slang_bootstrap_version_stderr}")
+    endif()
+    if(NOT slang_bootstrap_version STREQUAL PROJECT_VERSION)
+        message(
+            FATAL_ERROR
+            "The Slang host generators are incompatible with this source tree.\n"
+            "  source version:    ${PROJECT_VERSION}\n"
+            "  generator version: ${slang_bootstrap_version}\n"
+            "Rebuild and reinstall the generators from this checkout, then configure the "
+            "cross build again. For the generators preset, run:\n"
+            "  cmake --build --preset generators\n"
+            "  cmake --install build --config Release --prefix build-platform-generators "
+            "--component generators"
+        )
+    endif()
+endif()
 
 enum_option(
     SLANG_SLANG_LLVM_FLAVOR
@@ -732,6 +794,18 @@ add_subdirectory(prelude)
 add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
+add_subdirectory(source/slang-hgvm)
+add_subdirectory(source/slangvm-wasm)
+option(SLANG_ENABLE_SLANGVM_PYTHON "Build scalar Python bindings for HGVM" OFF)
+if(SLANG_ENABLE_SLANGVM_PYTHON)
+    if(NOT SLANG_ENABLE_SLANG_RHI)
+        message(
+            FATAL_ERROR
+            "SLANG_ENABLE_SLANGVM_PYTHON requires SLANG_ENABLE_SLANG_RHI"
+        )
+    endif()
+    add_subdirectory(source/slangvm)
+endif()
 add_subdirectory(source/slangc)
 if(TARGET slangc)
     # Keep DXC runtime artifacts and headers staged for targeted slangc builds.

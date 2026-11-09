@@ -1,10 +1,12 @@
 #include "slang-artifact-output-util.h"
 
+#include "core/slang-blob.h"
 #include "core/slang-hex-dump-util.h"
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
 #include "core/slang-string-util.h"
 #include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 
 #include <chrono>
 
@@ -12,6 +14,7 @@
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "slang-compiler.h"
+#include "slang-hgbc-disassembler.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -38,6 +41,22 @@ namespace Slang
         }
         return SLANG_FAIL;
     }
+
+    if (desc.kind == ArtifactKind::ObjectCode && desc.payload == ArtifactPayload::HGBC)
+    {
+        ComPtr<ISlangBlob> blob;
+        SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, blob.writeRef()));
+
+        StringBuilder text;
+        ComPtr<ISlangWriter> writer(new StringWriter(&text));
+        SLANG_RETURN_ON_FAIL(disassembleHGBC(blob, writer, sink));
+
+        auto disassemblyArtifact = ArtifactUtil::createArtifact(assemblyDesc);
+        disassemblyArtifact->addRepresentationUnknown(StringBlob::moveCreate(text));
+        *outArtifact = disassemblyArtifact.detach();
+        return SLANG_OK;
+    }
+
     // Get the downstream disassembler that can be used for this target
     // TODO(JS):
     // This could perhaps be performed in some other manner if there was more than one way to
@@ -192,8 +211,15 @@ static SlangResult _requireBlob(
     const UnownedStringSlice& writerName,
     ISlangWriter* writer)
 {
-    // If the output is console we will try and turn into disassembly
-    if (writer->isConsole())
+    auto desc = artifact->getDesc();
+    bool shouldTryDisassemble =
+        writer->isConsole() ||
+        (desc.kind == ArtifactKind::ObjectCode && desc.payload == ArtifactPayload::HGBC);
+
+    // If the output is console we will try and turn into disassembly.
+    // HGBC also uses disassembly for stdout pipes so FileCheck tests and command-line captures see
+    // the graph ops instead of raw bytes.
+    if (shouldTryDisassemble)
     {
         ComPtr<IArtifact> disassemblyArtifact;
         maybeDisassemble(session, artifact, sink, disassemblyArtifact);

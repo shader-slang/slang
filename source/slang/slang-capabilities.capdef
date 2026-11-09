@@ -123,6 +123,10 @@ def slangvm : target;
 /// [Target]
 def llvm : target;
 
+/// Represents the Host-Graph Byte-Code target.
+/// [Target]
+def hgbc : target;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -263,7 +267,7 @@ def optix_multilevel_traversal : _cuda_sm_5_0;
 
 /// All code-gen targets
 /// [Compound]
-alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl | llvm;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl | llvm | hgbc;
 
 /// All non-asm code-gen targets
 /// [Compound]
@@ -2332,6 +2336,25 @@ alias structuredbuffer = sm_4_0_version;
 /// Capabilities required to use RWStructuredBuffer
 /// [Compound]
 alias structuredbuffer_rw = sm_4_0_version;
+/// Capabilities required to use mutable StructuredBuffer handles from HGBC graphs
+/// [Compound]
+alias hgbc_structuredbuffer_rw =
+    cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm + structuredbuffer_rw | hgbc;
+
+/// Capabilities required to query read-only StructuredBuffer dimensions from HGBC graphs
+/// [Compound]
+alias hgbc_structuredbuffer_dimensions =
+    cpp_cuda_glsl_hlsl_spirv_wgsl_llvm + structuredbuffer | hgbc;
+
+/// Capabilities required to query mutable StructuredBuffer dimensions from HGBC graphs
+/// [Compound]
+alias hgbc_structuredbuffer_dimensions_rw =
+    cpp_cuda_glsl_hlsl_spirv_wgsl_llvm + structuredbuffer_rw | hgbc;
+
+/// Capabilities required for scalar, vector, and matrix numeric math in HGBC graphs
+/// [Compound]
+alias hgbc_numeric_math =
+    cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm + sm_4_0_version | hgbc;
 
 /// Capabilities required for implicit derivatives sampling.
 ///
@@ -2381,6 +2404,10 @@ alias texture_sm_4_0 = sm_4_0_version
 /// [Compound]
 alias texture_sm_4_1 = sm_4_1_version
                      ;
+/// Capabilities required to query Texture2D dimensions from HGBC graphs
+/// [Compound]
+alias hgbc_texture_dimensions =
+    cpp_cuda_glsl_hlsl_metal_spirv_wgsl + texture_sm_4_1 | hgbc;
 /// Capabilities required to use sm_4_1 samplerless texture operations
 /// [Compound]
 alias texture_sm_4_1_samplerless = texture_sm_4_1

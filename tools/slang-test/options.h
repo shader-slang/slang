@@ -61,6 +61,9 @@ struct Options
     // Root directory to use when looking for test cases
     Slang::String testDir;
 
+    // Executables used by EXTERNAL tests, keyed by the directive's tool name.
+    Slang::Dictionary<Slang::String, Slang::String> testTools;
+
     // only run test cases with names have one of these prefixes.
     Slang::List<Slang::String> testPrefixes;
 

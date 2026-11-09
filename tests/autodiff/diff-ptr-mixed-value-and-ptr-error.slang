@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
 
 // Test that mixing IDifferentiable value types with IDifferentiablePtrType outputs
-// in a differentiable function produces an error diagnostic.
+// in a function without backward hooks produces an error diagnostic.
 
 struct MyPtr : IDifferentiablePtrType
 {
@@ -23,8 +23,9 @@ struct MyPtr : IDifferentiablePtrType
 }
 
 // This function has both an IDifferentiablePtrType output (inout MyPtr)
-// and an IDifferentiable value input (float x), which is not supported.
-[Differentiable]
+// and an IDifferentiable value input (float x). Without backward hooks, its forward
+// call would have to remain entirely primal, which cannot propagate x's adjoint.
+[ForwardDifferentiable]
 [ForwardDerivative(fwd_mixed)]
 float mixedFunc(inout MyPtr ptr, float x)
 {

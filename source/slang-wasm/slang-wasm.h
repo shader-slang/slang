@@ -447,6 +447,7 @@ private:
 public:
     LanguageServer();
     ~LanguageServer();
+    void setEnableExperimentalFeatures(bool enabled);
     void didOpenTextDocument(std::string uri, std::string text);
     void didCloseTextDocument(std::string uri);
     void didChangeTextDocument(std::string uri, const std::vector<lsp::TextEdit>& changes);

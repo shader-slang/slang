@@ -510,6 +510,18 @@ public:
     {
         return dispatchIfNotNull(expr->originalExpr);
     }
+    bool visitHGBCAsmExpr(HGBCAsmExpr* expr)
+    {
+        for (const HGBCAsmInst& inst : expr->insts)
+        {
+            for (const HGBCAsmOperand& operand : inst.operands)
+            {
+                if (dispatchIfNotNull(operand.expr))
+                    return true;
+            }
+        }
+        return false;
+    }
     bool visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         for (const auto& i : expr->insts)
@@ -590,6 +602,12 @@ public:
         if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
             return true;
         return dispatchIfNotNull(expr->value);
+    }
+    bool visitIndexOfTypeInPackExpr(IndexOfTypeInPackExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->elementType.exp) || dispatchIfNotNull(expr->packType.exp);
     }
     bool visitShapePackTransformExpr(ShapePackTransformExpr* expr)
     {

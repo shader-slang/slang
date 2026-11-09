@@ -194,6 +194,16 @@ struct IRNameHintDecoration : IRDecoration
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+/// Provides a semantic name for reflection and serialized dispatch lookup. Types carry their
+/// complete source-level type expression; struct keys and callable exports carry their declared
+/// member name (their owner is represented separately). This metadata is independent of NameHint
+/// and must survive debug stripping, specialization, and serialization.
+FIDDLE()
+struct IRReflectionNameDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+};
+
 /// A decoration on a RTTIObject providing type size information.
 FIDDLE()
 struct IRRTTITypeSizeDecoration : IRDecoration
@@ -746,6 +756,37 @@ struct IRAnnotation : IRInst
 };
 
 FIDDLE()
+struct IRSlangEntryPoint : IRInst
+{
+    FIDDLE(leafInst())
+    IRStringLit* getModuleNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    IRStringLit* getEntryPointNameOperand() { return cast<IRStringLit>(getOperand(1)); }
+};
+
+FIDDLE()
+struct IRSpecializedSlangEntryPoint : IRInst
+{
+    FIDDLE(leafInst())
+    IRStringLit* getModuleNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+    IRStringLit* getEntryPointNameOperand() { return cast<IRStringLit>(getOperand(1)); }
+    UInt getSpecializationArgCount() { return (getOperandCount() - 2) / 2; }
+    IRStringLit* getSpecializationArgKind(UInt index)
+    {
+        return cast<IRStringLit>(getOperand(2 + index * 2));
+    }
+    IRInst* getSpecializationArgValue(UInt index) { return getOperand(3 + index * 2); }
+};
+
+// Maps each host dispatch argument to its original entry-point parameter index. Unlike a
+// resource binding index, this includes empty parameters and counts system values in the shader
+// signature. Legalization removes mapping entries together with erased host arguments.
+FIDDLE()
+struct IRShaderParameterMappingDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRDispatchKernel : IRInst
 {
     FIDDLE(leafInst())
@@ -755,6 +796,27 @@ struct IRDispatchKernel : IRInst
     {
         return IROperandList<IRInst>(getOperands() + 3, getOperands() + getOperandCount());
     }
+};
+
+// Trailing operands retain the reflected parameter index of each shader argument. Legalization
+// removes entries together with empty arguments, preserving the stage and binding of survivors.
+FIDDLE()
+struct IRMakeGraphicsPipeline : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRMakeRayTracer : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+/// A deferred RT call. Operands identify its role, shader ABI, runtime controls, and parameters.
+FIDDLE()
+struct IRRayPipelineCall : IRInst
+{
+    FIDDLE(leafInst())
 };
 
 FIDDLE()
@@ -1631,6 +1693,12 @@ struct IREntryPointLayout : IRLayout
     /// contain `out` or `inout` parameters.
     ///
     IRVarLayout* getResultLayout() { return cast<IRVarLayout>(getOperand(1)); }
+
+    /// The optional third operand assigns the GPU base without changing local capture layout.
+    IRIntLit* getUniformOffset()
+    {
+        return getOperandCount() == 3 ? cast<IRIntLit>(getOperand(2)) : nullptr;
+    }
 };
 
 /// Given an entry-point layout, extract the layout for the parameters struct.
@@ -1947,6 +2015,33 @@ struct IRStructuredBufferConsume : IRInst
 
 FIDDLE()
 struct IRStructuredBufferGetDimensions : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRTextureGetDimensions : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+/// Formats a compile-time string from a template and positional arguments.
+FIDDLE()
+struct IRStringFormat : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+/// Formats a compile-time, comma-separated reflection-name list for generic arguments.
+FIDDLE()
+struct IRFormatGenericArgReflectionNameList : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+/// Produces the semantic reflection name of a concrete type.
+FIDDLE()
+struct IRReflectionNameOf : IRInst
 {
     FIDDLE(leafInst())
 };
@@ -2775,6 +2870,7 @@ struct IRDebugInlinedAt : IRInst
     IRInst* getLine() { return getOperand(0); }
     IRInst* getCol() { return getOperand(1); }
     IRInst* getFile() { return getOperand(2); }
+    /// Returns the caller's lexical block or function at this inline call site.
     IRInst* getScope() { return getOperand(3); }
     IRInst* getOuterInlinedAt()
     {
@@ -2784,12 +2880,6 @@ struct IRDebugInlinedAt : IRInst
     }
     void setScope(IRInst* scope) { setOperand(3, scope); }
     bool isOuterInlinedPresent() { return operandCount == 5; }
-};
-
-FIDDLE()
-struct IRDebugLexicalBlock : IRInst
-{
-    FIDDLE(leafInst())
 };
 
 FIDDLE()
@@ -2835,6 +2925,18 @@ struct IRDebugFunction : IRInst
 };
 
 FIDDLE()
+struct IRDebugLexicalBlock : IRInst
+{
+    FIDDLE(leafInst())
+    IRInst* getSource() { return getOperand(0); }
+    IRInst* getLineStart() { return getOperand(1); }
+    IRInst* getColumnStart() { return getOperand(2); }
+    IRInst* getLineEnd() { return getOperand(3); }
+    IRInst* getColumnEnd() { return getOperand(4); }
+    IRInst* getParentScope() { return getOperand(5); }
+};
+
+FIDDLE()
 struct IRDebugFuncDecoration : IRInst
 {
     FIDDLE(leafInst())
@@ -2844,6 +2946,61 @@ FIDDLE()
 struct IRDebugLocationDecoration : IRDecoration
 {
     FIDDLE(leafInst())
+};
+
+struct IRHGBCAsm;
+
+FIDDLE()
+struct IRHGBCAsmOperand : IRInst
+{
+    FIDDLE(baseInst())
+
+    IRInst* getValue()
+    {
+        if (getOp() == kIROp_HGBCAsmOperandResult)
+            return nullptr;
+        SLANG_ASSERT(getOp() != kIROp_HGBCAsmOperandValuePack);
+        return getOperand(0);
+    }
+
+    IRHGBCAsm* getAsmBlock()
+    {
+        IRHGBCAsm* result = as<IRHGBCAsm>(getParent());
+        SLANG_ASSERT(result);
+        return result;
+    }
+};
+
+FIDDLE()
+struct IRHGBCAsmInst : IRInst
+{
+    FIDDLE(leafInst())
+
+    uint32_t getOpcode()
+    {
+        IRInst* opcode = getOperand(0);
+        if (auto globalRef = as<IRGlobalValueRef>(opcode))
+            opcode = globalRef->getValue();
+        return uint32_t(cast<IRIntLit>(opcode)->getValue());
+    }
+
+    IROperandList<IRHGBCAsmOperand> getHGBCOperands()
+    {
+        return IROperandList<IRHGBCAsmOperand>(
+            getOperands() + 1,
+            getOperands() + getOperandCount());
+    }
+};
+
+FIDDLE()
+struct IRHGBCAsm : IRInst
+{
+    FIDDLE(leafInst())
+
+    IRFilteredInstList<IRHGBCAsmInst> getInsts()
+    {
+        return IRFilteredInstList<IRHGBCAsmInst>(getFirstChild(), getLastChild());
+    }
 };
 
 struct IRSPIRVAsm;
@@ -3316,6 +3473,11 @@ public:
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
+    IRStringFormat* emitStringFormat(IRInst* format, Int argCount, IRInst* const* args);
+    IRFormatGenericArgReflectionNameList* emitFormatGenericArgReflectionNameList(
+        Int argCount,
+        IRInst* const* args);
+    IRReflectionNameOf* emitReflectionNameOf(IRInst* type);
     IRBlobLit* getBlobValue(ISlangBlob* blob);
     IRPtrLit* getPtrValue(IRType* type, void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
@@ -3685,10 +3847,9 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* line,
         IRInst* col,
         IRInst* file,
-        IRInst* debugFunc,
+        IRInst* scope,
         IRInst* outerInlinedAt);
     IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
-    IRInst* emitDebugLexicalBlock(IRInst* source, IRInst* line, IRInst* col, IRInst* parentScope);
     IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
     IRInst* emitDebugNoScope();
     IRInst* emitDebugFunction(
@@ -3698,6 +3859,13 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* file,
         IRInst* debugType,
         IRInst* parentScope = nullptr);
+    IRInst* emitDebugLexicalBlock(
+        IRInst* source,
+        IRInst* lineStart,
+        IRInst* columnStart,
+        IRInst* lineEnd,
+        IRInst* columnEnd,
+        IRInst* parentScope);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
@@ -3743,6 +3911,24 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* dispatchSize,
         Int argCount,
         IRInst* const* inArgs);
+    IRInst* emitMakeGraphicsPipelineInst(IRType* type, ArrayView<IRInst*> operands);
+    IRInst* emitMakeRayTracerInst(
+        IRType* type,
+        IRType* payloadType,
+        IRInst* maxRecursion,
+        IRInst* rayGenerationFn,
+        IRInst* closestHitFn,
+        IRInst* missFn);
+    IRInst* emitSlangEntryPointInst(
+        IRType* type,
+        IRStringLit* moduleName,
+        IRStringLit* entryPointName);
+    IRInst* emitSpecializedSlangEntryPointInst(
+        IRType* type,
+        IRStringLit* moduleName,
+        IRStringLit* entryPointName,
+        Int argOperandCount,
+        IRInst* const* argOperands);
     IRInst* emitCudaKernelLaunch(
         IRInst* baseFn,
         IRInst* gridDim,
@@ -4106,6 +4292,9 @@ $(type_info.return_type) $(type_info.method_name)(
     // Create a global "key" to use for indexing into a `struct` type.
     IRStructKey* createStructKey();
 
+    /// Returns the canonical key for an intrinsic storage field, including its reflection name.
+    IRStructKey* getBuiltinStructKey(KnownBuiltinDeclName kind);
+
     // Create a field nested in a struct type, declaring that
     // the specified field key maps to a field with the specified type.
     IRStructField* createStructField(IRType* aggType, IRStructKey* fieldKey, IRType* fieldType);
@@ -4451,6 +4640,16 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitAnd(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitOr(IRType* type, IRInst* left, IRInst* right);
+
+    IRHGBCAsmOperand* emitHGBCAsmOperandLiteral(IRInst* literal);
+    IRHGBCAsmOperand* emitHGBCAsmOperandValue(IRInst* value);
+    IRHGBCAsmOperand* emitHGBCAsmOperandValuePack(IRInst* valuePack);
+    IRHGBCAsmOperand* emitHGBCAsmOperandValuePack(UInt valueCount, IRInst* const* values);
+    IRHGBCAsmOperand* emitHGBCAsmOperandType(IRInst* type);
+    IRHGBCAsmOperand* emitHGBCAsmOperandId(IRInst* name);
+    IRHGBCAsmOperand* emitHGBCAsmOperandResult();
+    IRHGBCAsmInst* emitHGBCAsmInst(IRInst* opcode, List<IRInst*> operands);
+    IRHGBCAsm* emitHGBCAsm(IRType* type);
 
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
@@ -4800,7 +4999,10 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRTypeLayout* getTypeLayout(IROp op, List<IRInst*> const& operands);
     IRVarLayout* getVarLayout(List<IRInst*> const& operands);
-    IREntryPointLayout* getEntryPointLayout(IRVarLayout* paramsLayout, IRVarLayout* resultLayout);
+    IREntryPointLayout* getEntryPointLayout(
+        IRVarLayout* paramsLayout,
+        IRVarLayout* resultLayout,
+        IRIntLit* uniformOffset = nullptr);
 
     void addPhysicalTypeDecoration(IRInst* value)
     {
@@ -4820,6 +5022,11 @@ $(type_info.return_type) $(type_info.method_name)(
     void addNameHintDecoration(IRInst* value, UnownedStringSlice const& text)
     {
         addNameHintDecoration(value, getStringValue(text));
+    }
+
+    void addReflectionNameDecoration(IRInst* value, IRInst* name)
+    {
+        addDecoration(value, kIROp_ReflectionNameDecoration, name);
     }
 
     void addUserTypeNameDecoration(IRInst* value, IRStringLit* name)
@@ -5248,6 +5455,10 @@ $(type_info.return_type) $(type_info.method_name)(
     void addKeepAliveDecoration(IRInst* value) { addDecoration(value, kIROp_KeepAliveDecoration); }
 
     void addPublicDecoration(IRInst* value) { addDecoration(value, kIROp_PublicDecoration); }
+    void addHGBCExportDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_HGBCExportDecoration);
+    }
     void addHLSLExportDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_HLSLExportDecoration);

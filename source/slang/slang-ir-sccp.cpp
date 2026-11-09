@@ -1,8 +1,10 @@
 // slang-ir-sccp.cpp
 #include "slang-ir-sccp.h"
 
+#include "slang-base-type-info.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-translate.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 
@@ -118,6 +120,9 @@ struct SCCPContext
         case kIROp_BoolLit:
         case kIROp_FloatLit:
         case kIROp_StringLit:
+        case kIROp_StringFormat:
+        case kIROp_FormatGenericArgReflectionNameList:
+        case kIROp_ReflectionNameOf:
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
@@ -955,6 +960,444 @@ struct SCCPContext
         return c0->value.intVal != 0 ? v1 : v2;
     }
 
+    LatticeVal evalCompileTimeString(IRInst* value)
+    {
+        if (as<IRStringLit>(value))
+            return LatticeVal::getConstant(value);
+
+        auto latticeValue = getLatticeVal(value);
+        if (latticeValue.flavor == LatticeVal::Flavor::Constant)
+            return as<IRStringLit>(latticeValue.value) ? latticeValue : LatticeVal::getAny();
+
+        switch (value->getOp())
+        {
+        case kIROp_StringFormat:
+            return evalStringFormat(value);
+        case kIROp_FormatGenericArgReflectionNameList:
+            return evalFormatGenericArgReflectionNameList(value);
+        case kIROp_ReflectionNameOf:
+            return evalReflectionNameOf(value);
+        default:
+            return latticeValue;
+        }
+    }
+
+    bool appendStringFormatArg(StringBuilder& builder, IRInst* value)
+    {
+        if (auto stringValue = as<IRStringLit>(value))
+        {
+            builder << stringValue->getStringSlice();
+            return true;
+        }
+        if (auto intValue = as<IRIntLit>(value))
+        {
+            builder << intValue->getValue();
+            return true;
+        }
+        if (auto boolValue = as<IRBoolLit>(value))
+        {
+            builder << (boolValue->getValue() ? "true" : "false");
+            return true;
+        }
+        if (auto floatValue = as<IRFloatLit>(value))
+        {
+            builder << floatValue->getValue();
+            return true;
+        }
+        return false;
+    }
+
+    /// Appends one generic argument, recursively flattening any specialized pack it contains.
+    ///
+    /// Consider `Layer<int, each Rest>` specialized with `Rest = {float, bool}`. The first call
+    /// appends `int`, and the recursive pack calls append `float` and `bool`. The shared
+    /// `ioHasPreviousArg` state makes each successful scalar append own its leading separator, so
+    /// empty packs and adjacent packs cannot introduce a leading, trailing, or doubled comma.
+    LatticeVal::Flavor appendGenericArgReflectionName(
+        StringBuilder& builder,
+        IRInst* arg,
+        bool& ioHasPreviousArg)
+    {
+        if (auto typePack = as<IRTypePack>(arg))
+        {
+            for (UInt i = 0; i < typePack->getOperandCount(); ++i)
+            {
+                auto flavor = appendGenericArgReflectionName(
+                    builder,
+                    typePack->getOperand(i),
+                    ioHasPreviousArg);
+                if (flavor != LatticeVal::Flavor::Constant)
+                    return flavor;
+            }
+            return LatticeVal::Flavor::Constant;
+        }
+
+        if (auto valuePack = as<IRMakeValuePack>(arg))
+        {
+            for (UInt i = 0; i < valuePack->getOperandCount(); ++i)
+            {
+                auto flavor = appendGenericArgReflectionName(
+                    builder,
+                    valuePack->getOperand(i),
+                    ioHasPreviousArg);
+                if (flavor != LatticeVal::Flavor::Constant)
+                    return flavor;
+            }
+            return LatticeVal::Flavor::Constant;
+        }
+
+        auto argType = arg->getDataType();
+        if (argType &&
+            (argType->getOp() == kIROp_TypeParameterPackKind ||
+             argType->getOp() == kIROp_ValuePackType || argType->getOp() == kIROp_ExpandTypeOrVal))
+        {
+            return LatticeVal::Flavor::None;
+        }
+
+        LatticeVal argValue;
+        if (as<IRType>(arg) || as<IRTypeKind>(argType) || as<IRTypeType>(argType))
+        {
+            argValue = evalReflectionName(arg);
+        }
+        else if (
+            arg->getOp() == kIROp_StringFormat ||
+            arg->getOp() == kIROp_FormatGenericArgReflectionNameList ||
+            arg->getOp() == kIROp_ReflectionNameOf)
+        {
+            argValue = evalCompileTimeString(arg);
+        }
+        else
+        {
+            argValue = getLatticeVal(arg);
+        }
+
+        if (argValue.flavor != LatticeVal::Flavor::Constant)
+            return argValue.flavor;
+
+        StringBuilder argText;
+        if (!appendStringFormatArg(argText, argValue.value))
+            return LatticeVal::Flavor::Any;
+
+        if (ioHasPreviousArg)
+            builder << ", ";
+        builder << argText;
+        ioHasPreviousArg = true;
+        return LatticeVal::Flavor::Constant;
+    }
+
+    LatticeVal evalFormatGenericArgReflectionNameList(IRInst* inst)
+    {
+        StringBuilder result;
+        bool hasPreviousArg = false;
+        for (UInt i = 0; i < inst->getOperandCount(); ++i)
+        {
+            auto flavor =
+                appendGenericArgReflectionName(result, inst->getOperand(i), hasPreviousArg);
+            switch (flavor)
+            {
+            case LatticeVal::Flavor::None:
+                return LatticeVal::getNone();
+            case LatticeVal::Flavor::Any:
+                return LatticeVal::getAny();
+            default:
+                break;
+            }
+        }
+        return LatticeVal::getConstant(getBuilder()->getStringValue(result.getUnownedSlice()));
+    }
+
+    LatticeVal evalStringFormat(IRInst* inst)
+    {
+        if (inst->getOperandCount() == 0)
+            return LatticeVal::getAny();
+
+        auto formatValue = evalCompileTimeString(inst->getOperand(0));
+        SLANG_SCCP_RETURN_IF_NONE_OR_ANY(formatValue)
+        auto format = as<IRStringLit>(formatValue.value);
+        if (!format)
+            return LatticeVal::getAny();
+
+        StringBuilder result;
+        auto formatText = format->getStringSlice();
+        const char* cursor = formatText.begin();
+        const char* end = formatText.end();
+        UInt argIndex = 1;
+        while (cursor != end)
+        {
+            const char* placeholder = cursor;
+            while (placeholder != end &&
+                   !(*placeholder == '{' && placeholder + 1 != end && placeholder[1] == '}'))
+            {
+                ++placeholder;
+            }
+            result.append(cursor, placeholder);
+            if (placeholder == end)
+                break;
+
+            if (argIndex >= inst->getOperandCount())
+                return LatticeVal::getAny();
+            auto arg = inst->getOperand(argIndex++);
+            LatticeVal argValue;
+            if (arg->getOp() == kIROp_StringFormat ||
+                arg->getOp() == kIROp_FormatGenericArgReflectionNameList ||
+                arg->getOp() == kIROp_ReflectionNameOf)
+                argValue = evalCompileTimeString(arg);
+            else
+                argValue = getLatticeVal(arg);
+            if (argValue.flavor == LatticeVal::Flavor::None)
+                return LatticeVal::getNone();
+            if (argValue.flavor == LatticeVal::Flavor::Any ||
+                !appendStringFormatArg(result, argValue.value))
+            {
+                return LatticeVal::getAny();
+            }
+            cursor = placeholder + 2;
+        }
+
+        if (argIndex != inst->getOperandCount())
+            return LatticeVal::getAny();
+        return LatticeVal::getConstant(getBuilder()->getStringValue(result.getUnownedSlice()));
+    }
+
+    /// Builds a source-level type expression from semantic IR, never from display names.
+    ///
+    /// Consider `StructuredBuffer<Box<float>, ScalarDataLayout>`. The buffer's operands retain
+    /// both the element and layout types, and the element's ReflectionName decoration retains
+    /// its specialization. Recursing through this same evaluator preserves all three, even if
+    /// every NameHint was stripped. Textures use the complete `_Texture` constructor so no
+    /// access, texel type, sample count, or format can silently turn into a default argument.
+    LatticeVal evalReflectionName(IRInst* type)
+    {
+        if (auto nameDecoration = type->findDecoration<IRReflectionNameDecoration>())
+        {
+            auto name = evalCompileTimeString(nameDecoration->getNameOperand());
+            if (name.flavor == LatticeVal::Flavor::Constant)
+                if (auto literal = as<IRStringLit>(name.value))
+                    preserveLambdaDebugInfo(type, literal);
+            return name;
+        }
+
+        if (auto basicType = as<IRBasicType>(type))
+            return LatticeVal::getConstant(
+                getBuilder()->getStringValue(BaseTypeInfo::asText(basicType->getBaseType())));
+
+        const char* constructor = nullptr;
+        UInt argumentCount = type->getOperandCount();
+        switch (type->getOp())
+        {
+        case kIROp_Param:
+        case kIROp_GlobalGenericParam:
+        case kIROp_Generic:
+        case kIROp_Specialize:
+        case kIROp_LookupWitnessMethod:
+        case kIROp_ExtractExistentialType:
+            // These types can acquire a semantic identity after specialization.
+            return LatticeVal::getNone();
+        case kIROp_StringType:
+            constructor = "String";
+            break;
+        case kIROp_NativeStringType:
+            constructor = "NativeString";
+            break;
+        case kIROp_FloatE4M3Type:
+            constructor = "FloatE4M3";
+            break;
+        case kIROp_FloatE5M2Type:
+            constructor = "FloatE5M2";
+            break;
+        case kIROp_BFloat16Type:
+            constructor = "BFloat16";
+            break;
+        case kIROp_VectorType:
+            constructor = "vector";
+            break;
+        case kIROp_MatrixType:
+            {
+                // The source matrix constructor takes a MatrixLayoutMode, while IR stores
+                // its integer value. For example, matrix<float, 2, 3, MatrixLayoutMode(1)>
+                // must round-trip through reflection lookup without an implicit int-to-enum
+                // conversion. Reintroduce that source-level type at this serialization boundary.
+                auto matrixType = cast<IRMatrixType>(type);
+                IRInst* shape[] = {
+                    matrixType->getElementType(),
+                    matrixType->getRowCount(),
+                    matrixType->getColumnCount(),
+                };
+                StringBuilder arguments;
+                bool hasPreviousArg = false;
+                for (auto argument : shape)
+                {
+                    auto flavor =
+                        appendGenericArgReflectionName(arguments, argument, hasPreviousArg);
+                    if (flavor == LatticeVal::Flavor::None)
+                        return LatticeVal::getNone();
+                    if (flavor == LatticeVal::Flavor::Any)
+                        return LatticeVal::getAny();
+                }
+                auto layout = getLatticeVal(matrixType->getLayout());
+                SLANG_SCCP_RETURN_IF_NONE_OR_ANY(layout)
+                arguments << ", MatrixLayoutMode(";
+                if (!appendStringFormatArg(arguments, layout.value))
+                    return LatticeVal::getAny();
+                arguments << ")";
+                StringBuilder name;
+                name << "matrix<" << arguments << ">";
+                return LatticeVal::getConstant(
+                    getBuilder()->getStringValue(name.getUnownedSlice()));
+            }
+        case kIROp_TupleType:
+            // A tuple is one type argument, unlike a type pack, which expands into arguments.
+            // For example, Box<Tuple<uint, float>> must not become Box<uint, float>.
+            constructor = "Tuple";
+            break;
+        case kIROp_ArrayType:
+            // An explicit stride belongs to a legalized physical type, not a source Array.
+            if (argumentCount != 2)
+                return LatticeVal::getAny();
+            constructor = "Array";
+            break;
+        case kIROp_UnsizedArrayType:
+            {
+                if (argumentCount != 1)
+                    return LatticeVal::getAny();
+                auto element = evalReflectionName(type->getOperand(0));
+                if (element.flavor != LatticeVal::Flavor::Constant)
+                    return element;
+                StringBuilder name;
+                appendStringFormatArg(name, element.value);
+                name << "[]";
+                return LatticeVal::getConstant(
+                    getBuilder()->getStringValue(name.getUnownedSlice()));
+            }
+        case kIROp_HGVMRuntimeArrayType:
+            constructor = "RuntimeArray";
+            break;
+        case kIROp_OptionalType:
+            constructor = "Optional";
+            break;
+        case kIROp_AtomicType:
+            constructor = "Atomic";
+            break;
+        case kIROp_DescriptorHandleType:
+            constructor = "DescriptorHandle";
+            break;
+        case kIROp_TextureType:
+            constructor = "_Texture";
+            break;
+        case kIROp_TextureShape1DType:
+            constructor = "__Shape1D";
+            break;
+        case kIROp_TextureShape2DType:
+            constructor = "__Shape2D";
+            break;
+        case kIROp_TextureShape3DType:
+            constructor = "__Shape3D";
+            break;
+        case kIROp_TextureShapeCubeType:
+            constructor = "__ShapeCube";
+            break;
+        case kIROp_TextureShapeBufferType:
+            constructor = "__ShapeBuffer";
+            break;
+        case kIROp_DefaultBufferLayoutType:
+            constructor = "DefaultDataLayout";
+            break;
+        case kIROp_DefaultPushConstantBufferLayoutType:
+            constructor = "DefaultPushConstantDataLayout";
+            break;
+        case kIROp_Std140BufferLayoutType:
+            constructor = "Std140DataLayout";
+            break;
+        case kIROp_Std430BufferLayoutType:
+            constructor = "Std430DataLayout";
+            break;
+        case kIROp_ScalarBufferLayoutType:
+            constructor = "ScalarDataLayout";
+            break;
+        case kIROp_CBufferLayoutType:
+            constructor = "CDataLayout";
+            break;
+        case kIROp_HLSLStructuredBufferType:
+            constructor = "StructuredBuffer";
+            break;
+        case kIROp_HLSLRWStructuredBufferType:
+            constructor = "RWStructuredBuffer";
+            break;
+        case kIROp_HLSLAppendStructuredBufferType:
+            constructor = "AppendStructuredBuffer";
+            break;
+        case kIROp_HLSLConsumeStructuredBufferType:
+            constructor = "ConsumeStructuredBuffer";
+            break;
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+            constructor = "RasterizerOrderedStructuredBuffer";
+            break;
+        case kIROp_HLSLByteAddressBufferType:
+            constructor = "ByteAddressBuffer";
+            break;
+        case kIROp_HLSLRWByteAddressBufferType:
+            constructor = "RWByteAddressBuffer";
+            break;
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
+            constructor = "RasterizerOrderedByteAddressBuffer";
+            break;
+        case kIROp_ConstantBufferType:
+            constructor = "ConstantBuffer";
+            break;
+        case kIROp_ParameterBlockType:
+            constructor = "ParameterBlock";
+            break;
+        case kIROp_TextureBufferType:
+            constructor = "TextureBuffer";
+            break;
+        case kIROp_GLSLShaderStorageBufferType:
+            constructor = "GLSLShaderStorageBuffer";
+            break;
+        case kIROp_SamplerStateType:
+            constructor = "SamplerState";
+            break;
+        case kIROp_SamplerComparisonStateType:
+            constructor = "SamplerComparisonState";
+            break;
+        case kIROp_RaytracingAccelerationStructureType:
+            constructor = "RaytracingAccelerationStructure";
+            break;
+        default:
+            // Missing nominal metadata and unsupported intrinsic types are not display-name
+            // opportunities. Leave the operation unfolderable so a consumer requiring a
+            // concrete reflection string diagnoses it at its source location.
+            return LatticeVal::getAny();
+        }
+
+        StringBuilder arguments;
+        bool hasPreviousArg = false;
+        for (UInt i = 0; i < argumentCount; ++i)
+        {
+            auto argument = type->getOperand(i);
+            // lowerSimpleIntrinsicType also carries conformance witnesses as operands. These
+            // prove the declared generic constraints, but are not arguments in source syntax.
+            // Identify them by their type, not by a guessed count of trailing operands.
+            if (as<IRWitnessTableType>(argument->getDataType()))
+                continue;
+            auto flavor = appendGenericArgReflectionName(arguments, argument, hasPreviousArg);
+            if (flavor == LatticeVal::Flavor::None)
+                return LatticeVal::getNone();
+            if (flavor == LatticeVal::Flavor::Any)
+                return LatticeVal::getAny();
+        }
+        StringBuilder name;
+        name << constructor;
+        // Tuple<> is a concrete empty tuple, not the unspecialized Tuple constructor.
+        if (hasPreviousArg || type->getOp() == kIROp_TupleType)
+            name << "<" << arguments << ">";
+        return LatticeVal::getConstant(getBuilder()->getStringValue(name.getUnownedSlice()));
+    }
+
+    LatticeVal evalReflectionNameOf(IRInst* inst)
+    {
+        return evalReflectionName(inst->getOperand(0));
+    }
+
     // In order to perform constant folding, we need to be able to
     // interpret an instruction over the lattice values.
     //
@@ -971,6 +1414,13 @@ struct SCCPContext
         case kIROp_StringLit:
         case kIROp_BoolLit:
             return LatticeVal::getConstant(inst);
+
+        case kIROp_StringFormat:
+            return evalStringFormat(inst);
+        case kIROp_FormatGenericArgReflectionNameList:
+            return evalFormatGenericArgReflectionNameList(inst);
+        case kIROp_ReflectionNameOf:
+            return evalReflectionNameOf(inst);
 
         // We might also want to special-case certain
         // instructions where we shouldn't bother trying to
@@ -2031,6 +2481,9 @@ bool isEvaluableOpCode(IROp op)
     case kIROp_BoolLit:
     case kIROp_FloatLit:
     case kIROp_StringLit:
+    case kIROp_StringFormat:
+    case kIROp_FormatGenericArgReflectionNameList:
+    case kIROp_ReflectionNameOf:
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:

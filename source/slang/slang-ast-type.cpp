@@ -315,34 +315,51 @@ Type* MatrixExpressionType::getRowType()
     return rowType;
 }
 
-static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
+static Type* _getNoDiffType(ASTBuilder* astBuilder, Type* type)
+{
+    if (doesTypeHaveNoDiffModifier(type))
+        return type;
+
+    return astBuilder->getModifiedType(type, {astBuilder->getNoDiffModifierVal()});
+}
+
+// Maps resolved differentiation evidence elementwise so a mixed pack keeps its primal-only slots.
+static Type* getEffectiveDiffPairType(Type* primalType, Witness* evidence)
 {
     auto astBuilder = getCurrentASTBuilder();
 
     if (auto concretePack = as<ConcreteTypePack>(primalType))
     {
         // The differential pair of a type pack should be a type pack of differential pairs.
-        if (auto witnessPack = as<TypePackSubtypeWitness>(diffWitness))
+        auto witnessPack = as<TypePackSubtypeWitness>(evidence);
+        auto optionalPack = as<OptionalWitnessPack>(evidence);
+        SLANG_RELEASE_ASSERT(witnessPack || optionalPack);
+        List<Type*> diffPairTypes;
+        for (Index i = 0; i < concretePack->getTypeCount(); i++)
         {
-            List<Type*> diffPairTypes;
-            for (Index i = 0; i < concretePack->getTypeCount(); i++)
-            {
-                auto elemType = concretePack->getElementType(i);
-                auto elemWitness = witnessPack->getWitness(i);
-                auto diffPairType = getEffectiveDiffPairType(elemType, elemWitness);
-                diffPairTypes.add(diffPairType);
-            }
-            return astBuilder->getTypePack(diffPairTypes.getArrayView());
+            auto elemType = concretePack->getElementType(i);
+            Witness* elemWitness =
+                witnessPack ? witnessPack->getWitness(i) : optionalPack->getWitness(i);
+            diffPairTypes.add(getEffectiveDiffPairType(elemType, elemWitness));
         }
+        return astBuilder->getTypePack(diffPairTypes.getArrayView());
     }
+
+    if (as<NoneWitness>(evidence))
+        return _getNoDiffType(astBuilder, primalType);
+    auto diffWitness = as<SubtypeWitness>(evidence);
+    SLANG_RELEASE_ASSERT(
+        (diffWitness || as<AbsentWitnessPack>(evidence)) && !isUncheckedOptionalWitness(evidence));
 
     if (isAbstractTypePack(primalType))
     {
         // The differential pair of an abstract type pack P should be
         // `expand DiffPair<each P>`.
         auto eachType = astBuilder->getEachType(primalType);
-        auto eachWitness =
-            astBuilder->getEachSubtypeWitness(eachType, diffWitness->getSup(), diffWitness);
+        Witness* eachWitness =
+            diffWitness
+                ? astBuilder->getEachSubtypeWitness(eachType, diffWitness->getSup(), diffWitness)
+                : static_cast<Witness*>(astBuilder->getOrCreate<NoneWitness>());
         auto diffPairEachType = getEffectiveDiffPairType(eachType, eachWitness);
 
         if (auto expandType = as<ExpandType>(primalType))
@@ -458,6 +475,109 @@ static DeclRef<CallableDecl> getCallableDeclRefFromFuncTypeBase(Val* resolvedBas
     return DeclRef<CallableDecl>();
 }
 
+Val* DifferentialOrNoneType::_resolveImplOverride()
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto valueType = as<Type>(_getGenericTypeArg(this, 0)->resolve());
+    auto evidence = as<Witness>(_getGenericTypeArg(this, 1)->resolve());
+    SLANG_RELEASE_ASSERT(valueType && evidence);
+    if (as<NoneWitness>(evidence))
+        return astBuilder->getNoneType();
+
+    // Consider DifferentialOrNone<T> inside a function with optional T : IDifferentiable.
+    // The declaration supplies conditional evidence, not permission to access T.Differential.
+    // Retain that evidence here until substitution selects a real witness or NoneWitness.
+    if (isUncheckedOptionalWitness(evidence))
+        return astBuilder->getDifferentialOrNoneType(valueType, evidence);
+
+    auto subtypeWitness = as<SubtypeWitness>(evidence);
+    SLANG_RELEASE_ASSERT(
+        subtypeWitness && subtypeWitness->getSup() == astBuilder->getDifferentiableInterfaceType());
+    return getDifferentialValueTypeFromWitness(astBuilder, valueType, subtypeWitness);
+}
+
+/// Adds one output slot per ordinary input, retaining pack shape while evidence is optional.
+static void addBackwardInputGradientTypes(
+    ASTBuilder* astBuilder,
+    List<Type*>& parameterTypes,
+    Type* primalType,
+    Witness* evidence)
+{
+    if (auto concretePack = as<ConcreteTypePack>(primalType))
+    {
+        auto optionalPack = as<OptionalWitnessPack>(evidence);
+        auto subtypePack = as<TypePackSubtypeWitness>(evidence);
+        for (Index i = 0; i < concretePack->getTypeCount(); ++i)
+        {
+            Witness* elementEvidence = optionalPack  ? optionalPack->getWitness(i)
+                                       : subtypePack ? subtypePack->getWitness(i)
+                                                     : nullptr;
+            SLANG_RELEASE_ASSERT(optionalPack || subtypePack || !evidence);
+            addBackwardInputGradientTypes(
+                astBuilder,
+                parameterTypes,
+                concretePack->getElementType(i),
+                elementEvidence);
+        }
+        return;
+    }
+
+    if (isAbstractTypePack(primalType))
+    {
+        auto eachType = astBuilder->getEachType(primalType);
+        auto subtypeWitness = as<SubtypeWitness>(evidence);
+        SLANG_RELEASE_ASSERT(!evidence || subtypeWitness || as<AbsentWitnessPack>(evidence));
+        auto eachWitness = subtypeWitness ? astBuilder->getEachSubtypeWitness(
+                                                eachType,
+                                                subtypeWitness->getSup(),
+                                                subtypeWitness)
+                                          : nullptr;
+        List<Type*> elementParameterTypes;
+        addBackwardInputGradientTypes(astBuilder, elementParameterTypes, eachType, eachWitness);
+        SLANG_RELEASE_ASSERT(elementParameterTypes.getCount() == 1);
+        List<Val*> capturedPacks;
+        if (auto expandType = as<ExpandType>(primalType))
+        {
+            for (Index i = 0; i < expandType->getCapturedPackCount(); ++i)
+                capturedPacks.add(expandType->getCapturedPack(i));
+        }
+        else
+        {
+            capturedPacks.add(primalType);
+        }
+        // Parameter direction wraps the pack, just as it does for a declared
+        // `out expand T` parameter. Putting `out` inside the expansion instead
+        // makes overload checking interpret the entire pack as an input value.
+        auto elementOutputType = as<OutParamType>(elementParameterTypes[0]);
+        SLANG_RELEASE_ASSERT(elementOutputType);
+        parameterTypes.add(astBuilder->getOutParamType(astBuilder->getExpandType(
+            elementOutputType->getValueType(),
+            capturedPacks.getArrayView())));
+        return;
+    }
+
+    Type* gradientType = astBuilder->getNoneType();
+    if (auto subtypeWitness = as<SubtypeWitness>(evidence))
+    {
+        if (subtypeWitness->getSup() == astBuilder->getDifferentiableInterfaceType())
+            gradientType = astBuilder->getDifferentialOrNoneType(primalType, evidence);
+    }
+    else
+    {
+        if (auto eachOptional = as<EachOptionalWitness>(evidence))
+        {
+            SLANG_RELEASE_ASSERT(
+                eachOptional->getSup() == astBuilder->getDifferentiableInterfaceType());
+            gradientType = astBuilder->getDifferentialOrNoneType(primalType, evidence);
+        }
+        else
+        {
+            SLANG_RELEASE_ASSERT(!evidence || as<NoneWitness>(evidence));
+        }
+    }
+    parameterTypes.add(astBuilder->getOutParamType(gradientType));
+}
+
 /// Returns the parameter mode produced by the backward-callable transformation.
 ///
 /// This mapping is shared by ordinary parameters and an effective `this` parameter after the
@@ -527,13 +647,19 @@ Val* BwdCallableFuncType::_resolveImplOverride()
                 {
                     // We had a witness but not for a differentiable value type (most likely a
                     // differential pointer type).
-                    newParamTypes.add(astBuilder->getNoneType());
+                    newParamTypes.add(
+                        getDifferentiatedThisParamMode(thisParamDirection) == ParamPassingMode::In
+                            ? astBuilder->getOutParamType(astBuilder->getNoneType())
+                            : astBuilder->getNoneType());
                 }
             }
             else
             {
                 // Non-differentiable this type
-                newParamTypes.add(astBuilder->getNoneType());
+                newParamTypes.add(
+                    getDifferentiatedThisParamMode(thisParamDirection) == ParamPassingMode::In
+                        ? astBuilder->getOutParamType(astBuilder->getNoneType())
+                        : astBuilder->getNoneType());
             }
         }
 
@@ -542,6 +668,15 @@ Val* BwdCallableFuncType::_resolveImplOverride()
         for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
+            if (paramInfo.mode == ParamPassingMode::In)
+            {
+                addBackwardInputGradientTypes(
+                    astBuilder,
+                    newParamTypes,
+                    paramInfo.type,
+                    diffTypeWitness->getParamTypeDiffEvidence(i));
+                continue;
+            }
             auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
 
             auto diffValueType =
@@ -598,6 +733,32 @@ Val* BwdCallableFuncType::_resolveImplOverride()
     }
 }
 
+Type* getApplyForBwdParameterType(
+    ASTBuilder* astBuilder,
+    Type* parameterType,
+    SubtypeWitness* witness)
+{
+    if (!witness || witness->getSup() != astBuilder->getDifferentiableRefInterfaceType())
+        return parameterType;
+    auto [valueType, direction] = getParamInfoFromTypeWithModeWrapper(parameterType);
+    auto pairType = astBuilder->getDifferentialPtrPairType(valueType, witness);
+    switch (direction)
+    {
+    case ParamPassingMode::In:
+        return pairType;
+    case ParamPassingMode::Out:
+        return astBuilder->getOutParamType(pairType);
+    case ParamPassingMode::BorrowInOut:
+        return astBuilder->getBorrowInOutParamType(pairType);
+    case ParamPassingMode::BorrowIn:
+        return astBuilder->getConstRefParamType(pairType);
+    case ParamPassingMode::Ref:
+        return astBuilder->getRefParamType(pairType);
+    default:
+        SLANG_UNEXPECTED("unsupported apply parameter direction");
+    }
+}
+
 Val* ApplyForBwdFuncType::_resolveImplOverride()
 {
     // Resolve all three operands.
@@ -627,63 +788,34 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
         }
         else
         {
-            Type* tupleTypes[] = {funcResultType, resolvedCtxType};
+            // A returned pointer must carry its gradient destination into later calls, just
+            // like a pointer input. For example, Tensor.dmap allocates both buffers in apply.
+            auto applyResultType = getApplyForBwdParameterType(
+                astBuilder,
+                funcResultType,
+                diffTypeWitness->getReturnTypeDiffWitness());
+            Type* tupleTypes[] = {applyResultType, resolvedCtxType};
             resultType = astBuilder->getTupleType(makeArrayView(tupleTypes));
         }
         auto errorType = funcType->getErrorType();
 
-        // Get references to the differentiable interfaces to determine witness type.
-        auto differentiableRefInterface = astBuilder->getDifferentiableRefInterfaceType();
-
-        // Helper to check if witness is for IDifferentiablePtrType.
-        auto isPtrTypeWitness = [&](SubtypeWitness* witness) -> bool
+        // Apply invokes the primal method, so its explicit receiver retains the primal mode.
+        // For example, a constref receiver remains BorrowIn instead of becoming a value parameter.
+        // Pointer receivers still carry the gradient destination required by the apply ABI.
+        if (auto thisParamType = diffTypeWitness->getThisParamType())
         {
-            if (!witness)
-                return false;
-            return witness->getSup() == differentiableRefInterface;
-        };
+            newParamTypes.add(getApplyForBwdParameterType(
+                astBuilder,
+                thisParamType,
+                diffTypeWitness->getThisTypeDiffWitness()));
+        }
 
-        // Process each parameter.
-        // For ApplyForBwd, differentiable params get wrapped in DifferentialPtrPairType.
         for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
-            auto paramInfo = funcType->getParamInfo(i);
-            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
-
-            if (diffWitness && isPtrTypeWitness(diffWitness))
-            {
-                // This is an IDifferentiablePtrType param - use DifferentialPtrPairType.
-                auto ptrPairType =
-                    astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
-
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
-            }
-            else
-            {
-                // Non-ptr-differentiable param - add as-is.
-                // TODO: Probably need to wrap in no-diff
-                newParamTypes.add(funcType->getParamTypeWithModeWrapper(i));
-            }
+            newParamTypes.add(getApplyForBwdParameterType(
+                astBuilder,
+                funcType->getParamTypeWithModeWrapper(i),
+                diffTypeWitness->getParamTypeDiffWitness(i)));
         }
 
         return astBuilder->getFuncType(newParamTypes.getArrayView(), resultType, errorType);
@@ -726,61 +858,18 @@ Val* RematFuncType::_resolveImplOverride()
             auto [thisParamValueType, thisParamMode] =
                 getParamInfoFromTypeWithModeWrapper(thisParamType);
             auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamMode);
-            newParamTypes.add(getParamTypeWithModeWrapper(
+            newParamTypes.add(getApplyForBwdParameterType(
                 astBuilder,
-                thisParamValueType,
-                differentiatedThisMode));
+                getParamTypeWithModeWrapper(astBuilder, thisParamValueType, differentiatedThisMode),
+                diffTypeWitness->getThisTypeDiffWitness()));
         }
 
-        // Get references to the differentiable interfaces to determine witness type.
-        auto differentiableRefInterface = astBuilder->getDifferentiableRefInterfaceType();
-
-        // Helper to check if witness is for IDifferentiablePtrType.
-        auto isPtrTypeWitness = [&](SubtypeWitness* witness) -> bool
-        {
-            if (!witness)
-                return false;
-            return witness->getSup() == differentiableRefInterface;
-        };
-
-        // Remaining parameters match apply_bwd's parameters
-        // (DifferentialPtrPair-wrapped for differentiable params).
         for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
-            auto paramInfo = funcType->getParamInfo(i);
-            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
-
-            if (diffWitness && isPtrTypeWitness(diffWitness))
-            {
-                auto ptrPairType =
-                    astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
-
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
-            }
-            else
-            {
-                newParamTypes.add(funcType->getParamTypeWithModeWrapper(i));
-            }
+            newParamTypes.add(getApplyForBwdParameterType(
+                astBuilder,
+                funcType->getParamTypeWithModeWrapper(i),
+                diffTypeWitness->getParamTypeDiffWitness(i)));
         }
 
         // Return type is the FullCtxType (BwdCallable).
@@ -800,12 +889,67 @@ Val* RematFuncType::_resolveImplOverride()
     }
 }
 
-static Type* _getNoDiffType(ASTBuilder* astBuilder, Type* type)
+static Type* _getBackwardDiffScalarParameterType(
+    ASTBuilder* astBuilder,
+    Type* diffPairOrPrimalType,
+    ParamPassingMode mode)
 {
-    if (doesTypeHaveNoDiffModifier(type))
-        return type;
+    auto valuePairType = as<DifferentialPairType>(diffPairOrPrimalType);
+    auto pointerPairType = as<DifferentialPtrPairType>(diffPairOrPrimalType);
+    auto parameterValueType = valuePairType || pointerPairType
+                                  ? diffPairOrPrimalType
+                                  : _getNoDiffType(astBuilder, diffPairOrPrimalType);
 
-    return astBuilder->getModifiedType(type, {astBuilder->getNoDiffModifierVal()});
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+        if (valuePairType)
+            return astBuilder->getBorrowInOutParamType(diffPairOrPrimalType);
+        if (pointerPairType)
+            return diffPairOrPrimalType;
+        return parameterValueType;
+    case ParamPassingMode::BorrowInOut:
+        if (valuePairType || pointerPairType)
+            return astBuilder->getBorrowInOutParamType(diffPairOrPrimalType);
+        return parameterValueType;
+    case ParamPassingMode::BorrowIn:
+        return astBuilder->getConstRefParamType(parameterValueType);
+    default:
+        SLANG_UNEXPECTED("unsupported parameter mode for backward differential pair");
+    }
+}
+
+void addBackwardDiffParameterTypes(
+    ASTBuilder* astBuilder,
+    List<Type*>& outParamTypes,
+    Type* diffPairOrPrimalType,
+    ParamPassingMode mode)
+{
+    if (auto concretePack = as<ConcreteTypePack>(diffPairOrPrimalType))
+    {
+        for (Index i = 0; i < concretePack->getTypeCount(); ++i)
+        {
+            addBackwardDiffParameterTypes(
+                astBuilder,
+                outParamTypes,
+                concretePack->getElementType(i),
+                mode);
+        }
+        return;
+    }
+
+    if (auto expandType = as<ExpandType>(diffPairOrPrimalType))
+    {
+        List<Val*> capturedPacks;
+        for (Index i = 0; i < expandType->getCapturedPackCount(); ++i)
+            capturedPacks.add(expandType->getCapturedPack(i));
+        outParamTypes.add(astBuilder->getExpandType(
+            _getBackwardDiffScalarParameterType(astBuilder, expandType->getPatternType(), mode),
+            capturedPacks.getArrayView()));
+        return;
+    }
+
+    outParamTypes.add(_getBackwardDiffScalarParameterType(astBuilder, diffPairOrPrimalType, mode));
 }
 
 Val* BwdDiffFuncType::_resolveImplOverride()
@@ -815,7 +959,8 @@ Val* BwdDiffFuncType::_resolveImplOverride()
     auto resolvedWitness = _getGenericTypeArg(this, 1)->resolve();
 
     auto astBuilder = getCurrentASTBuilder();
-    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness);
+        diffTypeWitness && !diffTypeWitness->hasUncheckedOptionalEvidence())
     {
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
@@ -869,7 +1014,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         {
             auto paramInfo = funcType->getParamInfo(i);
 
-            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
+            auto diffWitness = diffTypeWitness->getParamTypeDiffEvidence(i);
 
             switch (paramInfo.mode)
             {
@@ -879,54 +1024,23 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     auto diffValueType = getDifferentialValueTypeFromWitness(
                         astBuilder,
                         paramInfo.type,
-                        diffWitness);
+                        as<SubtypeWitness>(diffWitness));
                     if (diffValueType)
                         newParamTypes.add(diffValueType);
                     break;
                 }
             case ParamPassingMode::In:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        // In parameters become inout differential pairs.
-                        if (as<DifferentialPairType>(pairType))
-                            newParamTypes.add(astBuilder->getBorrowInOutParamType(pairType));
-                        else if (as<DifferentialPtrPairType>(pairType))
-                            newParamTypes.add(pairType);
-                    }
-                    else
-                    {
-                        // Non-differentiable param gets no_diff modifier.
-                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
-                    }
-                    break;
-                }
             case ParamPassingMode::BorrowInOut:
-                {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(astBuilder->getBorrowInOutParamType(pairType));
-                    }
-                    else
-                    {
-                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
-                    }
-                    break;
-                }
             case ParamPassingMode::BorrowIn:
                 {
-                    if (diffWitness)
-                    {
-                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-                        newParamTypes.add(astBuilder->getConstRefParamType(pairType));
-                    }
-                    else
-                    {
-                        newParamTypes.add(astBuilder->getConstRefParamType(
-                            _getNoDiffType(astBuilder, paramInfo.type)));
-                    }
+                    auto pairOrPrimalType =
+                        diffWitness ? getEffectiveDiffPairType(paramInfo.type, diffWitness)
+                                    : paramInfo.type;
+                    addBackwardDiffParameterTypes(
+                        astBuilder,
+                        newParamTypes,
+                        pairOrPrimalType,
+                        paramInfo.mode);
                     break;
                 }
             case ParamPassingMode::Ref:
@@ -966,7 +1080,8 @@ Val* FwdDiffFuncType::_resolveImplOverride()
     auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
     auto resolvedWitness = _getGenericTypeArg(this, 1)->resolve();
 
-    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness);
+        diffTypeWitness && !diffTypeWitness->hasUncheckedOptionalEvidence())
     {
         // If we have a concrete witness, we should be able to turn this into a concrete func-type.
         List<Type*> newParamTypes;
@@ -1004,7 +1119,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
-            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
+            auto diffWitness = diffTypeWitness->getParamTypeDiffEvidence(i);
 
             switch (paramInfo.mode)
             {

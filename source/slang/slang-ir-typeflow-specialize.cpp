@@ -2,6 +2,7 @@
 
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
@@ -1886,7 +1887,8 @@ struct TypeFlowSpecializationContext
             info = analyzeMakeTuple(context, inst);
             break;
         case kIROp_Store:
-            info = analyzeStore(context, as<IRStore>(inst), workQueue);
+        case kIROp_DebugValue:
+            info = analyzeStore(context, inst, workQueue);
             break;
         case kIROp_SwizzledStore:
             info = analyzeSwizzledStore(context, as<IRSwizzledStore>(inst), workQueue);
@@ -2660,8 +2662,26 @@ struct TypeFlowSpecializationContext
         return none(); // No info for other load types
     }
 
-    IRInst* analyzeStore(IRInst* context, IRStore* storeInst, WorkQueue<WorkItem>& workQueue)
+    IRInst* analyzeStore(IRInst* context, IRInst* storeInst, WorkQueue<WorkItem>& workQueue)
     {
+        // DebugValue assigns a value to a source variable's debug storage and follows the same
+        // type flow as Store. Consider this example:
+        //
+        //     interface IFoo { float get(); }
+        //     struct Foo : IFoo
+        //     {
+        //         RWStructuredBuffer<float> buffer;
+        //         int dummy;
+        //         float get() { return buffer[0]; }
+        //     }
+        //     float read(IFoo value) { return value.get(); }
+        //
+        // When read is called only with Foo, specialization narrows value to that struct.
+        // Its debug variable must narrow with it, or resource legalization receives a concrete
+        // value paired with stale interface storage. Reuse the same merge and address propagation
+        // for both assignments, including debug fragments addressed through fields or elements.
+        SLANG_RELEASE_ASSERT(as<IRStore>(storeInst) || as<IRDebugValue>(storeInst));
+
         // For a simple store, we will attempt to update the location with
         // the information from the stored value.
         //
@@ -2672,8 +2692,8 @@ struct TypeFlowSpecializationContext
         // update the ptr with it.
         //
 
-        auto address = storeInst->getPtr();
-        if (auto valInfo = tryGetInfo(context, storeInst->getVal()))
+        auto address = storeInst->getOperand(0);
+        if (auto valInfo = tryGetInfo(context, storeInst->getOperand(1)))
         {
             IRBuilder builder(module);
             auto ptrInfo = builder.getPtrTypeWithAddressSpace(
@@ -2828,6 +2848,29 @@ struct TypeFlowSpecializationContext
         return none(); // No info for the base pointer => no info for the result.
     }
 
+    // Finds the declaration addressed by a field access so all aliases share its typeflow info.
+    // Consider this example:
+    //
+    //     class Owner { IValue items[2]; }
+    //     owner.items[i] = value;
+    //
+    // The store propagates through GetElementPtr to FieldAddress. Its base may be a pointer to
+    // the Owner handle during construction or the handle itself after simplification. Both forms
+    // address the same IRStructField in IRClassType. Recording that field's info lets later loads
+    // and by-value extracts recover the element witness set without guessing conformances.
+    static IRStructField* findAddressedField(IRFieldAddress* fieldAddress)
+    {
+        auto aggregateType = fieldAddress->getBase()->getDataType();
+        if (auto ptrType = as<IRPtrTypeBase>(aggregateType))
+            aggregateType = ptrType->getValueType();
+        if (!as<IRStructType>(aggregateType) && !as<IRClassType>(aggregateType))
+            return nullptr;
+
+        auto field = findStructField(aggregateType, cast<IRStructKey>(fieldAddress->getField()));
+        SLANG_RELEASE_ASSERT(field);
+        return field;
+    }
+
     IRInst* analyzeFieldAddress(IRInst* context, IRFieldAddress* fieldAddress)
     {
         // In this case, we don't look up the base's info, but rather, we find
@@ -2839,59 +2882,51 @@ struct TypeFlowSpecializationContext
         //
         IRBuilder builder(module);
         builder.setInsertAfter(fieldAddress);
-        auto basePtr = fieldAddress->getBase();
-
-        if (auto basePtrType = as<IRPtrTypeBase>(basePtr->getDataType()))
+        if (auto structField = findAddressedField(fieldAddress))
         {
-            if (auto structType = as<IRStructType>(basePtrType->getValueType()))
+            // Register this as a user of the field so updates will invoke this function again.
+            this->fieldUseSites.addIfNotExists(structField, HashSet<InstWithContext>());
+            this->fieldUseSites[structField].add(InstWithContext(context, fieldAddress));
+
+            if (this->fieldInfo.containsKey(structField))
             {
-                auto structField =
-                    findStructField(structType, as<IRStructKey>(fieldAddress->getField()));
+                return builder.getPtrTypeWithAddressSpace(
+                    (IRType*)this->fieldInfo[structField],
+                    as<IRPtrTypeBase>(fieldAddress->getDataType()));
+            }
 
-                // Register this as a user of the field so updates will invoke this function again.
-                this->fieldUseSites.addIfNotExists(structField, HashSet<InstWithContext>());
-                this->fieldUseSites[structField].add(InstWithContext(context, fieldAddress));
-
-                if (this->fieldInfo.containsKey(structField))
+            // When accessing an interface-typed field and no fieldInfo has been
+            // propagated, fall back to enumerating global witness tables.
+            // See the analogous logic in analyzeLoad for direct interface
+            // loads from resource pointers.
+            if (auto interfaceType = as<IRInterfaceType>(structField->getFieldType()))
+            {
+                if (!isComInterfaceType(interfaceType))
                 {
-                    return builder.getPtrTypeWithAddressSpace(
-                        (IRType*)this->fieldInfo[structField],
-                        as<IRPtrTypeBase>(fieldAddress->getDataType()));
-                }
-
-                // When accessing an interface-typed field and no fieldInfo has been
-                // propagated, fall back to enumerating global witness tables.
-                // See the analogous logic in analyzeLoad for direct interface
-                // loads from resource pointers.
-                if (auto interfaceType = as<IRInterfaceType>(structField->getFieldType()))
-                {
-                    if (!isComInterfaceType(interfaceType))
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
+                    if (tables.getCount() > 0)
                     {
-                        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-                        collectExistentialTables(interfaceType, tables);
-                        if (tables.getCount() > 0)
-                        {
-                            auto valueInfo = makeTaggedUnionType(as<IRWitnessTableSet>(
-                                builder.getSet(kIROp_WitnessTableSet, tables)));
-                            module->getContainerPool().free(&tables);
-                            return builder.getPtrTypeWithAddressSpace(
-                                (IRType*)valueInfo,
-                                as<IRPtrTypeBase>(fieldAddress->getDataType()));
-                        }
+                        auto valueInfo = makeTaggedUnionType(
+                            as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
                         module->getContainerPool().free(&tables);
+                        return builder.getPtrTypeWithAddressSpace(
+                            (IRType*)valueInfo,
+                            as<IRPtrTypeBase>(fieldAddress->getDataType()));
                     }
+                    module->getContainerPool().free(&tables);
                 }
-                else if (
-                    auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
-                {
-                    auto valueInfo =
-                        makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
-                            kIROp_WitnessTableSet,
-                            boundInterfaceType->getWitnessTable())));
-                    return builder.getPtrTypeWithAddressSpace(
-                        (IRType*)valueInfo,
-                        as<IRPtrTypeBase>(fieldAddress->getDataType()));
-                }
+            }
+            else if (
+                auto boundInterfaceType = as<IRBoundInterfaceType>(structField->getFieldType()))
+            {
+                auto valueInfo =
+                    makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                        kIROp_WitnessTableSet,
+                        boundInterfaceType->getWitnessTable())));
+                return builder.getPtrTypeWithAddressSpace(
+                    (IRType*)valueInfo,
+                    as<IRPtrTypeBase>(fieldAddress->getDataType()));
             }
         }
 
@@ -2906,10 +2941,12 @@ struct TypeFlowSpecializationContext
 
         IRBuilder builder(module);
 
-        if (auto structType = as<IRStructType>(fieldExtract->getBase()->getDataType()))
+        auto aggregateType = fieldExtract->getBase()->getDataType();
+        if (as<IRStructType>(aggregateType) || as<IRClassType>(aggregateType))
         {
             auto structField =
-                findStructField(structType, as<IRStructKey>(fieldExtract->getField()));
+                findStructField(aggregateType, cast<IRStructKey>(fieldExtract->getField()));
+            SLANG_RELEASE_ASSERT(structField);
 
             // Register this as a user of the field so updates will invoke this function again.
             this->fieldUseSites.addIfNotExists(structField, HashSet<InstWithContext>());
@@ -2920,7 +2957,7 @@ struct TypeFlowSpecializationContext
                 return this->fieldInfo[structField];
             }
 
-            // When extracting an interface-typed field from a struct and no fieldInfo
+            // When extracting an interface-typed field from an aggregate and no fieldInfo
             // has been propagated (e.g. the struct was loaded from a constant buffer
             // rather than constructed via MakeStruct), fall back to enumerating all
             // globally available witness tables for the interface. This mirrors the
@@ -4526,6 +4563,7 @@ struct TypeFlowSpecializationContext
                 typePack,
                 (UInt)newParams.getCount(),
                 newParams.getArrayView().getBuffer());
+            expandDebugValuePackBindings(param, newParams.getArrayView().arrayView);
             param->replaceUsesWith(val);
             param->removeAndDeallocate();
         }
@@ -4983,14 +5021,8 @@ struct TypeFlowSpecializationContext
                 //
 
                 IRBuilder builder(module);
-                auto baseStructPtrType = as<IRPtrTypeBase>(fieldAddress->getBase()->getDataType());
-                auto baseStructType = as<IRStructType>(baseStructPtrType->getValueType());
-                if (!baseStructType)
-                    return; // Do nothing..
-
-                if (auto fieldKey = as<IRStructKey>(fieldAddress->getField()))
+                if (auto foundField = findAddressedField(fieldAddress))
                 {
-                    IRStructField* foundField = findStructField(baseStructType, fieldKey);
                     IRInst* existingInfo = nullptr;
                     this->fieldInfo.tryGetValue(foundField, existingInfo);
 
@@ -5023,13 +5055,11 @@ struct TypeFlowSpecializationContext
                 }
             }
         }
-        else if (auto var = as<IRVar>(inst))
+        else if (as<IRVar>(inst) || as<IRDebugVar>(inst))
         {
-            // If we hit a local var, we'll update its info.
-            //
+            // Local storage and its debug counterpart both merge the types assigned to them.
             // This is one of the base cases for the recursion.
-            //
-            updateInfoForMerge(context, var, info, var->getDataType(), workQueue);
+            updateInfoForMerge(context, inst, info, inst->getDataType(), workQueue);
         }
         else if (auto param = as<IRParam>(inst))
         {
@@ -5256,13 +5286,12 @@ struct TypeFlowSpecializationContext
         }
     }
 
-    // Specialize the fields of a struct type based on the recorded field info (if we
-    // have a non-trivial specilialization)
-    //
-    bool specializeStructType(IRStructType* structType)
+    // Specializes struct and class field storage before rewriting accesses to those fields.
+    bool specializeAggregateFields(IRType* aggregateType)
     {
+        SLANG_RELEASE_ASSERT(as<IRStructType>(aggregateType) || as<IRClassType>(aggregateType));
         bool hasChanges = false;
-        for (auto field : structType->getFields())
+        for (auto field : IRFilteredInstList<IRStructField>(aggregateType->getChildren()))
         {
             IRInst* info = nullptr;
             this->fieldInfo.tryGetValue(field, info);
@@ -5620,7 +5649,7 @@ struct TypeFlowSpecializationContext
     bool performDynamicInstLowering()
     {
         WorkQueue<IRInst*> globalWorkList;
-        List<IRStructType*> structsToProcess;
+        List<IRType*> aggregatesToProcess;
 
         for (auto inst : module->getGlobalInsts())
         {
@@ -5629,16 +5658,18 @@ struct TypeFlowSpecializationContext
                     globalWorkList.enqueue(func);
 
             if (auto structType = as<IRStructType>(inst))
-                structsToProcess.add(structType);
+                aggregatesToProcess.add(structType);
+            else if (auto classType = as<IRClassType>(inst))
+                aggregatesToProcess.add(classType);
         }
 
         bool hasChanges = false;
 
-        // Lower struct types first so that data access can be
+        // Lower aggregate fields first so that data access can be
         // marshalled properly during func specializeing.
         //
-        for (auto structType : structsToProcess)
-            hasChanges |= specializeStructType(structType);
+        for (auto aggregateType : aggregatesToProcess)
+            hasChanges |= specializeAggregateFields(aggregateType);
 
         // Specialize module-scope instructions that had typeflow info seeded
         // by Phase 0 of performInformationPropagation. Must run before
@@ -5886,9 +5917,11 @@ struct TypeFlowSpecializationContext
         case kIROp_FieldExtract:
             return specializeFieldExtract(context, as<IRFieldExtract>(inst));
         case kIROp_Var:
+        case kIROp_DebugVar:
             return specializeVar(context, inst);
         case kIROp_Store:
-            return specializeStore(context, as<IRStore>(inst));
+        case kIROp_DebugValue:
+            return specializeStore(context, inst);
         case kIROp_SwizzledStore:
             return specializeSwizzledStore(context, as<IRSwizzledStore>(inst));
         case kIROp_GetSequentialID:
@@ -7039,7 +7072,14 @@ struct TypeFlowSpecializationContext
                 return replaceCallWithDefaultValue();
 
             if (isIntrinsic(callee))
-                effectiveFuncType = as<IRFuncType>(callee->getDataType());
+            {
+                // A specialized variadic intrinsic can already have a concrete type pack here.
+                // Consider `format("{} {}", x, y)`: the call has three arguments, while the
+                // intrinsic function type still spells its last parameter as a concrete pack.
+                // Use the same canonical pack expansion as call-site typeflow before matching
+                // arguments to parameters.
+                effectiveFuncType = maybeExpandFuncType(as<IRFuncType>(callee->getDataType()));
+            }
             else
                 effectiveFuncType = getEffectiveFuncType(selectedCallee);
 
@@ -7081,6 +7121,23 @@ struct TypeFlowSpecializationContext
             auto arg = inst->getArg(i);
             const auto [paramDirection, paramType] =
                 splitParameterDirectionAndType(effectiveFuncType->getParamType(i + extraArgCount));
+            if (paramDirection.kind == ParameterDirectionInfo::Kind::In)
+            {
+                // Consider `IValue value = new Counter(); value.set(42);`, where the
+                // interface requirement is mutating but Counter.set takes its class handle
+                // by value. Resolving the singleton witness selects that concrete callee
+                // directly. Load the borrowed receiver before adapting its value type, just
+                // as a dynamic-dispatch wrapper does for a call with multiple witnesses.
+                if (auto argumentStorage = as<IRPtrTypeBase>(arg->getDataType()))
+                {
+                    if (argumentStorage->getValueType() == paramType)
+                    {
+                        IRBuilder builder(inst);
+                        builder.setInsertBefore(inst);
+                        arg = builder.emitLoad(arg);
+                    }
+                }
+            }
             if (isConcreteType(funcTypeUnionMask->getParamType(i)))
             {
                 callArgs.add(arg);
@@ -7858,9 +7915,8 @@ struct TypeFlowSpecializationContext
         // `fieldInfo` means the producer already specialized the field's physical type. Only the
         // witness-table fallback needs the bridge.
         auto taggedUnionType = as<IRTaggedUnionType>(specializedType);
-        auto structType = as<IRStructType>(inst->getBase()->getDataType());
         auto structField =
-            structType ? findStructField(structType, as<IRStructKey>(inst->getField())) : nullptr;
+            findStructField(inst->getBase()->getDataType(), cast<IRStructKey>(inst->getField()));
         bool needsBridge = taggedUnionType && as<IRInterfaceType>(fieldType) &&
                            !isComInterfaceType(fieldType) && !isBuiltin(fieldType) && structField &&
                            !this->fieldInfo.containsKey(structField);
@@ -7923,7 +7979,7 @@ struct TypeFlowSpecializationContext
         return type;
     }
 
-    bool handleDefaultStore(IRStore* inst, IRType* destType)
+    bool handleDefaultStore(IRInst* value, IRType* destType)
     {
         // This handles a rare case in the compiler, where we
         // try to use default-construct to initialize a field.
@@ -7935,26 +7991,27 @@ struct TypeFlowSpecializationContext
         // modify the default-construct operand's type to
         // match the field.
         //
-        SLANG_ASSERT(inst->getVal()->getOp() == kIROp_DefaultConstruct);
+        SLANG_ASSERT(value->getOp() == kIROp_DefaultConstruct);
 
         // "Legalize" the store type.
-        if (destType != inst->getVal()->getDataType())
+        if (destType != value->getDataType())
         {
-            inst->getVal()->setFullType(destType);
+            value->setFullType(destType);
             return true;
         }
         else
             return false;
     }
 
-    bool specializeStore(IRInst* context, IRStore* inst)
+    bool specializeStore(IRInst* context, IRInst* inst)
     {
         // Similar to `specializeLoad`, we handle cases where
         // the pointer has been specialized, so that we upcast
         // our value to match the type before writing to the location.
         //
 
-        auto ptr = inst->getPtr();
+        auto ptr = inst->getOperand(0);
+        auto value = inst->getOperand(1);
         // Mirror specializeLoad's element-type extraction: ConstantBuffer
         // and other PointerLikeTypes are not IRPtrTypeBase but expose the
         // element type via getElementType().
@@ -7977,42 +8034,41 @@ struct TypeFlowSpecializationContext
         // removed from Slang, but the auto-diff process can sometimes
         // produce a store of default-constructed value.
         //
-        if (as<IRDefaultConstruct>(inst->getVal()))
-            return handleDefaultStore(inst, ptrInfo);
+        if (as<IRDefaultConstruct>(value))
+            return handleDefaultStore(value, ptrInfo);
 
         IRBuilder builder(context);
         builder.setInsertBefore(inst);
 
-        if (as<IRInterfaceType>(ptrInfo) && as<IRTaggedUnionType>(inst->getVal()->getDataType()))
+        if (as<IRInterfaceType>(ptrInfo) && as<IRTaggedUnionType>(value->getDataType()))
         {
             // Cast the interface pointer to a tagged-union pointer, and then emit the store.
-            auto taggedUnionType = cast<IRTaggedUnionType>(inst->getVal()->getDataType());
+            auto taggedUnionType = cast<IRTaggedUnionType>(value->getDataType());
             IRInst* castArgs[] = {
                 ptr,
                 taggedUnionType->getWitnessTableSet(),
                 taggedUnionType->getTypeSet()};
             // Mirror specializeLoad: preserve address space for plain Ptrs;
             // use a plain Ptr when the source is a PointerLikeType.
-            auto castPtrType = storePtrType
-                                   ? (IRType*)builder.getPtrTypeWithAddressSpace(
-                                         inst->getVal()->getDataType(),
-                                         storePtrType)
-                                   : (IRType*)builder.getPtrType(inst->getVal()->getDataType());
+            auto castPtrType = storePtrType ? (IRType*)builder.getPtrTypeWithAddressSpace(
+                                                  value->getDataType(),
+                                                  storePtrType)
+                                            : (IRType*)builder.getPtrType(value->getDataType());
             auto newPtr = builder.emitIntrinsicInst(
                 castPtrType,
                 kIROp_CastInterfaceToTaggedUnionPtr,
                 3,
                 castArgs);
-            builder.replaceOperand(inst->getPtrUse(), newPtr);
+            builder.replaceOperand(inst->getOperands(), newPtr);
             return true;
         }
 
-        auto specializedVal = upcastSet(&builder, inst->getVal(), ptrInfo);
+        auto specializedVal = upcastSet(&builder, value, ptrInfo);
 
-        if (specializedVal != inst->getVal())
+        if (specializedVal != value)
         {
             // If the value was changed, we need to update the store instruction.
-            builder.replaceOperand(inst->getValUse(), specializedVal);
+            builder.replaceOperand(inst->getOperands() + 1, specializedVal);
             return true;
         }
 
@@ -8256,6 +8312,7 @@ struct TypeFlowSpecializationContext
 
             IRBuilder builder(inst);
             auto destTaggedUnionType = cast<IRTaggedUnionType>(tryGetInfo(context, inst));
+
             if (destTaggedUnionType != srcTaggedUnionType)
             {
                 // If the source and destination tagged-union types are different,
@@ -8268,9 +8325,18 @@ struct TypeFlowSpecializationContext
                     1,
                     &tag);
 
-                auto unpackedValue = builder.emitUnpackAnyValue(
-                    getLoweredType(makeUntaggedUnionType(destTaggedUnionType->getTypeSet())),
-                    builder.emitGetValueFromTaggedUnion(inst->getOptionalOperand()));
+                auto payloadType =
+                    getLoweredType(makeUntaggedUnionType(destTaggedUnionType->getTypeSet()));
+                // Consider `Optional<IFoo> foo = {}; if (let f = foo) { ... }`.
+                // The extraction has no possible payload, but its unreachable branch can
+                // still carry debug uses. Keep the tagged-union representation and its tag
+                // mapping; there is no payload to unpack from the source's none value.
+                auto unpackedValue =
+                    destTaggedUnionType->getTypeSet()->isEmpty()
+                        ? builder.getPoison(payloadType)
+                        : builder.emitUnpackAnyValue(
+                              payloadType,
+                              builder.emitGetValueFromTaggedUnion(inst->getOptionalOperand()));
 
                 auto newTaggedUnion = builder.emitMakeTaggedUnion(
                     getLoweredType(destTaggedUnionType),

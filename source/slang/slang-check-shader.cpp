@@ -1811,10 +1811,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         SemanticsVisitor visitor(shared);
 
         auto typeTags = visitor.getTypeTags(returnType);
-        bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
-                                         (((int)typeTags & (int)TypeTag::Unsized) != 0);
+        bool hasResourceTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0);
+        bool hasUnsizedTypes = (((int)typeTags & (int)TypeTag::Unsized) != 0);
 
-        if (hasResourceOrUnsizedTypes)
+        if (hasUnsizedTypes || (hasResourceTypes && stage != Stage::Dispatch))
         {
             sink->diagnose(Diagnostics::EntryPointCannotReturnResourceType{
                 .entryPoint = entryPointName,
@@ -2687,7 +2687,7 @@ bool resolveStageOfProfileWithEntryPoint(
     Profile& entryPointProfile,
     CompilerOptionSet& optionSet,
     const List<RefPtr<TargetRequest>>& targets,
-    FuncDecl* entryPointFuncDecl,
+    FunctionDeclBase* entryPointFuncDecl,
     DiagnosticSink* sink)
 {
     if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
@@ -3627,7 +3627,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     RefPtr<EntryPointSpecializationInfo> info = new EntryPointSpecializationInfo();
 
-    DeclRef<FuncDecl> specializedFuncDeclRef = m_funcDeclRef;
+    DeclRef<FunctionDeclBase> specializedFuncDeclRef = m_funcDeclRef;
     Index genericArgCount = genericSpecializationParamCount;
     if (genericSpecializationParamCount)
     {

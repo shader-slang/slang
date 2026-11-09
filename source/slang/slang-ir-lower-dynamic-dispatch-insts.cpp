@@ -1,6 +1,7 @@
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 
 #include "slang-ir-any-value-marshalling.h"
+#include "slang-ir-hgbc-owned-erasure.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -90,6 +91,12 @@ IRInst* maybeUnpackArg(
         }
         else
         {
+            // A mutating interface requirement passes its receiver by address, but a class
+            // implementation receives the class handle by value. Unpack the stored payload,
+            // not the address of its carrier. The class method mutates the referenced object
+            // and does not replace the existential, so no payload writeback is needed.
+            if (as<IRPtrTypeBase>(arg->getDataType()))
+                argVal = builder->emitLoad(arg);
             return builder->emitUnpackAnyValue(paramValType, argVal);
         }
     }
@@ -768,6 +775,14 @@ struct UntaggedUnionLoweringContext : public InstPassBase
 
     void lowerUntaggedUnionType(IRUntaggedUnionType* untaggedUnionType)
     {
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            IRBuilder builder(module);
+            // Payload temporaries can outlive their enclosing existential. Giving the payload
+            // its own dynamic owner preserves its concrete type through copies and writeback.
+            untaggedUnionType->replaceUsesWith(getHGBCBoxType(builder));
+            return;
+        }
         // `none` has no payload, so a set with one real type needs no AnyValue container. For
         // example, `UntaggedUnion({Foo, none})` can store `Foo` directly while the tagged union's
         // separate witness-table tag continues to record whether the value is `Foo` or `none`.
@@ -886,8 +901,9 @@ void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, Dia
 //
 struct SequentialIDTagLoweringContext : public InstPassBase
 {
-    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module)
-        : InstPassBase(module), m_linkage(linkage)
+    bool preserveInvalidIDs;
+    SequentialIDTagLoweringContext(Linkage* linkage, IRModule* module, bool preserveInvalidIDs)
+        : InstPassBase(module), preserveInvalidIDs(preserveInvalidIDs), m_linkage(linkage)
     {
     }
     void lowerGetTagFromSequentialID(IRGetTagFromSequentialID* inst)
@@ -939,7 +955,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
         auto translatedID = builder.emitCallInst(
             inst->getDataType(),
-            createIntegerMappingFunc(builder.getModule(), mapping, mapping[defaultSeqID]),
+            // Local tags start at one. Keeping an unknown public ID invalid lets HGBC's checked
+            // constructor reject it instead of silently selecting the last registered type.
+            createIntegerMappingFunc(
+                builder.getModule(),
+                mapping,
+                preserveInvalidIDs ? 0 : mapping[defaultSeqID]),
             List<IRInst*>({srcSeqID}));
 
         inst->replaceUsesWith(translatedID);
@@ -1126,10 +1147,14 @@ private:
     Linkage* m_linkage;
 };
 
-void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink)
+void lowerSequentialIDTagCasts(
+    IRModule* module,
+    Linkage* linkage,
+    DiagnosticSink* sink,
+    bool preserveInvalidIDs)
 {
     SLANG_UNUSED(sink);
-    SequentialIDTagLoweringContext context(linkage, module);
+    SequentialIDTagLoweringContext context(linkage, module, preserveInvalidIDs);
     context.processModule();
 }
 
@@ -1207,8 +1232,9 @@ bool isEffectivelyComPtrType(IRType* type)
 //
 struct TaggedUnionLoweringContext : public InstPassBase
 {
-    TaggedUnionLoweringContext(IRModule* module)
-        : InstPassBase(module)
+    TargetProgram* targetProgram;
+    TaggedUnionLoweringContext(IRModule* module, TargetProgram* targetProgram)
+        : InstPassBase(module), targetProgram(targetProgram)
     {
     }
 
@@ -1219,10 +1245,34 @@ struct TaggedUnionLoweringContext : public InstPassBase
         IRBuilder* builder,
         IRInst* val,
         IRInst* interfaceType,
-        IRInst* targetType)
+        IRInst* targetType,
+        IRWitnessTableSet* witnessTableSet = nullptr)
     {
         auto baseInterfaceValue = val;
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            List<IRInst*> args;
+            args.add(val);
+            forEachInSet(
+                module,
+                witnessTableSet,
+                [&](IRInst* witness)
+                {
+                    if (auto table = as<IRWitnessTable>(witness))
+                    {
+                        args.add(builder->emitGetSequentialIDInst(table));
+                        args.add(builder->getIntValue(
+                            builder->getUIntType(),
+                            builder->getUniqueID(table)));
+                    }
+                });
+            return builder->emitIntrinsicInst(
+                cast<IRType>(targetType),
+                kIROp_HGVMConvertTaggedUnion,
+                args.getCount(),
+                args.getBuffer());
+        }
         // Singleton case: the tagged union was lowered directly to the element type.
         if (!as<IRTupleType>(targetType))
         {
@@ -1266,6 +1316,29 @@ struct TaggedUnionLoweringContext : public InstPassBase
         IRInst* taggedUnionType,
         IRWitnessTableSet* witnessTableSet = nullptr)
     {
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            List<IRInst*> args;
+            args.add(val);
+            forEachInSet(
+                module,
+                witnessTableSet,
+                [&](IRInst* witness)
+                {
+                    if (auto table = as<IRWitnessTable>(witness))
+                    {
+                        args.add(builder->getIntValue(
+                            builder->getUIntType(),
+                            builder->getUniqueID(table)));
+                        args.add(builder->emitGetSequentialIDInst(table));
+                    }
+                });
+            return builder->emitIntrinsicInst(
+                cast<IRType>(interfaceType),
+                kIROp_HGVMConvertTaggedUnion,
+                args.getCount(),
+                args.getBuffer());
+        }
         // Singleton case: the tagged union was lowered directly to the element type.
         if (!as<IRTupleType>(taggedUnionType))
         {
@@ -1372,7 +1445,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                             &builder,
                             user,
                             baseInterfaceType,
-                            as<IRPtrTypeBase>(inst->getDataType())->getValueType());
+                            as<IRPtrTypeBase>(inst->getDataType())->getValueType(),
+                            witnessTableSet);
                         for (auto oldUse : oldUses)
                         {
                             builder.replaceOperand(oldUse, newVal);
@@ -1430,7 +1504,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                             &builder,
                             user,
                             baseInterfaceType,
-                            as<IRPtrTypeBase>(inst->getDataType())->getValueType());
+                            as<IRPtrTypeBase>(inst->getDataType())->getValueType(),
+                            witnessTableSet);
                         for (auto oldUse : oldUses)
                         {
                             builder.replaceOperand(oldUse, newVal);
@@ -1461,6 +1536,29 @@ struct TaggedUnionLoweringContext : public InstPassBase
         auto typeSet = builder.getUntaggedUnionType(taggedUnion->getTypeSet());
         auto tableSet = taggedUnion->getWitnessTableSet();
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            List<IRInst*> cases;
+            forEachInSet(
+                module,
+                tableSet,
+                [&](IRInst* witness)
+                {
+                    auto table = as<IRWitnessTable>(witness);
+                    SLANG_RELEASE_ASSERT(
+                        table || as<IRNoneWitnessTableElement>(witness) ||
+                        as<IRUninitializedWitnessTableElement>(witness));
+                    cases.add(
+                        builder.getIntValue(builder.getUIntType(), builder.getUniqueID(witness)));
+                    cases.add(table ? table->getConcreteType() : builder.getVoidType());
+                });
+            return cast<IRType>(builder.emitIntrinsicInst(
+                nullptr,
+                kIROp_HGVMTaggedUnionType,
+                cases.getCount(),
+                cases.getBuffer()));
+        }
+
         if (taggedUnion->isSingleton())
         {
             auto elementType = (IRType*)taggedUnion->getTypeSet()->getElement(0);
@@ -1482,6 +1580,41 @@ struct TaggedUnionLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         auto tupleVal = inst->getOperand(0);
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            auto resultType = inst->getDataType();
+            if (as<IRNoneTypeElement>(resultType))
+            {
+                // Optional widening can extract the `none` value before placing it in a
+                // larger union. It carries no bytes, but extraction must still check that
+                // the source actually holds the none case. Untagged-union lowering changes
+                // the result marker to Void, which the checked projection supports.
+                IRInst* args[] = {
+                    tupleVal,
+                    builder.getIntValue(
+                        builder.getUIntType(),
+                        builder.getUniqueID(builder.getNoneWitnessTableElement()))};
+                inst->replaceUsesWith(builder.emitIntrinsicInst(
+                    resultType,
+                    kIROp_HGVMExtractTaggedUnion,
+                    SLANG_COUNT_OF(args),
+                    args));
+                inst->removeAndDeallocate();
+                return true;
+            }
+            auto box = builder.emitIntrinsicInst(
+                getHGBCBoxType(builder),
+                kIROp_HGVMGetTaggedUnionPayload,
+                1,
+                &tupleVal);
+            auto value = as<IRUntaggedUnionType>(resultType)
+                             ? box
+                             : emitHGBCPayloadConversion(builder, resultType, box);
+            inst->replaceUsesWith(value);
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         // Singleton case: the tagged union was lowered directly to the element type,
         // so GetValue is a no-op.
@@ -1507,6 +1640,18 @@ struct TaggedUnionLoweringContext : public InstPassBase
     {
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            auto value = inst->getOperand(0);
+            inst->replaceUsesWith(builder.emitIntrinsicInst(
+                inst->getDataType(),
+                kIROp_HGVMGetTaggedUnionCase,
+                1,
+                &value));
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         // Singleton case: the tag is a compile-time constant.
         auto tagType = cast<IRSetTagType>(inst->getDataType());
@@ -1563,6 +1708,19 @@ struct TaggedUnionLoweringContext : public InstPassBase
     {
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            IRInst* args[] = {inst->getOperand(1), inst->getOperand(2)};
+            // The payload may still carry a symbolic set type. Its pack operation will become
+            // a box when lowerUntaggedUnionTypes resolves that type immediately after this pass.
+            if (!as<IRUntaggedUnionType>(args[1]->getDataType()))
+                args[1] = emitHGBCBox(builder, args[1]);
+            inst->replaceUsesWith(
+                builder.emitIntrinsicInst(inst->getDataType(), kIROp_HGVMMakeTaggedUnion, 2, args));
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         // Singleton case: MakeTaggedUnion is a no-op, just use the value directly.
         if (!as<IRTupleType>(inst->getDataType()))
@@ -1644,11 +1802,11 @@ struct TaggedUnionLoweringContext : public InstPassBase
     }
 };
 
-bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink)
+bool lowerTaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
-    TaggedUnionLoweringContext context(module);
+    TaggedUnionLoweringContext context(module, targetProgram);
     return context.processModule();
 }
 
@@ -1781,6 +1939,30 @@ struct ExistentialLoweringContext : public InstPassBase
         if (isBuiltin(interfaceType))
             return (IRType*)builder.getIntValue(builder.getIntType(), 0);
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            List<IRInst*> cases;
+            // Witness tables are the canonical conformance map. Copy the concrete payload
+            // types and public IDs before the remaining interface metadata is stripped.
+            for (auto global : module->getGlobalInsts())
+            {
+                auto table = as<IRWitnessTable>(global);
+                if (!table || table->getConformanceType() != interfaceType)
+                    continue;
+                auto decoration = table->findDecoration<IRSequentialIDDecoration>();
+                if (!decoration)
+                    continue;
+                cases.add(
+                    builder.getIntValue(builder.getUIntType(), decoration->getSequentialID()));
+                cases.add(table->getConcreteType());
+            }
+            return builder.emitIntrinsicInst(
+                nullptr,
+                kIROp_HGVMTaggedUnionType,
+                cases.getCount(),
+                cases.getBuffer());
+        }
+
         // In the dynamic-dispatch case, a value of interface type
         // is going to be packed into the "any value" part of a tuple.
         // The size of the "any value" part depends on the interface
@@ -1808,6 +1990,13 @@ struct ExistentialLoweringContext : public InstPassBase
 
     IRInst* lowerBoundInterfaceType(IRBoundInterfaceType* boundInterfaceType)
     {
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            // Ordinary interface types are replaced before bound interface types in this pass.
+            auto representation = boundInterfaceType->getInterfaceType();
+            SLANG_RELEASE_ASSERT(representation->getOp() == kIROp_HGVMTaggedUnionType);
+            return representation;
+        }
         // A bound interface type represents an existential together with
         // static knowledge that the value stored in the extistential has
         // a particular concrete type.
@@ -1884,6 +2073,15 @@ struct ExistentialLoweringContext : public InstPassBase
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            // Dynamic type values are consumed by payload extraction. HGBC preserves their
+            // identity in the box rather than using the obsolete RTTI integer placeholder.
+            inst->replaceUsesWith(getHGBCBoxType(builder));
+            inst->removeAndDeallocate();
+            return true;
+        }
+
         if (auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType()))
         {
             inst->replaceUsesWith(builder.emitGetTupleElement(
@@ -1907,6 +2105,19 @@ struct ExistentialLoweringContext : public InstPassBase
 
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            auto value = inst->getOperand(0);
+            auto tag = builder.emitIntrinsicInst(
+                builder.getUIntType(),
+                kIROp_HGVMGetTaggedUnionCase,
+                1,
+                &value);
+            inst->replaceUsesWith(makeHandleFromID(builder, tag));
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         if (auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType()))
         {
@@ -1936,6 +2147,19 @@ struct ExistentialLoweringContext : public InstPassBase
 
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            auto value = inst->getOperand(0);
+            auto box = builder.emitIntrinsicInst(
+                getHGBCBoxType(builder),
+                kIROp_HGVMGetTaggedUnionPayload,
+                1,
+                &value);
+            inst->replaceUsesWith(emitHGBCPayloadConversion(builder, inst->getDataType(), box));
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType());
         auto element =
@@ -1979,6 +2203,23 @@ struct ExistentialLoweringContext : public InstPassBase
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            auto value = inst->getOperand(0);
+            auto box = builder.emitIntrinsicInst(
+                getHGBCBoxType(builder),
+                kIROp_HGVMGetTaggedUnionPayload,
+                1,
+                &value);
+            auto resultType = inst->getDataType();
+            inst->replaceUsesWith(
+                resultType->getOp() == kIROp_ExtractExistentialType
+                    ? box
+                    : emitHGBCPayloadConversion(builder, resultType, box));
+            inst->removeAndDeallocate();
+            return true;
+        }
+
         if (auto tupleType = as<IRTupleType>(inst->getOperand(0)->getDataType()))
         {
             inst->replaceUsesWith(builder.emitGetTupleElement(
@@ -2013,6 +2254,15 @@ struct ExistentialLoweringContext : public InstPassBase
 
         auto witnessTableID = inst->getOperand(0);
         auto value = inst->getOperand(1);
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            IRInst* args[] = {witnessTableID, emitHGBCBox(builder, value)};
+            inst->replaceUsesWith(
+                builder.emitIntrinsicInst(inst->getDataType(), kIROp_HGVMMakeTaggedUnion, 2, args));
+            inst->removeAndDeallocate();
+            return true;
+        }
 
         // Build the RTTI and witness-table-ID handle values via the handle
         // helpers, so this site does not depend on the lowered representation.

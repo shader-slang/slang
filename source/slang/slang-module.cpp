@@ -9,6 +9,59 @@
 namespace Slang
 {
 
+static bool _isHGBCTarget(TargetRequest* target)
+{
+    return target && target->getTarget() == CodeGenTarget::HGBC;
+}
+
+static bool _isDispatchEntryPointTarget(TargetRequest* target)
+{
+    if (!target)
+        return false;
+
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::HostVM:
+    case CodeGenTarget::HGBC:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool _shouldDiscoverEntryPointForTargets(
+    const Profile& profile,
+    const List<RefPtr<TargetRequest>>& targets)
+{
+    bool hasHGBCTarget = false;
+    bool hasDispatchEntryPointTarget = false;
+    for (auto target : targets)
+    {
+        if (_isHGBCTarget(target))
+        {
+            hasHGBCTarget = true;
+        }
+
+        if (_isDispatchEntryPointTarget(target))
+            hasDispatchEntryPointTarget = true;
+    }
+
+    // Graph/dispatch entry points are executable entry points only for graph-capable
+    // targets. Device shader sessions can still load modules containing graph code as
+    // payload-module IR for HGBC, but should not rediscover graph functions as device entry
+    // points.
+    if (profile.getStage() == Stage::Dispatch)
+        return targets.getCount() == 0 || hasDispatchEntryPointTarget;
+
+    // HGBC modules can contain ordinary compute/graphics shader entry points that are invoked
+    // from graph code. Treat only graph/dispatch shaders as HGBC entry points, so payload shaders
+    // are validated later for their actual device target instead of against the HGBC target.
+    if (hasHGBCTarget)
+        return profile.getStage() == Stage::Dispatch;
+
+    return true;
+}
+
 //
 // Module
 //
@@ -95,10 +148,20 @@ RefPtr<EntryPoint> Module::findEntryPointByName(UnownedStringSlice const& name)
     for (auto entryPoint : m_entryPoints)
     {
         if (entryPoint->getName()->text.getUnownedSlice() == name)
-            return entryPoint;
+            return _validateEntryPoint(entryPoint);
     }
 
     return nullptr;
+}
+
+RefPtr<EntryPoint> Module::_validateEntryPoint(EntryPoint* entryPoint, ISlangBlob** outDiagnostics)
+{
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+    DiagnosticSink sink(getLinkage()->getSourceManager(), DiagnosticSink::SourceLocationLexer());
+    applySettingsToDiagnosticSink(&sink, &sink, getLinkage()->m_optionSet);
+    validateEntryPoint(entryPoint, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+    return sink.getErrorCount() ? nullptr : entryPoint;
 }
 
 RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
@@ -106,11 +169,13 @@ RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
     SlangStage stage,
     ISlangBlob** outDiagnostics)
 {
-    // If there is already an entrypoint marked with the [shader] attribute,
-    // we should just return that.
-    //
-    if (auto existingEntryPoint = findEntryPointByName(name))
-        return existingEntryPoint;
+    // Binary libraries discover declarations without validating them for the loading target.
+    // Validate the selected shader here, retaining diagnostics for the caller.
+    for (auto entryPoint : m_entryPoints)
+    {
+        if (entryPoint->getName()->text.getUnownedSlice() == name)
+            return _validateEntryPoint(entryPoint, outDiagnostics);
+    }
 
     SLANG_AST_BUILDER_RAII(m_astBuilder);
 
@@ -348,8 +413,8 @@ void Module::_discoverEntryPointsImpl(
             continue;
         }
 
-        auto funcDecl = as<FuncDecl>(maybeFuncDecl);
-        if (!funcDecl)
+        auto funcDecl = as<FunctionDeclBase>(maybeFuncDecl);
+        if (!funcDecl || (!as<FuncDecl>(funcDecl) && !as<ConstructorDecl>(funcDecl)))
             continue;
 
         Profile profile;
@@ -403,10 +468,18 @@ void Module::_discoverEntryPointsImpl(
                 continue;
         }
 
+        if (!_shouldDiscoverEntryPointForTargets(profile, targets))
+            continue;
+
         RefPtr<EntryPoint> entryPoint =
             EntryPoint::create(getLinkage(), makeDeclRef(funcDecl), profile);
 
-        validateEntryPoint(entryPoint, sink);
+        // Binary libraries already have IR. Loading one must not validate unused shaders
+        // against the current target (for example, RT helpers imported by WebGPU compute).
+        // Entry-point lookup validates the selected declaration instead. Source checking
+        // precedes IR generation and keeps its existing eager entry-point diagnostics.
+        if (!getIRModule())
+            validateEntryPoint(entryPoint, sink);
 
         // Note: in the case that the user didn't explicitly
         // specify entry points and we are instead compiling

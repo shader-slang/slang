@@ -6,125 +6,58 @@
 
 namespace Slang
 {
-bool DebugValueStoreContext::isTypeKind(IRInst* inst)
+void expandDebugValuePackBindings(IRInst* packValue, ArrayView<IRInst*> elements)
 {
-    if (!inst)
-        return true;
-    switch (inst->getOp())
+    // Consider `out expand each T values` specialized with T = (uint, float).
+    // Parameter expansion produces two reference parameters. Bind those references to the
+    // source pack's element fragments directly, so debug metadata does not require a runtime
+    // aggregate containing OutParam values. The fragment types retain each scalar parameter's
+    // reference convention, just like an ordinary scalar reference parameter's debug binding.
+    List<IRDebugValue*> bindings;
+    for (auto use = packValue->firstUse; use; use = use->nextUse)
+        if (auto binding = as<IRDebugValue>(use->getUser()))
+            if (binding->getValue() == packValue)
+                bindings.add(binding);
+
+    IRBuilder builder(packValue);
+    for (auto binding : bindings)
     {
-    case kIROp_TypeKind:
-    case kIROp_TypeType:
-        return true;
-    default:
-        return false;
+        builder.setInsertBefore(binding);
+        for (Index i = 0; i < elements.getCount(); ++i)
+        {
+            auto element = elements[i];
+            auto fragment = builder.emitElementAddress(
+                builder.getPtrType(element->getFullType()),
+                binding->getDebugVar(),
+                builder.getIntValue(builder.getIntType(), i));
+            auto update = builder.emitDebugValue(fragment, element);
+            copyNameHintAndDebugDecorations(update, binding);
+        }
+        binding->removeAndDeallocate();
     }
 }
-bool DebugValueStoreContext::isDebuggableType(IRType* type)
-{
-    if (bool* result = m_mapTypeToDebugability.tryGetValue(type))
-        return *result;
 
-    bool debuggable = false;
-    switch (type->getOp())
-    {
-    case kIROp_VoidType:
-        break;
-    case kIROp_StructType:
-        {
-            auto structType = static_cast<IRStructType*>(type);
-            bool structDebuggable = true;
-            for (auto field : structType->getFields())
-            {
-                if (!isDebuggableType(field->getFieldType()))
-                {
-                    structDebuggable = false;
-                    break;
-                }
-            }
-            debuggable = structDebuggable;
-            break;
-        }
-    case kIROp_ArrayType:
-    case kIROp_UnsizedArrayType:
-        {
-            auto arrayType = static_cast<IRArrayTypeBase*>(type);
-            debuggable = isDebuggableType(arrayType->getElementType());
-            break;
-        }
-    case kIROp_HLSLInputPatchType:
-    case kIROp_HLSLOutputPatchType:
-    case kIROp_HLSLTriangleStreamType:
-        {
-            auto elementType = as<IRType>(type->getOperand(0));
-            debuggable = isDebuggableType(elementType);
-            break;
-        }
-    case kIROp_VectorType:
-    case kIROp_MatrixType:
-    case kIROp_PtrType:
-        debuggable = true;
-        break;
-    case kIROp_Param:
-        // Assume generic parameters are debuggable.
-        debuggable = true;
-        break;
-    case kIROp_Specialize:
-        {
-            auto specType = as<IRSpecialize>(type);
-            auto specTypeDebuggable =
-                isDebuggableType((IRType*)getResolvedInstForDecorations(specType));
-            if (!specTypeDebuggable)
-                break;
-            for (UInt i = 0; i < specType->getArgCount(); i++)
-            {
-                auto arg = specType->getArg(i);
-                if (isTypeKind(arg->getDataType()) &&
-                    !isDebuggableType((IRType*)specType->getArg(i)))
-                {
-                    specTypeDebuggable = false;
-                    break;
-                }
-            }
-            debuggable = false; // specTypeDebuggable;
-            break;
-        }
-    case kIROp_EnumType:
-        {
-            auto enumType = as<IREnumType>(type);
-            debuggable = isDebuggableType(enumType->getTagType());
-            break;
-        }
-    default:
-        if (as<IRBasicType>(type))
-            debuggable = true;
-        break;
-    }
-    m_mapTypeToDebugability[type] = debuggable;
-    return debuggable;
+/// Reuses the types of the original address chain when describing a variable fragment.
+/// Consider a store to `Pair<uint>.x` before specialization: lowering already computed the field
+/// address type, while rediscovering it from the generic struct would require specialization.
+static void emitDebugValueUpdate(
+    IRBuilder& builder,
+    IRInst* debugVar,
+    IRInst* newValue,
+    const List<IRInst*>& accessChain,
+    const List<IRInst*>& accessTypes)
+{
+    auto ptr = builder.emitElementAddress(
+        debugVar,
+        accessChain.getArrayView(),
+        accessTypes.getArrayView());
+    builder.emitDebugValue(ptr, newValue);
 }
 
-// True if `type` (after unwrapping attributed types) is a leaf opaque handle eligible for a
-// source-level debug variable: a texture or a sampler-state-family type. Deliberately narrower than
-// the broad isResourceType legalization classifier — no array unwrapping, no buffer / pointer-like
-// / subpass / builtin-generic shapes — because only these leaf handles get a DebugLocalVariable
-// with no backing OpVariable.
-static bool isSupportedOpaqueDebugHandleType(IRType* type)
-{
-    type = (IRType*)unwrapAttributedType(type);
-    return as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type);
-}
-
-// True if a function-local `var`/`let` of `type` should get a source-level DebugVar. Extends
-// isDebuggableType (scalars/vectors/matrices and aggregates of those) with the supported opaque
-// leaf handles: unlike plain data, a handle gets a DebugLocalVariable with no backing OpVariable
-// and is bound to its lowered SSA value by a DebugValue. This is a type decision only; whether the
-// concrete lowered value is a representable DebugValue operand is checked in SPIR-V legalization.
-bool DebugValueStoreContext::isDebugVarTypeSupported(IRType* type)
-{
-    return isDebuggableType(type) || isSupportedOpaqueDebugHandleType(type);
-}
-
-void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
+/// Records source variables before SSA promotion erases their storage and assignments.
+/// All declared types participate; specialization and target lowering preserve their
+/// representation.
+static void insertDebugValueStore(IRFunc* func)
 {
     IRBuilder builder(func);
     Dictionary<IRInst*, IRInst*> mapVarToDebugVar;
@@ -147,19 +80,6 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     {
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
         auto paramType = param->getDataType();
-        bool isRefParam = false;
-        if (auto outType = as<IROutParamTypeBase>(paramType))
-        {
-            isRefParam = true;
-            paramType = outType->getValueType();
-        }
-        else if (auto ptrType = as<IRBorrowInParamType>(param->getDataType()))
-        {
-            isRefParam = true;
-            paramType = ptrType->getValueType();
-        }
-        if (!isDebuggableType(paramType))
-            continue;
         auto debugVar = builder.emitDebugVar(
             paramType,
             funcDebugLoc->getSource(),
@@ -168,6 +88,18 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             debugFunc,
             builder.getIntValue(builder.getUIntType(), paramIndex));
         copyNameHintAndDebugDecorations(debugVar, param);
+
+        // Reference parameters describe storage, so their debug value is the address itself.
+        // For `void update(__ref uint value)`, a write to `value` changes the pointee but does
+        // not replace this binding with a uint snapshot. This also avoids reading an `out`
+        // parameter before the callee initializes it.
+        if (as<IROutParamTypeBase>(paramType) || as<IRBorrowInParamType>(paramType) ||
+            as<IRRefParamType>(paramType))
+        {
+            builder.emitDebugValue(debugVar, param);
+            paramIndex++;
+            continue;
+        }
 
         mapVarToDebugVar[param] = debugVar;
 
@@ -182,22 +114,9 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             }
         }
 
-        // Store the initial value of the parameter into the debug var.
-        IRInst* paramVal = nullptr;
-        if (!isRefParam)
+        if (!hasProxyVar)
         {
-            paramVal = param;
-        }
-        else if (
-            as<IRBorrowInOutParamType>(param->getDataType()) ||
-            as<IRBorrowInParamType>(param->getDataType()))
-        {
-            paramVal = builder.emitLoad(param);
-        }
-
-        if (paramVal && !hasProxyVar)
-        {
-            builder.emitDebugValue(debugVar, paramVal);
+            builder.emitDebugValue(debugVar, param);
         }
         paramIndex++;
     }
@@ -214,8 +133,6 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                 {
                     auto varType = tryGetPointedToType(&builder, varInst->getDataType());
                     builder.setInsertBefore(varInst);
-                    if (!isDebugVarTypeSupported(varType))
-                        continue;
                     auto debugVar = builder.emitDebugVar(
                         varType,
                         debugLoc->getSource(),
@@ -231,12 +148,6 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 
     // Collect all stores and insert debug value insts to update debug vars.
 
-    // Helper func to insert debugValue updates.
-    auto setDebugValue = [&](IRInst* debugVar, IRInst* newValue, ArrayView<IRInst*> accessChain)
-    {
-        auto ptr = builder.emitElementAddress(debugVar, accessChain);
-        builder.emitDebugValue(ptr, newValue);
-    };
     for (auto block : func->getBlocks())
     {
         IRInst* nextInst = nullptr;
@@ -247,24 +158,31 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             if (auto storeInst = as<IRStore>(inst))
             {
                 List<IRInst*> accessChain;
-                auto varInst = getRootAddr(storeInst->getPtr(), accessChain);
+                List<IRInst*> accessTypes;
+                auto varInst = getRootAddr(storeInst->getPtr(), accessChain, &accessTypes);
                 IRInst* debugVar = nullptr;
                 if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                 {
                     builder.setInsertAfter(storeInst);
-                    setDebugValue(debugVar, storeInst->getVal(), accessChain.getArrayView());
+                    emitDebugValueUpdate(
+                        builder,
+                        debugVar,
+                        storeInst->getVal(),
+                        accessChain,
+                        accessTypes);
                 }
             }
             else if (auto swizzledStore = as<IRSwizzledStore>(inst))
             {
                 List<IRInst*> accessChain;
-                auto varInst = getRootAddr(swizzledStore->getDest(), accessChain);
+                List<IRInst*> accessTypes;
+                auto varInst = getRootAddr(swizzledStore->getDest(), accessChain, &accessTypes);
                 IRInst* debugVar = nullptr;
                 if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                 {
                     builder.setInsertAfter(swizzledStore);
                     auto loadVal = builder.emitLoad(swizzledStore->getDest());
-                    setDebugValue(debugVar, loadVal, accessChain.getArrayView());
+                    emitDebugValueUpdate(builder, debugVar, loadVal, accessChain, accessTypes);
                 }
             }
             else if (auto callInst = as<IRCall>(inst))
@@ -278,13 +196,14 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                     if (!as<IRPtrTypeBase>(arg->getDataType()))
                         continue;
                     List<IRInst*> accessChain;
-                    auto varInst = getRootAddr(arg, accessChain);
+                    List<IRInst*> accessTypes;
+                    auto varInst = getRootAddr(arg, accessChain, &accessTypes);
                     IRInst* debugVar = nullptr;
                     if (mapVarToDebugVar.tryGetValue(varInst, debugVar))
                     {
                         builder.setInsertAfter(callInst);
                         auto loadVal = builder.emitLoad(arg);
-                        setDebugValue(debugVar, loadVal, accessChain.getArrayView());
+                        emitDebugValueUpdate(builder, debugVar, loadVal, accessChain, accessTypes);
                     }
                 }
             }
@@ -292,7 +211,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     }
 }
 
-void insertDebugValueStore(DebugValueStoreContext& context, IRModule* module)
+void insertDebugValueStore(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -300,12 +219,12 @@ void insertDebugValueStore(DebugValueStoreContext& context, IRModule* module)
         {
             if (auto func = as<IRFunc>(findGenericReturnVal(genericInst)))
             {
-                context.insertDebugValueStore(func);
+                insertDebugValueStore(func);
             }
         }
         else if (auto func = as<IRFunc>(globalInst))
         {
-            context.insertDebugValueStore(func);
+            insertDebugValueStore(func);
         }
     }
 }

@@ -236,10 +236,13 @@ enum class AnnotationKind
     DifferentialZero = 14,
     DifferentialAdd = 15,
 
+    // Optional evidence must be selected before deriving a pair type or looking up members.
+    OptionalDifferentiableWitness = 16,
+
     // Sentinel — keep last. `cloneAnnotations` in slang-ir-link.cpp
     // static_asserts against this value so that adding a kind forces a visit
     // to the pruning gate (see the note above this enum).
-    CountOf = 16,
+    CountOf = 17,
 };
 
 

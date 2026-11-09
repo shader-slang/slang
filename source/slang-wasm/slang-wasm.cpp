@@ -773,6 +773,11 @@ LanguageServer::~LanguageServer()
     delete m_core;
 }
 
+void LanguageServer::setEnableExperimentalFeatures(bool enabled)
+{
+    m_core->m_workspace->updateExperimentalFeatures(enabled);
+}
+
 void LanguageServer::init()
 {
     Slang::LanguageServerProtocol::InitializeParams args = {};

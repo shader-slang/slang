@@ -4959,6 +4959,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::ShaderObjectCode:
                     case CodeGenTarget::HostLLVMIR:
                     case CodeGenTarget::ShaderLLVMIR:
+                    case CodeGenTarget::HGBC:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

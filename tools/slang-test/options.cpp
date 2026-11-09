@@ -70,6 +70,7 @@ static bool _isSubCommand(const char* arg)
         "  -bindir <path>                 Set directory for binaries (default: the path to the "
         "slang-test executable)\n"
         "  -test-dir <path>               Set directory for test files (default: tests/)\n"
+        "  -test-tool <name> <path>       Set an executable for EXTERNAL tests\n"
         "  -v [level]                     Set verbosity level (verbose, info, failure)\n"
         "                                 Default: verbose when -v used, info otherwise\n"
         "  -hide-ignored                  Hide results from ignored tests\n"
@@ -232,6 +233,16 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
             optionsOut->binDir = *argCursor++;
+        }
+        else if (strcmp(arg, "-test-tool") == 0)
+        {
+            if (argEnd - argCursor < 2)
+            {
+                stdError.print("error: expected a tool name and executable path for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            String name = *argCursor++;
+            optionsOut->testTools.set(name, String(*argCursor++));
         }
         else if (strcmp(arg, "-use-shared-library") == 0)
         {

@@ -379,6 +379,9 @@ EMSCRIPTEN_BINDINGS(slang)
 
     class_<slang::wgsl::lsp::LanguageServer>("LanguageServer")
         .function(
+            "setEnableExperimentalFeatures",
+            &slang::wgsl::lsp::LanguageServer::setEnableExperimentalFeatures)
+        .function(
             "didOpenTextDocument",
             &slang::wgsl::lsp::LanguageServer::didOpenTextDocument,
             allow_raw_pointers())

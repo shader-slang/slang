@@ -123,6 +123,176 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
     }
 }
 
+/**
+A differential address that presents logical `T` values backed by `dT` storage.
+
+Neural layers continue to calculate contributions in `T`. Reads and writes convert at the address
+boundary, and atomic additions accumulate in `dT`. This allows, for example, an FP16 network to use
+FP32 gradient storage without changing the layer interfaces.
+*/
+public struct BindlessDifferentialAddressQ<T, dT> : IPointerLikeAddress<T>
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+    where dT : __BuiltinFloatingPointType
+    where dT.Differential == dT
+{
+    public typealias Differential = BindlessDifferentialAddressQ<T, dT>;
+
+    internal no_diff BindlessAddress<dT> storage;
+
+    public __init(RWStructuredBuffer<dT>.Handle handle)
+    {
+        storage = BindlessAddress<dT>(handle);
+    }
+
+    public __subscript(uint index)->T
+    {
+        [nonmutating]
+        get { return __realCast<T>(storage[index]); }
+
+        [mutating]
+        set { storage[index] = __realCast<dT>(newValue); }
+    }
+
+    public void atomicAdd(uint index, T value)
+    {
+        storage.atomicAdd(index, __realCast<dT>(value));
+    }
+
+    public void atomicAdd(uint index, vector<T, 2> value)
+    {
+        atomicAdd(index, value[0]);
+        atomicAdd(index + 1, value[1]);
+    }
+
+    [ForwardDerivative(fwd_getOffset)]
+    public This getOffset(int elements)
+    {
+        This address;
+        address.storage = storage.getOffset(elements);
+        return address;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
+    }
+
+    typealias BufferType = RWStructuredBuffer<dT>;
+
+    internal RWStructuredBuffer<dT> getBuffer()
+    {
+        return storage.getBuffer();
+    }
+
+    internal uint getBaseIndex()
+    {
+        return storage.getBaseIndex();
+    }
+
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        return storage.readUint4<DstType, IsAligned, ActualBoundary>(offsetIndex);
+    }
+
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(
+        int offsetIndex,
+        uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        storage.writeUint4Atomic<SrcType, IsAligned, ActualBoundary>(offsetIndex, value);
+    }
+}
+
+/** A bindless address for `T` parameters whose differential accumulates in `dT`. */
+public struct BindlessAddressQ<T, dT> : IPointerLikeAddress<T>
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+    where dT : __BuiltinFloatingPointType
+    where dT.Differential == dT
+{
+    public typealias Differential = BindlessDifferentialAddressQ<T, dT>;
+
+    internal no_diff BindlessAddress<T> storage;
+
+    public __init(RWStructuredBuffer<T>.Handle handle)
+    {
+        storage = BindlessAddress<T>(handle);
+    }
+
+    public static Differential makeDifferential(RWStructuredBuffer<dT>.Handle handle)
+    {
+        return Differential(handle);
+    }
+
+    public __subscript(uint index)->T
+    {
+        [nonmutating]
+        get { return storage[index]; }
+
+        [mutating]
+        set { storage[index] = newValue; }
+    }
+
+    public void atomicAdd(uint index, T value)
+    {
+        storage.atomicAdd(index, value);
+    }
+
+    public void atomicAdd(uint index, vector<T, 2> value)
+    {
+        storage.atomicAdd(index, value);
+    }
+
+    [ForwardDerivative(fwd_getOffset)]
+    public This getOffset(int elements)
+    {
+        This address;
+        address.storage = storage.getOffset(elements);
+        return address;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
+    }
+
+    typealias BufferType = RWStructuredBuffer<T>;
+
+    internal RWStructuredBuffer<T> getBuffer()
+    {
+        return storage.getBuffer();
+    }
+
+    internal uint getBaseIndex()
+    {
+        return storage.getBaseIndex();
+    }
+
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        return storage.readUint4<DstType, IsAligned, ActualBoundary>(offsetIndex);
+    }
+
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(
+        int offsetIndex,
+        uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        storage.writeUint4Atomic<SrcType, IsAligned, ActualBoundary>(offsetIndex, value);
+    }
+}
+
 public struct PointerAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T

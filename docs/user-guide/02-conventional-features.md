@@ -205,6 +205,11 @@ struct MyData
 > #### Note ####
 > Unlike C/C++, `class` is not a valid keyword for GPU code and it is reserved for CPU/host side logic.
 
+Classes use reference semantics in host code. Their methods can update mutable object fields
+without `[mutating]`, including through a `let` class handle. See
+[Class handles and object mutation](class-reference-types.md) for the distinction between changing
+an object and replacing its handle, and for interface examples.
+
 Structure types can have constructors. Constructors are defined with the `__init` keyword:
 
 ```hlsl

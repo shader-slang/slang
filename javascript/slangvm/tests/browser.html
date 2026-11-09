@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>slangvm browser integration</title>
+<style>canvas { width: 160px; height: 120px; }</style>
+<canvas id="canvas" width="160" height="120"></canvas>
+<pre id="result">Running</pre>
+<script type="importmap">
+{
+    "imports": {
+        "slangvm": "../../../build.em/Release/slangvm/src/index.js",
+        "slangvm/file-system": "../../../build.em/Release/slangvm/src/file-system.js",
+        "slangvm/http-file-system": "../../../build.em/Release/slangvm/src/http-file-system.js"
+    }
+}
+</script>
+<script type="module" src="./browser.js"></script>
+</html>

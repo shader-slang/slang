@@ -148,7 +148,7 @@ jobs:
               -DSLANG_INSTALL_USER_SKILLS=ON \
               --preset emscripten \
               -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
-            cmake --build --preset emscripten --config Release --target slang-wasm
+            cmake --build --preset emscripten --config Release --target slang-wasm slangvm-javascript
             exit 0
           fi
 
@@ -295,6 +295,7 @@ jobs:
             cp build.em/Release/bin/slang-wasm.wasm "${base}/slang-wasm.wasm"
             cp build.em/Release/bin/slang-wasm.js "${base}/slang-wasm.js"
             cp build.em/Release/bin/interface.d.ts "${base}/interface.d.ts"
+            cp -R build.em/Release/slangvm "${base}/slangvm"
             cp -R LICENSES "${base}/LICENSES"
             # CPack ships third-party notices for the native packages; the WASM
             # package is assembled by hand here, so copy the notices for the

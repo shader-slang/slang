@@ -3280,6 +3280,8 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         break;
 
     case kIROp_DebugSource:
+    case kIROp_DebugLambda:
+    case kIROp_DebugLexicalBlock:
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
@@ -3288,7 +3290,6 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugNoScope:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
-    case kIROp_DebugLexicalBlock:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
         break;
@@ -5256,6 +5257,12 @@ void CLikeSourceEmitter::ensureInstOperand(
 
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
+    // The static-method owner is reflection metadata for HGBC, not a source-code dependency.
+    // For example, an empty Foo can remain the owner of Foo.$init after its value representation
+    // is removed. Emitting Foo only for that metadata would introduce an invalid empty WGSL struct.
+    if (as<IRStaticMethodDecoration>(inst))
+        return;
+
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
@@ -5349,6 +5356,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
+    case kIROp_DebugLambda:
     case kIROp_DebugLexicalBlock:
     case kIROp_DebugVar:
     case kIROp_DebugLine:

@@ -46,5 +46,9 @@ SLANG_FORMAT(r8ui, (UINT8, 1, sizeof(uint8_t)))
 SLANG_FORMAT(r64ui, (UINT64, 1, sizeof(uint64_t)))
 SLANG_FORMAT(r64i, (INT64, 1, sizeof(int64_t)))
 SLANG_FORMAT(bgra8, (UINT8, 4, sizeof(uint32_t)))
+SLANG_FORMAT(rgba8_srgb, (UINT8, 4, sizeof(uint32_t)))
+SLANG_FORMAT(d32f, (FLOAT32, 1, sizeof(float)))
+SLANG_FORMAT(d16, (FLOAT32, 1, sizeof(uint16_t)))
+SLANG_FORMAT(d32f_s8, (FLOAT32, 1, sizeof(uint32_t) * 2))
 
 #undef SLANG_FORMAT

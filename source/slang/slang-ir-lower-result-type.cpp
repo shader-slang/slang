@@ -3,6 +3,7 @@
 #include "slang-ir-lower-result-type.h"
 
 #include "slang-ir-any-value-marshalling.h"
+#include "slang-ir-hgbc-owned-erasure.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-target-program.h"
@@ -61,6 +62,25 @@ struct ResultTypeLoweringContext
         RefPtr<LoweredResultTypeInfo> info = new LoweredResultTypeInfo();
         auto resultType = cast<IRResultType>(type);
         info->resultType = (IRType*)type;
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            info->valueType = resultType->getValueType();
+            info->errorType = resultType->getErrorType();
+            IRInst* cases[] = {
+                builder->getIntValue(builder->getUIntType(), 0),
+                info->valueType,
+                builder->getIntValue(builder->getUIntType(), 1),
+                info->errorType};
+            info->loweredType = cast<IRType>(builder->emitIntrinsicInst(
+                nullptr,
+                kIROp_HGVMTaggedUnionType,
+                SLANG_COUNT_OF(cases),
+                cases));
+            mapLoweredTypeToResultTypeInfo[info->loweredType] = info;
+            loweredResultTypes[type] = info;
+            return info.Ptr();
+        }
 
         auto structType = builder->createStructType();
         info->loweredType = structType;
@@ -121,6 +141,19 @@ struct ResultTypeLoweringContext
 
         auto info = getLoweredResultType(builder, inst->getDataType());
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            auto value = info->valueType->getOp() == kIROp_VoidType ? builder->getVoidValue()
+                                                                    : inst->getOperand(0);
+            IRInst* args[] = {
+                builder->getIntValue(builder->getUIntType(), 0),
+                emitHGBCBox(*builder, value)};
+            inst->replaceUsesWith(
+                builder->emitIntrinsicInst(info->loweredType, kIROp_HGVMMakeTaggedUnion, 2, args));
+            inst->removeAndDeallocate();
+            return;
+        }
+
         List<IRInst*> operands;
         operands.add(builder->getBoolValue(false));
         auto packInst = builder->emitPackAnyValue(
@@ -141,6 +174,17 @@ struct ResultTypeLoweringContext
 
         auto info = getLoweredResultType(builder, inst->getDataType());
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            IRInst* args[] = {
+                builder->getIntValue(builder->getUIntType(), 1),
+                emitHGBCBox(*builder, inst->getErrorValue())};
+            inst->replaceUsesWith(
+                builder->emitIntrinsicInst(info->loweredType, kIROp_HGVMMakeTaggedUnion, 2, args));
+            inst->removeAndDeallocate();
+            return;
+        }
+
         auto packInst = builder->emitPackAnyValue(info->anyValueType, inst->getErrorValue());
 
         List<IRInst*> operands;
@@ -156,6 +200,15 @@ struct ResultTypeLoweringContext
     {
         auto loweredResultTypeInfo = getLoweredResultType(builder, resultInst->getDataType());
         SLANG_ASSERT(loweredResultTypeInfo);
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            IRInst* args[] = {resultInst, builder->getIntValue(builder->getUIntType(), 1)};
+            return builder->emitIntrinsicInst(
+                loweredResultTypeInfo->errorType,
+                kIROp_HGVMExtractTaggedUnion,
+                2,
+                args);
+        }
         if (loweredResultTypeInfo->valueType)
         {
             auto value = builder->emitFieldExtract(
@@ -194,6 +247,18 @@ struct ResultTypeLoweringContext
         SLANG_ASSERT(loweredResultTypeInfo);
         SLANG_ASSERT(loweredResultTypeInfo->valueType);
 
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            IRInst* args[] = {base, builder->getIntValue(builder->getUIntType(), 0)};
+            inst->replaceUsesWith(builder->emitIntrinsicInst(
+                loweredResultTypeInfo->valueType,
+                kIROp_HGVMExtractTaggedUnion,
+                2,
+                args));
+            inst->removeAndDeallocate();
+            return;
+        }
+
         auto getElement = builder->emitFieldExtract(
             loweredResultTypeInfo->anyValueType,
             base,
@@ -212,6 +277,19 @@ struct ResultTypeLoweringContext
         auto base = inst->getResultOperand();
         auto loweredResultTypeInfo = getLoweredResultType(builder, base->getDataType());
         SLANG_ASSERT(loweredResultTypeInfo);
+
+        if (usesHGBCOwnedErasure(targetProgram))
+        {
+            auto tag = builder->emitIntrinsicInst(
+                builder->getUIntType(),
+                kIROp_HGVMGetTaggedUnionCase,
+                1,
+                &base);
+            inst->replaceUsesWith(
+                builder->emitNeq(tag, builder->getIntValue(builder->getUIntType(), 0)));
+            inst->removeAndDeallocate();
+            return;
+        }
 
         auto isFailure = builder->emitFieldExtract(
             loweredResultTypeInfo->tagType,

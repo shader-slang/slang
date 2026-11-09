@@ -64,6 +64,7 @@ void buildEntryPointReferenceGraph(
             break;
         case kIROp_Block:
         case kIROp_SPIRVAsm:
+        case kIROp_HGBCAsm:
             for (auto child : inst->getChildren())
             {
                 addToWorkList({entryPoint, child});
@@ -80,6 +81,13 @@ void buildEntryPointReferenceGraph(
                 auto operand = as<IRSPIRVAsmOperandInst>(inst);
                 addToWorkList({entryPoint, operand->getValue()});
             }
+            break;
+        case kIROp_HGBCAsmOperandValue:
+            addToWorkList({entryPoint, as<IRHGBCAsmOperand>(inst)->getValue()});
+            break;
+        case kIROp_HGBCAsmOperandValuePack:
+            for (UInt i = 0; i < inst->getOperandCount(); ++i)
+                addToWorkList({entryPoint, inst->getOperand(i)});
             break;
         }
         for (UInt i = 0; i < inst->getOperandCount(); i++)

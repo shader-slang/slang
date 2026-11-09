@@ -190,7 +190,9 @@ public:
             return SLANG_E_INVALID_ARG;
         }
 
-        ComPtr<slang::IEntryPoint> entryPoint(m_entryPoints[index].Ptr());
+        ComPtr<slang::IEntryPoint> entryPoint(_validateEntryPoint(m_entryPoints[index]));
+        if (!entryPoint)
+            return SLANG_FAIL;
         *outEntryPoint = entryPoint.detach();
         return SLANG_OK;
     }
@@ -444,6 +446,9 @@ public:
     };
 
     RefPtr<EntryPoint> findEntryPointByName(UnownedStringSlice const& name);
+    RefPtr<EntryPoint> _validateEntryPoint(
+        EntryPoint* entryPoint,
+        ISlangBlob** outDiagnostics = nullptr);
     RefPtr<EntryPoint> findAndCheckEntryPoint(
         UnownedStringSlice const& name,
         SlangStage stage,

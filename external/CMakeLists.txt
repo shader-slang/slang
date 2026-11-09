@@ -403,7 +403,9 @@ endif()
 if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_BUILD_FROM_SLANG_REPO ON)
     set(SLANG_RHI_BUILD_TESTS ON)
-    set(SLANG_RHI_BUILD_TESTS_WITH_GLFW OFF)
+    if(NOT DEFINED SLANG_RHI_BUILD_TESTS_WITH_GLFW)
+        set(SLANG_RHI_BUILD_TESTS_WITH_GLFW OFF)
+    endif()
     set(SLANG_RHI_INSTALL OFF)
     set(SLANG_RHI_BINARY_DIR ${slang_BINARY_DIR}/$<CONFIG>/bin)
     set(SLANG_RHI_FETCH_SLANG OFF)
@@ -446,10 +448,13 @@ if(SLANG_ENABLE_SLANG_RHI)
     endif()
 
     # Output slang-rhi-tests to the bin directory so we can run it easily.
-    set_target_properties(
-        slang-rhi-tests
-        PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${slang_BINARY_DIR}/$<CONFIG>/bin
-    )
+    if(TARGET slang-rhi-tests)
+        set_target_properties(
+            slang-rhi-tests
+            PROPERTIES
+                RUNTIME_OUTPUT_DIRECTORY ${slang_BINARY_DIR}/$<CONFIG>/bin
+        )
+    endif()
 endif()
 
 # Tidy things up:

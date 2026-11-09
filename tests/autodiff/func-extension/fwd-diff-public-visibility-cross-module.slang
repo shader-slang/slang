@@ -1,6 +1,4 @@
-//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
-
-// TODO: re-enable when func-extension visibility is implemented separately.
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
 
 // Test: a public func-extension is accessible from another module.
 

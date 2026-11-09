@@ -105,6 +105,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
      "Object code for host execution (host style)"},
     {SLANG_HOST_LLVM_IR, "ll", "llvm-host-ir,llvm-ir", "LLVM IR assembly (host style)"},
     {SLANG_SHADER_LLVM_IR, "ll", "llvm-shader-ir", "LLVM IR assembly (shader style)"},
+    {SLANG_HGBC, "hgbc", "hgbc", "Host-Graph Byte-Code"},
 };
 
 static const NamesDescriptionValue s_languageInfos[] = {

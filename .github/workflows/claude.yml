@@ -234,6 +234,7 @@ jobs:
 
           # Advanced configuration (override action defaults via repository variables)
           model: ${{ vars.ANTHROPIC_MODEL }}
+          nv-inference-url: ${{ vars.CLAUDE_NV_INFERENCE_URL }}
           nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
           nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
           nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}

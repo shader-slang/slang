@@ -686,6 +686,31 @@ PtrTypeBase* ASTBuilder::getPtrType(Type* valueType, char const* ptrTypeName)
     return as<PtrTypeBase>(getSpecializedBuiltinType(valueType, ptrTypeName));
 }
 
+/// Gets the declared witness that a data-layout type implements `IBufferDataLayout`.
+static DeclaredSubtypeWitness* _getDataLayoutWitness(
+    ASTBuilder* astBuilder,
+    Type* dataLayoutType)
+{
+    auto dataLayoutDeclRef = as<DeclRefType>(dataLayoutType)->getDeclRef();
+    auto dataLayoutDecl = dataLayoutDeclRef.as<ContainerDecl>().getDecl();
+    Type* dataLayoutInterface =
+        astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType();
+    DeclaredSubtypeWitness* dataLayoutWitness = nullptr;
+    for (auto constraintDecl : dataLayoutDecl->getDirectMemberDeclsOfType<TypeConstraintDecl>())
+    {
+        if (constraintDecl->getSup().type == dataLayoutInterface)
+        {
+            dataLayoutWitness = astBuilder->getDeclaredSubtypeWitness(
+                dataLayoutType,
+                dataLayoutInterface,
+                constraintDecl);
+            break;
+        }
+    }
+    SLANG_RELEASE_ASSERT(dataLayoutWitness);
+    return dataLayoutWitness;
+}
+
 PtrTypeBase* ASTBuilder::getPtrType(
     Type* valueType,
     Val* accessQualifier,
@@ -693,26 +718,13 @@ PtrTypeBase* ASTBuilder::getPtrType(
     Type* dataLayoutType,
     char const* ptrTypeName)
 {
-    auto declRef = as<DeclRefType>(dataLayoutType)->getDeclRef();
-    auto containerDeclRef = declRef.as<ContainerDecl>();
-    auto dataLayoutInterface = m_sharedASTBuilder->getIBufferDataLayoutType();
-    DeclaredSubtypeWitness* subtypeWitness = nullptr;
-
-    for (auto typeConstraintDeclRef :
-         containerDeclRef.getDecl()->getDirectMemberDeclsOfType<TypeConstraintDecl>())
-    {
-        if (typeConstraintDeclRef->getSup().type == dataLayoutInterface)
-        {
-            subtypeWitness = getDeclaredSubtypeWitness(
-                dataLayoutType,
-                m_sharedASTBuilder->getIBufferDataLayoutType(),
-                typeConstraintDeclRef);
-        }
-    }
-
-    SLANG_RELEASE_ASSERT(subtypeWitness);
-
-    Val* args[] = {valueType, accessQualifier, addrSpace, dataLayoutType, subtypeWitness};
+    Val* args[] = {
+        valueType,
+        accessQualifier,
+        addrSpace,
+        dataLayoutType,
+        _getDataLayoutWitness(this, dataLayoutType),
+    };
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
@@ -771,16 +783,32 @@ ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)
     return as<ParameterBlockType>(getSpecializedBuiltinType(elementType, "ParameterBlockType"));
 }
 
+/// Constructs a structured-buffer type with the default layout and its interface witness.
+///
+/// `StructuredBuffer<T>` spells its defaulted layout parameter implicitly in source, but checked
+/// generic applications contain both that argument and its `IBufferDataLayout` witness. Building
+/// only the element argument creates a second, non-canonical spelling that cannot unify with the
+/// checked source type.
+static Type* _getStructuredBufferType(
+    ASTBuilder* astBuilder,
+    Type* elementType,
+    const char* magicTypeName)
+{
+    Type* dataLayoutType = astBuilder->getDefaultLayoutType();
+    Val* args[] = {elementType, dataLayoutType, _getDataLayoutWitness(astBuilder, dataLayoutType)};
+    return astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicTypeName);
+}
+
 HLSLStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
 {
     return as<HLSLStructuredBufferType>(
-        getSpecializedBuiltinType(elementType, "HLSLStructuredBufferType"));
+        _getStructuredBufferType(this, elementType, "HLSLStructuredBufferType"));
 }
 
 HLSLRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
 {
     return as<HLSLRWStructuredBufferType>(
-        getSpecializedBuiltinType(elementType, "HLSLRWStructuredBufferType"));
+        _getStructuredBufferType(this, elementType, "HLSLRWStructuredBufferType"));
 }
 
 SamplerStateType* ASTBuilder::getSamplerStateType()
@@ -825,6 +853,12 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witne
     Val* args[] = {valueType, diffTypeWitness};
     return as<DifferentialPairType>(
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
+}
+
+Type* ASTBuilder::getDifferentialOrNoneType(Type* valueType, Witness* diffTypeWitness)
+{
+    Val* args[] = {valueType, diffTypeWitness};
+    return getSpecializedBuiltinType(makeArrayView(args), "DifferentialOrNoneType");
 }
 
 DifferentialPtrPairType* ASTBuilder::getDifferentialPtrPairType(

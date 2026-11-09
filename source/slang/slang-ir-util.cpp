@@ -1,14 +1,237 @@
 #include "slang-ir-util.h"
 
+#include "core/slang-crypto.h"
 #include "core/slang-short-list.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
+
+namespace
+{
+// This encodes the existing lowered IR, not source-level types. For example, Array<alpha.Item, 2>
+// and Array<beta.Item, 2> have the same display hint but different nominal element linkage.
+// Length-delimited names and tagged operands preserve that distinction without reconstructing ASTs.
+struct RuntimeIdentityBuilder
+{
+    HashSet<IRInst*> visiting;
+    bool allowCodeLinkage = false;
+
+    static void appendName(StringBuilder& text, UnownedStringSlice name)
+    {
+        text << "N" << name.getLength() << ":" << name;
+    }
+
+    bool getNominalName(
+        String& outName,
+        IRRuntimeTypeIdentityDecoration* identity,
+        IRSpecialize* extraSpecialization = nullptr)
+    {
+        auto declarationName = cast<IRStringLit>(identity->getOperand(0))->getStringSlice();
+        StringBuilder arguments;
+        for (UInt i = 1; i < identity->getOperandCount();)
+        {
+            auto count = getIntVal(identity->getOperand(i++));
+            SLANG_RELEASE_ASSERT(count >= 0 && UInt(count) <= identity->getOperandCount() - i);
+            arguments << "G" << count << "[";
+            for (IRIntegerValue j = 0; j < count; ++j)
+                if (!append(arguments, identity->getOperand(i++)))
+                    return false;
+            arguments << "]";
+        }
+        if (extraSpecialization)
+        {
+            arguments << "G" << extraSpecialization->getArgCount() << "[";
+            for (UInt i = 0; i < extraSpecialization->getArgCount(); ++i)
+                if (!append(arguments, extraSpecialization->getArg(i)))
+                    return false;
+            arguments << "]";
+        }
+        if (arguments.getLength() == 0)
+        {
+            outName = declarationName;
+            return true;
+        }
+        StringBuilder name;
+        // Runtime keys retain the complete encoding: a digest is appropriate for a linker
+        // symbol but must not turn distinct nominal arguments into the same runtime type.
+        name << "_SR1";
+        appendName(name, declarationName);
+        name << arguments;
+        outName = name.produceString();
+        return true;
+    }
+
+    bool append(StringBuilder& text, IRInst* value)
+    {
+        if (!value || !visiting.add(value))
+            return false;
+        SLANG_DEFER(visiting.remove(value));
+
+        // Intrinsic types are canonicalized by their lowered opcode and operands. A source
+        // spelling such as vector<T, N> can decorate the same interned type as float2.
+        auto identity = (!as<IRType>(value) || isNominalOp(value->getOp()))
+                            ? value->findDecoration<IRRuntimeTypeIdentityDecoration>()
+                            : nullptr;
+        if (identity)
+        {
+            String name;
+            if (!getNominalName(name, identity))
+                return false;
+            appendName(text, name.getUnownedSlice());
+            return true;
+        }
+        if (auto specialize = as<IRSpecialize>(value))
+        {
+            if (auto genericIdentity =
+                    specialize->getBase()->findDecoration<IRRuntimeTypeIdentityDecoration>())
+            {
+                String name;
+                if (!getNominalName(name, genericIdentity, specialize))
+                    return false;
+                appendName(text, name.getUnownedSlice());
+                return true;
+            }
+        }
+        if (allowCodeLinkage)
+        {
+            if (auto linkage = value->findDecoration<IRLinkageDecoration>())
+            {
+                appendName(text, linkage->getMangledName());
+                return true;
+            }
+        }
+
+        // Nominal declarations without linkage, unresolved parameters, and executable values
+        // cannot acquire a portable identity by inspecting their children or their name hints.
+        if (isNominalOp(value->getOp()) || as<IRParam>(value) || as<IRPtrLit>(value))
+            return false;
+        if (!as<IRType>(value) && !as<IRAttr>(value) && !as<IRConstant>(value) &&
+            !as<IRSpecialize>(value) && value->getOp() != kIROp_MakeValuePack)
+            return false;
+
+        text << "O" << getOpcodeStableName(value->getOp()) << "[";
+        if (auto constant = as<IRConstant>(value))
+        {
+            if (!append(text, constant->getDataType()))
+                return false;
+            switch (constant->getOp())
+            {
+            case kIROp_IntLit:
+                text << "I" << constant->value.intVal << ";";
+                break;
+            case kIROp_BoolLit:
+                text << "B" << (constant->value.intVal != 0) << ";";
+                break;
+            case kIROp_FloatLit:
+                {
+                    uint64_t bits = 0;
+                    static_assert(sizeof(bits) == sizeof(constant->value.floatVal));
+                    memcpy(&bits, &constant->value.floatVal, sizeof(bits));
+                    text << "F" << bits << ";";
+                    break;
+                }
+            case kIROp_StringLit:
+                appendName(text, constant->getStringSlice());
+                break;
+            case kIROp_VoidLit:
+                break;
+            default:
+                return false;
+            }
+        }
+        text << value->getOperandCount() << ":";
+        for (UInt i = 0; i < value->getOperandCount(); ++i)
+            if (!append(text, value->getOperand(i)))
+                return false;
+        text << "]";
+        return true;
+    }
+};
+} // namespace
+
+bool getRuntimeTypeMangledName(IRInst* type, String& outName)
+{
+    auto identity = type->findDecoration<IRRuntimeTypeIdentityDecoration>();
+    RuntimeIdentityBuilder builder;
+    if (identity)
+        return builder.getNominalName(outName, identity);
+    StringBuilder encoded;
+    encoded << "_SR1T";
+    if (!builder.append(encoded, type))
+        return false;
+    outName = encoded.produceString();
+    return true;
+}
+
+bool getSpecializationArgumentIdentity(IRSpecialize* specialize, String& outIdentity)
+{
+    RuntimeIdentityBuilder builder;
+    builder.allowCodeLinkage = true;
+    StringBuilder encoded;
+    encoded << specialize->getArgCount() << "[";
+    for (UInt i = 0; i < specialize->getArgCount(); ++i)
+        if (!builder.append(encoded, specialize->getArg(i)))
+            return false;
+    encoded << "]";
+    DigestBuilder<SHA1> digest;
+    digest.append(encoded.getUnownedSlice());
+    outIdentity = digest.finalize().toString();
+    return true;
+}
+
+void preserveHGBCHostInterfaceTypes(IRModule* module)
+{
+    List<IRType*> workList;
+    HashSet<IRType*> visited;
+    for (auto global : module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(global);
+        if (function && function->findDecoration<IRHostOnlyDecoration>())
+            workList.add(function->getDataType());
+    }
+    IRBuilder builder(module);
+    while (workList.getCount())
+    {
+        auto type = workList.getLast();
+        workList.removeLast();
+        if (!visited.add(type))
+            continue;
+        if (auto aggregate = as<IRStructType>(type))
+        {
+            builder.addDecorationIfNotExist(aggregate, kIROp_BinaryInterfaceTypeDecoration);
+            for (auto field : aggregate->getFields())
+                workList.add(field->getFieldType());
+        }
+        for (UInt i = 0; i < type->getOperandCount(); ++i)
+            if (auto operandType = as<IRType>(type->getOperand(i)))
+                workList.add(operandType);
+    }
+}
+
+IRInst* preserveLambdaDebugInfo(IRInst* type, IRStringLit* name)
+{
+    if (!type->findDecoration<IRLambdaDecoration>())
+        return nullptr;
+    auto location = type->findDecoration<IRDebugLocationDecoration>();
+    auto module = type->findDecoration<IRTypeModuleNameDecoration>();
+    if (!location || !module)
+        return nullptr;
+    IRBuilder builder(type->getModule());
+    builder.setInsertInto(type->getModule());
+    IRInst* operands[] = {
+        name,
+        module->getNameOperand(),
+        location->getSource(),
+        location->getLine(),
+        location->getCol()};
+    return builder.emitIntrinsicInst(builder.getVoidType(), kIROp_DebugLambda, 5, operands);
+}
 
 // Share the struct-field traversal while allowing callers to choose which field types disappear.
 // DCE's existing query ignores only void and nested empty structs. Payload boundaries also need
@@ -77,6 +300,7 @@ bool isAddressInst(IRInst* inst)
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_HGVMRuntimeArrayGetElementPtr:
     case kIROp_NodeOutputRecordGetElementPtr:
         return true;
     default:
@@ -140,9 +364,52 @@ bool isAnnotation(IRInst* inst)
     return as<IRAnnotation>(inst);
 }
 
+bool isClassType(IRInst* type)
+{
+    if (!type)
+        return false;
+    type = unwrapAttributedType(type);
+    if (!type)
+        return false;
+    if (auto thisType = as<IRThisType>(type))
+        return isClassType(thisType->getConstraintType());
+    if (auto specialize = as<IRSpecialize>(type))
+        return isClassType(findSpecializeReturnVal(specialize));
+    if (auto genericInst = as<IRGeneric>(type))
+        return isClassType(findGenericReturnVal(genericInst));
+    return type->getOp() == kIROp_ClassType;
+}
+
 bool isPtrToClassType(IRInst* type)
 {
-    return isPointerOfType(type, kIROp_ClassType);
+    if (!type)
+        return false;
+    type = unwrapAttributedType(type);
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        return isClassType(ptrType->getValueType());
+    return false;
+}
+
+bool isHeapObjectAddress(IRInst* address)
+{
+    for (; address && isAddressInst(address);)
+    {
+        if (as<IRHGVMRuntimeArrayGetElementPtr>(address))
+            return true;
+        if (auto fieldAddress = as<IRFieldAddress>(address))
+        {
+            if (isPtrToClassType(fieldAddress->getBase()->getDataType()))
+                return true;
+            address = fieldAddress->getBase();
+        }
+        else
+        {
+            if (address->getOperandCount() == 0)
+                break;
+            address = address->getOperand(0);
+        }
+    }
+    return false;
 }
 
 bool isPtrToArrayType(IRInst* type)
@@ -350,7 +617,6 @@ bool isValueType(IRInst* dataType)
     {
     case kIROp_StructType:
     case kIROp_InterfaceType:
-    case kIROp_ClassType:
     case kIROp_VectorType:
     case kIROp_MatrixType:
     case kIROp_TupleType:
@@ -2006,11 +2272,17 @@ int getParamIndexInBlock(IRParam* paramInst)
 
 bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* inst)
 {
-    auto root = getRootAddr(inst);
+    // A class field or runtime-array element address crosses a local handle slot and addresses
+    // shared heap storage. Treat the resulting address as unknown mutable memory even though
+    // getRootAddr() returns the local variable. Nested value fields retain that classification.
+    if (isHeapObjectAddress(inst))
+        return true;
 
     auto type = unwrapAttributedType(inst->getDataType());
     if (!isPtrLikeOrHandleType(type))
         return false;
+
+    auto root = getRootAddr(inst);
 
     if (root)
     {
@@ -2398,14 +2670,15 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
 {
     for (auto inst : block->getChildren())
     {
-        if (auto asmBlock = as<IRSPIRVAsm>(inst))
+        if (as<IRSPIRVAsm>(inst) || as<IRHGBCAsm>(inst))
         {
             IRInst* next = nullptr;
-            for (auto i = asmBlock->getFirstChild(); i; i = next)
+            for (auto i = inst->getFirstChild(); i; i = next)
             {
                 next = i->getNextInst();
-                if (!as<IRSPIRVAsmInst>(i) && !as<IRSPIRVAsmOperand>(i))
-                    i->insertBefore(asmBlock);
+                if (!as<IRSPIRVAsmInst>(i) && !as<IRSPIRVAsmOperand>(i) && !as<IRHGBCAsmInst>(i) &&
+                    !as<IRHGBCAsmOperand>(i))
+                    i->insertBefore(inst);
             }
         }
     }
@@ -2549,7 +2822,7 @@ struct GenericChildrenMigrationContextImpl
                 {
                 case kIROp_Param:
                 case kIROp_StructType:
-                case kIROp_StructKey:
+                case kIROp_DeclaredStructKey:
                 case kIROp_InterfaceType:
                 case kIROp_ClassType:
                 case kIROp_Func:

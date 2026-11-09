@@ -84,19 +84,6 @@ struct DiffTransposePass
         }
     };
 
-    struct FuncTranspositionInfo
-    {
-        // Inst that represents the reverse-mode derivative
-        // of the *output* of the function.
-        //
-        // IRInst* dOutInst;
-
-        // Mapping of insts to addresses for holding the
-        // reverse-mode gradients.
-        //
-        // OrderedDictionary<IRInst*, IRInst*> transposeInstMap;
-    };
-
     struct PendingBlockTerminatorEntry
     {
         IRBlock* fwdBlock;
@@ -540,9 +527,8 @@ struct DiffTransposePass
         }
     }
 
-    void transposeDiffBlocksInFunc(IRFunc* revDiffFunc, FuncTranspositionInfo transposeInfo)
+    void transposeDiffBlocksInFunc(IRFunc* revDiffFunc, IRFuncType* primalFuncType)
     {
-        SLANG_UNUSED(transposeInfo);
         // Note down terminal primal and terminal differential blocks
         // since we need to link them up at the end.
         auto terminalPrimalBlocks = getTerminalPrimalBlocks(revDiffFunc);
@@ -564,13 +550,34 @@ struct DiffTransposePass
         for (auto param : diffParamBlock->getParams())
             paramsToProcess.add(param);
 
-        for (auto param : paramsToProcess)
+        SLANG_RELEASE_ASSERT(paramsToProcess.getCount() == primalFuncType->getParamCount());
+        for (Index paramIndex = 0; paramIndex < paramsToProcess.getCount(); ++paramIndex)
         {
+            auto param = paramsToProcess[paramIndex];
             const auto& [direction, type] = splitParameterDirectionAndType(param->getDataType());
 
             if (as<IRVoidType>(param->getDataType()))
             {
-                transposedParams.add(param, param);
+                // Unzip retains one None slot per primal parameter, but that slot does not
+                // retain the primal parameter's direction. For example, the uint index in
+                // float mapElement(uint index, float value) needs an out None gradient slot.
+                // Read the original signature so non-differentiable out/inout parameters keep
+                // their existing placeholder convention.
+                const auto& [primalDirection, primalType] =
+                    splitParameterDirectionAndType(primalFuncType->getParamType(paramIndex));
+                if (primalDirection.kind == ParameterDirectionInfo::Kind::In)
+                {
+                    builder.setInsertAfter(param);
+                    auto transposedParam = builder.emitParam(fromDirectionAndType(
+                        &builder,
+                        ParameterDirectionInfo::Kind::Out,
+                        builder.getVoidType()));
+                    transposedParams.add(param, transposedParam);
+                }
+                else
+                {
+                    transposedParams.add(param, param);
+                }
                 continue;
             }
 
@@ -819,7 +826,11 @@ struct DiffTransposePass
                     {
                         // Ignore void parameters.
                         if (as<IRVoidType>(fwdParam->getDataType()))
+                        {
+                            if (fwdParam != revParam)
+                                instsToRemove.add(fwdParam);
                             break;
+                        }
 
                         if (auto gradient = extractAccumulatorVarGradient(&builder, fwdParam))
                         {
@@ -1277,6 +1288,8 @@ struct DiffTransposePass
         auto bwdPropFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
             AnnotationKind::BackwardDerivativePropagate);
+        auto bwdPropFuncType =
+            cast<IRFuncType>(diffTypeContext.resolveType(builder, bwdPropFunc->getDataType()));
 
         List<IRInst*> bwdPropArgs;
         List<std::pair<IRInst*, IRVar*>> writebacks;
@@ -1291,7 +1304,10 @@ struct DiffTransposePass
                 splitParameterDirectionAndType(fwdPropCalleeFuncType->getParamType(ii));
             if (as<IRVoidType>(argType))
             {
-                bwdPropArgs.add(builder->getVoidValue());
+                if (as<IROutParamType>(bwdPropFuncType->getParamType(ii)))
+                    bwdPropArgs.add(builder->emitVar(builder->getVoidType()));
+                else
+                    bwdPropArgs.add(builder->getVoidValue());
                 continue;
             }
 
@@ -3040,10 +3056,13 @@ struct DiffTransposePass
     IRInst* dOutParam;
 };
 
-void transposeDiffBlocksInFunc(AutoDiffSharedContext* sharedContext, IRFunc* propagateFunc)
+void transposeDiffBlocksInFunc(
+    AutoDiffSharedContext* sharedContext,
+    IRFunc* propagateFunc,
+    IRFuncType* primalFuncType)
 {
     DiffTransposePass pass(sharedContext);
-    pass.transposeDiffBlocksInFunc(propagateFunc, {});
+    pass.transposeDiffBlocksInFunc(propagateFunc, primalFuncType);
 }
 
 } // namespace Slang

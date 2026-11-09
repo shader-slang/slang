@@ -207,6 +207,179 @@ RefPtr<ComponentType::SpecializationInfo> CompositeComponentType::_validateSpeci
 // SpecializedComponentType
 //
 
+/// Order groups by their entry-point indices, independent of declaration order.
+static bool precedesUniformLayoutGroup(List<Index> const& left, List<Index> const& right)
+{
+    auto count = Math::Min(left.getCount(), right.getCount());
+    for (Index i = 0; i < count; ++i)
+    {
+        if (left[i] != right[i])
+            return left[i] < right[i];
+    }
+    return left.getCount() < right.getCount();
+}
+
+/// Canonicalize sets of entry-point indices without changing entry-point enumeration.
+static void normalizeUniformLayoutGroups(List<List<Index>>& groups)
+{
+    for (auto& group : groups)
+    {
+        group.sort();
+        for (Index i = group.getCount() - 1; i > 0; --i)
+        {
+            if (group[i] == group[i - 1])
+                group.removeAt(i);
+        }
+    }
+    groups.sort(precedesUniformLayoutGroup);
+    for (Index i = groups.getCount() - 1; i > 0; --i)
+    {
+        if (!precedesUniformLayoutGroup(groups[i - 1], groups[i]))
+            groups.removeAt(i);
+    }
+}
+
+SlangResult ComponentType::createEntryPointUniformLayoutConstraints(
+    slang::EntryPointUniformLayoutGroup const* groups,
+    SlangInt groupCount,
+    slang::IComponentType** outConstraints,
+    slang::IBlob** outDiagnostics)
+{
+    if (!outConstraints)
+        return SLANG_E_INVALID_ARG;
+    *outConstraints = nullptr;
+    if (outDiagnostics)
+        *outDiagnostics = nullptr;
+    if (groupCount < 0 || (groupCount && !groups))
+        return SLANG_E_INVALID_ARG;
+
+    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+    List<List<Index>> copiedGroups;
+    for (Index g = 0; g < groupCount; ++g)
+    {
+        auto const& group = groups[g];
+        if (group.entryPointCount <= 0 || !group.entryPointIndices)
+            return SLANG_E_INVALID_ARG;
+        List<Index> indices;
+        for (Index i = 0; i < group.entryPointCount; ++i)
+        {
+            auto index = group.entryPointIndices[i];
+            if (index < 0 || index >= getEntryPointCount())
+                return SLANG_E_INVALID_ARG;
+            indices.add(index);
+        }
+        copiedGroups.add(_Move(indices));
+    }
+    normalizeUniformLayoutGroups(copiedGroups);
+    RefPtr<EntryPointUniformLayoutConstraints> constraints =
+        new EntryPointUniformLayoutConstraints(this, copiedGroups);
+    *outConstraints = asExternal(constraints.detach());
+    return SLANG_OK;
+}
+
+void EntryPointUniformLayoutConstraints::buildHash(DigestBuilder<SHA1>& builder)
+{
+    builder.append(UnownedStringSlice("entry-point-uniform-layout-constraints-v1"));
+    m_source->buildHash(builder);
+    builder.append(m_groups.getCount());
+    for (auto const& group : m_groups)
+    {
+        builder.append(group.getCount());
+        for (auto index : group)
+            builder.append(index);
+    }
+}
+
+void EntryPointUniformLayoutConstraints::acceptVisitor(
+    ComponentTypeVisitor* visitor,
+    SpecializationInfo* specializationInfo)
+{
+    SLANG_RELEASE_ASSERT(!specializationInfo);
+    visitor->visitEntryPointUniformLayoutConstraints(this);
+}
+
+/// Resolve membership using the component tree that defines entry-point enumeration.
+/// Consider compose({module, V, F}) with a constraint on indices {0, 1}. When that program
+/// is embedded after another entry point, its namespace starts at index 1, so the resolved
+/// group becomes {1, 2}. Specialization preserves these occurrences. Function declarations
+/// and mangled names cannot identify them: the same function can have several specializations.
+struct CollectUniformLayoutGroups : ComponentTypeVisitor
+{
+    Dictionary<ComponentType*, List<Index>> namespaces;
+    List<EntryPointUniformLayoutConstraints*> constraints;
+    Index nextEntryPoint = 0;
+
+    void visitComponent(ComponentType* component, ComponentType::SpecializationInfo* info = nullptr)
+    {
+        auto& offsets = namespaces.getOrAddValue(component, List<Index>());
+        offsets.add(nextEntryPoint);
+        component->acceptVisitor(this, info);
+    }
+
+    void visitEntryPoint(EntryPoint*, EntryPoint::EntryPointSpecializationInfo*) SLANG_OVERRIDE
+    {
+        ++nextEntryPoint;
+    }
+
+    void visitModule(Module*, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE {}
+    void visitTypeConformance(TypeConformance*) SLANG_OVERRIDE {}
+
+    void visitComposite(
+        CompositeComponentType* composite,
+        CompositeComponentType::CompositeSpecializationInfo* info) SLANG_OVERRIDE
+    {
+        for (Index i = 0; i < composite->getChildComponentCount(); ++i)
+            visitComponent(composite->getChildComponent(i), info ? info->childInfos[i] : nullptr);
+    }
+
+    void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
+    {
+        visitComponent(specialized->getBaseComponentType(), specialized->getSpecializationInfo());
+    }
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* renamed,
+        EntryPoint::EntryPointSpecializationInfo* info) SLANG_OVERRIDE
+    {
+        visitComponent(renamed->getBase(), info);
+    }
+
+    void visitEntryPointUniformLayoutConstraints(EntryPointUniformLayoutConstraints* component)
+        SLANG_OVERRIDE
+    {
+        constraints.add(component);
+    }
+};
+
+SlangResult ComponentType::getEntryPointUniformLayoutGroups(
+    List<List<Index>>& outGroups,
+    DiagnosticSink* sink)
+{
+    CollectUniformLayoutGroups collector;
+    collector.visitComponent(this);
+    SLANG_RELEASE_ASSERT(collector.nextEntryPoint == getEntryPointCount());
+    outGroups.clear();
+    for (auto constraints : collector.constraints)
+    {
+        auto offsets = collector.namespaces.tryGetValue(constraints->getSource());
+        if (!offsets || offsets->getCount() != 1)
+        {
+            sink->diagnose(Diagnostics::InvalidEntryPointUniformLayoutConstraints{
+                .reason = "the referenced component must occur exactly once in the program"});
+            return SLANG_E_INVALID_ARG;
+        }
+        for (auto const& group : constraints->getGroups())
+        {
+            List<Index> indices;
+            for (auto index : group)
+                indices.add((*offsets)[0] + index);
+            outGroups.add(_Move(indices));
+        }
+    }
+    normalizeUniformLayoutGroups(outGroups);
+    return SLANG_OK;
+}
+
 /// Utility type for collecting modules references by types/declarations
 struct SpecializationArgModuleCollector : ComponentTypeVisitor
 {

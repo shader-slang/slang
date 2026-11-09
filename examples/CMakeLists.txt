@@ -143,6 +143,7 @@ if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
     add_subdirectory(shader-coverage-image-pipeline)
     add_subdirectory(shader-object)
     add_subdirectory(shader-toy)
+    add_subdirectory(slangvm)
     add_subdirectory(triangle)
 
     #

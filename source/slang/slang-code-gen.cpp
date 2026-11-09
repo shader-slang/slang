@@ -6,6 +6,7 @@
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
+#include "slang-emit-hgbc.h"
 #include "slang-emit-metal.h"        // for `MetalExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
 #include "slang-rich-diagnostics.h"
@@ -1201,6 +1202,9 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostVM:
         SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
         return SLANG_OK;
+    case CodeGenTarget::HGBC:
+        SLANG_RETURN_ON_FAIL(emitHGBCForEntryPoints(this, outArtifact));
+        return SLANG_OK;
     default:
         break;
     }
@@ -1257,6 +1261,7 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::HostLLVMIR:
     case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HGBC:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 

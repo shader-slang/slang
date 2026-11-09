@@ -18,6 +18,8 @@
 namespace Slang
 {
 
+struct TargetEntryPoint;
+
 /// A `TargetProgram` represents a `ComponentType` specialized for a particular `TargetRequest`
 ///
 /// TODO: This should probably be renamed to `TargetComponentType`.
@@ -53,6 +55,10 @@ public:
     /// Get the existing layout for the program on the target, if already created.
     ///
     ProgramLayout* getExistingLayout() { return m_layout; }
+
+    /// Returns an occurrence and its target layout after getOrCreateLayout() has completed.
+    /// The record belongs to the existing ProgramLayout, which also supplies reflection.
+    const TargetEntryPoint& getEntryPoint(Index index) const;
 
     /// Get the compiled code for an entry point on the target.
     ///

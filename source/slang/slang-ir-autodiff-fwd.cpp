@@ -330,6 +330,16 @@ struct ForwardDiffTranslationContext
 
         if (IRType* const diffType = differentiateType(builder, origInst->getFullType()); diffType)
         {
+            // A synthesized constructor for an empty pointer-differentiable closure can return
+            // Undefined: there are no fields to initialize. Pointer differentials carry handles,
+            // so an undefined handle stays undefined instead of requesting a value-type dzero.
+            if (diffTypeContext.isDifferentiablePtrType(origInst->getFullType()))
+            {
+                return InstPair(
+                    primalVal,
+                    builder->emitIntrinsicInst(diffType, origInst->getOp(), 0, nullptr));
+            }
+
             auto dzero = getDifferentialZeroOfType(builder, origInst->getFullType());
             if (dzero)
             {
@@ -1239,7 +1249,7 @@ struct ForwardDiffTranslationContext
 
     bool checkIsPtrPairMethod(IRFuncType* funcType, SourceLoc diagnosticLoc)
     {
-        // Determine if this call should use "pointer pair method" mode.
+        // Determine if a call without backward hooks should use "pointer pair method" mode.
         // If any output (out/inout/ref parameter, or return value) is a differentiable pointer type
         // (conforms to IDifferentiablePtrType), we should not mark the call as mixed-differential
         // so that the transposition logic won't try to reverse it (doesn't make sense for
@@ -1306,6 +1316,12 @@ struct ForwardDiffTranslationContext
     //
     InstPair translateCall(IRBuilder* builder, IRCall* origCall)
     {
+        // A no_diff call stays primal even when its callee has a derivative. For example,
+        // no_diff targets[index] must not request a gradient handle for an inactive tensor.
+        // Honor the call decoration before looking up any derivative association.
+        if (origCall->findDecoration<IRTreatCallAsDifferentiableDecoration>())
+            return translateNonDiffInst(builder, origCall);
+
         IRInst* origCallee = origCall->getCallee();
 
         if (!origCallee)
@@ -1325,6 +1341,9 @@ struct ForwardDiffTranslationContext
         IRInst* diffCallee = (this->diffTypeContext.tryGetAssociationOfKind(
             primalCallee,
             AnnotationKind::ForwardDerivative));
+        auto backwardApply = this->diffTypeContext.tryGetAssociationOfKind(
+            primalCallee,
+            AnnotationKind::BackwardDerivativeApply);
 
         if (!diffCallee || as<IRVoidLit>(diffCallee))
         {
@@ -1334,9 +1353,7 @@ struct ForwardDiffTranslationContext
             if (this->useTrivialFwdsForBwdDifferentiableFuncs)
             {
                 // See if the callee is backward differentiable.
-                if (this->diffTypeContext.tryGetAssociationOfKind(
-                        primalCallee,
-                        AnnotationKind::BackwardDerivativeApply))
+                if (backwardApply)
                 {
                     // If yes, then we want to generate a trivial forward function.
                     IRInst* args[] = {primalCallee->getDataType()};
@@ -1385,7 +1402,13 @@ struct ForwardDiffTranslationContext
         SLANG_ASSERT(diffCalleeType);
         SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
 
-        auto isPointerPairMethod = checkIsPtrPairMethod(calleeType, origCall->sourceLoc);
+        // Calls with backward hooks must remain mixed so unzipping can replace the forward
+        // call with apply/remat/propagate, even for pointer-valued results. Consider a
+        // Buffer.twice() operation with fwd_diff and __apply extensions: its returned gradient
+        // buffer receives adjoints before the saved context propagates them to the input.
+        // Treating that call as entirely primal would discard the context's backward work.
+        auto isPointerPairMethod =
+            !backwardApply && checkIsPtrPairMethod(calleeType, origCall->sourceLoc);
 
         auto placeholderCallee = builder->getPoison(builder->getTypeKind());
         auto placeholderCall = builder->emitCallInst(nullptr, placeholderCallee, 0, nullptr);
@@ -2753,6 +2776,13 @@ struct ForwardDiffTranslationContext
         case kIROp_DetachDerivative:
         case kIROp_GetSequentialID:
         case kIROp_GetStringHash:
+        case kIROp_HGBCAsm:
+        case kIROp_HGBCAsmOperandLiteral:
+        case kIROp_HGBCAsmOperandValue:
+        case kIROp_HGBCAsmOperandValuePack:
+        case kIROp_HGBCAsmOperandType:
+        case kIROp_HGBCAsmOperandId:
+        case kIROp_HGBCAsmOperandResult:
         case kIROp_SPIRVAsm:
         case kIROp_SPIRVAsmOperandLiteral:
         case kIROp_SPIRVAsmOperandInst:
@@ -2810,7 +2840,8 @@ struct ForwardDiffTranslationContext
         case kIROp_CreateExistentialObject:
             return translateNonDiffInst(builder, origInst);
 
-        case kIROp_StructKey:
+        case kIROp_DeclaredStructKey:
+        case kIROp_BuiltinStructKey:
             return InstPair(origInst, nullptr);
 
         case kIROp_Unreachable:
@@ -3358,7 +3389,8 @@ struct ForwardDiffTranslationContext
             SLANG_RELEASE_ASSERT(diffReturnVal);
 
             auto diffPair = emitMakeDiffPair(builder, pairType, primalReturnVal, diffReturnVal);
-            builder->markInstAsMixedDifferential(diffPair, pairType);
+            // emitMakeDiffPair keeps pointer pairs primal: both handles are needed by the
+            // apply pass. Only value pairs should be split into primal and differential parts.
 
             IRReturn* pairReturn = as<IRReturn>(builder->emitReturn(diffPair));
             builder->markInstAsMixedDifferential(pairReturn, pairType);

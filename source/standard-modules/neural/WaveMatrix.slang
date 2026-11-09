@@ -737,6 +737,46 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     // columns of the stored W correspond to the rows of W^T).
     // =========================================================================
 
+    /// Loads optimally tiled FP16 weights from a persistent `SharedMemoryPool` region.
+    ///
+    /// `baseVectorIndex` is measured in `uint4` elements. Keeping the pool in its native
+    /// `uint4` representation avoids reinterpreting a Workgroup pointer, which is not a legal
+    /// input to the device-pointer cooperative-matrix overload on SPIR-V.
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    [mutating]
+    void loadWeightTiledFromShared<ShMemSize : ISharedMemorySize, bool Transpose = false>(
+        uint baseVectorIndex)
+    {
+        typealias ShMemPool = SharedMemoryPool<ShMemSize>;
+        static const int ElementsPerVector = sizeof(uint4) / sizeof(half);
+        static const int TileSizeInElements = TILE * TILE;
+        static const int TileStrideInVectors = TILE / ElementsPerVector;
+        static const int StoredTileCols = Transpose ? TileRows : TileCols;
+        static const linalg.CoopMatMatrixLayout loadLayout =
+            Transpose ? linalg.CoopMatMatrixLayout.ColumnMajor :
+                        linalg.CoopMatMatrixLayout.RowMajor;
+
+        [ForceUnroll]
+        for (int r = 0; r < TileRows; r++)
+        {
+            [ForceUnroll]
+            for (int c = 0; c < TileCols; c++)
+            {
+                int idx = tileIdx(r, c);
+                int storedRow = Transpose ? c : r;
+                int storedCol = Transpose ? r : c;
+                int elementOffset =
+                    (storedRow * StoredTileCols + storedCol) * TileSizeInElements;
+                uint vectorOffset = baseVectorIndex + uint(elementOffset / ElementsPerVector);
+                tiles[idx] = Tile.Load<loadLayout, uint4>(
+                    ShMemPool.data,
+                    vectorOffset,
+                    uint(TileStrideInVectors));
+            }
+        }
+    }
+
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     [mutating]

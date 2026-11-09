@@ -23,20 +23,29 @@ bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* p
     return false;
 }
 
+// Counts ordinary arguments represented by a parameter's value type. A concrete <uint, float>
+// pack occupies one FuncType operand but consumes two arguments during overload checking.
+// An abstract pack consumes one expand expression until specialization makes its size known.
+static Index getFixedParameterArgumentCount(Type* parameterValueType)
+{
+    if (auto typePack = as<ConcreteTypePack>(unwrapModifiedType(parameterValueType)))
+        return typePack->getTypeCount();
+    return 1;
+}
+
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
     List<DeclRef<ParamDecl>> const& params)
 {
     ParamCounts counts = {0, 0};
     for (auto param : params)
     {
-        Index allowedArgCountToAdd = 1;
         auto paramType = unwrapModifiedType(getParamValueType(m_astBuilder, param));
+        Index allowedArgCountToAdd = getFixedParameterArgumentCount(paramType);
         if (isTypePack(paramType))
         {
-            if (auto typePack = as<ConcreteTypePack>(paramType))
+            if (as<ConcreteTypePack>(paramType))
             {
-                counts.required += typePack->getTypeCount();
-                allowedArgCountToAdd = typePack->getTypeCount();
+                counts.required += allowedArgCountToAdd;
             }
             else if (isFreeFormTypePackParam(this, paramType, param.getDecl()))
             {
@@ -169,9 +178,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
 
     case OverloadCandidate::Flavor::Expr:
         {
-            auto paramCount = candidate.funcType->getParamCount();
-            paramCounts.allowed = paramCount;
-            paramCounts.required = paramCount;
+            auto funcType = candidate.funcType;
+            for (Index i = 0; i < funcType->getParamCount(); ++i)
+                paramCounts.required +=
+                    getFixedParameterArgumentCount(funcType->getParamValueType(i));
+            paramCounts.allowed = paramCounts.required;
         }
         break;
 
@@ -1016,6 +1027,16 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     return true;
 }
 
+/// Returns whether an expression is a handle to a concrete class object.
+///
+/// A class handle has reference semantics: invoking a mutating method changes the referenced
+/// object without changing or rebinding the handle expression itself. It therefore does not need
+/// the l-value receiver required by value types.
+static bool isConcreteClassHandleExpr(Expr* expr)
+{
+    return expr && isDeclRefTypeOf<ClassDecl>(expr->type.type);
+}
+
 ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
 {
     auto expr = inExpr;
@@ -1088,7 +1109,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     {
         if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
-            if (context.baseExpr && !context.baseExpr->type.isLeftValue)
+            const bool receiverIsClassHandle = isConcreteClassHandleExpr(context.baseExpr);
+            if (context.baseExpr && !context.baseExpr->type.isLeftValue && !receiverIsClassHandle)
             {
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
                 {
@@ -1109,7 +1131,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
             // We will detect such cases here and issue a diagnostic that explains
             // the situation.
             //
-            if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
+            if (context.baseExpr && !receiverIsClassHandle &&
+                context.mode == OverloadResolveContext::Mode::ForReal)
             {
                 if (auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
                 {
@@ -1260,6 +1283,13 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
 
             auto sub = getSub(m_astBuilder, constraintDeclRef);
             auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+            if (genericTypeConstraintDecl->hasModifier<OptionalConstraintModifier>() &&
+                !genericTypeConstraintDecl->isEqualityConstraint && isTypePack(sub))
+            {
+                newArgs.add(getOptionalSubtypeWitness(sub, sup));
+                continue;
+            }
 
             auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
 
@@ -1681,6 +1711,21 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
                     const auto& decl = subscriptDeclRef.getDecl();
+                    bool hasReadAccessor = false;
+                    bool hasWriteAccessor = false;
+                    for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
+                    {
+                        if (as<GetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
+                            hasReadAccessor = true;
+                        if (as<SetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
+                            hasWriteAccessor = true;
+                    }
+
+                    // A setter-only subscript is writable but cannot be materialized as a value.
+                    // Preserve that distinction so a read is diagnosed before IR lowering looks
+                    // for a getter that does not exist.
+                    callExpr->type.isWriteOnly = hasWriteAccessor && !hasReadAccessor;
+
                     for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
                         if (as<SetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
@@ -2761,14 +2806,13 @@ void SemanticsVisitor::maybeExpandArgList(List<Expr*>& args)
                 localScope->addBinding(letExpr);
                 auto varExpr = m_astBuilder->create<VarExpr>();
                 varExpr->declRef = varDecl;
-                varExpr->type = expr->type.type;
-                varExpr->type.isLeftValue = false;
+                varExpr->type = expr->type;
                 for (Index i = 0; i < typePack->getTypeCount(); i++)
                 {
                     auto expandedArg = m_astBuilder->create<SwizzleExpr>();
                     expandedArg->base = varExpr;
                     expandedArg->type = typePack->getElementType(i);
-                    expandedArg->type.isLeftValue = false;
+                    expandedArg->type.isLeftValue = expr->type.isLeftValue;
                     expandedArg->elementIndices.add((uint32_t)i);
                     result.add(expandedArg);
                 }
@@ -3286,9 +3330,20 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
 
     if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
     {
-        // The expression directly referenced a declaration,
-        // so we can use that declaration directly to look
-        // for anything applicable.
+        // A local can hold a first-class function value, including a graphics pipeline callable.
+        // In that case the declaration itself is not callable; its value is.
+        // Keep the expression as the call target so lowering preserves the value's producer.
+        if (as<VarDeclBase>(declRefExpr->declRef.getDecl()))
+        {
+            if (auto funcType = as<FuncType>(funcExprType))
+            {
+                AddFuncExprOverloadCandidate(funcType, context, funcExpr, kConversionCost_None);
+                return;
+            }
+        }
+
+        // The expression directly referenced a declaration, so use that declaration to find
+        // anything applicable.
         AddDeclRefOverloadCandidates(
             LookupResultItem(declRefExpr->declRef),
             context,
@@ -3301,8 +3356,9 @@ void SemanticsVisitor::AddOverloadCandidates(Expr* funcExpr, OverloadResolveCont
     }
     else if (auto funcType = as<FuncType>(funcExprType))
     {
-        // TODO(tfoley): deprecate this path...
-        AddFuncOverloadCandidate(funcType, context, kConversionCost_None);
+        // A checked function-valued expression is the call target itself. In particular,
+        // a ray hit-group registration need not have a closest-hit declaration to unwrap.
+        AddFuncExprOverloadCandidate(funcType, context, funcExpr, kConversionCost_None);
     }
     else if (auto overloadedExpr = as<OverloadedExpr>(funcExpr))
     {

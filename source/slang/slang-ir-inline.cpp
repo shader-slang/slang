@@ -376,6 +376,17 @@ struct InliningPassBase
         // without an inline chain needs a scope-only instruction, not DebugNoScope.
         builder.setInsertAfter(call);
         builder.emitDebugScope(callerScope, callDebugInlinedAt);
+        // Restore the caller's line along with its scope. Consider `print(twice(2))`, where
+        // `twice` is inlined: the remaining print belongs to the call-site line, not to the
+        // last line of `twice`. Keeping only the scope restoration misattributes that print
+        // in every consumer of the inline debug stream.
+        builder.emitDebugLine(
+            lastDebugLine->getSource(),
+            getIntVal(lastDebugLine->getLineStart()),
+            getIntVal(lastDebugLine->getLineEnd()),
+            getIntVal(lastDebugLine->getColStart()),
+            getIntVal(lastDebugLine->getColEnd()));
+
         builder.setInsertBefore(call);
         auto newDebugInlinedAt = builder.emitDebugInlinedAt(
             lastDebugLine->getLineStart(),
@@ -571,6 +582,30 @@ struct InliningPassBase
         return clonedInst;
     }
 
+    /// Clones a debug scope and attaches the call site's inline identity when needed.
+    ///
+    /// Consider an inlined function with a local block. The block's `IRDebugScope` originally has
+    /// no `inlinedAt` operand because it was emitted in its physical function. Once cloned into the
+    /// caller, that marker must use the same inline site as the function-entry marker; otherwise
+    /// instructions in the block appear to belong to a new physical frame. Scopes that already
+    /// carry an inline site are cloned normally, and the existing nested-inline rewrite updates
+    /// their outer site later.
+    static IRInst* _cloneDebugScopeWithInlineSite(
+        CallSiteInfo const& callSite,
+        IRCloneEnv* env,
+        IRBuilder* builder,
+        IRDebugScope* debugScope,
+        IRInst* newDebugInlinedAt)
+    {
+        if (!newDebugInlinedAt || debugScope->getInlinedAt())
+            return _cloneInstWithSourceLoc(callSite, env, builder, debugScope);
+
+        IRInst* clonedScope = findCloneForOperand(env, debugScope->getScope());
+        IRInst* clonedInst = builder->emitDebugScope(clonedScope, newDebugInlinedAt);
+        _setSourceLoc(clonedInst, debugScope, callSite);
+        return clonedInst;
+    }
+
     /// Inline the body of the callee for `callSite`, for a callee that has only
     /// a single basic block.
     ///
@@ -625,20 +660,13 @@ struct InliningPassBase
                 break;
 
             case kIROp_DebugScope:
-                {
-                    auto scope =
-                        as<IRDebugScope>(_cloneInstWithSourceLoc(callSite, env, builder, inst));
-                    if (newDebugInlinedAt && !scope->getInlinedAt())
-                    {
-                        builder->setInsertBefore(scope);
-                        auto replacement =
-                            builder->emitDebugScope(scope->getScope(), newDebugInlinedAt);
-                        replacement->sourceLoc = scope->sourceLoc;
-                        scope->removeAndDeallocate();
-                        builder->setInsertBefore(call);
-                    }
-                    break;
-                }
+                _cloneDebugScopeWithInlineSite(
+                    callSite,
+                    env,
+                    builder,
+                    as<IRDebugScope>(inst),
+                    newDebugInlinedAt);
+                break;
 
             case kIROp_DebugInlinedAt:
                 {
@@ -851,6 +879,15 @@ struct InliningPassBase
                     //
                     // SourceLoc information is copied if there is appropriate data available.
                     _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                    break;
+
+                case kIROp_DebugScope:
+                    _cloneDebugScopeWithInlineSite(
+                        callSite,
+                        env,
+                        builder,
+                        as<IRDebugScope>(inst),
+                        newDebugInlinedAt);
                     break;
 
                 case kIROp_Return:
@@ -1261,6 +1298,7 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
 
                 // Also avoid inlining functions with inline-asm instructions.
                 case kIROp_SPIRVAsm:
+                case kIROp_HGBCAsm:
                     canInline = false;
                     goto end;
                 }
@@ -1352,7 +1390,7 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
 
         // If a function body has only asm blocks + trivial insts (load/store),
         // this is considered as a pure asm function, and we can inline it.
-        bool hasSpvAsm = false;
+        bool hasAsm = false;
         for (auto inst = func->getFirstBlock()->getFirstOrdinaryInst(); inst != returnInst;
              inst = inst->getNextInst())
         {
@@ -1360,7 +1398,10 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
             {
             case kIROp_SPIRVAsmOperandInst:
             case kIROp_SPIRVAsm:
-                hasSpvAsm = true;
+            case kIROp_HGBCAsmOperandValue:
+            case kIROp_HGBCAsmOperandValuePack:
+            case kIROp_HGBCAsm:
+                hasAsm = true;
                 continue;
             case kIROp_Load:
             case kIROp_LoadFromUninitializedMemory:
@@ -1371,7 +1412,7 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
                 return false;
             }
         }
-        return hasSpvAsm;
+        return hasAsm;
     }
 };
 

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slang VM browser examples</title>
+<style>
+    body { font: 16px system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    canvas { display: block; width: 100%; height: 360px; margin: 1rem 0; background: #192337; }
+    pre { white-space: pre-wrap; padding: 1rem; background: #f4f4f4; }
+    button { padding: .5rem 1rem; }
+</style>
+<h1>Slang VM in the browser</h1>
+<p>The scalar and Point examples run on page load. The GPU example shares a buffer between
+    Slang programs through an opaque struct, then the Canvas runs
+    <a href="https://www.shadertoy.com/view/XdlSDs">[SIG2014] - Total Noob</a> by dynamite
+    using a Slang compute shader and WebGPU.</p>
+<button id="run">Run Shadertoy shader</button>
+<button id="stop" disabled>Stop</button>
+<canvas id="canvas" width="640" height="360" aria-label="Animated glowing ring computed in Slang"></canvas>
+<pre id="output" aria-live="polite"></pre>
+<script type="importmap">
+{
+    "imports": {
+        "slangvm": "../../../build.em/Release/slangvm/src/index.js",
+        "slangvm/file-system": "../../../build.em/Release/slangvm/src/file-system.js",
+        "slangvm/http-file-system": "../../../build.em/Release/slangvm/src/http-file-system.js"
+    }
+}
+</script>
+<script type="module" src="./demo.js"></script>
+</html>

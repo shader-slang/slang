@@ -169,14 +169,157 @@ endif()
 #
 # Slang Interpreter
 #
+if(
+    SLANG_ENABLE_SLANG_RHI
+    AND (SLANG_ENABLE_TESTS OR SLANG_ENABLE_EXAMPLES OR SLANG_ENABLE_SLANGI)
+)
+    # `platform` contains the native window abstraction used by both test tools and the HGVM path
+    # in `slangi`. Keep it outside the tests-only block so the standalone `slangi` can execute a
+    # graph entry point that creates a window.
+    slang_add_target(
+        platform
+        ${SLANG_LIB_TYPE}
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            core
+            imgui
+            stb
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
+            slang-rhi
+            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
+            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
+            ${CMAKE_DL_LIBS}
+        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
+        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_FROM_PUBLIC imgui
+        INCLUDE_DIRECTORIES_PUBLIC
+            .
+            platform
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
+        EXPORT_MACRO_PREFIX SLANG_PLATFORM
+    )
+endif()
+
 if(SLANG_ENABLE_SLANGI)
     slang_add_target(
         slangi
         EXECUTABLE
+        EXPLICIT_SOURCE
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/main.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/hgbc-compiler.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/hgvm-native-host.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/hgvm-native-host.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/slangi-options.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/slangi-options.h
         LINK_WITH_PRIVATE core compiler-core slang
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )
+    target_link_libraries(slangi PRIVATE slang-hgvm-compiler)
+    if(SLANG_ENABLE_SLANG_RHI)
+        target_link_libraries(slangi PRIVATE slang-hgvm slang-rhi platform)
+        target_compile_definitions(slangi PRIVATE SLANGI_ENABLE_HGVM=1)
+        target_sources(slangi PRIVATE slangi/hgvm-trace.cpp slangi/hgvm-trace.h)
+        target_sources(
+            slangi
+            PRIVATE
+                slangi/hgvm-event-display.cpp
+                slangi/hgvm-event-display.h
+                slangi/hgvm-stats.cpp
+                slangi/hgvm-stats.h
+                slangi/hgvm-stats-console.cpp
+                slangi/hgvm-stats-console.h
+        )
+        target_sources(
+            slangi
+            PRIVATE slangi/hgvm-debug-cli.cpp slangi/hgvm-debug-cli.h
+        )
+        target_sources(
+            slangi
+            PRIVATE slangi/hgvm-debug-dap.cpp slangi/hgvm-debug-dap.h
+        )
+        # Native slangi distributions need the window library as well as the executable.
+        if(SLANG_LIB_TYPE STREQUAL "SHARED")
+            install(
+                TARGETS platform
+                RUNTIME DESTINATION ${runtime_subdir}
+                LIBRARY DESTINATION ${library_subdir}
+            )
+        endif()
+    endif()
+    if(SLANG_ENABLE_TESTS)
+        if(SLANG_ENABLE_SLANG_RHI)
+            add_test(
+                NAME slangi-engines
+                COMMAND
+                    ${CMAKE_COMMAND} -DSLANGI=$<TARGET_FILE:slangi>
+                    -DTRACKING=${SLANG_ENABLE_HGVM_EVENT_TRACKING}
+                    -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/slangi/tests/engines.slang
+                    -P
+                    ${CMAKE_CURRENT_SOURCE_DIR}/slangi/tests/test-engines.cmake
+            )
+            add_test(
+                NAME slangi-trace
+                COMMAND
+                    ${CMAKE_COMMAND} -DSLANGI=$<TARGET_FILE:slangi>
+                    -DSLANGC=$<TARGET_FILE:slangc>
+                    -DTRACKING=${SLANG_ENABLE_HGVM_EVENT_TRACKING}
+                    -DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/slangi/tests/graph-trace.slang
+                    -DBINARY=${CMAKE_CURRENT_BINARY_DIR}/slangi-trace.hgbc -P
+                    ${CMAKE_CURRENT_SOURCE_DIR}/slangi/tests/test-trace.cmake
+            )
+            add_test(
+                NAME slangi-host-graph-disasm
+                COMMAND
+                    $<TARGET_FILE:slangi> -disasm
+                    ${slang_SOURCE_DIR}/tests/compute/hgvm/readback.slang
+            )
+            set_tests_properties(
+                slangi-host-graph-disasm
+                PROPERTIES PASS_REGULAR_EXPRESSION "% HGBC Disassembly"
+            )
+            add_test(
+                NAME slangi-hgbc-precompiled-build
+                COMMAND
+                    $<TARGET_FILE:slangc>
+                    ${slang_SOURCE_DIR}/tests/compute/hgvm/readback.slang
+                    -target hgbc -o
+                    ${CMAKE_CURRENT_BINARY_DIR}/slangi-graph-main.hgbc
+            )
+            set_tests_properties(
+                slangi-hgbc-precompiled-build
+                PROPERTIES FIXTURES_SETUP slangi-hgbc-precompiled
+            )
+            add_test(
+                NAME slangi-hgbc-precompiled-main
+                COMMAND
+                    $<TARGET_FILE:slangi>
+                    ${CMAKE_CURRENT_BINARY_DIR}/slangi-graph-main.hgbc
+            )
+            set_tests_properties(
+                slangi-hgbc-precompiled-main
+                PROPERTIES FIXTURES_REQUIRED slangi-hgbc-precompiled
+            )
+            add_test(
+                NAME slangi-hgbc-precompiled-disasm
+                COMMAND
+                    $<TARGET_FILE:slangi> -disasm
+                    ${CMAKE_CURRENT_BINARY_DIR}/slangi-graph-main.hgbc
+            )
+            set_tests_properties(
+                slangi-hgbc-precompiled-disasm
+                PROPERTIES
+                    FIXTURES_REQUIRED slangi-hgbc-precompiled
+                    PASS_REGULAR_EXPRESSION "% HGBC Disassembly"
+            )
+        endif()
+    endif()
 endif()
 
 if(SLANG_ENABLE_GFX)
@@ -312,10 +455,29 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         test-server
         EXECUTABLE
         EXCLUDE_FROM_ALL
-        LINK_WITH_PRIVATE core compiler-core slang
+        LINK_WITH_PRIVATE core compiler-core slang slang-hgvm slang-hgvm-compiler slang-rhi platform
         INCLUDE_FROM_PRIVATE unit-test slang-rhi
-        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/tools
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/tools
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi
         FOLDER test
+    )
+    target_sources(
+        test-server
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/hgbc-compiler.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/hgvm-native-host.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/hgvm-native-host.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/slangi-options.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/slangi/slangi-options.h
+    )
+    target_sources(
+        test-server
+        PRIVATE slangi/hgvm-trace.cpp slangi/hgvm-trace.h
+    )
+    target_sources(
+        test-server
+        PRIVATE slangi/hgvm-event-display.cpp slangi/hgvm-event-display.h
     )
     slang_add_target(
         test-process
@@ -350,6 +512,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             test-server
             test-process
         OPTIONAL_REQUIRES
+            slangi
             slang-rt
             slang-glslang
             slang-llvm
@@ -373,7 +536,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         add_dependencies(slang-test copy-gfx-slang-modules)
     endif()
 
-    include(CTest)
     add_test(
         NAME slang-test
         COMMAND
@@ -397,51 +559,13 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
     )
 
-    # These are libraries loaded at runtime from the test executable:
-    #
-    # `platform` contains all the platform abstractions for a GUI application.
-    #
-    # The public header gui.h includes both imgui.h and slang-rhi.h. imgui is
-    # INCLUDE_FROM_PUBLIC (below) so consumers of gui.h inherit its (override-aware) leaf
-    # include dir, since including gui.h transitively includes imgui.h; slang-rhi stays
-    # INCLUDE_FROM_PRIVATE because every current gui.h consumer links slang-rhi directly.
-    #
-    slang_add_target(
-        platform
-        ${SLANG_LIB_TYPE}
-        EXCLUDE_FROM_ALL
-        USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE
-            core
-            imgui
-            stb
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
-            slang-rhi
-            "$<$<PLATFORM_ID:Darwin>:-framework Cocoa>"
-            "$<$<PLATFORM_ID:Darwin>:-framework QuartzCore>"
-            ${CMAKE_DL_LIBS}
-        LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
-        EXTRA_COMPILE_DEFINITIONS_PRIVATE
-            $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        INCLUDE_FROM_PRIVATE slang-rhi
-        INCLUDE_FROM_PUBLIC imgui
-        INCLUDE_DIRECTORIES_PUBLIC
-            .
-            platform
-            if
-            (not ${SLANG_OVERRIDE_GLM_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
-        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_GLM_PATH} endif ()
-        EXPORT_MACRO_PREFIX SLANG_PLATFORM
-    )
-
     slang_add_target(
         gfx-unit-test
         MODULE
         EXCLUDE_FROM_ALL
         EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi
+        LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi slang-hgvm slang-hgvm-compiler
         INCLUDE_FROM_PRIVATE slang-rhi
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         INCLUDE_DIRECTORIES_PUBLIC
@@ -454,6 +578,18 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OUTPUT_NAME gfx-unit-test-tool
         REQUIRED_BY slang-test
         FOLDER test/tools
+    )
+    target_sources(
+        gfx-unit-test
+        PRIVATE slangi/hgvm-event-display.cpp slangi/hgvm-event-display.h
+    )
+    target_sources(
+        gfx-unit-test
+        PRIVATE
+            slangi/hgvm-stats.cpp
+            slangi/hgvm-stats.h
+            slangi/hgvm-stats-console.cpp
+            slangi/hgvm-stats-console.h
     )
     # The #11856 unit test drives DeviceCache::acquireDevice, so compile it into this module too.
     target_sources(

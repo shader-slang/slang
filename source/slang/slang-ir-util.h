@@ -11,6 +11,22 @@ namespace Slang
 struct GenericChildrenMigrationContextImpl;
 struct IRCloneEnv;
 
+/// Preserves a lambda's resolved reflection name and definition location independently of its
+/// type. Shader specialization can retain only the name string after the type is eliminated.
+IRInst* preserveLambdaDebugInfo(IRInst* type, IRStringLit* name);
+
+/// Returns a stable identity for a concrete nominal or intrinsic type, or false for local-only types.
+/// Specialization operands remain IR values until this query, so erased enums use their actual
+/// runtime type. Display names and addresses of compiler objects never participate in identity.
+bool getRuntimeTypeMangledName(IRInst* type, String& outName);
+
+/// Encodes concrete specialization arguments using nominal linkage and complete IR operands.
+/// Returns false when an argument has no stable identity (for example, an unresolved parameter).
+bool getSpecializationArgumentIdentity(IRSpecialize* specialize, String& outIdentity);
+
+/// Preserves the representation of types exposed by concrete HGBC host function signatures.
+void preserveHGBCHostInterfaceTypes(IRModule* module);
+
 constexpr IRIntegerValue kInvalidAnyValueSize = 0xFFFFFFFF;
 constexpr IRIntegerValue kDefaultAnyValueSize = 16;
 constexpr SlangInt kRTTIHeaderSize = 16;
@@ -119,7 +135,13 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
 
 bool isAnnotation(IRInst* inst);
 
+/// Returns true if `type` resolves to a class type.
+bool isClassType(IRInst* type);
+
 bool isPtrToClassType(IRInst* type);
+
+/// Returns true if `address` directly or transitively addresses shared heap-object storage.
+bool isHeapObjectAddress(IRInst* address);
 
 bool isPtrToArrayType(IRInst* type);
 

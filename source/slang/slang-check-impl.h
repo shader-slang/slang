@@ -2010,6 +2010,10 @@ public:
         bool& outDiagnosed);
 
     bool isWitnessUncheckedOptional(SubtypeWitness* witness);
+    Witness* getOptionalSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        IsSubTypeOptions options = IsSubTypeOptions::None);
     LookupResult filterLookupResultByCheckedOptional(const LookupResult& lookupResult);
     LookupResult filterLookupResultByCheckedOptionalAndDiagnose(
         const LookupResult& lookupResult,
@@ -3240,57 +3244,53 @@ public:
     /// The plain overloads derive the type-info witness from `baseFuncAsType`. The
     /// `WithWitness` overloads are used when conformance checking already selected a specific
     /// witness, so the computed interface type stays tied to that proof instead of re-synthesizing
-    /// a different one.
-    FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
+    /// a different one. The result can remain a calculated type while optional differentiability
+    /// is unresolved, so callers must preserve it until specialization determines the signature.
+    Type* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
         Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
-        return as<FuncType>(
-            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        return m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName);
     }
 
-    FuncType* getCalculatedDiffFuncTypeWithWitness(
+    Type* getCalculatedDiffFuncTypeWithWitness(
         const char* magicCalcName,
         Type* baseFuncAsType,
         Witness* typeInfoWitness)
     {
         Val* args[] = {baseFuncAsType, typeInfoWitness};
-        return as<FuncType>(
-            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        return m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName);
     }
 
-    FuncType* getCalculatedDiffFuncType(
+    Type* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
         Type* operand1)
     {
         Val* args[] = {baseFuncAsType, operand1, getDiffTypeInfoWitness(baseFuncAsType)};
-        return as<FuncType>(
-            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        return m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName);
     }
 
-    FuncType* getCalculatedDiffFuncTypeWithWitness(
+    Type* getCalculatedDiffFuncTypeWithWitness(
         const char* magicCalcName,
         Type* baseFuncAsType,
         Type* operand1,
         Witness* typeInfoWitness)
     {
         Val* args[] = {baseFuncAsType, operand1, typeInfoWitness};
-        return as<FuncType>(
-            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        return m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName);
     }
 
-    FuncType* getCalculatedDiffFuncType(
+    Type* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
         Type* operand1,
         Type* operand2)
     {
         Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
-        return as<FuncType>(
-            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        return m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName);
     }
 
-    FuncType* getCalculatedDiffFuncTypeWithWitness(
+    Type* getCalculatedDiffFuncTypeWithWitness(
         const char* magicCalcName,
         Type* baseFuncAsType,
         Type* operand1,
@@ -3298,8 +3298,7 @@ public:
         Witness* typeInfoWitness)
     {
         Val* args[] = {baseFuncAsType, operand1, operand2, typeInfoWitness};
-        return as<FuncType>(
-            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        return m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName);
     }
 
     Type* getForwardDiffFuncInterfaceType(Type* baseType);
@@ -4389,18 +4388,23 @@ public:
     Expr* visitApplyForBwdExpr(ApplyForBwdExpr* expr);
     Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
     Expr* visitDispatchKernelExpr(DispatchKernelExpr* expr);
+    Expr* visitMakeGraphicsPipelineExpr(MakeGraphicsPipelineExpr* expr);
+    Expr* visitRayTraceExpr(RayTraceExpr* expr);
+    Expr* visitRayPipelineCallExpr(RayPipelineCallExpr* expr);
 
     Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
     Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
     Expr* visitPackQueryExpr(PackQueryExpr* expr);
+    Expr* visitIndexOfTypeInPackExpr(IndexOfTypeInPackExpr* expr);
     Expr* visitShapePackTransformExpr(ShapePackTransformExpr* expr);
 
     Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 
     Expr* visitDetachExpr(DetachExpr* expr);
 
+    Expr* visitHGBCAsmExpr(HGBCAsmExpr*);
     Expr* visitSPIRVAsmExpr(SPIRVAsmExpr*);
 
     /// Perform semantic checking on a `modifier` that is being applied to the given `type`
@@ -4634,10 +4638,6 @@ VarDeclBase* getTrailingUnsizedArrayElement(
 // texture, buffer, sampler, acceleration structure, etc.
 bool isOpaqueHandleType(Type* type);
 
-// Returns true if `type` itself is an opaque handle type, or if it is a struct
-// (or array thereof) that transitively contains an opaque handle field.
-bool typeTransitivelyContainsOpaqueHandle(SemanticsVisitor* visitor, Type* type);
-
 void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
@@ -4658,7 +4658,7 @@ bool resolveStageOfProfileWithEntryPoint(
     Profile& entryPointProfile,
     CompilerOptionSet& optionSet,
     const List<RefPtr<TargetRequest>>& targets,
-    FuncDecl* entryPointFuncDecl,
+    FunctionDeclBase* entryPointFuncDecl,
     DiagnosticSink* sink);
 
 // For an extensions decl, collect a list of decls on which the extension might be applying to.

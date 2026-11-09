@@ -137,6 +137,7 @@ public:
                 case kIROp_DebugInlinedAt:
                 case kIROp_DebugLexicalBlock:
                 case kIROp_DebugFunction:
+                case kIROp_DebugLambda:
                     continue;
                 default:
                     break;

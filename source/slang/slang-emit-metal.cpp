@@ -1714,7 +1714,7 @@ void MetalSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 
     auto varLayout = findVarLayout(inst);
 
-    if (inst->getOp() == kIROp_StructKey)
+    if (as<IRStructKey>(inst))
     {
         // Only emit [[attribute(n)]] on struct keys.
 

@@ -6,7 +6,7 @@ public enum LayoutType : uint32_t
     Optimal = 1,
 }
 
-internal interface IStorageLayout
+public interface IStorageLayout
 {
     internal static const LayoutType Layout;
 }

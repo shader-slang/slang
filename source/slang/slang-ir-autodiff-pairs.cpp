@@ -180,7 +180,10 @@ struct DifferentialPairTypeBuilder
         }
         else
         {
-            return emitFieldAccessor(builder, baseInst, this->globalPrimalKey);
+            return emitFieldAccessor(
+                builder,
+                baseInst,
+                builder->getBuiltinStructKey(KnownBuiltinDeclName::DifferentialPairPrimal));
         }
     }
 
@@ -193,42 +196,11 @@ struct DifferentialPairTypeBuilder
         }
         else
         {
-            return emitFieldAccessor(builder, baseInst, this->globalDiffKey);
+            return emitFieldAccessor(
+                builder,
+                baseInst,
+                builder->getBuiltinStructKey(KnownBuiltinDeclName::DifferentialPairDifferential));
         }
-    }
-
-    IRStructKey* _getOrCreateDiffStructKey()
-    {
-        if (!this->globalDiffKey)
-        {
-            IRBuilder builder(sharedContext->moduleInst);
-            // Insert directly at top level (skip any generic scopes etc.)
-            builder.setInsertInto(sharedContext->moduleInst);
-
-            this->globalDiffKey = builder.createStructKey();
-            builder.addNameHintDecoration(
-                this->globalDiffKey,
-                UnownedTerminatedStringSlice("differential"));
-        }
-
-        return this->globalDiffKey;
-    }
-
-    IRStructKey* _getOrCreatePrimalStructKey()
-    {
-        if (!this->globalPrimalKey)
-        {
-            // Insert directly at top level (skip any generic scopes etc.)
-            IRBuilder builder(sharedContext->moduleInst);
-            builder.setInsertInto(sharedContext->moduleInst);
-
-            this->globalPrimalKey = builder.createStructKey();
-            builder.addNameHintDecoration(
-                this->globalPrimalKey,
-                UnownedTerminatedStringSlice("primal"));
-        }
-
-        return this->globalPrimalKey;
     }
 
     IRInst* _createDiffPairType(IRType* origBaseType, IRType* diffType)
@@ -258,8 +230,14 @@ struct DifferentialPairTypeBuilder
         getTypeNameHint(nameBuilder, origBaseType);
         builder.addNameHintDecoration(pairStructType, nameBuilder.toString().getUnownedSlice());
 
-        builder.createStructField(pairStructType, _getOrCreatePrimalStructKey(), origBaseType);
-        builder.createStructField(pairStructType, _getOrCreateDiffStructKey(), (IRType*)diffType);
+        builder.createStructField(
+            pairStructType,
+            builder.getBuiltinStructKey(KnownBuiltinDeclName::DifferentialPairPrimal),
+            origBaseType);
+        builder.createStructField(
+            pairStructType,
+            builder.getBuiltinStructKey(KnownBuiltinDeclName::DifferentialPairDifferential),
+            diffType);
         return pairStructType;
     }
 
@@ -442,10 +420,6 @@ struct DifferentialPairTypeBuilder
     Dictionary<IRInst*, IRType*> diffTypeMap;
 
 
-    IRStructKey* globalPrimalKey = nullptr;
-
-    IRStructKey* globalDiffKey = nullptr;
-
     IRInst* genericDiffPairType = nullptr;
 
     List<IRInst*> generatedTypeList;
@@ -457,6 +431,12 @@ struct DifferentialPairTypeBuilder
 
 struct DiffPairLoweringPass : InstPassBase
 {
+    enum class PairField
+    {
+        Primal,
+        Differential,
+    };
+
     DiffPairLoweringPass(AutoDiffSharedContext* context)
         : InstPassBase(context->moduleInst->getModule()), pairBuilderStorage(context)
     {
@@ -501,51 +481,81 @@ struct DiffPairLoweringPass : InstPassBase
         return nullptr;
     }
 
+    IRInst* emitPairFieldAccess(
+        IRBuilder* builder,
+        IRType* loweredPairType,
+        IRInst* base,
+        PairField field)
+    {
+        if (field == PairField::Primal)
+            return pairBuilder->emitPrimalFieldAccess(builder, loweredPairType, base);
+        return pairBuilder->emitDiffFieldAccess(builder, loweredPairType, base);
+    }
+
+    /// Lowers a differential-pair field access while preserving field-sensitive loads.
+    ///
+    /// Consider `inout DifferentialPair<T> pair; T value = pair.p;`. The front end represents
+    /// the source access as `GetPrimal(load(pair))`. Extracting the field after that load would
+    /// read the entire pair, including `pair.d`, even when the backward-derivative ABI permits
+    /// `pair.d` to remain uninitialized. Address the field first so downstream passes see
+    /// `load(GetPrimal(pair))` and only read the requested field.
+    IRInst* lowerPairFieldAccess(
+        IRBuilder* builder,
+        IRType* loweredPairType,
+        IRInst* base,
+        PairField field)
+    {
+        if (auto pairLoad = as<IRLoad>(base))
+        {
+            auto fieldAddress =
+                emitPairFieldAccess(builder, loweredPairType, pairLoad->getPtr(), field);
+            SLANG_RELEASE_ASSERT(asRelevantPtrType(fieldAddress->getDataType()));
+            return builder->emitLoad(fieldAddress);
+        }
+        return emitPairFieldAccess(builder, loweredPairType, base, field);
+    }
+
     IRInst* lowerPairAccess(IRBuilder* builder, IRInst* inst)
     {
+        IRInst* base = nullptr;
+        PairField field;
         if (auto getDiffInst = as<IRDifferentialPairGetDifferentialBase>(inst))
         {
-            auto pairType = getDiffInst->getBase()->getDataType();
-            if (auto pairPtrType = as<IRPtrTypeBase>(pairType))
-            {
-                pairType = pairPtrType->getValueType();
-            }
-
-            builder->setInsertBefore(getDiffInst);
-            if (auto loweredType = lowerPairType(builder, pairType))
-            {
-                IRInst* diffFieldExtract = nullptr;
-                diffFieldExtract = pairBuilder->emitDiffFieldAccess(
-                    builder,
-                    (IRType*)loweredType,
-                    getDiffInst->getBase());
-                getDiffInst->replaceUsesWith(diffFieldExtract);
-                getDiffInst->removeAndDeallocate();
-                return diffFieldExtract;
-            }
+            base = getDiffInst->getBase();
+            field = PairField::Differential;
         }
         else if (auto getPrimalInst = as<IRDifferentialPairGetPrimalBase>(inst))
         {
-            auto pairType = getPrimalInst->getBase()->getDataType();
-            if (auto pairPtrType = as<IRPtrTypeBase>(pairType))
-            {
-                pairType = pairPtrType->getValueType();
-            }
-
-            builder->setInsertBefore(getPrimalInst);
-            if (auto loweredType = lowerPairType(builder, pairType))
-            {
-                IRInst* primalFieldExtract = nullptr;
-                primalFieldExtract = pairBuilder->emitPrimalFieldAccess(
-                    builder,
-                    (IRType*)loweredType,
-                    getPrimalInst->getBase());
-                getPrimalInst->replaceUsesWith(primalFieldExtract);
-                getPrimalInst->removeAndDeallocate();
-                return primalFieldExtract;
-            }
+            base = getPrimalInst->getBase();
+            field = PairField::Primal;
+        }
+        else
+        {
+            return nullptr;
         }
 
+        auto pairType = base->getDataType();
+        if (auto pairPtrType = as<IRPtrTypeBase>(pairType))
+        {
+            pairType = pairPtrType->getValueType();
+        }
+
+        builder->setInsertBefore(inst);
+        if (auto loweredType = lowerPairType(builder, pairType))
+        {
+            auto pairLoad = as<IRLoad>(base);
+            auto loweredAccess = lowerPairFieldAccess(builder, (IRType*)loweredType, base, field);
+            inst->replaceUsesWith(loweredAccess);
+            inst->removeAndDeallocate();
+
+            // The field-address load replaces the original whole-pair load. Remove it here when
+            // this access was its last use: not every consumer runs DCE before interpreting the
+            // lowered IR, and evaluating the dead load would still read an uninitialized sibling
+            // field.
+            if (pairLoad && !pairLoad->hasUses())
+                pairLoad->removeAndDeallocate();
+            return loweredAccess;
+        }
         return nullptr;
     }
 

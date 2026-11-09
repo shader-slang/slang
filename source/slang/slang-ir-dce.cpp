@@ -494,6 +494,9 @@ bool trimOptimizableTypes(IRModule* module)
 
 bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
 {
+    // Lambda names can outlive their closure types when used as shader specialization strings.
+    if (inst->getOp() == kIROp_DebugLambda)
+        return true;
     // The main source of confusion/complexity here is that
     // we are using the same routine to decide:
     //

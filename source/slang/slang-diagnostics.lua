@@ -607,6 +607,7 @@ err(
 )
 
 err("null-component-type", 105, "componentTypes[~index:Int] is `nullptr`")
+err("invalid-entry-point-uniform-layout-constraints", -1, "invalid entry-point uniform layout constraints: ~reason:String")
 
 -- Code 99996: moved from 99999 to avoid severity conflict with internal-severity diagnostics at that code.
 standalone_note("note-failed-to-load-dynamic-library", 99996, "failed to load dynamic library '~path'")
@@ -1309,6 +1310,7 @@ warning(
     span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
 )
 
+-- HGBC diagnostics use the next available IDs after the upstream SPIR-V diagnostics.
 -- Distinct from the E29106 "too many operands" *warning* above: that one is the
 -- parser's recovery guess (the extra tokens are likely a missing semicolon), so
 -- it stays a warning; this is the checker finding an opcode that takes no
@@ -1318,6 +1320,83 @@ err(
     29118,
     "SPIR-V instruction takes no operands",
     span { loc = "location", message = "~opcode does not take any operands" }
+)
+
+err(
+    "unrecognized-hgbc-opcode",
+    29119,
+    "unrecognized HGBC opcode",
+    span { loc = "location", message = "unrecognized HGBC opcode: ~opcode" }
+)
+
+err(
+    "hgbc-asm-compiler-owned-opcode",
+    29120,
+    "compiler-owned HGBC opcode in hgbc_asm",
+    span { loc = "location", message = "~opcode is compiler-owned and cannot be written in hgbc_asm" }
+)
+
+err(
+    "hgbc-instruction-without-result-id",
+    29121,
+    "HGBC instruction has no result-id operand",
+    span { loc = "location", message = "cannot use assignment syntax because ~opcode does not have a result-id operand" }
+)
+
+err(
+    "hgbc-instruction-without-result-type-id",
+    29122,
+    "HGBC instruction has no result-type-id operand",
+    span { loc = "location", message = "cannot use typed assignment syntax because ~opcode does not have a result-type-id operand" }
+)
+
+err(
+    "hgbc-instruction-invalid-operand-count",
+    29123,
+    "invalid HGBC operand count",
+    span { loc = "location", message = "~opcode has an invalid number of operands" }
+)
+
+err(
+    "hgbc-invalid-operand-kind",
+    29124,
+    "invalid HGBC assembly operand",
+    span { loc = "location", message = "operand ~operandIndex:Int of ~opcode must be ~expected" }
+)
+
+err(
+    "hgbc-id-redefinition",
+    29125,
+    "HGBC id redefinition",
+    span { loc = "location", message = "HGBC id '%~id' is already defined in the current assembly block" }
+)
+
+err(
+    "hgbc-undefined-id",
+    29126,
+    "undefined HGBC id",
+    span { loc = "location", message = "HGBC id '%~id' is not defined before this use" }
+)
+
+err(
+    "hgbc-unable-to-resolve-enum",
+    29127,
+    "unknown HGBC enumerant",
+    span { loc = "location", message = "unknown enumerant '~name' for this HGBC operand" }
+)
+
+err(
+    "misplaced-hgbc-result-marker",
+    29128,
+    "misplaced HGBC result marker",
+    span { loc = "location", message = "the result marker may appear only once, as the result of the final instruction in an hgbc_asm expression" }
+)
+
+err(
+    "hgbc-operand-range",
+    29129,
+    "HGBC literal operand is out of range",
+    span { loc = "location", message = "HGBC literal operands must fit in 32 bits" }
 )
 
 
@@ -2085,6 +2164,27 @@ err(
 )
 
 err(
+    "index-of-type-in-pack-argument-invalid",
+    30443,
+    "invalid __index_of_type_in_pack operands",
+    span { loc = "location", message = "expected a single type followed by a type pack" }
+)
+
+err(
+    "index-of-type-in-pack-missing",
+    30444,
+    "type is absent from the pack in __index_of_type_in_pack",
+    span { loc = "location", message = "the searched type must occur exactly once in the type pack" }
+)
+
+err(
+    "index-of-type-in-pack-ambiguous",
+    30445,
+    "type occurs more than once in the pack in __index_of_type_in_pack",
+    span { loc = "location", message = "the searched type must occur exactly once in the type pack" }
+)
+
+err(
     "shape-pack-argument-is-invalid",
     30417,
     "invalid ~opName argument",
@@ -2394,17 +2494,24 @@ err(
 )
 
 err(
+    "expanded-output-argument-requires-address",
+    -1,
+    "expanded output argument must have an address",
+    span { loc = "expr:Expr", message = "expanded output arguments must name addressable storage; properties and swizzles requiring copy-back are not supported." }
+)
+
+err(
+    "borrowed-parameter-pack-unsupported",
+    -1,
+    "borrowed parameter packs are not supported",
+    span { loc = "modifier:Modifier", message = "'__constref' parameter packs are not supported." }
+)
+
+err(
     "improper-use-of-type",
     30106,
     "type cannot be used in this context",
     span { loc = "expr:Expr", message = "type '~type:Type' cannot be used in this context." }
-)
-
-err(
-    "parameter-pack-must-be-const",
-    30107,
-    "parameter pack must be 'const'",
-    span { loc = "modifier:Modifier", message = "a parameter pack must be declared as 'const'." }
 )
 
 -- defer diagnostics
@@ -2444,6 +2551,41 @@ err(
     30112,
     "non-copyable type captured",
     span { loc = "expr:Expr", message = "cannot capture non-copyable type '~type:Type' in a lambda expression." }
+)
+
+err(
+    "differentiable-lambda-value-capture",
+    -1,
+    "differentiable value capture is unsupported",
+    span { loc = "expr:Expr", message = "cannot capture differentiable value type '~type:Type' in a differentiable lambda; mark the captured value 'no_diff' or store it in an IDifferentiablePtrType." }
+)
+
+err(
+    "derivative-signature-requires-resolved-differentiability",
+    -1,
+    "derivative signature depends on optional differentiability",
+    span { loc = "expr:Expr", message = "cannot use 'fwd_diff' or 'bwd_diff' before optional differentiability is resolved; specialize the callable's parameter types first" }
+)
+
+err(
+    "optional-differentiability-requires-in-parameters",
+    -1,
+    "optional differentiability requires input parameters",
+    span { loc = "param:Decl", message = "a function with optionally differentiable inputs must use simple 'in' parameters for all ordinary arguments" }
+)
+
+err(
+    "optional-differentiability-result-not-supported",
+    -1,
+    "optional differentiability on a result is unsupported",
+    span { loc = "decl:Decl", message = "a differentiable function's result must not have optional differentiability; require IDifferentiable or mark the result 'no_diff'" }
+)
+
+err(
+    "optional-differentiability-receiver-not-supported",
+    -1,
+    "optional differentiability on a receiver is unsupported",
+    span { loc = "decl:Decl", message = "a differentiable function's receiver must not have optional differentiability; require a differentiable receiver or use NoDiffThis" }
 )
 
 -- uncaught throw diagnostics
@@ -3467,10 +3609,10 @@ err(
 )
 
 err(
-    "static-const-requirement-must-be-int-or-bool",
+    "static-const-requirement-must-be-scalar",
     30306,
     "invalid static const requirement type",
-    span { loc = "decl:Decl", message = "'static const' requirement can only have int or bool type." }
+    span { loc = "decl:Decl", message = "'static const' requirement must have a Boolean, integer, or floating-point type." }
 )
 
 err(
@@ -3865,6 +4007,32 @@ err(
     span { loc = "expr:Expr", message = "initializing an interface variable with defaults is not supported. Please provide a compatible initializer or leave the variable uninitialized" }
 )
 
+
+
+
+err(
+    "expected-graphics-pipeline-desc",
+    30528,
+    "expected graphics pipeline settings",
+    span { loc = "expr:Expr", message = "expected a '__GraphicsPipelineDesc' value, got '~type:Type'" }
+)
+
+
+
+err(
+    "invalid-raytracing-shader-signature",
+    30531,
+    "invalid ray-tracing shader signature",
+    span { loc = "expr:Expr", message = "~stage:String shader ~reason:String" }
+)
+
+err(
+    "invalid-raytracing-recursion-depth",
+    30532,
+    "invalid ray-tracing recursion depth",
+    span { loc = "expr:Expr", message = "~value:Int is not a valid ray-tracing recursion depth; expected at least 1" }
+)
+
 --
 -- 3062x: variables
 --
@@ -4118,13 +4286,6 @@ err(
     span { loc = "location", message = "__subscript declaration must have a return type specified after '->'" }
 )
 
-err(
-    "optional-cannot-wrap-resource-type",
-    30902,
-    "'Optional<T>' cannot wrap a resource or opaque type",
-    span { loc = "expr:Expr", message = "'~type:Type' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'." }
-)
-
 -- Load semantic checking diagnostics (part 8) - Accessors, Bit Fields, Integer Constants, Overloads, Switch, Generics, Ambiguity
 -- (inlined from slang-diagnostics-semantic-checking-8.lua)
 
@@ -4306,7 +4467,7 @@ standalone_note(
 -- "no overload applicable" error for a rejected generic candidate. The DSL binds severity at
 -- definition time, so a note cannot reuse an error's text; each message string below is
 -- intentionally identical to the *span* message of E38029 / E30440 respectively (not that error's
--- top-level header) and MUST be kept in sync — rewording either error's span message should update
+-- top-level header) and MUST be kept in sync â€” rewording either error's span message should update
 -- its companion note here (and vice versa).
 standalone_note(
     "overload-candidate-type-argument-does-not-conform", -- keep in sync with E38029's span message
@@ -5486,6 +5647,13 @@ warning(
 -- 45xxx - Linking
 
 err(
+    "host-function-in-device-program",
+    45901,
+    "host function is unavailable in a device program",
+    span { loc = "location", message = "host function '~function:IRInst' is referenced by a device program" }
+)
+
+err(
     "unresolved-symbol",
     45001,
     "unresolved external symbol",
@@ -5517,7 +5685,7 @@ warning(
 err(
     "coverage-binding-exhausted",
     45103,
-    "could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0"
+    "could not allocate a free binding slot for `__slang_coverage` â€” existing global parameters occupy too many slots in space 0"
 )
 
 err(
@@ -5660,7 +5828,9 @@ err(
 err(
     "static-assertion-failure",
     41400,
-    "static assertion failed",
+    -- Precompiled libraries can lack source locations, so their span is not rendered.
+    -- Keep the user's assertion message in the diagnostic heading as well.
+    "static assertion failed, ~message",
     span { loc = "location", message = "static assertion failed, ~message" }
 )
 
@@ -6046,7 +6216,7 @@ err(
     "optix-hit-attribute-type-not-supported",
     55217,
     "unsupported hit attribute type for ReportHit on OptiX",
-    span { loc = "location", message = "the hit attribute type passed to 'ReportHit' cannot be lowered to OptiX attribute registers; each scalar field must fit in one 32-bit register ('float', 'bool', and 8/16/32-bit signed or unsigned integers, and vectors/arrays/matrices of those) — 'double', 'half', and 64-bit types are not supported." }
+    span { loc = "location", message = "the hit attribute type passed to 'ReportHit' cannot be lowered to OptiX attribute registers; each scalar field must fit in one 32-bit register ('float', 'bool', and 8/16/32-bit signed or unsigned integers, and vectors/arrays/matrices of those) â€” 'double', 'half', and 64-bit types are not supported." }
 )
 
 err(
@@ -6088,6 +6258,13 @@ warning(
     "precise-qualifier-unsupported-on-target",
     56005,
     "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
+    span { loc = "location" }
+)
+
+err(
+    "hgbc-unsupported-feature",
+    56006,
+    "HGBC target does not support ~feature:String yet",
     span { loc = "location" }
 )
 

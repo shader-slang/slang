@@ -122,6 +122,7 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 - (BOOL)windowShouldClose:(id)window_
 {
     window->shouldClose = true;
+    window->events.close();
     if (CocoaAppContext::mainWindow == window)
         CocoaAppContext::isTerminated = true;
     return YES;
@@ -175,11 +176,10 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 
     const NSTrackingAreaOptions options = NSTrackingMouseEnteredAndExited |
                                           NSTrackingMouseMoved |
-                                          NSTrackingActiveInKeyWindow |
+                                          NSTrackingActiveAlways |
                                           NSTrackingEnabledDuringMouseDrag |
                                           NSTrackingCursorUpdate |
-                                          NSTrackingInVisibleRect |
-                                          NSTrackingAssumeInside;
+                                          NSTrackingInVisibleRect;
 
     trackingArea = [[NSTrackingArea alloc] initWithRect:[self bounds]
                                                 options:options
@@ -220,7 +220,8 @@ static KeyCode getKeyCode(NSUInteger keyCode)
     getMousePosition(event, self, mouseX, mouseY);
     ButtonState::Enum buttons = ButtonState::LeftButton;
     buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
-    window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
+    window->events.mouseDown(
+        MouseEventArgs{mouseX, mouseY, 0, buttons, [event clickCount] % 2 == 0});
 }
 
 - (void)mouseUp:(NSEvent*)event
@@ -236,7 +237,8 @@ static KeyCode getKeyCode(NSUInteger keyCode)
     getMousePosition(event, self, mouseX, mouseY);
     ButtonState::Enum buttons = ButtonState::RightButton;
     buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
-    window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
+    window->events.mouseDown(
+        MouseEventArgs{mouseX, mouseY, 0, buttons, [event clickCount] % 2 == 0});
 }
 
 - (void)rightMouseUp:(NSEvent*)event
@@ -254,7 +256,8 @@ static KeyCode getKeyCode(NSUInteger keyCode)
         getMousePosition(event, self, mouseX, mouseY);
         ButtonState::Enum buttons = ButtonState::MiddleButton;
         buttons = _addButtonState(buttons, getModifierState([event modifierFlags]));
-        window->events.mouseDown(MouseEventArgs{mouseX, mouseY, 0, buttons});
+        window->events.mouseDown(
+            MouseEventArgs{mouseX, mouseY, 0, buttons, [event clickCount] % 2 == 0});
     }
 }
 
@@ -288,6 +291,17 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 {
     getMousePosition(event, self, mouseX, mouseY);
     window->events.mouseMove(MouseEventArgs{mouseX, mouseY, 0, getModifierState([event modifierFlags])});
+}
+
+- (void)mouseEntered:(NSEvent*)event
+{
+    getMousePosition(event, self, mouseX, mouseY);
+    window->events.mouseEnter(MouseEventArgs{mouseX, mouseY, 0, getModifierState([event modifierFlags])});
+}
+
+- (void)mouseExited:(NSEvent*)event
+{
+    window->events.mouseLeave();
 }
 
 - (void)scrollWheel:(NSEvent *)event
@@ -517,6 +531,11 @@ CocoaPlatformWindow::CocoaPlatformWindow(const WindowDesc& desc)
 
     delegate = [[WindowDelegate alloc] initWithPlatformWindow:this];
     [window setDelegate:delegate];
+
+    ContentView* contentView = [[ContentView alloc] initWithPlatformWindow:this];
+    [window setContentView:contentView];
+    [window makeFirstResponder:contentView];
+    [contentView release];
 
     NSString* title = [NSString stringWithUTF8String:desc.title];
     [window setTitle:title];

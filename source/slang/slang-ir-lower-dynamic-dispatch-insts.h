@@ -14,7 +14,7 @@ void lowerUntaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, Dia
 // Lower `SetTaggedUnion` and `CastInterfaceToTaggedUnionPtr` instructions
 // May create new `Reinterpret` instructions.
 //
-bool lowerTaggedUnionTypes(IRModule* module, DiagnosticSink* sink);
+bool lowerTaggedUnionTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 // Lower `SetTagType` types
 void lowerTagTypes(IRModule* module);
@@ -25,7 +25,11 @@ void lowerTagTypes(IRModule* module);
 void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 
 // Lower `GetTagFromSequentialID` and `GetSequentialIDFromTag` instructions
-void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink);
+void lowerSequentialIDTagCasts(
+    IRModule* module,
+    Linkage* linkage,
+    DiagnosticSink* sink,
+    bool preserveInvalidIDs = false);
 
 // Lower `ExtractExistentialValue`, `ExtractExistentialType`, `ExtractExistentialWitnessTable`,
 // `InterfaceType`, `GetSequentialID`, `WitnessTableIDType` and `RTTIHandleType` instructions.

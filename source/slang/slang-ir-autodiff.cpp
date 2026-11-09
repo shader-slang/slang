@@ -381,6 +381,52 @@ IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
     AnnotationKind kind)
 {
     IRBuilder builder(sharedContext->moduleInst);
+    if (kind == AnnotationKind::DifferentialPairType || kind == AnnotationKind::DifferentialType ||
+        kind == AnnotationKind::DifferentialZero || kind == AnnotationKind::DifferentialAdd)
+    {
+        if (auto witness =
+                builder.tryLookupAnnotation(target, AnnotationKind::OptionalDifferentiableWitness))
+        {
+            // The optional witness is the source of truth for all four associations. In
+            // particular, absent evidence must never form a differential pair or member lookup.
+            if (as<IRNoneWitnessTableElement>(witness))
+                return nullptr;
+            if (auto table = as<IRWitnessTable>(witness))
+            {
+                if (as<IRVoidType>(table->getConformanceType()))
+                {
+                    SLANG_RELEASE_ASSERT(as<IRVoidType>(table->getConcreteType()));
+                    return nullptr;
+                }
+            }
+
+            switch (kind)
+            {
+            case AnnotationKind::DifferentialPairType:
+                return builder.getDifferentialPairType((IRType*)target, witness);
+            case AnnotationKind::DifferentialType:
+                return _lookupWitness(
+                    &builder,
+                    witness,
+                    sharedContext->differentialAssocTypeStructKey,
+                    builder.getTypeType());
+            case AnnotationKind::DifferentialZero:
+                return _lookupWitness(
+                    &builder,
+                    witness,
+                    sharedContext->zeroMethodStructKey,
+                    sharedContext->zeroMethodType);
+            case AnnotationKind::DifferentialAdd:
+                return _lookupWitness(
+                    &builder,
+                    witness,
+                    sharedContext->addMethodStructKey,
+                    sharedContext->addMethodType);
+            default:
+                SLANG_UNREACHABLE("expected a value differential association");
+            }
+        }
+    }
     return builder.tryLookupAnnotation(target, kind);
 }
 
@@ -1005,6 +1051,7 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_ConditionalType:
     case kIROp_ArrayType:
     case kIROp_DifferentialPairType:
+    case kIROp_DifferentialPtrPairType:
     case kIROp_InterfaceType:
     case kIROp_AssociatedType:
     case kIROp_AnyValueType:

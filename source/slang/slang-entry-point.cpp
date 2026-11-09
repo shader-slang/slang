@@ -1,6 +1,9 @@
 // slang-entry-point.cpp
 #include "slang-entry-point.h"
 
+#include "slang-ast-expr.h"
+#include "slang-ast-modifier.h"
+#include "slang-compiler-api.h"
 #include "slang-compiler.h"
 #include "slang-mangle.h"
 
@@ -21,7 +24,7 @@ ISlangUnknown* EntryPoint::getInterface(const Guid& guid)
 
 RefPtr<EntryPoint> EntryPoint::create(
     Linkage* linkage,
-    DeclRef<FuncDecl> funcDeclRef,
+    DeclRef<FunctionDeclBase> funcDeclRef,
     Profile profile)
 {
     RefPtr<EntryPoint> entryPoint =
@@ -40,7 +43,8 @@ RefPtr<EntryPoint> EntryPoint::createDummyForPassThrough(
     Name* name,
     Profile profile)
 {
-    RefPtr<EntryPoint> entryPoint = new EntryPoint(linkage, name, profile, DeclRef<FuncDecl>());
+    RefPtr<EntryPoint> entryPoint =
+        new EntryPoint(linkage, name, profile, DeclRef<FunctionDeclBase>());
     return entryPoint;
 }
 
@@ -50,12 +54,17 @@ RefPtr<EntryPoint> EntryPoint::createDummyForDeserialize(
     Profile profile,
     String mangledName)
 {
-    RefPtr<EntryPoint> entryPoint = new EntryPoint(linkage, name, profile, DeclRef<FuncDecl>());
+    RefPtr<EntryPoint> entryPoint =
+        new EntryPoint(linkage, name, profile, DeclRef<FunctionDeclBase>());
     entryPoint->m_mangledName = mangledName;
     return entryPoint;
 }
 
-EntryPoint::EntryPoint(Linkage* linkage, Name* name, Profile profile, DeclRef<FuncDecl> funcDeclRef)
+EntryPoint::EntryPoint(
+    Linkage* linkage,
+    Name* name,
+    Profile profile,
+    DeclRef<FunctionDeclBase> funcDeclRef)
     : ComponentType(linkage), m_name(name), m_profile(profile), m_funcDeclRef(funcDeclRef)
 {
     // Collect any specialization parameters used by the entry point
@@ -162,3 +171,16 @@ List<SourceFile*> const& EntryPoint::getFileDependencies()
 }
 
 } // namespace Slang
+
+SLANG_EXTERN_C bool slang_isHostEntryPoint(slang::IEntryPoint* entryPoint)
+{
+    if (!entryPoint)
+        return false;
+    auto component = Slang::asInternal(static_cast<slang::IComponentType*>(entryPoint));
+    auto internalEntryPoint = Slang::as<Slang::EntryPoint>(component);
+    if (!internalEntryPoint || !internalEntryPoint->getFuncDecl())
+        return false;
+    auto attribute = internalEntryPoint->getFuncDecl()->findModifier<Slang::EntryPointAttribute>();
+    return attribute && attribute->getKeywordName() &&
+           attribute->getKeywordName()->text == "host";
+}

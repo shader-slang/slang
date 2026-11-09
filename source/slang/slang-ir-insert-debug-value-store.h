@@ -1,24 +1,18 @@
 #ifndef SLANG_IR_INSERT_DEBUG_VALUE_STORE_H
 #define SLANG_IR_INSERT_DEBUG_VALUE_STORE_H
 
-#include "core/slang-basic.h"
+#include "core/slang-array-view.h"
 
 namespace Slang
 {
 struct IRModule;
-struct IRType;
-struct IRFunc;
 struct IRInst;
 
-struct DebugValueStoreContext
-{
-    Dictionary<IRType*, bool> m_mapTypeToDebugability;
-    bool isDebuggableType(IRType* type);
-    bool isDebugVarTypeSupported(IRType* type);
-    void insertDebugValueStore(IRFunc* func);
-    bool isTypeKind(IRInst* inst);
-};
-void insertDebugValueStore(DebugValueStoreContext& context, IRModule* module);
+/// Emits declarations and value bindings for source variables of every type in the module.
+void insertDebugValueStore(IRModule* module);
+
+/// Splits a pack's debug binding into existing element fragments when its parameters expand.
+void expandDebugValuePackBindings(IRInst* packValue, ArrayView<IRInst*> elements);
 
 } // namespace Slang
 

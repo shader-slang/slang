@@ -298,6 +298,12 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_HGVMBoxType:
+        *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+        return SLANG_OK;
+    case kIROp_HGVMTaggedUnionType:
+        *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
+        return SLANG_OK;
     case kIROp_TupleType:
         {
             auto tupleType = cast<IRTupleType>(type);

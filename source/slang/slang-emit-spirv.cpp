@@ -2410,6 +2410,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return true;
             }
 
+        case kIROp_DebugLambda:
+            // This association is for host trace display, not shader debug instructions.
+            return true;
         case kIROp_DebugFunction:
             if (shouldEmitExtendedDebugInfo)
             {
@@ -10921,8 +10924,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             m_voidType,
             getNonSemanticDebugInfoExtInst(),
             debugLexicalBlock->getSource(),
-            debugLexicalBlock->getLine(),
-            debugLexicalBlock->getCol(),
+            debugLexicalBlock->getLineStart(),
+            debugLexicalBlock->getColumnStart(),
             scope);
     }
 
@@ -11070,7 +11073,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         for (Index i = 0; i < irAccessChain.getCount(); i++)
         {
             auto element = irAccessChain[i];
-            if (element->getOp() == kIROp_StructKey)
+            if (as<IRStructKey>(element))
             {
                 auto key = as<IRStructKey>(element);
                 auto structType = as<IRStructType>(type);

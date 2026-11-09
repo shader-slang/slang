@@ -20,6 +20,12 @@ TargetProgram::TargetProgram(ComponentType* componentType, TargetRequest* target
     m_optionSet.inheritFrom(targetReq->getOptionSet());
 }
 
+const TargetEntryPoint& TargetProgram::getEntryPoint(Index index) const
+{
+    SLANG_RELEASE_ASSERT(m_layout && index >= 0 && index < m_layout->entryPoints.getCount());
+    return m_layout->entryPoints[index];
+}
+
 IArtifact* TargetProgram::_createWholeProgramResult(
     DiagnosticSink* sink,
     EndToEndCompileRequest* endToEndReq)

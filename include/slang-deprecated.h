@@ -933,6 +933,18 @@ extern "C"
     SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(
         SlangReflectionEntryPoint* entryPoint);
 
+    /// Return the assigned push-constant byte base, or -1 when no placement was assigned.
+    SLANG_API SlangInt
+    spReflectionEntryPoint_getPushConstantOffset(SlangReflectionEntryPoint* entryPoint);
+    SLANG_API SlangInt
+    spReflectionEntryPoint_getPushConstantSize(SlangReflectionEntryPoint* entryPoint);
+
+    /// Return placement in the shader-record application data, or -1 if unassigned.
+    SLANG_API SlangInt
+    spReflectionEntryPoint_getShaderRecordOffset(SlangReflectionEntryPoint* entryPoint);
+    SLANG_API SlangInt
+    spReflectionEntryPoint_getShaderRecordSize(SlangReflectionEntryPoint* entryPoint);
+
     SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getVarLayout(
         SlangReflectionEntryPoint* entryPoint);
 
@@ -997,6 +1009,18 @@ extern "C"
         SlangReflectionFunction** candidates);
 
     SLANG_API SlangUInt spReflection_getEntryPointCount(SlangReflection* reflection);
+    SLANG_API SlangUInt
+    spReflection_getEntryPointUniformLayoutGroupCount(SlangReflection* reflection);
+    SLANG_API SlangInt spReflection_getEntryPointUniformLayoutGroupSize(
+        SlangReflection* reflection,
+        SlangUInt groupIndex);
+    SLANG_API SlangUInt spReflection_getEntryPointUniformLayoutGroupEntryPointCount(
+        SlangReflection* reflection,
+        SlangUInt groupIndex);
+    SLANG_API SlangInt spReflection_getEntryPointUniformLayoutGroupEntryPointIndex(
+        SlangReflection* reflection,
+        SlangUInt groupIndex,
+        SlangUInt indexInGroup);
     SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(
         SlangReflection* reflection,
         SlangUInt index);

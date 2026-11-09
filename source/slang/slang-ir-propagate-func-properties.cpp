@@ -104,6 +104,27 @@ public:
         {
             for (auto inst : block->getChildren())
             {
+                if (as<IRAllocObj>(inst))
+                {
+                    // Allocation has no externally visible side effect when its result is unused,
+                    // but each invocation must return a distinct object identity. A function that
+                    // allocates can therefore be NoSideEffect, but it cannot be ReadNone.
+                    hasNonReadNoneOp = true;
+                    break;
+                }
+
+                if (auto fieldExtract = as<IRFieldExtract>(inst))
+                {
+                    // Unlike a struct extraction, reading a class field observes shared heap
+                    // storage that another call can mutate. Such a function may still have no
+                    // side effects, but it is not ReadNone.
+                    if (isClassType(fieldExtract->getBase()->getDataType()))
+                    {
+                        hasNonReadNoneOp = true;
+                        break;
+                    }
+                }
+
                 // Is this inst known to not have global side effect/analyzable?
                 if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {

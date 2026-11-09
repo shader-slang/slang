@@ -723,6 +723,7 @@ typedef uint32_t SlangSizeT;
         SLANG_HOST_OBJECT_CODE = 34, ///< Host object code
         SLANG_HOST_LLVM_IR = 35,     ///< Host LLVM IR assembly
         SLANG_SHADER_LLVM_IR = 36,   ///< Host LLVM IR assembly (kernel/shader)
+        SLANG_HGBC = 37,             ///< Host-Graph Byte-Code
 
         SLANG_TARGET_COUNT_OF,
     };
@@ -3730,6 +3731,37 @@ struct EntryPointReflection
 
     TypeLayoutReflection* getTypeLayout() { return getVarLayout()->getTypeLayout(); }
 
+    /** Assigned GPU byte base for ordinary push-constant parameters, or -1 if unassigned.
+
+     * Parameter field offsets remain local to the payload. An unassigned offset retains legacy
+
+     * behavior, or indicates that the program still requires specialization.
+    */
+    SlangInt getPushConstantOffset()
+    {
+        return spReflectionEntryPoint_getPushConstantOffset((SlangReflectionEntryPoint*)this);
+    }
+
+    /// Assigned upload size including trailing padding, or -1 if no layout is assigned.
+    /// The ordinary-data type layout reports the local capture size without this padding.
+    SlangInt getPushConstantSize()
+    {
+        return spReflectionEntryPoint_getPushConstantSize((SlangReflectionEntryPoint*)this);
+    }
+
+    /// Assigned byte base in shader-record application data, excluding the native identifier.
+    /// Fields retain local offsets. Returns -1 without explicit placement constraints.
+    SlangInt getShaderRecordOffset()
+    {
+        return spReflectionEntryPoint_getShaderRecordOffset((SlangReflectionEntryPoint*)this);
+    }
+
+    /// Assigned region size including trailing padding, or -1 without placement constraints.
+    SlangInt getShaderRecordSize()
+    {
+        return spReflectionEntryPoint_getShaderRecordSize((SlangReflectionEntryPoint*)this);
+    }
+
     VariableLayoutReflection* getResultVarLayout()
     {
         return (VariableLayoutReflection*)spReflectionEntryPoint_getResultVarLayout(
@@ -3817,6 +3849,35 @@ struct ShaderReflection
     SlangUInt getEntryPointCount()
     {
         return spReflection_getEntryPointCount((SlangReflection*)this);
+    }
+
+    SlangUInt getEntryPointUniformLayoutGroupCount()
+    {
+        return spReflection_getEntryPointUniformLayoutGroupCount((SlangReflection*)this);
+    }
+
+    /// Maximum end byte of the group's nonempty payloads, or -1 if not fully assigned.
+    SlangInt getEntryPointUniformLayoutGroupSize(SlangUInt groupIndex)
+    {
+        return spReflection_getEntryPointUniformLayoutGroupSize((SlangReflection*)this, groupIndex);
+    }
+
+    SlangUInt getEntryPointUniformLayoutGroupEntryPointCount(SlangUInt groupIndex)
+    {
+        return spReflection_getEntryPointUniformLayoutGroupEntryPointCount(
+            (SlangReflection*)this,
+            groupIndex);
+    }
+
+    /// Return a program entry-point index, or -1 for an invalid group/member index.
+    SlangInt getEntryPointUniformLayoutGroupEntryPointIndex(
+        SlangUInt groupIndex,
+        SlangUInt indexInGroup)
+    {
+        return spReflection_getEntryPointUniformLayoutGroupEntryPointIndex(
+            (SlangReflection*)this,
+            groupIndex,
+            indexInGroup);
     }
 
     EntryPointReflection* getEntryPointByIndex(SlangUInt index)
@@ -5681,6 +5742,37 @@ struct IComponentType : public ISlangUnknown
 };
     #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
+/// Entry points whose independent uniform payloads must coexist in one push-constant or
+/// shader-record layout. Indices refer to the component on which the constraint factory is queried.
+/// The factory copies the array; the caller does not need to retain it.
+struct EntryPointUniformLayoutGroup
+{
+    SlangInt const* entryPointIndices = nullptr;
+    SlangInt entryPointCount = 0;
+};
+
+/// Experimental, opt-in uniform layout constraints. Query this interface on IComponentType.
+/// Ordinary composition does not imply that entry points coexist in a pipeline.
+struct IEntryPointUniformLayoutService_Experimental : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0x751db452,
+        0xe3d1,
+        0x47c8,
+        {0x97, 0x15, 0x32, 0xcd, 0x08, 0xbc, 0xea, 0x69})
+
+    /// Create a component containing only constraints about this component's entry points.
+    /// Compose the result with this component before requesting layout or code. The result
+    /// adds no entry points or specialization parameters. Intersecting groups share one
+    /// consistent offset for each entry point. Missing or ambiguous source occurrences are
+    /// diagnosed when requesting the final program's layout.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createEntryPointUniformLayoutConstraints(
+        EntryPointUniformLayoutGroup const* groups,
+        SlangInt groupCount,
+        IComponentType** outConstraints,
+        IBlob** outDiagnostics = nullptr) = 0;
+};
+
 struct IEntryPoint : public IComponentType
 {
     SLANG_COM_INTERFACE(0x8f241361, 0xf5bd, 0x4ca0, {0xa3, 0xac, 0x2, 0xf7, 0xfa, 0x24, 0x2, 0xb8})
@@ -5947,6 +6039,13 @@ struct SlangGlobalSessionDesc
  * @return The created blob on success, or nullptr on failure.
  */
 SLANG_EXTERN_C SLANG_API ISlangBlob* slang_createBlob(const void* data, size_t size);
+
+/** Determine whether an entry point was declared with `[host]`.
+ *
+ * Host entry points use the dispatch stage internally, so ordinary stage reflection cannot
+ * distinguish host entry points from explicitly declared dispatch entry points.
+ */
+SLANG_EXTERN_C SLANG_API bool slang_isHostEntryPoint(slang::IEntryPoint* entryPoint);
 
 /* Serialize coverage metadata into the canonical
  * `.coverage-manifest.json` shape. Same bytes that `slangc` writes

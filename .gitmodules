@@ -41,6 +41,7 @@
 [submodule "external/slang-rhi"]
 	path = external/slang-rhi
 	url = https://github.com/shader-slang/slang-rhi.git
+	branch = h-slang
 [submodule "external/WindowsToolchain"]
 	path = external/WindowsToolchain
 	url = https://github.com/MarkSchofield/WindowsToolchain/

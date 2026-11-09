@@ -1,0 +1,5 @@
+# Install with: python -m pip install -r docs-requirements.txt
+mkdocs==1.6.1
+# Pin the theme for reproducible local documentation builds.
+mkdocs-material==9.6.23
+Pygments==2.19.2

@@ -22,6 +22,7 @@ class ComponentTypeProxy : public ProxyBase<
                                slang::IEntryPoint,
                                slang::ITypeConformance,
                                slang::IComponentType2,
+                               slang::IEntryPointUniformLayoutService_Experimental,
                                slang::IModulePrecompileService_Experimental>
 {
 public:
@@ -125,6 +126,13 @@ public:
         {
             addRef();
             *outObject = static_cast<slang::IComponentType2*>(this);
+            return SLANG_OK;
+        }
+
+        if (uuid == slang::IEntryPointUniformLayoutService_Experimental::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<slang::IEntryPointUniformLayoutService_Experimental*>(this);
             return SLANG_OK;
         }
 
@@ -488,6 +496,27 @@ public:
             return nullptr;
         RECORD_CALL();
         return m_entryPoint->getFunctionReflection();
+    }
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createEntryPointUniformLayoutConstraints(
+        slang::EntryPointUniformLayoutGroup const* groups,
+        SlangInt groupCount,
+        slang::IComponentType** outConstraints,
+        slang::IBlob** outDiagnostics) override
+    {
+        RECORD_CALL();
+        RECORD_INPUT_ARRAY(groups, groupCount);
+        PREPARE_POINTER_OUTPUT(outConstraints);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+        auto result = getActual<slang::IEntryPointUniformLayoutService_Experimental>()
+                          ->createEntryPointUniformLayoutConstraints(
+                              groups,
+                              groupCount,
+                              outConstraints,
+                              outDiagnostics);
+        RECORD_COM_OUTPUT(outConstraints);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     // ITypeConformance has no additional methods beyond IComponentType

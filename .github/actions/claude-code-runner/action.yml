@@ -10,7 +10,7 @@ inputs:
   nv-inference-url:
     description: "NVIDIA Inference Portal base URL"
     required: false
-    default: "https://inference-api.nvidia.com"
+    default: ""
   nv-inference-opus-model:
     description: "Opus model name for NV Inference Portal"
     required: false
@@ -119,7 +119,7 @@ inputs:
   bedrock-base-url:
     description: "LLMGW Bedrock proxy URL"
     required: false
-    default: "https://prod.api.nvidia.com/llm/v1/aws"
+    default: ""
   small-fast-model:
     description: "Small fast model for subagents (Bedrock format)"
     required: false
@@ -198,6 +198,9 @@ runs:
     # Validate environment and inputs
     - name: Validate Environment
       shell: bash
+      env:
+        INFERENCE_BASE_URL: ${{ inputs.nv-inference-url }}
+        BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url }}
       run: |
         set -euo pipefail
 
@@ -211,12 +214,20 @@ runs:
         echo "🔍 Validating auth provider: $AUTH_PROVIDER"
 
         if [ "$AUTH_PROVIDER" = "llmgw" ]; then
+          if [ -z "$BEDROCK_BASE_URL" ]; then
+            echo "::error::Set the bedrock-base-url input for your gateway"
+            exit 1
+          fi
           if [ -z "$LLMGW_ID" ] || [ -z "$LLMGW_SECRET" ] || [ -z "$LLMGW_TOKEN_URL" ]; then
             echo "::error::Missing LLMGW credentials (set via inputs or env vars)"
             exit 1
           fi
           command -v curl >/dev/null 2>&1 || { echo "::error::curl required"; exit 1; }
         elif [ "$AUTH_PROVIDER" = "nv-inference" ]; then
+          if [ -z "$INFERENCE_BASE_URL" ]; then
+            echo "::error::Set the nv-inference-url input for your inference service"
+            exit 1
+          fi
           if [ -z "$NV_TOKEN" ]; then
             echo "::error::Missing NV_INFERENCE_TOKEN (set via input or env var)"
             exit 1
@@ -554,7 +565,7 @@ runs:
       uses: anthropics/claude-code-action@v1
       env:
         # Use Bedrock with bearer token auth (not AWS SigV4)
-        ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url || 'https://prod.api.nvidia.com/llm/v1/aws' }}
+        ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url }}
         AWS_BEARER_TOKEN_BEDROCK: ${{ steps.auth-token.outputs.token }}
         AWS_REGION: ${{ inputs.aws-region || 'us-west-2' }}
         # Small/fast model must be in step env (not just settings.json) so it propagates

@@ -25,6 +25,9 @@ struct LinkedIR
 //
 LinkedIR linkIR(CodeGenContext* codeGenContext);
 
+// Link IR and run the common optimization/finalization pipeline for HGBC emission.
+SlangResult linkAndOptimizeIRForHGBC(CodeGenContext* codeGenContext, LinkedIR& outLinkedIR);
+
 // Prelinking is a step that happens immediately after visiting all AST nodes during IR lowering,
 // and before any IR validation steps. Prelinking copys all extern symbols that are
 // [unsafeForceInlineEarly] into the current module being lowered, so that we can perform necessary

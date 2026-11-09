@@ -58,6 +58,7 @@
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-glsl-liveness.h"
+#include "slang-ir-hgbc-owned-erasure.h"
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
@@ -68,6 +69,7 @@
 #include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
+#include "slang-ir-legalize-hgbc-control-flow.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-matrix-types.h"
 #include "slang-ir-legalize-mesh-outputs.h"
@@ -152,39 +154,6 @@ Slang::String get_slang_torch_prelude();
 
 namespace Slang
 {
-
-EntryPointLayout* findEntryPointLayout(ProgramLayout* programLayout, EntryPoint* entryPoint)
-{
-    // TODO: This function shouldn't need to exist, and it
-    // somewhat hampers the capabilities of the compiler (e.g.,
-    // it isn't supported to have a single program contain
-    // two different "instances" of the same entry point).
-    //
-    // Code that cares about layouts should be looking up
-    // the entry point layout by index on a `ProgramLayout`,
-    // knowing that those indices will align with the order
-    // of entry points on the `ComponentType` for the program.
-
-    for (auto entryPointLayout : programLayout->entryPoints)
-    {
-        if (entryPointLayout->entryPoint.getName() != entryPoint->getName())
-            continue;
-
-        // TODO: We need to be careful about this check, since it relies on
-        // the profile information in the layout matching that in the request.
-        //
-        // What we really seem to want here is some dictionary mapping the
-        // `EntryPoint` directly to the `EntryPointLayout`, and maybe
-        // that is precisely what we should build...
-        //
-        if (entryPointLayout->profile != entryPoint->getProfile())
-            continue;
-
-        return entryPointLayout;
-    }
-
-    return nullptr;
-}
 
 /// Given a layout computed for a scope, get the layout to use when lookup up variables.
 ///
@@ -444,6 +413,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugLine:
     case kIROp_DebugLocationDecoration:
     case kIROp_DebugSource:
+    case kIROp_DebugLambda:
     case kIROp_DebugInlinedAt:
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
@@ -1387,6 +1357,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::HostLLVMIR:
         case CodeGenTarget::HostObjectCode:
         case CodeGenTarget::HostHostCallable:
+        case CodeGenTarget::HGBC:
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
@@ -1426,6 +1397,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::HGBC:
         break;
     }
 
@@ -1709,7 +1681,8 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram, sink);
+    if (target != CodeGenTarget::HGBC)
+        SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram, sink);
 
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
@@ -1749,25 +1722,41 @@ Result linkAndOptimizeIR(
     // correct. (Full producer trace in the PR for issue #11917.)
     if (requiredLoweringPassSet.taggedUnion)
     {
-        if (SLANG_PASS(lowerTaggedUnionTypes, sink))
+        if (SLANG_PASS(lowerTaggedUnionTypes, targetProgram, sink))
             requiredLoweringPassSet.reinterpret = true;
     }
 
     if (requiredLoweringPassSet.untaggedUnion)
         SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
+    if (target == CodeGenTarget::HGBC)
+        SLANG_PASS(lowerHGBCOwnedPayloads);
+
     if (requiredLoweringPassSet.reinterpret)
         SLANG_PASS(lowerReinterpret, targetProgram, sink);
 
-    SLANG_PASS(lowerSequentialIDTagCasts, codeGenContext->getLinkage(), sink);
+    SLANG_PASS(
+        lowerSequentialIDTagCasts,
+        codeGenContext->getLinkage(),
+        sink,
+        target == CodeGenTarget::HGBC);
     if (requiredLoweringPassSet.tagOps)
         SLANG_PASS(lowerTagInsts, sink);
     if (requiredLoweringPassSet.tagType)
         SLANG_PASS(lowerTagTypes);
 
+    // Capture the linked conformance map before DCE removes the witness tables used by tag
+    // lowering. The host representation validates both a conformance ID and its payload type.
+    if (target == CodeGenTarget::HGBC)
+        SLANG_PASS(lowerExistentials, targetProgram, sink);
+
     SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
 
-    SLANG_PASS(lowerExistentials, targetProgram, sink);
+    if (target != CodeGenTarget::HGBC)
+        SLANG_PASS(lowerExistentials, targetProgram, sink);
+
+    if (target == CodeGenTarget::HGBC)
+        SLANG_PASS(lowerHGBCOwnedPayloads);
 
     // Get rid of weak-use insts and any dictionaries in the module inst.
     SLANG_PASS(removeWeakUseInsts);
@@ -1779,8 +1768,9 @@ Result linkAndOptimizeIR(
 
     // If we have a target that is GPU like we use the string hashing mechanism
     // but for that to work we need to inline such that calls (or returns) of strings
-    // boil down into getStringHash(stringLiteral)
-    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    // boil down into getStringHash(stringLiteral). HGBC supports strings and reference
+    // parameters directly, so it does not need type-driven inlining.
+    if (target != CodeGenTarget::HGBC && !ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
     {
         // We could fail because
         // 1) It's not inlinable for some reason (for example if it's recursive)
@@ -1808,6 +1798,10 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    if (target == CodeGenTarget::HGBC)
+        SLANG_PASS(validateHGBCOrdinaryBytePacking, targetProgram, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
     // Expand captured parameters for CUDA (including PTX and OptiX) and Metal after tuple
     // lowering, before aggregate parameters are converted to references. Keep the other target
     // pipelines unchanged until this optimization is validated for them.
@@ -2063,6 +2057,8 @@ Result linkAndOptimizeIR(
     {
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
+        if (target == CodeGenTarget::HGBC)
+            SLANG_PASS(preserveHGBCHostInterfaceTypes);
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
@@ -2418,6 +2414,12 @@ Result linkAndOptimizeIR(
         }
         break;
 
+    case CodeGenTarget::HGBC:
+        {
+            SLANG_PASS(legalizeBinaryOpsForHGBC, sink, targetProgram);
+        }
+        break;
+
     default:
         break;
     }
@@ -2524,6 +2526,9 @@ Result linkAndOptimizeIR(
     // On targets that don't support default initialization, remove 'raw' default construct
     // insts because our code-gen will not have any way to emit them.
     //
+    case CodeGenTarget::HGBC:
+        SLANG_PASS(removeRawDefaultConstructors);
+        break;
     case CodeGenTarget::SPIRV:
         if (targetProgram->shouldEmitSPIRVDirectly())
             SLANG_PASS(removeRawDefaultConstructors);
@@ -2628,10 +2633,19 @@ Result linkAndOptimizeIR(
     else
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
-    SLANG_PASS(
-        lowerBufferElementTypeToStorageType,
-        targetProgram,
-        bufferElementTypeLoweringOptions);
+    // HGBC treats structured buffers as opaque device-resource handles. Graph code can transfer
+    // their elements only through operations such as copy and readback, whose layout converters
+    // marshal between the VM's logical host representation and the layout reflected by the RHI
+    // device. Lowering their element types here would instead replace that logical identity with
+    // a target-independent physical type before HGBC can construct the converter. Embedded shader
+    // modules are compiled for their actual device target later and still run this pass there.
+    if (target != CodeGenTarget::HGBC)
+    {
+        SLANG_PASS(
+            lowerBufferElementTypeToStorageType,
+            targetProgram,
+            bufferElementTypeLoweringOptions);
+    }
 
     // If we are generating code for glsl or metal, perform address space propagation now.
     // For SPIRV, we will do that during spirv legalization that happens after
@@ -2694,7 +2708,15 @@ Result linkAndOptimizeIR(
     // TODO: Maybe make this conditional (only touch the optimizable types).
     // to make it more narrowly scoped.
     //
+    if (target == CodeGenTarget::HGBC)
+        SLANG_PASS(preserveHGBCHostInterfaceTypes);
     SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
+
+    // Buffer element lowering above can create physical types that contain zero-sized structs.
+    // Empty-type legalization represents those fields as `void` in non-optimizable structs so
+    // their keys remain available while layouts are rewritten. Remove the placeholders now: they
+    // have no storage, and targets such as SPIR-V do not permit `void` structure members.
+    SLANG_PASS(cleanUpVoidType);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
@@ -2842,19 +2864,27 @@ Result linkAndOptimizeIR(
         SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
     }
 
+    if (target == CodeGenTarget::HGBC)
+    {
+        SLANG_PASS(legalizeControlFlowForHGBC);
+        // Structured loops, conditionals, and switches can retain unreachable merge blocks.
+        // With only executable edges left, DCE can remove those blocks before emission.
+        SLANG_PASS(eliminateDeadCode, fastIRSimplificationOptions.deadCodeElimOptions);
+    }
+
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
     // reflect the IR that code is generated from as closely as possible.
     //
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    if ((target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly))
+    if ((target != CodeGenTarget::SPIRV) && (target != CodeGenTarget::SPIRVAssembly) &&
+        (target != CodeGenTarget::HGBC))
     {
-        // We need to perform a final pass to ensure that all the
-        // variables in the IR module have their scopes set correctly.
-        //
-        // This is a separate pass because it needs to run after
-        // all the other optimization passes have been performed.
+        // Textual targets need declarations visible outside their defining loop scopes.
+        // SPIR-V and HGBC can directly reference values whose definitions dominate their uses.
+        // Applying this pass to HGBC would duplicate class construction and resource allocation
+        // when those values escape a loop, instead of preserving the original objects.
 
         SLANG_PASS(applyVariableScopeCorrection, targetRequest);
         validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -2897,6 +2927,13 @@ Result linkAndOptimizeIR(
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 
 #undef SLANG_PASS
+}
+
+SlangResult linkAndOptimizeIRForHGBC(CodeGenContext* codeGenContext, LinkedIR& outLinkedIR)
+{
+    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    return linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, outLinkedIR);
 }
 
 SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact)

@@ -37,55 +37,6 @@ namespace
 // 'renderFromLayout' which actually puts the lines and characters together
 //
 
-// Return the number of terminal columns occupied by a single Unicode code
-// point. This is a coarse approximation of POSIX `wcwidth`: zero-width
-// combining marks count as 0, the common East-Asian "wide" and "fullwidth"
-// ranges count as 2, and everything else counts as 1. It exists so caret/
-// underline rows line up under multi-byte and wide characters in source
-// snippets (e.g. CJK text), which a naive byte- or code-point count gets wrong.
-Int64 codePointDisplayWidth(Char32 c)
-{
-    // A tab advances by an indeterminate amount, but since the renderer emits
-    // the source line verbatim (tabs are not expanded), counting it as a single
-    // column keeps the caret line consistent with the rest of this code, which
-    // also treats one tab as one column (e.g. indent detection). This matches
-    // the pre-existing behavior before display-width handling was introduced.
-    if (c == '\t')
-        return 1;
-
-    // Other control characters (NUL, the C0 range, and the C1 range) have no
-    // sensible width; treat as zero so they don't shift the underline.
-    if (c == 0 || c < 0x20 || (c >= 0x7f && c < 0xa0))
-        return 0;
-
-    // Zero-width combining marks and joiners.
-    if ((c >= 0x0300 && c <= 0x036f) || // combining diacritical marks
-        (c >= 0x1ab0 && c <= 0x1aff) || // combining diacritical marks extended
-        (c >= 0x1dc0 && c <= 0x1dff) || // combining diacritical marks supplement
-        (c >= 0x20d0 && c <= 0x20ff) || // combining diacritical marks for symbols
-        (c >= 0xfe20 && c <= 0xfe2f) || // combining half marks
-        c == 0x200b ||                  // zero-width space
-        c == 0x200d)                    // zero-width joiner
-        return 0;
-
-    // East-Asian wide and fullwidth ranges (subset covering the common cases).
-    if ((c >= 0x1100 && c <= 0x115f) || // Hangul Jamo
-        (c >= 0x2e80 && c <= 0x303e) || // CJK radicals, Kangxi, symbols
-        (c >= 0x3041 && c <= 0x33ff) || // Hiragana, Katakana, CJK symbols
-        (c >= 0x3400 && c <= 0x4dbf) || // CJK Unified Ideographs Extension A
-        (c >= 0x4e00 && c <= 0x9fff) || // CJK Unified Ideographs
-        (c >= 0xa000 && c <= 0xa4cf) || // Yi
-        (c >= 0xac00 && c <= 0xd7a3) || // Hangul Syllables
-        (c >= 0xf900 && c <= 0xfaff) || // CJK Compatibility Ideographs
-        (c >= 0xfe30 && c <= 0xfe4f) || // CJK Compatibility Forms
-        (c >= 0xff00 && c <= 0xff60) || // Fullwidth Forms
-        (c >= 0xffe0 && c <= 0xffe6) || // Fullwidth signs
-        (c >= 0x20000 && c <= 0x3fffd)) // CJK Unified Ideographs Extension B+
-        return 2;
-
-    return 1;
-}
-
 // Decode a single UTF-8 code point from `[cur, end)`, advancing `cur`. The
 // reader handed to `getUnicodePointFromUTF8` returns 0 once `cur` reaches `end`,
 // so a truncated multi-byte sequence at the end of the buffer terminates the
@@ -108,7 +59,7 @@ Int64 displayWidth(const UnownedStringSlice& text)
     const char* cur = text.begin();
     const char* const end = text.end();
     while (cur < end)
-        width += codePointDisplayWidth(decodeCodePoint(cur, end));
+        width += UTF8Util::getCodePointDisplayWidth(decodeCodePoint(cur, end));
     return width;
 }
 
@@ -526,7 +477,7 @@ private:
             const char* const end = content.end();
             Int64 col = 1;
             while (cur < end && col < displayColumn)
-                col += codePointDisplayWidth(decodeCodePoint(cur, end));
+                col += UTF8Util::getCodePointDisplayWidth(decodeCodePoint(cur, end));
             return Int64(cur - content.begin());
         };
 

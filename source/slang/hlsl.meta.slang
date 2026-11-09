@@ -87,15 +87,15 @@ __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer)]
+[require(hgbc_structuredbuffer_dimensions)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer_rw)]
+[require(hgbc_structuredbuffer_dimensions_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer_rw)]
+[require(hgbc_structuredbuffer_dimensions_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 //@public:
@@ -833,6 +833,11 @@ __intrinsic_type($(kIROp_TextureType))
 struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 {
 }
+
+__intrinsic_op($(kIROp_TextureGetDimensions))
+[require(hgbc)]
+uint2 __textureGetDimensions<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(
+    _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> texture);
 
 //@hidden:
 
@@ -6440,6 +6445,21 @@ __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
 [require(spirv, structuredbuffer)]
 LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer, uint element);
 
+// Selecting the ref accessor here keeps device writes on their original path, without
+// recursively calling the value setter or taking a user-visible device pointer.
+[__unsafeForceInlineEarly]
+void __storeBufferElement<T>(__ref T destination, T value)
+{
+    destination = value;
+}
+
+[__unsafeForceInlineEarly]
+void __storeStructuredBufferElement<T, L:IBufferDataLayout, TIndex:__BuiltinIntegerType>(
+    RWStructuredBuffer<T, L> buffer, TIndex index, T value)
+{
+    __storeBufferElement(buffer[index], value);
+}
+
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
 A structured buffer can be viewed as an array of the specified element type.
@@ -6465,7 +6485,7 @@ struct StructuredBuffer : IArray<T>
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer)]
+    [require(hgbc_structuredbuffer_dimensions)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -6508,10 +6528,15 @@ struct StructuredBuffer : IArray<T>
     __generic<TIndex : __BuiltinIntegerType>
     __subscript(TIndex index) -> T
     {
-        [__readNone]
-        __intrinsic_op($(kIROp_StructuredBufferLoad))
-        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
-        get;
+        [__unsafeForceInlineEarly]
+        get
+        {
+            __target_switch
+            {
+            case hgbc: return readBack(this, __intCast<uint>(index));
+            default: return this.Load(index);
+            }
+        }
     };
 };
 
@@ -7683,7 +7708,7 @@ $}
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
+[require(hgbc_structuredbuffer_rw)]
 /**
 Represents an opaque handle to a mutable structured buffer allocated in global memory.
 A structured buffer can be viewed as an array of the specified element type.
@@ -7712,7 +7737,7 @@ struct $(item.name) : IRWArray<T>
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer_rw)]
+    [require(hgbc_structuredbuffer_dimensions_rw)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -7768,13 +7793,42 @@ struct $(item.name) : IRWArray<T>
     __generic<TIndex : __BuiltinIntegerType>
     __subscript(TIndex index) -> T
     {
+${ if (item.op == kIROp_HLSLRWStructuredBufferType) { $}
+        // Host indexing transfers one value; device indexing retains native buffer operations.
+        [__unsafeForceInlineEarly]
+        get
+        {
+            __target_switch
+            {
+            case hgbc: return readBack(this, __intCast<uint>(index));
+            default: return this.Load(index);
+            }
+        }
+
+        [__unsafeForceInlineEarly]
+        [nonmutating]
+        set
+        {
+            __target_switch
+            {
+            case hgbc:
+                let temporary = RuntimeArray<T>::alloc(1);
+                temporary[0] = newValue;
+                copy(this, __intCast<uint>(index), temporary, 0, 1);
+                break;
+            default:
+                __storeStructuredBufferElement(this, index, newValue);
+                break;
+            }
+        }
+${ } $}
         // If a 'Buffer[index]' is referred to by a '__ref', call 'kIROp_RWStructuredBufferGetElementPtr(index)'.
         //
         // This allows call's to stay aware that the input is from a 'Buffer'.
         [__NoSideEffect]
         [nonmutating]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
-        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
+        [require(hgbc_structuredbuffer_rw)]
         ref;
     }
 };
@@ -8344,6 +8398,7 @@ uint3 WorkgroupCount()
 __generic<T : __BuiltinType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+[require(hgbc)]
 bool any(T x)
 {
     __target_switch
@@ -8381,12 +8436,16 @@ bool any(T x)
             __intrinsic_asm "ret $0";
         else
             return false;
+    case hgbc: return hgbc_asm {
+        result : $$bool = OpAny $$T $x;
+    };
     }
 }
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+[require(hgbc)]
 bool any(vector<T, N> x)
 {
     if(N == 1)
@@ -8445,6 +8504,9 @@ bool any(vector<T, N> x)
                 result = result || any(x[i]);
             return result;
         }
+    case hgbc: return hgbc_asm {
+        result : $$bool = OpAny $$vector<T, N> $x;
+    };
     default:
         bool result = false;
         for(int i = 0; i < N; ++i)
@@ -8456,11 +8518,15 @@ bool any(vector<T, N> x)
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+[require(hgbc)]
 bool any(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "any";
+    case hgbc: return hgbc_asm {
+        result : $$bool = OpAny $$matrix<T, N, M> $x;
+    };
     default:
         bool result = false;
         for(int i = 0; i < N; ++i)
@@ -8636,7 +8702,7 @@ matrix<float,N,M> asfloat(matrix<float,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T asin(T x)
 {
     __target_switch
@@ -8651,12 +8717,15 @@ T asin(T x)
     };
     case wgsl: __intrinsic_asm "asin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.asin($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpAsin $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> asin(vector<T, N> x)
 {
     __target_switch
@@ -8669,6 +8738,9 @@ vector<T, N> asin(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "asin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.asin($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpAsin $x;
+    };
     default:
         VECTOR_MAP_UNARY(T,N,asin,x);
     }
@@ -8676,12 +8748,15 @@ vector<T, N> asin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> asin(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "asin";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpAsin $x;
+    };
     default:
         MATRIX_MAP_UNARY(T,N,M,asin,x);
     }
@@ -9293,7 +9368,7 @@ matrix<T, N, M> atan(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T atan2(T y, T x)
 {
     __target_switch
@@ -9308,12 +9383,15 @@ T atan2(T y, T x)
     };
     case wgsl: __intrinsic_asm "atan2";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan2($0, $1)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpAtan2 $$T $y $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
     __target_switch
@@ -9325,6 +9403,9 @@ vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Atan2 $y $x
     };
     case wgsl: __intrinsic_asm "atan2";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpAtan2 $$vector<T, N> $y $x;
+    };
     default:
         VECTOR_MAP_BINARY(T, N, atan2, y, x);
     }
@@ -9332,12 +9413,15 @@ vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "atan2";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpAtan2 $$matrix<T, N, M> $y $x;
+    };
     default:
         MATRIX_MAP_BINARY(T, N, M, atan2, y, x);
     }
@@ -9406,7 +9490,7 @@ matrix<T, N, M> atanh(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T ceil(T x)
 {
     __target_switch
@@ -9421,12 +9505,15 @@ T ceil(T x)
     };
     case wgsl: __intrinsic_asm "ceil";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.ceil($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpCeil $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> ceil(vector<T, N> x)
 {
     __target_switch
@@ -9439,6 +9526,9 @@ vector<T, N> ceil(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "ceil";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.ceil($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpCeil $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, ceil, x);
     }
@@ -9446,12 +9536,15 @@ vector<T, N> ceil(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> ceil(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "ceil";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpCeil $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, ceil, x);
     }
@@ -9737,7 +9830,7 @@ void clip(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T cos(T x)
 {
     __target_switch
@@ -9752,12 +9845,15 @@ T cos(T x)
     };
     case wgsl: __intrinsic_asm "cos";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpCos $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> cos(vector<T, N> x)
 {
     __target_switch
@@ -9770,6 +9866,9 @@ vector<T, N> cos(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "cos";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpCos $x;
+    };
     default:
         VECTOR_MAP_UNARY(T,N, cos, x);
     }
@@ -9777,12 +9876,15 @@ vector<T, N> cos(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> cos(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "cos";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpCos $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, cos, x);
     }
@@ -10576,7 +10678,7 @@ vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T dot(T x, T y)
 {
     __target_switch
@@ -10678,7 +10780,7 @@ T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
 // resolution, so that overload remains distinct from the broader arithmetic signature.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     // Preserve the established concrete floating-point intrinsic path. A non-forced forwarding
@@ -10712,7 +10814,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     // Preserve the established concrete integer intrinsic path for the same reason as the
@@ -11072,7 +11174,7 @@ matrix<T,N,M> EvaluateAttributeSnapped(__constref matrix<T,N,M> x, int2 offset)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T exp(T x)
 {
     __target_switch
@@ -11087,13 +11189,16 @@ T exp(T x)
     };
     case wgsl: __intrinsic_asm "exp";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpExp $x;
+    };
     }
 }
 
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> exp(vector<T, N> x)
 {
     __target_switch
@@ -11106,6 +11211,9 @@ vector<T, N> exp(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "exp";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpExp $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, exp, x);
     }
@@ -11114,12 +11222,15 @@ vector<T, N> exp(vector<T, N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> exp(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "exp";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpExp $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, exp, x);
     }
@@ -11131,7 +11242,7 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T exp2(T x)
 {
     __target_switch
@@ -11161,13 +11272,16 @@ T exp2(T x)
         __intrinsic_asm "exp2";
     case llvm:
         __intrinsic_asm "%result = call $T0 @llvm.exp2($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpExp2 $x;
+    };
     }
 
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T,N> exp2(vector<T,N> x)
 {
     __target_switch
@@ -11181,6 +11295,9 @@ vector<T,N> exp2(vector<T,N> x)
     };
     case wgsl: __intrinsic_asm "exp2";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp2($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpExp2 $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, exp2, x);
     }
@@ -11188,12 +11305,15 @@ vector<T,N> exp2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T,N,M> exp2(matrix<T,N,M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "exp2";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpExp2 $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, exp2, x);
     }
@@ -11710,7 +11830,7 @@ vector<uint,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> va
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T floor(T x)
 {
     __target_switch
@@ -11725,12 +11845,15 @@ T floor(T x)
     };
     case wgsl: __intrinsic_asm "floor";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.floor($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpFloor $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> floor(vector<T, N> x)
 {
     __target_switch
@@ -11743,6 +11866,9 @@ vector<T, N> floor(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "floor";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.floor($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpFloor $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, floor, x);
     }
@@ -11750,12 +11876,15 @@ vector<T, N> floor(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> floor(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "floor";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpFloor $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, floor, x);
     }
@@ -13071,7 +13200,7 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T log(T x)
 {
     __target_switch
@@ -13086,12 +13215,15 @@ T log(T x)
     };
     case wgsl: __intrinsic_asm "log";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpLog $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> log(vector<T, N> x)
 {
     __target_switch
@@ -13104,6 +13236,9 @@ vector<T, N> log(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "log";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpLog $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, log, x);
     }
@@ -13111,12 +13246,15 @@ vector<T, N> log(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> log(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "log";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpLog $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, log, x);
     }
@@ -13195,7 +13333,7 @@ matrix<T,N,M> log10(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T log2(T x)
 {
     __target_switch
@@ -13210,12 +13348,15 @@ T log2(T x)
     };
     case wgsl: __intrinsic_asm "log2";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log2($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpLog2 $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T,N> log2(vector<T,N> x)
 {
     __target_switch
@@ -13228,6 +13369,9 @@ vector<T,N> log2(vector<T,N> x)
     };
     case wgsl: __intrinsic_asm "log2";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log2($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpLog2 $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, log2, x);
     }
@@ -13235,12 +13379,15 @@ vector<T,N> log2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T,N,M> log2(matrix<T,N,M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "log2";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpLog2 $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, log2, x);
     }
@@ -13376,11 +13523,14 @@ bool __llvmExtremaIsNaN(T value)
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T __max_impl(T x, T y)
 {
     __target_switch
     {
+    case hgbc: return hgbc_asm {
+        result : $$T = OpMax $$T $x $y;
+    };
     case hlsl: __intrinsic_asm "max";
     case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
@@ -13418,7 +13568,7 @@ T __max_impl(T x, T y)
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T max(T x, T y)
 {
     return __max_impl(x, y);
@@ -13435,7 +13585,7 @@ __generic<T : IFloat>
 [__readNone]
 [ForceInline]
 [OverloadRank(-11)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T max(T x, T y)
 {
     return x.__max(y);
@@ -13445,7 +13595,7 @@ __generic<T : IInteger>
 [__readNone]
 [ForceInline]
 [OverloadRank(-12)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T max(T x, T y)
 {
     return x.__max(y);
@@ -13462,7 +13612,7 @@ T max(T x, T y)
 __generic<T : IComparable>
 [__readNone]
 [OverloadRank(-13)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T max(T x, T y)
 {
     // `__isFloat`/`__isInt` also hold for builtin vectors and matrices, which `__max_impl` cannot
@@ -13488,11 +13638,14 @@ T max(T x, T y)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> __vectorMaxImpl(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpMax $$vector<T, N> $x $y;
+    };
     case hlsl: __intrinsic_asm "max";
     case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
@@ -13548,11 +13701,14 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     __target_switch
     {
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M, L> = OpMax $$matrix<T, N, M, L> $x $y;
+    };
     case hlsl: __intrinsic_asm "max";
     default:
         // HLSL has a native matrix operation. Other targets decompose the logical rows so each row
@@ -13574,7 +13730,7 @@ matrix<T, N, M, L> __matrixMaxImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     return __vectorMaxImpl(x, y);
@@ -13588,7 +13744,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMaxImpl(x, y);
@@ -13598,7 +13754,7 @@ matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T max(T x, T y)
 {
     __target_switch
@@ -13620,7 +13776,7 @@ T max(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     return __vectorMaxImpl(x, y);
@@ -13636,7 +13792,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 // derivative registration. Differentiable generic code must constrain `T` to
 // `__BuiltinFloatingPointType` so overload resolution selects the overload above.
 [OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     return __vectorMaxImpl(x, y);
@@ -13650,7 +13806,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMaxImpl(x, y);
@@ -13666,7 +13822,7 @@ __generic<
 [ForceInline]
 // See the vector overload above for the common-arithmetic rank and primal-only contract.
 [OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M, L> max(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMaxImpl(x, y);
@@ -13780,11 +13936,14 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 __generic<T : IComparable>
 [__unsafeForceInlineEarly]
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T __min_impl(T x, T y)
 {
     __target_switch
     {
+    case hgbc: return hgbc_asm {
+        result : $$T = OpMin $$T $x $y;
+    };
     case hlsl: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
@@ -13824,7 +13983,7 @@ T __min_impl(T x, T y)
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T min(T x, T y)
 {
     return __min_impl(x, y);
@@ -13837,11 +13996,14 @@ T min(T x, T y)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> __vectorMinImpl(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
+    case hgbc: return hgbc_asm {
+        result : $$vector<T,N> = OpMin $$vector<T,N> $x $y;
+    };
     case hlsl: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
@@ -13897,11 +14059,14 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     __target_switch
     {
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T,N,M,L> = OpMin $$matrix<T,N,M,L> $x $y;
+    };
     case hlsl: __intrinsic_asm "min";
     default:
         // HLSL has a native matrix operation. Other targets decompose the logical rows so each row
@@ -13923,7 +14088,7 @@ matrix<T, N, M, L> __matrixMinImpl(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     return __vectorMinImpl(x, y);
@@ -13937,7 +14102,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
 {
     return __matrixMinImpl(x, y);
@@ -13947,7 +14112,7 @@ matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T min(T x, T y)
 {
     __target_switch
@@ -13969,7 +14134,7 @@ T min(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     return __vectorMinImpl(x, y);
@@ -13985,7 +14150,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 // derivative registration. Differentiable generic code must constrain `T` to
 // `__BuiltinFloatingPointType` so overload resolution selects the overload above.
 [OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     return __vectorMinImpl(x, y);
@@ -13999,7 +14164,7 @@ __generic<
     let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T,N,M,L> min(matrix<T,N,M,L> x, matrix<T,N,M,L> y)
 {
     return __matrixMinImpl(x, y);
@@ -14015,7 +14180,7 @@ __generic<
 [ForceInline]
 // See the vector overload above for the common-arithmetic rank and primal-only contract.
 [OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M, L> min(matrix<T, N, M, L> x, matrix<T, N, M, L> y)
 {
     return __matrixMinImpl(x, y);
@@ -14032,7 +14197,7 @@ __generic<T : IFloat>
 [__readNone]
 [ForceInline]
 [OverloadRank(-11)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T min(T x, T y)
 {
     return x.__min(y);
@@ -14042,7 +14207,7 @@ __generic<T : IInteger>
 [__readNone]
 [ForceInline]
 [OverloadRank(-12)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T min(T x, T y)
 {
     return x.__min(y);
@@ -14059,7 +14224,7 @@ T min(T x, T y)
 __generic<T : IComparable>
 [__readNone]
 [OverloadRank(-13)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T min(T x, T y)
 {
     // `__isFloat`/`__isInt` also hold for builtin vectors and matrices, which `__min_impl` cannot
@@ -14861,7 +15026,7 @@ T normalize(T x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T pow(T x, T y)
 {
     __target_switch
@@ -14876,12 +15041,15 @@ T pow(T x, T y)
     };
     case wgsl: __intrinsic_asm "pow";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpPow $$T $x $y;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -14894,6 +15062,9 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
     };
     case wgsl: __intrinsic_asm "pow";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpPow $$vector<T, N> $x $y;
+    };
     default:
         VECTOR_MAP_BINARY(T, N, pow, x, y);
     }
@@ -14901,12 +15072,15 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "pow";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpPow $$matrix<T, N, M> $x $y;
+    };
     default:
         MATRIX_MAP_BINARY(T, N, M, pow, x, y);
     }
@@ -14966,6 +15140,36 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 [require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
+
+/// Print a string value from a graph entry point.
+[require(hgbc)]
+__intrinsic_op($(kIROp_Printf))
+void print(String text);
+
+/// Print an unsigned integer value from a graph entry point.
+[require(hgbc)]
+__intrinsic_op($(kIROp_Printf))
+void print(uint value);
+
+/// Print a half-precision floating-point value from a graph entry point.
+[require(hgbc)]
+__intrinsic_op($(kIROp_Printf))
+void print(half value);
+
+/// Print a floating-point value from a graph entry point.
+[require(hgbc)]
+__intrinsic_op($(kIROp_Printf))
+void print(float value);
+
+/// Print a double-precision floating-point value from a graph entry point.
+[require(hgbc)]
+__intrinsic_op($(kIROp_Printf))
+void print(double value);
+
+/// Print a Boolean value from a graph entry point.
+[require(hgbc)]
+__intrinsic_op($(kIROp_Printf))
+void print(bool value);
 
 /// Abort shader execution with a debug message (VK_KHR_shader_abort).
 /// @param T The variadic type pack parameter for the arguments to be included in the message.
@@ -15682,7 +15886,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T sin(T x)
 {
     __target_switch
@@ -15697,12 +15901,15 @@ T sin(T x)
     };
     case wgsl: __intrinsic_asm "sin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpSin $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> sin(vector<T, N> x)
 {
     __target_switch
@@ -15715,6 +15922,9 @@ vector<T, N> sin(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "sin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpSin $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, sin, x);
     }
@@ -15722,12 +15932,15 @@ vector<T, N> sin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> sin(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "sin";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpSin $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, sin, x);
     }
@@ -15982,7 +16195,7 @@ matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T sqrt(T x)
 {
     __target_switch
@@ -15997,12 +16210,15 @@ T sqrt(T x)
     };
     case wgsl: __intrinsic_asm "sqrt";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sqrt($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpSqrt $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> sqrt(vector<T, N> x)
 {
     __target_switch
@@ -16015,6 +16231,9 @@ vector<T, N> sqrt(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "sqrt";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sqrt($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpSqrt $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, sqrt, x);
     }
@@ -16022,12 +16241,15 @@ vector<T, N> sqrt(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> sqrt(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "sqrt";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpSqrt $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, sqrt, x);
     }
@@ -16095,7 +16317,7 @@ matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 T tan(T x)
 {
     __target_switch
@@ -16110,12 +16332,15 @@ T tan(T x)
     };
     case wgsl: __intrinsic_asm "tan";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.tan($0)";
+    case hgbc: return hgbc_asm {
+        result : $$T = OpTan $x;
+    };
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 vector<T, N> tan(vector<T, N> x)
 {
     __target_switch
@@ -16128,6 +16353,9 @@ vector<T, N> tan(vector<T, N> x)
     };
     case wgsl: __intrinsic_asm "tan";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.tan($0)";
+    case hgbc: return hgbc_asm {
+        result : $$vector<T, N> = OpTan $x;
+    };
     default:
         VECTOR_MAP_UNARY(T, N, tan, x);
     }
@@ -16135,12 +16363,15 @@ vector<T, N> tan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(hgbc_numeric_math)]
 matrix<T, N, M> tan(matrix<T, N, M> x)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "tan";
+    case hgbc: return hgbc_asm {
+        result : $$matrix<T, N, M> = OpTan $x;
+    };
     default:
         MATRIX_MAP_UNARY(T, N, M, tan, x);
     }
@@ -29399,14 +29630,399 @@ uint64_t clockARB()
     }
 }
 
+/// Tracks deferred ray-tracing registrations on the host. Binding replaces this identity with
+/// its dispatch-relative SBT offset; the private field only describes the device representation.
+__magic_type(RaytracingPipelineType)
+__target_intrinsic(hgbc, "OpRaytracingPipelineType")
+struct RaytracingPipeline
+{
+    private uint bindingOffset;
+
+    [require(glsl_hlsl_spirv, raytracing_allstages)]
+    uint getBindingOffset() { return bindingOffset; }
+}
+
+/// A host-side graph value produced asynchronously by GPU work.
+///
+/// A `Defer<T>` can be retained by an HGBC graph object and waited on by a later graph
+/// invocation. It has no device-shader representation.
+__intrinsic_type($(kIROp_DeferType))
+[require(hgbc)]
+struct Defer<T>
+{
+    /// Wait until the producing GPU submission completes and return its host value.
+    T wait()
+    {
+        return hgbc_asm {
+            result : $$T = OpWaitDefer $this;
+        };
+    }
+}
+
+/// A reference-counted host array whose element count is selected when it is allocated.
+///
+/// Runtime arrays are graph values and have no device-shader representation. Assigning or passing
+/// one copies its handle, while indexing addresses the shared heap allocation.
+__intrinsic_type($(kIROp_HGVMRuntimeArrayType))
+[require(hgbc)]
+struct RuntimeArray<T> : IRWArray<T>
+{
+    /// Allocate a zero-initialized runtime array containing `elementCount` elements.
+    static RuntimeArray<T> alloc(uint elementCount)
+    {
+        return hgbc_asm {
+            result : $$RuntimeArray<T> = OpAllocateRuntimeArray $elementCount;
+        };
+    }
+
+    /// Return the number of elements selected when this array was allocated.
+    int getCount()
+    {
+        return hgbc_asm {
+            result : $$int = OpRuntimeArrayGetCount $$RuntimeArray<T> $this;
+        };
+    }
+
+    __subscript(int index) -> T
+    {
+        [__NoSideEffect]
+        [nonmutating]
+        __intrinsic_op($(kIROp_HGVMRuntimeArrayGetElementPtr))
+        [require(hgbc)]
+        ref;
+    }
+
+    __subscript(uint index) -> T
+    {
+        [__NoSideEffect]
+        [nonmutating]
+        __intrinsic_op($(kIROp_HGVMRuntimeArrayGetElementPtr))
+        [require(hgbc)]
+        ref;
+    }
+}
+
+__generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let isMS:int,
+    let sampleCount:int, let access:int, let isShadow:int, let format:int>
+extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, 0, format>
+{
+    /// Return an owning bindless view with the same element, access, and format as this texture.
+    /// HGVM supports single-sample, non-array 2D textures. Read handles expose all mip levels;
+    /// writable handles expose mip zero, matching ordinary writable texture binding.
+    [require(hgbc)]
+    DescriptorHandle<This> getDescriptorHandle()
+    {
+        return hgbc_asm {
+            result : $$DescriptorHandle<This> = OpResourceToDescriptorHandle $this;
+        };
+    }
+}
+
+/// A host presentation surface whose logical storage format is part of its type.
+///
+/// Consider `Surface<RGBA8UnormSrgb>`: the type records that an acquired image uses normalized
+/// eight-bit sRGB storage even though fragment shaders read and write converted `float4` values.
+/// The integer is an HGBC `ResourceFormat` wire value and is interpreted only by the HGBC target.
+__intrinsic_type($(kIROp_HGVMSurfaceType))
+[require(hgbc)]
+struct Surface<let format : int>
+{
+}
+
+/// A graph render target with separate shader-element and physical-storage format parameters.
+///
+/// Consider `RenderTarget2D<float4, RGBA8UnormSrgb>`: pixels occupy four normalized bytes, while
+/// shader loads and fragment outputs use `float4`. This distinction prevents surface images from
+/// being confused with `RWTexture2D<float4>`, whose natural HGBC allocation is RGBA32Float.
+__intrinsic_type($(kIROp_HGVMRenderTargetType))
+[require(hgbc)]
+struct RenderTarget2D<T, let format : int>
+{
+}
+
+/// Returns the Slang image-format enumerant for one writable texture element type.
+///
+/// Consider `float3`: RHI writable textures use four-component storage for three-component graph
+/// values, so specialization reduces this call to `RGBA32Float`. HGBC uses the same numeric format
+/// values as Slang texture types, so allocation and type operands need no intermediate translation.
+[__unsafeForceInlineEarly]
+[require(hgbc)]
+uint __getHGBCNaturalTextureFormat<T : ITexelElement>()
+{
+    if (T.Element is float)
+        return T.elementCount == 1 ? 6 : T.elementCount == 2 ? 3 : 1;
+    if (T.Element is int)
+        return T.elementCount == 1 ? 27 : T.elementCount == 2 ? 24 : 21;
+    if (T.Element is uint)
+        return T.elementCount == 1 ? 37 : T.elementCount == 2 ? 34 : 30;
+    return 0;
+}
+
 extension<T, L : IBufferDataLayout> StructuredBuffer<T, L> : IArray<T>
 {
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+
+    /// Return an owning bindless view of this graph buffer.
+    [require(hgbc)]
+    DescriptorHandle<StructuredBuffer<T, L>> getDescriptorHandle()
+    {
+        return hgbc_asm {
+            result : $$DescriptorHandle<StructuredBuffer<T, L>> =
+                OpResourceToDescriptorHandle $this;
+        };
+    }
+
+    /// Read back one element from a graph buffer as a graph value.
+    /// @remarks This is currently only implemented for the HGBC graph target and blocks graph
+    /// execution until prior GPU work affecting the buffer is visible to the CPU.
+    [require(hgbc)]
+    T readBack(uint index)
+    {
+        return hgbc_asm {
+            result : $$T = OpReadBackBufferElement $$StructuredBuffer<T, L> $this $index;
+        };
+    }
+
+    /// Begin reading back one element without waiting for the producing GPU work.
+    [require(hgbc)]
+    Defer<T> asyncReadBack(uint index)
+    {
+        return hgbc_asm {
+            result : $$Defer<T> = OpAsyncReadBackBufferElement $$StructuredBuffer<T, L> $this $index;
+        };
+    }
+
+    /// Allocate a temporary graph-owned read-only structured buffer.
+    /// @param count The number of elements in the temporary buffer.
+    /// @remarks This is currently only implemented for the HGBC graph target. Populate the buffer
+    /// with a host upload before dispatching GPU work that reads it.
+    [require(hgbc)]
+    static StructuredBuffer<T, L> alloc(uint count)
+    {
+        uint one = 1;
+        return hgbc_asm {
+            result : $$StructuredBuffer<T, L> = OpAllocateResource
+                Buffer Buffer Undefined DeviceLocal UnorderedAccess $$T
+                $count $one $one 1 1 0
+                ShaderResource UnorderedAccess CopySource CopyDestination IndexBuffer
+                AccelerationStructureBuildInput;
+        };
+    }
 }
+
+/// Convenience spelling for an ordinary D32 floating-point texture.
+typealias DepthTarget2D = Texture2D<float, 0, 44>;
+
+// These values carry draw-time assembly and viewport/scissor data. Pipeline configuration is
+// represented separately by a globally prepared GraphicsPipeline definition.
+__target_intrinsic(hgbc, "OpGraphicsDrawType")
+struct __GraphicsDraw {}
+
+__target_intrinsic(hgbc, "OpGraphicsDrawParametersType")
+struct __GraphicsDrawParameters {}
 
 extension<T, L : IBufferDataLayout> RWStructuredBuffer<T, L> : IRWArray<T>
 {
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
+
+    /// Return an owning bindless view of this graph buffer.
+    [require(hgbc)]
+    DescriptorHandle<RWStructuredBuffer<T, L>> getDescriptorHandle()
+    {
+        return hgbc_asm {
+            result : $$DescriptorHandle<RWStructuredBuffer<T, L>> =
+                OpResourceToDescriptorHandle $this;
+        };
+    }
+
+    /// Read back one element from a graph buffer as a graph value.
+    /// @remarks This is currently only implemented for the HGBC graph target and blocks graph
+    /// execution until prior GPU work affecting the buffer is visible to the CPU.
+    [require(hgbc)]
+    T readBack(uint index)
+    {
+        return hgbc_asm {
+            result : $$T = OpReadBackBufferElement $$RWStructuredBuffer<T, L> $this $index;
+        };
+    }
+
+    /// Begin reading back one element without waiting for the producing GPU work.
+    [require(hgbc)]
+    Defer<T> asyncReadBack(uint index)
+    {
+        return hgbc_asm {
+            result : $$Defer<T> = OpAsyncReadBackBufferElement $$RWStructuredBuffer<T, L> $this $index;
+        };
+    }
+
+    /// Allocate a temporary graph-owned structured buffer.
+    /// @param count The number of elements in the temporary buffer.
+    /// @remarks This is currently only implemented for the HGBC graph target.
+    [require(hgbc)]
+    static RWStructuredBuffer<T, L> alloc(uint count)
+    {
+        uint one = 1;
+        return hgbc_asm {
+            result : $$RWStructuredBuffer<T, L> = OpAllocateResource
+                Buffer Buffer Undefined DeviceLocal UnorderedAccess $$T
+                $count $one $one 1 1 0
+                ShaderResource UnorderedAccess CopySource CopyDestination IndexBuffer
+                AccelerationStructureBuildInput;
+        };
+    }
+}
+
+/// Copy one logical element range between HGVM array-storage objects.
+///
+/// The concrete endpoint types remain operands of the HGBC instruction so staging can select a
+/// host copy, upload, readback, or device copy without exposing separate operations to callers.
+[require(hgbc)]
+internal void __copyArrayRange<TDestination, TSource>(
+    TDestination destination,
+    uint destinationOffset,
+    TSource source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    hgbc_asm {
+        OpCopyArrayRange $$TDestination $$TSource
+            $destination $destinationOffset $source $sourceOffset $elementCount;
+    };
+}
+
+[require(hgbc)]
+void copy<T>(
+    RuntimeArray<T> destination,
+    uint destinationOffset,
+    RuntimeArray<T> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, L : IBufferDataLayout>(
+    RuntimeArray<T> destination,
+    uint destinationOffset,
+    StructuredBuffer<T, L> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, L : IBufferDataLayout>(
+    RuntimeArray<T> destination,
+    uint destinationOffset,
+    RWStructuredBuffer<T, L> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, L : IBufferDataLayout>(
+    StructuredBuffer<T, L> destination,
+    uint destinationOffset,
+    RuntimeArray<T> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, L : IBufferDataLayout>(
+    RWStructuredBuffer<T, L> destination,
+    uint destinationOffset,
+    RuntimeArray<T> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, LD : IBufferDataLayout, LS : IBufferDataLayout>(
+    StructuredBuffer<T, LD> destination,
+    uint destinationOffset,
+    StructuredBuffer<T, LS> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, LD : IBufferDataLayout, LS : IBufferDataLayout>(
+    StructuredBuffer<T, LD> destination,
+    uint destinationOffset,
+    RWStructuredBuffer<T, LS> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, LD : IBufferDataLayout, LS : IBufferDataLayout>(
+    RWStructuredBuffer<T, LD> destination,
+    uint destinationOffset,
+    StructuredBuffer<T, LS> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+[require(hgbc)]
+void copy<T, LD : IBufferDataLayout, LS : IBufferDataLayout>(
+    RWStructuredBuffer<T, LD> destination,
+    uint destinationOffset,
+    RWStructuredBuffer<T, LS> source,
+    uint sourceOffset,
+    uint elementCount)
+{
+    __copyArrayRange(destination, destinationOffset, source, sourceOffset, elementCount);
+}
+
+__generic<T, L : IBufferDataLayout>
+[require(hgbc)]
+T readBack(StructuredBuffer<T, L> buffer, uint index)
+{
+    return hgbc_asm {
+        result : $$T = OpReadBackBufferElement $$StructuredBuffer<T, L> $buffer $index;
+    };
+}
+
+__generic<T, L : IBufferDataLayout>
+[require(hgbc)]
+T readBack(RWStructuredBuffer<T, L> buffer, uint index)
+{
+    return hgbc_asm {
+        result : $$T = OpReadBackBufferElement $$RWStructuredBuffer<T, L> $buffer $index;
+    };
+}
+
+__generic<T, L : IBufferDataLayout>
+[require(hgbc)]
+Defer<T> asyncReadBack(StructuredBuffer<T, L> buffer, uint index)
+{
+    return hgbc_asm {
+        result : $$Defer<T> = OpAsyncReadBackBufferElement $$StructuredBuffer<T, L> $buffer $index;
+    };
+}
+
+__generic<T, L : IBufferDataLayout>
+[require(hgbc)]
+Defer<T> asyncReadBack(RWStructuredBuffer<T, L> buffer, uint index)
+{
+    return hgbc_asm {
+        result : $$Defer<T> = OpAsyncReadBackBufferElement $$RWStructuredBuffer<T, L> $buffer $index;
+    };
 }
 
 extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IRWArray<T>

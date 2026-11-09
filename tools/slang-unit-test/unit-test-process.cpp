@@ -666,6 +666,17 @@ static SlangResult _reflectTest(UnitTestContext* context)
     return SLANG_OK;
 }
 
+SLANG_UNIT_TEST(CommandLineEmptyArguments)
+{
+    CommandLine command;
+    command.addArg("");
+    command.addArg("two words");
+    command.addArg("");
+    command.addArg("last");
+    command.addArg("");
+    SLANG_CHECK(command.toStringArgs() == "\"\" \"two words\" \"\" last \"\"");
+}
+
 SLANG_UNIT_TEST(CommandLineProcessReadToCompletion)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1)));

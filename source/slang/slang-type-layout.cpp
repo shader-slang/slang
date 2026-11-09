@@ -2998,6 +2998,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::HostLLVMIR:
     case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HGBC:
         if (isCPUTargetViaLLVM(targetReq))
         {
             return &kLLVMLayoutRulesFamilyImpl;
@@ -5975,6 +5976,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         }
         else if (auto classDeclRef = declRef.as<ClassDecl>())
         {
+            // HGBC class values are managed handles. Their fields are described separately by
+            // OpClassType, so reflection lays out the value itself as a pointer-sized handle
+            // instead of trying to place the class payload inline.
+            if (context.targetReq->getTarget() == CodeGenTarget::HGBC)
+            {
+                return createSimpleTypeLayout(rules->GetPointerLayout(context), type, rules);
+            }
+
             if (context.sink)
             {
                 auto name = classDeclRef.getName();

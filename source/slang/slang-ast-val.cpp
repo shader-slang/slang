@@ -332,11 +332,11 @@ Val* TypePackSubtypeWitness::_substituteImplOverride(
     int* ioDiff)
 {
     int diff = 0;
-    ShortList<SubtypeWitness*> newWitnesses;
+    ShortList<Witness*> newWitnesses;
     for (Index i = 0; i < getCount(); i++)
     {
         auto witness = getWitness(i);
-        auto newWitness = as<SubtypeWitness>(witness->substituteImpl(astBuilder, subst, &diff));
+        auto newWitness = as<Witness>(witness->substituteImpl(astBuilder, subst, &diff));
         newWitnesses.add(newWitness);
     }
     auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
@@ -344,7 +344,8 @@ Val* TypePackSubtypeWitness::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return getCurrentASTBuilder()->getSubtypeWitnessPack(
+    return OptionalWitnessPack::create(
+        astBuilder,
         newSub,
         newSup,
         newWitnesses.getArrayView().arrayView);
@@ -353,11 +354,11 @@ Val* TypePackSubtypeWitness::_substituteImplOverride(
 Val* TypePackSubtypeWitness::_resolveImplOverride()
 {
     int diff = 0;
-    ShortList<SubtypeWitness*> newWitnesses;
+    ShortList<Witness*> newWitnesses;
     for (Index i = 0; i < getCount(); i++)
     {
         auto witness = getWitness(i);
-        auto newWitness = as<SubtypeWitness>(witness->resolve());
+        auto newWitness = as<Witness>(witness->resolve());
         if (witness != newWitness)
             diff++;
         newWitnesses.add(newWitness);
@@ -371,7 +372,8 @@ Val* TypePackSubtypeWitness::_resolveImplOverride()
 
     if (!diff)
         return this;
-    return getCurrentASTBuilder()->getSubtypeWitnessPack(
+    return OptionalWitnessPack::create(
+        getCurrentASTBuilder(),
         newSub,
         newSup,
         newWitnesses.getArrayView().arrayView);
@@ -389,6 +391,223 @@ void TypePackSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice(")");
 }
 
+Witness* OptionalWitnessPack::create(
+    ASTBuilder* astBuilder,
+    Type* sub,
+    Type* sup,
+    ArrayView<Witness*> witnesses)
+{
+    ShortList<SubtypeWitness*> proofs;
+    for (auto witness : witnesses)
+    {
+        SLANG_RELEASE_ASSERT(witness);
+        auto proof = as<SubtypeWitness>(witness);
+        if (!proof)
+            return astBuilder->getOrCreate<OptionalWitnessPack>(sub, sup, witnesses);
+        proofs.add(proof);
+    }
+    return astBuilder->getSubtypeWitnessPack(sub, sup, proofs.getArrayView().arrayView);
+}
+
+Val* OptionalWitnessPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    ShortList<Witness*> witnesses;
+    for (Index i = 0; i < getCount(); i++)
+        witnesses.add(as<Witness>(getWitness(i)->substituteImpl(astBuilder, subst, &diff)));
+    auto sub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto sup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return create(astBuilder, sub, sup, witnesses.getArrayView().arrayView);
+}
+
+Val* OptionalWitnessPack::_resolveImplOverride()
+{
+    bool changed = false;
+    ShortList<Witness*> witnesses;
+    for (Index i = 0; i < getCount(); i++)
+    {
+        auto witness = as<Witness>(getWitness(i)->resolve());
+        changed |= witness != getWitness(i);
+        witnesses.add(witness);
+    }
+    auto sub = as<Type>(getSub()->resolve());
+    auto sup = as<Type>(getSup()->resolve());
+    if (!changed && sub == getSub() && sup == getSup())
+        return this;
+    return create(getCurrentASTBuilder(), sub, sup, witnesses.getArrayView().arrayView);
+}
+
+ConversionCost OptionalWitnessPack::getOverloadResolutionCost()
+{
+    ConversionCost cost = kConversionCost_None;
+    for (Index i = 0; i < getCount(); i++)
+    {
+        auto witness = getWitness(i);
+        if (as<NoneWitness>(witness) || as<AbsentWitnessPack>(witness))
+            cost += kConversionCost_FailedOptionalConstraint;
+        else if (auto proof = as<SubtypeWitness>(witness))
+            cost += proof->getOverloadResolutionCost();
+        else if (auto pack = as<OptionalWitnessPack>(witness))
+            cost += pack->getOverloadResolutionCost();
+    }
+    return cost;
+}
+
+void OptionalWitnessPack::_toTextOverride(StringBuilder& out)
+{
+    out << "OptionalPack(";
+    for (Index i = 0; i < getCount(); i++)
+    {
+        if (i)
+            out << ", ";
+        out << getWitness(i);
+    }
+    out << ")";
+}
+
+Witness* AbsentWitnessPack::create(ASTBuilder* astBuilder, Type* sub, Type* sup)
+{
+    if (auto pack = as<ConcreteTypePack>(sub))
+    {
+        ShortList<Witness*> witnesses;
+        for (Index i = 0; i < pack->getTypeCount(); i++)
+        {
+            auto elementType = pack->getElementType(i);
+            witnesses.add(
+                isTypePack(elementType) ? create(astBuilder, elementType, sup)
+                                        : astBuilder->getOrCreate<NoneWitness>());
+        }
+        return OptionalWitnessPack::create(
+            astBuilder,
+            sub,
+            sup,
+            witnesses.getArrayView().arrayView);
+    }
+    SLANG_RELEASE_ASSERT(isAbstractTypePack(sub));
+    return astBuilder->getOrCreate<AbsentWitnessPack>(sub, sup);
+}
+
+Val* AbsentWitnessPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto sub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto sup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return create(astBuilder, sub, sup);
+}
+
+Val* AbsentWitnessPack::_resolveImplOverride()
+{
+    auto sub = as<Type>(getSub()->resolve());
+    auto sup = as<Type>(getSup()->resolve());
+    if (sub == getSub() && sup == getSup())
+        return this;
+    return create(getCurrentASTBuilder(), sub, sup);
+}
+
+void AbsentWitnessPack::_toTextOverride(StringBuilder& out)
+{
+    out << "AbsentWitnessPack(" << getSub() << ", " << getSup() << ")";
+}
+
+Val* EachOptionalWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto pattern = as<Witness>(getPatternWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (as<AbsentWitnessPack>(pattern))
+    {
+        (*ioDiff)++;
+        return astBuilder->getOrCreate<NoneWitness>();
+    }
+    if (auto pack = as<OptionalWitnessPack>(pattern))
+    {
+        if (subst.packExpansionIndex >= 0)
+        {
+            SLANG_RELEASE_ASSERT(subst.packExpansionIndex < pack->getCount());
+            (*ioDiff)++;
+            return pack->getWitness(subst.packExpansionIndex);
+        }
+    }
+    if (auto pack = as<TypePackSubtypeWitness>(pattern))
+    {
+        if (subst.packExpansionIndex >= 0)
+        {
+            SLANG_RELEASE_ASSERT(subst.packExpansionIndex < pack->getCount());
+            (*ioDiff)++;
+            return pack->getWitness(subst.packExpansionIndex);
+        }
+    }
+    auto sub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto sup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    if (auto proof = as<SubtypeWitness>(pattern))
+        return astBuilder->getEachSubtypeWitness(sub, sup, proof);
+    return astBuilder->getOrCreate<EachOptionalWitness>(sub, sup, pattern);
+}
+
+Val* EachOptionalWitness::_resolveImplOverride()
+{
+    auto pattern = as<Witness>(getPatternWitness()->resolve());
+    if (as<AbsentWitnessPack>(pattern))
+        return getCurrentASTBuilder()->getOrCreate<NoneWitness>();
+    auto sub = as<Type>(getSub()->resolve());
+    auto sup = as<Type>(getSup()->resolve());
+    if (auto proof = as<SubtypeWitness>(pattern))
+        return getCurrentASTBuilder()->getEachSubtypeWitness(sub, sup, proof);
+    if (pattern == getPatternWitness() && sub == getSub() && sup == getSup())
+        return this;
+    return getCurrentASTBuilder()->getOrCreate<EachOptionalWitness>(sub, sup, pattern);
+}
+
+void EachOptionalWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "EachOptionalWitness(" << getPatternWitness() << ")";
+}
+
+bool isUncheckedOptionalWitness(Witness* witness)
+{
+    if (auto declared = as<DeclaredSubtypeWitness>(witness))
+        return declared->isOptional();
+    if (auto each = as<EachSubtypeWitness>(witness))
+        return isUncheckedOptionalWitness(each->getPatternTypeWitness());
+    if (auto expand = as<ExpandSubtypeWitness>(witness))
+        return isUncheckedOptionalWitness(expand->getPatternTypeWitness());
+    if (as<EachOptionalWitness>(witness))
+        return true;
+    if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+        return isUncheckedOptionalWitness(transitive->getSubToMid()) ||
+               isUncheckedOptionalWitness(transitive->getMidToSup());
+    if (auto pack = as<TypePackSubtypeWitness>(witness))
+    {
+        for (Index i = 0; i < pack->getCount(); i++)
+            if (isUncheckedOptionalWitness(pack->getWitness(i)))
+                return true;
+    }
+    if (auto pack = as<OptionalWitnessPack>(witness))
+    {
+        for (Index i = 0; i < pack->getCount(); i++)
+            if (isUncheckedOptionalWitness(pack->getWitness(i)))
+                return true;
+    }
+    return false;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExpandSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Val* ExpandSubtypeWitness::_substituteImplOverride(
@@ -403,23 +622,22 @@ Val* ExpandSubtypeWitness::_substituteImplOverride(
         return this;
     if (auto subTypePack = as<ConcreteTypePack>(newSub))
     {
-        // If sub is substituted into a concrete type pack, we should return a
-        // TypePackSubtypeWitness.
-        ShortList<SubtypeWitness*> newWitnesses;
+        // Expanding an optional constraint may produce missing proofs at individual indices.
+        // Preserve those entries instead of casting them to null subtype witnesses.
+        ShortList<Witness*> newWitnesses;
         for (int i = 0; i < (int)subTypePack->getTypeCount(); i++)
         {
             auto elementType = subTypePack->getElementType(i);
             subst.packExpansionIndex = i;
-            auto elementWitness = as<SubtypeWitness>(
-                getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
-            auto newWitness = getCurrentASTBuilder()->getExpandSubtypeWitness(
-                elementType,
-                newSup,
-                elementWitness);
-            newWitnesses.add(as<SubtypeWitness>(newWitness));
+            auto elementWitness =
+                as<Witness>(getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+            if (auto proof = as<SubtypeWitness>(elementWitness))
+                elementWitness = astBuilder->getExpandSubtypeWitness(elementType, newSup, proof);
+            newWitnesses.add(elementWitness);
         }
         (*ioDiff)++;
-        return getCurrentASTBuilder()->getSubtypeWitnessPack(
+        return OptionalWitnessPack::create(
+            astBuilder,
             newSub,
             newSup,
             newWitnesses.getArrayView().arrayView);
@@ -464,7 +682,21 @@ Val* EachSubtypeWitness::_substituteImplOverride(
 {
     int diff = 0;
     auto newPatternWitness =
-        as<SubtypeWitness>(getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+        as<Witness>(getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (as<AbsentWitnessPack>(newPatternWitness))
+    {
+        (*ioDiff)++;
+        return astBuilder->getOrCreate<NoneWitness>();
+    }
+    if (auto witnessPack = as<OptionalWitnessPack>(newPatternWitness))
+    {
+        if (subst.packExpansionIndex >= 0)
+        {
+            SLANG_RELEASE_ASSERT(subst.packExpansionIndex < witnessPack->getCount());
+            (*ioDiff)++;
+            return witnessPack->getWitness(subst.packExpansionIndex);
+        }
+    }
     if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
     {
         if (subst.packExpansionIndex >= 0 && subst.packExpansionIndex < witnessPack->getCount())
@@ -479,13 +711,17 @@ Val* EachSubtypeWitness::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return getCurrentASTBuilder()->getEachSubtypeWitness(newSub, newSup, newPatternWitness);
+    if (auto proof = as<SubtypeWitness>(newPatternWitness))
+        return astBuilder->getEachSubtypeWitness(newSub, newSup, proof);
+    return astBuilder->getOrCreate<EachOptionalWitness>(newSub, newSup, newPatternWitness);
 }
 
 Val* EachSubtypeWitness::_resolveImplOverride()
 {
     int diff = 0;
-    auto newPatternWitness = as<SubtypeWitness>(getPatternTypeWitness()->resolve());
+    auto newPatternWitness = as<Witness>(getPatternTypeWitness()->resolve());
+    if (as<AbsentWitnessPack>(newPatternWitness))
+        return getCurrentASTBuilder()->getOrCreate<NoneWitness>();
     if (newPatternWitness != getPatternTypeWitness())
         diff++;
     auto newSub = as<Type>(getSub()->resolve());
@@ -496,7 +732,12 @@ Val* EachSubtypeWitness::_resolveImplOverride()
         diff++;
     if (!diff)
         return this;
-    return getCurrentASTBuilder()->getEachSubtypeWitness(newSub, newSup, newPatternWitness);
+    if (auto proof = as<SubtypeWitness>(newPatternWitness))
+        return getCurrentASTBuilder()->getEachSubtypeWitness(newSub, newSup, proof);
+    return getCurrentASTBuilder()->getOrCreate<EachOptionalWitness>(
+        newSub,
+        newSup,
+        newPatternWitness);
 }
 
 void EachSubtypeWitness::_toTextOverride(StringBuilder& out)
@@ -792,8 +1033,13 @@ void PackBranchSubtypeWitness::_toTextOverride(StringBuilder& out)
 Val* DeclaredSubtypeWitness::_resolveImplOverride()
 {
     auto resolvedDeclRef = getDeclRef().declRefBase->resolve();
-    if (auto resolvedVal = as<SubtypeWitness>(resolvedDeclRef))
+    if (auto resolvedVal = as<Witness>(resolvedDeclRef))
+    {
+        // Resolving an optional declaration has the same contract as substituting its generic
+        // argument: the result may be absent or contain elementwise optional pack evidence.
+        SLANG_RELEASE_ASSERT(as<SubtypeWitness>(resolvedVal) || isOptional());
         return resolvedVal;
+    }
 
     auto newSub = as<Type>(getSub()->resolve());
     auto newSup = as<Type>(getSup()->resolve());
@@ -1112,6 +1358,18 @@ Val* DeclRefTypeCoercionWitness::_resolveImplOverride()
 }
 
 // DiffTypeInfoWitness
+DiffTypeInfoWitness* DiffTypeInfoWitness::create(ASTBuilder* astBuilder, ArrayView<Val*> operands)
+{
+    // Consider `f<T>(T value) where optional T : IDifferentiable`. Substitution with uint
+    // supplies NoneWitness, while directly querying f<uint> supplies null. Both must identify
+    // the same differentiability interface and its calculated function signatures.
+    SLANG_RELEASE_ASSERT(operands.getCount() >= 3);
+    List<Val*> canonicalOperands;
+    for (auto operand : operands)
+        canonicalOperands.add(as<NoneWitness>(operand) ? nullptr : operand);
+    return astBuilder->getOrCreate<DiffTypeInfoWitness>(canonicalOperands);
+}
+
 void DiffTypeInfoWitness::_toTextOverride(StringBuilder& out)
 {
     out << "DiffTypeInfoWitness(";
@@ -1137,7 +1395,7 @@ Val* DiffTypeInfoWitness::_substituteImplOverride(
     if (diff)
     {
         (*ioDiff)++;
-        return astBuilder->getOrCreate<DiffTypeInfoWitness>(newOperands);
+        return create(astBuilder, newOperands.getArrayView());
     }
     else
     {
@@ -1160,7 +1418,7 @@ Val* DiffTypeInfoWitness::_resolveImplOverride()
 
     if (diff)
     {
-        return getCurrentASTBuilder()->getOrCreate<DiffTypeInfoWitness>(newOperands);
+        return create(getCurrentASTBuilder(), newOperands.getArrayView());
     }
     else
     {
@@ -1357,11 +1615,13 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
                 pairDiffWitnesses.add(diffWitness);
         }
 
-        return getCurrentASTBuilder()->getOrCreate<DiffTypeInfoWitness>(
-            thisParamType,
-            thisDiffWitness,
-            resultDiffWitness,
-            pairDiffWitnesses);
+        List<Val*> operands;
+        operands.add(thisParamType);
+        operands.add(thisDiffWitness);
+        operands.add(resultDiffWitness);
+        for (auto witness : pairDiffWitnesses)
+            operands.add(witness);
+        return DiffTypeInfoWitness::create(getCurrentASTBuilder(), operands.getArrayView());
     }
 
     return getCurrentASTBuilder()->getOrCreate<HigherOrderDiffTypeTranslationWitness>(
@@ -2742,6 +3002,100 @@ Val* CountOfIntVal::_resolveImplOverride()
     if (resolvedArg == getValArg())
         return this;
     return tryFold(getCurrentASTBuilder(), getType(), resolvedArg);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IndexOfTypeInPackIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/// Checks whether the canonical operands still contain specialization-dependent values.
+/// Consider looking up Wrapper<4> in {Wrapper<N>, Wrapper<4>}. A known pack length is
+/// insufficient: N can still change whether the match is unique. Walking the Val operands
+/// checks those dependencies without inspecting declarations' bodies or inventing a
+/// separate type-equivalence relation.
+static bool isConcreteTypeIndexOperand(Val* val)
+{
+    val = val->resolve();
+    if (as<ErrorType>(val) || as<EachType>(val) || as<ExtractExistentialType>(val))
+        return false;
+    if (as<IntVal>(val) && !as<ConstantIntVal>(val))
+        return false;
+    if (auto declRef = as<DeclRefBase>(val))
+    {
+        auto decl = declRef->getDecl();
+        if (as<GenericTypeParamDeclBase>(decl) || as<GlobalGenericParamDecl>(decl) ||
+            as<AssocTypeDecl>(decl) || as<ThisTypeDecl>(decl))
+            return false;
+    }
+    for (auto operand : val->m_operands)
+    {
+        if (operand.kind == ValNodeOperandKind::ValNode && operand.getVal() &&
+            !isConcreteTypeIndexOperand(operand.getVal()))
+            return false;
+    }
+    return true;
+}
+
+IndexOfTypeInPackIntVal::LookupResult IndexOfTypeInPackIntVal::findIndex(
+    Type* elementType,
+    Type* packType,
+    Index& outIndex)
+{
+    auto pack = as<ConcreteTypePack>(packType);
+    if (!pack || !isConcreteTypeIndexOperand(elementType) || !isConcreteTypeIndexOperand(pack))
+        return LookupResult::Unknown;
+
+    outIndex = -1;
+    for (Index i = 0; i < pack->getTypeCount(); ++i)
+    {
+        if (isTypePack(pack->getElementType(i)))
+            return LookupResult::Unknown;
+        if (elementType->equals(pack->getElementType(i)))
+        {
+            if (outIndex >= 0)
+                return LookupResult::Ambiguous;
+            outIndex = i;
+        }
+    }
+    return outIndex >= 0 ? LookupResult::Found : LookupResult::Missing;
+}
+
+IntVal* IndexOfTypeInPackIntVal::tryFold(
+    ASTBuilder* astBuilder,
+    Type* intType,
+    Type* elementType,
+    Type* packType)
+{
+    Index index;
+    if (findIndex(elementType, packType, index) == LookupResult::Found)
+        return astBuilder->getIntVal(intType, index);
+    return astBuilder->getOrCreate<IndexOfTypeInPackIntVal>(intType, elementType, packType);
+}
+
+void IndexOfTypeInPackIntVal::_toTextOverride(StringBuilder& out)
+{
+    out << "__index_of_type_in_pack<" << getElementType() << ", " << getPackType() << ">";
+}
+
+Val* IndexOfTypeInPackIntVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto elementType = as<Type>(getElementType()->substituteImpl(astBuilder, subst, &diff));
+    auto packType = as<Type>(getPackType()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return tryFold(astBuilder, getType(), elementType, packType);
+}
+
+Val* IndexOfTypeInPackIntVal::_resolveImplOverride()
+{
+    auto elementType = as<Type>(getElementType()->resolve());
+    auto packType = as<Type>(getPackType()->resolve());
+    if (elementType == getElementType() && packType == getPackType())
+        return this;
+    return tryFold(getCurrentASTBuilder(), getType(), elementType, packType);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FirstIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

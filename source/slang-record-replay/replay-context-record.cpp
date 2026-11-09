@@ -613,6 +613,11 @@ void ReplayContext::record(RecordFlag flags, slang::SpecializationArg& value)
     }
 }
 
+void ReplayContext::record(RecordFlag flags, slang::EntryPointUniformLayoutGroup& value)
+{
+    recordArray(flags, value.entryPointIndices, value.entryPointCount);
+}
+
 void ReplayContext::record(RecordFlag flags, SlangGlobalSessionDesc& value)
 {
     record(flags, value.structureSize);

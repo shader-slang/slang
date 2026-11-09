@@ -86,6 +86,59 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         return output;
     }
 
+    /// Evaluates from optimally tiled FP16 weights cached persistently in the shared-memory pool.
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    internal static WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>
+    forwardFromShared<bool Bias = false>(
+        WaveTangledVector<T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
+        uint parameterBaseVectorIndex)
+    {
+        static_assert(T is half,
+            "Persistent shared Vulkan weights currently support FP16 inference.");
+
+        static const int TileWidthIn = 16 / (sizeof(uint4) / sizeof(half));
+        static const int TileWidthOut = 16 / (sizeof(uint4) / sizeof(T));
+        static const int ShmemPerWarp =
+            N * (TileWidthIn > TileWidthOut ? TileWidthIn : TileWidthOut);
+        uint perWarpBase = uint(getWaveId()) * uint(ShmemPerWarp);
+
+        MatrixA<M, K> wA;
+        wA.loadWeightTiledFromShared<ShMemSize, false>(parameterBaseVectorIndex);
+
+        typealias InputVec = WaveTangledVector<
+            T, ShMemSize, InputSize, SubgroupSize, SubgroupCount>;
+        MatrixB<K, N> inputB;
+        inputB.fromVectorViaShMem<ShMemSize, T, InputVec.Uint4AlignedInputSize, false>(
+            input.data,
+            perWarpBase);
+
+        MatrixC<T, M, N> resultMat = matMul<T, M, K, N>(wA, inputB);
+
+        typealias OutputVec = WaveTangledVector<
+            T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
+        OutputVec output;
+        resultMat.toVectorViaShMem<ShMemSize, OutputVec.Uint4AlignedInputSize, false>(
+            output.data,
+            perWarpBase);
+
+        if (Bias)
+        {
+            static const int ElementsPerVector = sizeof(uint4) / sizeof(T);
+            static const int PaddedInputSize = ((K + 15) / 16) * 16;
+            static const int PaddedOutputSize = ((M + 15) / 16) * 16;
+            uint biasElementOffset =
+                parameterBaseVectorIndex * ElementsPerVector +
+                uint(PaddedInputSize * PaddedOutputSize);
+            for (int i = 0; i < M; i++)
+            {
+                output.data[i] += ShMemPool.smemLoad<T>(0, int(biasElementOffset) + i);
+            }
+        }
+
+        return output;
+    }
+
     // =========================================================================
     // Transpose MMA: result = W^T × input
     //

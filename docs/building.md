@@ -27,22 +27,16 @@ directory.
 
 ## Get the Source Code
 
-Clone [this](https://github.com/shader-slang/slang) repository. Make sure to
-fetch the submodules also.
+Clone the [`h-slang` branch](https://github.com/shader-slang/slang/tree/h-slang), including
+its submodules.
 
 ```bash
-git clone https://github.com/shader-slang/slang --recursive
+git clone --branch h-slang --recursive https://github.com/shader-slang/slang
+cd slang
 ```
 
-You will need the git tags from this repository, otherwise versioning
-information (including the Slang modules directory name and the library
-filenames on macOS and Linux) will be incorrect. The above command should fetch
-them for you, but if you're fetching from a fork you may need to explicitly
-fetch the latest tags from the shader-slang repository with:
-
-```bash
-git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'
-```
+This snapshot records its public version in `cmake/slang_git_version`. Builds do
+not require upstream tags or development history to determine their version.
 
 ## Configure and build
 

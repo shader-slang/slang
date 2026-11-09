@@ -435,6 +435,12 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "KCO");
         emitVal(context, countOfIntVal->getValArg());
     }
+    else if (auto indexVal = as<IndexOfTypeInPackIntVal>(val))
+    {
+        emitRaw(context, "KPI");
+        emitVal(context, indexVal->getElementType());
+        emitVal(context, indexVal->getPackType());
+    }
     else if (auto firstIntVal = as<FirstIntVal>(val))
     {
         emitRaw(context, "KPF");

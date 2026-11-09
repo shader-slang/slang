@@ -77,6 +77,22 @@ IRInst* clonePatternVal(IRCloneEnv& cloneEnv, IRBuilder* builder, IRInst* val, I
     cloneEnv.mapOldValToNew[val] = val;
     auto result = clonePatternValImpl(cloneEnv, builder, val, eachIndex);
     cloneEnv.mapOldValToNew[val] = result;
+    if (result != val)
+    {
+        // Consider `expand squareIfFloat<each T>(each values)`. The callee's derivative
+        // annotations refer to the same `each T` and optional witness as the callee itself.
+        // Cloning its operands creates a new specialization for this expansion index, so
+        // preserve those associations under the same mapping. They can then resolve to
+        // concrete values or absence when the pack is specialized, before autodiff runs.
+        // Register the cloned target first because an annotation refers back to its target.
+        traverseUsers<IRAnnotation>(
+            val,
+            [&](IRAnnotation* annotation)
+            {
+                if (annotation->getTarget() == val)
+                    clonePatternVal(cloneEnv, builder, annotation, eachIndex);
+            });
+    }
     return result;
 }
 

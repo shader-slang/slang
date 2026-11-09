@@ -175,6 +175,9 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
     static const int N = SubgroupSize;
     static const int K = InputSize;
 
+    typealias OuterProductLayout = LinearOuterProductSharedMemoryLayout<
+        T, Target, SubgroupSize, SubgroupCount, InputSize, OutputSize>;
+
     internal static const int Uint4AlignedK = TileInfo.Uint4AlignedK;
     internal static const int Uint4AlignedM = TileInfo.Uint4AlignedM;
 
@@ -626,11 +629,12 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
         if (SubgroupCount <= 1)
             return;
 
-        static const int ElementsPerLane = CMShape.SizeCInElements / N;
-        static const int RegsPerLane = (ElementsPerLane * sizeof(T) + 3) / 4;
-        static const int TileStride = (RegsPerLane * N * 4 + sizeof(uint4) - 1) / sizeof(uint4);
+        static const int TileStride = OuterProductLayout.ReductionTileStride;
         static const int TotalTiles = ROW * COLUMN;
 
+        // TODO (WORKAROUND): Keep this compile-time-sized cross-subgroup reduction branch-free.
+        // The NVIDIA Vulkan driver miscompiles the dynamic switch generated at -O0.
+        [ForceUnroll]
         for (int k = 1; k < SubgroupCount; k <<= 1)
         {
             uint subgroupOffset = (subgroupId / (k<<1)) * (TotalTiles * TileStride);
@@ -953,7 +957,7 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
     }
 
     // Load vectors to shmem and compute the outer product via CoopMat MMA.
-    // Shared by both linear and tiled layout outerProductAccumulate paths.
+    // Used by the linear-layout outerProductAccumulate path.
     //
     // All N lanes write their vectors simultaneously (no idle lanes), requiring
     // N * StrideInVectorTile shmem per warp instead of BatchSize * StrideInVectorTile.
@@ -961,8 +965,6 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     internal static void outerProduct<int CoopMatCRows, int CoopMatCColumns, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
-        uint sharedMemoryAOffset,
-        uint sharedMemoryBOffset,
         uint subgroupIndex,
         InArrayTypeA inputVectorA,
         InArrayTypeB inputVectorB,
@@ -975,12 +977,12 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
             where InArrayTypeB : IArrayAccessor<TypeB>
     {
         static const int BatchSize = CMShape.COLUMN_A;
-        static const int StrideInVectorTileA = CoopMatCRows * CMShape.ROW_A / CMShape.ElementCountPerVector;
-        static const int StrideInVectorTileB = CoopMatCColumns * CMShape.COLUMN_B / CMShape.ElementCountPerVector;
+        static const int StrideInVectorTileA = OuterProductLayout.LaneStrideA;
+        static const int StrideInVectorTileB = OuterProductLayout.LaneStrideB;
 
         // Per-warp shmem: N * Stride (holds ALL lanes' vectors at once)
-        uint warpLocalPtrAOffset = sharedMemoryAOffset + subgroupIndex * StrideInVectorTileA * N;
-        uint warpLocalPtrBOffset = sharedMemoryBOffset + subgroupIndex * StrideInVectorTileB * N;
+        uint warpLocalPtrAOffset = subgroupIndex * OuterProductLayout.WarpStrideA;
+        uint warpLocalPtrBOffset = OuterProductLayout.BOffset + subgroupIndex * OuterProductLayout.WarpStrideB;
 
         // All 32 lanes write simultaneously — one load, one barrier
         loadAllVectorsForOuterProduct<TileInfo.Uint4AlignedM / CMShape.ElementCountPerVector, StrideInVectorTileA, TypeA, InArrayTypeA>(warpLocalPtrAOffset, inputVectorA);
@@ -1020,10 +1022,7 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
     // Concrete outer product using WaveTangledVector's loadToSharedMemoryForOuterProduct.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    [require(spvAtomicFloat16AddEXT)]
     internal static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
-        uint sharedMemoryAOffset,
-        uint sharedMemoryBOffset,
         InArrayTypeA inputVectorA,
         InArrayTypeB inputVectorB,
         Address weightAddress)
@@ -1037,10 +1036,12 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
             where InArrayTypeA : IArrayAccessor<TypeA>
             where InArrayTypeB : IArrayAccessor<TypeB>
     {
+        static_assert(ShMemSize.Bytes >= OuterProductLayout.Bytes,
+            "The linear outer-product scratch allocation is too small.");
         const uint subgroupIndex = getWaveId();
 
-        static const int CoopMatCRows = (M + CMShape.ROW_A - 1) / CMShape.ROW_A;
-        static const int CoopMatCColumns = (K + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
+        static const int CoopMatCRows = OuterProductLayout.TileRows;
+        static const int CoopMatCColumns = OuterProductLayout.TileColumns;
         static const int StrideInVectorTileC = CoopMatCColumns * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
@@ -1050,7 +1051,7 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
             matC[i].fill(T(0.0f));
 
         outerProduct<CoopMatCRows, CoopMatCColumns, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
-            sharedMemoryAOffset, sharedMemoryBOffset, subgroupIndex, inputVectorA, inputVectorB, matC);
+            subgroupIndex, inputVectorA, inputVectorB, matC);
 
         GroupMemoryBarrierWithGroupSync();
         // Use all-at-once reduction: 2 barriers instead of 2*CoopMatCRows barriers.
@@ -1066,7 +1067,7 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
                 {
                     matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(
                         ShMemPool.data,
-                        sharedMemoryBOffset + j * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC,
+                        OuterProductLayout.BOffset + j * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC,
                         (uint)StrideInVectorTileC);
                 }
 
@@ -1077,7 +1078,7 @@ internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, Ta
                 // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
 
                 typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, true, SubgroupCount>;
-                MMA.storeShA<U, Address>(sharedMemoryBOffset, i, weightAddress);
+                MMA.storeShA<U, Address>(OuterProductLayout.BOffset, i, weightAddress);
 
                 // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
                 GroupMemoryBarrierWithWaveSync();

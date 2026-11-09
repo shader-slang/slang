@@ -67,7 +67,10 @@ struct TransformParamsToConstRefContext
                 auto user = use->getUser();
                 builder.setInsertBefore(user);
                 IRLoad* loadInst = as<IRLoad>(builder.emitLoad(newAddrInst));
-                use->set(loadInst);
+                // Calling an IFunc with a struct parameter constructs a MakeValuePack from
+                // that parameter. Packs are hoistable, so replace the operand through the
+                // builder to preserve global value numbering when inserting the load.
+                builder.replaceOperand(use, loadInst);
 
                 workList.add(loadInst);
             });
@@ -438,8 +441,16 @@ struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContex
     {
         if (!func->isDefinition())
             return false;
-        if (func->findDecoration<IREntryPointDecoration>() != nullptr)
+        if (auto entryPoint = func->findDecoration<IREntryPointDecoration>())
+        {
+            // A dispatch-stage entry point is a host graph function, not a GPU shader interface.
+            // Its parameters remain ordinary graph values consumed by the HGBC interpreter. In
+            // particular, rewriting a runtime String parameter to `borrow in String` would make
+            // its value uses address-based while its exported HGBC signature remains by value.
+            if (entryPoint->getProfile().getStage() == Stage::Dispatch)
+                return false;
             return true;
+        }
         return false;
     }
     virtual bool shouldTransformParam(IRParam* param) override

@@ -66,6 +66,27 @@ internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSiz
         }
     }
 
+    /// Evaluates Vulkan FP16 weights that were staged once into persistent shared memory.
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic, spirv)]
+    internal static WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>
+    forwardFromShared<bool Bias = false>(
+        __constref WaveTangledVector<
+            T, ShMemSize, InputSize, SubgroupSize, SubgroupCount> input,
+        uint parameterBaseVectorIndex)
+    {
+        typealias Vulkan = TiledMMAVulkan<
+            T,
+            InputSize,
+            OutputSize,
+            SubgroupSize,
+            Target,
+            ShMemSize,
+            TransposeA,
+            SubgroupCount>;
+        return Vulkan.forwardFromShared<Bias>(input, parameterBaseVectorIndex);
+    }
+
     // =========================================================================
     // Unified backward: dispatches to CUDA, Vulkan, or Metal backend.
     //

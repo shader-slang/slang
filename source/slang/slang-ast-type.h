@@ -87,6 +87,21 @@ bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
 bool isPackType(Type* type);
 
+/// Appends the parameter types produced by applying a backward-derivative parameter mode.
+/// Concrete type packs are flattened, while abstract packs retain an expansion with the mode
+/// applied to its pattern.
+void addBackwardDiffParameterTypes(
+    ASTBuilder* astBuilder,
+    List<Type*>& outParamTypes,
+    Type* diffPairOrPrimalType,
+    ParamPassingMode mode);
+
+/// Retains value primals and pairs pointer primals with their gradient destinations for apply.
+Type* getApplyForBwdParameterType(
+    ASTBuilder* astBuilder,
+    Type* parameterType,
+    SubtypeWitness* witness);
+
 // Base class for types that can be used in arithmetic expressions
 FIDDLE(abstract)
 class ArithmeticExpressionType : public DeclRefType
@@ -310,6 +325,20 @@ class PointerLikeType : public BuiltinGenericType
 
 FIDDLE()
 class DynamicResourceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+/// A typed graphics pipeline descriptor whose values must specialize to constants.
+FIDDLE()
+class GraphicsPipelineDescType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+/// A managed host registry represented by its dispatch-relative binding offset on the device.
+FIDDLE()
+class RaytracingPipelineType : public BuiltinType
 {
     FIDDLE(...)
 };
@@ -640,6 +669,14 @@ class DifferentialPtrPairType : public ArithmeticExpressionType
 {
     FIDDLE(...)
     Type* getPrimalRefType();
+};
+
+/// Resolves to a value differential or None using optional conformance evidence.
+FIDDLE()
+class DifferentialOrNoneType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
 };
 
 FIDDLE()

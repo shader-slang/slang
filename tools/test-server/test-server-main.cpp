@@ -11,6 +11,7 @@
 #include "core/slang-test-tool-util.h"
 #include "core/slang-writer.h"
 #include "gfx-unit-test/gfx-test-util.h"
+#include "hgvm-test-tool.h"
 #include "render-test/slang-support.h"
 #include "slang-com-helper.h"
 #include "slang-rhi.h"
@@ -206,6 +207,7 @@ protected:
 
     RefPtr<JSONRPCConnection> m_connection; ///< RPC connection, recieves calls to execute and
                                             ///< returns results via JSON-RPC
+    std::unique_ptr<HGVMTestTool> m_hgvmTestTool;
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -328,6 +330,7 @@ SlangResult TestServer::init(int argc, const char* const* argv)
 
 TestServer::~TestServer()
 {
+    m_hgvmTestTool.reset();
     for (auto& [_, value] : m_unitTestModules)
         value->destroy();
 }
@@ -424,10 +427,6 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     if (name == "slangc")
     {
         return &SlangCTool::innerMain;
-    }
-    else if (name == "slangi")
-    {
-        return &SlangITool::innerMain;
     }
 
     StringBuilder sharedLibToolBuilder;
@@ -608,12 +607,15 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 
     SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, id));
 
-    auto sink = m_connection->getSink();
+    const bool isSlangi = args.toolName == "slangi";
 
-    auto func = getToolFunction(args.toolName, sink);
-    if (!func)
+    auto sink = m_connection->getSink();
+    InnerMainFunc func = nullptr;
+    if (!isSlangi)
     {
-        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
+        func = getToolFunction(args.toolName, sink);
+        if (!func)
+            return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
     // Assume we will used the shared session
@@ -650,13 +652,47 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     stdWriters.setDebugCallback(&debugCallback);
 
     // HACK, to make behavior the same as previously
-    if (args.toolName == "slangc")
+    if (args.toolName == "slangc" || args.toolName == "slangi")
     {
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, stdErrorWriter);
     }
 
-    const SlangResult funcRes =
-        func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    SlangResult funcRes = SLANG_OK;
+    if (isSlangi)
+    {
+        StdWriters* previousWriters = StdWriters::getSingleton();
+        StdWriters::setSingleton(&stdWriters);
+        SLANG_DEFER(StdWriters::setSingleton(previousWriters));
+        ::SlangITool::Options options;
+        bool shouldExit = false;
+        funcRes = ::SlangITool::parseOptions(
+            &stdWriters,
+            int(toolArgs.getCount()),
+            toolArgs.begin(),
+            options,
+            shouldExit);
+        if (SLANG_SUCCEEDED(funcRes) && !shouldExit)
+        {
+            if (options.useLegacyInterpreter)
+            {
+                funcRes = SlangITool::innerMain(
+                    &stdWriters,
+                    session,
+                    int(toolArgs.getCount()),
+                    toolArgs.begin());
+            }
+            else
+            {
+                if (!m_hgvmTestTool)
+                    m_hgvmTestTool = std::make_unique<HGVMTestTool>();
+                funcRes = m_hgvmTestTool->execute(&stdWriters, session, options);
+            }
+        }
+    }
+    else
+    {
+        funcRes = func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    }
 
     TestServerProtocol::ExecutionResult result;
     result.result = funcRes;

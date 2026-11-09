@@ -35,16 +35,10 @@ static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
 static const int workgroupCount = WorkgroupSize / SubgroupSize;
 
-static const int MaxK = 64;
-static const int MaxM = 64;
-static const int ShMemSizeA = MaxM * 4;
-static const int ShMemSizeB = MaxK * 4;
-static const int TotalShMemSizeA = ShMemSizeA * workgroupCount;
-static const int TotalShMemSizeB = ShMemSizeB * workgroupCount * sizeof(DType)/sizeof(half);
-
-public struct TestShMemSize : ISharedMemorySize {
-    public static const uint Bytes = (TotalShMemSizeA + TotalShMemSizeB) * sizeof(uint4);
-}
+// Exercise the library's allocation contract, not an oversized manual test pool.
+// CUDA and SPIR-V share this linear-layout scratch requirement.
+typealias TestShMemSize = SharedMemorySize<DType, TargetEnum.SPIR_V,
+    ExecutionMode.Training, SubgroupSize, workgroupCount, TEST_SIZE, TEST_SIZE>;
 
 void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 {

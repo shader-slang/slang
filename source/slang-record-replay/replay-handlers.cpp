@@ -170,6 +170,7 @@ static void registerAllHandlers()
     REPLAY_REGISTER(ComponentTypeProxy, link);
     REPLAY_REGISTER(ComponentTypeProxy, getEntryPointHostCallable);
     REPLAY_REGISTER(ComponentTypeProxy, renameEntryPoint);
+    REPLAY_REGISTER(ComponentTypeProxy, createEntryPointUniformLayoutConstraints);
     REPLAY_REGISTER(ComponentTypeProxy, linkWithOptions);
     REPLAY_REGISTER(ComponentTypeProxy, getTargetHostCallable);
     REPLAY_REGISTER(ComponentTypeProxy, getEntryPointMetadata);

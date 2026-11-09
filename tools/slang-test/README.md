@@ -23,6 +23,7 @@ slang-test -bindir path/to/bin -category full tests/compute/array-param
 - `-h, --help`: Show help message
 - `-bindir <path>`: Set directory for binaries (default: the path to the slang-test executable)
 - `-test-dir <path>`: Set directory for test files (default: tests/)
+- `-test-tool <name> <path>`: Configure an executable used by `EXTERNAL` tests.
 - `-v`: Enable verbose output
 - `-verbose-paths`: Use verbose paths in output
 - `-hide-ignored`: Hide results from ignored tests
@@ -117,7 +118,22 @@ Available test types:
 - `COMPARE_COMPUTE`: Runs render-test to execute a compute shader and writes the result to a text file. The test passes if the output matches the expected content
 - `COMPARE_COMPUTE_EX`: Same as COMPARE_COMPUTE, but supports additional parameter specifications
 - `COMPARE_RENDER_COMPUTE`: Runs render-test with "-slang -gcompute" options and compares text file outputs
+- `INTERPRET`: Runs a Slang entry point with `slangi`. Add the `hgvm` command option for a
+  `[host]` entry point, for example `//TEST:INTERPRET(hgvm):`.
+- `EXTERNAL`: Runs an external command, passing the directive's arguments without a shell.
+  For example, `//TEST:EXTERNAL(tool=python): "$dirname/test_export.py"`. A nonzero exit
+  status fails the test. Add `filecheck=CHECK` to check captured output as well. The executable
+  is selected by `-test-tool`, then by `-bindir`, then by `PATH`.
 - `LANG_SERVER`: Tests Language Server Protocol features by sending requests (like completion, hover, signatures) and comparing responses with expected outputs. See [Language server tests](#language-server-tests)
+
+Independent HGBC representation checks belong in `tests/hgbc`. Runtime HGVM tests belong in
+the feature directory they exercise and use `INTERPRET(hgvm)`. Use
+`-use-test-server -server-count 1` for HGVM tests. The default run discovers only `tests/`.
+
+`$dirname` expands to the test file's parent directory in test arguments and debugger
+`PREFIX-SEND` commands, so external suites can resolve imports independently of the working
+directory. Run an external suite with `-test-dir <suite>/tests -exclude unit-test
+<suite>/tests/`, using this build's `-bindir` and the suite's documented tool and asset setup.
 
 Deprecated test types (do not create new tests of these kinds, and we need to slowly migrate existing tests to use SIMPLE, COMPARE_COMPUTE(\_EX) or COMPARE_RENDER_COMPUTE instead):
 
@@ -128,6 +144,17 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `COMPARE_GLSL`: Runs the slangc compiler both through Slang and directly, then compares the SPIR-V assembly output
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
+
+## D3D12 Shader Profile Workaround
+
+D3D12 RHI devices temporarily default to Shader Model 6.8, or the highest supported model on
+older adapters. No environment variable or command-line selection is required. This covers
+test-server, standalone HGVM execution, and other RHI-based D3D12 test tools, including when
+D3D12 is selected automatically. Explicitly requested shader profiles still take precedence.
+
+This works around an NVIDIA SM6.9 constant-array vector-load issue.
+Remove the temporary default cap after verifying the driver fix. Other graphics APIs and
+compiler-only target selection retain their existing behavior.
 
 ## Language server tests
 

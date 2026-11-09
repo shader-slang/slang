@@ -91,12 +91,36 @@ After building, run tests from the repository root using the generated `slang-te
 the directory for the selected configuration:
 
 - `build/Debug/bin/slang-test`: run the Debug test suite.
-- `build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8`: run optimized
-  tests with symbols in parallel using test servers.
-- `build/Release/bin/slang-test -use-test-server -server-count 8`: run Release tests in
-  parallel using test servers.
+- `build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1`: run optimized
+  tests with symbols using a single test server.
+- `build/Release/bin/slang-test -use-test-server -server-count 1`: run Release tests using
+  a single test server.
 
 On Windows-hosted builds, use the `.exe` suffix if that is the generated binary name.
+
+After making a large Slang compiler change, run `slangc.exe` under `cdb` the first time. Debug
+asserts can otherwise open a blocking dialog box and stall unattended command execution.
+
+SlangPy host-graph tests:
+
+- Use the Python interpreter configured in `external/slangpy/build/windows-vs2022`
+  for SlangPy tests so the extension matches the interpreter ABI. Set `$slangpyPython`
+  to that interpreter before running the commands below.
+- For now, do not treat debug-heap breakpoints or heap-corruption diagnostics as the primary
+  SlangPy test failure if pytest can still complete and report pass/fail results. Use
+  `_NO_DEBUG_HEAP=1` when needed to get a clean pytest result. Only stop to investigate heap
+  issues when they prevent the test process from completing successfully.
+- The sandbox may not be able to access the default user temp directory. From
+  `external/slangpy`, create a workspace temp directory and set `TEMP`/`TMP` before pytest:
+
+  ```powershell
+  New-Item -ItemType Directory -Force -Path .temp\pytest-tmp | Out-Null
+  $env:TEMP=(Resolve-Path .temp\pytest-tmp).Path
+  $env:TMP=$env:TEMP
+  & $slangpyPython -m pytest `
+      slangpy\tests\slangpy_tests\test_host_graph.py --device-types d3d12 -q -s `
+      --basetemp .temp\pytest-base
+  ```
 
 ## Include Path Conventions
 
@@ -165,6 +189,33 @@ case conversion, associative arrays (`declare -A`), `mapfile`/`readarray`, and n
 ## Testing Guidelines
 
 Add tests near related coverage in `tests/`.
+
+Never run `slang-test` with multithreaded or parallel test servers unless the user explicitly
+asks for it. Parallel test-server execution hangs and crashes this system. Use
+`-use-test-server -server-count 1` when running with a test server; do not launch concurrent
+`slang-test` runs to bypass this restriction. A request to run tests or validate a change is
+not permission to use parallel test servers.
+
+HGVM/HGBC automated tests must run without opening native windows or requiring an interactive
+desktop. Use offscreen rendering, synthetic input events, or compiler-only checks for coverage
+of UI and window-related code.
+
+Choose validation based on the scope and risk of the change:
+
+- For documentation-only edits, including prose, styling, templates, and agent instructions,
+  do not run builds, tests, formatting checks, or browser checks unless the user requests them.
+- For code changes, rebuild affected binaries as needed and run focused tests that cover the
+  changed behavior. Include relevant runtime image comparisons, unit tests, or CLI tests when
+  those areas are affected.
+- Run broader HGVM/HGBC suites when changes affect shared compiler/runtime behavior, focused
+  tests reveal wider regressions, or the user explicitly requests a full run. Do not run the
+  entire suite automatically after every edit.
+- Once appropriate checks finish, do not repeat or expand them unless a subsequent change,
+  failure, or unresolved concern warrants it.
+
+Report failures and relevant checks that could not run. A previously observed failure is not
+an expected failure unless it is explicitly marked as such; do not silently omit failures or
+update gold images to make the suite pass.
 
 Slang tests:
 

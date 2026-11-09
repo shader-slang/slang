@@ -330,20 +330,12 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
 
             builder->setInsertBefore(paramStructType);
 
-            // We need to know the "key" that should be used for the parameter,
-            // so we will read it off of the entry-point layout information.
-            //
-            // TODO: Maybe we should associate the key to the parameter via
-            // a decoration to avoid this indirection?
-            //
-            // TODO: Alternatively, we should make this pass responsible for
-            // dealing with the transfer of layout information from the entry
-            // point to its parameters, rather than baking that behavior into
-            // the linker. After all, this pass is traversing the same information
-            // anyway, so it could do the work while it is here...
-            //
-            auto paramFieldKey = cast<IRStructKey>(
-                entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
+            // This field belongs to the newly generated parameter struct, not to the source
+            // parameter's shared DeclRef. For example, two renamed intersection exports can
+            // have record bases 4 and 0. Reusing their source layout's field key would attach
+            // both explicit offsets to one key and corrupt whole-program emission. Create a
+            // key for this generated field; its name and other decorations come from param.
+            auto paramFieldKey = builder->createStructKey();
             structLayoutBuilder.addField(
                 paramFieldKey,
                 entryPointParamsStructLayout->getFieldLayout(paramIndex));
@@ -358,6 +350,25 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             // be moved to the *field* instead.
             //
             param->transferDecorationsTo(paramFieldKey);
+
+            // Consider a fragment payload assigned to byte 64 with a float4 parameter at
+            // local offset 0. Its host shader object still stores 16 bytes, while the generated
+            // GPU parameter struct must access byte 64. Preserve the checked local layout and
+            // express placement on the generated field key using the existing explicit-offset
+            // representation. Storage-type lowering retains this key, and both SPIR-V and GLSL
+            // emission consume that representation.
+            if (auto base = entryPointLayout->getUniformOffset())
+            {
+                if (auto localOffset = paramLayout->findOffsetAttr(LayoutResourceKind::Uniform))
+                {
+                    builder->addDecoration(
+                        paramFieldKey,
+                        kIROp_VkStructOffsetDecoration,
+                        builder->getIntValue(
+                            builder->getInt64Type(),
+                            base->getValue() + localOffset->getOffset()));
+                }
+            }
 
             // At this point we want to eliminate the original entry point
             // parameter, in favor of the `struct` field we declared.

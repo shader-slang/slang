@@ -555,6 +555,7 @@ public:
     SLANG_API void record(RecordFlag flags, slang::TargetDesc& value);
     SLANG_API void record(RecordFlag flags, slang::SessionDesc& value);
     SLANG_API void record(RecordFlag flags, slang::SpecializationArg& value);
+    SLANG_API void record(RecordFlag flags, slang::EntryPointUniformLayoutGroup& value);
     SLANG_API void record(RecordFlag flags, SlangGlobalSessionDesc& value);
 
     // Blob interface - serialized by content hash, not tracked as COM interface

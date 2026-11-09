@@ -161,6 +161,13 @@ struct ASTIterator
             dispatchIfNotNull(expr->value);
         }
 
+        void visitIndexOfTypeInPackExpr(IndexOfTypeInPackExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->elementType.exp);
+            dispatchIfNotNull(expr->packType.exp);
+        }
+
         void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -350,6 +357,17 @@ struct ASTIterator
         void visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
         {
             dispatchIfNotNull(expr->innerExpr);
+        }
+
+        void visitHGBCAsmExpr(HGBCAsmExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for (const HGBCAsmInst& inst : expr->insts)
+            {
+                dispatchIfNotNull(inst.opcode.expr);
+                for (const HGBCAsmOperand& operand : inst.operands)
+                    dispatchIfNotNull(operand.expr);
+            }
         }
 
         void visitSPIRVAsmExpr(SPIRVAsmExpr* expr)

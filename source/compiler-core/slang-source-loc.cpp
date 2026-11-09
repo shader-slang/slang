@@ -753,6 +753,8 @@ void SourceManager::_resetLoc()
 
 void SourceManager::_resetSource()
 {
+    m_sourceFileMap.clear();
+
     for (auto item : m_sourceViews)
     {
         delete item;
@@ -765,8 +767,6 @@ void SourceManager::_resetSource()
 
     m_sourceViews.clear();
     m_sourceFiles.clear();
-
-    m_sourceFileMap.clear();
 }
 
 

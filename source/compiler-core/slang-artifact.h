@@ -223,6 +223,8 @@ enum class ArtifactPayload : uint8_t
 
     PostEmitMetadata, ///< Metadata from post emit (binding information)
 
+    HGBC, ///< Host-Graph Byte-Code
+
     CountOf,
 };
 

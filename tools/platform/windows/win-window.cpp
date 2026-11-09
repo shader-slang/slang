@@ -1,6 +1,7 @@
 #ifdef _WIN32
 
 #include "platform/window.h"
+#include "platform/windows/win-window-input.h"
 
 #include <windows.h>
 #include <windowsx.h>
@@ -58,6 +59,8 @@ ButtonState::Enum getModifierState(WPARAM wParam)
     ButtonState::Enum result = ButtonState::Enum::None;
     if (wParam & MK_CONTROL)
         result = _addButtonState(result, ButtonState::Enum::Control);
+    if (wParam & MK_LBUTTON)
+        result = _addButtonState(result, ButtonState::Enum::LeftButton);
     if (wParam & MK_MBUTTON)
         result = _addButtonState(result, ButtonState::Enum::MiddleButton);
     if (wParam & MK_RBUTTON)
@@ -74,52 +77,79 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     bool useDefProc = true;
     Window* window = nullptr;
     Win32AppContext::windows.tryGetValue(hWnd, window);
+    MouseEventArgs buttonEvent;
+    bool pressed;
+    if (translateMouseButtonMessage(message, lParam, buttonEvent, pressed))
+    {
+        buttonEvent.buttons = _addButtonState(getModifierState(wParam), buttonEvent.buttons);
+        if (pressed)
+        {
+            if (window)
+            {
+                SetCapture(hWnd);
+                window->events.mouseDown(buttonEvent);
+            }
+        }
+        else
+        {
+            if (window)
+                window->events.mouseUp(buttonEvent);
+            if (GetCapture() == hWnd && !(wParam & (MK_LBUTTON | MK_MBUTTON | MK_RBUTTON)))
+                ReleaseCapture();
+        }
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
     switch (message)
     {
-    case WM_LBUTTONUP:
-    case WM_MBUTTONUP:
-    case WM_RBUTTONUP:
-        {
-            int mx = GET_X_LPARAM(lParam);
-            int my = GET_Y_LPARAM(lParam);
-            bool processed = false;
-            if (window)
-            {
-                window->events.mouseUp(MouseEventArgs{mx, my, 0, getModifierState(wParam)});
-            }
-        }
-        break;
-    case WM_LBUTTONDOWN:
-    case WM_MBUTTONDOWN:
-    case WM_RBUTTONDOWN:
-        {
-            int mx = GET_X_LPARAM(lParam);
-            int my = GET_Y_LPARAM(lParam);
-            bool processed = false;
-            if (window)
-            {
-                window->events.mouseDown(MouseEventArgs{mx, my, 0, getModifierState(wParam)});
-            }
-        }
-        break;
     case WM_MOUSEMOVE:
         {
             int mx = GET_X_LPARAM(lParam);
             int my = GET_Y_LPARAM(lParam);
             if (window)
             {
+                // Use Windows' leave registration as the inside state. Captured moves can be
+                // outside the client area and must not start a new enter/leave cycle there.
+                RECT clientRect;
+                GetClientRect(hWnd, &clientRect);
+                POINT point = {mx, my};
+                TRACKMOUSEEVENT tracking = {sizeof(TRACKMOUSEEVENT), TME_QUERY, hWnd, 0};
+                TrackMouseEvent(&tracking);
+                if (PtInRect(&clientRect, point) &&
+                    (tracking.hwndTrack != hWnd || !(tracking.dwFlags & TME_LEAVE) ||
+                     (tracking.dwFlags & TME_NONCLIENT)))
+                {
+                    // TME_QUERY overwrites hwndTrack as well as the flags, so start a fresh
+                    // request.
+                    TRACKMOUSEEVENT request = {sizeof(TRACKMOUSEEVENT), TME_LEAVE, hWnd, 0};
+                    if (TrackMouseEvent(&request))
+                        window->events.mouseEnter(
+                            MouseEventArgs{mx, my, 0, getModifierState(wParam)});
+                }
                 window->events.mouseMove(MouseEventArgs{mx, my, 0, getModifierState(wParam)});
             }
         }
+        break;
+    case WM_CAPTURECHANGED:
+        // Normal release queues mouseUp first. Unexpected loss has no release to commit a drag.
+        if (window)
+            window->events.mouseCaptureLost();
+        break;
+    case WM_MOUSELEAVE:
+        if (window)
+            window->events.mouseLeave();
         break;
     case WM_MOUSEWHEEL:
         {
             int delta = GET_WHEEL_DELTA_WPARAM(wParam);
             if (window)
             {
-                window->events.mouseMove(MouseEventArgs{0, 0, delta, getModifierState(wParam)});
+                window->events.mouseWheel(MouseEventArgs{0, 0, delta, getModifierState(wParam)});
             }
         }
+        break;
+    case WM_CLOSE:
+        if (window)
+            window->events.close();
         break;
     case WM_CHAR:
         {
@@ -344,8 +374,10 @@ public:
             style,
             CW_USEDEFAULT,
             0, // x, y
-            windowRect.right,
-            windowRect.bottom,
+            // AdjustWindowRect extends left/top into the nonclient area as well as right/bottom.
+            // Use the full extent so client pixels match the requested render-target dimensions.
+            windowRect.right - windowRect.left,
+            windowRect.bottom - windowRect.top,
             NULL, // parent
             NULL, // menu
             instance,

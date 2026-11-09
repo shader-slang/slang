@@ -136,6 +136,7 @@ class SyntaxNodeBase : public NodeBase
 
     // The primary source location associated with this AST node
     FIDDLE() SourceLoc loc;
+
 };
 
 enum class ValNodeOperandKind

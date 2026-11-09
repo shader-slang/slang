@@ -1031,6 +1031,7 @@ FloatInfo getFloatingTypeInfo(const IRType* floatType);
 
 bool isIntegralScalarOrCompositeType(IRType* t);
 
+// Finds a field by its canonical key in a struct or class, including generic specializations.
 IRStructField* findStructField(IRInst* type, IRStructKey* key);
 
 void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts);
@@ -1667,7 +1668,7 @@ bool isDefinition(IRInst* inVal);
 FIDDLE()
 struct IRStructKey : IRInst
 {
-    FIDDLE(leafInst())
+    FIDDLE(baseInst())
 };
 
 //
@@ -2246,11 +2247,10 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding `UniformParameterShadowVarDecl` shifts the sequential `ASTNodeType` values.
-    // A version-33 `LetDecl` would therefore be decoded as a shadow declaration.
-    // Version 34 is the earliest module version with the updated AST node numbering.
-    const static UInt k_minSupportedModuleVersion = 34;
-    const static UInt k_maxSupportedModuleVersion = 34;
+    // The merge changes AST node numbering and reconciles fork-specific IR opcode IDs.
+    // Older modules cannot be decoded with this schema and must be recompiled.
+    const static UInt k_minSupportedModuleVersion = 35;
+    const static UInt k_maxSupportedModuleVersion = 35;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

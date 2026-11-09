@@ -23,6 +23,45 @@ struct CleanUpVoidContext
     {
     }
 
+    // Backward contexts keep out None slots until optional evidence is specialized. None has
+    // no storage, so erase its output slots along with ordinary void parameters and arguments.
+    bool isVoidParameterType(IRType* type)
+    {
+        if (auto outputType = as<IROutParamType>(type))
+            type = outputType->getValueType();
+        return as<IRVoidType>(type) != nullptr;
+    }
+
+    // Remove call arguments before rewriting any function types. Consider a context call that
+    // passes a global None variable to an out None parameter: the argument is a pointer, so its
+    // value type alone cannot identify the slot. The original signature owns that information.
+    void removeVoidCallArguments(IRCall* call)
+    {
+        auto funcType = cast<IRFuncType>(call->getCallee()->getDataType());
+        List<IRInst*> args;
+        for (UInt i = 0; i < call->getArgCount(); ++i)
+        {
+            if (i < funcType->getParamCount() && isVoidParameterType(funcType->getParamType(i)))
+                continue;
+            auto arg = call->getArg(i);
+            if (!as<IRVoidType>(arg->getDataType()))
+                args.add(arg);
+        }
+        if (args.getCount() == Index(call->getArgCount()))
+            return;
+        IRBuilder builder(module);
+        builder.setInsertBefore(call);
+        auto newCall = builder.emitCallInst(
+            call->getFullType(),
+            call->getCallee(),
+            args.getCount(),
+            args.getBuffer());
+        call->transferDecorationsTo(newCall);
+        newCall->sourceLoc = call->sourceLoc;
+        call->replaceUsesWith(newCall);
+        call->removeAndDeallocate();
+    }
+
     void addToWorkList(IRInst* inst)
     {
         for (auto ii = inst->getParent(); ii; ii = ii->getParent())
@@ -42,7 +81,6 @@ struct CleanUpVoidContext
     {
         switch (inst->getOp())
         {
-        case kIROp_Call:
         case kIROp_MakeStruct:
             {
                 // Remove void argument.
@@ -84,7 +122,7 @@ struct CleanUpVoidContext
                 Index nextKeptArgIndex = 0;
                 for (auto param : func->getParams())
                 {
-                    bool needToRemove = (param->getDataType()->getOp() == kIROp_VoidType);
+                    bool needToRemove = isVoidParameterType(param->getDataType());
                     argIndexRemap.add(needToRemove ? -1 : nextKeptArgIndex);
 
                     if (needToRemove)
@@ -110,6 +148,26 @@ struct CleanUpVoidContext
                     m_debugVarRemappedArgIndices.add(func, argIndexRemap);
                 }
             }
+            break;
+        case kIROp_Var:
+        case kIROp_GlobalVar:
+        case kIROp_FieldAddress:
+            {
+                // A var's type points to its stored value. This removes storage for None, while
+                // retaining a variable that stores an ordinary opaque void pointer
+                // (ptr<ptr<void>>).
+                if (as<IRVoidType>(cast<IRPtrTypeBase>(inst->getDataType())->getValueType()))
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    inst->replaceUsesWith(builder.getVoidValue());
+                    m_instsToRemove.add(inst);
+                }
+            }
+            break;
+        case kIROp_Store:
+            if (as<IRVoidType>(as<IRStore>(inst)->getVal()->getDataType()))
+                m_instsToRemove.add(inst);
             break;
         case kIROp_DebugValue:
             {
@@ -218,7 +276,7 @@ struct CleanUpVoidContext
                 List<IRType*> newParamTypes;
                 for (auto paramType : funcType->getParamTypes())
                 {
-                    if (paramType->getOp() == kIROp_VoidType)
+                    if (isVoidParameterType(paramType))
                     {
                         continue;
                     }
@@ -273,6 +331,7 @@ struct CleanUpVoidContext
         switch (inst->getOp())
         {
         case kIROp_Load:
+        case kIROp_DefaultConstruct:
         case kIROp_GetElement:
         case kIROp_GetOptionalValue:
         case kIROp_FieldExtract:
@@ -287,12 +346,27 @@ struct CleanUpVoidContext
                 IRBuilder builder(module);
                 builder.setInsertBefore(inst);
                 inst->replaceUsesWith(builder.getVoidValue());
+                if (inst->getOp() == kIROp_Load || inst->getOp() == kIROp_DefaultConstruct)
+                    m_instsToRemove.add(inst);
             }
         }
     }
 
     void processModule()
     {
+        // Preserve the original parameter roles until every call has been rewritten.
+        addToWorkList(module->getModuleInst());
+        while (workList.getCount() != 0)
+        {
+            auto inst = workList.getLast();
+            workList.removeLast();
+            workListSet.remove(inst);
+            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+                addToWorkList(child);
+            if (auto call = as<IRCall>(inst))
+                removeVoidCallArguments(call);
+        }
+
         addToWorkList(module->getModuleInst());
 
         while (workList.getCount() != 0)
@@ -303,6 +377,9 @@ struct CleanUpVoidContext
             workListSet.remove(inst);
 
             processInst(inst);
+
+            if (m_instsToRemove.contains(inst))
+                continue;
 
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
             {

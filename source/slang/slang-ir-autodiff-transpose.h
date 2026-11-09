@@ -6,5 +6,8 @@
 
 namespace Slang
 {
-void transposeDiffBlocksInFunc(AutoDiffSharedContext* sharedContext, IRFunc* propagateFunc);
+void transposeDiffBlocksInFunc(
+    AutoDiffSharedContext* sharedContext,
+    IRFunc* propagateFunc,
+    IRFuncType* primalFuncType);
 } // namespace Slang

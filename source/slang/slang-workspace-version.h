@@ -180,6 +180,7 @@ public:
     // compiler default stands. A `#language` directive still wins, since the preprocessor applies
     // it unconditionally.
     SlangLanguageVersion predefinedLanguageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
+    bool enableExperimentalFeatures = false;
 
     slang::IGlobalSession* slangGlobalSession;
     Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
@@ -195,6 +196,7 @@ public:
     bool updateSearchPaths(List<String> searchPaths);
     bool updateSearchInWorkspace(bool value);
     bool updatePredefinedLanguageVersion(SlangLanguageVersion version);
+    bool updateExperimentalFeatures(bool value);
 
     void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
     void invalidate();

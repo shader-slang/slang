@@ -11,6 +11,75 @@
 
 using namespace Slang;
 
+// Reloaded modules need inheritance witnesses computed by reflection, outside compilation's
+// AST builder scope. Compile in a different global session so its cached witnesses cannot hide
+// a missing scope in the reflection API, then destroy that session before using the binary.
+SLANG_UNIT_TEST(reflectionSubtypeAfterModuleReload)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(slang::createGlobalSession(globalSession.writeRef())));
+    slang::TargetDesc target = {};
+    target.format = SLANG_HLSL;
+    target.profile = globalSession->findProfile("sm_6_6");
+    slang::SessionDesc desc = {};
+    desc.targets = &target;
+    desc.targetCount = 1;
+    ComPtr<slang::IBlob> serialized;
+    {
+        ComPtr<slang::IGlobalSession> sourceGlobalSession;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang::createGlobalSession(sourceGlobalSession.writeRef())));
+        ComPtr<slang::ISession> sourceSession;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(sourceGlobalSession->createSession(desc, sourceSession.writeRef())));
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = sourceSession->loadModuleFromSourceString(
+            "subtype_scope",
+            "subtype_scope.slang",
+            R"(
+                public interface IBase { associatedtype Value; }
+                public interface IDerived : IBase {}
+                public struct Impl : IDerived { public typealias Value = uint; }
+            )",
+            diagnostics.writeRef());
+        SLANG_CHECK_ABORT(module);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->serialize(serialized.writeRef())));
+    }
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(globalSession->createSession(desc, session.writeRef())));
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromIRBlob(
+        "subtype_scope",
+        "subtype_scope.slang-module",
+        serialized,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module);
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout);
+    const char* names[] = {
+        "uint",
+        "float",
+        "Impl",
+        "IDerived",
+        "DescriptorHandle<RWStructuredBuffer<uint>>",
+        "DescriptorHandle<RWStructuredBuffer<uint, ScalarDataLayout>>",
+    };
+    for (auto name : names)
+    {
+        auto type = layout->findTypeByName(name);
+        SLANG_CHECK_ABORT(type);
+        SLANG_CHECK(layout->isSubType(type, type));
+    }
+    auto implementation = layout->findTypeByName("Impl");
+    auto base = layout->findTypeByName("IBase");
+    SLANG_CHECK_ABORT(implementation && base);
+    SLANG_CHECK(layout->isSubType(implementation, base));
+    SLANG_CHECK(!layout->isSubType(base, implementation));
+    SLANG_CHECK(
+        !layout->isSubType(layout->findTypeByName("uint"), layout->findTypeByName("float")));
+}
+
 static String getTypeFullName(slang::TypeReflection* type)
 {
     ComPtr<ISlangBlob> blob;

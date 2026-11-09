@@ -143,6 +143,42 @@ local insts = {
 			},
 			-- Represents an `Optional<T>`.
 			{ Optional = { struct_name = "OptionalType", operands = { { "valueType", "IRType" } }, hoistable = true } },
+			-- Represents a graph value whose host result will become available asynchronously.
+			{
+				Defer = {
+					struct_name = "DeferType",
+					operands = { { "valueType", "IRType" } },
+					hoistable = true,
+				},
+			},
+			-- Represents a reference-counted host array whose element count is selected at run time.
+			{
+				HGVMRuntimeArray = {
+					struct_name = "HGVMRuntimeArrayType",
+					operands = { { "elementType", "IRType" } },
+					hoistable = true,
+				},
+			},
+			-- Owns an immutable, dynamically typed host payload. Its concrete type remains in HGBC.
+			{ HGVMBox = { struct_name = "HGVMBoxType", hoistable = true } },
+			-- Alternating case-tag literals and concrete payload types; a void payload has no box.
+			{ HGVMTaggedUnion = { struct_name = "HGVMTaggedUnionType", hoistable = true } },
+			-- Represents a host-visible presentation surface with one statically selected storage format.
+			{
+				HGVMSurface = {
+					struct_name = "HGVMSurfaceType",
+					operands = { { "format" } },
+					hoistable = true,
+				},
+			},
+			-- Represents an HGVM render target whose shader value and storage format are independent.
+			{
+				HGVMRenderTarget = {
+					struct_name = "HGVMRenderTargetType",
+					operands = { { "elementType", "IRType" }, { "format" } },
+					hoistable = true,
+				},
+			},
 			-- Represents a `Conditional<T, hasValue>`.
 			{ Conditional = { struct_name = "ConditionalType", operands = { { "valueType", "IRType" }, { "hasValue", "IRInst" } }, hoistable = true } },
 			-- Represents an enum type
@@ -211,6 +247,12 @@ local insts = {
 			{ ApplyForBwdFuncType = { hoistable = true } },
 			{ BwdCallableFuncType = { hoistable = true } },
 			{ RematFuncType = { hoistable = true } },
+			{
+				DifferentialOrNoneType = {
+					hoistable = true,
+					operands = { { "primalType", "IRType" }, { "witness" } },
+				},
+			},
 
 			{
 				TensorView = {
@@ -911,7 +953,14 @@ local insts = {
 	-- (that is, they have mangled names that can be used
 	-- for linkage).
 	--
-	{ key = { struct_name = "StructKey", global = true } },
+	{
+		StructKey = {
+			{ key = { struct_name = "DeclaredStructKey", global = true } },
+			-- Intrinsic storage fields have an identity shared by source declarations and
+			-- compiler-generated types. Deduplicate them by their KnownBuiltinDeclName role.
+			{ BuiltinStructKey = { operands = { { "kindOperand", "IRIntLit" } }, hoistable = true } },
+		},
+	},
 	-- A requirement key for a recognized built-in interface requirement (e.g. an
 	-- `IDifferentiable` requirement identified by `BuiltinRequirementKind`).
 	-- Unlike an ordinary struct key -- which is a distinct `global` symbol per
@@ -964,6 +1013,27 @@ local insts = {
 			{
 				blob_constant = { struct_name = "BlobLit" },
 			},
+		},
+	},
+	-- A compile-time string assembled from a format string followed by its arguments.
+	-- The format string uses `{}` as a positional placeholder for each argument.
+	{ StringFormat = { struct_name = "StringFormat", min_operands = 1, hoistable = true } },
+	-- A compile-time, comma-separated reflection-name list for generic arguments. Each operand is
+	-- either one ordinary type/value argument or a type/value pack that contributes zero or more
+	-- arguments. This instruction must fold to a string literal after specialization.
+	{
+		FormatGenericArgReflectionNameList = {
+			struct_name = "FormatGenericArgReflectionNameList",
+			hoistable = true,
+		},
+	},
+	-- The compile-time reflection name of a type. This instruction is folded once its
+	-- type operand is concrete.
+	{
+		ReflectionNameOf = {
+			struct_name = "ReflectionNameOf",
+			operands = { { "type" } },
+			hoistable = true,
 		},
 	},
 	{ CapabilitySet = { hoistable = true, { capabilityConjunction = {} }, { capabilityDisjunction = {} } } },
@@ -1367,10 +1437,17 @@ local insts = {
 			operands = { { "base" }, { "index" } },
 		},
 	},
+	{
+		hgvmRuntimeArrayGetElementPtr = {
+			struct_name = "HGVMRuntimeArrayGetElementPtr",
+			operands = { { "base" }, { "index" } },
+		},
+	},
 	-- Append/Consume-StructuredBuffer operations
 	{ StructuredBufferAppend = { operands = { { "buffer" }, { "element", optional = true } } } },
 	{ StructuredBufferConsume = { operands = { { "buffer" } } } },
 	{ StructuredBufferGetDimensions = { operands = { { "buffer" } } } },
+	{ TextureGetDimensions = { operands = { { "texture" } } } },
 	-- Resource qualifiers for dynamically varying index
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
@@ -1838,6 +1915,28 @@ local insts = {
 				nameHint = { struct_name = "NameHintDecoration", operands = { { "nameOperand", "IRStringLit" } } },
 			},
 			{
+				ReflectionName = {
+					struct_name = "ReflectionNameDecoration",
+					operands = { { "nameOperand" } },
+				},
+			},
+			{
+				TypeModuleName = {
+					struct_name = "TypeModuleNameDecoration",
+					operands = { { "nameOperand", "IRStringLit" } },
+				},
+			},
+			{
+				RuntimeTypeIdentity = {
+					-- The unobfuscated declaration mangle followed by specialization groups.
+					-- Each group is an integer argument count followed by that many IR operands.
+					-- Keeping operands allows ordinary specialization and lowering to resolve them.
+					struct_name = "RuntimeTypeIdentityDecoration",
+					min_operands = 1,
+				},
+			},
+			{ Lambda = { struct_name = "LambdaDecoration" } },
+			{
 				PhysicalType = {
 					struct_name = "PhysicalTypeDecoration",
 					min_operands = 1,
@@ -1950,6 +2049,10 @@ local insts = {
 			{ shader64BitIndexing = { struct_name = "Shader64BitIndexingDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
+			-- Records source-level public visibility for HGBC API reflection. This is
+			-- intentionally separate from PublicDecoration because it is metadata only
+			-- and must not affect physical type legalization on other targets.
+			{ hgbcExport = { struct_name = "HGBCExportDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
 			{ downstreamModuleExport = { struct_name = "DownstreamModuleExportDecoration" } },
 			{ downstreamModuleImport = { struct_name = "DownstreamModuleImportDecoration" } },
@@ -2110,8 +2213,15 @@ local insts = {
 					},
 				},
 			},
+			{ ShaderParameterMappingDecoration = { min_operands = 0 } },
 			{ CudaKernel = { struct_name = "CudaKernelDecoration" } },
 			{ CudaHost = { struct_name = "CudaHostDecoration" } },
+			{
+				HostOnlyDecoration = {
+					-- Marks a function whose definition is available only in host programs.
+					-- This also applies to generic methods that are not entry points.
+				},
+			},
 			{
 				TorchEntryPoint = {
 					struct_name = "TorchEntryPointDecoration",
@@ -2481,6 +2591,13 @@ local insts = {
 			},
 			{ method = { struct_name = "MethodDecoration" } },
 			{
+				staticMethod = {
+					-- Records the canonical owner type of a static member function.
+					struct_name = "StaticMethodDecoration",
+					operands = { { "ownerType", "IRType" } },
+				},
+			},
+			{
 				packoffset = {
 					struct_name = "PackOffsetDecoration",
 					operands = { { "registerOffset", "IRIntLit" }, { "componentOffset", "IRIntLit" } },
@@ -2755,6 +2872,13 @@ local insts = {
 	},
 	{ isNullExistential = { operands = { { "val" } } } },
 	{ extractTaggedUnionTag = { operands = { { "val" } } } },
+	{ HGVMBoxValue = { struct_name = "HGVMBox", operands = { { "value" } } } },
+	{ HGVMUnbox = { operands = { { "box" } } } },
+	{ HGVMMakeTaggedUnion = { operands = { { "tag" }, { "box" } } } },
+	{ HGVMGetTaggedUnionCase = { operands = { { "value" } } } },
+	{ HGVMGetTaggedUnionPayload = { operands = { { "value" } } } },
+	{ HGVMExtractTaggedUnion = { operands = { { "value" }, { "tag" } } } },
+	{ HGVMConvertTaggedUnion = {} },
 	{ extractTaggedUnionPayload = { operands = { { "unionVal" } } } },
 	{ BuiltinCast = { operands = { { "val" } } } },
 	{ bitCast = { operands = { { "val" } } } },
@@ -2827,6 +2951,11 @@ local insts = {
 			operands = { { "value" }, { "valueWitness" }, { "typeOperand" }, { "targetWitness", optional = true } },
 		},
 	},
+	-- This compile-time query requires exactly one matching type. Until specialization
+	-- resolves it, its diagnostic obligation must survive even if the result is unused.
+	-- Keep it at the evaluation site so enclosing functions cannot be inferred readNone
+	-- before their type arguments have been checked.
+	{ IndexOfTypeInPack = { operands = { { "elementType" }, { "pack" } } } },
 	{ TypeEquals = { operands = { { "type1" }, { "type2" } } } },
 	{ IsInt = { operands = { { "value" } } } },
 	{ IsBool = { operands = { { "value" } } } },
@@ -2879,7 +3008,33 @@ local insts = {
 		-- Identity remat for when MinimalContext == BwdCallable.
 		{ IdentityRemat = { min_operands = 1 } },
 	} },
+	{ SlangEntryPoint = { operands = { { "moduleName" }, { "entryPointName" } } } },
+	{ SpecializedSlangEntryPoint = { min_operands = 2 } },
 	{ DispatchKernel = { operands = { { "baseFn" }, { "threadGroupSize" }, { "dispatchSize" } } } },
+	{ RayPipelineCall = { min_operands = 11 } },
+	{
+		MakeGraphicsPipeline = {
+			operands = {
+				{ "vertexFn" },
+				{ "fragmentFn" },
+				{ "state" },
+				{ "drawParameterCount" },
+				{ "vertexArgumentCount" },
+			},
+			min_operands = 5,
+		},
+	},
+	{
+		MakeRayTracer = {
+			operands = {
+				{ "payloadType", "IRType" },
+				{ "maxRecursion" },
+				{ "rayGenerationFn" },
+				{ "closestHitFn" },
+				{ "missFn" },
+			},
+		},
+	},
 	{
 		CudaKernelLaunch = {
 			operands = {
@@ -2999,15 +3154,17 @@ local insts = {
 	-- DebugInfo
 	{ DebugSource = { min_operands = 3, hoistable = true } },
 	{
+		DebugLambda = {
+			operands = { { "name" }, { "moduleName" }, { "source" }, { "line" }, { "column" } },
+			hoistable = true,
+		},
+	},
+	{
 		DebugLine = {
 			min_operands = 5,
 		},
 	},
-	{
-		DebugVar = {
-			min_operands = 5,
-		},
-	},
+	{ DebugVar = { min_operands = 4 } },
 	{
 		DebugValue = {
 			min_operands = 2,
@@ -3021,7 +3178,7 @@ local insts = {
 	},
 	{
 		DebugLexicalBlock = {
-			operands = { { "source" }, { "line" }, { "col" }, { "parentScope" } },
+			min_operands = 6,
 		},
 	},
 	{ DebugInlinedVariable = { min_operands = 2 } },
@@ -3045,6 +3202,18 @@ local insts = {
 	-- Embedded Precompiled Libraries
 	{ EmbeddedDownstreamIR = { operands = { { "targetOperand", "IRIntLit" }, { "blob", "IRBlobLit" } } } },
 	-- Inline assembly
+	{ HGBCAsm = { parent = true } },
+	{ HGBCAsmInst = { min_operands = 1 } },
+	{
+		HGBCAsmOperand = {
+			{ HGBCAsmOperandLiteral = { min_operands = 1 } },
+			{ HGBCAsmOperandValue = { min_operands = 1 } },
+			{ HGBCAsmOperandValuePack = {} },
+			{ HGBCAsmOperandType = { min_operands = 1 } },
+			{ HGBCAsmOperandId = { min_operands = 1 } },
+			{ HGBCAsmOperandResult = {} },
+		},
+	},
 	{ SPIRVAsm = { parent = true } },
 	{ SPIRVAsmInst = { min_operands = 1 } },
 	{
@@ -3594,6 +3763,13 @@ local function process(insts)
 			-- Look up stable name
 			local stable_id = name_to_stable_name[full_path]
 			if stable_id then
+				-- Duplicate IDs would deserialize one instruction as another.
+				local previous_inst = stable_name_to_inst[stable_id]
+				if previous_inst then
+					error(string.format(
+						"Duplicate stable instruction ID %d: %s and %s",
+						stable_id, previous_inst.struct_name, full_path))
+				end
 				value.stable_name = stable_id
 				stable_name_to_inst[stable_id] = value
 				if stable_id > max_stable_name then

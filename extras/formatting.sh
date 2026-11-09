@@ -255,7 +255,11 @@ filter_explicit_files() {
       esac
     done
   done
-  printf '%s\n' "${result[@]}"
+  # With no arguments, printf would emit an empty path. Some formatters interpret
+  # that path as the working directory and recursively format the whole checkout.
+  if [ ${#result[@]} -gt 0 ]; then
+    printf '%s\n' "${result[@]}"
+  fi
 }
 
 function list_files() {

@@ -337,6 +337,37 @@ class CountOfIntVal : public SizeOfLikeIntVal
 };
 
 FIDDLE()
+class IndexOfTypeInPackIntVal : public IntVal
+{
+    FIDDLE(...)
+    IndexOfTypeInPackIntVal(Type* intType, Type* elementType, Type* packType)
+    {
+        setOperands(intType, elementType, packType);
+    }
+    Type* getElementType() const { return as<Type>(getOperand(1)); }
+    Type* getPackType() const { return as<Type>(getOperand(2)); }
+
+    enum class LookupResult
+    {
+        Unknown,
+        Found,
+        Missing,
+        Ambiguous,
+    };
+
+    /// Finds the unique match once substitution has made every type comparison decidable.
+    static LookupResult findIndex(Type* elementType, Type* packType, Index& outIndex);
+    static IntVal* tryFold(
+        ASTBuilder* astBuilder,
+        Type* intType,
+        Type* elementType,
+        Type* packType);
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
 class FirstIntVal : public IntVal
 {
     FIDDLE(...)
@@ -805,6 +836,76 @@ class TypePackSubtypeWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+/// Carries elementwise evidence for an optional pack constraint without asserting conformance.
+/// An element is either a subtype witness or NoneWitness. Unlike TypePackSubtypeWitness, this
+/// value is not a proof that every element conforms to the interface.
+FIDDLE()
+class OptionalWitnessPack : public Witness
+{
+    FIDDLE(...)
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    Index getCount() { return getOperandCount() - 2; }
+    Witness* getWitness(Index index) { return as<Witness>(getOperand(index + 2)); }
+
+    OptionalWitnessPack(Type* sub, Type* sup, ArrayView<Witness*> witnesses)
+    {
+        setOperands(sub, sup);
+        for (auto witness : witnesses)
+            addOperands(ValNodeOperand(witness));
+    }
+
+    /// Uses the ordinary proof pack when every element supplies a subtype witness.
+    static Witness* create(
+        ASTBuilder* astBuilder,
+        Type* sub,
+        Type* sup,
+        ArrayView<Witness*> witnesses);
+
+    ConversionCost getOverloadResolutionCost();
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+/// Records absent evidence for every element of a pack whose length is still dependent.
+FIDDLE()
+class AbsentWitnessPack : public Witness
+{
+    FIDDLE(...)
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+
+    AbsentWitnessPack(Type* sub, Type* sup) { setOperands(sub, sup); }
+
+    static Witness* create(ASTBuilder* astBuilder, Type* sub, Type* sup);
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+/// Projects optional evidence while its pack expansion index is still dependent.
+FIDDLE()
+class EachOptionalWitness : public Witness
+{
+    FIDDLE(...)
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    Witness* getPatternWitness() { return as<Witness>(getOperand(2)); }
+
+    EachOptionalWitness(Type* sub, Type* sup, Witness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+/// Reports unresolved optional constraints structurally, without considering checked statements.
+bool isUncheckedOptionalWitness(Witness* witness);
+
 FIDDLE()
 class EachSubtypeWitness : public SubtypeWitness
 {
@@ -1013,6 +1114,9 @@ class DiffTypeInfoWitness : public SubtypeWitness
 {
     FIDDLE(...)
 
+    /// Canonicalizes scalar absence to null while preserving elementwise pack evidence.
+    static DiffTypeInfoWitness* create(ASTBuilder* astBuilder, ArrayView<Val*> operands);
+
     Type* getThisParamType() { return as<Type>(getOperand(0)); }
 
     SubtypeWitness* getThisTypeDiffWitness() { return as<SubtypeWitness>(getOperand(1)); }
@@ -1024,7 +1128,20 @@ class DiffTypeInfoWitness : public SubtypeWitness
         return as<SubtypeWitness>(getOperand(3 + index));
     }
 
+    Witness* getParamTypeDiffEvidence(Index index) { return as<Witness>(getOperand(3 + index)); }
+
     UCount getParamTypeCount() { return getOperandCount() - 3; }
+
+    bool hasUncheckedOptionalEvidence()
+    {
+        if (isUncheckedOptionalWitness(getThisTypeDiffWitness()) ||
+            isUncheckedOptionalWitness(getReturnTypeDiffWitness()))
+            return true;
+        for (Index i = 0; i < Index(getParamTypeCount()); ++i)
+            if (isUncheckedOptionalWitness(getParamTypeDiffEvidence(i)))
+                return true;
+        return false;
+    }
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();

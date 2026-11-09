@@ -231,7 +231,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
         x(Miscellaneous, Base) \
             x(Log, Miscellaneous) \
             x(Lock, Miscellaneous) \
-        x(SourceMap, Base)
+        x(SourceMap, Base) \
+        x(HGBC, Base)
 
 #define SLANG_ARTIFACT_PAYLOAD_ENTRY(TYPE, PARENT) { Index(ArtifactPayload::TYPE), Index(ArtifactPayload::PARENT), #TYPE },
 
@@ -342,6 +343,9 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     case SLANG_SHADER_LLVM_IR:
         return Desc::make(Kind::Assembly, Payload::LLVMIR, Style::Kernel, 0);
 
+    case SLANG_HGBC:
+        return Desc::make(Kind::ObjectCode, Payload::HGBC, Style::Kernel, 0);
+
     default:
         break;
     }
@@ -423,6 +427,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 return SLANG_METAL_LIB_ASM;
             case Payload::WGSL_SPIRV:
                 return SLANG_WGSL_SPIRV_ASM;
+            case Payload::HGBC:
+                return SLANG_HGBC;
             default:
                 break;
             }
@@ -467,6 +473,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 return SLANG_METAL_LIB_ASM;
             case Payload::WGSL_SPIRV:
                 return SLANG_WGSL_SPIRV;
+            case Payload::HGBC:
+                return SLANG_HGBC;
             default:
                 break;
             }
@@ -754,6 +762,9 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
     case Payload::SlangIR:
         return toSlice("slang-ir");
 
+    case Payload::HGBC:
+        return toSlice("hgbc");
+
     case Payload::MetalAIR:
         return toSlice("metallib");
 
@@ -772,6 +783,15 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 {
     switch (desc.kind)
     {
+    case ArtifactKind::ObjectCode:
+        {
+            if (desc.payload == Payload::HGBC)
+            {
+                out << toSlice("hgbc");
+                return SLANG_OK;
+            }
+            break;
+        }
     case ArtifactKind::Library:
         {
             // Special cases
@@ -1033,6 +1053,12 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
 
 /* static */ bool ArtifactDescUtil::isDisassembly(const ArtifactDesc& from, const ArtifactDesc& to)
 {
+    if (from.kind == ArtifactKind::ObjectCode && from.payload == ArtifactPayload::HGBC &&
+        to.kind == ArtifactKind::Assembly && to.payload == ArtifactPayload::HGBC)
+    {
+        return from.style == to.style && from.flags == to.flags;
+    }
+
     // From must be a binary like type
     if (!isDerivedFrom(from.kind, ArtifactKind::CompileBinary))
     {

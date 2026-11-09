@@ -270,6 +270,9 @@ protected:
 
 struct UTF8Util
 {
+    /// Approximates terminal column width, including combining marks and common wide characters.
+    static Int64 getCodePointDisplayWidth(Char32 c);
+
     /// Given a slice calculate the number of code points (unicode chars)
     ///
     /// NOTE! This doesn't check the *validity* of code points/encoding.

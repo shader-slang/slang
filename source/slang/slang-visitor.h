@@ -218,6 +218,16 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         return e;
     }
 
+    // Walk operands even when checking has replaced an operator call with a
+    // BuiltinOperatorExpr, which has arguments but no functionExpr. For example,
+    // lambda capture must still find scale in an already-checked `x / scale`.
+    Expr* visitExprWithArgsBase(ExprWithArgsBase* e)
+    {
+        for (auto& arg : e->arguments)
+            arg = dispatchIfNotNull(arg);
+        return e;
+    }
+
     // --- Call / generic application ---
     // AppExprBase is the common base for InvokeExpr, GenericAppExpr, TypeCastExpr,
     // OperatorExpr, etc. All share functionExpr + arguments.
@@ -225,9 +235,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitAppExprBase(AppExprBase* e)
     {
         e->functionExpr = dispatchIfNotNull(e->functionExpr);
-        for (auto& arg : e->arguments)
-            arg = dispatchIfNotNull(arg);
-        return e;
+        return visitExprWithArgsBase(e);
     }
 
     // --- Unary-like ---
@@ -385,6 +393,16 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         e->originalExpr = dispatchIfNotNull(e->originalExpr);
         return e;
     }
+    Expr* visitHGBCAsmExpr(HGBCAsmExpr* e)
+    {
+        for (HGBCAsmInst& inst : e->insts)
+        {
+            inst.opcode.expr = dispatchIfNotNull(inst.opcode.expr);
+            for (HGBCAsmOperand& operand : inst.operands)
+                operand.expr = dispatchIfNotNull(operand.expr);
+        }
+        return e;
+    }
     Expr* visitSPIRVAsmExpr(SPIRVAsmExpr* e)
     {
         for (auto& inst : e->insts)
@@ -398,9 +416,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitAggTypeCtorExpr(AggTypeCtorExpr* e)
     {
         e->base.exp = dispatchIfNotNull(e->base.exp);
-        for (auto& arg : e->arguments)
-            arg = dispatchIfNotNull(arg);
-        return e;
+        return visitExprWithArgsBase(e);
     }
     Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* e)
     {
@@ -469,6 +485,37 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         e->baseFunction = dispatchIfNotNull(e->baseFunction);
         e->threadGroupSize = dispatchIfNotNull(e->threadGroupSize);
         e->dispatchSize = dispatchIfNotNull(e->dispatchSize);
+        return e;
+    }
+
+    Expr* visitMakeGraphicsPipelineExpr(MakeGraphicsPipelineExpr* e)
+    {
+        e->baseFunction = dispatchIfNotNull(e->baseFunction);
+        e->fragmentFunction = dispatchIfNotNull(e->fragmentFunction);
+        e->settings = dispatchIfNotNull(e->settings);
+        return e;
+    }
+
+    Expr* visitRayTraceExpr(RayTraceExpr* e)
+    {
+        e->baseFunction = dispatchIfNotNull(e->baseFunction);
+        e->closestHitFunction = dispatchIfNotNull(e->closestHitFunction);
+        e->missFunction = dispatchIfNotNull(e->missFunction);
+        e->maxRecursionDepthExpr = dispatchIfNotNull(e->maxRecursionDepthExpr);
+        return e;
+    }
+    Expr* visitRayPipelineCallExpr(RayPipelineCallExpr* e)
+    {
+        e->baseFunction = dispatchIfNotNull(e->baseFunction);
+        e->anyHitFunction = dispatchIfNotNull(e->anyHitFunction);
+        e->intersectionFunction = dispatchIfNotNull(e->intersectionFunction);
+        e->payloadTypeExpr.exp = dispatchIfNotNull(e->payloadTypeExpr.exp);
+        e->attributeTypeExpr.exp = dispatchIfNotNull(e->attributeTypeExpr.exp);
+        e->pipeline = dispatchIfNotNull(e->pipeline);
+        e->geometrySlot = dispatchIfNotNull(e->geometrySlot);
+        e->raySlot = dispatchIfNotNull(e->raySlot);
+        e->extent = dispatchIfNotNull(e->extent);
+        e->maxRecursion = dispatchIfNotNull(e->maxRecursion);
         return e;
     }
 

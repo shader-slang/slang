@@ -293,7 +293,10 @@ struct BackwardDiffTranslationContext
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter)
         // representing the derivative of the return value.
-        transposeDiffBlocksInFunc(autoDiffSharedContext, propagateFunc);
+        transposeDiffBlocksInFunc(
+            autoDiffSharedContext,
+            propagateFunc,
+            cast<IRFuncType>(targetFunc->getDataType()));
 
         // Apply checkpointing policy to legalize cross-scope uses of primal values
         // using either recompute or store strategies.
@@ -338,50 +341,14 @@ struct BackwardDiffTranslationContext
 
         // ------------------------------------------------------------
         // Fill in the propagate function's type.
-        List<IRType*> propagateParamTypes;
-        IRType* propagateResultType;
-
-        propagateParamTypes.add((IRType*)intermediateType);
-
-        for (UInt i = 0; i < targetFunc->getParamCount(); i++)
-        {
-            const auto& [direction, paramType] =
-                splitParameterDirectionAndType(targetFunc->getParamType(i));
-            auto diffValueParamType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
-                paramType,
-                AnnotationKind::DifferentialType);
-
-            if (diffValueParamType)
-                propagateParamTypes.add(fromDirectionAndType(
-                    builder,
-                    transposeDirection(direction),
-                    diffValueParamType));
-            else
-                propagateParamTypes.add(builder->getVoidType());
-        }
-
-        auto resultType = targetFunc->getResultType();
-        auto diffResultType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
-            resultType,
-            AnnotationKind::DifferentialType);
-        if (diffResultType)
-        {
-            propagateResultType =
-                fromDirectionAndType(builder, ParameterDirectionInfo::Kind::In, diffResultType);
-        }
-        else
-        {
-            propagateResultType = builder->getVoidType();
-        }
-
-        if (propagateResultType->getOp() != kIROp_VoidType)
-        {
-            // If the result type is not void, we need to add it as the last parameter.
-            propagateParamTypes.add(propagateResultType);
-        }
-
-        auto propagateFuncType = builder->getFuncType(propagateParamTypes, builder->getVoidType());
-        propagateFunc->setFullType(propagateFuncType);
+        IRInst* propagateTypeOperands[] = {targetFunc->getDataType(), intermediateType};
+        propagateFunc->setFullType(diffTypeContext.resolveType(
+            builder,
+            builder->emitIntrinsicInst(
+                builder->getTypeKind(),
+                kIROp_BwdCallableFuncType,
+                SLANG_COUNT_OF(propagateTypeOperands),
+                propagateTypeOperands)));
 
         // --------------------------------------------------------------------------
 
@@ -550,6 +517,8 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
         auto bwdPropParam = bwdPropFuncBuilder.emitParam(
             bwdPropFuncType->getParamType(idx + 1)); // +1 to skip the context param
+        auto [bwdPropDirection, bwdPropValueType] =
+            splitParameterDirectionAndType(bwdPropParam->getDataType());
         generateName(&builder, primalFuncParams[idx], bwdPropParam, "d_");
         bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
 
@@ -573,7 +542,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
                     .emitFieldAddress(builder.getPtrType(structFieldType), rematContextVar, key),
                 rematContextValue);
 
-            if (as<IRVoidType>(bwdPropParam->getDataType()))
+            if (as<IRVoidType>(bwdPropValueType))
             {
                 // Add just the primal part (there's no differential part since its void).
                 bwdDiffFuncArgs.add(
@@ -619,7 +588,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
                 bwdDiffFuncArgs.add(pairVar);
             }
         }
-        else if (!as<IRVoidType>(bwdPropParam->getDataType()))
+        else if (!as<IRVoidType>(bwdPropValueType))
         {
             // Primal => Out param
             // Diff => In diff param.
@@ -761,9 +730,15 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     IRInst* applyBwdFunc = translateInst->getOperand(0);
     IRInst* rematFunc = translateInst->getOperand(1);
     IRInst* bwdPropFunc = translateInst->getOperand(2);
-    IRFuncType* bwdDiffFuncType = cast<IRFuncType>(translateInst->getDataType());
 
     IRBuilder builder(sharedContext->moduleInst);
+    DifferentiableTypeConformanceContext diffTypeContext(sharedContext);
+
+    // Optional constraints keep the associated derivative signature symbolic until
+    // specialization supplies concrete evidence. Resolve that signature before constructing
+    // the adapter, just as we resolve the apply and propagation signatures in the reverse adapter.
+    auto bwdDiffFuncType =
+        cast<IRFuncType>(diffTypeContext.resolveType(&builder, translateInst->getDataType()));
 
     // This will nest the func at the right place (inside any generic contexts).
     builder.setInsertAfter(translateInst);
@@ -801,10 +776,16 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         auto applyParamType = applyBwdFuncType->getParamType(i);
         auto bwdPropParamType =
             bwdPropFuncType->getParamType(i + 1); // +1 to skip the context param
+        auto [bwdPropDirection, bwdPropValueType] =
+            splitParameterDirectionAndType(bwdPropParamType);
+        bool hasValueDifferential = !as<IRVoidType>(bwdPropValueType);
 
-        if (as<IRVoidType>(bwdPropParamType))
+        if (!hasValueDifferential)
         {
-            bwdPropFuncParams.add(builder.getVoidValue());
+            if (bwdPropDirection.kind == ParameterDirectionInfo::Kind::Out)
+                bwdPropFuncParams.add(builder.emitVar(bwdPropValueType));
+            else
+                bwdPropFuncParams.add(builder.getVoidValue());
         }
 
         if (as<IROutParamType>(applyParamType))
@@ -817,7 +798,7 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
             //
             rematFuncArgs.add(builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType()));
 
-            if (!as<IRVoidType>(bwdPropParamType))
+            if (hasValueDifferential)
             {
                 bwdPropFuncParams.add(
                     bwdDiffFuncParams[bwdDiffParamIdx]); // Use the original parameter as-is.
@@ -825,7 +806,7 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
             }
             continue;
         }
-        else if (as<IRBorrowInOutParamType>(applyParamType) && as<IRVoidType>(bwdPropParamType))
+        else if (as<IRBorrowInOutParamType>(applyParamType) && !hasValueDifferential)
         {
             {
                 auto var = builder.emitVar(as<IRPtrTypeBase>(applyParamType)->getValueType());
@@ -842,7 +823,7 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
             bwdDiffParamIdx++;
             continue;
         }
-        else if (!as<IRVoidType>(bwdPropParamType))
+        else if (hasValueDifferential)
         {
             // inout diff-pair or in diff-ptr-pair
             if (auto bwdDiffParamPtrType =

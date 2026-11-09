@@ -1,0 +1,10 @@
+//TEST(smoke):EXTERNAL(tool=test-process,filecheck=CHECK): "count" "3"
+//TEST(smoke):EXTERNAL(tool=test-process): count 0
+
+// The process runner must preserve arguments and capture stdout even when the suite uses
+// -use-test-server. Asset-tool tests use this same path to launch Python and headless Blender.
+// CHECK: standard output = {
+// CHECK-NEXT: 0
+// CHECK-NEXT: 1
+// CHECK-NEXT: 2
+// CHECK-NEXT: }

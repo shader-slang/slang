@@ -102,7 +102,14 @@ public:
     {
         RECORD_CALL();
         // recordArray calls record() per element, which dispatches to
-        // recordInterfaceImpl and unwraps each proxy to its implementation.
+        // recordInterfaceImpl and unwraps each proxy to its implementation. Marshal
+        // into a local array: the API accepts a const array, and callers can reuse it.
+        List<slang::IComponentType*> unwrappedComponents;
+        if (_ctx.isWriting() && componentTypes && componentTypeCount > 0)
+        {
+            unwrappedComponents.addRange(componentTypes, componentTypeCount);
+            componentTypes = unwrappedComponents.getBuffer();
+        }
         RECORD_INPUT_ARRAY(componentTypes, componentTypeCount);
         PREPARE_POINTER_OUTPUT(outCompositeComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);

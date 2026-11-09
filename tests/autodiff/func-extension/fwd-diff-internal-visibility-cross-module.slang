@@ -1,6 +1,4 @@
-//DISABLE_TEST:SIMPLE(diag=CHECK): -experimental-feature
-
-// TODO: re-enable when func-extension visibility is implemented separately.
+//TEST:SIMPLE(diag=CHECK): -experimental-feature
 
 // Test: an internal func-extension is not accessible from another module,
 // while a public func-extension from the same imported module remains usable.

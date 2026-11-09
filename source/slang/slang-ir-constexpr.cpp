@@ -58,7 +58,8 @@ bool isConstExpr(IRInst* value)
     case kIROp_FloatLit:
     case kIROp_BoolLit:
     case kIROp_Func:
-    case kIROp_StructKey:
+    case kIROp_DeclaredStructKey:
+    case kIROp_BuiltinStructKey:
     case kIROp_WitnessTable:
     case kIROp_Generic:
     case kIROp_GlobalConstant:
@@ -196,6 +197,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_ShapeSwap:
     case kIROp_ShapeReduce:
     case kIROp_PackBranch:
+    case kIROp_IndexOfTypeInPack:
         // TODO: more cases
         return true;
 

@@ -242,6 +242,8 @@ FIDDLE() namespace Slang
         WaveReadLaneFirst,
         CallShader,
         ReportHit = 16,
+        DifferentialPairPrimal,
+        DifferentialPairDifferential,
         COUNT
     };
 

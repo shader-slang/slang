@@ -77,11 +77,18 @@ void computeOneLayer<TargetEnum Target, ExecutionMode Mode, T, U, Arr:IRWArray<u
     const int regsPerLane = (elementsPerLane * sizeof(DType) + 3) / 4;
     const int tileStride = (regsPerLane * SubgroupSize * 4 + sizeof(uint4) - 1) / sizeof(uint4);
     const int bytesForCrossWarpReduction = !isTraining ? 0 :
-        max(subgroupCount / 2, 1) * nTileRows * nTileCols * tileStride * sizeof(uint4);
+        (subgroupCount / 2) * nTileRows * nTileCols * tileStride * sizeof(uint4);
 
-    // Term 3: BytesForOuterProductStore — per-row MatC tile store
+    // All lanes' half-packed operands coexist, with B immediately after A.
+    const int operandABytes = subgroupCount * SubgroupSize * alignedM * sizeof(half);
+    const int operandBBytes = subgroupCount * SubgroupSize * alignedK * sizeof(half);
+    const int bytesForOuterProductStaging = !isTraining || Target == TargetEnum.Metal ? 0 :
+        operandABytes + operandBBytes;
+
+    // Term 3: End of the per-row MatC tile store, including the B-region offset.
     const int bytesForOuterProductStore = !isTraining ? 0 :
-        nTileCols * coopMatShape * coopMatShape * sizeof(DType);
+        (Target == TargetEnum.Metal ? 0 : operandABytes)
+        + nTileCols * coopMatShape * coopMatShape * sizeof(DType);
 
     // Term 4: BytesForSumReduceRows — bias reduce
     const int heightInVecB = coopMatShape / (sizeof(uint4) / sizeof(half));
@@ -91,7 +98,8 @@ void computeOneLayer<TargetEnum Target, ExecutionMode Mode, T, U, Arr:IRWArray<u
         (subgroupCount * SubgroupSize * heightInVecB + subgroupCount * tileStrideVec * coopMatShape) * sizeof(uint4)
         + ((subgroupCount * mPadded * sizeof(DType) + sizeof(uint4) - 1) / sizeof(uint4)) * sizeof(uint4);
 
-    result[index++] = max(max(max(bytesForMMA, bytesForOuterProductStore), bytesForCrossWarpReduction), bytesForSumReduceRows);
+    result[index++] = max(bytesForOuterProductStaging,
+        max(max(max(bytesForMMA, bytesForOuterProductStore), bytesForCrossWarpReduction), bytesForSumReduceRows));
 }
 
 

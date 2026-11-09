@@ -6,6 +6,7 @@
 #include "core/slang-hash.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-random-generator.h"
+#include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
@@ -112,6 +113,7 @@ struct SwizzledMatrixLValueInfo;
 struct CopiedValInfo;
 struct ExtractedExistentialValInfo;
 struct ImplicitCastLValueInfo;
+struct AddressPackInfo;
 
 // This type is our core representation of lowered values.
 // In the simple case, it just wraps an `IRInst*`.
@@ -133,6 +135,10 @@ struct LoweredValInfo
         // An l-value represented as an IR
         // pointer to the value
         Ptr,
+
+        // A pack of addresses, one per logical value-pack element.
+        // Unlike Ptr, this does not point to a single aggregate allocation.
+        AddressPack,
 
         // A member declaration bound to a particular `this` value
         BoundMember,
@@ -207,6 +213,14 @@ struct LoweredValInfo
 
     static LoweredValInfo boundMember(BoundMemberInfo* boundMemberInfo);
 
+    static LoweredValInfo addressPack(AddressPackInfo* info);
+
+    AddressPackInfo* getAddressPackInfo()
+    {
+        SLANG_ASSERT(flavor == Flavor::AddressPack);
+        return (AddressPackInfo*)ext;
+    }
+
     BoundMemberInfo* getBoundMemberInfo()
     {
         SLANG_ASSERT(flavor == Flavor::BoundMember);
@@ -260,6 +274,16 @@ struct LoweredValInfo
         SLANG_ASSERT(flavor == Flavor::ImplicitCastedLValue);
         return (ImplicitCastLValueInfo*)ext;
     }
+};
+
+// Records the storage for an expanded argument or a directional pack parameter.
+// For `out expand each T values`, addresses has type `expand Out<each T>` while
+// valueType is `expand each T`. The pointer opcode preserves the scalar access convention.
+struct AddressPackInfo : ExtendedValueInfo
+{
+    IRInst* addresses;
+    IRType* valueType;
+    IROp pointerOp;
 };
 
 // This case is used to indicate a reference to an AST-level
@@ -399,6 +423,14 @@ LoweredValInfo LoweredValInfo::boundMember(BoundMemberInfo* boundMemberInfo)
     LoweredValInfo info;
     info.flavor = Flavor::BoundMember;
     info.ext = boundMemberInfo;
+    return info;
+}
+
+LoweredValInfo LoweredValInfo::addressPack(AddressPackInfo* addressPackInfo)
+{
+    LoweredValInfo info;
+    info.flavor = Flavor::AddressPack;
+    info.ext = addressPackInfo;
     return info;
 }
 
@@ -575,8 +607,6 @@ struct SharedIRGenContext
     //   in the source code.
     //
     List<IRInst*> m_stringLiterals;
-
-    DebugValueStoreContext debugValueContext;
 };
 
 struct IRGenContext;
@@ -892,16 +922,25 @@ LoweredValInfo emitCallToVal(
                 {
                     // If callee is a dispatch kernel expr, don't emit call(dispatchKernel,
                     // ...), instead emit a dispatchKernel(high_order_args, actual_args).
-                    auto result = LoweredValInfo::simple(builder->emitDispatchKernelInst(
+                    auto result = builder->emitDispatchKernelInst(
                         type,
                         dispatchKernel->getBaseFn(),
                         dispatchKernel->getThreadGroupSize(),
                         dispatchKernel->getDispatchSize(),
                         argCount,
-                        args));
+                        args);
+                    auto mapping =
+                        dispatchKernel->findDecoration<IRShaderParameterMappingDecoration>();
+                    SLANG_RELEASE_ASSERT(mapping && mapping->getOperandCount() == UInt(argCount));
+                    cloneDecoration(mapping, result);
                     SLANG_ASSERT(!dispatchKernel->hasUses());
                     dispatchKernel->removeAndDeallocate();
-                    return result;
+                    return LoweredValInfo::simple(result);
+                }
+                if (auto rayTracer = as<IRMakeRayTracer>(callee))
+                {
+                    return LoweredValInfo::simple(
+                        builder->emitCallInst(type, rayTracer, argCount, args));
                 }
                 else
                 {
@@ -951,9 +990,137 @@ LoweredValInfo emitCallToVal(
 
 LoweredValInfo lowerRValueExpr(IRGenContext* context, Expr* expr);
 
+static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val);
+
 void lowerRValueExprWithDestination(IRGenContext* context, LoweredValInfo destination, Expr* expr);
 
 IRType* lowerType(IRGenContext* context, Type* type);
+
+// Returns the scalar IR pointer convention for a directional parameter.
+static IROp getParameterPointerOp(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::Out:
+        return kIROp_OutParamType;
+    case ParamPassingMode::BorrowInOut:
+        return kIROp_BorrowInOutParamType;
+    case ParamPassingMode::Ref:
+        return kIROp_RefParamType;
+    case ParamPassingMode::BorrowIn:
+        return kIROp_BorrowInParamType;
+    default:
+        SLANG_UNREACHABLE("expected a directional parameter");
+    }
+}
+
+// Builds the same pointer qualifiers for scalar parameters and elements of parameter packs.
+static IRType* getPackElementPointerType(IRBuilder* builder, IRType* valueType, IROp pointerOp)
+{
+    switch (pointerOp)
+    {
+    case kIROp_PtrType:
+        return builder->getPtrType(valueType);
+    case kIROp_OutParamType:
+        return builder->getOutParamType(valueType);
+    case kIROp_BorrowInOutParamType:
+        return builder->getBorrowInOutParamType(valueType);
+    case kIROp_RefParamType:
+        return builder->getRefParamType(valueType, AddressSpace::Generic);
+    case kIROp_BorrowInParamType:
+        return builder->getBorrowInParamType(valueType, AddressSpace::Generic);
+    default:
+        SLANG_UNREACHABLE("expected an address-pack pointer convention");
+    }
+}
+
+// Uses a pack's existing cardinality captures when emitting a value expansion over it.
+static List<IRInst*> getPackExpansionCaptures(IRType* valueType)
+{
+    List<IRInst*> captures;
+    if (auto expansion = as<IRExpandTypeOrVal>(valueType))
+    {
+        for (UInt i = 0; i < expansion->getCaptureCount(); ++i)
+            captures.add(expansion->getCaptureType(i));
+    }
+    else
+    {
+        captures.add(valueType);
+    }
+    return captures;
+}
+
+// Distributes a uniform parameter direction over a pack at the AST-to-IR ABI boundary.
+// `out expand each T` is one directed pack in the AST, but the IR represents its eventual
+// scalar parameters as `expand Out<each T>`. Existing pack specialization then flattens them.
+static IRType* getAddressPackType(IRBuilder* builder, IRType* valueType, IROp pointerOp)
+{
+    if (auto pack = as<IRTypePack>(valueType))
+    {
+        List<IRType*> elements;
+        for (UInt i = 0; i < pack->getOperandCount(); ++i)
+            elements.add(
+                getPackElementPointerType(builder, (IRType*)pack->getOperand(i), pointerOp));
+        return builder->getTypePack(elements.getCount(), elements.getBuffer());
+    }
+
+    auto captures = getPackExpansionCaptures(valueType);
+    auto expansion = as<IRExpandTypeOrVal>(valueType);
+    auto elementType = expansion
+                           ? (IRType*)expansion->getPatternType()
+                           : (IRType*)builder->emitEachInst(builder->getTypeKind(), valueType);
+    return (IRType*)builder->getExpandTypeOrVal(
+        builder->getTypeKind(),
+        getPackElementPointerType(builder, elementType, pointerOp),
+        captures.getArrayView());
+}
+
+// Lowers scalar and pack parameters through the same directional ABI construction.
+static IRType* lowerParameterType(IRGenContext* context, Type* valueType, ParamPassingMode mode)
+{
+    auto irType = lowerType(context, valueType);
+    if (mode == ParamPassingMode::In)
+        return irType;
+    auto pointerOp = getParameterPointerOp(mode);
+    return isTypePack(valueType) ? getAddressPackType(context->irBuilder, irType, pointerOp)
+                                 : getPackElementPointerType(context->irBuilder, irType, pointerOp);
+}
+
+// Retains a pack's logical value type separately from its per-element address representation.
+static LoweredValInfo makeAddressPack(
+    IRGenContext* context,
+    IRInst* addresses,
+    IRType* valueType,
+    IROp pointerOp)
+{
+    RefPtr<AddressPackInfo> info = new AddressPackInfo();
+    info->addresses = addresses;
+    info->valueType = valueType;
+    info->pointerOp = pointerOp;
+    context->shared->extValues.add(info);
+    return LoweredValInfo::addressPack(info);
+}
+
+// Reads a directional parameter pack without loading a fictitious pointer-to-pack aggregate.
+static IRInst* loadAddressPack(IRGenContext* context, AddressPackInfo* info)
+{
+    auto builder = context->irBuilder;
+    auto captures = getPackExpansionCaptures(info->valueType);
+    auto result =
+        builder->emitExpandInst(info->valueType, captures.getCount(), captures.getBuffer());
+    builder->setInsertInto(result);
+    builder->emitBlock();
+    auto index = builder->emitParam(builder->getIntType());
+    auto elementType =
+        (IRType*)builder->emitGetTupleElement(builder->getTypeKind(), info->valueType, index);
+    auto address = builder->emitGetTupleElement(
+        getPackElementPointerType(builder, elementType, info->pointerOp),
+        info->addresses,
+        index);
+    builder->emitYield(builder->emitLoad(elementType, address));
+    builder->setInsertAfter(result);
+    return result;
+}
 
 void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal);
 
@@ -1213,6 +1380,7 @@ top:
     case LoweredValInfo::Flavor::None:
     case LoweredValInfo::Flavor::Simple:
     case LoweredValInfo::Flavor::Ptr:
+    case LoweredValInfo::Flavor::AddressPack:
         return lowered;
 
     case LoweredValInfo::Flavor::BoundStorage:
@@ -1380,6 +1548,9 @@ IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
     case LoweredValInfo::Flavor::Ptr:
         return builder->emitLoad(lowered.val);
 
+    case LoweredValInfo::Flavor::AddressPack:
+        return loadAddressPack(context, lowered.getAddressPackInfo());
+
     default:
         SLANG_UNEXPECTED("unhandled value flavor");
         UNREACHABLE_RETURN(nullptr);
@@ -1392,6 +1563,107 @@ IRInst* lowerSimpleVal(IRGenContext* context, Val* val)
 {
     auto lowered = lowerVal(context, val);
     return getSimpleVal(context, lowered);
+}
+
+static IRGeneric* getOuterGeneric(IRInst* value);
+
+/// Builds the semantic reflection name of a declaration reference.
+///
+/// Generic arguments are represented as compile-time string operands so the
+/// name can be hoisted before those arguments become concrete. For example,
+/// `addInPlace<T>._lambda` becomes the format `addInPlace<{}>._lambda` with one
+/// `FormatGenericArgReflectionNameList` operand for all of its generic arguments. The same
+/// operation handles ordinary arguments and packs. For example, specializing
+/// `Layer<int, each Rest>` with `Rest = {float, bool}` produces `Layer<int, float, bool>` without
+/// requiring the outer format to predict the pack's length.
+static IRInst* emitReflectionNameForDeclRef(IRGenContext* context, DeclRefBase* declRef)
+{
+    auto builder = context->irBuilder;
+    SubstitutionSet substSet(declRef);
+    List<DeclRefBase*> declRefs;
+
+    for (auto current = declRef; current; current = current->getParent())
+    {
+        auto decl = current->getDecl();
+        if (as<ExtensionDecl>(decl))
+        {
+            declRefs.add(current);
+            break;
+        }
+        if (as<ModuleDecl>(decl) || as<FileDecl>(decl) || as<IncludeDecl>(decl))
+            continue;
+        if (decl->parentDecl && as<GenericDecl>(decl->parentDecl))
+            continue;
+        declRefs.add(current);
+    }
+    declRefs.reverse();
+
+    StringBuilder format;
+    List<IRInst*> formatArgs;
+    bool isFirst = true;
+    for (auto current : declRefs)
+    {
+        auto decl = current->getDecl();
+        if (!isFirst)
+            format << ".";
+        isFirst = false;
+
+        if (auto name = decl->getName())
+        {
+            // Reflection lookup parses this path as source. For example, a lambda inside
+            // operator() needs `Context.operator().Lambda`, not `Context.().Lambda`.
+            if (as<FuncDecl>(maybeGetInner(decl)))
+                ASTPrinter::appendDeclName(decl, format);
+            else
+                format << name->text;
+            if (auto genericDecl = as<GenericDecl>(decl))
+            {
+                List<IRInst*> genericArgs;
+                Index parameterCount = 0;
+                for (auto member : genericDecl->getDirectMemberDecls())
+                {
+                    if (isGenericParam(member))
+                        ++parameterCount;
+                }
+
+                // The caller supplies default substitutions, so each generic's arguments
+                // are identified by its declaration rather than its position in an IR chain.
+                auto genericApp = substSet.findGenericAppDeclRef(genericDecl);
+                SLANG_RELEASE_ASSERT(genericApp);
+                auto args = genericApp->getArgs();
+                SLANG_RELEASE_ASSERT(args.getCount() >= parameterCount);
+                for (Index i = 0; i < parameterCount; ++i)
+                {
+                    IRInst* arg = nullptr;
+                    if (auto typeArg = as<Type>(args[i]))
+                        arg = lowerType(context, typeArg);
+                    else
+                        arg = lowerSimpleVal(context, args[i]);
+                    SLANG_RELEASE_ASSERT(arg);
+                    genericArgs.add(arg);
+                }
+                format << "<{}>";
+                formatArgs.add(builder->emitFormatGenericArgReflectionNameList(
+                    genericArgs.getCount(),
+                    genericArgs.getBuffer()));
+            }
+        }
+        else if (auto extensionDecl = as<ExtensionDecl>(decl))
+        {
+            auto targetType =
+                getTargetType(context->astBuilder, DeclRef(current).as<ExtensionDecl>());
+            if (targetType)
+            {
+                format << "{}";
+                formatArgs.add(builder->emitReflectionNameOf(lowerType(context, targetType)));
+            }
+        }
+    }
+
+    auto formatValue = builder->getStringValue(format.getUnownedSlice());
+    if (formatArgs.getCount() == 0)
+        return formatValue;
+    return builder->emitStringFormat(formatValue, formatArgs.getCount(), formatArgs.getBuffer());
 }
 
 LoweredValInfo lowerLValueExpr(IRGenContext* context, Expr* expr);
@@ -1459,7 +1731,14 @@ static void addLinkageDecoration(
     }
     for (auto modifier : decl->modifiers)
     {
-        if (as<HLSLExportModifier>(modifier))
+        if (as<PublicModifier>(modifier))
+        {
+            // HGBC reflects source-public declarations as its callable host API. Keep this
+            // target-specific visibility marker separate from IRPublicDecoration: the latter is
+            // also interpreted as a physical-type constraint by CPU/CUDA legalization.
+            builder->addHGBCExportDecoration(inst);
+        }
+        else if (as<HLSLExportModifier>(modifier))
         {
             builder->addHLSLExportDecoration(inst);
             builder->addKeepAliveDecoration(inst);
@@ -1557,9 +1836,28 @@ static bool isLinkageNameObfuscated(IRGenContext* context, Decl* decl)
     return context->shared->m_obfuscateCode && !isFromCoreModule(decl);
 }
 
+static void addRuntimeTypeIdentityDecoration(
+    IRBuilder* builder,
+    IRInst* inst,
+    UnownedStringSlice mangledName)
+{
+    auto identity = builder->getStringValue(mangledName);
+    builder->addDecoration(inst, kIROp_RuntimeTypeIdentityDecoration, identity);
+    auto outer = inst;
+    while (auto generic = getOuterGeneric(outer))
+        outer = generic;
+    if (outer != inst)
+        builder->addDecoration(outer, kIROp_RuntimeTypeIdentityDecoration, identity);
+}
+
 static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     const String mangledName = getMangledName(context->astBuilder, decl);
+
+    if (as<AggTypeDecl>(decl))
+    {
+        addRuntimeTypeIdentityDecoration(context->irBuilder, inst, mangledName.getUnownedSlice());
+    }
 
     // Obfuscate the mangled names if necessary.
     if (isLinkageNameObfuscated(context, decl))
@@ -2088,6 +2386,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(count);
     }
 
+    LoweredValInfo visitIndexOfTypeInPackIntVal(IndexOfTypeInPackIntVal* val)
+    {
+        IRInst* args[] = {
+            lowerType(context, val->getElementType()),
+            lowerType(context, val->getPackType())};
+        return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(
+            lowerType(context, val->getType()),
+            kIROp_IndexOfTypeInPack,
+            2,
+            args));
+    }
+
     IRInst* emitNonEmptyPackWitness(IRInst* pack)
     {
         auto builder = getBuilder();
@@ -2301,7 +2611,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
-    LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
+    // Required and optional evidence packs have different semantic contracts but share the IR
+    // pack representation. Each optional element already lowers to its own witness or sentinel.
+    template<typename TWitnessPack>
+    LoweredValInfo lowerWitnessPack(TWitnessPack* witnessPack)
     {
         auto irBuilder = getBuilder();
         ShortList<IRInst*> witnesses;
@@ -2318,6 +2631,34 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 elementTypes.getArrayView().getBuffer()),
             witnesses.getArrayView().arrayView);
         return LoweredValInfo::simple(irWitnessPack);
+    }
+
+    LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
+    {
+        return lowerWitnessPack(witnessPack);
+    }
+
+    LoweredValInfo visitOptionalWitnessPack(OptionalWitnessPack* witnessPack)
+    {
+        return lowerWitnessPack(witnessPack);
+    }
+
+    LoweredValInfo visitAbsentWitnessPack(AbsentWitnessPack* witness)
+    {
+        auto builder = getBuilder();
+        auto pattern = lowerSimpleVal(context, context->astBuilder->getOrCreate<NoneWitness>());
+        auto pack = lowerType(context, witness->getSub());
+        auto captures = getPackExpansionCaptures(pack);
+        return LoweredValInfo::simple(
+            builder->getExpandTypeOrVal(pattern->getFullType(), pattern, captures.getArrayView()));
+    }
+
+    LoweredValInfo visitEachOptionalWitness(EachOptionalWitness* witness)
+    {
+        auto pattern = lowerSimpleVal(context, witness->getPatternWitness());
+        auto supType = lowerType(context, witness->getSup());
+        auto witnessType = getBuilder()->getWitnessTableType(supType);
+        return LoweredValInfo::simple(getBuilder()->emitEachInst(witnessType, pattern));
     }
 
     LoweredValInfo visitExpandSubtypeWitness(ExpandSubtypeWitness* witness)
@@ -2554,6 +2895,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             kIROp_ForwardDiffFuncType));
     }
 
+    LoweredValInfo visitDifferentialOrNoneType(DifferentialOrNoneType* type)
+    {
+        auto application = as<GenericAppDeclRef>(type->getDeclRefBase());
+        IRInst* operands[] = {
+            lowerType(context, as<Type>(application->getArg(0))),
+            lowerSimpleVal(context, as<Witness>(application->getArg(1)))};
+        return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(
+            getBuilder()->getTypeKind(),
+            kIROp_DifferentialOrNoneType,
+            2,
+            operands));
+    }
+
     LoweredValInfo visitBwdDiffFuncType(BwdDiffFuncType* bwdFuncType)
     {
         return LoweredValInfo::simple(lowerFuncDependentType(
@@ -2757,7 +3111,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         List<IRType*> paramTypes;
         for (Index pp = 0; pp < paramCount; ++pp)
         {
-            paramTypes.add(lowerType(context, type->getParamTypeWithModeWrapper(pp)));
+            const auto [valueType, mode] = type->getParamInfo(pp);
+            paramTypes.add(lowerParameterType(context, valueType, mode));
         }
         if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
         {
@@ -2930,10 +3285,29 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
                 });
-        return getBuilder()->getType(
-            op,
-            static_cast<UInt>(operands.getCount()),
-            operands.getBuffer());
+        // Source constraints can append witnesses beyond the intrinsic opcode's declared operands.
+        // For example, _Texture and DescriptorHandle carry such proofs, but their IR types do not.
+        // Keep witnesses required by the opcode (such as DifferentialPair's) and any variadic data.
+        Index operandCount = operands.getCount();
+        const Index fixedOperandCount = getIROpInfo(op).fixedArgCount;
+        while (operandCount > fixedOperandCount &&
+               as<IRWitnessTableTypeBase>(operands[operandCount - 1]->getDataType()))
+            --operandCount;
+        operands.setCount(operandCount);
+        auto loweredType =
+            getBuilder()->getType(op, static_cast<UInt>(operands.getCount()), operands.getBuffer());
+        if (op == kIROp_DescriptorHandleType &&
+            !loweredType->findDecoration<IRReflectionNameDecoration>())
+        {
+            // A descriptor remains a typed value even when a host target erases part of its
+            // resource layout. Preserve the checked specialization here so, for example,
+            // DescriptorHandle<StructuredBuffer<uint, ScalarDataLayout>> cannot acquire the
+            // default layout when the runtime resolves its shader parameter type.
+            getBuilder()->addReflectionNameDecoration(
+                loweredType,
+                emitReflectionNameForDeclRef(context, type->getDeclRef().declRefBase));
+        }
+        return loweredType;
     }
 
     IRType* visitResourceType(ResourceType* type) { return lowerSimpleIntrinsicType(type); }
@@ -3432,6 +3806,7 @@ void addSimpleArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo a
     case LoweredValInfo::Flavor::BoundStorage:
     case LoweredValInfo::Flavor::BoundMember:
     case LoweredValInfo::Flavor::ExtractedExistential:
+    case LoweredValInfo::Flavor::AddressPack:
         args.add(getSimpleVal(context, argVal));
         break;
 
@@ -3473,6 +3848,12 @@ void addArg(
     Type* argType,                     //< The AST-level type of the argument
     SourceLoc loc)                     //< A location to use if we need to report an error
 {
+    if (argVal.flavor == LoweredValInfo::Flavor::AddressPack &&
+        paramPassingMode != ParamPassingMode::In)
+    {
+        ioArgs->add(argVal.getAddressPackInfo()->addresses);
+        return;
+    }
     switch (paramPassingMode)
     {
     case ParamPassingMode::In:
@@ -3668,6 +4049,20 @@ void addCallArgsForParam(
     List<IRInst*>* ioArgs,
     List<OutArgumentFixup>* ioFixups)
 {
+    if (paramPassingMode != ParamPassingMode::In)
+    {
+        if (auto pack = as<PackExpr>(argExpr))
+        {
+            // Concrete scalar arguments still use their ordinary temporary/copy-back path.
+            // Only an abstract expansion requires every element to have an address already.
+            List<IRInst*> elements;
+            for (auto element : pack->args)
+                addCallArgsForParam(context, paramPassingMode, element, &elements, ioFixups);
+            ioArgs->add(
+                context->irBuilder->emitMakeValuePack(elements.getCount(), elements.getBuffer()));
+            return;
+        }
+    }
     switch (paramPassingMode)
     {
     case ParamPassingMode::Ref:
@@ -3773,6 +4168,11 @@ DeclRef<D> createDefaultSpecializedDeclRef(
 
 struct StmtLoweringVisitor;
 
+IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc);
+static HumaneSourceLoc _getDebugHumaneLoc(
+    IRGenContext* context,
+    IRInst* debugSourceInst,
+    SourceLoc loc);
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt);
 
 void maybeEmitDebugLine(
@@ -4148,36 +4548,8 @@ void _lowerInfoFromFuncParameters(
 
     for (auto paramInfo : parameterLists.params)
     {
-        IRType* irParamType = lowerType(context, paramInfo.type);
-
-        // Depending on the parameter-passing mode we chose to use
-        // for the parameter, the actual IR type of the parameter
-        // might include a wrapper to represent that mode as a
-        // specific case of pointer type.
-        //
-        switch (paramInfo.actualParamPassingModeToUse)
-        {
-        case ParamPassingMode::In:
-            // The default `in` parameter-passing mode required no wrapping.
-            break;
-
-        case ParamPassingMode::Out:
-            irParamType = builder->getOutParamType(irParamType);
-            break;
-        case ParamPassingMode::BorrowInOut:
-            irParamType = builder->getBorrowInOutParamType(irParamType);
-            break;
-        case ParamPassingMode::Ref:
-            irParamType = builder->getRefParamType(irParamType, AddressSpace::Generic);
-            break;
-        case ParamPassingMode::BorrowIn:
-            irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);
-            break;
-
-        default:
-            SLANG_UNEXPECTED("unknown parameter direction");
-            break;
-        }
+        IRType* irParamType =
+            lowerParameterType(context, paramInfo.type, paramInfo.actualParamPassingModeToUse);
 
         // If the parameter was explicitly marked as being a compile-time
         // constant (`constexpr`), then attach that information to its
@@ -5393,21 +5765,197 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->getVoidValue());
     }
 
+    String getDispatchCalleeModuleName(Decl* decl)
+    {
+        if (auto moduleDecl = findModuleDecl(decl))
+        {
+            if (auto moduleName = moduleDecl->getName())
+                return moduleName->text;
+        }
+        return "module";
+    }
+
+    String getDispatchCalleeEntryPointName(DeclRef<Decl> declRef)
+    {
+        if (auto name = declRef.getName())
+            return name->text;
+
+        if (auto name = declRef.getDecl()->getName())
+            return name->text;
+
+        return "";
+    }
+
+    IRInst* lowerDispatchCallee(Expr* funcExpr, SourceLoc loc)
+    {
+        auto declRefExpr = as<DeclRefExpr>(funcExpr);
+        if (!declRefExpr)
+        {
+            context->getSink()->diagnose(Diagnostics::InternalCompilerError{.location = loc});
+            return getBuilder()->getVoidValue();
+        }
+
+        auto declRef = sharedLoweringContext.resolveAliases(declRefExpr->declRef);
+        if (!declRef.template as<CallableDecl>())
+        {
+            context->getSink()->diagnose(Diagnostics::InternalCompilerError{.location = loc});
+            return getBuilder()->getVoidValue();
+        }
+
+        IRType* calleeType = lowerType(context, funcExpr->type);
+        auto moduleName = getDispatchCalleeModuleName(declRef.getDecl());
+        auto entryPointName = getDispatchCalleeEntryPointName(declRef);
+        auto moduleNameInst = getBuilder()->getStringValue(moduleName.getUnownedSlice());
+        auto entryPointNameInst = getBuilder()->getStringValue(entryPointName.getUnownedSlice());
+
+        auto genericAppDeclRef = SubstitutionSet(declRef).findGenericAppDeclRef();
+        if (!genericAppDeclRef)
+        {
+            if (as<GenericDecl>(declRef.getDecl()->parentDecl))
+            {
+                context->getSink()->diagnose(Diagnostics::InternalCompilerError{.location = loc});
+                return getBuilder()->getVoidValue();
+            }
+
+            return getBuilder()->emitSlangEntryPointInst(
+                calleeType,
+                moduleNameInst,
+                entryPointNameInst);
+        }
+
+        List<IRInst*> specializationArgOperands;
+        for (auto arg : genericAppDeclRef->getArgs())
+        {
+            if (as<SubtypeWitness>(arg))
+                continue;
+
+            if (auto typeArg = as<Type>(arg))
+            {
+                specializationArgOperands.add(getBuilder()->getStringValue(toSlice("type")));
+                specializationArgOperands.add(
+                    getBuilder()->emitReflectionNameOf(lowerType(context, typeArg)));
+                continue;
+            }
+
+            if (auto intArg = as<IntVal>(arg))
+            {
+                specializationArgOperands.add(getBuilder()->getStringValue(toSlice("expr")));
+                specializationArgOperands.add(lowerSimpleVal(context, intArg));
+                continue;
+            }
+
+            context->getSink()->diagnose(Diagnostics::InternalCompilerError{.location = loc});
+            return getBuilder()->getVoidValue();
+        }
+
+        return getBuilder()->emitSpecializedSlangEntryPointInst(
+            calleeType,
+            moduleNameInst,
+            entryPointNameInst,
+            (Int)specializationArgOperands.getCount(),
+            specializationArgOperands.getBuffer());
+    }
+
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
     {
-        auto baseVal = lowerSubExpr(expr->baseFunction);
-        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
+        auto baseVal = lowerDispatchCallee(expr->baseFunction, expr->loc);
         auto threadSize = lowerRValueExpr(context, expr->threadGroupSize);
         auto groupSize = lowerRValueExpr(context, expr->dispatchSize);
         // Actual arguments to be filled in when we lower the actual call expr.
         // This is handled in `emitCallToVal`.
-        return LoweredValInfo::simple(getBuilder()->emitDispatchKernelInst(
+        auto builder = getBuilder();
+        auto dispatch = builder->emitDispatchKernelInst(
             lowerType(context, expr->type),
-            baseVal.val,
+            baseVal,
             getSimpleVal(context, threadSize),
             getSimpleVal(context, groupSize),
             0,
-            nullptr));
+            nullptr);
+        List<IRInst*> parameterIndices;
+        for (auto index : expr->shaderParameterIndices)
+            parameterIndices.add(builder->getIntValue(builder->getUIntType(), index));
+        builder->addDecoration(
+            dispatch,
+            kIROp_ShaderParameterMappingDecoration,
+            parameterIndices.getBuffer(),
+            parameterIndices.getCount());
+        return LoweredValInfo::simple(dispatch);
+    }
+
+    LoweredValInfo visitMakeGraphicsPipelineExpr(MakeGraphicsPipelineExpr* expr)
+    {
+        auto vertexVal = lowerDispatchCallee(expr->baseFunction, expr->loc);
+        auto fragmentVal = lowerDispatchCallee(expr->fragmentFunction, expr->loc);
+        auto builder = getBuilder();
+        auto type = as<IRFuncType>(lowerType(context, expr->type));
+        List<IRInst*> operands;
+        operands.add(vertexVal);
+        operands.add(fragmentVal);
+        operands.add(getSimpleVal(context, lowerRValueExpr(context, expr->settings)));
+        operands.add(builder->getIntValue(builder->getUIntType(), expr->drawParameterCount));
+        operands.add(builder->getIntValue(builder->getUIntType(), expr->vertexArgumentCount));
+        SLANG_RELEASE_ASSERT(
+            expr->shaderParameterIndices.getCount() ==
+            type->getParamCount() - expr->drawParameterCount);
+        for (auto index : expr->shaderParameterIndices)
+            operands.add(builder->getIntValue(builder->getUIntType(), index));
+        return LoweredValInfo::simple(
+            builder->emitMakeGraphicsPipelineInst(type, operands.getArrayView()));
+    }
+
+    LoweredValInfo visitRayTraceExpr(RayTraceExpr* expr)
+    {
+        auto rayGenerationVal = lowerDispatchCallee(expr->baseFunction, expr->loc);
+        auto closestHitVal = lowerDispatchCallee(expr->closestHitFunction, expr->loc);
+        auto missVal = lowerDispatchCallee(expr->missFunction, expr->loc);
+        auto constantMaxRecursionDepth = as<ConstantIntVal>(expr->maxRecursionDepthValue);
+        SLANG_RELEASE_ASSERT(constantMaxRecursionDepth);
+        return LoweredValInfo::simple(getBuilder()->emitMakeRayTracerInst(
+            lowerType(context, expr->type),
+            lowerType(context, expr->rayPayloadType),
+            getBuilder()->getIntValue(
+                getBuilder()->getUIntType(),
+                constantMaxRecursionDepth->getValue()),
+            rayGenerationVal,
+            closestHitVal,
+            missVal));
+    }
+
+    LoweredValInfo visitRayPipelineCallExpr(RayPipelineCallExpr* expr)
+    {
+        auto builder = getBuilder();
+        auto zero = builder->getIntValue(builder->getUIntType(), 0);
+        auto lowerControl = [&](Expr* value) -> IRInst*
+        { return value ? getSimpleVal(context, lowerRValueExpr(context, value)) : zero; };
+        List<IRInst*> operands;
+        operands.add(builder->getIntValue(builder->getUIntType(), UInt(expr->kind)));
+        operands.add(
+            expr->baseFunction ? lowerDispatchCallee(expr->baseFunction, expr->loc) : zero);
+        operands.add(lowerControl(expr->pipeline));
+        operands.add(lowerControl(expr->geometrySlot));
+        operands.add(lowerControl(expr->raySlot));
+        operands.add(lowerControl(expr->extent));
+        operands.add(
+            expr->maxRecursionValue ? lowerSimpleVal(context, expr->maxRecursionValue) : zero);
+        operands.add(
+            expr->payloadType ? lowerType(context, expr->payloadType) : builder->getVoidType());
+        operands.add(
+            expr->attributeType ? lowerType(context, expr->attributeType) : builder->getVoidType());
+        operands.add(
+            expr->anyHitFunction ? lowerDispatchCallee(expr->anyHitFunction, expr->loc) : zero);
+        operands.add(
+            expr->intersectionFunction ? lowerDispatchCallee(expr->intersectionFunction, expr->loc)
+                                       : zero);
+        for (Index i = 0; i < expr->parameterIndices.getCount(); ++i)
+        {
+            operands.add(builder->getIntValue(builder->getUIntType(), expr->parameterRoles[i]));
+            operands.add(builder->getIntValue(builder->getUIntType(), expr->parameterIndices[i]));
+        }
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(
+            lowerType(context, expr->type),
+            kIROp_RayPipelineCall,
+            operands.getCount(),
+            operands.getBuffer()));
     }
 
     LoweredValInfo visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
@@ -5477,6 +6025,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         const auto value = as<SizeOfExpr>(sizeOfLikeExpr) ? size.size : size.alignment;
 
         return LoweredValInfo::simple(getBuilder()->getIntValue(resultType, value));
+    }
+
+    LoweredValInfo visitIndexOfTypeInPackExpr(IndexOfTypeInPackExpr* expr)
+    {
+        auto value = IndexOfTypeInPackIntVal::tryFold(
+            context->astBuilder,
+            expr->type.type,
+            expr->elementType.type,
+            expr->packType.type);
+        return lowerVal(context, value);
     }
 
     LoweredValInfo visitPackQueryExpr(PackQueryExpr* packQueryExpr)
@@ -5562,6 +6120,102 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         SLANG_UNEXPECTED("a valid ast should not contain an LambdaExpr.");
         UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    /// Preserves checked HGBC assembly structure until target emission.
+    LoweredValInfo visitHGBCAsmExpr(HGBCAsmExpr* expr)
+    {
+        if (!expr->insts.getCount())
+            return LoweredValInfo{};
+
+        IRBuilder* builder = context->irBuilder;
+        IRType* type = lowerType(context, expr->type);
+        IRHGBCAsm* hgbcAsm = builder->emitHGBCAsm(type);
+
+        const auto lowerOperand = [&](const HGBCAsmOperand& operand) -> IRHGBCAsmOperand*
+        {
+            switch (operand.flavor)
+            {
+            case HGBCAsmOperand::Literal:
+            case HGBCAsmOperand::NamedValue:
+                return builder->emitHGBCAsmOperandLiteral(
+                    builder->getIntValue(builder->getUIntType(), operand.knownValue));
+
+            case HGBCAsmOperand::Id:
+                return builder->emitHGBCAsmOperandId(
+                    builder->getStringValue(operand.token.getContent()));
+
+            case HGBCAsmOperand::ResultMarker:
+                return builder->emitHGBCAsmOperandResult();
+
+            case HGBCAsmOperand::SlangValue:
+                {
+                    IRInst* value = nullptr;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(hgbcAsm);
+                        value = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitHGBCAsmOperandValue(value);
+                }
+
+            case HGBCAsmOperand::SlangValueAddr:
+                {
+                    IRInst* address = nullptr;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(hgbcAsm);
+                        LoweredValInfo loweredAddress = tryGetAddress(
+                            context,
+                            lowerLValueExpr(context, operand.expr),
+                            TryGetAddressMode::Default);
+                        if (loweredAddress.flavor != LoweredValInfo::Flavor::Ptr)
+                        {
+                            context->getSink()->diagnose(
+                                Diagnostics::NoSuchAddress{.location = operand.expr->loc});
+                            return nullptr;
+                        }
+                        address = loweredAddress.val;
+                    }
+                    return builder->emitHGBCAsmOperandValue(address);
+                }
+
+            case HGBCAsmOperand::SlangValuePack:
+                {
+                    IRInst* valuePack = nullptr;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(hgbcAsm);
+                        valuePack = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitHGBCAsmOperandValuePack(valuePack);
+                }
+
+            case HGBCAsmOperand::SlangType:
+                {
+                    IRInst* loweredType = nullptr;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(hgbcAsm);
+                        loweredType = lowerType(context, operand.type.type);
+                    }
+                    return builder->emitHGBCAsmOperandType(loweredType);
+                }
+            }
+            SLANG_UNREACHABLE("unhandled HGBC assembly operand");
+        };
+
+        IRBuilderInsertLocScope insertScope(builder);
+        builder->setInsertInto(hgbcAsm);
+        for (const HGBCAsmInst& inst : expr->insts)
+        {
+            IRInst* opcode = builder->getIntValue(builder->getUIntType(), inst.opcode.knownValue);
+            List<IRInst*> operands;
+            for (const HGBCAsmOperand& operand : inst.operands)
+                operands.add(lowerOperand(operand));
+            builder->emitHGBCAsmInst(opcode, operands);
+        }
+        return LoweredValInfo::simple(hgbcAsm);
     }
 
     LoweredValInfo visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
@@ -5803,6 +6457,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto declRef = expr->declRef;
         if (auto fieldDeclRef = declRef.as<VarDecl>())
         {
+            // Consider `getBox().value = 1`: the class handle is an r-value, but its
+            // object's field is writable. Field-address IR takes the address of a
+            // handle slot, so materialize that handle using the existing temporary
+            // path. Only the handle is copied; the field still belongs to the same
+            // object, and no assignment back to `getBox()` is needed.
+            if (isLValueContext() && isDeclRefTypeOf<ClassDecl>(baseExpr->type.type) &&
+                loweredBase.flavor != LoweredValInfo::Flavor::Ptr)
+            {
+                loweredBase = moveIntoMutableTemp(context, loweredBase);
+            }
             // Okay, easy enough: we have a reference to a field of a struct type...
             return extractField(loweredType, loweredBase, fieldDeclRef);
         }
@@ -5985,8 +6649,32 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto subVal = lowerSubExpr(expr->baseExpr);
         SLANG_ASSERT(context->expandIndex);
+        auto elementType = lowerType(context, expr->type);
+        if (subVal.flavor == LoweredValInfo::Flavor::AddressPack)
+        {
+            auto packInfo = subVal.getAddressPackInfo();
+            auto address = getBuilder()->emitGetTupleElement(
+                getPackElementPointerType(getBuilder(), elementType, packInfo->pointerOp),
+                packInfo->addresses,
+                context->expandIndex);
+            return LoweredValInfo::ptr(address);
+        }
+        if (isLValueContext() && expr->type.isLeftValue)
+        {
+            auto baseAddress = tryGetAddress(context, subVal, TryGetAddressMode::Default);
+            if (baseAddress.flavor == LoweredValInfo::Flavor::Ptr)
+            {
+                return LoweredValInfo::ptr(getBuilder()->emitElementAddress(
+                    getBuilder()->getPtrType(elementType),
+                    baseAddress.val,
+                    context->expandIndex));
+            }
+            context->getSink()->diagnose(
+                Diagnostics::ExpandedOutputArgumentRequiresAddress{.expr = expr});
+            return LoweredValInfo::ptr(getBuilder()->emitVar(elementType));
+        }
         auto irEach = getBuilder()->emitGetTupleElement(
-            lowerType(context, expr->type),
+            elementType,
             getSimpleVal(context, subVal),
             context->expandIndex);
         return LoweredValInfo::simple(irEach);
@@ -5996,21 +6684,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto irBuilder = getBuilder();
         auto irType = lowerType(context, expr->type);
-        List<IRInst*> irCapturedPacks;
-
-        if (auto expandTypeOrVal = as<IRExpandTypeOrVal>(irType))
-        {
-            for (UInt i = 0; i < expandTypeOrVal->getCaptureCount(); i++)
-            {
-                irCapturedPacks.add(expandTypeOrVal->getCaptureType(i));
-            }
-        }
-        else
-        {
-            irCapturedPacks.add(irType);
-        }
+        auto irCapturedPacks = getPackExpansionCaptures(irType);
+        bool isAddressPack = isLValueContext() && expr->type.isLeftValue;
+        auto resultType =
+            isAddressPack ? getAddressPackType(irBuilder, irType, kIROp_PtrType) : irType;
         auto expandInst = irBuilder->emitExpandInst(
-            irType,
+            resultType,
             (UInt)irCapturedPacks.getCount(),
             irCapturedPacks.getBuffer());
         irBuilder->setInsertInto(expandInst);
@@ -6019,8 +6698,25 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         IRInst* oldExpandIndex = context->expandIndex;
         context->expandIndex = eachIndex;
         SLANG_DEFER(context->expandIndex = oldExpandIndex);
-        irBuilder->emitYield(getSimpleVal(context, lowerSubExpr(expr->baseExpr)));
+        auto element = lowerSubExpr(expr->baseExpr);
+        if (isAddressPack)
+        {
+            auto address = tryGetAddress(context, element, TryGetAddressMode::Default);
+            if (address.flavor != LoweredValInfo::Flavor::Ptr)
+            {
+                context->getSink()->diagnose(
+                    Diagnostics::ExpandedOutputArgumentRequiresAddress{.expr = expr->baseExpr});
+                address = createVar(context, lowerType(context, expr->baseExpr->type));
+            }
+            irBuilder->emitYield(address.val);
+        }
+        else
+        {
+            irBuilder->emitYield(getSimpleVal(context, element));
+        }
         irBuilder->setInsertAfter(expandInst);
+        if (isAddressPack)
+            return makeAddressPack(context, expandInst, irType, kIROp_PtrType);
         return LoweredValInfo::simple(expandInst);
     }
 
@@ -7347,6 +8043,19 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         auto loweredBase = lowerLValueExpr(context, expr->base);
         UInt elementCount = (UInt)expr->elementIndices.getCount();
 
+        if (loweredBase.flavor == LoweredValInfo::Flavor::AddressPack)
+        {
+            // Concrete expansions are evaluated once in a LetExpr, then maybeExpandArgList
+            // selects each argument with a single-element SwizzleExpr. Preserve the selected
+            // address instead of treating these heterogeneous elements as a vector swizzle.
+            SLANG_RELEASE_ASSERT(elementCount == 1);
+            auto packInfo = loweredBase.getAddressPackInfo();
+            return LoweredValInfo::ptr(getBuilder()->emitGetTupleElement(
+                getPackElementPointerType(getBuilder(), irType, packInfo->pointerOp),
+                packInfo->addresses,
+                (UInt)expr->elementIndices[0]));
+        }
+
         // Assign to `resultElements` the elements from `sourceElements` according to the first `n`
         // indices in `indices`
         auto backpermute =
@@ -7488,9 +8197,21 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
     LoweredValInfo visitSwizzleExpr(SwizzleExpr* expr)
     {
         auto irType = lowerType(context, expr->type);
-        auto irBase = getSimpleVal(context, lowerRValueExpr(context, expr->base));
-
         auto builder = getBuilder();
+        auto loweredBase = lowerRValueExpr(context, expr->base);
+        if (loweredBase.flavor == LoweredValInfo::Flavor::AddressPack)
+        {
+            // The concrete-expansion binding also serves ordinary input arguments. Reading
+            // one selected element must not load every other address in the pack.
+            SLANG_RELEASE_ASSERT(expr->elementIndices.getCount() == 1);
+            auto packInfo = loweredBase.getAddressPackInfo();
+            auto address = builder->emitGetTupleElement(
+                getPackElementPointerType(builder, irType, packInfo->pointerOp),
+                packInfo->addresses,
+                (UInt)expr->elementIndices[0]);
+            return LoweredValInfo::simple(builder->emitLoad(irType, address));
+        }
+        auto irBase = getSimpleVal(context, loweredBase);
 
         auto irIntType = getIntType(context);
 
@@ -7795,16 +8516,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // If pushScopeBlock actually created the block, we have to insert
             // or deallocate it here. Otherwise, we assume that the caller
             // handles the end block.
-            auto builder = getBuilder();
             if (context->scopeEndBlock->hasUses())
             {
                 // The end of the scope was referenced, so we need to actually
                 // keep it around and jump through it.
                 // Move the terminator to the scope end block.
                 emitBranchIfNeeded(context->scopeEndBlock);
+                auto builder = getBuilder();
                 builder->insertBlock(context->scopeEndBlock);
                 emitCurrentDebugScope(context);
                 builder->setInsertInto(context->scopeEndBlock);
+                emitCurrentDebugScope(context);
             }
             else
             {
@@ -9294,10 +10016,19 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
     sourcePath = pathInfo.getMostUniqueIdentity();
     if (!source)
         source = sourceManager->findSourceFile(sourcePath);
-    if (source &&
-        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    if (source)
     {
-        return debugSourceInst;
+        // A source file can be referenced while lowering more than one IR module. Use its stable
+        // identity for every module so the linked debug map does not contain both the import
+        // spelling (for example, "libs/camera.slang") and its canonical path.
+        String sourceIdentity = source->getPathInfo().getMostUniqueIdentity();
+        if (sourceIdentity.getLength())
+            sourcePath = sourceIdentity;
+
+        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+        {
+            return debugSourceInst;
+        }
     }
 
     if (sourcePath.getLength() == 0)
@@ -9511,6 +10242,25 @@ static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
            ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
 }
 
+// Returns whether a constructor result can be built with a zero-operand MakeStruct.
+// Use the checked source type: a closure inside `apply<T>` lowers to an IRSpecialize,
+// and its IRStructType may also still be having its fields populated during lowering.
+static bool isFieldlessStructType(ASTBuilder* astBuilder, Type* type)
+{
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+    if (!structDeclRef)
+        return false;
+    auto decl = structDeclRef.getDecl();
+    if (decl->aliasedType || decl->hasModifier<IntrinsicTypeModifier>() ||
+        decl->hasModifier<BuiltinTypeModifier>() || findBaseStructType(astBuilder, structDeclRef))
+        return false;
+    return getMembersOfType<VarDecl>(astBuilder, structDeclRef, MemberFilterStyle::Instance)
+        .isEmpty();
+}
+
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -9656,6 +10406,10 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
     if (!source)
         return nullptr;
     auto loc = _getDebugHumaneLoc(context, source, stmt->loc);
+    SourceLoc closingLoc = stmt->loc;
+    if (auto blockStmt = as<BlockStmt>(stmt))
+        closingLoc = blockStmt->closingSourceLoc;
+    auto end = closingLoc.isValid() ? _getDebugHumaneLoc(context, source, closingLoc) : loc;
     IRBuilder builder(*context->irBuilder);
     // Keep metadata inside the generic that owns the function. Its normal clone environment
     // then remaps lexical parents and declaration scopes together with the function body.
@@ -9664,6 +10418,8 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
         source,
         builder.getIntValue(builder.getUIntType(), loc.line),
         builder.getIntValue(builder.getUIntType(), loc.column),
+        builder.getIntValue(builder.getUIntType(), end.line),
+        builder.getIntValue(builder.getUIntType(), end.column),
         context->currentDebugScope);
 }
 
@@ -9724,7 +10480,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
 #endif
 }
 
-/// Create and return a mutable temporary initialized with `val`
+/// Creates and returns a mutable temporary initialized with `val`.
 static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val)
 {
     IRInst* irVal = getSimpleVal(context, val);
@@ -9985,6 +10741,35 @@ void assign(IRGenContext* context, LoweredValInfo const& inLeft, LoweredValInfo 
 top:
     switch (left.flavor)
     {
+    case LoweredValInfo::Flavor::AddressPack:
+        {
+            // Consider `values = expand each source` for an `out expand each T values`
+            // parameter. Evaluate the right-hand pack once, then store into each address.
+            auto packInfo = left.getAddressPackInfo();
+            auto values = getSimpleVal(context, right);
+            auto captures = getPackExpansionCaptures(packInfo->valueType);
+            auto expansion = builder->emitExpandInst(
+                packInfo->valueType,
+                captures.getCount(),
+                captures.getBuffer());
+            builder->setInsertInto(expansion);
+            builder->emitBlock();
+            auto index = builder->emitParam(builder->getIntType());
+            auto elementType = (IRType*)builder->emitGetTupleElement(
+                builder->getTypeKind(),
+                packInfo->valueType,
+                index);
+            auto address = builder->emitGetTupleElement(
+                getPackElementPointerType(builder, elementType, packInfo->pointerOp),
+                packInfo->addresses,
+                index);
+            auto value = builder->emitGetTupleElement(elementType, values, index);
+            assign(context, LoweredValInfo::ptr(address), LoweredValInfo::simple(value));
+            builder->emitYield(value);
+            builder->setInsertAfter(expansion);
+        }
+        break;
+
     case LoweredValInfo::Flavor::Ptr:
         {
             // The `left` value is just a pointer, so we can emit
@@ -11144,6 +11929,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // TODO(JS):
             // Should the mangled name take part in obfuscation if enabled?
 
+            // A constrained generic's witness is an identity operand too. Keep the nominal
+            // conformance and its specialization operands, rather than its hashed linker name.
+            addRuntimeTypeIdentityDecoration(
+                subBuilder,
+                irWitnessTable,
+                mangledName.getUnownedSlice());
             addLinkageDecoration(
                 context,
                 irWitnessTable,
@@ -11795,11 +12586,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
 
-                // An immutable `let` lowers to the initializer's SSA value with no backing IRVar,
-                // so this is the only site that can attach debug info to it.
-                if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
-                    context->shared->debugValueContext.isDebugVarTypeSupported(
-                        initVal.val->getDataType()))
+                // For debug builds, still create debug information for let variables
+                // even though we're not creating an actual variable
+                // Requires Standard level or higher for variable debug info
+                if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid())
                 {
                     // Create a debug variable for this let declaration
                     auto builder = context->irBuilder;
@@ -12579,6 +13369,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         maybeAddDebugLocationDecoration(context, irAggType);
+        if (as<LambdaDecl>(decl))
+            subBuilder->addSimpleDecoration<IRLambdaDecoration>(irAggType);
 
         auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
 
@@ -12598,6 +13390,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
+
+        // Reflection names need the semantic arguments of every enclosing generic, including
+        // generic extensions. An unspecialized declaration reference loses that association:
+        // a lambda in extension<T>.map<U, F> would pair map with the extension's IR parameters.
+        auto reflectionDeclRef = createDefaultSpecializedDeclRef(subContext, nullptr, decl);
+        subBuilder->addReflectionNameDecoration(
+            irAggType,
+            emitReflectionNameForDeclRef(subContext, reflectionDeclRef.declRefBase));
+
+        // Preserve the declaring module before linking and specialization erase that context.
+        // Reflection names intentionally omit the module, so tracing needs this separate identity.
+        if (auto moduleDecl = findModuleDecl(decl))
+            if (auto moduleName = moduleDecl->getName())
+                subBuilder->addDecoration(
+                    irAggType,
+                    kIROp_TypeModuleNameDecoration,
+                    subBuilder->getStringValue(moduleName->text.getUnownedSlice()));
 
 
         if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>();
@@ -12766,6 +13575,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         auto builder = getBuilder();
         IRInst* irFieldKey = nullptr;
+        if (auto builtin = fieldDecl->findModifier<KnownBuiltinAttribute>())
+        {
+            // Consider a captured DifferentialPtrPair<T>. Its source layout refers to these
+            // declarations, while autodiff constructs its storage struct directly in IR.
+            // Both producers must use the same key, even across serialized module boundaries.
+            auto role = as<ConstantIntVal>(builtin->name);
+            SLANG_RELEASE_ASSERT(role);
+            auto kind = KnownBuiltinDeclName(role->getValue());
+            irFieldKey = builder->getBuiltinStructKey(kind);
+        }
         if (auto extVarModifier = fieldDecl->findModifier<ExtensionExternVarModifier>())
         {
             irFieldKey = ensureDecl(context, extVarModifier->originalDecl.getDecl()).val;
@@ -12777,6 +13596,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irFieldKey = builder->createStructKey();
 
             addNameHint(context, irFieldKey, fieldDecl);
+            // Field lookup during host/device marshalling uses the checked declaration's name,
+            // independently of optional debug hints or obfuscated linkage names.
+            builder->addReflectionNameDecoration(
+                irFieldKey,
+                builder->getStringValue(getText(fieldDecl->getName()).getUnownedSlice()));
             addVarDecorations(context, irFieldKey, fieldDecl);
             addLinkageDecoration(context, irFieldKey, fieldDecl);
             maybeAddDebugLocationDecoration(context, irFieldKey);
@@ -13671,19 +14495,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return as<IRStringLit>(builder->getStringValue(stringLitExpr->value.getUnownedSlice()));
     }
 
-    bool isClassType(IRType* type)
-    {
-        type = (IRType*)unwrapAttributedType(type);
-        if (auto specialize = as<IRSpecialize>(type))
-        {
-            return findSpecializeReturnVal(specialize)->getOp() == kIROp_ClassType;
-        }
-        else if (auto genericInst = as<IRGeneric>(type))
-        {
-            return findGenericReturnVal(genericInst)->getOp() == kIROp_ClassType;
-        }
-        return type->getOp() == kIROp_ClassType;
-    }
+    bool isClassType(IRType* type) { return Slang::isClassType(type); }
 
     void lowerAutoPyBindCudaFunctionDecorations(
         IRGenContext* subContext,
@@ -13858,6 +14670,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->sourceLoc = decl->loc;
 
         FuncDeclBaseTypeInfo info;
+        // Associated-function signatures use the same lowering path as references to them.
+        // Resolved signatures include the implicit receiver; symbolic calculations are retained.
         _lowerFuncDeclBaseTypeInfo(
             subContext,
             createDefaultSpecializedDeclRef(context, nullptr, decl),
@@ -13927,6 +14741,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         addNameHint(subContext, irFunc, decl);
+        // HGBC member exports carry the owner type separately. Their API key is the declared
+        // member name, not a qualified display hint or a mangled linkage name.
+        if (as<IRFunc>(irFunc) && decl->getName())
+            subBuilder->addReflectionNameDecoration(
+                irFunc,
+                subBuilder->getStringValue(getText(decl->getName()).getUnownedSlice()));
         addLinkageDecoration(subContext, irFunc, decl);
         maybeAddDebugLocationDecoration(subContext, irFunc);
 
@@ -13943,9 +14763,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        // For diagnostics
-        if (as<StructDecl>(decl->parentDecl))
-            getBuilder()->addSimpleDecoration<IRMethodDecoration>(irFunc);
+        // Preserve whether a graph-visible member is static and its canonical owner type. The HGBC
+        // emitter cannot recover this information from a name or parameter shape because a static
+        // method intentionally has no receiver parameter.
+        if (auto parentStructDecl = as<StructDecl>(decl->parentDecl))
+        {
+            if (isEffectivelyStatic(decl, parentStructDecl))
+            {
+                auto declRef = createDefaultSpecializedDeclRef(context, nullptr, decl);
+                auto ownerType = DeclRefType::create(subContext->astBuilder, declRef.getParent());
+                SLANG_ASSERT(ownerType);
+                auto irOwnerType = lowerType(subContext, ownerType);
+                subBuilder->addDecoration(irFunc, kIROp_StaticMethodDecoration, irOwnerType);
+            }
+            else
+            {
+                getBuilder()->addSimpleDecoration<IRMethodDecoration>(irFunc);
+            }
+        }
 
         auto irFuncType = info.type;
         auto& irResultType = info.resultType;
@@ -14102,12 +14937,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 default:
                     {
-                        // The remaining parameter-passing modes all result in
-                        // the `irParam` being a pointer to the logical value
-                        // of the AST-level parameter. We can represent that
-                        // fact in the `LoweredValInfo` we construct:
+                        // The remaining modes pass addresses. A scalar parameter has one
+                        // pointer; a pack has one pointer per element rather than a pointer
+                        // to a whole aggregate.
                         //
-                        paramVal = LoweredValInfo::ptr(irParam);
+                        paramVal =
+                            isTypePack(paramInfo.type)
+                                ? makeAddressPack(
+                                      subContext,
+                                      irParam,
+                                      lowerType(subContext, paramInfo.type),
+                                      getParameterPointerOp(paramInfo.actualParamPassingModeToUse))
+                                : LoweredValInfo::ptr(irParam);
                         //
                         // Note: we have consciously designed the semantics of
                         // parameter-pasing modes like `inout` and `out` in Slang
@@ -14273,6 +15114,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         auto allocatedObj = subContext->irBuilder->emitAllocObj(irResultType);
                         subContext->irBuilder->emitStore(thisVar, allocatedObj);
                     }
+                    else if (isFieldlessStructType(
+                                 subContext->astBuilder,
+                                 constructorDecl->returnType.type))
+                    {
+                        // A capture-free lambda such as `(int x) => x` constructs a struct
+                        // with no fields to initialize. Give `this` its empty aggregate value
+                        // so returning it does not become LoadFromUninitializedMemory in SSA.
+                        // The type may be preserved across a host call instead of erased.
+                        auto emptyValue =
+                            subContext->irBuilder->emitMakeStruct(irResultType, 0, nullptr);
+                        subContext->irBuilder->emitStore(thisVar, emptyValue);
+                    }
                 }
 
                 // For a user-written initializer compiled with debug info, expose the object
@@ -14388,6 +15241,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
         addSpecializedForTargetDecorations(irFunc, decl);
+
+        // Preserve host availability on every function definition, including generic
+        // methods that are not discovered as entry points. Nested shader lambdas have
+        // their own declarations and do not inherit this restriction from their parent.
+        if (auto entryPoint = decl->findModifier<EntryPointAttribute>())
+        {
+            if (entryPoint->capabilitySet->getTargetStage() == CapabilityAtom::dispatch)
+                getBuilder()->addSimpleDecoration<IRHostOnlyDecoration>(irFunc);
+        }
 
         // If this declaration was marked as having a target-specific lowering
         // for a particular target, then handle that here.
@@ -14985,10 +15847,6 @@ static IRInst* ensureAbstractThisWitnessVisibleFromCurrentScope(
 
 LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst, IRType* type)
 {
-    const auto initialSubst = subst;
-    SLANG_UNUSED(initialSubst);
-
-
     if (as<ThisTypeDecl>(decl))
     {
         // A declref to ThisType decl should be lowered differently
@@ -15580,7 +16438,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // This allows debugging of local variable values.
     if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
-        insertDebugValueStore(context->shared->debugValueContext, module);
+        insertDebugValueStore(module);
     }
 
 
@@ -16344,7 +17202,13 @@ IREntryPointLayout* lowerEntryPointLayout(
     auto irParamsLayout = lowerVarLayout(context, entryPointLayout->parametersLayout);
     auto irResultLayout = lowerEntryPointResultLayout(context, entryPointLayout->resultLayout);
 
-    return context->irBuilder->getEntryPointLayout(irParamsLayout, irResultLayout);
+    auto builder = context->irBuilder;
+    auto offset = entryPointLayout->uniformOffset;
+    return builder->getEntryPointLayout(
+        irParamsLayout,
+        irResultLayout,
+        offset >= 0 ? cast<IRIntLit>(builder->getIntValue(builder->getInt64Type(), offset))
+                    : nullptr);
 }
 
 /// Check if a DeclRef<FuncDecl> refers to an unspecialized generic function,
@@ -16485,21 +17349,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     auto latestSpirvAtom = getLatestSpirvAtom();
     auto latestMetalAtom = getLatestMetalAtom();
 
-    // Map each entry-point function declaration to the capability set inferred for it *as an entry
-    // point*, which can exceed the function declaration's own requirements (see
-    // `EntryPoint::getInferredCapabilityRequirements`). The layout list below is keyed by
-    // `DeclRef<FuncDecl>`, so we look up the owning `EntryPoint` here to read its stored set.
-    Dictionary<FuncDecl*, CapabilitySetVal*> entryPointInferredCaps;
-    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    for (auto& targetEntryPoint : programLayout->entryPoints)
     {
-        auto entryPoint = program->getEntryPoint(i);
-        if (auto entryPointFuncDecl = entryPoint->getFuncDecl())
-            entryPointInferredCaps[entryPointFuncDecl] =
-                entryPoint->getInferredCapabilityRequirements();
-    }
-
-    for (auto entryPointLayout : programLayout->entryPoints)
-    {
+        auto entryPointLayout = targetEntryPoint.layout;
         auto funcDeclRef = entryPointLayout->entryPoint;
 
         // HACK: skip over entry points that came from deserialization,
@@ -16523,14 +17375,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
                 getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
-        SLANG_ASSERT(asFuncDecl);
-        // Every layout entry point is one of the program's entry points (both come from the same
-        // component-type walk), so its inferred capability set — which can exceed the function
-        // declaration's own requirements — is always in the map.
-        auto found = entryPointInferredCaps.tryGetValue(asFuncDecl);
-        SLANG_RELEASE_ASSERT(found);
-        CapabilitySet set{*found};
+        // The record retains the entry point's inferred requirements, which may exceed the
+        // source function's requirements. No lookup by shared function declaration is needed.
+        CapabilitySet set{targetEntryPoint.entryPoint->getInferredCapabilityRequirements()};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
@@ -16544,9 +17391,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
             }
         }
 
-        auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);
+        targetEntryPoint.irLayout = lowerEntryPointLayout(context, entryPointLayout);
 
-        builder->addLayoutDecoration(irFunc, irEntryPointLayout);
+        // The target record is an external consumer of this IR layout. Keep the layout and
+        // its operands alive through obfuscation DCE, even though no function refers to it yet.
+        // Linking will attach this occurrence's layout to its own exported function.
+        builder->addKeepAliveDecoration(targetEntryPoint.irLayout);
     }
 
     // Lets strip and run DCE here

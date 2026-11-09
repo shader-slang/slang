@@ -98,6 +98,7 @@ private:
 class ComponentType : public RefObject,
                       public slang::IComponentType,
                       public slang::IComponentType2,
+                      public slang::IEntryPointUniformLayoutService_Experimental,
                       public slang::IModulePrecompileService_Experimental
 {
 public:
@@ -223,6 +224,17 @@ public:
 
     /// Get the number of entry points linked into this component type.
     virtual Index getEntryPointCount() = 0;
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL createEntryPointUniformLayoutConstraints(
+        slang::EntryPointUniformLayoutGroup const* groups,
+        SlangInt groupCount,
+        slang::IComponentType** outConstraints,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+
+    /// Resolve explicit coexistence groups into this program's entry-point index namespace.
+    SlangResult getEntryPointUniformLayoutGroups(
+        List<List<Index>>& outGroups,
+        DiagnosticSink* sink);
 
     /// Get one of the entry points linked into this component type.
     virtual RefPtr<EntryPoint> getEntryPoint(Index index) = 0;

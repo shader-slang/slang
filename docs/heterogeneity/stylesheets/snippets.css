@@ -1,0 +1,131 @@
+/* Inline guide icons use the same paths and colors as the snippet controls. */
+.md-typeset img[src$="snippet-run.svg"],
+.md-typeset img[src$="snippet-reset.svg"] {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin: 0 0.1em;
+  vertical-align: -0.15em;
+}
+
+.slang-snippet {
+  margin: 0 0 24px;
+  overflow: hidden;
+  border: 1px solid #becfbe;
+  border-radius: 5px;
+  background: #f8faf7;
+}
+
+.snippet-source { position: relative; }
+.snippet-actions {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+}
+.snippet-source:hover .snippet-actions,
+.slang-snippet:focus-within .snippet-actions,
+.snippet-running .snippet-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.snippet-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border: 1px solid #dce4dd;
+  border-radius: 3px;
+  color: #52634f;
+  background: #f8faf7;
+  box-shadow: 0 1px 3px #20312c14;
+  cursor: pointer;
+}
+.snippet-actions svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.snippet-actions .snippet-run { color: #386b22; }
+.snippet-actions button:hover:not(:disabled) { background: #eef3eb; border-color: #9fb39d; }
+.snippet-actions button:disabled { cursor: default; opacity: .55; }
+.slang-snippet [hidden] { display: none; }
+.snippet-actions button:focus-visible,
+.snippet-editor:focus-visible { outline: 2px solid #386b22; outline-offset: -2px; }
+
+/* Touch screens have no hover; keep the small controls directly reachable. */
+@media (hover: none) {
+  .snippet-actions { opacity: 1; pointer-events: auto; }
+}
+
+.md-typeset textarea.snippet-editor {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  resize: vertical;
+  min-height: 150px;
+  color: #20312c;
+  background: #f8faf7;
+  font: 14px/1.65 Consolas, "Liberation Mono", monospace;
+  tab-size: 4;
+}
+.snippet-result { border-top: 1px solid #dce4dd; padding: 10px 16px; background: white; }
+.snippet-monaco { width: 100%; min-height: 180px; }
+.snippet-language-status { padding: 5px 16px; color: #667566; font-size: 12px; overflow-wrap: anywhere; }
+.snippet-language-error { color: #8b1c24; background: #fff0f0; }
+/* The documentation theme's form/code rules must not alter Monaco's input or widgets. */
+.md-typeset .monaco-editor textarea { min-height: 0; padding: 0; border: 0; box-shadow: none; }
+.md-typeset .monaco-editor .view-lines { line-height: inherit; }
+.snippet-status { color: #435342; font-size: 13px; }
+.snippet-display {
+  position: relative;
+  margin-top: 10px;
+  width: 100%;
+  overflow: hidden;
+  background: white;
+  border-radius: 3px;
+}
+.snippet-display canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: white;
+}
+.snippet-display canvas:focus-visible { outline: 2px solid #386b22; outline-offset: 2px; }
+.md-typeset pre.snippet-output {
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+  border: 0;
+  background: transparent;
+  color: #20312c;
+  font: 14px/1.6 Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.snippet-error .snippet-result { border-color: #d5a4a4; background: #fff0f0; }
+.snippet-error .snippet-status,
+.snippet-error .snippet-output { color: #8b1c24; }
+.md-typeset .snippet-filename {
+  padding: 0.35rem 0.65rem;
+  background: #edf3ea;
+  color: #3d6137;
+  font: 0.72rem var(--md-code-font-family);
+  border-bottom: 1px solid #dce5d8;
+}
+.md-typeset .snippet-source-status {
+  padding: 0.3rem 0.65rem;
+  color: #745517;
+  font-size: 0.7rem;
+}

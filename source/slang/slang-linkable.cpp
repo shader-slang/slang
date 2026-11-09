@@ -100,6 +100,8 @@ ComponentType* asInternal(slang::IComponentType* inComponentType)
 
 ISlangUnknown* ComponentType::getInterface(Guid const& guid)
 {
+    if (guid == slang::IEntryPointUniformLayoutService_Experimental::getTypeGuid())
+        return static_cast<slang::IEntryPointUniformLayoutService_Experimental*>(this);
     if (guid == ISlangUnknown::getTypeGuid() || guid == slang::IComponentType::getTypeGuid())
     {
         return static_cast<slang::IComponentType*>(this);
@@ -307,6 +309,29 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     getLinkage()->buildHash(builder, targetIndex);
 
     buildHash(builder);
+
+    // Constraints refer to component occurrences, not just shader contents. Two child
+    // components can hash identically while occupying different entry-point ranges.
+    // Hash the resolved indices as well so choosing either occurrence cannot reuse code
+    // compiled with the other's allocation. Leave unannotated hashes unchanged.
+    List<List<Index>> uniformGroups;
+    DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
+    if (SLANG_FAILED(getEntryPointUniformLayoutGroups(uniformGroups, &sink)))
+    {
+        *outHash = nullptr;
+        return;
+    }
+    if (uniformGroups.getCount())
+    {
+        builder.append(UnownedStringSlice("resolved-entry-point-uniform-layout-v1"));
+        builder.append(uniformGroups.getCount());
+        for (auto const& group : uniformGroups)
+        {
+            builder.append(group.getCount());
+            for (auto index : group)
+                builder.append(index);
+        }
+    }
 
     // A component's own option set feeds target code generation (TargetProgram merges it in), so it
     // belongs in the entry-point cache key -- in particular the link-time downstream arguments that
@@ -915,7 +940,9 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
         linkage,
         linkage->m_optionSet.getLanguageVersion(),
         sink);
-    SemanticsVisitor visitor(&sharedSemanticsContext);
+    auto semanticsContext =
+        SemanticsContext(&sharedSemanticsContext).allowStaticReferenceToNonStaticMember();
+    SemanticsVisitor visitor(semanticsContext);
     type = visitor.TranslateTypeNode(typeExpr);
     auto typeOut = visitor.tryCoerceToProperType(TypeExp(type));
     if (typeOut.type)
@@ -1186,6 +1213,9 @@ Expr* ComponentType::findDeclFromStringInType(
 
 bool ComponentType::isSubType(Type* subType, Type* superType)
 {
+    // Reflection can compute inheritance witnesses after compilation has left its builder
+    // scope. Witness lookup and substitution must use this component's session builder.
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     auto sharedSemanticsContext = getLinkage()->getSemanticsForReflection();
     SemanticsContext context(sharedSemanticsContext);
     SemanticsVisitor visitor(context);

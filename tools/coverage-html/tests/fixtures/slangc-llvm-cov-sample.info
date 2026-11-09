@@ -1,4 +1,4 @@
-SF:/Users/jvepsalainen/github/jvepsalainen-nv-3/slang/source/compiler-core/slang-name.cpp
+SF:/workspace/slang/source/compiler-core/slang-name.cpp
 FN:8,_ZN5Slang7getTextEPNS_4NameE
 FN:15,_ZN5Slang25getUnownedStringSliceTextEPNS_4NameE
 FN:20,_ZN5Slang7getCstrEPNS_4NameE
@@ -57,7 +57,7 @@ BRH:6
 LF:29
 LH:25
 end_of_record
-SF:/Users/jvepsalainen/github/jvepsalainen-nv-3/slang/source/core/slang-semantic-version.h
+SF:/workspace/slang/source/core/slang-semantic-version.h
 FN:18,_ZN5Slang15SemanticVersionC2Ev
 FN:23,_ZN5Slang15SemanticVersionC2Eiii
 FN:28,_ZN5Slang15SemanticVersion5resetEv
@@ -179,7 +179,7 @@ BRH:7
 LF:60
 LH:25
 end_of_record
-SF:/Users/jvepsalainen/github/jvepsalainen-nv-3/slang/source/slang/slang-fossil.cpp
+SF:/workspace/slang/source/slang/slang-fossil.cpp
 FN:29,_ZN5Slang6Fossil12getRootValueEP10ISlangBlob
 FN:34,_ZN5Slang6Fossil12getRootValueEPKvm
 FN:81,_ZNK5Slang6Fossil6ValRefINS_26FossilizedContainerObjBaseEE10getElementEx

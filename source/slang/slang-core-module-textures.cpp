@@ -72,7 +72,8 @@ void TextureTypeInfo::writeFuncBody(
     const String& spirvRWDefault,
     const String& spirvCombined,
     const String& metal,
-    const String& wgsl)
+    const String& wgsl,
+    const String& hgbc)
 {
     BraceScope funcScope{i, sb};
     {
@@ -132,6 +133,11 @@ void TextureTypeInfo::writeFuncBody(
             sb << i << "case wgsl:\n";
             sb << i << "__intrinsic_asm \"" << wgsl << "\";\n";
         }
+        if (hgbc.getLength())
+        {
+            sb << i << "case hgbc:\n";
+            sb << i << hgbc << "\n";
+        }
     }
 }
 
@@ -145,13 +151,23 @@ void TextureTypeInfo::writeFuncWithSig(
     const String& cuda,
     const String& metal,
     const String& wgsl,
-    const ReadNoneMode readNoneMode)
+    const ReadNoneMode readNoneMode,
+    const String& hgbc)
 {
     if (readNoneMode == ReadNoneMode::Always)
         sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
-    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined, metal, wgsl);
+    writeFuncBody(
+        funcName,
+        glsl,
+        cuda,
+        spirvDefault,
+        spirvRWDefault,
+        spirvCombined,
+        metal,
+        wgsl,
+        hgbc);
     sb << "\n";
 }
 
@@ -166,7 +182,8 @@ void TextureTypeInfo::writeFunc(
     const String& cuda,
     const String& metal,
     const String& wgsl,
-    const ReadNoneMode readNoneMode)
+    const ReadNoneMode readNoneMode,
+    const String& hgbc)
 {
     writeFuncWithSig(
         funcName,
@@ -178,7 +195,8 @@ void TextureTypeInfo::writeFunc(
         cuda,
         metal,
         wgsl,
-        readNoneMode);
+        readNoneMode,
+        hgbc);
 }
 
 enum class DimType
@@ -620,21 +638,36 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 generateSpirvAsm(spirvRWDefault, true, toSlice("$this"));
             }
 
+            StringBuilder hgbc;
+            if (baseShape == SLANG_TEXTURE_2D && !isArray && !isMultisample && !includeMipInfo)
+            {
+                hgbc << "{ let dimensions = __textureGetDimensions(this);";
+                hgbc << " width = " << rawT << "(dimensions.x);";
+                hgbc << " height = " << rawT << "(dimensions.y); }";
+            }
+
             sb << "    __glsl_version(450)\n";
 
-            sb << "    [require(cpp";
-            if (cuda.getLength() && !includeMipInfo)
-                sb << "_cuda";
-            if (glsl.getLength())
-                sb << "_glsl";
-            sb << "_hlsl";
-            if (metal.getLength())
-                sb << "_metal";
-            if (spirvDefault.getLength() && spirvCombined.getLength())
-                sb << "_spirv";
-            if (wgsl.getLength())
-                sb << "_wgsl";
-            sb << ", texture_sm_4_1)]\n";
+            if (hgbc.getLength())
+            {
+                sb << "    [require(hgbc_texture_dimensions)]\n";
+            }
+            else
+            {
+                sb << "    [require(cpp";
+                if (cuda.getLength() && !includeMipInfo)
+                    sb << "_cuda";
+                if (glsl.getLength())
+                    sb << "_glsl";
+                sb << "_hlsl";
+                if (metal.getLength())
+                    sb << "_metal";
+                if (spirvDefault.getLength() && spirvCombined.getLength())
+                    sb << "_spirv";
+                if (wgsl.getLength())
+                    sb << "_wgsl";
+                sb << ", texture_sm_4_1)]\n";
+            }
 
             // Every mip-level overload also queries the mip count, which requires OptiX. Gate the
             // whole overload accordingly, even though `txq.level.*` works in plain CUDA. This
@@ -653,7 +686,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 cuda.produceString(),
                 metal,
                 wgsl,
-                ReadNoneMode::Always);
+                ReadNoneMode::Always,
+                hgbc.produceString());
         }
     }
 }

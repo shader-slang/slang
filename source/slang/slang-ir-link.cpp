@@ -5,6 +5,8 @@
 #include "core/slang-performance-profiler.h"
 #include "slang-capability.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-clone.h"
+#include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-specialize-target-switch.h"
@@ -20,12 +22,6 @@
 
 namespace Slang
 {
-
-/// Find a suitable layout for `entryPoint` in `programLayout`.
-///
-/// TODO: This function should be eliminated. See its body
-/// for an explanation of the problems.
-EntryPointLayout* findEntryPointLayout(ProgramLayout* programLayout, EntryPoint* entryPoint);
 
 struct IRSpecSymbol : RefObject
 {
@@ -229,7 +225,7 @@ IRInst* cloneInst(
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
     // `IRAnnotation`s exclusively carry auto-diff trait associations: a target's
-    // derivative functions and differential type/zero/add/pair witnesses. Every
+    // derivative functions, optional evidence, and differential type/zero/add/pair witnesses. Every
     // `AnnotationKind` is differentiability-related (see the note at its
     // definition in slang-type-system-shared.h), so when auto-diff link
     // artifacts may be pruned we can skip cloning annotations wholesale instead
@@ -242,7 +238,7 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
     // distinguish kinds — otherwise the new annotations are silently dropped
     // from every non-differentiating program.
     static_assert(
-        int(AnnotationKind::CountOf) == 16,
+        int(AnnotationKind::CountOf) == 17,
         "AnnotationKind changed: revisit cloneAnnotations' wholesale-skip gate");
     if (context->getShared()->canPruneAutodiffLinkArtifacts())
         return;
@@ -351,7 +347,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_GlobalVar:
     case kIROp_GlobalParam:
     case kIROp_GlobalConstant:
-    case kIROp_StructKey:
+    case kIROp_DeclaredStructKey:
     case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
@@ -1118,10 +1114,13 @@ static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* buil
 
 IRFunc* specializeIRForEntryPoint(
     IRSpecContext* context,
-    String const& mangledName,
-    EntryPoint* entryPoint,
-    UnownedStringSlice nameOverride)
+    const TargetEntryPoint& targetEntryPoint,
+    const List<IRFunc*>& previousEntryPoints)
 {
+    auto entryPoint = targetEntryPoint.entryPoint;
+    const auto& mangledName = targetEntryPoint.mangledName;
+    auto nameOverride = targetEntryPoint.layout->nameOverride.getUnownedSlice();
+
     // We start by looking up the IR symbol that
     // matches the mangled name given to the
     // function we want to emit.
@@ -1213,6 +1212,29 @@ IRFunc* specializeIRForEntryPoint(
     {
         SLANG_UNEXPECTED("expected entry point to be a function");
         UNREACHABLE_RETURN(nullptr);
+    }
+
+    // Linking resolves ordinary references by function identity. A second export of that
+    // same function still needs its own name and parameter layout. Clone the linked body,
+    // retaining its resolved dependencies, before installing the occurrence's layout.
+    if (previousEntryPoints.contains(clonedFunc))
+    {
+        IRCloneEnv env;
+        clonedFunc = cast<IRFunc>(cloneInst(&env, context->builder, clonedFunc));
+        if (auto linkage = clonedFunc->findDecoration<IRLinkageDecoration>())
+            linkage->removeAndDeallocate();
+        if (auto layout = clonedFunc->findDecoration<IRLayoutDecoration>())
+            layout->removeAndDeallocate();
+        if (auto block = clonedFunc->getFirstBlock())
+            for (auto param = block->getFirstParam(); param; param = param->getNextParam())
+                if (auto layout = param->findDecoration<IRLayoutDecoration>())
+                    layout->removeAndDeallocate();
+    }
+    if (auto originalLayout = targetEntryPoint.irLayout)
+    {
+        context->builder->addLayoutDecoration(
+            clonedFunc,
+            cast<IREntryPointLayout>(cloneValue(context, originalLayout)));
     }
 
     if (!clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration))
@@ -1486,7 +1508,7 @@ IRInst* cloneInst(
     case kIROp_Generic:
         return cloneGenericImpl(context, builder, cast<IRGeneric>(originalInst), originalValues);
 
-    case kIROp_StructKey:
+    case kIROp_DeclaredStructKey:
         return cloneStructKeyImpl(
             context,
             builder,
@@ -2181,6 +2203,79 @@ void cloneUsedWitnessTableEntries(IRSpecContext* context)
     }
 }
 
+// Return a host function definition, unwrapping only its defining generics. A global
+// specialization refers to another definition and must not be treated as its owner.
+static IRFunc* getHostOnlyFunction(IRInst* inst)
+{
+    if (auto generic = as<IRGeneric>(inst))
+        inst = findInnerMostGenericReturnVal(generic);
+    auto func = as<IRFunc>(inst);
+    return func && func->findDecoration<IRHostOnlyDecoration>() ? func : nullptr;
+}
+
+// Select the executable device program before any entry-point lowering. Consider a
+// shader lambda inside Object<Geometry<T>>: its conformance can bring in an unused
+// specialization of Geometry.build, whose host body calls further host entry points.
+// The generic context and witness are valid, but host definitions are unavailable here.
+// Keep declarations until DCE has removed unused references; any declaration that
+// remains is an invalid device dependency, including calls through generic callbacks.
+static void stripHostOnlyDefinitions(
+    IRModule* module,
+    const List<IRFunc*>& entryPoints,
+    DiagnosticSink* sink)
+{
+    for (auto entryPoint : entryPoints)
+    {
+        if (entryPoint->findDecoration<IRHostOnlyDecoration>())
+        {
+            sink->diagnose(Diagnostics::HostFunctionInDeviceProgram{
+                .function = entryPoint,
+                .location = entryPoint->sourceLoc,
+            });
+            return;
+        }
+    }
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = getHostOnlyFunction(globalInst);
+        if (!func)
+            continue;
+
+        // A source export does not make a host function available to device callers.
+        // Remove roots on both the function and its enclosing generic, if present.
+        for (IRInst* inst = func;; inst = inst->getParent())
+        {
+            while (auto decoration = inst->findDecoration<IRKeepAliveDecoration>())
+                decoration->removeAndDeallocate();
+            while (auto decoration = inst->findDecoration<IRHLSLExportDecoration>())
+                decoration->removeAndDeallocate();
+            if (inst == globalInst)
+                break;
+        }
+        while (auto decoration = func->findDecoration<IREntryPointDecoration>())
+            decoration->removeAndDeallocate();
+        while (auto block = func->getLastBlock())
+            block->removeAndDeallocate();
+    }
+}
+
+// Diagnose unavailable declarations only after target selection and DCE have removed
+// references from unused witness entries, host bodies, and inactive target-switch arms.
+static void diagnoseHostOnlyReferences(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = getHostOnlyFunction(globalInst))
+        {
+            sink->diagnose(Diagnostics::HostFunctionInDeviceProgram{
+                .function = func,
+                .location = func->sourceLoc,
+            });
+        }
+    }
+}
+
 LinkedIR linkIR(CodeGenContext* codeGenContext)
 {
     SLANG_PROFILE;
@@ -2303,14 +2398,10 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     List<IRFunc*> irEntryPoints;
     for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
     {
-        auto entryPointMangledName = program->getEntryPointMangledName(entryPointIndex);
-        auto nameOverride = program->getEntryPointNameOverride(entryPointIndex);
-        auto entryPoint = program->getEntryPoint(entryPointIndex).get();
         irEntryPoints.add(specializeIRForEntryPoint(
             context,
-            entryPointMangledName,
-            entryPoint,
-            nameOverride.getUnownedSlice()));
+            targetProgram->getEntryPoint(entryPointIndex),
+            irEntryPoints));
     }
 
     // Layout information for global shader parameters is also required,
@@ -2327,6 +2418,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             auto irOriginalGlobalScopeVarLayout = irGlobalScopeLayoutDecoration->getLayout();
             irGlobalScopeVarLayout =
                 cast<IRVarLayout>(cloneValue(context, irOriginalGlobalScopeVarLayout));
+            // Preserve the module's layout reference so that DCE can run on the linked
+            // program before global uniforms are collected. LinkedIR also returns this
+            // layout to the caller, but that C++ pointer is not a root in the IR graph.
+            context->builder->addLayoutDecoration(
+                state->irModule->getModuleInst(),
+                irGlobalScopeVarLayout);
         }
     }
 
@@ -2354,6 +2451,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // instructions in all the input modules.
                 [[fallthrough]];
             case kIROp_DebugSource:
+            case kIROp_DebugLambda:
                 // Need to list all source files in the debug source file list,
                 // regardless if the source files participate in the line table or not.
                 cloneValue(context, inst);
@@ -2455,8 +2553,18 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         }
     }
 
+    bool isDeviceProgram = target != CodeGenTarget::HGBC && !isHeterogeneousTarget(target);
+    if (isDeviceProgram)
+        stripHostOnlyDefinitions(state->irModule, irEntryPoints, codeGenContext->getSink());
+
     // Specialize target_switch branches to use the best branch for the target.
     specializeTargetSwitch(targetReq, state->irModule, codeGenContext->getSink());
+
+    if (isDeviceProgram)
+    {
+        eliminateDeadCode(state->irModule);
+        diagnoseHostOnlyReferences(state->irModule, codeGenContext->getSink());
+    }
 
     // Diagnose on unresolved symbols if we are compiling into a target that does
     // not allow incomplete symbols.
@@ -2579,7 +2687,7 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_GlobalVar:
         case kIROp_GlobalParam:
         case kIROp_GlobalConstant:
-        case kIROp_StructKey:
+        case kIROp_DeclaredStructKey:
         case kIROp_InterfaceRequirementEntry:
         case kIROp_GlobalGenericParam:
         case kIROp_InterfaceType:

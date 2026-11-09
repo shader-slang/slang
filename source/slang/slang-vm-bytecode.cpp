@@ -502,7 +502,12 @@ StringBuilder& operator<<(StringBuilder& sb, VMModuleView& module)
     for (uint32_t i = 0; i < module.functionCount; i++)
     {
         auto f = module.getFunction(i);
-        sb << "func " << f.name << ":\n";
+        sb << "func " << f.name << ":"
+           << " ws=" << f.header->workingSetSizeInBytes
+           << " cs=" << f.header->codeSize
+           << " pc=" << f.header->parameterCount
+           << " ps=" << f.header->parameterSizeInBytes
+           << " rs=" << f.header->returnValueSizeInBytes << "\n";
         for (auto inst : f)
         {
             sb << "  ";

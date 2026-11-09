@@ -319,6 +319,68 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
     }
 }
 
+/// Extends an existing neural scratch allocation with a persistent shared-memory tail.
+///
+/// Cooperative neural operations continue to use the scratch region beginning at byte zero. The
+/// cache starts at `CacheOffsetBytes` and remains intact while those operations reuse the scratch
+/// region. Both regions are aligned for vectorized `uint4` copies.
+public struct SharedMemorySizeWithCache<
+    ScratchSize : ISharedMemorySize,
+    let CacheByteCount : uint>
+    : ISharedMemorySize
+{
+    public static const uint CacheOffsetBytes =
+        (ScratchSize.Bytes + sizeof(uint4) - 1) & ~(sizeof(uint4) - 1);
+    public static const uint Bytes =
+        (CacheOffsetBytes + CacheByteCount + sizeof(uint4) - 1) & ~(sizeof(uint4) - 1);
+}
+
+/// Copies a parameter range into a persistent region of a neural shared-memory pool.
+///
+/// Every workgroup invocation must call `copyFrom` with the same source and thread count. The
+/// caller may copy multiple adjacent caches and then issue one `GroupMemoryBarrierWithGroupSync`
+/// before evaluating operations that consume the cached parameters.
+public struct SharedMemoryParameterCache<
+    T,
+    ShMemSize : ISharedMemorySize,
+    let BaseByteOffset : uint,
+    let ParameterCount : int>
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+{
+    static const int ElementsPerVector = sizeof(uint4) / sizeof(T);
+    static const uint BaseVectorOffset = BaseByteOffset / sizeof(uint4);
+    static const uint VectorCount =
+        (uint(ParameterCount) + ElementsPerVector - 1) / ElementsPerVector;
+
+    [require(compute)]
+    public static void copyFrom<Address>(
+        Address source,
+        uint threadIndex,
+        uint threadCount)
+        where Address : IPointerLikeAddress<T>
+    {
+        static_assert(BaseByteOffset % sizeof(uint4) == 0,
+            "A persistent neural cache must be uint4-aligned.");
+        static_assert(
+            BaseByteOffset + uint(ParameterCount) * sizeof(T) <= ShMemSize.Bytes,
+            "The persistent neural cache exceeds its shared-memory allocation.");
+        if (threadCount == 0)
+            return;
+
+        for (uint vectorIndex = threadIndex;
+             vectorIndex < VectorCount;
+             vectorIndex += threadCount)
+        {
+            uint elementIndex = vectorIndex * ElementsPerVector;
+            SharedMemoryPool<ShMemSize>.data[BaseVectorOffset + vectorIndex] =
+                source.readUint4<T, false, uint(ParameterCount)>(int(elementIndex));
+        }
+    }
+
+    public static const uint BaseVectorIndex = BaseVectorOffset;
+}
+
 internal struct SharedMemoryUsage<T, TargetEnum Target, ExecutionMode ExeMode, int InputSize, int OutputSize, int SubgroupSize>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -363,6 +425,46 @@ internal struct SharedMemoryUsage<T, TargetEnum Target, ExecutionMode ExeMode, i
     static const int SharedMemSizeInVectorMatC = SharedMemSizeInVectorMatB * sizeof(T) / sizeof(half);
 }
 
+// The linear-layout backward pass reuses this allocation in three phases: stage both
+// operands, reduce the partial matrices, then write one tile row to global memory.
+// Offsets and strides are in uint4 units; allocation sizes are in bytes. Keep the
+// indexing and allocation formulas together so changing a phase cannot silently
+// increase its footprint without also increasing SharedMemorySize.
+internal struct LinearOuterProductSharedMemoryLayout<
+    T, TargetEnum Target, int SubgroupSize, int SubgroupCount, int InputSize, int OutputSize>
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+{
+    typealias CMShape = CoopMatShape<T, Target>;
+    static const int TileRows = (OutputSize + CMShape.ROW_A - 1) / CMShape.ROW_A;
+    static const int TileColumns = (InputSize + CMShape.COLUMN_B - 1) / CMShape.COLUMN_B;
+
+    // All lanes stage dOut (A) and input (B) simultaneously. Both operands are
+    // packed to half even when T is float, and each vector is rounded to a tile.
+    static const int LaneStrideA = TileRows * CMShape.ROW_A / CMShape.ElementCountPerVector;
+    static const int LaneStrideB = TileColumns * CMShape.COLUMN_B / CMShape.ElementCountPerVector;
+    static const int WarpStrideA = SubgroupSize * LaneStrideA;
+    static const int WarpStrideB = SubgroupSize * LaneStrideB;
+    static const uint BOffset = SubgroupCount * WarpStrideA;
+    static const uint StagingBytes = (BOffset + SubgroupCount * WarpStrideB) * sizeof(uint4);
+
+    // Reduction starts at zero after all subgroups finish reading the operands.
+    // The first butterfly step has floor(G/2) matrices live; later steps need no
+    // more space. Native fragments round each lane's payload to uint registers.
+    static const int ElementsPerLane = CMShape.SizeCInElements / SubgroupSize;
+    static const int RegistersPerLane = (ElementsPerLane * sizeof(T) + 3) / 4;
+    static const int ReductionTileStride =
+        (RegistersPerLane * SubgroupSize * 4 + sizeof(uint4) - 1) / sizeof(uint4);
+    static const uint ReductionBytes =
+        (SubgroupCount / 2) * TileRows * TileColumns * ReductionTileStride * sizeof(uint4);
+
+    // Only subgroup zero writes back, one row of tiles at a time. The current
+    // implementation puts that row at BOffset, not at the start of the pool.
+    static const uint StoreRowBytes = TileColumns * CMShape.ROW_C * CMShape.COLUMN_C * sizeof(T);
+    static const uint StoreEndBytes = BOffset * sizeof(uint4) + StoreRowBytes;
+    static const uint Bytes = Max(Max(StagingBytes, ReductionBytes), StoreEndBytes);
+}
+
 internal struct SharedMemorySizeForLayer<
     T,
     TargetEnum Target,
@@ -376,6 +478,8 @@ internal struct SharedMemorySizeForLayer<
 {
     typealias ShMemInfo = SharedMemoryUsage<T, Target, ExeMode, InputSize, OutputSize, SubgroupSize>;
     typealias CMShape = CoopMatShape<T, Target>;
+    typealias OuterProductLayout = LinearOuterProductSharedMemoryLayout<
+        T, Target, SubgroupSize, SubgroupCount, InputSize, OutputSize>;
 
     // The MMA forward/backward uses: shared A tiles + per-warp B/C tiles.
     // With MMAHelperNew (CUDA + OptimalLayout), forward and backward MMA
@@ -410,23 +514,17 @@ internal struct SharedMemorySizeForLayer<
         ? Max(MetalBytesForMMA, MetalBytesForOuterProduct)
         : (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 
-    // Cross-warp butterfly reduction for outer product.
-    // The first butterfly pass has G/2 warps storing simultaneously, each
-    // needing one full MatrixC<T,M,K> in native layout. The final store-to-
-    // global phase (warp 0 only) also needs one matrix. Max(G/2, 1) covers both.
-    static const int NTileRows = (OutputSize + CMShape.ROW_A - 1) / CMShape.ROW_A;
-    static const int NTileCols = (InputSize + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
-    static const int ElementsPerLane = CMShape.SizeCInElements / SubgroupSize;
-    static const int RegsPerLane = (ElementsPerLane * sizeof(T) + 3) / 4;
-    static const int TileStride = (RegsPerLane * SubgroupSize * 4 + sizeof(uint4) - 1) / sizeof(uint4);
+    // CUDA and SPIR-V linear-layout training stage both full-lane operands.
+    // Metal has a different staging algorithm, accounted for above.
+    static const uint BytesForOuterProductStaging =
+        !ShMemInfo.IsTraining || Target == TargetEnum.Metal ? 0 : OuterProductLayout.StagingBytes;
     static const uint BytesForCrossWarpReduction = !ShMemInfo.IsTraining ? 0 :
-        Max(SubgroupCount / 2, 1) * NTileRows * NTileCols * TileStride * sizeof(uint4);
+        OuterProductLayout.ReductionBytes;
 
-    // Outer product store phase: one row of MatC tiles stored to shmem at a time.
-    // NTileCols MatC tiles × (ROW_C * COLUMN_C * sizeof(T)) bytes each.
-    static const int NCoopMatCColumns = (InputSize + CMShape.COLUMN_B - 1) / CMShape.COLUMN_B;
+    // Count the end address of the tile row, including its nonzero offset on
+    // the linear path. These phases reuse scratch, so their sizes are not added.
     static const uint BytesForOuterProductStore = !ShMemInfo.IsTraining ? 0 :
-        NCoopMatCColumns * CMShape.ROW_C * CMShape.COLUMN_C * sizeof(T);
+        (Target == TargetEnum.Metal ? OuterProductLayout.StoreRowBytes : OuterProductLayout.StoreEndBytes);
 
     // sumReduceRows uses three contiguous shared memory regions:
     //   1. Per-warp input vectors: SubgroupCount * SubgroupSize * HeightInVecB uint4s
@@ -439,9 +537,9 @@ internal struct SharedMemorySizeForLayer<
         (SubgroupCount * SubgroupSize * HeightInVecB_SR + SubgroupCount * TileStrideVec_SR * CMShape.ROW_C) * sizeof(uint4)
         + ((SubgroupCount * MPadded_SR * sizeof(T) + sizeof(uint4) - 1) / sizeof(uint4)) * sizeof(uint4);
 
-    static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore),
-                                          BytesForCrossWarpReduction),
-                                                BytesForSumReduceRows);
+    static const uint Bytes = Max(
+        Max(BytesForMMA, BytesForOuterProductStaging),
+        Max(BytesForOuterProductStore, Max(BytesForCrossWarpReduction, BytesForSumReduceRows)));
 }
 
 internal interface ISharedMemorySizePackNode

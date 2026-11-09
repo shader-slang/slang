@@ -465,6 +465,12 @@ bool tryRemoveRedundantStore(
     bool hasAddrUse = false;
     bool hasOverridingStore = false;
 
+    // A class field may be rooted in a local handle slot, and a RuntimeArray element begins at an
+    // SSA handle value. Both stores target shared heap storage, so neither can be removed as a
+    // dead store to function-local address construction.
+    if (isHeapObjectAddress(store->getPtr()))
+        return false;
+
     // Generally, we do not remove stores to global variables.
     // A special case is if there is a store into a thread-local global var,
     // and there are no other uses of the global var other than the store, we should be able to

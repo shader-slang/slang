@@ -44,7 +44,9 @@ enum class MouseEvent
     Move,
     Down,
     Up,
-    Scroll
+    Scroll,
+    Enter,
+    Leave
 };
 
 class X11AppContext
@@ -139,7 +141,8 @@ public:
             X11AppContext::xdisplay,
             handle,
             StructureNotifyMask | KeyPressMask | KeyReleaseMask | PointerMotionMask |
-                ButtonPressMask | ButtonReleaseMask | ExposureMask | FocusChangeMask);
+                ButtonPressMask | ButtonReleaseMask | ExposureMask | FocusChangeMask |
+                EnterWindowMask | LeaveWindowMask);
 
         if (desc.style == WindowStyle::FixedSize)
         {
@@ -367,6 +370,12 @@ public:
         case MouseEvent::Scroll:
             events.mouseWheel(e);
             break;
+        case MouseEvent::Enter:
+            events.mouseEnter(e);
+            break;
+        case MouseEvent::Leave:
+            events.mouseLeave();
+            break;
         default:
             break;
         }
@@ -374,6 +383,7 @@ public:
 
     void handleCloseEvent()
     {
+        events.close();
         hide();
         if (X11AppContext::mainWindowHandle == handle)
             Application::quit();
@@ -381,7 +391,13 @@ public:
 
     void handleExposeEvent() {}
 
-    void handleFocus(bool focus) {}
+    void handleFocus(bool focus)
+    {
+        if (focus)
+            events.focus();
+        else
+            events.lostFocus();
+    }
 };
 
 Window* Application::createWindow(const WindowDesc& desc)
@@ -501,6 +517,20 @@ void doEventsImpl(bool waitForEvents)
                     nextEvent.xbutton.button,
                     nextEvent.xbutton.state,
                     nextEvent.xbutton.time);
+            }
+            break;
+        case EnterNotify:
+        case LeaveNotify:
+            if (X11AppContext::windows.tryGetValue(nextEvent.xcrossing.window, sysWindow))
+            {
+                sysWindow->handleMouseEvent(
+                    nextEvent.type == EnterNotify ? MouseEvent::Enter : MouseEvent::Leave,
+                    nextEvent.xcrossing.x,
+                    nextEvent.xcrossing.y,
+                    0,
+                    0,
+                    nextEvent.xcrossing.state,
+                    nextEvent.xcrossing.time);
             }
             break;
         case ConfigureNotify:

@@ -698,6 +698,7 @@ public:
     SamplerStateType* getSamplerStateType();
 
     DifferentialPairType* getDifferentialPairType(Type* valueType, Witness* diffTypeWitness);
+    Type* getDifferentialOrNoneType(Type* valueType, Witness* diffTypeWitness);
 
     DifferentialPtrPairType* getDifferentialPtrPairType(
         Type* valueType,

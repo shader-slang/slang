@@ -2083,21 +2083,6 @@ bool SemanticsVisitor::_coerce(
     // none_t can be cast into any Optional<T> type.
     if (as<NoneType>(fromType) && as<OptionalType>(toType))
     {
-        // Guard against Optional<T> where T is opaque — this catches the generic
-        // specialization case (e.g. process<SamplerState>(none)) that CoerceToUsableType
-        // misses because T was still abstract at declaration time.
-        // Only emit the diagnostic when we are constructing the final expression
-        // (outToExpr != nullptr); canCoerce() probes with outToExpr=nullptr but
-        // also passes getSink(), so we must not emit there to avoid duplicates.
-        auto optType = as<OptionalType>(toType);
-        if (typeTransitivelyContainsOpaqueHandle(this, optType->getValueType()))
-        {
-            if (sink && outToExpr)
-                sink->diagnose(Diagnostics::OptionalCannotWrapResourceType{
-                    .type = optType->getValueType(),
-                    .expr = fromExpr});
-            return false;
-        }
         if (outCost)
         {
             *outCost = kConversionCost_NoneToOptional;
@@ -3098,6 +3083,12 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
     {
         return false;
     }
+
+    // A function value has no receiver storage in which to preserve mutable callable state.
+    // Keep even an empty mutating closure as IMutatingFunc instead of silently erasing that
+    // contract through the synthesized static-lambda wrapper below.
+    if (invokeFunc->hasModifier<MutatingAttribute>())
+        return false;
 
     auto invokeFuncDeclRef = m_astBuilder->getMemberDeclRef(lambdaStruct, invokeFunc);
 

@@ -1,0 +1,33 @@
+{
+  "name": "slangvm",
+  "version": "0.0.0",
+  "description": "Slang compiler and host graph virtual machine for browsers",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./file-system": {
+      "types": "./src/file-system.d.ts",
+      "import": "./src/file-system.js"
+    },
+    "./http-file-system": {
+      "types": "./src/http-file-system.d.ts",
+      "import": "./src/http-file-system.js"
+    }
+  },
+  "files": [
+    "src",
+    "wasm",
+    "slang",
+    "README.md",
+    "LICENSE",
+    "LICENSES",
+    "third-party-notices"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "license": "Apache-2.0 WITH LLVM-exception"
+}

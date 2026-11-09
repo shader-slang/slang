@@ -26,8 +26,6 @@ void testOuterProductAccumulateImpl<
     typealias MMA = MMAHelper<DType, InputSize, OutputSize, 32, Target, ShMemSize, false, SubgroupCount>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
-    const int OffsetA = 0;
-    const int OffsetB = 64 * 4 * SubgroupCount;
 
     DType dOutVector[OutSize] = {};
     DType inputVector[InSize] = {};
@@ -39,7 +37,7 @@ void testOuterProductAccumulateImpl<
         dOutVector[i] = dOutData[i];
 
     MMA.outerProductAccumulate<DType, Address, DType, DType[OutSize], DType, DType[InSize]>(
-        OffsetA, OffsetB, dOutVector, inputVector, address);
+        dOutVector, inputVector, address);
 }
 
 public void testOuterProductAccumulate<

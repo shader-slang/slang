@@ -115,7 +115,16 @@ static bool isAliasable(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
+    case kIROp_GetTupleElement:
+    case kIROp_Each:
     case kIROp_InOutImplicitCast:
+        return true;
+    case kIROp_MakeValuePack:
+        // An output argument pack transports addresses without reading their contents.
+        // A pack of ordinary values still reads its operands when it is constructed.
+        for (UInt i = 0; i < inst->getOperandCount(); ++i)
+            if (!as<IRPtrTypeBase>(inst->getOperand(i)->getDataType()))
+                return false;
         return true;
     default:
         break;
@@ -243,6 +252,16 @@ static void getAliasableInstructionsRec(
             continue;
         }
 
+        // Consider `writePack(expand each values)`. Lowering yields the address of
+        // each tuple element from an IRExpand, and the resulting address pack is
+        // passed to the call. Follow that transport so the call's parameter mode
+        // determines whether the original storage is read or written.
+        if (as<IRYield>(user) && as<IRPtrTypeBase>(inst->getDataType()))
+        {
+            if (auto expand = as<IRExpand>(user->getParent()->getParent()))
+                getAliasableInstructionsRec(expand, visited, addresses);
+        }
+
         // Follow SSA value flow through a phi: an argument passed to a branch/loop
         // becomes the corresponding block parameter, which is the same value along
         // this edge.
@@ -362,22 +381,43 @@ enum InstructionUsageType
     Load         // Instruciton acts as a load from the source
 };
 
+// Parameter direction belongs to each element of a variadic parameter. The type
+// expansion has already been lowered to IRExpand before this analysis runs, so
+// inspect its yielded type just as we inspect each element of a concrete type pack.
+static InstructionUsageType getParameterUsageType(IRInst* paramType)
+{
+    auto type = unwrapAttributedType((IRType*)getResolvedInstForDecorations(paramType));
+    if (auto pack = as<IRTypePack>(type))
+    {
+        for (UInt i = 0; i < pack->getOperandCount(); ++i)
+            if (getParameterUsageType(pack->getOperand(i)) != Store)
+                return Load;
+        return Store;
+    }
+    if (auto expand = as<IRExpand>(type))
+    {
+        auto block = expand->getBlocks().getFirst();
+        SLANG_ASSERT(block && block == expand->getBlocks().getLast());
+        auto yield = as<IRYield>(block->getTerminator());
+        SLANG_ASSERT(yield);
+        return getParameterUsageType(yield->getOperand(0));
+    }
+    return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) ||
+            as<IRRefParamType>(type))
+               ? Store
+               : Load;
+}
+
 static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
 {
     IRInst* callee = call->getCallee();
 
-    // Resolve the actual function
-    IRFunc* ftn = nullptr;
-    IRFuncType* ftype = nullptr;
-    if (auto spec = as<IRSpecialize>(callee))
-        ftn = as<IRFunc>(getResolvedInstForDecorations(spec));
-    else if (as<IRTranslateBase>(callee))
+    if (as<IRTranslateBase>(callee))
         return Store;
 
-    else if (auto wit = as<IRLookupWitnessMethod>(callee))
-        ftype = as<IRFuncType>(wit->getFullType());
-    else
-        ftn = as<IRFunc>(callee);
+    // A specialized callable can be a generated derivative operation, not only
+    // an IRFunc. Its function type remains the source of parameter directions.
+    auto ftype = as<IRFuncType>(getResolvedInstForDecorations(callee->getFullType()));
 
     // Find the argument index so we can fetch the type
     int index = 0;
@@ -392,19 +432,12 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
         }
     }
 
-    if (ftn)
-        ftype = as<IRFuncType>(ftn->getFullType());
-
     if (!ftype)
         return None;
 
     // Consider it as a store if its passed
     // as an out/inout/ref parameter
-    auto type = unwrapAttributedType(ftype->getParamType(index));
-    return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) ||
-            as<IRRefParamType>(type))
-               ? Store
-               : Load;
+    return getParameterUsageType(ftype->getParamType(index));
 }
 
 static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
@@ -423,6 +456,11 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     case kIROp_UnconditionalBranch:
         // TODO: Ignore branches for now
         return None;
+
+    case kIROp_Yield:
+        // Yielding an address from an expansion transports the reference; its
+        // consumers determine whether the pointed-to value is read or written.
+        return as<IRPtrTypeBase>(inst->getDataType()) ? None : Load;
 
     // Debug info instructions should be ignored - they don't constitute
     // actual loads or stores of data, they're just metadata.
@@ -465,13 +503,16 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
             return Load;
         return Store;
 
-    // A SPIR-V asm block is opaque -- its operands have no fixed read/write
+    // An asm block is opaque -- its operands have no fixed read/write
     // role -- so conservatively treat any use by one as a store (a write).
     case kIROp_SPIRVAsm:
+    case kIROp_HGBCAsm:
         return Store;
 
     case kIROp_SPIRVAsmOperandInst:
-        // For SPIRV asm instructions, need to check out the entire
+    case kIROp_HGBCAsmOperandValue:
+    case kIROp_HGBCAsmOperandValuePack:
+        // For asm instructions, need to check out the entire
         // block when doing reachability checks
         return StoreParent;
 

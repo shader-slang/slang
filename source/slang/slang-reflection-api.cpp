@@ -45,6 +45,13 @@ static inline Type* convert(SlangReflectionType* type)
 
 static inline SlangReflectionType* convert(Type* type)
 {
+    if (!type)
+        return nullptr;
+    // Reflection can inspect a type after another session has become current. Unwrapping
+    // may canonicalize a specialized type pack, so use the type's reflection builder,
+    // just as the other reflection operations that perform substitution do.
+    SLANG_AST_BUILDER_RAII(type->getASTBuilderForReflection());
+
     // Peel off any modifier wrappers (e.g. `no_diff`, `unorm`, `snorm`).
     // These can appear on function return/parameter types after generic
     // specialization (see issue #11277) and on `no_diff`-qualified struct
@@ -227,6 +234,9 @@ static SlangParameterCategory maybeRemapParameterCategory(
         // Is the category they were asking about one that makes sense for the type
         // of this variable?
         Type* type = typeLayout->getType();
+        // Synthetic scopes can have no source type. Otherwise, array unwrapping must
+        // resolve types in the session that produced this reflection layout.
+        SLANG_AST_BUILDER_RAII(type ? type->getASTBuilderForReflection() : nullptr);
         while (auto arrayType = as<ArrayExpressionType>(type))
             type = arrayType->getElementType();
         switch (spReflectionType_GetKind(convert(type)))
@@ -424,6 +434,7 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     auto type = convert(inType);
     if (!type)
         return SLANG_TYPE_KIND_NONE;
+    SLANG_AST_BUILDER_RAII(type->getASTBuilderForReflection());
 
     // TODO(tfoley): Don't emit the same type more than once...
 
@@ -961,6 +972,9 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
 SLANG_API char const* spReflectionType_GetName(SlangReflectionType* inType)
 {
     auto type = convert(inType);
+    if (!type)
+        return nullptr;
+    SLANG_AST_BUILDER_RAII(type->getASTBuilderForReflection());
 
     if (auto declRefType = as<DeclRefType>(type))
     {
@@ -1157,6 +1171,7 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
         Type* result = program->getTypeFromString(name, &sink);
 
         ASTBuilder* astBuilder = program->getLinkage()->getASTBuilder();
+        SLANG_AST_BUILDER_RAII(astBuilder);
 
         if (auto genericType = as<GenericDeclRefType>(result))
         {
@@ -5327,6 +5342,88 @@ SLANG_API int spReflectionEntryPoint_usesAnySampleRateInput(SlangReflectionEntry
     return (entryPointLayout->flags & EntryPointLayout::Flag::usesAnySampleRateInput) != 0;
 }
 
+SLANG_API SlangInt
+spReflectionEntryPoint_getPushConstantOffset(SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPoint = convert(inEntryPoint);
+    return entryPoint && entryPoint->uniformStorageKind == LayoutResourceKind::PushConstantBuffer
+               ? entryPoint->uniformOffset
+               : -1;
+}
+
+SLANG_API SlangInt
+spReflectionEntryPoint_getShaderRecordOffset(SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPoint = convert(inEntryPoint);
+    return entryPoint && entryPoint->uniformStorageKind == LayoutResourceKind::ShaderRecord
+               ? entryPoint->uniformOffset
+               : -1;
+}
+
+SLANG_API SlangInt
+spReflectionEntryPoint_getShaderRecordSize(SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPoint = convert(inEntryPoint);
+    return entryPoint && entryPoint->uniformStorageKind == LayoutResourceKind::ShaderRecord
+               ? entryPoint->uniformSize
+               : -1;
+}
+
+SLANG_API SlangUInt spReflection_getEntryPointUniformLayoutGroupCount(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    return program ? program->entryPointUniformLayoutGroups.getCount() : 0;
+}
+
+SLANG_API SlangInt
+spReflectionEntryPoint_getPushConstantSize(SlangReflectionEntryPoint* inEntryPoint)
+{
+    auto entryPoint = convert(inEntryPoint);
+    return entryPoint && entryPoint->uniformStorageKind == LayoutResourceKind::PushConstantBuffer
+               ? entryPoint->uniformSize
+               : -1;
+}
+
+SLANG_API SlangInt
+spReflection_getEntryPointUniformLayoutGroupSize(SlangReflection* inProgram, SlangUInt groupIndex)
+{
+    auto program = convert(inProgram);
+    if (!program || groupIndex >= SlangUInt(program->entryPointUniformLayoutGroups.getCount()))
+        return -1;
+    SlangInt size = 0;
+    for (auto index : program->entryPointUniformLayoutGroups[groupIndex])
+    {
+        auto entryPoint = program->entryPoints[index].layout;
+        if (entryPoint->uniformOffset < 0)
+            return -1;
+        if (entryPoint->uniformSize)
+            size = Math::Max(size, entryPoint->uniformOffset + entryPoint->uniformSize);
+    }
+    return size;
+}
+
+SLANG_API SlangUInt spReflection_getEntryPointUniformLayoutGroupEntryPointCount(
+    SlangReflection* inProgram,
+    SlangUInt groupIndex)
+{
+    auto program = convert(inProgram);
+    if (!program || groupIndex >= SlangUInt(program->entryPointUniformLayoutGroups.getCount()))
+        return 0;
+    return program->entryPointUniformLayoutGroups[groupIndex].getCount();
+}
+
+SLANG_API SlangInt spReflection_getEntryPointUniformLayoutGroupEntryPointIndex(
+    SlangReflection* inProgram,
+    SlangUInt groupIndex,
+    SlangUInt indexInGroup)
+{
+    auto program = convert(inProgram);
+    if (!program || groupIndex >= SlangUInt(program->entryPointUniformLayoutGroups.getCount()))
+        return -1;
+    auto const& group = program->entryPointUniformLayoutGroups[groupIndex];
+    return indexInGroup < SlangUInt(group.getCount()) ? group[indexInGroup] : -1;
+}
+
 SLANG_API SlangReflectionVariableLayout* spReflectionEntryPoint_getVarLayout(
     SlangReflectionEntryPoint* inEntryPoint)
 {
@@ -5513,7 +5610,7 @@ SLANG_API SlangReflectionEntryPoint* spReflection_getEntryPointByIndex(
     if (!program)
         return 0;
 
-    return convert(program->entryPoints[(int)index].Ptr());
+    return convert(program->entryPoints[(int)index].layout.Ptr());
 }
 
 SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(
@@ -5525,8 +5622,9 @@ SLANG_API SlangReflectionEntryPoint* spReflection_findEntryPointByName(
         return 0;
 
     // TODO: improve on naive linear search
-    for (auto ep : program->entryPoints)
+    for (const auto& targetEntryPoint : program->entryPoints)
     {
+        auto ep = targetEntryPoint.layout;
         if (ep->entryPoint.getName()->text == name)
         {
             return convert(ep);

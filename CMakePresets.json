@@ -19,7 +19,7 @@
     },
     {
       "name": "emscripten",
-      "description": "Emscripten-based Wasm build",
+      "description": "Emscripten build for the Slang compiler",
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build.em",
       "cacheVariables": {
@@ -27,10 +27,14 @@
         "SLANG_LIB_TYPE": "STATIC",
         "SLANG_ENABLE_AFTERMATH": "OFF",
         "SLANG_ENABLE_CUDA": "OFF",
+        "SLANG_ENABLE_EXAMPLES": "OFF",
         "SLANG_ENABLE_GFX": "OFF",
         "SLANG_ENABLE_OPTIX": "OFF",
         "SLANG_ENABLE_REPLAYER": "OFF",
-        "SLANG_ENABLE_SLANG_RHI": "OFF",
+        "SLANG_ENABLE_SLANGI": "OFF",
+        "SLANG_ENABLE_SLANG_RHI": "ON",
+        "SLANG_EXCLUDE_DAWN": "OFF",
+        "SLANG_RHI_ENABLE_WGPU": "ON",
         "SLANG_ENABLE_SPLIT_DEBUG_INFO": "OFF",
         "SLANG_ENABLE_TESTS": "OFF",
         "CMAKE_C_FLAGS_INIT": "-fwasm-exceptions -Os",
@@ -237,6 +241,12 @@
       "configurePreset": "emscripten",
       "configuration": "Release",
       "targets": ["slang-wasm"]
+    },
+    {
+      "name": "emscripten-slangvm",
+      "configurePreset": "emscripten",
+      "configuration": "Release",
+      "targets": ["slangvm-javascript"]
     },
     {
       "name": "generators",

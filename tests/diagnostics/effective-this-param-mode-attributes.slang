@@ -24,29 +24,18 @@ struct Value
     __init() {}
 }
 
+// h-slang keeps legacy class receiver attributes as no-ops on the by-value handle.
 class Reference
 {
     static const int elementCount = 4;
 
     [mutating]
-    /*CHECK:
-     ^^^^^^^^ attribute cannot change a source-declared class member's effective `this` parameter
-     ^^^^^^^^ attribute 'mutating' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value.
-    */
     void method(int[this.elementCount] values) {}
 
     [constref]
-    /*CHECK:
-     ^^^^^^^^ attribute cannot change a source-declared class member's effective `this` parameter
-     ^^^^^^^^ attribute 'constref' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value.
-    */
     void borrowedMethod() {}
 
     [__ref]
-    /*CHECK:
-     ^^^^^ attribute cannot change a source-declared class member's effective `this` parameter
-     ^^^^^ attribute '__ref' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value.
-    */
     void referenceMethod() {}
 }
 

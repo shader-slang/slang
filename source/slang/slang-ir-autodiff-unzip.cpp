@@ -144,8 +144,42 @@ struct UnzippingContext
                 splitInfo->diffBlockMap[as<IRBlock>(primalMap[block])] =
                     as<IRBlock>(diffMap[block]);
 
+        splitDifferentialParameterComputations(builder, as<IRBlock>(diffMap[firstBlock]));
+
         for (auto block : mixedBlocks)
             block->removeAndDeallocate();
+    }
+
+    // Keep the differential parameter block free of computations before transposition.
+    // Consider a callable requirement with a float parameter pack. Reconstructing its pack
+    // emits MakeValuePack(dValue), which the IR builder may hoist beside dValue in this block.
+    // Transposition replaces the parameters separately from the code blocks, so the pack must
+    // belong to a code block too; otherwise it would retain a removed forward parameter.
+    void splitDifferentialParameterComputations(IRBuilder* builder, IRBlock* parameterBlock)
+    {
+        auto firstInst = parameterBlock->getFirstOrdinaryInst();
+        if (firstInst == parameterBlock->getTerminator())
+            return;
+
+        builder->setInsertAfter(parameterBlock);
+        auto codeBlock = builder->emitBlock();
+        codeBlock->insertAfter(parameterBlock);
+        auto differentialDecoration =
+            parameterBlock->findDecoration<IRDifferentialInstDecoration>();
+        SLANG_RELEASE_ASSERT(differentialDecoration);
+        builder->markInstAsDifferential(
+            codeBlock,
+            builder->getBasicBlockType(),
+            differentialDecoration->getPrimalInst());
+
+        for (auto inst = firstInst; inst;)
+        {
+            auto nextInst = inst->getNextInst();
+            inst->insertAtEnd(codeBlock);
+            inst = nextInst;
+        }
+        builder->setInsertInto(parameterBlock);
+        builder->emitBranch(codeBlock);
     }
 
     static IRInst* _getOriginalFunc(IRInst* call)

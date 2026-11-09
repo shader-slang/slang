@@ -1,0 +1,82 @@
+site_name: h-slang
+site_description: Heterogeneous programming with Slang
+docs_dir: docs/heterogeneity
+site_dir: build/heterogeneity-docs
+exclude_docs: |
+  /_scratch/
+dev_addr: 127.0.0.1:8000
+strict: true
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  font: false
+  palette:
+    scheme: default
+    primary: custom
+    accent: custom
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.footer
+
+nav:
+  - Intro:
+      - Overview: index.md
+      - Installation and setup: installation.md
+      - Run your first program: invoking.md
+  - Programming Guide:
+      - Host functions: host-functions.md
+      - Launch compute kernels: grid-dispatch.md
+      - Launch draw calls: draw-calls.md
+      - Launch ray-tracing pipelines: ray-tracing.md
+      - Resource types: resources.md
+      - Automatic differentiation: automatic-differentiation.md
+      - Interoperability: interoperability.md
+  - Tooling:
+      - Debugging: debugging.md
+      - Event tracking: event-tracking.md
+  - Tutorials:
+      - An SDF path tracer: sdf-path-tracer.md
+  - Contributing to the docs: contributing.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      css_class: codehilite
+      guess_lang: false
+      extend_pygments_lang:
+        - name: slang
+          lang: hlsl
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/code.css
+  - stylesheets/snippets.css
+
+extra_javascript:
+  - scripts/snippets.js
+
+hooks:
+  - extras/heterogeneity_docs.py
+
+extra:
+  repository_source_url: !ENV
+    - HSLANG_DOCS_SOURCE_URL
+    - https://github.com/shader-slang/slang/blob/h-slang/
+
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn

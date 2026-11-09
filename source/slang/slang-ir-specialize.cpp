@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
@@ -178,6 +179,7 @@ struct SpecializationContext
         switch (inst->getOp())
         {
         case kIROp_GlobalGenericParam:
+        case kIROp_IndexOfTypeInPack:
         case kIROp_LookupWitnessMethod:
         case kIROp_GetTupleElement:
         case kIROp_ExtractFirstFromPack:
@@ -886,6 +888,7 @@ struct SpecializationContext
             return maybeSpecializeExpand(as<IRExpand>(inst));
 
         case kIROp_GetTupleElement:
+        case kIROp_Swizzle:
             return maybeSpecializeFoldableInst(inst);
 
         case kIROp_ExtractFirstFromPack:
@@ -908,11 +911,17 @@ struct SpecializationContext
         case kIROp_MakeTuple:
             return maybeSpecializeMakeValuePackOrTuple(inst);
 
+        case kIROp_HGBCAsmOperandValuePack:
+            return maybeSpecializeHGBCAsmOperandValuePack(cast<IRHGBCAsmOperand>(inst));
+
         case kIROp_PackBranch:
             return maybeSpecializePackBranch(cast<IRPackBranch>(inst));
 
         case kIROp_CountOf:
             return maybeSpecializeCountOf(inst);
+
+        case kIROp_IndexOfTypeInPack:
+            return maybeSpecializeIndexOfTypeInPack(inst);
 
         case kIROp_FuncTypeOf:
             return maybeSpecializeFuncTypeOf(inst);
@@ -950,6 +959,30 @@ struct SpecializationContext
             SLANG_ASSERT(inst);
             flattenedList.add(inst);
         }
+    }
+
+    bool maybeSpecializeHGBCAsmOperandValuePack(IRHGBCAsmOperand* inst)
+    {
+        if (inst->getOperandCount() != 1)
+            return false;
+
+        auto valuePack = as<IRMakeValuePack>(inst->getOperand(0));
+        if (!valuePack)
+            return false;
+
+        ShortList<IRInst*> values;
+        flattenPackOperand(values, valuePack);
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto replacement = builder.emitHGBCAsmOperandValuePack(
+            (UInt)values.getCount(),
+            values.getArrayView().getBuffer());
+        inst->transferDecorationsTo(replacement);
+        inst->replaceUsesWith(replacement);
+        inst->removeAndDeallocate();
+        addUsersToWorkList(replacement);
+        return true;
     }
 
     bool maybeSpecializeTypePackOrTupleType(IRInst* inst)
@@ -1108,6 +1141,46 @@ struct SpecializationContext
         // reachable only through a no-op wrapper past a user.
         enqueue(replacement);
         addUsersToWorkList(replacement);
+        return true;
+    }
+
+    /// Resolves a type query before target legalization can erase nominal type identity.
+    bool maybeSpecializeIndexOfTypeInPack(IRInst* inst)
+    {
+        auto elementType = inst->getOperand(0);
+        auto pack = as<IRTypePack>(inst->getOperand(1));
+        if (!pack || !areAllOperandsFullySpecialized(inst) || !areAllOperandsFullySpecialized(pack))
+            return false;
+
+        Index index = -1;
+        for (UInt i = 0; i < pack->getOperandCount(); ++i)
+        {
+            // Nested packs are flattened by the existing type-pack specialization rule.
+            if (as<IRTypePack>(pack->getOperand(i)))
+                return false;
+            if (elementType == pack->getOperand(i))
+            {
+                if (index >= 0)
+                {
+                    if (sink)
+                        sink->diagnose(
+                            Diagnostics::IndexOfTypeInPackAmbiguous{.location = inst->sourceLoc});
+                    return false;
+                }
+                index = i;
+            }
+        }
+        if (index < 0)
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::IndexOfTypeInPackMissing{.location = inst->sourceLoc});
+            return false;
+        }
+        IRBuilder builder(module);
+        auto result = builder.getIntValue(inst->getDataType(), index);
+        addUsersToWorkList(inst);
+        inst->replaceUsesWith(result);
+        inst->removeAndDeallocate();
         return true;
     }
 
@@ -1994,6 +2067,13 @@ struct SpecializationContext
         bool anyChange = false;
         while (processSpecializationWorkListFromRoot(rootInst))
             anyChange = true;
+        if (anyChange)
+        {
+            // Concrete pack parameters are temporarily reconstructed during expansion. Once
+            // their projections have folded, remove dead reconstructions before autodiff consumes
+            // the specialized function.
+            anyChange |= eliminateDeadCode(rootInst);
+        }
         return anyChange;
     }
 
@@ -3635,6 +3715,7 @@ struct SpecializationContext
                 typePack,
                 (UInt)newParams.getCount(),
                 newParams.getArrayView().getBuffer());
+            expandDebugValuePackBindings(param, newParams.getArrayView().arrayView);
             param->replaceUsesWith(val);
             param->removeAndDeallocate();
             addUsersToWorkList(val);
@@ -3728,7 +3809,7 @@ void finalizeSpecialization(IRModule* module)
         default:
             break;
 
-        case kIROp_StructKey:
+        case kIROp_DeclaredStructKey:
         case kIROp_Func:
             for (auto decor = inst->getFirstDecoration(); decor;)
             {

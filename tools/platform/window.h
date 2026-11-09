@@ -162,6 +162,8 @@ struct MouseEventArgs
     int x, y;
     int delta;
     ButtonState::Enum buttons;
+    // Set on the second press of a native double-click. It is still delivered through mouseDown.
+    bool isDoubleClick = false;
 };
 
 struct Rect
@@ -193,10 +195,16 @@ public:
         Slang::Action<> sizeChanged;
         Slang::Action<> focus;
         Slang::Action<> lostFocus;
+        Slang::Action<> close;
         Slang::Action<KeyEventArgs&> keyDown;
         Slang::Action<KeyEventArgs&> keyUp;
         Slang::Action<KeyEventArgs&> keyPress;
         Slang::Action<MouseEventArgs> mouseMove;
+        // Enter includes client coordinates; leave invalidates the last pointer position.
+        Slang::Action<MouseEventArgs> mouseEnter;
+        Slang::Action<> mouseLeave;
+        // Native capture ended; unlike mouseLeave, an active drag must stop.
+        Slang::Action<> mouseCaptureLost;
         Slang::Action<MouseEventArgs> mouseUp;
         Slang::Action<MouseEventArgs> mouseDown;
         Slang::Action<MouseEventArgs> mouseWheel;

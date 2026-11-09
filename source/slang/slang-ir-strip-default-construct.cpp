@@ -21,6 +21,11 @@ struct RemoveDefaultConstructInsts : InstPassBase
             kIROp_DefaultConstruct,
             [&](IRDefaultConstruct* defaultConstruct)
             {
+                // An empty managed carrier is an initialized null owner, not undefined storage.
+                // Keeping the store is essential when replacing a live box or union value.
+                if (defaultConstruct->getDataType()->getOp() == kIROp_HGVMBoxType ||
+                    defaultConstruct->getDataType()->getOp() == kIROp_HGVMTaggedUnionType)
+                    return;
                 List<IRInst*> instsToRemove;
                 for (auto use = defaultConstruct->firstUse; use; use = use->nextUse)
                 {

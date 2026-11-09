@@ -107,6 +107,12 @@ set(glsl_module_generated_header_dir
 set(glsl_module_generated_header
     ${glsl_module_generated_header_dir}/slang-glsl-module-generated.h
 )
+set(core_module_generation_stamp
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-core-module-generation.stamp
+)
+set(core_module_serialization_check
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-core-module-serialization-check.spv
+)
 
 # Propagate to parent directory scope, so they're visible to
 # slang-glsl-module/CMakeLists.txt
@@ -139,10 +145,12 @@ else()
 endif()
 
 add_custom_command(
-    OUTPUT
+    OUTPUT ${core_module_generation_stamp}
+    BYPRODUCTS
         ${core_module_archive_without_timestamp}
         ${core_module_generated_header}
         ${glsl_module_generated_header}
+        ${core_module_serialization_check}
     ${bootstrap_pre_copy_command}
     COMMAND
         ${CMAKE_COMMAND} -E make_directory ${core_module_generated_header_dir}
@@ -158,19 +166,27 @@ add_custom_command(
         ${core_module_generated_header}
         -save-glsl-module-bin-source
         ${glsl_module_generated_header}
+    COMMAND
+        "$<TARGET_FILE:slang-bootstrap>"
+        -load-core-module
+        ${core_module_archive_without_timestamp}
+        ${CMAKE_CURRENT_SOURCE_DIR}/core-module-serialization-check.slang
+        -target
+        spirv
+        -o
+        ${core_module_serialization_check}
+    COMMAND ${CMAKE_COMMAND} -E touch ${core_module_generation_stamp}
     DEPENDS
         slang-bootstrap
         slang-without-embedded-core-module
+        ${CMAKE_CURRENT_SOURCE_DIR}/core-module-serialization-check.slang
         ${bootstrap_extra_deps}
     VERBATIM
 )
 
 add_custom_target(
     generate_core_module
-    DEPENDS
-        ${core_module_archive_without_timestamp}
-        ${core_module_generated_header}
-        ${glsl_module_generated_header}
+    DEPENDS ${core_module_generation_stamp}
 )
 set_target_properties(generate_core_module PROPERTIES FOLDER generated)
 

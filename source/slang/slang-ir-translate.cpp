@@ -100,6 +100,32 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             }
         }
         break;
+    case kIROp_DifferentialOrNoneType:
+        {
+            auto witness = inst->getOperand(1);
+            if (as<IRNoneWitnessTableElement>(witness))
+                return memoize(subBuilder.getVoidType());
+
+            auto witnessTable = as<IRWitnessTable>(witness);
+            if (!witnessTable)
+                return inst;
+
+            // NoneWitness lowers to the existing void-to-void witness table. A generic
+            // optional constraint stays symbolic until specialization supplies this table
+            // or a concrete IDifferentiable conformance.
+            if (as<IRVoidType>(witnessTable->getConformanceType()))
+            {
+                SLANG_RELEASE_ASSERT(as<IRVoidType>(witnessTable->getConcreteType()));
+                return memoize(subBuilder.getVoidType());
+            }
+
+            auto differentialType = findWitnessTableEntry(
+                witnessTable,
+                subBuilder.getBuiltinRequirementKey(
+                    (IRIntegerValue)BuiltinRequirementKind::DifferentialType));
+            SLANG_RELEASE_ASSERT(differentialType);
+            return memoize(differentialType);
+        }
     // Translate special func-types.
     case kIROp_ApplyForBwdFuncType:
     case kIROp_ForwardDiffFuncType:
@@ -436,7 +462,8 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         as<IRForwardDiffFuncType>(instWithCanonicalOperands) ||
         as<IRBwdCallableFuncType>(instWithCanonicalOperands) ||
         as<IRApplyForBwdFuncType>(instWithCanonicalOperands) ||
-        as<IRBackwardDiffFuncType>(instWithCanonicalOperands))
+        as<IRBackwardDiffFuncType>(instWithCanonicalOperands) ||
+        as<IRDifferentialOrNoneType>(instWithCanonicalOperands))
     {
         auto translateInst = ctx->maybeTranslateInst(instWithCanonicalOperands);
         instWithCanonicalOperands->replaceUsesWith(translateInst);

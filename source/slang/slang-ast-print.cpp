@@ -658,6 +658,14 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto indexExpr = as<IndexOfTypeInPackExpr>(expr))
+    {
+        sb << "__index_of_type_in_pack<";
+        addExpr(indexExpr->elementType.exp);
+        sb << ", ";
+        addExpr(indexExpr->packType.exp);
+        sb << ">";
+    }
     else if (const auto packQueryExpr = as<PackQueryExpr>(expr))
     {
         sb << getPackQueryName(packQueryExpr) << "(";
@@ -848,6 +856,59 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto ray = as<RayPipelineCallExpr>(expr))
+    {
+        const bool dispatch = ray->kind == RayPipelineCallExpr::Kind::Dispatch;
+        sb
+            << (dispatch                                           ? "__dispatchRays("
+                : ray->kind == RayPipelineCallExpr::Kind::HitGroup ? "__setRayHitGroup("
+                : ray->kind == RayPipelineCallExpr::Kind::Hit      ? "__setRayHitShader("
+                                                                   : "__setRayMiss(");
+        if (!dispatch)
+        {
+            addExpr(ray->pipeline);
+            sb << ", ";
+            if (ray->geometrySlot)
+            {
+                addExpr(ray->geometrySlot);
+                sb << ", ";
+            }
+            addExpr(ray->raySlot);
+            sb << ", ";
+        }
+        if (ray->kind == RayPipelineCallExpr::Kind::HitGroup)
+        {
+            addExpr(ray->payloadTypeExpr.exp);
+            sb << ", ";
+            addExpr(ray->attributeTypeExpr.exp);
+            sb << ", ";
+        }
+        if (ray->baseFunction)
+            addExpr(ray->baseFunction);
+        else
+            sb << "void";
+        if (ray->kind == RayPipelineCallExpr::Kind::HitGroup)
+        {
+            sb << ", ";
+            if (ray->anyHitFunction)
+                addExpr(ray->anyHitFunction);
+            else
+                sb << "void";
+            sb << ", ";
+            if (ray->intersectionFunction)
+                addExpr(ray->intersectionFunction);
+            else
+                sb << "void";
+        }
+        if (dispatch)
+        {
+            sb << ", ";
+            addExpr(ray->extent);
+            sb << ", ";
+            addExpr(ray->maxRecursion);
+        }
+        sb << ")";
+    }
     else if (const auto higherOrderInvokeExpr = as<HigherOrderInvokeExpr>(expr))
     {
         if (const auto primalSubstituteExpr = as<PrimalSubstituteExpr>(higherOrderInvokeExpr);
@@ -869,6 +930,15 @@ void ASTPrinter::addExpr(Expr* expr)
                  dispatchKernelExpr)
         {
             sb << "__dispatch_kernel(";
+        }
+        else if (const auto pipelineExpr = as<MakeGraphicsPipelineExpr>(higherOrderInvokeExpr);
+                 pipelineExpr)
+        {
+            sb << "__makeGraphicsPipeline(";
+        }
+        else if (const auto rayTraceExpr = as<RayTraceExpr>(higherOrderInvokeExpr); rayTraceExpr)
+        {
+            sb << "raytrace(";
         }
         else
         {
@@ -902,6 +972,40 @@ void ASTPrinter::addExpr(Expr* expr)
             else
             {
                 sb << "<unknown-dispatch-size>";
+            }
+        }
+        else if (const auto pipelineExpr = as<MakeGraphicsPipelineExpr>(higherOrderInvokeExpr))
+        {
+            sb << ", ";
+            if (pipelineExpr->fragmentFunction)
+                addExpr(pipelineExpr->fragmentFunction);
+            else
+                sb << "<unknown-fragment-function>";
+
+            sb << ", ";
+            if (pipelineExpr->settings)
+                addExpr(pipelineExpr->settings);
+            else
+                sb << "<unknown-graphics-pipeline-settings>";
+        }
+        else if (const auto rayTraceExpr = as<RayTraceExpr>(higherOrderInvokeExpr))
+        {
+            sb << ", ";
+            if (rayTraceExpr->closestHitFunction)
+                addExpr(rayTraceExpr->closestHitFunction);
+            else
+                sb << "<unknown-closest-hit-function>";
+
+            sb << ", ";
+            if (rayTraceExpr->missFunction)
+                addExpr(rayTraceExpr->missFunction);
+            else
+                sb << "<unknown-miss-function>";
+
+            if (rayTraceExpr->maxRecursionDepthExpr)
+            {
+                sb << ", ";
+                addExpr(rayTraceExpr->maxRecursionDepthExpr);
             }
         }
 
@@ -1083,6 +1187,73 @@ void ASTPrinter::addExpr(Expr* expr)
             first = false;
         }
         sb << ")";
+    }
+    else if (const auto hgbcAsmExpr = as<HGBCAsmExpr>(expr))
+    {
+        sb << "hgbc_asm {";
+        bool first = true;
+        for (const HGBCAsmInst& inst : hgbcAsmExpr->insts)
+        {
+            if (!first)
+                sb << "\n  ";
+            else
+                sb << " ";
+
+            if (inst.opcode.token.type != TokenType::Unknown)
+                sb << inst.opcode.token.getContent();
+            else
+                sb << "<unknown-opcode>";
+
+            for (const HGBCAsmOperand& operand : inst.operands)
+            {
+                sb << " ";
+                switch (operand.flavor)
+                {
+                case HGBCAsmOperand::Literal:
+                    if (operand.token.type != TokenType::Unknown)
+                        sb << operand.token.getContent();
+                    else
+                        sb << operand.knownValue;
+                    break;
+                case HGBCAsmOperand::Id:
+                    sb << "%" << operand.token.getContent();
+                    break;
+                case HGBCAsmOperand::ResultMarker:
+                    sb << "result";
+                    break;
+                case HGBCAsmOperand::NamedValue:
+                    sb << operand.token.getContent();
+                    break;
+                case HGBCAsmOperand::SlangValue:
+                case HGBCAsmOperand::SlangValuePack:
+                    sb << "$";
+                    if (operand.expr)
+                        addExpr(operand.expr);
+                    else
+                        sb << "<unknown-slang-value>";
+                    break;
+                case HGBCAsmOperand::SlangValueAddr:
+                    sb << "&";
+                    if (operand.expr)
+                        addExpr(operand.expr);
+                    else
+                        sb << "<unknown-slang-address>";
+                    break;
+                case HGBCAsmOperand::SlangType:
+                    sb << "$$";
+                    if (operand.type.type)
+                        addType(operand.type.type);
+                    else if (operand.expr)
+                        addExpr(operand.expr);
+                    else
+                        sb << "<unknown-type>";
+                    break;
+                }
+            }
+            sb << ";";
+            first = false;
+        }
+        sb << " }";
     }
     else if (const auto spirvAsmExpr = as<SPIRVAsmExpr>(expr))
     {

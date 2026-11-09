@@ -337,7 +337,7 @@ public:
                 {
                     // If the module is coming from string instead of an actual file, store it as
                     // is.
-                    encode(canonicalModulePath);
+                    encode(file->getPathInfo().foundPath);
                 }
             }
             else

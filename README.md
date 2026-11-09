@@ -3,6 +3,26 @@ SPDX-FileCopyrightText: The Khronos Group, Inc.
 SPDX-License-Identifier: CC-BY-4.0
 -->
 
+# `h-slang`: Exploring heterogeneous programming in Slang
+
+`h-slang` is an experimental research flavor of Slang that investigates heterogeneous programming.
+**The language extensions and runtime APIs introduced by this project are not part of the
+official Slang specification.** Their presence in this repository does not imply adoption
+by the official Slang project.
+
+Syntax, APIs, and behavior may change without backward compatibility, and features may be incomplete or unstable.
+
+`h-slang` uses a new byte-code target called HGBC and an interpreter (HGVM) that uses slang-rhi to execute GPU logic. It includes the compiler, runtime, bundled standard modules, standalone examples, and compiler/runtime tests.
+
+Build Slang following [the build guide](docs/building.md), including `slangi`, `slangc`,
+and `slang-test`. Start with the [heterogeneous programming guide](docs/heterogeneity/index.md)
+and [standalone host-compute examples](examples/host-compute/README.md).
+
+See the [test-runner documentation](tools/slang-test/README.md) for compiler and runtime
+test configuration. Always use one test server for HGVM tests.
+
+# Upstream Slang's README
+
 # Slang
 
 ![CI Status](https://github.com/shader-slang/slang/actions/workflows/ci.yml/badge.svg?branch=master)

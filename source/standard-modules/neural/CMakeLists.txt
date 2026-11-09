@@ -48,9 +48,17 @@ else()
     # Build standard modules with slang-bootstrap so this target never requires
     # slangc.exe. Load the generated core module so this step does not recompile it.
     set(SLANG_COMPILER slang-bootstrap)
-    set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
+    # The compiler implementation lives in this library. Its rebuild may leave the
+    # bootstrap executable unchanged, but still invalidates the serialized module.
+    set(SLANG_COMPILER_DEPENDENCY
+        slang-bootstrap
+        slang-without-embedded-core-module
+    )
 endif()
-set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
+set(SLANG_COMPILER_CORE_MODULE_ARGS
+    -load-core-module
+    ${core_module_archive_without_timestamp}
+)
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 # Determine compiler flags based on build type
@@ -65,8 +73,10 @@ endif()
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND
-        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} ${NEURAL_MODULE_DEFINES} -I
-        ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS}
+        ${NEURAL_MODULE_DEFINES} -experimental-feature -I
+        ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o
+        ${SLANG_NEURAL_MODULE_FILE_NAME}
     DEPENDS
         ${neural_copied_files}
         ${neural_unittest_sources}
@@ -81,6 +91,17 @@ add_custom_command(
 # are fixed (PRs #10835, #10847). Build the neural module unconditionally.
 add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
+
+# `slangc` and `slangi` discover this precompiled module beside their Slang library at runtime.
+# A targeted build of either executable does not include `ALL`, so without these edges it can leave
+# an older module next to a newly built compiler. The module already depends on `slang-bootstrap`
+# and the generated core module above; pulling its target into these builds keeps that complete
+# compiler/module artifact set in sync.
+foreach(neural_module_consumer slangc slangi)
+    if(TARGET ${neural_module_consumer})
+        add_dependencies(${neural_module_consumer} slang-neural-module)
+    endif()
+endforeach()
 
 # Install the neural directory to the configured location in the release package
 # Installs into <install-dir>/slang/ to match the `import slang.neural;` convention.

@@ -1427,6 +1427,17 @@ static void emitReflectionEntryPointJSON(
     {
         writer << ",\n\"usesAnySampleRateInput\": true";
     }
+
+    if (entryPoint->getPushConstantOffset() >= 0)
+    {
+        writer << ",\n\"pushConstantOffset\": " << entryPoint->getPushConstantOffset();
+        writer << ",\n\"pushConstantSize\": " << entryPoint->getPushConstantSize();
+    }
+    if (entryPoint->getShaderRecordOffset() >= 0)
+    {
+        writer << ",\n\"shaderRecordOffset\": " << entryPoint->getShaderRecordOffset();
+        writer << ",\n\"shaderRecordSize\": " << entryPoint->getShaderRecordSize();
+    }
     if (auto resultVarLayout = entryPoint->getResultVarLayout())
     {
         writer << ",\n\"result\": ";
@@ -1524,6 +1535,31 @@ static void emitReflectionJSON(
 
         writer.dedent();
         writer << "\n]";
+    }
+
+    auto uniformGroupCount = programReflection->getEntryPointUniformLayoutGroupCount();
+    if (uniformGroupCount)
+    {
+        writer << ",\n\"entryPointUniformLayoutGroups\": [";
+        for (SlangUInt g = 0; g < uniformGroupCount; ++g)
+        {
+            if (g)
+                writer << ", ";
+            writer << "{\"entryPoints\": [";
+            auto count = programReflection->getEntryPointUniformLayoutGroupEntryPointCount(g);
+            for (SlangUInt i = 0; i < count; ++i)
+            {
+                if (i)
+                    writer << ", ";
+                writer << programReflection->getEntryPointUniformLayoutGroupEntryPointIndex(g, i);
+            }
+            writer << "]";
+            auto size = programReflection->getEntryPointUniformLayoutGroupSize(g);
+            if (size >= 0)
+                writer << ", \"pushConstantSize\": " << size;
+            writer << "}";
+        }
+        writer << "]";
     }
 
     auto genParamCount = programReflection->getTypeParameterCount();

@@ -1781,6 +1781,17 @@ private:
         if (!typeConstraintDecl)
             return WitnessConstraintInferenceResult::NotApplicable;
 
+        // Consider matching `extension<T> Box<T> where optional T : IDifferentiable`
+        // against `Box<uint>`. Unification already selected uint and its absent witness.
+        // Absence supplies no conformance shape to infer from: joining uint with
+        // IDifferentiable here would promote T to float while retaining uint's absence,
+        // making the extension's target differ from the type it was matched against.
+        if (auto selectedWitness = m_context.discoveredWitnessArgs.tryGetValue(typeConstraintDecl))
+        {
+            if (as<NoneWitness>(*selectedWitness) || as<AbsentWitnessPack>(*selectedWitness))
+                return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
+        }
+
         // The subject side must be ready before the shape comparison is useful.
         // In `T : IFoo<U>`, comparing before `T` is known would only restate the
         // source constraint; after `T` is solved to a concrete type, the subtype
@@ -2981,6 +2992,16 @@ private:
         if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
             return nullptr;
 
+        if (constraintDecl->hasModifier<OptionalConstraintModifier>() &&
+            !constraintDecl->isEqualityConstraint && isTypePack(sub))
+        {
+            return m_visitor->getOptionalSubtypeWitness(
+                sub,
+                sup,
+                m_context.additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching
+                                                     : IsSubTypeOptions::None);
+        }
+
         // Subtype witness construction belongs to `isSubtype()`. That path owns
         // facet linearization, generic-parameter conformances, associated-type
         // constraints, concrete conformances, and cached answers; the solver
@@ -3392,8 +3413,10 @@ private:
             // cost. Concrete subtype witnesses contribute the cost determined by
             // the subtype checker, such as the number of interface upcasts.
             auto witnessArg = getSolvedWitnessArg(constraint.decl);
-            if (as<NoneWitness>(witnessArg))
+            if (as<NoneWitness>(witnessArg) || as<AbsentWitnessPack>(witnessArg))
                 cost += kConversionCost_FailedOptionalConstraint;
+            else if (auto optionalPack = as<OptionalWitnessPack>(witnessArg))
+                cost += optionalPack->getOverloadResolutionCost();
             else if (auto subTypeWitness = as<SubtypeWitness>(witnessArg))
                 cost += subTypeWitness->getOverloadResolutionCost();
         }
@@ -3557,6 +3580,64 @@ bool SemanticsVisitor::TryUnifyVals(
         // unresolved non-constant pairs to the later checking/proof path instead of rejecting them
         // here.
         return true;
+    }
+
+    // Applying `extension<T> f<T>` to `f<uint>` must bind the extension's optional
+    // constraint parameter to the already-selected absent evidence. Requiring two subtype
+    // proofs here rejects the extension before the generic solver can check its constraints.
+    auto optionalParameter = as<DeclaredSubtypeWitness>(fst);
+    auto optionalArgument = as<Witness>(snd);
+    if (!optionalParameter)
+    {
+        optionalParameter = as<DeclaredSubtypeWitness>(snd);
+        optionalArgument = as<Witness>(fst);
+    }
+    if (optionalParameter && optionalParameter->isOptional() &&
+        (as<NoneWitness>(optionalArgument) || as<OptionalWitnessPack>(optionalArgument) ||
+         as<AbsentWitnessPack>(optionalArgument)))
+    {
+        auto constraintDecl = optionalParameter->getDeclRef().as<GenericTypeConstraintDecl>();
+        if (constraintDecl && isGenericConstraintParameterDecl(constraintDecl.getDecl()) &&
+            isRelevantGeneric(constraints, constraintDecl.getDecl()->parentDecl))
+        {
+            constraints.discoveredWitnessArgs[constraintDecl.getDecl()] = optionalArgument;
+            return true;
+        }
+    }
+
+    // A callable constraint such as IDifferentiableFuncWithDiffThis<T, uint, T> carries
+    // a mixed pack of optional evidence. Matching two generic declarations must unify the
+    // corresponding proofs, including their generic witness arguments; comparing only the
+    // pack objects would lose the same inference performed for an ordinary subtype witness.
+    auto fstOptionalPack = as<OptionalWitnessPack>(fst);
+    auto sndOptionalPack = as<OptionalWitnessPack>(snd);
+    auto fstProofPack = as<TypePackSubtypeWitness>(fst);
+    auto sndProofPack = as<TypePackSubtypeWitness>(snd);
+    if ((fstOptionalPack && (sndOptionalPack || sndProofPack)) || (sndOptionalPack && fstProofPack))
+    {
+        auto fstCount = fstOptionalPack ? fstOptionalPack->getCount() : fstProofPack->getCount();
+        auto sndCount = sndOptionalPack ? sndOptionalPack->getCount() : sndProofPack->getCount();
+        if (fstCount != sndCount)
+            return false;
+        auto fstSup = fstOptionalPack ? fstOptionalPack->getSup() : fstProofPack->getSup();
+        auto sndSup = sndOptionalPack ? sndOptionalPack->getSup() : sndProofPack->getSup();
+        bool okay = TryUnifyTypes(constraints, unificationOptions, fstSup, sndSup);
+        for (Index i = 0; i < fstCount; i++)
+        {
+            Witness* fstElement =
+                fstOptionalPack ? fstOptionalPack->getWitness(i) : fstProofPack->getWitness(i);
+            Witness* sndElement =
+                sndOptionalPack ? sndOptionalPack->getWitness(i) : sndProofPack->getWitness(i);
+            if (!TryUnifyVals(
+                    constraints,
+                    unificationOptions,
+                    fstElement,
+                    fstLVal,
+                    sndElement,
+                    sndLVal))
+                okay = false;
+        }
+        return okay;
     }
 
     if (auto fstWit = as<DeclaredSubtypeWitness>(fst))

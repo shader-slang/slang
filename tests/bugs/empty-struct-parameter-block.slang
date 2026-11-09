@@ -13,7 +13,8 @@
 // legalization treats a public type as "simple" and keeps it. An empty struct declared
 // `public` (as `EmptyType` is here) was therefore retained and reproduced the mismatch. The
 // fix stops emitting `IRPublicDecoration` for the `public` modifier, so a public empty
-// struct now legalizes identically to a non-public one.
+// struct now legalizes identically to a non-public one. `IRHGBCExportDecoration` separately
+// preserves that visibility for HGBC API reflection without constraining physical layout.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -shaderobj
 // The reported failure is on CUDA (a distinct emitter); assert at the text-emit level that

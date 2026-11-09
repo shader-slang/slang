@@ -416,12 +416,14 @@ struct ContainerDeclDirectMemberDeclsInfo
 %   "ParamPassingMode",
 %   "PreferRecomputeAttribute::SideEffectBehavior",
 %   "TreatAsDifferentiableExpr::Flavor",
+%   "RayPipelineCallExpr::Kind",
 %   "LogicOperatorShortCircuitExpr::Flavor",
 %   "RequirementWitness::Flavor",
 %   "CapabilityAtom",
 %   "DeclAssociationKind",
 %   "TokenType",
 %   "ValNodeOperandKind",
+%   "HGBCAsmOperand::Flavor",
 %   "SPIRVAsmOperand::Flavor",
 %   "SlangLanguageVersion",
 %}
@@ -492,11 +494,13 @@ SLANG_DECLARE_FOSSILIZED_AS($T, FossilUInt);
 %
 %astStructTypes = {
 %   Slang.QualType,
+%   Slang.HGBCAsmOperand,
 %   Slang.ParamInfo,
 %   Slang.SPIRVAsmOperand,
 %   Slang.DeclAssociation,
 %   Slang.NameLoc,
 %   Slang.WitnessTable,
+%   Slang.HGBCAsmInst,
 %   Slang.SPIRVAsmInst,
 %   Slang.ASTModuleInfo,
 %   Slang.ContainerDeclDirectMemberDeclsInfo,

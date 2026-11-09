@@ -135,6 +135,13 @@ bool allUsesLeadToLoads(IRInst* inst)
                 if (u != &user->getOperands()[0])
                     return false;
 
+                // A field address based on Ptr<Class> points into the referenced heap object,
+                // not into the local variable that stores the class handle. Promoting that local
+                // would turn the heap mutation into an UpdateElement of the handle value.
+                if (as<IRFieldAddress>(user) &&
+                    isPtrToClassType(user->getOperand(0)->getDataType()))
+                    return false;
+
                 if (!allUsesLeadToLoads(user))
                     return false;
             }

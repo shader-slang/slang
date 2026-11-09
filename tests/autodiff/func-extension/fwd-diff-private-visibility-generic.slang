@@ -1,5 +1,4 @@
-//DISABLE_TEST:SIMPLE(diag=CHECK, non-exhaustive): -experimental-feature
-// TODO: re-enable when func-extension visibility is implemented separately.
+//TEST:SIMPLE(diag=CHECK): -experimental-feature
 //CHECK: invalid private visibility
 //CHECK: cannot have private visibility because it is not a member of a type.
 

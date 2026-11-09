@@ -4,6 +4,10 @@ Slang Documentation
 This directory contains documentation for the Slang system.
 Some of the documentation is intended for users of the language and compiler, while other documentation is intended for developers contributing to the project.
 
+The `h-slang` branch has a dedicated [heterogeneous programming guide](heterogeneity/index.md),
+starting with [installation](heterogeneity/installation.md) and [a first program](heterogeneity/invoking.md). See its
+[local preview instructions](heterogeneity/contributing.md#preview-locally) to view the site.
+
 Getting Started
 ---------------
 

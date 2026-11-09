@@ -1,10 +1,9 @@
 // Regression test for issue #7878: returning `none` from a generic wrapper's
 // `Optional<T>` accessor, then instantiating the wrapper with a resource type,
 // used to reach spirv-emit as a `defaultConstruct` of an opaque handle and abort
-// with "Unhandled local inst in spirv-emit". The front-end `Optional<T>` check
-// (E30902) does not fire here because `T` is only known to be `Texture2D` after
-// specialization. The compiler must reject this with a diagnostic rather than
-// crash: there is no default/zero value for an opaque handle on Khronos targets.
+// with "Unhandled local inst in spirv-emit". The front end permits resources in
+// `Optional<T>`, so the Khronos target must reject the unsupported local opaque
+// value with a diagnostic rather than crash.
 //
 // The caret pins the diagnostic to the user's `none`, exercising the
 // `defaultVal->sourceLoc = inst->sourceLoc` propagation in the Optional lowering;

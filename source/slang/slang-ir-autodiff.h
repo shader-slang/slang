@@ -153,7 +153,11 @@ struct DifferentiableTypeConformanceContext
             }
 
             auto resultType = resolveType(builder, funcType->getResultType());
-            return builder->getFuncType(paramTypes, resultType);
+            // Concrete pack elements must be classified independently. For example, a
+            // specialized <uint, float> input has only one differentiable element.
+            return maybeExpandConcreteFuncTypePacks(
+                builder,
+                builder->getFuncType(paramTypes, resultType));
         }
 
         switch (typeInst->getOp())
@@ -337,14 +341,18 @@ struct DifferentiableTypeConformanceContext
                         paramTypes.add(innerFnType->getParamType(i));
                 }
 
-                // Result type: Tuple<ResultType, ContextType> for non-void,
-                // ContextType for void.
+                // Pointer results carry their gradient destination into the caller's primal
+                // pass, just like pointer inputs. Value-result gradients arrive during backward.
+                auto applyResultType = innerFnType->getResultType();
+                if (isDifferentiablePtrType(applyResultType))
+                    applyResultType = cast<IRType>(tryGetAssociationOfKind(
+                        applyResultType,
+                        AnnotationKind::DifferentialPtrPairType));
                 IRType* resultType;
-                if (as<IRVoidType>(innerFnType->getResultType()))
+                if (as<IRVoidType>(applyResultType))
                     resultType = (IRType*)contextType;
                 else
-                    resultType =
-                        builder->getTupleType(innerFnType->getResultType(), (IRType*)contextType);
+                    resultType = builder->getTupleType(applyResultType, (IRType*)contextType);
 
                 return builder->getFuncType(paramTypes, resultType);
                 break;
@@ -400,6 +408,15 @@ struct DifferentiableTypeConformanceContext
                             builder,
                             transposeDirection(paramDirection),
                             (IRType*)diffValueType));
+                    }
+                    else if (paramDirection.kind == ParameterDirectionInfo::Kind::In)
+                    {
+                        // An input always contributes an output slot to the backward context.
+                        // A non-differentiable specialization keeps that slot as out None.
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            ParameterDirectionInfo::Kind::Out,
+                            builder->getVoidType()));
                     }
                     else
                         paramTypes.add(builder->getVoidType());

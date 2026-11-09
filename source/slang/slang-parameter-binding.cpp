@@ -3115,7 +3115,7 @@ struct ScopeLayoutBuilder
         // over to the struct type layout for the scope.
         //
         m_structLayout->addResourceUsage(LayoutResourceKind::Uniform, m_structLayoutInfo.size);
-        m_structLayout->uniformAlignment = m_structLayout->uniformAlignment;
+        m_structLayout->uniformAlignment = m_structLayoutInfo.alignment;
 
         RefPtr<TypeLayout> scopeTypeLayout = m_structLayout;
 
@@ -3374,9 +3374,14 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
     //
-    context->shared->programLayout->entryPoints.add(entryPointLayout);
+    auto programLayout = context->shared->programLayout;
+    auto program = programLayout->getProgram();
+    auto entryPointIndex = programLayout->entryPoints.getCount();
+    SLANG_RELEASE_ASSERT(program->getEntryPoint(entryPointIndex).get() == entryPoint);
+    programLayout->entryPoints.add(
+        {entryPoint, entryPointLayout, program->getEntryPointMangledName(entryPointIndex)});
 
-    DeclRef<FuncDecl> entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
+    DeclRef<FunctionDeclBase> entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
 
     // HACK: We might have an `EntryPoint` that has been deserialized, in
     // which case we don't currently have access to its AST-level information,
@@ -3484,6 +3489,23 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     auto paramsStructLayout = scopeBuilder.m_structLayout;
     paramsStructLayout->type = entryPointType;
 
+    // Instance entry points have an implicit `this` parameter in IR. Represent that receiver in
+    // the entry-point parameter layout as well so the layout and IR parameter lists have the same
+    // shape. Graph targets use this parameter as the persistent object being invoked.
+    auto entryPointFuncDecl = entryPointFuncDeclRef.getDecl();
+    if (!as<ConstructorDecl>(entryPointFuncDecl) &&
+        !entryPointFuncDecl->hasModifier<HLSLStaticModifier>())
+    {
+        if (auto parentTypeDeclRef = entryPointFuncDeclRef.getParent().as<AggTypeDecl>())
+        {
+            auto receiverType = DeclRefType::create(astBuilder, parentTypeDeclRef);
+            RefPtr<VarLayout> receiverVarLayout = new VarLayout();
+            receiverVarLayout->stage = state.stage;
+            receiverVarLayout->typeLayout = createTypeLayout(layoutContext, receiverType);
+            scopeBuilder.addSimpleParameter(receiverVarLayout);
+        }
+    }
+
     for (auto& shaderParamInfo : entryPoint->getShaderParams())
     {
         auto paramDeclRef = shaderParamInfo.paramDeclRef;
@@ -3548,8 +3570,8 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     }
     entryPointLayout->parametersLayout = scopeBuilder.endLayout();
 
-    // For an entry point with a non-`void` return type, we need to process the
-    // return type as a varying output parameter.
+    // For an entry point with a non-`void` return type, compute its result layout.
+    // Dispatch entry points return ordinary host values; shader entry points return varyings.
     //
     // TODO: Ideally we should make the layout process more robust to empty/void
     // types and apply this logic unconditionally.
@@ -3565,23 +3587,32 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
         RefPtr<VarLayout> resultLayout = new VarLayout();
         resultLayout->stage = state.stage;
 
-        auto resultTypeLayout = processEntryPointVaryingParameterDecl(
-            context,
-            entryPointFuncDeclRef.getDecl(),
-            resultType,
-            state,
-            resultLayout);
+        // A host function such as `[host] Counter makeCounter()` returns a managed class
+        // handle. Use the ordinary target layout, just as for its uniform parameters,
+        // rather than traversing class fields as shader output semantics.
+        const bool isDispatch = state.stage == Stage::Dispatch;
+        auto resultTypeLayout = isDispatch ? createTypeLayout(context->layoutContext, resultType)
+                                           : processEntryPointVaryingParameterDecl(
+                                                 context,
+                                                 entryPointFuncDeclRef.getDecl(),
+                                                 resultType,
+                                                 state,
+                                                 resultLayout);
 
         if (resultTypeLayout)
         {
             resultLayout->typeLayout = resultTypeLayout;
 
-            for (auto rr : resultTypeLayout->resourceInfos)
+            // A host result has its own return storage and does not occupy parameter space.
+            if (!isDispatch)
             {
-                auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
-                resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    entryPointRes->count.getFiniteValue();
-                entryPointRes->count += rr.count;
+                for (auto rr : resultTypeLayout->resourceInfos)
+                {
+                    auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
+                    resultLayout->findOrAddResourceInfo(rr.kind)->index =
+                        entryPointRes->count.getFiniteValue();
+                    entryPointRes->count += rr.count;
+                }
             }
 
             entryPointLayout->resultLayout = resultLayout;
@@ -3994,7 +4025,7 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         //
         auto globalEntryPointIndex = m_counters->entryPointCounter++;
         auto globalEntryPointInfo =
-            m_context->shared->programLayout->entryPoints[globalEntryPointIndex];
+            m_context->shared->programLayout->entryPoints[globalEntryPointIndex].layout;
 
 
         // We mostly treat an entry point like a single shader parameter that
@@ -4270,7 +4301,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     //
     for (auto& entryPoint : sharedContext.programLayout->entryPoints)
     {
-        auto paramsLayout = entryPoint->parametersLayout->getTypeLayout();
+        auto paramsLayout = entryPoint.layout->parametersLayout->getTypeLayout();
         for (auto resInfo : paramsLayout->resourceInfos)
         {
             if (!doesEntryPointParameterResourceNeedDefaultSpace(resInfo.kind))
@@ -4286,7 +4317,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             //
             if (allEntryPointParametersOfKindAreExplicitlyVkBound(
                     sharedContext,
-                    entryPoint,
+                    entryPoint.layout,
                     resInfo.kind))
                 continue;
 
@@ -4450,6 +4481,145 @@ static void _maybeApplyHLSLToVulkanShifts(
     }
 }
 
+/// Place implicit push-constant and shader-record payloads according to coexistence constraints.
+/// For groups {V, F1} and {V, F2}, V conflicts with both fragment payloads, while F1 and F2
+/// may reuse bytes. Keep the normal field/type layouts local: only the entry-point payload
+/// base changes, and lowering carries that base into the generated GPU parameter struct.
+static SlangResult assignEntryPointUniformOffsets(ProgramLayout* layout, DiagnosticSink* sink)
+{
+    if (layout->entryPointUniformLayoutGroups.getCount() == 0 ||
+        !isKhronosTarget(layout->getTargetReq()) ||
+        layout->getProgram()->getSpecializationParamCount() != 0)
+        return SLANG_OK;
+
+    struct Payload
+    {
+        HashSet<Index> conflicts;
+        UInt64 size = 0;
+        UInt64 offset = 0;
+        bool used = false;
+    };
+    List<Payload> payloads;
+    payloads.setCount(layout->entryPoints.getCount());
+    for (auto const& group : layout->entryPointUniformLayoutGroups)
+    {
+        const bool rayGroup =
+            isRaytracingStage(layout->entryPoints[group[0]].layout->profile.getStage());
+        for (auto index : group)
+        {
+            if (isRaytracingStage(layout->entryPoints[index].layout->profile.getStage()) !=
+                rayGroup)
+            {
+                sink->diagnose(Diagnostics::InvalidEntryPointUniformLayoutConstraints{
+                    .reason = "a group cannot combine shader-record and push-constant storage"});
+                return SLANG_FAIL;
+            }
+        }
+        for (auto index : group)
+        {
+            payloads[index].used = true;
+            for (auto other : group)
+            {
+                if (other != index)
+                    payloads[index].conflicts.add(other);
+            }
+        }
+    }
+
+    // Explicit globals need shared-block lowering only when they occupy the same storage
+    // class as a constrained entry-point payload. A global push constant is independent of
+    // ray shader-record data, and must not prevent assigning the latter's record offsets.
+    for (auto const& group : layout->entryPointUniformLayoutGroups)
+    {
+        auto storage = isRaytracingStage(layout->entryPoints[group[0]].layout->profile.getStage())
+                           ? LayoutResourceKind::ShaderRecord
+                           : LayoutResourceKind::PushConstantBuffer;
+        for (auto field : getScopeStructLayout(layout)->fields)
+        {
+            if (!field->typeLayout->FindResourceInfo(storage))
+                continue;
+            sink->diagnose(Diagnostics::InvalidEntryPointUniformLayoutConstraints{
+                .reason = "explicit global storage sharing a constrained entry-point payload "
+                          "requires shared-block lowering, which is not supported yet"});
+            return SLANG_FAIL;
+        }
+    }
+
+    for (Index i = 0; i < payloads.getCount(); ++i)
+    {
+        auto& payload = payloads[i];
+        if (!payload.used)
+            continue;
+        auto entryPoint = layout->entryPoints[i].layout;
+        auto dataLayout = getScopeStructLayout(entryPoint);
+        if (dataLayout->FindResourceInfo(LayoutResourceKind::PushConstantBuffer))
+        {
+            sink->diagnose(Diagnostics::InvalidEntryPointUniformLayoutConstraints{
+                .reason = "explicit push-constant parameters in a jointly placed entry-point "
+                          "payload require shared-block lowering, which is not supported yet"});
+            return SLANG_FAIL;
+        }
+        auto data = dataLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+        if (data && !data->count.isFinite())
+        {
+            sink->diagnose(Diagnostics::InvalidEntryPointUniformLayoutConstraints{
+                .reason = "entry-point captures require a concrete finite layout"});
+            return SLANG_FAIL;
+        }
+        auto size = data ? data->count.getFiniteValue().getValidValue() : 0;
+        // Shader-record usage is intentionally removed from the program-wide binding counts.
+        // The stage remains the canonical source of the implicit parameter storage kind.
+        const bool rayStage = isRaytracingStage(entryPoint->profile.getStage());
+        if (size && !rayStage &&
+            !entryPoint->parametersLayout->typeLayout->FindResourceInfo(
+                LayoutResourceKind::PushConstantBuffer))
+            continue;
+        entryPoint->uniformStorageKind =
+            rayStage ? LayoutResourceKind::ShaderRecord : LayoutResourceKind::PushConstantBuffer;
+        UInt64 alignment = Math::Max<UInt64>(4, dataLayout->uniformAlignment.getValidValue());
+        // Bound each operand before rounding or adding intervals. The allocator uses
+        // 64-bit arithmetic, while Vulkan's range offsets and sizes are 32-bit values.
+        if (UInt64(size) > UInt64(UINT32_MAX) - 3 || alignment > UInt64(UINT32_MAX))
+        {
+            sink->diagnose(Diagnostics::InvalidEntryPointUniformLayoutConstraints{
+                .reason = "entry-point uniform payload exceeds the target address range"});
+            return SLANG_FAIL;
+        }
+        payload.size = (UInt64(size) + 3) & ~UInt64(3);
+        UInt64 candidate = 0;
+        for (;;)
+        {
+            bool moved = false;
+            for (Index previous = 0; previous < i; ++previous)
+            {
+                auto const& occupied = payloads[previous];
+                if (!payload.conflicts.contains(previous) || !occupied.size || !payload.size)
+                    continue;
+                if (candidate < occupied.offset + occupied.size &&
+                    occupied.offset < candidate + payload.size)
+                {
+                    candidate =
+                        ((occupied.offset + occupied.size + alignment - 1) / alignment) * alignment;
+                    moved = true;
+                    break;
+                }
+            }
+            if (!moved)
+                break;
+        }
+        if (candidate + payload.size > UInt64(UINT32_MAX))
+        {
+            sink->diagnose(Diagnostics::InvalidEntryPointUniformLayoutConstraints{
+                .reason = "assigned uniform byte range exceeds the target address range"});
+            return SLANG_FAIL;
+        }
+        payload.offset = candidate;
+        entryPoint->uniformOffset = SlangInt(candidate);
+        entryPoint->uniformSize = SlangInt(payload.size);
+    }
+    return SLANG_OK;
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_AST_BUILDER_RAII(targetProgram->getProgram()->getLinkage()->getASTBuilder());
@@ -4459,6 +4629,10 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
     RefPtr<ProgramLayout> programLayout = new ProgramLayout();
     programLayout->targetProgram = targetProgram;
+    if (SLANG_FAILED(program->getEntryPointUniformLayoutGroups(
+            programLayout->entryPointUniformLayoutGroups,
+            sink)))
+        return nullptr;
 
     {
         auto& pool = programLayout->hashedStringLiteralPool;
@@ -4541,7 +4715,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     }
     for (auto& entryPoint : sharedContext.programLayout->entryPoints)
     {
-        addExplicitVkBindingsForEntryPointParameters(&context, entryPoint);
+        addExplicitVkBindingsForEntryPointParameters(&context, entryPoint.layout);
     }
 
     // It is possible that code has specified an explicit location
@@ -4834,6 +5008,8 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         programLayout->bindlessSpaceIndex = availableIndex;
     }
 
+    if (SLANG_FAILED(assignEntryPointUniformOffsets(programLayout, sink)))
+        return nullptr;
     return programLayout;
 }
 

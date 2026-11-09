@@ -20,6 +20,7 @@
 #include "slang-ast-print.h"
 #include "slang-ast-support-types.h"
 #include "slang-ast-synthesis.h"
+#include "slang-hgbc-format.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
@@ -605,10 +606,12 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 expr->type = m_astBuilder->getErrorType();
             }
 
-            // The member's `QualType` supplies its own l-value status. An ordinary instance
-            // member additionally requires an l-value base. Buffer accesses and property
-            // accessors have the separate rules below when the base is not an l-value.
-            if (!baseExpr->type.isLeftValue)
+            // A value-type member needs a writable base, but a class handle names separate
+            // object storage. Consider `let box = new Box(); box.value = 1;`: the assignment
+            // changes the object without rebinding `box`. The same rule lets an ordinary
+            // class method assign to `this.value` while keeping `this` itself immutable.
+            // Preserve the member's own qualifiers so immutable fields remain unwritable.
+            if (!baseExpr->type.isLeftValue && !isDeclRefTypeOf<ClassDecl>(baseExpr->type.type))
             {
                 // A GLSL buffer interface block provides mutable storage even though its
                 // parameter expression is not an l-value. The member is writable only when
@@ -1337,12 +1340,15 @@ LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(
 
 bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
 {
-    auto declaredWitness = as<DeclaredSubtypeWitness>(witness);
-    if (!declaredWitness)
-        return false;
-
-    auto decl = declaredWitness->getDeclRef().getDecl();
-    if (!decl || !decl->hasModifier<OptionalConstraintModifier>())
+    if (auto transitive = as<TransitiveSubtypeWitness>(witness))
+    {
+        // An inherited member relies on the original optional constraint. For example, checking
+        // `T is IDerived` also permits members of IBase when IDerived inherits IBase; comparing
+        // only the final T : IBase proof would lose that checked condition.
+        return isWitnessUncheckedOptional(transitive->getSubToMid()) ||
+               isWitnessUncheckedOptional(transitive->getMidToSup());
+    }
+    if (!isUncheckedOptionalWitness(witness))
         return false;
 
     // Okay, we've found an optional subtype witness. This result needs
@@ -2191,18 +2197,42 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 getASTBuilder()->getDifferentiableInterfaceType()))
         {
             hasDiffValueConformance = true;
-            maybeRegisterVal(
-                this,
-                type,
-                type,
-                getName("Differential"),
-                AnnotationKind::DifferentialType);
-            this->getParentDifferentiableAttribute()->addAssocVal(
-                type,
-                (SlangInt)AnnotationKind::DifferentialPairType,
-                getCurrentASTBuilder()->getDifferentialPairType(type, witness));
-            maybeRegisterVal(this, type, type, getName("dzero"), AnnotationKind::DifferentialZero);
-            maybeRegisterVal(this, type, type, getName("dadd"), AnnotationKind::DifferentialAdd);
+            if (isWitnessUncheckedOptional(witness))
+            {
+                // Consider `f<T>(T metadata) where optional T : IDifferentiable`.
+                // Register its evidence, not a pair or member lookup: specializing T to uint
+                // would otherwise produce DifferentialPair<uint, None> and lookup(None, dzero).
+                // Autodiff derives the associations only after the evidence has been selected.
+                getParentDifferentiableAttribute()->addAssocVal(
+                    type,
+                    (SlangInt)AnnotationKind::OptionalDifferentiableWitness,
+                    witness);
+            }
+            else
+            {
+                maybeRegisterVal(
+                    this,
+                    type,
+                    type,
+                    getName("Differential"),
+                    AnnotationKind::DifferentialType);
+                getParentDifferentiableAttribute()->addAssocVal(
+                    type,
+                    (SlangInt)AnnotationKind::DifferentialPairType,
+                    getCurrentASTBuilder()->getDifferentialPairType(type, witness));
+                maybeRegisterVal(
+                    this,
+                    type,
+                    type,
+                    getName("dzero"),
+                    AnnotationKind::DifferentialZero);
+                maybeRegisterVal(
+                    this,
+                    type,
+                    type,
+                    getName("dadd"),
+                    AnnotationKind::DifferentialAdd);
+            }
         }
 
         if (auto witness = tryGetInterfaceConformanceWitness(
@@ -3027,6 +3057,23 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             return as<IntVal>(
                 CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
         }
+    }
+
+    if (auto indexExpr = expr.as<IndexOfTypeInPackExpr>())
+    {
+        auto query = indexExpr.getExpr();
+        if (!query->elementType.type || !query->packType.type)
+            CheckTerm(query);
+        if (as<ErrorType>(query->type.type))
+            return nullptr;
+        auto elementType =
+            as<Type>(query->elementType.type->substitute(m_astBuilder, expr.getSubsts()));
+        auto packType = as<Type>(query->packType.type->substitute(m_astBuilder, expr.getSubsts()));
+        return IndexOfTypeInPackIntVal::tryFold(
+            m_astBuilder,
+            query->type.type,
+            elementType,
+            packType);
     }
 
     if (auto packQueryExpr = expr.as<PackQueryExpr>())
@@ -4285,11 +4332,27 @@ void SemanticsVisitor::_checkAliasedOutArguments(
 
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
+    // Overload resolution groups concrete variadic arguments into PackExprs. An apply call
+    // resolves its primal overload first, then its associated apply method; the second lookup
+    // must start from the original argument list rather than packing the first result again.
+    auto originalArguments = expr->arguments;
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {
         if (!invoke->functionExpr)
             return rs;
+
+        if (auto applyExpr = as<ApplyForBwdExpr>(invoke->functionExpr))
+        {
+            // The provisional apply signature selects the primal overload. Its result is still
+            // the primal result, so check the resolved apply_bwd call before assigning the type
+            // of this expression. For example, applying a void function returns its context.
+            invoke->functionExpr = convertHigherOrderExprToLookup(this, applyExpr);
+            if (IsErrorExpr(invoke->functionExpr))
+                return CreateErrorExpr(invoke);
+            invoke->arguments = originalArguments;
+            return CheckInvokeExprWithCheckedOperands(invoke);
+        }
 
         // if this is still an invoke expression, test arguments passed to inout/out parameter
         // are LValues.
@@ -5533,19 +5596,82 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
     Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedDecl;
     ASTBuilder* astBuilder;
     DiagnosticSink* sink;
+    SemanticsVisitor* semantics;
 
     LambdaCaptureVisitor(
         LambdaExpr* inLambdaExpr,
         LambdaDecl* inLambdaDecl,
         Dictionary<Decl*, VarDeclBase*>* inMap,
         ASTBuilder* inAstBuilder,
-        DiagnosticSink* inSink)
+        DiagnosticSink* inSink,
+        SemanticsVisitor* inSemantics)
         : lambdaExpr(inLambdaExpr)
         , lambdaDecl(inLambdaDecl)
         , mapSrcDeclToCapturedDecl(inMap)
         , astBuilder(inAstBuilder)
         , sink(inSink)
+        , semantics(inSemantics)
     {
+    }
+
+    /// Adds the differential field for an active pointer capture and preserves constant captures.
+    ///
+    /// Consider `(uint index, float value)~ => parameters.load(index) * value`, where
+    /// `parameters` implements IDifferentiablePtrType. The closure stores `parameters`, and its
+    /// Differential stores the corresponding gradient handle. Both fields need their ordinary
+    /// DerivativeMember associations before checking the body can inspect the closure's type.
+    void addDifferentialCapture(VarDeclBase* capturedField, Decl* sourceDecl, Expr* sourceExpr)
+    {
+        if (!lambdaExpr->differentiableLoc.isValid() || lambdaExpr->mutatingLoc.isValid())
+            return;
+
+        auto fieldType = capturedField->type.type;
+        bool isNoDiff =
+            sourceDecl->hasModifier<NoDiffModifier>() || doesTypeHaveNoDiffModifier(fieldType);
+        auto pointerWitness = isNoDiff ? nullptr
+                                       : semantics->tryGetInterfaceConformanceWitness(
+                                             fieldType,
+                                             astBuilder->getDifferentiableRefInterfaceType());
+        if (!pointerWitness)
+        {
+            if (!isNoDiff && semantics->tryGetInterfaceConformanceWitness(
+                                 fieldType,
+                                 astBuilder->getDifferentiableInterfaceType()))
+            {
+                sink->diagnose(Diagnostics::DifferentiableLambdaValueCapture{
+                    .type = fieldType,
+                    .expr = sourceExpr});
+            }
+            addModifier(capturedField, astBuilder->create<NoDiffModifier>());
+            return;
+        }
+
+        auto differentialDecl = as<StructDecl>(
+            lambdaDecl->findLastDirectMemberDeclOfName(semantics->getName("Differential")));
+        SLANG_RELEASE_ASSERT(differentialDecl);
+        auto differentialType =
+            DeclRefType::create(astBuilder, semantics->getDefaultDeclRef(differentialDecl));
+        auto diffField = astBuilder->create<VarDecl>();
+        diffField->nameAndLoc = capturedField->nameAndLoc;
+        diffField->type.type =
+            semantics->getDifferentialType(astBuilder, fieldType, sourceExpr->loc);
+        differentialDecl->addMember(diffField);
+
+        auto differentialMember = astBuilder->create<StaticMemberExpr>();
+        differentialMember->type.type = diffField->type.type;
+        differentialMember->declRef = semantics->getDefaultDeclRef(diffField);
+        auto baseTypeExpr = astBuilder->create<SharedTypeExpr>();
+        baseTypeExpr->base.type = differentialType;
+        baseTypeExpr->type.type = astBuilder->getTypeType(differentialType);
+        differentialMember->baseExpression = baseTypeExpr;
+
+        auto derivativeMember = astBuilder->create<DerivativeMemberAttribute>();
+        derivativeMember->memberDeclRef = differentialMember;
+        addModifier(capturedField, derivativeMember);
+
+        auto selfDerivativeMember = astBuilder->create<DerivativeMemberAttribute>();
+        selfDerivativeMember->memberDeclRef = differentialMember;
+        addModifier(diffField, selfDerivativeMember);
     }
 
     /// Try to capture an outer-scope declaration referenced by a VarExpr or ThisExpr.
@@ -5600,6 +5726,7 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
             }
             SLANG_ASSERT(exprIn->type.type);
             capturedVarDecl->type.type = exprIn->type.type;
+            addDifferentialCapture(capturedVarDecl, srcDecl, exprIn);
             mapSrcDeclToCapturedDecl->add(srcDecl, capturedVarDecl);
             lambdaDecl->addMember(capturedVarDecl);
 
@@ -5616,7 +5743,9 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
 
         auto thisLambdaExpr = astBuilder->create<ThisExpr>();
         thisLambdaExpr->scope = lambdaDecl->ownedScope;
-        thisLambdaExpr->type = QualType(DeclRefType::create(astBuilder, lambdaDecl));
+        const bool isMutating =
+            lambdaDecl->funcDecl && lambdaDecl->funcDecl->hasModifier<MutatingAttribute>();
+        thisLambdaExpr->type = QualType(DeclRefType::create(astBuilder, lambdaDecl), isMutating);
         thisLambdaExpr->checked = true;
 
         auto resultMemberExpr = astBuilder->create<MemberExpr>();
@@ -5624,7 +5753,7 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
         resultMemberExpr->baseExpression = thisLambdaExpr;
         resultMemberExpr->type = exprIn->type;
         resultMemberExpr->loc = exprIn->loc;
-        resultMemberExpr->type.isLeftValue = false;
+        resultMemberExpr->type.isLeftValue = isMutating;
         resultMemberExpr->checked = true;
         return resultMemberExpr;
     }
@@ -5660,7 +5789,8 @@ Expr* SemanticsVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
         m_parentLambdaDecl,
         m_mapSrcDeclToCapturedLambdaDecl,
         m_astBuilder,
-        getSink());
+        getSink(),
+        this);
     return visitor.dispatch(exprIn);
 }
 
@@ -5906,10 +6036,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    if (as<DifferentialPairType>(diffPairValType))
-                        paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
-                    else if (as<DifferentialPtrPairType>(diffPairValType))
-                        paramTypes.add(diffPairValType);
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5924,7 +6055,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5939,7 +6074,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    paramTypes.add(m_astBuilder->getConstRefParamType(diffPairValType));
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5970,11 +6109,48 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
 
 struct HigherOrderInvokeExprCheckingActions
 {
+    // Keep the operand syntax while its resolved form is built. Member checking types the
+    // original base expression in place before lookup adds any interface upcast.
+    Expr* originalFuncExpr = nullptr;
+
     virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) = 0;
     virtual void fillHigherOrderInvokeExpr(
         HigherOrderInvokeExpr* resultDiffExpr,
         SemanticsVisitor* semantics,
         Expr* funcExpr) = 0;
+
+    /// Rejects a source derivative operator whose parameter convention is still conditional.
+    ///
+    /// Consider `f<T>(T value) where optional T : IDifferentiable`. Before specialization,
+    /// `bwd_diff(f<T>)` cannot decide whether its argument is `T` or `inout DifferentialPair<T>`.
+    /// The callable's calculated derivative member type remains deferred for conformance checking,
+    /// but an explicit derivative expression must have a signature the caller can check now.
+    bool checkDerivativeSignatureIsResolved(SemanticsVisitor* semantics, Expr* funcExpr)
+    {
+        auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr));
+        if (!declRefExpr)
+            return true;
+
+        auto astBuilder = semantics->getASTBuilder();
+        auto declRef = declRefExpr->declRef;
+        if (auto genericDeclRef = declRef.as<GenericDecl>())
+        {
+            declRef = createDefaultSubstitutionsIfNeeded(
+                astBuilder,
+                semantics,
+                astBuilder->getMemberDeclRef(genericDeclRef, getInner(genericDeclRef)));
+        }
+        auto witness = semantics->getDiffTypeInfoWitness(DeclRefType::create(astBuilder, declRef));
+        auto diffTypeInfo = witness ? as<DiffTypeInfoWitness>(witness->resolve()) : nullptr;
+        if (diffTypeInfo && diffTypeInfo->hasUncheckedOptionalEvidence())
+        {
+            semantics->getSink()->diagnose(
+                Diagnostics::DerivativeSignatureRequiresResolvedDifferentiability{
+                    .expr = funcExpr});
+            return false;
+        }
+        return true;
+    }
 
     FuncType* getBaseFunctionType(SemanticsVisitor* semantics, Expr* funcExpr)
     {
@@ -6019,24 +6195,43 @@ struct HigherOrderInvokeExprCheckingActions
         return declRef.as<CallableDecl>();
     }
 
-    // Extract the effective `this` parameter information for a statically referenced member method
-    // (e.g. `Type::method`). Returns an empty result for declarations without that parameter and
-    // for member methods referenced by name within their own type (e.g.
-    // `[BackwardDerivativeOf(f)]`).
+    // Extract the effective `this` parameter for an explicit member reference, including
+    // `Type::method` and a bound `value.method`. An unqualified member name within its own
+    // type (for example `[BackwardDerivativeOf(f)]`) does not add an explicit receiver here.
     std::optional<ParamInfo> getThisParamInfoForBaseFunc(
         SemanticsVisitor* semantics,
         Expr* funcExpr)
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
-        // Only produce a `this` type when the method is accessed via `Type::method`
-        // (`StaticMemberExpr`). When referenced by name within the same struct (a plain
-        // `DeclRefExpr`), the derivative is itself a member method with its own effective `this`
-        // parameter.
-        if (!as<StaticMemberExpr>(innerExpr))
+        auto originalMemberExpr =
+            as<MemberExpr>(getInnerMostExprFromHigherOrderExpr(originalFuncExpr));
+        auto memberExpr = as<MemberExpr>(innerExpr);
+        if (!as<StaticMemberExpr>(innerExpr) && !memberExpr && !originalMemberExpr)
             return std::nullopt;
-        if (auto callableDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
-            return semantics->findEffectiveThisParamInfo(callableDeclRef);
-        return std::nullopt;
+        auto callableDeclRef = getBaseFunctionDeclRef(semantics, funcExpr);
+        if (!callableDeclRef)
+            return std::nullopt;
+        auto thisParamInfo = semantics->findEffectiveThisParamInfo(callableDeclRef);
+        if (!thisParamInfo)
+            return std::nullopt;
+
+        // Consider bwd_diff(dFunction.p.operator()) with F : IUnary. Lookup can upcast F to
+        // IUnary and rebuild the candidate without its bound receiver. The original checked
+        // expression retains F; preserve that value type with the declaration's effective mode.
+        auto receiver = originalMemberExpr ? originalMemberExpr : memberExpr;
+        if (receiver)
+        {
+            auto receiverType = receiver->baseExpression->type.type;
+            if (doesTypeHaveNoDiffModifier(thisParamInfo->type) &&
+                !doesTypeHaveNoDiffModifier(receiverType))
+            {
+                receiverType = semantics->getASTBuilder()->getModifiedType(
+                    receiverType,
+                    semantics->getASTBuilder()->getNoDiffModifierVal());
+            }
+            thisParamInfo->type = receiverType;
+        }
+        return thisParamInfo;
     }
 };
 
@@ -6060,6 +6255,11 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             return;
         }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        if (!checkDerivativeSignatureIsResolved(semantics, funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            return;
+        }
         resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisParamInfo);
         if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
         {
@@ -6094,6 +6294,11 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             return;
         }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        if (!checkDerivativeSignatureIsResolved(semantics, funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            return;
+        }
         resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisParamInfo);
         if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
         {
@@ -6147,12 +6352,224 @@ struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprChecki
     }
 };
 
+static bool _isSystemValueParameter(ParamDecl* param)
+{
+    auto semantic = param->findModifier<HLSLSimpleSemantic>();
+    if (!semantic)
+        return false;
+
+    String semanticName(semantic->name.getContent());
+    auto lowerSemanticName = semanticName.toLower();
+    return lowerSemanticName.startsWith("sv_") || lowerSemanticName.startsWith("nv_");
+}
+
+struct DispatchKernelExprCheckingActions : HigherOrderInvokeExprCheckingActions
+{
+    virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
+    {
+        return semantics->getASTBuilder()->create<DispatchKernelExpr>();
+    }
+
+    void fillHigherOrderInvokeExpr(
+        HigherOrderInvokeExpr* resultExpr,
+        SemanticsVisitor* semantics,
+        Expr* funcExpr) override
+    {
+        resultExpr->baseFunction = funcExpr;
+        auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
+        if (!baseFuncType)
+        {
+            resultExpr->type = semantics->getASTBuilder()->getErrorType();
+            semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
+            return;
+        }
+
+        auto funcDecl = (CallableDecl*)nullptr;
+        if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+        {
+            funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
+            if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+                funcDecl = as<CallableDecl>(genDecl->inner);
+        }
+
+        auto dispatchExpr = as<DispatchKernelExpr>(resultExpr);
+        SLANG_RELEASE_ASSERT(dispatchExpr);
+        dispatchExpr->shaderParameterIndices.clear();
+        if (!funcDecl)
+        {
+            for (Index i = 0; i < baseFuncType->getParamCount(); ++i)
+                dispatchExpr->shaderParameterIndices.add(UInt(i));
+            resultExpr->type = baseFuncType;
+            return;
+        }
+
+        List<Type*> paramTypes;
+        Index paramIndex = 0;
+        for (auto param : funcDecl->getParameters())
+        {
+            if (paramIndex >= baseFuncType->getParamCount())
+                break;
+
+            if (_isSystemValueParameter(param))
+            {
+                paramIndex++;
+                continue;
+            }
+
+            dispatchExpr->shaderParameterIndices.add(UInt(paramIndex));
+            paramTypes.add(baseFuncType->getParamTypeWithModeWrapper(paramIndex++));
+            resultExpr->newParameterNames.add(param->getName());
+        }
+
+        resultExpr->type = semantics->getASTBuilder()->getFuncType(
+            paramTypes.getArrayView(),
+            baseFuncType->getResultType(),
+            baseFuncType->getErrorType());
+    }
+};
+
+static FuncType* _getHigherOrderBaseFunctionType(SemanticsVisitor* semantics, Expr* funcExpr)
+{
+    if (auto funcType = as<FuncType>(funcExpr->type.type))
+        return funcType;
+
+    auto astBuilder = semantics->getASTBuilder();
+    if (auto declRefExpr = as<DeclRefExpr>(funcExpr))
+    {
+        if (auto baseFuncGenericDeclRef = declRefExpr->declRef.as<GenericDecl>())
+        {
+            DeclRef<Decl> unspecializedInnerRef = createDefaultSubstitutionsIfNeeded(
+                astBuilder,
+                semantics,
+                astBuilder->getMemberDeclRef(
+                    baseFuncGenericDeclRef,
+                    getInner(baseFuncGenericDeclRef)));
+            auto callableDeclRef = unspecializedInnerRef.as<CallableDecl>();
+            if (!callableDeclRef)
+                return nullptr;
+            return getFuncType(astBuilder, callableDeclRef);
+        }
+    }
+
+    return nullptr;
+}
+
+static CallableDecl* _getCallableDeclFromHigherOrderExpr(Expr* funcExpr)
+{
+    if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+    {
+        auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
+        if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+            funcDecl = as<CallableDecl>(genDecl->inner);
+        return funcDecl;
+    }
+
+    return nullptr;
+}
+
+static bool _isBindablePipelineParamType(Type* type)
+{
+    if (auto resolvedType = as<Type>(type->resolve()))
+        type = resolvedType;
+
+    if (as<HLSLStructuredBufferTypeBase>(type))
+        return true;
+
+    if (as<RaytracingAccelerationStructureType>(type))
+        return true;
+
+    if (auto textureType = as<TextureTypeBase>(type))
+    {
+        switch (textureType->getAccess())
+        {
+        case SLANG_RESOURCE_ACCESS_READ:
+        case SLANG_RESOURCE_ACCESS_READ_WRITE:
+        case SLANG_RESOURCE_ACCESS_WRITE:
+            return true;
+        default:
+            break;
+        }
+    }
+
+    if (as<BasicExpressionType>(type))
+        return true;
+
+    if (as<VectorExpressionType>(type))
+        return true;
+
+    return false;
+}
+
+/// Adds all graph-supplied shader parameters in reflection order, including resource captures.
+/// System values and interpolation inputs are supplied by the pipeline instead.
+static void _addPipelineBindableParams(
+    Expr* funcExpr,
+    FuncType* funcType,
+    List<Type*>& paramTypes,
+    List<Name*>& parameterNames,
+    List<UInt>* shaderParameterIndices = nullptr)
+{
+    auto funcDecl = _getCallableDeclFromHigherOrderExpr(funcExpr);
+    if (!funcDecl)
+        return;
+
+    Index paramIndex = 0;
+    for (auto param : funcDecl->getParameters())
+    {
+        if (paramIndex >= funcType->getParamCount())
+            break;
+
+        Type* paramValueType = funcType->getParamValueType(paramIndex);
+        Type* paramTypeWithMode = funcType->getParamTypeWithModeWrapper(paramIndex);
+        paramIndex++;
+
+        if (_isSystemValueParameter(param))
+            continue;
+
+        if (!param->hasModifier<HLSLUniformModifier>() &&
+            !_isBindablePipelineParamType(paramValueType))
+            continue;
+
+        paramTypes.add(paramTypeWithMode);
+        parameterNames.add(param->getName());
+        if (shaderParameterIndices)
+            shaderParameterIndices->add(UInt(paramIndex - 1));
+    }
+}
+
+static Stage _getHigherOrderEntryPointStage(Expr* funcExpr)
+{
+    auto funcDecl = _getCallableDeclFromHigherOrderExpr(funcExpr);
+    auto entryPointAttr = funcDecl ? funcDecl->findModifier<EntryPointAttribute>() : nullptr;
+    if (!entryPointAttr || !entryPointAttr->capabilitySet)
+        return Stage::Unknown;
+    return getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
+}
+
+static bool _isRayPayloadType(Type* type)
+{
+    if (auto resolvedType = as<Type>(type->resolve()))
+        type = resolvedType;
+    auto declRefType = as<DeclRefType>(type);
+    auto decl = declRefType ? declRefType->getDeclRef().getDecl() : nullptr;
+    return decl && decl->findModifier<RayPayloadAttribute>();
+}
+
+static Expr* _resolveHigherOrderFunctionExpr(SemanticsVisitor* semantics, Expr* funcExpr)
+{
+    SemanticsVisitor subVisitor(semantics->getShared());
+    subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
+    funcExpr = subVisitor.dispatchExpr(funcExpr, subVisitor);
+    return subVisitor.maybeResolveOverloadedExpr(funcExpr, LookupMask::Function, nullptr);
+}
+
 static Expr* _checkHigherOrderInvokeExpr(
     SemanticsVisitor* semantics,
     HigherOrderInvokeExpr* expr,
     HigherOrderInvokeExprCheckingActions* actions)
 {
     // Check/Resolve inner function declaration.
+    actions->originalFuncExpr = expr->baseFunction;
     SemanticsVisitor subVisitor(semantics->getShared());
     subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
     // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
@@ -6237,28 +6654,30 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        // __apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
-        // Give it the base function type so overload resolution works with original args.
+        // Apply receives value primals directly, but pointer primals carry their gradient
+        // destinations. Match ApplyForBwdFuncType during overload selection as well, so a
+        // custom apply taking DifferentialPtrPair<T> resolves the original T parameter.
+        auto astBuilder = semantics->getASTBuilder();
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        List<Type*> paramTypes;
         if (thisParamInfo)
         {
-            List<Type*> paramTypes;
-            paramTypes.add(getParamTypeWithModeWrapper(
-                semantics->getASTBuilder(),
-                thisParamInfo->type,
-                thisParamInfo->mode));
-            for (Index i = 0; i < baseFuncType->getParamCount(); i++)
-                paramTypes.add(baseFuncType->getParamTypeWithModeWrapper(i));
-
-            resultExpr->type = semantics->getASTBuilder()->getFuncType(
-                paramTypes.getArrayView(),
-                baseFuncType->getResultType(),
-                baseFuncType->getErrorType());
+            paramTypes.add(getApplyForBwdParameterType(
+                astBuilder,
+                getParamTypeWithModeWrapper(astBuilder, *thisParamInfo),
+                semantics->isTypeDifferentiable(thisParamInfo->type)));
         }
-        else
+        for (Index i = 0; i < baseFuncType->getParamCount(); i++)
         {
-            resultExpr->type = baseFuncType;
+            paramTypes.add(getApplyForBwdParameterType(
+                astBuilder,
+                baseFuncType->getParamTypeWithModeWrapper(i),
+                semantics->isTypeDifferentiable(baseFuncType->getParamValueType(i))));
         }
+        resultExpr->type = astBuilder->getFuncType(
+            paramTypes.getArrayView(),
+            baseFuncType->getResultType(),
+            baseFuncType->getErrorType());
 
         if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
         {
@@ -6365,17 +6784,22 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
             return false;
         return constElementCount->getValue() == 3;
     };
-    expr->threadGroupSize = dispatchExpr(expr->threadGroupSize, *this);
-    if (!isInt3Type(expr->threadGroupSize->type.type))
+
+    if (expr->threadGroupSize)
     {
-        auto uint3Type = m_astBuilder->getVectorType(
-            m_astBuilder->getUIntType(),
-            m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
-        getSink()->diagnose(Diagnostics::TypeMismatch{
-            .expectedType = uint3Type,
-            .actualType = expr->threadGroupSize->type,
-            .expr = expr->threadGroupSize});
+        expr->threadGroupSize = dispatchExpr(expr->threadGroupSize, *this);
+        if (!isInt3Type(expr->threadGroupSize->type.type))
+        {
+            auto uint3Type = m_astBuilder->getVectorType(
+                m_astBuilder->getUIntType(),
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
+            getSink()->diagnose(Diagnostics::TypeMismatch{
+                .expectedType = uint3Type,
+                .actualType = expr->threadGroupSize->type,
+                .expr = expr->threadGroupSize});
+        }
     }
+
     expr->dispatchSize = dispatchExpr(expr->dispatchSize, *this);
     if (!isInt3Type(expr->dispatchSize->type.type))
     {
@@ -6387,8 +6811,405 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
             .actualType = expr->dispatchSize->type,
             .expr = expr->dispatchSize});
     }
-    PassthroughHighOrderExprCheckingActionsBase<DispatchKernelExpr> actions;
+
+    // Public `dispatch(fn, groupCount)` is a small MVP shim over the existing
+    // `DispatchKernelExpr`. The full checker should synthesize this from
+    // `[numthreads]`; for now the HGBC backend only consumes the dispatch size.
+    if (!expr->threadGroupSize)
+    {
+        expr->threadGroupSize = expr->dispatchSize;
+    }
+
+    DispatchKernelExprCheckingActions actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
+}
+
+Expr* SemanticsExprVisitor::visitMakeGraphicsPipelineExpr(MakeGraphicsPipelineExpr* expr)
+{
+    expr->settings = dispatchExpr(expr->settings, *this);
+    if (IsErrorExpr(expr->settings))
+        return CreateErrorExpr(expr);
+
+    auto graphicsDecl = as<GenericDecl>(
+        m_astBuilder->getSharedASTBuilder()->findMagicDecl("GraphicsPipelineDescType"));
+    auto settingsType = as<DeclRefType>(expr->settings->type.type);
+    auto graphicsArgs =
+        settingsType
+            ? SubstitutionSet(settingsType->getDeclRef()).findGenericAppDeclRef(graphicsDecl)
+            : nullptr;
+    if (!graphicsArgs)
+    {
+        getSink()->diagnose(Diagnostics::ExpectedGraphicsPipelineDesc{
+            .type = expr->settings->type.type,
+            .expr = expr->settings});
+        return CreateErrorExpr(expr);
+    }
+
+    expr->baseFunction = _resolveHigherOrderFunctionExpr(this, expr->baseFunction);
+    expr->fragmentFunction = _resolveHigherOrderFunctionExpr(this, expr->fragmentFunction);
+
+    if (IsErrorExpr(expr->baseFunction) || IsErrorExpr(expr->fragmentFunction))
+        return CreateErrorExpr(expr);
+
+    auto vertexFuncType = _getHigherOrderBaseFunctionType(this, expr->baseFunction);
+    auto fragmentFuncType = _getHigherOrderBaseFunctionType(this, expr->fragmentFunction);
+    if (!vertexFuncType)
+    {
+        expr->type = m_astBuilder->getErrorType();
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->baseFunction});
+        return expr;
+    }
+    if (!fragmentFuncType)
+    {
+        expr->type = m_astBuilder->getErrorType();
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->fragmentFunction});
+        return expr;
+    }
+
+    List<Type*> paramTypes;
+    // The descriptor owns the target and assembly roles. All shader uniforms and resources
+    // remain shader arguments, including the first structured buffer of a vertex shader.
+    paramTypes.add(as<Type>(graphicsArgs->getArg(0)));
+    expr->newParameterNames.add(getName("target"));
+    auto hasDepth = as<ConstantIntVal>(graphicsArgs->getArg(4)->resolve());
+    if (!hasDepth)
+    {
+        getSink()->diagnose(
+            Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->settings->loc});
+        return CreateErrorExpr(expr);
+    }
+    if (hasDepth->getValue())
+    {
+        // Preserve the checked depth texture specialization supplied by the descriptor.
+        // Its format belongs to the pipeline signature, just like the color texture's format.
+        auto depthType = as<Type>(graphicsArgs->getArg(6));
+        SLANG_RELEASE_ASSERT(depthType);
+        paramTypes.add(depthType);
+        expr->newParameterNames.add(getName("depthTarget"));
+    }
+    paramTypes.add(as<Type>(graphicsArgs->getArg(1)));
+    expr->newParameterNames.add(getName("assembly"));
+    paramTypes.add(as<Type>(graphicsArgs->getArg(2)));
+    expr->newParameterNames.add(getName("parameters"));
+    expr->drawParameterCount = paramTypes.getCount();
+    expr->shaderParameterIndices.clear();
+    _addPipelineBindableParams(
+        expr->baseFunction,
+        vertexFuncType,
+        paramTypes,
+        expr->newParameterNames,
+        &expr->shaderParameterIndices);
+    expr->vertexArgumentCount = paramTypes.getCount() - expr->drawParameterCount;
+    _addPipelineBindableParams(
+        expr->fragmentFunction,
+        fragmentFuncType,
+        paramTypes,
+        expr->newParameterNames,
+        &expr->shaderParameterIndices);
+    expr->type = m_astBuilder->getFuncType(
+        paramTypes.getArrayView(),
+        m_astBuilder->getVoidType(),
+        m_astBuilder->getBottomType());
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitRayTraceExpr(RayTraceExpr* expr)
+{
+    if (expr->maxRecursionDepthExpr)
+    {
+        expr->maxRecursionDepthExpr = dispatchExpr(expr->maxRecursionDepthExpr, *this);
+        expr->maxRecursionDepthValue = CheckIntegerConstantExpression(
+            expr->maxRecursionDepthExpr,
+            IntegerConstantExpressionCoercionType::AnyInteger,
+            nullptr,
+            ConstantFoldingKind::CompileTime);
+        auto maxRecursionDepth = as<ConstantIntVal>(
+            expr->maxRecursionDepthValue ? expr->maxRecursionDepthValue->resolve() : nullptr);
+        if (!maxRecursionDepth)
+            return CreateErrorExpr(expr);
+        expr->maxRecursionDepthValue = maxRecursionDepth;
+        if (maxRecursionDepth->getValue() < 1)
+        {
+            getSink()->diagnose(Diagnostics::InvalidRaytracingRecursionDepth{
+                .value = int64_t(maxRecursionDepth->getValue()),
+                .expr = expr->maxRecursionDepthExpr});
+            return CreateErrorExpr(expr);
+        }
+    }
+    else
+    {
+        expr->maxRecursionDepthValue = m_astBuilder->getIntVal(m_astBuilder->getUIntType(), 1);
+    }
+
+    expr->baseFunction = _resolveHigherOrderFunctionExpr(this, expr->baseFunction);
+    expr->closestHitFunction = _resolveHigherOrderFunctionExpr(this, expr->closestHitFunction);
+    expr->missFunction = _resolveHigherOrderFunctionExpr(this, expr->missFunction);
+    if (IsErrorExpr(expr->baseFunction) || IsErrorExpr(expr->closestHitFunction) ||
+        IsErrorExpr(expr->missFunction))
+        return CreateErrorExpr(expr);
+
+    FuncType* rayGenerationType = _getHigherOrderBaseFunctionType(this, expr->baseFunction);
+    FuncType* closestHitType = _getHigherOrderBaseFunctionType(this, expr->closestHitFunction);
+    FuncType* missType = _getHigherOrderBaseFunctionType(this, expr->missFunction);
+    if (!rayGenerationType || !closestHitType || !missType)
+    {
+        Expr* invalidExpr = !rayGenerationType ? expr->baseFunction
+                            : !closestHitType  ? expr->closestHitFunction
+                                               : expr->missFunction;
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = invalidExpr});
+        return CreateErrorExpr(expr);
+    }
+
+    struct StageFunction
+    {
+        Expr* expr;
+        FuncType* type;
+        Stage expectedStage;
+        const char* name;
+    };
+    StageFunction functions[] = {
+        {expr->baseFunction, rayGenerationType, Stage::RayGeneration, "ray-generation"},
+        {expr->closestHitFunction, closestHitType, Stage::ClosestHit, "closest-hit"},
+        {expr->missFunction, missType, Stage::Miss, "miss"},
+    };
+    for (const auto& function : functions)
+    {
+        if (_getHigherOrderEntryPointStage(function.expr) != function.expectedStage)
+        {
+            getSink()->diagnose(Diagnostics::InvalidRaytracingShaderSignature{
+                .stage = String(function.name),
+                .reason = String("must have the matching [shader(...)] stage"),
+                .expr = function.expr});
+            return CreateErrorExpr(expr);
+        }
+        if (!function.type->getResultType()->equals(m_astBuilder->getVoidType()))
+        {
+            getSink()->diagnose(Diagnostics::InvalidRaytracingShaderSignature{
+                .stage = String(function.name),
+                .reason = String("must return void"),
+                .expr = function.expr});
+            return CreateErrorExpr(expr);
+        }
+    }
+
+    expr->rayPayloadType =
+        closestHitType->getParamCount() ? closestHitType->getParamValueType(0) : nullptr;
+    if (!expr->rayPayloadType || !_isRayPayloadType(expr->rayPayloadType))
+    {
+        getSink()->diagnose(Diagnostics::InvalidRaytracingShaderSignature{
+            .stage = String("pipeline"),
+            .reason = String("payload type must have the [raypayload] attribute"),
+            .expr = expr->closestHitFunction});
+        return CreateErrorExpr(expr);
+    }
+
+    auto hasMatchingPayload = [expr](FuncType* funcType)
+    {
+        return funcType->getParamCount() > 0 &&
+               as<BorrowInOutParamType>(funcType->getParamTypeWithModeWrapper(0)) &&
+               funcType->getParamValueType(0)->equals(expr->rayPayloadType);
+    };
+    if (!hasMatchingPayload(closestHitType) || !hasMatchingPayload(missType))
+    {
+        Expr* invalidExpr =
+            !hasMatchingPayload(closestHitType) ? expr->closestHitFunction : expr->missFunction;
+        const char* stage = !hasMatchingPayload(closestHitType) ? "closest-hit" : "miss";
+        getSink()->diagnose(Diagnostics::InvalidRaytracingShaderSignature{
+            .stage = String(stage),
+            .reason = String("must begin with an inout parameter of the pipeline payload type"),
+            .expr = invalidExpr});
+        return CreateErrorExpr(expr);
+    }
+    if (closestHitType->getParamCount() < 2)
+    {
+        getSink()->diagnose(Diagnostics::InvalidRaytracingShaderSignature{
+            .stage = String("closest-hit"),
+            .reason = String("must accept triangle intersection attributes"),
+            .expr = expr->closestHitFunction});
+        return CreateErrorExpr(expr);
+    }
+
+    List<Type*> paramTypes;
+    auto uint3Type = m_astBuilder->getVectorType(
+        m_astBuilder->getUIntType(),
+        m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
+    paramTypes.add(uint3Type);
+    expr->newParameterNames.add(getName("dispatchSize"));
+    _addPipelineBindableParams(
+        expr->baseFunction,
+        rayGenerationType,
+        paramTypes,
+        expr->newParameterNames);
+    _addPipelineBindableParams(
+        expr->closestHitFunction,
+        closestHitType,
+        paramTypes,
+        expr->newParameterNames);
+    _addPipelineBindableParams(expr->missFunction, missType, paramTypes, expr->newParameterNames);
+
+    expr->type = m_astBuilder->getFuncType(
+        paramTypes.getArrayView(),
+        m_astBuilder->getVoidType(),
+        m_astBuilder->getBottomType());
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitRayPipelineCallExpr(RayPipelineCallExpr* expr)
+{
+    const bool isDispatch = expr->kind == RayPipelineCallExpr::Kind::Dispatch;
+    const bool isGroup = expr->kind == RayPipelineCallExpr::Kind::HitGroup;
+    const bool isHit = isGroup || expr->kind == RayPipelineCallExpr::Kind::Hit;
+    auto diagnose = [&](Expr* location, const char* reason) -> Expr*
+    {
+        getSink()->diagnose(Diagnostics::InvalidRaytracingShaderSignature{
+            .stage = String(
+                isDispatch ? "ray-generation"
+                : isHit    ? "closest-hit"
+                           : "miss"),
+            .reason = String(reason),
+            .expr = location});
+        return CreateErrorExpr(expr);
+    };
+    auto checkUInt = [&](Expr*& value)
+    {
+        value = dispatchExpr(value, *this);
+        value = coerce(CoercionSite::Argument, m_astBuilder->getUIntType(), value, getSink());
+        return !IsErrorExpr(value);
+    };
+    if (!isDispatch)
+    {
+        expr->pipeline = dispatchExpr(expr->pipeline, *this);
+        if (IsErrorExpr(expr->pipeline))
+            return CreateErrorExpr(expr);
+        if (!as<RaytracingPipelineType>(expr->pipeline->type.type))
+            return diagnose(expr->pipeline, "registration requires a RaytracingPipeline tracker");
+        if (!checkUInt(expr->raySlot) || (isHit && !checkUInt(expr->geometrySlot)))
+            return CreateErrorExpr(expr);
+    }
+    else
+    {
+        expr->extent = dispatchExpr(expr->extent, *this);
+        auto uint3Type = m_astBuilder->getVectorType(
+            m_astBuilder->getUIntType(),
+            m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
+        expr->extent = coerce(CoercionSite::Argument, uint3Type, expr->extent, getSink());
+        expr->maxRecursion = dispatchExpr(expr->maxRecursion, *this);
+        if (IsErrorExpr(expr->extent) || IsErrorExpr(expr->maxRecursion))
+            return CreateErrorExpr(expr);
+        expr->maxRecursionValue = CheckIntegerConstantExpression(
+            expr->maxRecursion,
+            IntegerConstantExpressionCoercionType::AnyInteger,
+            nullptr,
+            ConstantFoldingKind::CompileTime);
+        if (!expr->maxRecursionValue)
+            return CreateErrorExpr(expr);
+        if (auto depth = as<ConstantIntVal>(expr->maxRecursionValue->resolve()))
+            if (depth->getValue() < 1 || depth->getValue() > 0xffffffffll)
+                return diagnose(
+                    expr->maxRecursion,
+                    "recursion depth must be a positive uint constant");
+    }
+
+    if (isGroup)
+    {
+        expr->payloadTypeExpr = CheckProperType(expr->payloadTypeExpr);
+        expr->attributeTypeExpr = CheckProperType(expr->attributeTypeExpr);
+        expr->payloadType = expr->payloadTypeExpr.type;
+        expr->attributeType = expr->attributeTypeExpr.type;
+        if (as<ErrorType>(expr->payloadType) || as<ErrorType>(expr->attributeType))
+            return CreateErrorExpr(expr);
+        if (!_isRayPayloadType(expr->payloadType))
+            return diagnose(expr, "hit-group payload must be a [raypayload] type");
+    }
+    List<Type*> parameterTypes;
+    Expr** stageFunctions[] = {
+        &expr->baseFunction,
+        &expr->anyHitFunction,
+        &expr->intersectionFunction};
+    const Stage hitStages[] = {Stage::ClosestHit, Stage::AnyHit, Stage::Intersection};
+    for (UInt role = 0; role < (isGroup ? 3u : 1u); ++role)
+    {
+        auto& function = *stageFunctions[role];
+        if (isGroup)
+        {
+            function = dispatchExpr(function, *this);
+            if (auto type = as<TypeType>(function->type.type))
+            {
+                if (!type->getType()->equals(m_astBuilder->getVoidType()))
+                    return diagnose(function, "an absent hit-group stage must be spelled void");
+                function = nullptr;
+                continue;
+            }
+        }
+        function = _resolveHigherOrderFunctionExpr(this, function);
+        if (IsErrorExpr(function))
+            return CreateErrorExpr(expr);
+        auto functionType = _getHigherOrderBaseFunctionType(this, function);
+        auto functionDecl = _getCallableDeclFromHigherOrderExpr(function);
+        Stage stage = isDispatch ? Stage::RayGeneration : isHit ? hitStages[role] : Stage::Miss;
+        if (!functionType || !functionDecl || _getHigherOrderEntryPointStage(function) != stage)
+            return diagnose(function, "must name an entry point with the matching shader stage");
+        if (!functionType->getResultType()->equals(m_astBuilder->getVoidType()))
+            return diagnose(function, "entry point must return void");
+        const bool hasPayload = stage != Stage::RayGeneration && stage != Stage::Intersection;
+        const bool hasAttributes = stage == Stage::ClosestHit || stage == Stage::AnyHit;
+        Index nativeParameterCount = hasAttributes ? 2 : hasPayload ? 1 : 0;
+        if (functionType->getParamCount() < nativeParameterCount)
+            return diagnose(function, "entry point is missing its native payload or attributes");
+        if (hasPayload)
+        {
+            auto payloadType = functionType->getParamValueType(0);
+            if (!_isRayPayloadType(payloadType) ||
+                !as<BorrowInOutParamType>(functionType->getParamTypeWithModeWrapper(0)))
+                return diagnose(function, "must begin with an inout [raypayload] parameter");
+            if (isGroup && !payloadType->equals(expr->payloadType))
+                return diagnose(
+                    function,
+                    "shader payload must match the declared hit-group payload");
+            expr->payloadType = payloadType;
+        }
+        if (hasAttributes)
+        {
+            if (functionType->getParamPassingMode(1) != ParamPassingMode::In)
+                return diagnose(
+                    function,
+                    "hit attributes must be passed by value as an input parameter");
+            auto attributeType = functionType->getParamValueType(1);
+            if (isGroup && !attributeType->equals(expr->attributeType))
+                return diagnose(
+                    function,
+                    "shader attributes must match the declared hit-group attributes");
+            expr->attributeType = attributeType;
+        }
+        Index index = 0;
+        for (auto parameter : functionDecl->getParameters())
+        {
+            if (index < nativeParameterCount)
+            {
+                if (parameter->hasModifier<HLSLUniformModifier>())
+                    return diagnose(
+                        function,
+                        "native payload and attribute parameters cannot be uniform");
+            }
+            else
+            {
+                if (!parameter->hasModifier<HLSLUniformModifier>())
+                    return diagnose(function, "extra shader parameters must be explicitly uniform");
+                auto parameterType = functionType->getParamTypeWithModeWrapper(index);
+                if (parameterType != functionType->getParamValueType(index))
+                    return diagnose(function, "uniform arguments must be passed by value");
+                parameterTypes.add(parameterType);
+                expr->parameterIndices.add(UInt(index));
+                expr->parameterRoles.add(role);
+            }
+            ++index;
+        }
+    }
+    expr->type = m_astBuilder->getFuncType(
+        parameterTypes.getArrayView(),
+        m_astBuilder->getVoidType(),
+        m_astBuilder->getBottomType());
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
@@ -6836,6 +7657,41 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     sizeOfLikeExpr->sizedType = type;
 
     return sizeOfLikeExpr;
+}
+
+Expr* SemanticsExprVisitor::visitIndexOfTypeInPackExpr(IndexOfTypeInPackExpr* expr)
+{
+    expr->elementType = CheckProperType(expr->elementType);
+    expr->packType = CheckProperType(expr->packType);
+    expr->type = m_astBuilder->getIntType();
+    auto elementType = expr->elementType.type;
+    auto packType = expr->packType.type;
+    if (as<ErrorType>(elementType) || as<ErrorType>(packType))
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+    if (isTypePack(elementType) || !isTypePack(packType))
+    {
+        getSink()->diagnose(Diagnostics::IndexOfTypeInPackArgumentInvalid{.location = expr->loc});
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+    Index index;
+    switch (IndexOfTypeInPackIntVal::findIndex(elementType, packType, index))
+    {
+    case IndexOfTypeInPackIntVal::LookupResult::Missing:
+        getSink()->diagnose(Diagnostics::IndexOfTypeInPackMissing{.location = expr->loc});
+        expr->type = m_astBuilder->getErrorType();
+        break;
+    case IndexOfTypeInPackIntVal::LookupResult::Ambiguous:
+        getSink()->diagnose(Diagnostics::IndexOfTypeInPackAmbiguous{.location = expr->loc});
+        expr->type = m_astBuilder->getErrorType();
+        break;
+    default:
+        break;
+    }
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
@@ -7959,16 +8815,6 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     auto unwrappedValueType = unwrapModifiedType(valueType);
     auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
 
-    // Reject `expr as OpaqueType` (and structs containing opaque fields) because
-    // Optional<T> cannot wrap resource/opaque types.
-    if (typeTransitivelyContainsOpaqueHandle(this, typeExpr.type))
-    {
-        getSink()->diagnose(
-            Diagnostics::OptionalCannotWrapResourceType{.type = typeExpr.type, .expr = expr});
-        expr->type = m_astBuilder->getErrorType();
-        return expr;
-    }
-
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
 
@@ -8049,7 +8895,7 @@ Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
     if (isTypeExpr)
         expr->type = m_astBuilder->getTypeType(expandType);
     else
-        expr->type = QualType(expandType);
+        expr->type = QualType(expandType, expr->baseExpr->type.isLeftValue);
     return expr;
 }
 
@@ -8132,7 +8978,7 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         if (isTypeNode)
             expr->type = m_astBuilder->getTypeType(eachType);
         else
-            expr->type = QualType(eachType);
+            expr->type = QualType(eachType, expr->baseExpr->type.isLeftValue);
         return expr;
     }
 error:;
@@ -8144,6 +8990,41 @@ error:;
     return expr;
 }
 
+/// Declares a differentiable closure's pointer state before its body introduces captures.
+///
+/// The nominal Differential type stays the same while capture checking adds gradient fields.
+/// Declaring the receiver conformance here lets calls in the body see the intended pointer
+/// receiver instead of caching an implicit NoDiffThis signature for an incomplete closure.
+static void _declareDifferentiableLambdaState(SemanticsVisitor* semantics, LambdaDecl* lambdaDecl)
+{
+    auto astBuilder = semantics->getASTBuilder();
+    auto pointerInterface = astBuilder->getDifferentiableRefInterfaceType();
+    auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+    inheritanceDecl->base.type = pointerInterface;
+    lambdaDecl->addMember(inheritanceDecl);
+
+    auto differentialDecl = astBuilder->create<StructDecl>();
+    differentialDecl->nameAndLoc.name = semantics->getName("Differential");
+    differentialDecl->loc = lambdaDecl->loc;
+    addModifier(differentialDecl, astBuilder->create<SynthesizedModifier>());
+    lambdaDecl->addMember(differentialDecl);
+
+    ASTSynthesizer synthesizer(astBuilder, semantics->getNamePool());
+    synthesizer.pushContainerScope(lambdaDecl);
+    synthesizer.pushScopeForContainer(differentialDecl);
+
+    auto differentialInheritance = astBuilder->create<InheritanceDecl>();
+    differentialInheritance->base.type = pointerInterface;
+    differentialDecl->addMember(differentialInheritance);
+
+    auto selfDifferential = astBuilder->create<TypeDefDecl>();
+    selfDifferential->nameAndLoc.name = semantics->getName("Differential");
+    selfDifferential->type.type =
+        DeclRefType::create(astBuilder, semantics->getDefaultDeclRef(differentialDecl));
+    differentialDecl->addMember(selfDifferential);
+}
+
+/// Checks a lambda and synthesizes its anonymous callable type.
 Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
 {
     ASTSynthesizer synthesizer = ASTSynthesizer(m_astBuilder, getNamePool());
@@ -8152,15 +9033,20 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     Dictionary<Decl*, VarDeclBase*> mapSrcDeclToCapturedDecl;
     ensureAllDeclsRec(lambdaExpr->paramScopeDecl, DeclCheckState::DefinitionChecked);
     LambdaDecl* lambdaStructDecl = m_astBuilder->create<LambdaDecl>();
-    auto subContext = withParentLambdaExpr(lambdaExpr, lambdaStructDecl, &mapSrcDeclToCapturedDecl);
     addModifier(lambdaStructDecl, m_astBuilder->create<SynthesizedModifier>());
-    synthesizer.pushScopeForContainer(lambdaStructDecl);
     lambdaStructDecl->loc = lambdaExpr->loc;
     StringBuilder nameBuilder;
     nameBuilder << "_slang_Lambda_";
     if (m_parentFunc)
     {
-        nameBuilder << getText(m_parentFunc->getName());
+        // A lambda inside operator() must still have an identifier as its declaration name.
+        // Its enclosing method retains the operator identity in qualified reflection paths.
+        auto parentName = getText(m_parentFunc->getName());
+        if (parentName.getLength() &&
+            !(CharUtil::isAlphaOrDigit(parentName[0]) || parentName[0] == '_'))
+            nameBuilder << "operator";
+        else
+            nameBuilder << parentName;
         nameBuilder << "_";
         nameBuilder << m_parentFunc->getDirectMemberDeclCount();
         m_parentFunc->addMember(lambdaStructDecl);
@@ -8172,17 +9058,55 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
     lambdaStructDecl->nameAndLoc.loc = lambdaExpr->loc;
+    synthesizer.pushScopeForContainer(lambdaStructDecl);
+
+    bool hasDifferentiableReceiver =
+        lambdaExpr->differentiableLoc.isValid() && !lambdaExpr->mutatingLoc.isValid();
+    if (hasDifferentiableReceiver)
+        _declareDifferentiableLambdaState(this, lambdaStructDecl);
 
     auto funcDecl = m_astBuilder->create<FuncDecl>();
-    synthesizer.pushScopeForContainer(funcDecl);
     funcDecl->loc = lambdaExpr->loc;
     funcDecl->nameAndLoc.name = getName("()");
     funcDecl->nameAndLoc.loc = lambdaExpr->loc;
     lambdaStructDecl->addMember(funcDecl);
     lambdaStructDecl->funcDecl = funcDecl;
+    synthesizer.pushScopeForContainer(funcDecl);
+
     addModifier(funcDecl, m_astBuilder->create<SynthesizedModifier>());
+    if (lambdaExpr->mutatingLoc.isValid())
+    {
+        auto mutatingAttr = m_astBuilder->create<MutatingAttribute>();
+        mutatingAttr->loc = lambdaExpr->mutatingLoc;
+        addModifier(funcDecl, mutatingAttr);
+    }
+    if (lambdaExpr->differentiableLoc.isValid())
+    {
+        // `[Differentiable]` is represented by BackwardDifferentiableAttribute because backward
+        // differentiability includes forward differentiability.
+        auto differentiableAttr = m_astBuilder->create<BackwardDifferentiableAttribute>();
+        differentiableAttr->loc = lambdaExpr->differentiableLoc;
+        addModifier(funcDecl, differentiableAttr);
+
+        // Mutating differentiable lambdas retain their existing explicit-parameter semantics.
+        // Pointer receiver differentiation currently applies to nonmutating lambdas only.
+        if (!hasDifferentiableReceiver)
+        {
+            auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
+            noDiffThisAttr->loc = lambdaExpr->differentiableLoc;
+            addModifier(funcDecl, noDiffThisAttr);
+        }
+    }
 
     // As we check the body, we will fill in the result type when we visit `ReturnStmt`.
+    auto subContext = withParentLambdaExpr(lambdaExpr, lambdaStructDecl, &mapSrcDeclToCapturedDecl);
+    if (lambdaExpr->differentiableLoc.isValid())
+        subContext = subContext.withParentFunc(funcDecl);
+    // Body expressions need their own temporary scopes because they execute when the lambda is
+    // called. For example, opening a captured interface in `() => callback()` creates a temporary
+    // initialized from `this.callback`. Sharing the enclosing expression's scope would place that
+    // initialization around the closure constructor, where the lambda's `this` is unavailable.
+    subContext = subContext.withExprLocalScope(nullptr);
     dispatchStmt(lambdaExpr->bodyStmt, subContext);
 
     // If the lambda has no return type, we will set it to `void`.
@@ -8198,11 +9122,24 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         funcDecl->addMember(param);
     }
 
-    // LambdaDecl should inherit from `IFunc<>`.
+    // Select the callable interface from the lambda's independent mutating and differentiable
+    // properties. Each nonmutating interface inherits its mutating counterpart, so nonmutating
+    // lambdas remain usable by callers that accept either kind of callable.
     if (funcDecl->returnType.type)
     {
+        const char* interfaceName = nullptr;
+        if (lambdaExpr->differentiableLoc.isValid())
+        {
+            interfaceName = lambdaExpr->mutatingLoc.isValid() ? "IDifferentiableMutatingFunc"
+                                                              : "IDifferentiableFuncWithDiffThis";
+        }
+        else
+        {
+            interfaceName = lambdaExpr->mutatingLoc.isValid() ? "IMutatingFunc" : "IFunc";
+        }
+
         auto genApp = m_astBuilder->create<GenericAppExpr>();
-        genApp->functionExpr = synthesizer.emitVarExpr(getName("IFunc"));
+        genApp->functionExpr = synthesizer.emitVarExpr(getName(interfaceName));
         auto returnTypeExp = synthesizer.emitStaticTypeExpr(funcDecl->returnType.type);
         genApp->arguments.add(returnTypeExp);
         for (auto param : getMembersOfType<ParamDecl>(m_astBuilder, lambdaExpr->paramScopeDecl))
@@ -8214,9 +9151,40 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         auto inheritanceDecl = m_astBuilder->create<InheritanceDecl>();
         inheritanceDecl->base.exp = genApp;
         lambdaStructDecl->addMember(inheritanceDecl);
+
+        // Body checking can query the anonymous closure type before return-type inference gives us
+        // enough information to add its callable base. Discard any inheritance information cached
+        // from that incomplete shape now that the synthesized type is complete.
+        getShared()->invalidateInheritanceInfo(DeclRefType::create(m_astBuilder, lambdaStructDecl));
     }
 
-    // Synthesizer the ctor signature, and `IFunc` witness.
+    if (lambdaExpr->differentiableLoc.isValid())
+    {
+        // Lambda bodies are checked directly above rather than through the ordinary declaration
+        // body visitor. Populate the callable's differential type dictionary for its signature
+        // explicitly; expression checking has already registered types used by the body.
+        SemanticsExprVisitor typeVisitor(subContext);
+        if (hasDifferentiableReceiver)
+        {
+            typeVisitor.maybeRegisterDifferentiableType(
+                m_astBuilder,
+                DeclRefType::create(m_astBuilder, lambdaStructDecl),
+                lambdaExpr->loc);
+        }
+        for (auto param : funcDecl->getParameters())
+            typeVisitor.maybeRegisterDifferentiableType(m_astBuilder, param->type.type, param->loc);
+        typeVisitor.maybeRegisterDifferentiableType(
+            m_astBuilder,
+            funcDecl->returnType.type,
+            funcDecl->loc);
+
+        // The closure's interface conformance is checked as part of checking the containing
+        // LambdaDecl. Make the synthesized operator's derivative declarations available before
+        // that conformance tries to use it as the IDifferentiableFunc witness.
+        ensureDecl(funcDecl, DeclCheckState::ReadyForLookup);
+    }
+
+    // Synthesize the constructor signature and callable-interface witness.
     ensureDecl(lambdaStructDecl, DeclCheckState::AttributesChecked);
 
     // Return an expr that represents `SynthesizedLambdaStruct.__init(captured_args...)`.
@@ -9187,31 +10155,30 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     //
     if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
     {
-        // If a member (dynamic or static) lookup result contains both the actual definition
-        // and the interface definition obtained from inheritance, we want to filter out
-        // the interface definitions.
+        // An extension's extern variable only supplies metadata for the original declaration.
+        // Keep the original declaration when looking up one of its members.
         LookupResult filteredLookupResult;
         for (auto lookupResult : overloadedExpr->lookupResult2.items)
         {
-            bool shouldRemove = false;
-            if (lookupResult.declRef.getParent().as<InterfaceDecl>())
-            {
-                shouldRemove = true;
-            }
-            if (lookupResult.declRef.getDecl()->hasModifier<ExtensionExternVarModifier>())
-                shouldRemove = true;
-            if (!shouldRemove)
+            if (!lookupResult.declRef.getDecl()->hasModifier<ExtensionExternVarModifier>())
             {
                 AddToLookupResult(filteredLookupResult, lookupResult);
             }
         }
+
+        // Consider `function.operator().remat(...)` where the type of `function` is a
+        // generic parameter constrained to IDifferentiableFuncWithDiffThis. Lookup can
+        // find both its operator requirement and the inherited IFunc requirement. Normal
+        // overload ranking chooses the more derived requirement, or the concrete method
+        // when one is available. Removing all interface requirements would instead leave
+        // this valid generic member lookup with no candidates.
+        filteredLookupResult = resolveOverloadedLookup(filteredLookupResult);
         baseExpr = createLookupResultExpr(
             overloadedExpr->name,
             filteredLookupResult,
             overloadedExpr->base,
             overloadedExpr->loc,
             overloadedExpr);
-        // TODO: handle other cases of OverloadedExpr that need filtering.
     }
 
     // Dereference after resolving overloaded expressions, so that the
@@ -9927,6 +10894,282 @@ Expr* SemanticsExprVisitor::visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
         expr->emptyType.type,
         expr->nonEmptyType.type);
     expr->type = m_astBuilder->getTypeType(packBranchType);
+    return expr;
+}
+
+/// Checks an HGBC assembly block against the generated wire-format descriptors.
+Expr* SemanticsExprVisitor::visitHGBCAsmExpr(HGBCAsmExpr* expr)
+{
+    bool failed = false;
+    bool hasResultMarker = false;
+    HashSet<Name*> definedIds;
+
+    const auto getOperandKindName = [](HGBCOperandKind kind) -> const char*
+    {
+        switch (kind)
+        {
+        case HGBCOperandKind::Id:
+            return "a $value, &address, or previously-defined %id";
+        case HGBCOperandKind::TypeId:
+            return "a $$Type";
+        case HGBCOperandKind::ResultId:
+            return "a new %id or result";
+        case HGBCOperandKind::UInt:
+        case HGBCOperandKind::FloatBits:
+        case HGBCOperandKind::ByteCount:
+            return "an integer literal";
+        case HGBCOperandKind::Bool:
+            return "true, false, 0, or 1";
+        case HGBCOperandKind::Enum:
+            return "a valid enumerant or its integer value";
+        }
+        return "a valid operand";
+    };
+
+    for (Index instIndex = 0; instIndex < expr->insts.getCount(); ++instIndex)
+    {
+        HGBCAsmInst& inst = expr->insts[instIndex];
+        const HGBCOpcode opcode = HGBCOpcode(inst.opcode.knownValue);
+        const HGBCOpcodeInfo* opcodeInfo = getHGBCOpcodeInfo(opcode);
+        SLANG_RELEASE_ASSERT(opcodeInfo);
+
+        if (!hasHGBCOpcodeFlag(opcode, HGBCOpcodeFlags::InlineAsm))
+        {
+            failed = true;
+            getSink()->diagnose(Diagnostics::HgbcAsmCompilerOwnedOpcode{
+                .opcode = inst.opcode.token.getContent(),
+                .location = inst.opcode.token.loc});
+            continue;
+        }
+
+        const Index inlineFixedOperandCount = Index(getHGBCInlineAsmFixedOperandCount(*opcodeInfo));
+        bool hasTypedValuePack =
+            inst.operands.getCount() == inlineFixedOperandCount + 1 &&
+            opcodeInfo->repeatedOperandCount == 2 &&
+            opcodeInfo->operands[opcodeInfo->fixedOperandCount].kind == HGBCOperandKind::TypeId &&
+            opcodeInfo->operands[opcodeInfo->fixedOperandCount + 1].kind == HGBCOperandKind::Id &&
+            inst.operands.getLast().flavor == HGBCAsmOperand::SlangValuePack;
+        if (!hasTypedValuePack &&
+            !isValidHGBCInlineAsmOperandCount(*opcodeInfo, size_t(inst.operands.getCount())))
+        {
+            failed = true;
+            getSink()->diagnose(Diagnostics::HgbcInstructionInvalidOperandCount{
+                .opcode = inst.opcode.token.getContent(),
+                .location = inst.opcode.token.loc});
+            continue;
+        }
+
+        HGBCAsmOperand* localResult = nullptr;
+        if (opcodeInfo->resultOperandIndex >= 0)
+        {
+            const int sourceResultOperandIndex = getHGBCInlineAsmSourceOperandIndex(
+                *opcodeInfo,
+                size_t(opcodeInfo->resultOperandIndex));
+            SLANG_RELEASE_ASSERT(sourceResultOperandIndex >= 0);
+            localResult = &inst.operands[sourceResultOperandIndex];
+            if (localResult->flavor == HGBCAsmOperand::Id)
+            {
+                if (definedIds.contains(localResult->token.getName()))
+                {
+                    failed = true;
+                    getSink()->diagnose(Diagnostics::HgbcIdRedefinition{
+                        .id = localResult->token.getContent(),
+                        .location = localResult->token.loc});
+                }
+            }
+            else if (localResult->flavor == HGBCAsmOperand::ResultMarker)
+            {
+                if (hasResultMarker || instIndex + 1 != expr->insts.getCount())
+                {
+                    failed = true;
+                    getSink()->diagnose(
+                        Diagnostics::MisplacedHgbcResultMarker{.location = localResult->token.loc});
+                }
+                hasResultMarker = true;
+            }
+            else
+            {
+                failed = true;
+                getSink()->diagnose(Diagnostics::HgbcInvalidOperandKind{
+                    .operandIndex = sourceResultOperandIndex,
+                    .opcode = inst.opcode.token.getContent(),
+                    .expected = getOperandKindName(HGBCOperandKind::ResultId),
+                    .location = localResult->token.loc});
+            }
+        }
+
+        for (Index operandIndex = 0; operandIndex < inst.operands.getCount(); ++operandIndex)
+        {
+            HGBCAsmOperand& operandValue = inst.operands[operandIndex];
+            if (hasTypedValuePack && operandIndex == inlineFixedOperandCount)
+            {
+                operandValue.expr = dispatch(operandValue.expr);
+                continue;
+            }
+            const HGBCOperandInfo* operandInfo =
+                getHGBCInlineAsmOperandInfo(*opcodeInfo, size_t(operandIndex));
+            SLANG_RELEASE_ASSERT(operandInfo);
+
+            bool operandIsValid = true;
+            switch (operandInfo->kind)
+            {
+            case HGBCOperandKind::ResultId:
+                break;
+
+            case HGBCOperandKind::TypeId:
+                if (operandValue.flavor == HGBCAsmOperand::SlangType)
+                {
+                    operandValue.type.exp = operandValue.expr;
+                    operandValue.type = CheckProperType(operandValue.type);
+                    operandValue.expr = operandValue.type.exp;
+                }
+                else
+                {
+                    operandIsValid = false;
+                }
+                break;
+
+            case HGBCOperandKind::Id:
+                if (operandValue.flavor == HGBCAsmOperand::SlangValue ||
+                    operandValue.flavor == HGBCAsmOperand::SlangValueAddr ||
+                    operandValue.flavor == HGBCAsmOperand::SlangValuePack)
+                {
+                    operandValue.expr = dispatch(operandValue.expr);
+                    if (operandValue.flavor == HGBCAsmOperand::SlangValuePack &&
+                        (operandIndex < inlineFixedOperandCount ||
+                         opcodeInfo->repeatedOperandCount != 1))
+                    {
+                        operandIsValid = false;
+                    }
+                }
+                else if (operandValue.flavor == HGBCAsmOperand::Id)
+                {
+                    if (!definedIds.contains(operandValue.token.getName()))
+                    {
+                        failed = true;
+                        getSink()->diagnose(Diagnostics::HgbcUndefinedId{
+                            .id = operandValue.token.getContent(),
+                            .location = operandValue.token.loc});
+                    }
+                }
+                else
+                {
+                    operandIsValid = false;
+                }
+                break;
+
+            case HGBCOperandKind::UInt:
+            case HGBCOperandKind::ByteCount:
+                if (operandValue.flavor == HGBCAsmOperand::SlangValue)
+                {
+                    operandValue.expr = dispatch(operandValue.expr);
+                    operandIsValid = isScalarIntegerType(operandValue.expr->type);
+                }
+                else
+                {
+                    operandIsValid = operandValue.flavor == HGBCAsmOperand::Literal;
+                }
+                break;
+
+            case HGBCOperandKind::FloatBits:
+                operandIsValid = operandValue.flavor == HGBCAsmOperand::Literal;
+                break;
+
+            case HGBCOperandKind::Bool:
+                if (operandValue.flavor == HGBCAsmOperand::Literal)
+                {
+                    operandIsValid = operandValue.knownValue <= 1;
+                }
+                else if (operandValue.flavor == HGBCAsmOperand::NamedValue)
+                {
+                    auto name = operandValue.token.getContent();
+                    if (name == "true")
+                        operandValue.knownValue = 1;
+                    else if (name == "false")
+                        operandValue.knownValue = 0;
+                    else
+                        operandIsValid = false;
+                }
+                else
+                {
+                    operandIsValid = false;
+                }
+                break;
+
+            case HGBCOperandKind::Enum:
+                if (operandValue.flavor == HGBCAsmOperand::NamedValue)
+                {
+                    auto name = operandValue.token.getContent();
+                    uint32_t value = 0;
+                    if (findHGBCEnumValueByName(
+                            operandInfo->enumKind,
+                            name.begin(),
+                            size_t(name.getLength()),
+                            value))
+                    {
+                        operandValue.knownValue = value;
+                    }
+                    else
+                    {
+                        failed = true;
+                        getSink()->diagnose(Diagnostics::HgbcUnableToResolveEnum{
+                            .name = name,
+                            .location = operandValue.token.loc});
+                    }
+                }
+                else if (operandValue.flavor == HGBCAsmOperand::Literal)
+                {
+                    if (!getHGBCEnumValueName(operandInfo->enumKind, operandValue.knownValue))
+                    {
+                        failed = true;
+                        getSink()->diagnose(Diagnostics::HgbcUnableToResolveEnum{
+                            .name = operandValue.token.getContent(),
+                            .location = operandValue.token.loc});
+                    }
+                }
+                else if (operandValue.flavor == HGBCAsmOperand::SlangValue)
+                {
+                    // A generic helper may not know its enumerant until specialization. Consider
+                    // `OpAllocateResource Texture Texture2D $__formatOf<T>()`: semantic checking
+                    // proves that the expression is integer-valued here, while HGBC emission
+                    // requires specialization to reduce it to one concrete enum literal.
+                    operandValue.expr = dispatch(operandValue.expr);
+                    operandIsValid = isScalarIntegerType(operandValue.expr->type);
+                }
+                else
+                {
+                    operandIsValid = false;
+                }
+                break;
+            }
+
+            if (!operandIsValid)
+            {
+                failed = true;
+                SourceLoc operandLoc = operandValue.token.loc.isValid() ? operandValue.token.loc
+                                                                        : operandValue.expr->loc;
+                getSink()->diagnose(Diagnostics::HgbcInvalidOperandKind{
+                    .operandIndex = operandIndex,
+                    .opcode = inst.opcode.token.getContent(),
+                    .expected = getOperandKindName(operandInfo->kind),
+                    .location = operandLoc});
+            }
+        }
+
+        if (localResult && localResult->flavor == HGBCAsmOperand::Id)
+            definedIds.add(localResult->token.getName());
+
+        if (localResult && localResult->flavor == HGBCAsmOperand::ResultMarker)
+        {
+            SLANG_RELEASE_ASSERT(opcodeInfo->typeOperandIndex >= 0);
+            expr->type = inst.operands[opcodeInfo->typeOperandIndex].type.type;
+        }
+    }
+
+    if (failed)
+        return CreateErrorExpr(expr);
+    if (!expr->type)
+        expr->type = m_astBuilder->getVoidType();
     return expr;
 }
 

@@ -193,14 +193,14 @@ public:
     /// Create an entry point that refers to the given function.
     static RefPtr<EntryPoint> create(
         Linkage* linkage,
-        DeclRef<FuncDecl> funcDeclRef,
+        DeclRef<FunctionDeclBase> funcDeclRef,
         Profile profile);
 
     /// Get the function decl-ref, including any generic arguments.
-    DeclRef<FuncDecl> getFuncDeclRef() { return m_funcDeclRef; }
+    DeclRef<FunctionDeclBase> getFuncDeclRef() { return m_funcDeclRef; }
 
     /// Get the function declaration (without generic arguments).
-    FuncDecl* getFuncDecl() { return m_funcDeclRef.getDecl(); }
+    FunctionDeclBase* getFuncDecl() { return m_funcDeclRef.getDecl(); }
 
     /// Get the name of the entry point
     Name* getName() { return m_name; }
@@ -299,7 +299,7 @@ public:
     class EntryPointSpecializationInfo : public SpecializationInfo
     {
     public:
-        DeclRef<FuncDecl> specializedFuncDeclRef;
+        DeclRef<FunctionDeclBase> specializedFuncDeclRef;
         List<ExpandedSpecializationArg> existentialSpecializationArgs;
     };
 
@@ -319,7 +319,11 @@ protected:
         DiagnosticSink* sink) SLANG_OVERRIDE;
 
 private:
-    EntryPoint(Linkage* linkage, Name* name, Profile profile, DeclRef<FuncDecl> funcDeclRef);
+    EntryPoint(
+        Linkage* linkage,
+        Name* name,
+        Profile profile,
+        DeclRef<FunctionDeclBase> funcDeclRef);
 
     void _collectGenericSpecializationParamsRec(Decl* decl);
     void _collectShaderParams();
@@ -330,7 +334,7 @@ private:
 
     // The declaration of the entry-point function itself.
     //
-    DeclRef<FuncDecl> m_funcDeclRef;
+    DeclRef<FunctionDeclBase> m_funcDeclRef;
 
     /// The mangled name of the entry point function
     String m_mangledName;

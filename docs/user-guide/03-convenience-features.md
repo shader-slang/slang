@@ -163,6 +163,11 @@ int rs = foo.staticMethod(a,b);
 
 ### Mutability of member functions
 
+In `h-slang`, calling a `[mutating]` or `[ref]` member on a value type requires an l-value
+receiver. A concrete class handle has reference semantics and need not be an l-value: the
+call changes the referenced object without rebinding the handle. Arguments passed to `out`,
+`inout`, or `__ref` parameters still require l-values.
+
 For GPU performance considerations, the `this` argument in a member function is immutable by default. Attempting to modify `this` will result in a compile error. If you intend to define a member function that mutates the object, use `[mutating]` attribute on the member function as shown in the following example.
 
 ```slang
@@ -1189,13 +1194,39 @@ Slang supports lambda expressions for passing small callable values to higher-or
 ```slang
 (parameterList) => expression
 (parameterList) => { statements; return expression; }
+(parameterList)! => expression
+(parameterList)! => { statements; return expression; }
+(parameterList)~ => expression
+(parameterList)~ => { statements; return expression; }
 ```
 
 Parameter types must be written explicitly. In the single-expression form, the expression's type is the return type. In the block form, all `return` statements must return the same type.
 
+The temporary `!` suffix makes the lambda mutating. A mutating lambda implements
+`IMutatingFunc` and can modify its captured copies. The suffix is experimental and will be
+replaced when the permanent lambda-modifier syntax is selected.
+
+The temporary `~` suffix makes the lambda differentiable. It implements
+`IDifferentiableFuncWithDiffThis` and its `operator()` is treated as `[Differentiable]`.
+The closure implements `IDifferentiablePtrType`, so captured pointer types carry their
+differential handles into the lambda. Captures explicitly marked `no_diff` remain constant.
+Capturing an active differentiable value, such as a `float`, is currently unsupported; pass it
+as an explicit argument or mark it `no_diff` when it should be constant. Ordinary input types
+may be non-differentiable, such as a `uint` index, while the result must be differentiable.
+
+Generic helpers accepting a `~` lambda must constrain the callable to
+`IDifferentiableFuncWithDiffThis`. This interface does not inherit `IDifferentiableFunc` or
+`IDifferentiableMutatingFunc`: those interfaces do not differentiate the receiver, so converting
+to them would discard the gradient handles of active captures. `!~` retains its previous
+receiver-constant semantics and implements `IDifferentiableMutatingFunc`. Like `!`, the `~`
+spelling is temporary.
+
 ### Basic usage
 
-Lambdas implement the `IFunc<TReturn, TArgs...>` interface (or `IMutatingFunc<...>` for mutating variants). Any function or method that takes an `IFunc` can be called with a matching lambda:
+Lambdas implement the callable interface selected by their suffix: `IFunc` for an ordinary lambda,
+`IMutatingFunc` for `!`, `IDifferentiableFuncWithDiffThis` for `~`, or
+`IDifferentiableMutatingFunc` for `!~`. Any function or method that takes the matching interface can
+be called with a compatible lambda:
 
 ```slang
 struct Matrix
@@ -1251,14 +1282,27 @@ Parameter types must also match the `functype` signature exactly. The return typ
 
 ### Capture semantics
 
-A lambda body may reference variables from the enclosing scope. **Captured variables are read-only inside the lambda body.** Attempting to assign to a captured variable is an error:
+A lambda body may reference variables from the enclosing scope. An ordinary lambda treats its
+captured variables as read-only. Attempting to assign to a captured variable is an error:
 
 ```slang
 int c = 2;
 let f = (int x) => { c = x; return 0; };  // error: cannot assign to captured 'c'
 ```
 
-If you need to mutate state, pass the state as a parameter or accumulate the result and assign after the lambda returns.
+A mutating lambda can modify the values stored in its closure:
+
+```csharp
+int c = 2;
+var f = ()! => ++c;
+int first = f();   // 3
+int second = f();  // 4
+// The outer c is still 2 because captures are by value.
+```
+
+The closure must itself be stored in a mutable location, such as a `var`, to invoke its mutating
+`operator()`. Captured class handles retain reference semantics, so every copy continues to refer
+to the same class object.
 
 ### Interaction with generic type inference
 
@@ -1279,7 +1323,8 @@ Named function-object types (conforming to `IFunc`) work in the same position as
 ### Limitations
 
 - Lambdas are experimental; supported targets currently include SPIR-V, the CPU backend, and the Slang interpreter. Other targets may reject some lambda forms.
-- Captured variables are read-only (see above).
+- Captures are by value. A mutating lambda changes its closure's copy, not the original variable.
+- Differentiable lambdas treat the closure as `no_diff`; automatic differentiation does not propagate gradients into captured values. Captured resource handles may use custom differentiable accessors to read primal storage and update separate differential storage.
 - Each lambda expression has a unique anonymous type; two lambdas with the same signature are not directly interconvertible.
 
 User-Defined Attributes (Experimental)

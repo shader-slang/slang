@@ -2611,6 +2611,35 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
     return static_cast<IRStringLit*>(_findOrEmitConstant(keyInst));
 }
 
+IRStringFormat* IRBuilder::emitStringFormat(IRInst* format, Int argCount, IRInst* const* args)
+{
+    List<IRInst*> operands;
+    operands.add(format);
+    operands.addRange(args, argCount);
+    return as<IRStringFormat>(emitIntrinsicInst(
+        getStringType(),
+        kIROp_StringFormat,
+        operands.getCount(),
+        operands.getBuffer()));
+}
+
+IRFormatGenericArgReflectionNameList* IRBuilder::emitFormatGenericArgReflectionNameList(
+    Int argCount,
+    IRInst* const* args)
+{
+    return as<IRFormatGenericArgReflectionNameList>(emitIntrinsicInst(
+        getStringType(),
+        kIROp_FormatGenericArgReflectionNameList,
+        argCount,
+        args));
+}
+
+IRReflectionNameOf* IRBuilder::emitReflectionNameOf(IRInst* type)
+{
+    return as<IRReflectionNameOf>(
+        emitIntrinsicInst(getStringType(), kIROp_ReflectionNameOf, 1, &type));
+}
+
 IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
 {
     IRConstant keyInst{};
@@ -3632,17 +3661,6 @@ IRInst* IRBuilder::emitDebugVar(
     }
 }
 
-IRInst* IRBuilder::emitDebugLexicalBlock(
-    IRInst* source,
-    IRInst* line,
-    IRInst* col,
-    IRInst* parentScope)
-{
-    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
-    IRInst* args[] = {source, line, col, parentScope};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugLexicalBlock, 4, args);
-}
-
 IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
 {
     List<IRInst*> args;
@@ -3659,18 +3677,18 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     IRInst* line,
     IRInst* col,
     IRInst* file,
-    IRInst* debugFunc,
+    IRInst* scope,
     IRInst* outerInlinedAt)
 {
-    SLANG_ASSERT(debugFunc);
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(scope) || as<IRDebugLexicalBlock>(scope));
     if (outerInlinedAt)
     {
-        IRInst* args[] = {line, col, file, debugFunc, outerInlinedAt};
+        IRInst* args[] = {line, col, file, scope, outerInlinedAt};
         return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 5, args);
     }
     else
     {
-        IRInst* args[] = {line, col, file, debugFunc};
+        IRInst* args[] = {line, col, file, scope};
         return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 4, args);
     }
 }
@@ -3692,6 +3710,19 @@ IRInst* IRBuilder::emitDebugFunction(
     }
     IRInst* args[] = {name, line, col, file, debugType};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
+}
+
+IRInst* IRBuilder::emitDebugLexicalBlock(
+    IRInst* source,
+    IRInst* lineStart,
+    IRInst* columnStart,
+    IRInst* lineEnd,
+    IRInst* columnEnd,
+    IRInst* parentScope)
+{
+    SLANG_RELEASE_ASSERT(as<IRDebugFunction>(parentScope) || as<IRDebugLexicalBlock>(parentScope));
+    IRInst* args[] = {source, lineStart, columnStart, lineEnd, columnEnd, parentScope};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugLexicalBlock, 6, args);
 }
 
 IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
@@ -3801,6 +3832,69 @@ IRInst* IRBuilder::emitDispatchKernelInst(
     auto inst = createInst<IRDispatchKernel>(
         this,
         kIROp_DispatchKernel,
+        type,
+        (Int)args.getCount(),
+        args.getBuffer());
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitMakeGraphicsPipelineInst(IRType* type, ArrayView<IRInst*> operands)
+{
+    auto inst = createInst<IRMakeGraphicsPipeline>(
+        this,
+        kIROp_MakeGraphicsPipeline,
+        type,
+        operands.getCount(),
+        operands.getBuffer());
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitMakeRayTracerInst(
+    IRType* type,
+    IRType* payloadType,
+    IRInst* maxRecursion,
+    IRInst* rayGenerationFn,
+    IRInst* closestHitFn,
+    IRInst* missFn)
+{
+    IRInst* args[] = {
+        payloadType,
+        maxRecursion,
+        rayGenerationFn,
+        closestHitFn,
+        missFn,
+    };
+    auto inst =
+        createInst<IRMakeRayTracer>(this, kIROp_MakeRayTracer, type, SLANG_COUNT_OF(args), args);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitSlangEntryPointInst(
+    IRType* type,
+    IRStringLit* moduleName,
+    IRStringLit* entryPointName)
+{
+    IRInst* args[] = {moduleName, entryPointName};
+    auto inst = createInst<IRSlangEntryPoint>(this, kIROp_SlangEntryPoint, type, 2, args);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitSpecializedSlangEntryPointInst(
+    IRType* type,
+    IRStringLit* moduleName,
+    IRStringLit* entryPointName,
+    Int argOperandCount,
+    IRInst* const* argOperands)
+{
+    List<IRInst*> args = {moduleName, entryPointName};
+    args.addRange(argOperands, (Index)argOperandCount);
+    auto inst = createInst<IRSpecializedSlangEntryPoint>(
+        this,
+        kIROp_SpecializedSlangEntryPoint,
         type,
         (Int)args.getCount(),
         args.getBuffer());
@@ -4034,7 +4128,7 @@ IRInst* IRBuilder::emitLookupInterfaceMethodInst(
     // the emit logic, but this is a reasonably early place
     // to catch it.
     //
-    SLANG_ASSERT(witnessTableVal && witnessTableVal->getOp() != kIROp_StructKey);
+    SLANG_ASSERT(witnessTableVal && !as<IRStructKey>(witnessTableVal));
 
     IRInst* args[] = {witnessTableVal, interfaceMethodVal};
 
@@ -4218,6 +4312,11 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
         return getVoidValue();
     case kIROp_StringType:
         return getStringValue(UnownedStringSlice());
+    case kIROp_HGVMBoxType:
+    case kIROp_HGVMTaggedUnionType:
+        // These owned carriers have no decomposable IR literal. In particular, a peephole
+        // query with fallback disabled must not recreate the instruction it is simplifying.
+        return fallback ? emitDefaultConstructRaw(type) : nullptr;
     case kIROp_PtrType:
     case kIROp_BorrowInOutParamType:
     case kIROp_OutParamType:
@@ -5403,9 +5502,36 @@ IRInterfaceType* IRBuilder::createInterfaceType(UInt operandCount, IRInst* const
 
 IRStructKey* IRBuilder::createStructKey()
 {
-    IRStructKey* structKey = createInst<IRStructKey>(this, kIROp_StructKey, nullptr);
+    IRStructKey* structKey =
+        createInst<IRDeclaredStructKey>(this, kIROp_DeclaredStructKey, nullptr);
     addGlobalValue(this, structKey);
     return structKey;
+}
+
+IRStructKey* IRBuilder::getBuiltinStructKey(KnownBuiltinDeclName kind)
+{
+    const char* name = nullptr;
+    switch (kind)
+    {
+    case KnownBuiltinDeclName::DifferentialPairPrimal:
+        name = "primal";
+        break;
+    case KnownBuiltinDeclName::DifferentialPairDifferential:
+        name = "differential";
+        break;
+    default:
+        SLANG_UNEXPECTED("not a built-in storage field");
+    }
+
+    IRInst* role = getIntValue(getIntType(), IRIntegerValue(kind));
+    auto key = cast<IRStructKey>(emitIntrinsicInst(nullptr, kIROp_BuiltinStructKey, 1, &role));
+    if (!key->findDecoration<IRReflectionNameDecoration>())
+    {
+        auto fieldName = UnownedTerminatedStringSlice(name);
+        addReflectionNameDecoration(key, getStringValue(fieldName));
+        addNameHintDecoration(key, fieldName);
+    }
+    return key;
 }
 
 // Create a field nested in a struct type, declaring that
@@ -7123,6 +7249,98 @@ IRInst* IRBuilder::emitGpuForeach(List<IRInst*> args)
     return inst;
 }
 
+IRHGBCAsmOperand* IRBuilder::emitHGBCAsmOperandLiteral(IRInst* literal)
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    auto operand = createInst<IRHGBCAsmOperand>(
+        this,
+        kIROp_HGBCAsmOperandLiteral,
+        literal->getFullType(),
+        literal);
+    addInst(operand);
+    return operand;
+}
+
+IRHGBCAsmOperand* IRBuilder::emitHGBCAsmOperandValue(IRInst* value)
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    auto operand =
+        createInst<IRHGBCAsmOperand>(this, kIROp_HGBCAsmOperandValue, value->getFullType(), value);
+    addInst(operand);
+    return operand;
+}
+
+IRHGBCAsmOperand* IRBuilder::emitHGBCAsmOperandValuePack(IRInst* valuePack)
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    auto operand = createInst<IRHGBCAsmOperand>(
+        this,
+        kIROp_HGBCAsmOperandValuePack,
+        valuePack->getFullType(),
+        valuePack);
+    addInst(operand);
+    return operand;
+}
+
+IRHGBCAsmOperand* IRBuilder::emitHGBCAsmOperandValuePack(UInt valueCount, IRInst* const* values)
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    auto operand = createInst<IRHGBCAsmOperand>(
+        this,
+        kIROp_HGBCAsmOperandValuePack,
+        getVoidType(),
+        valueCount,
+        values);
+    addInst(operand);
+    return operand;
+}
+
+IRHGBCAsmOperand* IRBuilder::emitHGBCAsmOperandType(IRInst* type)
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    auto operand =
+        createInst<IRHGBCAsmOperand>(this, kIROp_HGBCAsmOperandType, getTypeType(), type);
+    addInst(operand);
+    return operand;
+}
+
+IRHGBCAsmOperand* IRBuilder::emitHGBCAsmOperandId(IRInst* name)
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    auto operand = createInst<IRHGBCAsmOperand>(this, kIROp_HGBCAsmOperandId, getVoidType(), name);
+    addInst(operand);
+    return operand;
+}
+
+IRHGBCAsmOperand* IRBuilder::emitHGBCAsmOperandResult()
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    auto operand = createInst<IRHGBCAsmOperand>(this, kIROp_HGBCAsmOperandResult, getVoidType());
+    addInst(operand);
+    return operand;
+}
+
+IRHGBCAsmInst* IRBuilder::emitHGBCAsmInst(IRInst* opcode, List<IRInst*> operands)
+{
+    SLANG_ASSERT(as<IRHGBCAsm>(m_insertLoc.getParent()));
+    operands.insert(0, opcode);
+    auto inst = createInst<IRHGBCAsmInst>(
+        this,
+        kIROp_HGBCAsmInst,
+        getVoidType(),
+        operands.getCount(),
+        operands.getBuffer());
+    addInst(inst);
+    return inst;
+}
+
+IRHGBCAsm* IRBuilder::emitHGBCAsm(IRType* type)
+{
+    auto asmInst = createInst<IRHGBCAsm>(this, kIROp_HGBCAsm, type);
+    addInst(asmInst);
+    return asmInst;
+}
+
 IRSPIRVAsmOperand* IRBuilder::emitSPIRVAsmOperandLiteral(IRInst* literal)
 {
     SLANG_ASSERT(as<IRSPIRVAsm>(m_insertLoc.getParent()));
@@ -7560,14 +7778,15 @@ IRVarLayout* IRBuilder::getVarLayout(List<IRInst*> const& operands)
 
 IREntryPointLayout* IRBuilder::getEntryPointLayout(
     IRVarLayout* paramsLayout,
-    IRVarLayout* resultLayout)
+    IRVarLayout* resultLayout,
+    IRIntLit* uniformOffset)
 {
-    IRInst* operands[] = {paramsLayout, resultLayout};
+    IRInst* operands[] = {paramsLayout, resultLayout, uniformOffset};
 
     return cast<IREntryPointLayout>(createIntrinsicInst(
         getVoidType(),
         kIROp_EntryPointLayout,
-        SLANG_COUNT_OF(operands),
+        uniformOffset ? 3 : 2,
         operands));
 }
 
@@ -7930,6 +8149,9 @@ static bool shouldFoldInstIntoUses(IRDumpContext* context, IRInst* inst)
         return true;
 
     if (as<IRSPIRVAsmOperand>(inst))
+        return true;
+
+    if (as<IRHGBCAsmOperand>(inst))
         return true;
 
     return false;
@@ -8298,6 +8520,28 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
     // clear anyway to the user
     switch (op)
     {
+    case kIROp_HGBCAsmOperandLiteral:
+    case kIROp_HGBCAsmOperandValue:
+    case kIROp_HGBCAsmOperandType:
+        dumpInstExpr(context, inst->getOperand(0));
+        return;
+    case kIROp_HGBCAsmOperandValuePack:
+        dump(context, "$expand(");
+        for (UInt i = 0; i < inst->getOperandCount(); ++i)
+        {
+            if (i)
+                dump(context, ", ");
+            dumpInstExpr(context, inst->getOperand(i));
+        }
+        dump(context, ")");
+        return;
+    case kIROp_HGBCAsmOperandId:
+        dump(context, "%");
+        dumpInstExpr(context, inst->getOperand(0));
+        return;
+    case kIROp_HGBCAsmOperandResult:
+        dump(context, "result");
+        return;
     case kIROp_SPIRVAsmOperandEnum:
         dumpInstExpr(context, inst->getOperand(0));
         return;
@@ -8384,6 +8628,7 @@ static void dumpInstBody(IRDumpContext* context, IRInst* inst)
     case kIROp_ClassType:
     case kIROp_GLSLShaderStorageBufferType:
     case kIROp_SPIRVAsm:
+    case kIROp_HGBCAsm:
         dumpIRParentInst(context, inst);
         return;
 
@@ -8881,9 +9126,11 @@ bool isIntegralScalarOrCompositeType(IRType* t)
 
 IRStructField* findStructField(IRInst* type, IRStructKey* key)
 {
-    if (auto irStructType = as<IRStructType>(type))
+    // Attributes such as no_diff qualify a value without changing its nominal field declarations.
+    type = unwrapAttributedType(type);
+    if (as<IRStructType>(type) || as<IRClassType>(type))
     {
-        for (auto field : irStructType->getFields())
+        for (auto field : IRFilteredInstList<IRStructField>(type->getChildren()))
         {
             if (field->getKey() == key)
             {
@@ -8895,11 +9142,9 @@ IRStructField* findStructField(IRInst* type, IRStructKey* key)
     {
         if (auto irGeneric = as<IRGeneric>(irSpecialize->getBase()))
         {
-            if (auto irGenericStructType =
-                    as<IRStructType>(findInnerMostGenericReturnVal(irGeneric)))
-            {
-                return findStructField(irGenericStructType, key);
-            }
+            auto aggregateType = findInnerMostGenericReturnVal(irGeneric);
+            if (as<IRStructType>(aggregateType) || as<IRClassType>(aggregateType))
+                return findStructField(aggregateType, key);
         }
     }
 
@@ -9500,6 +9745,9 @@ bool IRInst::mightHaveSideEffects(
     if (as<IRSPIRVAsmOperand>(this))
         return false;
 
+    if (as<IRHGBCAsmOperand>(this))
+        return false;
+
     if (as<IRSetBase>(this))
         return false;
 
@@ -9512,6 +9760,10 @@ bool IRInst::mightHaveSideEffects(
     // to safely cover all the instructions we haven't had time to think about.
     default:
         break;
+
+    case kIROp_IndexOfTypeInPack:
+        // An unused lookup must still diagnose missing or ambiguous types on specialization.
+        return true;
 
     case kIROp_Call:
         {
@@ -9547,6 +9799,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_RTTIType:
     case kIROp_Func:
     case kIROp_DebugFunction:
+    case kIROp_DebugLambda:
     case kIROp_DebugLexicalBlock:
     case kIROp_Generic:
     case kIROp_Var:
@@ -9555,7 +9808,8 @@ bool IRInst::mightHaveSideEffects(
                           // load/store would have side effects
     case kIROp_GlobalConstant:
     case kIROp_GlobalParam:
-    case kIROp_StructKey:
+    case kIROp_DeclaredStructKey:
+    case kIROp_BuiltinStructKey:
     case kIROp_GlobalGenericParam:
     case kIROp_ThisTypeWitness:
     case kIROp_WitnessTable:
@@ -10200,8 +10454,6 @@ bool isMovableInst(IRInst* inst)
     case kIROp_Or:
     case kIROp_Not:
     case kIROp_Neg:
-    case kIROp_FieldExtract:
-    case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
     case kIROp_NodeOutputRecordGetElementPtr:
@@ -10259,6 +10511,14 @@ bool isMovableInst(IRInst* inst)
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
         return true;
+    case kIROp_FieldExtract:
+        // A class field is shared heap storage, so another call can change the value without
+        // changing the class handle operand. Struct field extraction remains freely movable.
+        return !isClassType(as<IRFieldExtract>(inst)->getBase()->getDataType());
+    case kIROp_FieldAddress:
+        // Forming a class field address reads the class handle through Ptr<Class>. If that local
+        // handle slot is reassigned, a later field-address operation must resolve the new object.
+        return !isPtrToClassType(as<IRFieldAddress>(inst)->getBase()->getDataType());
     case kIROp_Call:
         // Similar to the case in IRInst::mightHaveSideEffects, pure
         // calls are ok

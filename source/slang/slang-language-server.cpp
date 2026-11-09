@@ -219,7 +219,7 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 15)
+                    if (arr.getCount() == 16)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
@@ -230,6 +230,7 @@ SlangResult LanguageServer::parseNextMessage()
                         updateWorkspaceFlavor(arr[12]);
                         updateTraceOptions(arr[13]);
                         updatePredefinedLanguageVersion(arr[14]);
+                        updateExperimentalFeatures(arr[15]);
                     }
                 }
                 break;
@@ -2600,6 +2601,32 @@ void LanguageServer::updatePredefinedLanguageVersion(const JSONValue& value)
     }
 }
 
+void LanguageServer::updateExperimentalFeatures(const JSONValue& value)
+{
+    if (!value.isValid())
+        return;
+
+    // Clients without this setting return null; removing it restores the opt-in default.
+    bool enabled = false;
+    if (value.type != JSONValue::Type::Null)
+    {
+        JSONToNativeConverter converter(
+            m_connection->getContainer(),
+            &m_typeMap,
+            m_connection->getSink());
+        if (SLANG_FAILED(converter.convert(value, &enabled)))
+            return;
+    }
+    if (m_core.m_workspace->updateExperimentalFeatures(enabled))
+    {
+        // A new session is initially empty. Requeue open documents so disabling the setting
+        // restores their diagnostics without waiting for a source edit or an editor request.
+        for (const auto& [path, _] : m_core.m_workspace->openedDocuments)
+            m_pendingModulesToUpdateDiagnostics.add(path);
+        sendRefreshRequests(m_connection);
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
@@ -2633,6 +2660,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slangLanguageServer.trace.server";
     args.items.add(item);
     item.section = "slang.predefinedLanguageVersion";
+    args.items.add(item);
+    item.section = "slang.enableExperimentalFeatures";
     args.items.add(item);
     m_connection->sendCall(
         ConfigurationParams::methodName,
@@ -3231,6 +3260,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.predefinedLanguageVersion")
         {
             updatePredefinedLanguageVersion(kv.value);
+        }
+        else if (key == "slang.enableExperimentalFeatures")
+        {
+            updateExperimentalFeatures(kv.value);
         }
     }
 }

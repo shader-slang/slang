@@ -36,13 +36,12 @@ static SlangResult compileAndInterpret(
     sessionDesc.targets = &targetDesc;
     sessionDesc.compilerOptionEntryCount = 0;
     String pathName = Path::getParentDirectory(fileName);
+    if (!pathName.getLength())
+        pathName = ".";
     String moduleName = Path::getFileNameWithoutExt(fileName);
     const char* searchPaths[] = {pathName.getBuffer()};
-    if (pathName.getLength())
-    {
-        sessionDesc.searchPathCount = 1;
-        sessionDesc.searchPaths = searchPaths;
-    }
+    sessionDesc.searchPathCount = 1;
+    sessionDesc.searchPaths = searchPaths;
     ComPtr<slang::ISession> session;
     SLANG_RETURN_ON_FAIL(globalSession->createSession(sessionDesc, session.writeRef()));
 
@@ -61,6 +60,11 @@ static SlangResult compileAndInterpret(
             diagnosticBlob.writeRef())))
     {
         maybePrintDiagnostic(diagnosticBlob);
+        return SLANG_FAIL;
+    }
+    if (slang_isHostEntryPoint(entryPoint))
+    {
+        stdWriters->getError().print("[host] entry points require HGVM; omit -legacy.\n");
         return SLANG_FAIL;
     }
 
@@ -188,6 +192,7 @@ SlangResult innerMain(
     String entryPointName = toSlice("main");
     UnownedStringSlice fileName;
     bool disasm = false;
+    bool useLegacyInterpreter = false;
     int innerArgIndex = 0;
     if (argc < 2)
     {
@@ -204,6 +209,10 @@ SlangResult innerMain(
         {
             disasm = true;
         }
+        else if (arg == "-legacy")
+        {
+            useLegacyInterpreter = true;
+        }
         else if (arg.startsWith("-"))
         {
             return SLANG_FAIL;
@@ -215,7 +224,7 @@ SlangResult innerMain(
             break;
         }
     }
-    if (!fileName.getLength())
+    if (!useLegacyInterpreter || !fileName.getLength())
     {
         return SLANG_FAIL;
     }

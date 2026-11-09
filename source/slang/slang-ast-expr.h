@@ -552,6 +552,15 @@ class CountOfExpr : public SizeOfLikeExpr
     FIDDLE(...)
 };
 
+/// A compile-time lookup of a unique type in a type pack.
+FIDDLE()
+class IndexOfTypeInPackExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp elementType;
+    FIDDLE() TypeExp packType;
+};
+
 FIDDLE(abstract)
 class PackQueryExpr : public Expr
 {
@@ -880,6 +889,63 @@ class DispatchKernelExpr : public HigherOrderInvokeExpr
     FIDDLE(...)
     FIDDLE() Expr* threadGroupSize;
     FIDDLE() Expr* dispatchSize;
+    FIDDLE() List<UInt> shaderParameterIndices;
+};
+
+/// Constructs a callable graphics pipeline from specialized stages and a typed static descriptor.
+/// Draw controls precede shader arguments; resources remain ordinary captures in their stage.
+FIDDLE()
+class MakeGraphicsPipelineExpr : public HigherOrderInvokeExpr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* fragmentFunction;
+    FIDDLE() Expr* settings;
+    FIDDLE() UInt drawParameterCount = 0;
+    FIDDLE() UInt vertexArgumentCount = 0;
+    FIDDLE() List<UInt> shaderParameterIndices;
+};
+
+/// An expression of the form `raytrace(rayGen, closestHit, miss, maxRecursionDepth)` that produces
+/// a callable ray-tracing dispatcher. The recursion-depth argument is optional and defaults to 1.
+FIDDLE()
+class RayTraceExpr : public HigherOrderInvokeExpr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* closestHitFunction;
+    FIDDLE() Expr* missFunction;
+    FIDDLE() Expr* maxRecursionDepthExpr = nullptr;
+    FIDDLE() IntVal* maxRecursionDepthValue = nullptr;
+    FIDDLE() Type* rayPayloadType = nullptr;
+};
+
+/// A checked shader registration or ray-generation dispatch awaiting its uniform arguments.
+FIDDLE()
+class RayPipelineCallExpr : public Expr
+{
+    FIDDLE(...)
+    enum class Kind
+    {
+        Miss,
+        Hit,
+        Dispatch,
+        HitGroup
+    };
+    FIDDLE() Kind kind = Kind::Miss;
+    FIDDLE() Expr* baseFunction = nullptr;
+    FIDDLE() Expr* pipeline = nullptr;
+    FIDDLE() Expr* geometrySlot = nullptr;
+    FIDDLE() Expr* raySlot = nullptr;
+    FIDDLE() Expr* extent = nullptr;
+    FIDDLE() Expr* maxRecursion = nullptr;
+    FIDDLE() IntVal* maxRecursionValue = nullptr;
+    FIDDLE() Type* payloadType = nullptr;
+    FIDDLE() Type* attributeType = nullptr;
+    FIDDLE() List<UInt> parameterIndices;
+    FIDDLE() List<UInt> parameterRoles;
+    FIDDLE() TypeExp payloadTypeExpr;
+    FIDDLE() TypeExp attributeTypeExpr;
+    FIDDLE() Expr* anyHitFunction = nullptr;
+    FIDDLE() Expr* intersectionFunction = nullptr;
 };
 
 FIDDLE()
@@ -888,6 +954,8 @@ class LambdaExpr : public Expr
     FIDDLE(...)
     FIDDLE() ScopeDecl* paramScopeDecl;
     FIDDLE() Stmt* bodyStmt;
+    FIDDLE() SourceLoc mutatingLoc;
+    FIDDLE() SourceLoc differentiableLoc;
 };
 
 /// An express to mark its inner expression as an intended non-differential call.
@@ -1029,6 +1097,52 @@ class PackExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() List<Expr*> args;
+};
+
+FIDDLE()
+struct HGBCAsmOperand
+{
+    FIDDLE(...)
+
+public:
+    enum Flavor
+    {
+        Literal,
+        Id,
+        ResultMarker,
+        NamedValue,
+        SlangValue,
+        SlangValuePack,
+        SlangType,
+        SlangValueAddr,
+    };
+
+    FIDDLE() Flavor flavor;
+    Token token;
+    FIDDLE() Expr* expr = nullptr;
+    FIDDLE() uint32_t knownValue = 0xffffffff;
+    FIDDLE() TypeExp type = TypeExp();
+};
+
+/// Stores one descriptor-validated HGBC instruction before IR lowering.
+FIDDLE()
+struct HGBCAsmInst
+{
+    FIDDLE(...)
+
+public:
+    FIDDLE() HGBCAsmOperand opcode;
+    FIDDLE() List<HGBCAsmOperand> operands;
+};
+
+/// Represents an inline block that emits ordinary HGBC records.
+FIDDLE()
+class HGBCAsmExpr : public Expr
+{
+    FIDDLE(...)
+
+public:
+    FIDDLE() List<HGBCAsmInst> insts;
 };
 
 FIDDLE()

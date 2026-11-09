@@ -25,6 +25,7 @@
 #include "compiler-core/slang-downstream-compiler.h"
 #include "compiler-core/slang-language-server-protocol.h"
 #include "compiler-core/slang-nvrtc-compiler.h"
+#include "debugger-test.h"
 #include "diagnostic-annotation-util.h"
 #include "directory-util.h"
 #include "options.h"
@@ -103,6 +104,7 @@ struct TestOptions
     {
         return commandOptions.tryGetValue("diag", prefix);
     }
+    bool isHGVMInterpreterTest() const { return commandOptions.containsKey("hgvm"); }
     bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
 
     Type type = Type::Normal;
@@ -1650,6 +1652,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_HOST_OBJECT_CODE:
     case SLANG_SHADER_LLVM_IR:
     case SLANG_OBJECT_CODE:
+    case SLANG_HGBC:
         {
             return 0;
         }
@@ -3382,6 +3385,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
+
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we
@@ -3529,6 +3533,19 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
 
     CommandLine cmdLine;
 
+    const bool useHGVM = input.testOptions->isHGVMInterpreterTest();
+    if (useHGVM)
+    {
+        cmdLine.addArg("-diagnostic-color");
+        cmdLine.addArg("never");
+    }
+    else
+    {
+        // Plain INTERPRET directives exercise the legacy bytecode interpreter. HGVM tests opt in
+        // with INTERPRET(hgvm), while slangi itself defaults to HGVM.
+        cmdLine.addArg("-legacy");
+    }
+
     List<String> args;
 
     for (Index i = 0; i < input.testOptions->args.getCount(); i++)
@@ -3551,11 +3568,20 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
         }
     }
 
-    cmdLine.addArg(input.filePath);
-
-    for (auto arg : args)
+    if (useHGVM)
     {
-        cmdLine.addArg(arg);
+        // HGVM interpreter tests commonly need compiler options such as an example's include path.
+        // `slangi` parses those options before the source file and does not treat trailing options
+        // as compile configuration.
+        for (auto arg : args)
+            cmdLine.addArg(arg);
+        cmdLine.addArg(input.filePath);
+    }
+    else
+    {
+        cmdLine.addArg(input.filePath);
+        for (auto arg : args)
+            cmdLine.addArg(arg);
     }
 
     if (SLANG_FAILED(_initSlangInterpreter(context, cmdLine)))
@@ -3564,7 +3590,20 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
     }
 
     ExecuteResult exeRes;
-    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+    SpawnType spawnType = input.spawnType;
+    if (useHGVM)
+    {
+        SpawnType requestedSpawnType = context->getFinalSpawnType(input.spawnType);
+        if (requestedSpawnType != SpawnType::UseTestServer &&
+            requestedSpawnType != SpawnType::UseFullyIsolatedTestServer)
+        {
+            // The shared-library slangi entry point does not provide the native HGVM host. Keep
+            // the executable as the default while allowing an explicitly selected test server to
+            // use its persistent compiler and native HGVM environment.
+            spawnType = SpawnType::UseExe;
+        }
+    }
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, spawnType, cmdLine, exeRes));
 
     if (context->isCollectingRequirements())
     {
@@ -3580,6 +3619,123 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
         false,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
+}
+
+/// Runs a scripted debugger session from SEND comments and checks its output with LLVM FileCheck.
+/// The CLI owns stdin, so it runs as a subprocess even when other tests use a persistent server.
+TestResult runDebuggerTest(TestContext* context, TestInput& input)
+{
+    auto& reporter = *context->getTestReporter();
+    const auto& options = input.testOptions->commandOptions;
+    String mode = "CLI", prefix = "CLI", precompile;
+    options.tryGetValue("mode", mode);
+    options.tryGetValue("prefix", prefix);
+    bool useBytecode = options.tryGetValue("precompile", precompile);
+    if ((mode != "CLI" && mode != "DAP") || !prefix.getLength() ||
+        (useBytecode &&
+         (precompile.getLength() != 1 || precompile[0] < '0' || precompile[0] > '3')))
+    {
+        reporter.message(
+            TestMessageType::RunError,
+            "DEBUGGER requires mode=CLI|DAP, a nonempty prefix, and optional precompile=0|1|2|3");
+        return TestResult::Fail;
+    }
+    if (context->isCollectingRequirements())
+        return TestResult::Pass;
+
+    String source, error;
+    List<String> commands;
+    if (SLANG_FAILED(File::readAllText(input.filePath, source)) ||
+        SLANG_FAILED(collectDebuggerCommands(
+            source,
+            input.filePath,
+            prefix,
+            commands,
+            error,
+            mode == "DAP")))
+    {
+        reporter.messageFormat(
+            TestMessageType::RunError,
+            "Failed to read debugger script '%s': %s",
+            input.filePath.getBuffer(),
+            error.getBuffer());
+        return TestResult::Fail;
+    }
+
+    TestOptions checkOptions = *input.testOptions;
+    checkOptions.commandOptions.set("filecheck", prefix + "-CHECK");
+    TestInput checkInput = input;
+    checkInput.testOptions = &checkOptions;
+    String programPath = input.filePath;
+    if (useBytecode)
+    {
+        programPath = input.outputStem + ".debugger.hgbc";
+        CommandLine compiler;
+        _initSlangCompiler(context, compiler);
+        compiler.addArg(input.filePath);
+        compiler.addArg("-target");
+        compiler.addArg("hgbc");
+        compiler.addArg("-g" + precompile);
+        compiler.addArg("-o");
+        compiler.addArg(programPath);
+        // Entry selection and import paths apply to both source and precompiled sessions.
+        String entry = "main";
+        for (Index i = 0; i < input.testOptions->args.getCount(); ++i)
+        {
+            const auto& arg = input.testOptions->args[i];
+            if (arg == "-entry" && i + 1 < input.testOptions->args.getCount())
+                entry = input.testOptions->args[++i];
+            else if (arg == "-I" && i + 1 < input.testOptions->args.getCount())
+            {
+                compiler.addArg(arg);
+                compiler.addArg(input.testOptions->args[++i]);
+            }
+            else if (arg.startsWith("-I"))
+                compiler.addArg(arg);
+        }
+        compiler.addArg("-entry");
+        compiler.addArg(entry);
+        ExecuteResult compiled;
+        compiled.init();
+        auto code = spawnAndWait(context, input.outputStem, input.spawnType, compiler, compiled);
+        if (code != ToolReturnCode::Success)
+        {
+            File::remove(programPath);
+            reporter.message(TestMessageType::RunError, "Failed to compile debugger input");
+            return _validateOutput(context, checkInput, getOutput(compiled), true);
+        }
+    }
+
+    CommandLine debugger;
+    _initSlangInterpreter(context, debugger);
+    debugger.addArg(mode == "DAP" ? "-dap" : "-debug");
+    if (mode == "CLI")
+    {
+        debugger.addArg("-diagnostic-color");
+        debugger.addArg("never");
+        for (const auto& arg : input.testOptions->args)
+            debugger.addArg(arg);
+        debugger.addArg(programPath);
+    }
+    if (context->options.verbosity == VerbosityLevel::Verbose)
+        reporter.message(TestMessageType::Info, debugger.toString().getBuffer());
+    ExecuteResult result;
+    SlangResult status =
+        mode == "DAP"
+            ? runDebuggerDAP(
+                  debugger,
+                  commands,
+                  programPath,
+                  context->connectionTimeOutInMs,
+                  result,
+                  error)
+            : runDebuggerCLI(debugger, commands, context->connectionTimeOutInMs, result, error);
+    if (useBytecode)
+        File::remove(programPath);
+    if (SLANG_FAILED(status))
+        reporter.message(TestMessageType::RunError, error.getBuffer());
+    bool failed = SLANG_FAILED(status) || result.resultCode != 0;
+    return _validateOutput(context, checkInput, getOutput(result), failed);
 }
 
 TestResult runDispatcherTest(TestContext* context, TestInput& input)
@@ -3615,6 +3771,57 @@ TestResult runDispatcherTest(TestContext* context, TestInput& input)
         false,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
+}
+
+/// Runs a suite-owned command and reports its exit status, with optional FileCheck assertions.
+/// For example, EXTERNAL(tool=python) lets an external suite test its asset exporter alongside
+/// its Slang programs. Executables are configured by -test-tool, found in -bindir, or on PATH.
+TestResult runExternalTest(TestContext* context, TestInput& input)
+{
+    String tool;
+    if (!input.testOptions->commandOptions.tryGetValue("tool", tool) || !tool.getLength())
+    {
+        context->getTestReporter()->message(
+            TestMessageType::RunError,
+            "EXTERNAL requires a nonempty tool option");
+        return TestResult::Fail;
+    }
+    if (context->isCollectingRequirements())
+        return TestResult::Pass;
+
+    String executable;
+    if (!context->options.testTools.tryGetValue(tool, executable))
+    {
+        executable = Path::combine(context->options.binDir, tool + Process::getExecutableSuffix());
+        if (!File::exists(executable))
+            executable = tool;
+    }
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(executable));
+    auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
+    for (const auto& arg : input.testOptions->args)
+    {
+        // Test directives retain shell quoting; the process API expects individual raw arguments.
+        StringBuilder unescaped;
+        if (SLANG_FAILED(StringEscapeUtil::unescapeShellLike(
+                escapeHandler,
+                arg.getUnownedSlice(),
+                unescaped)))
+            return TestResult::Fail;
+        cmdLine.addArg(unescaped.produceString());
+    }
+    ExecuteResult result;
+    if (SLANG_FAILED(spawnAndWaitExe(context, input.outputStem, cmdLine, result)))
+        return TestResult::Fail;
+    if (result.resultCode != 0)
+    {
+        context->getTestReporter()->message(TestMessageType::TestFailure, getOutput(result));
+        return TestResult::Fail;
+    }
+    String prefix;
+    if (input.testOptions->getFileCheckPrefix(prefix))
+        return _fileCheckTest(*context, input.filePath, prefix, getOutput(result));
+    return TestResult::Pass;
 }
 
 TestResult runCompile(TestContext* context, TestInput& input)
@@ -5963,6 +6170,8 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"SIMPLE_EX", &runSimpleTest, 0},
     {"SIMPLE_LINE", &runSimpleLineTest, 0},
     {"INTERPRET", &runInterpreterTest, 0},
+    {"EXTERNAL", &runExternalTest, 0},
+    {"DEBUGGER", &runDebuggerTest, 0},
     {"DISPATCHER", &runDispatcherTest, 0},
     {"REFLECTION", &runReflectionTest, 0},
     {"CPU_REFLECTION", &runReflectionTest, 0},

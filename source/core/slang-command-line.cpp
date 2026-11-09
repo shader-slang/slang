@@ -112,7 +112,12 @@ void CommandLine::appendArgs(StringBuilder& out) const
         {
             out << " ";
         }
-        StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), out);
+        // An empty argument still occupies one argv slot. Without quotes, for example,
+        // `tool --label "" next` would reach the child as `tool --label next` on Windows.
+        if (arg.getLength() == 0)
+            StringEscapeUtil::appendQuoted(escapeHandler, arg.getUnownedSlice(), out);
+        else
+            StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), out);
     }
 }
 

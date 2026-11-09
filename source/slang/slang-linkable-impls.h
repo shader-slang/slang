@@ -97,6 +97,29 @@ private:
     FileDependencyList m_fileDependencyList;
 };
 
+/// An empty code composite that contributes explicit uniform-layout constraints.
+/// The source is retained for identity, but is not a child: enumerating this component must
+/// not enumerate the source's entry points, modules, or specialization parameters again.
+class EntryPointUniformLayoutConstraints : public CompositeComponentType
+{
+public:
+    EntryPointUniformLayoutConstraints(ComponentType* source, List<List<Index>> const& groups)
+        : CompositeComponentType(source->getLinkage(), {}), m_source(source), m_groups(groups)
+    {
+    }
+
+    ComponentType* getSource() { return m_source; }
+    List<List<Index>> const& getGroups() const { return m_groups; }
+
+    void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
+    void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
+        SLANG_OVERRIDE;
+
+private:
+    RefPtr<ComponentType> m_source;
+    List<List<Index>> m_groups;
+};
+
 /// A component type created by specializing another component type.
 class SpecializedComponentType : public ComponentType
 {
@@ -543,6 +566,9 @@ private:
 class ComponentTypeVisitor
 {
 public:
+    /// Metadata-only constraints contribute no code to ordinary component visitors.
+    virtual void visitEntryPointUniformLayoutConstraints(EntryPointUniformLayoutConstraints*) {}
+
     // The following methods should be overriden in a concrete subclass
     // to customize how it acts on each of the concrete types of component.
     //

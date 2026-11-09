@@ -164,6 +164,15 @@ bool Workspace::updatePredefinedLanguageVersion(SlangLanguageVersion version)
     return changed;
 }
 
+bool Workspace::updateExperimentalFeatures(bool value)
+{
+    if (enableExperimentalFeatures == value)
+        return false;
+    enableExperimentalFeatures = value;
+    invalidate();
+    return true;
+}
+
 void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
 {
     for (auto uri : rootDirURI)
@@ -535,19 +544,24 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
     }
     desc.preprocessorMacros = macroDescs.getBuffer();
 
-    // Inject the assumed language version (slang.predefinedLanguageVersion) as a session compiler
-    // option so directive-less files parse at that version; when unset (UNKNOWN) inject nothing and
-    // keep the compiler default. langVersionEntry must outlive the createSession call below, so it
-    // is declared in this scope (compilerOptionEntries borrows it by pointer).
-    slang::CompilerOptionEntry langVersionEntry;
+    // Diagnostics and completion create sessions through this same path. Keep the option storage
+    // alive until createSession returns, and preserve the compiler's language version when unset.
+    List<slang::CompilerOptionEntry> compilerOptions;
     if (predefinedLanguageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN)
     {
+        slang::CompilerOptionEntry langVersionEntry = {};
         langVersionEntry.name = slang::CompilerOptionName::LanguageVersion;
         langVersionEntry.value.kind = slang::CompilerOptionValueKind::Int;
         langVersionEntry.value.intValue0 = predefinedLanguageVersion;
-        desc.compilerOptionEntries = &langVersionEntry;
-        desc.compilerOptionEntryCount = 1;
+        compilerOptions.add(langVersionEntry);
     }
+    slang::CompilerOptionEntry experimentalEntry = {};
+    experimentalEntry.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalEntry.value.intValue0 = enableExperimentalFeatures;
+    compilerOptions.add(experimentalEntry);
+    desc.compilerOptionEntries = compilerOptions.getBuffer();
+    desc.compilerOptionEntryCount = (uint32_t)compilerOptions.getCount();
 
     ComPtr<slang::ISession> session;
     slangGlobalSession->createSession(desc, session.writeRef());

@@ -219,6 +219,10 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::wgsl);
         break;
 
+    case CodeGenTarget::HGBC:
+        atoms.add(CapabilityName::hgbc);
+        break;
+
     default:
         break;
     }

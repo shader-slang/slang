@@ -173,15 +173,11 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
             GroupMemoryBarrierWithGroupSync();
 
-            static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
-            static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * SubgroupSize;
-            uint shB_outer = shA + uint(SubgroupCount * _outerPerWarpA);
-
             // dW = dOut * input^T, stored in linear layout
             MMA.outerProductAccumulate<T, Address.Differential,
                                        T, OutputVector.Differential,
                                        T, T[Uint4AlignedInputSize]
-                                      >( shA, shB_outer, doutput, dthis.p.data, dWeightAddress.d);
+                                      >(doutput, dthis.p.data, dWeightAddress.d);
 
             if (Bias)
             {
@@ -213,6 +209,32 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         case metal:
             return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.Metal, false>(weightAddress, none);
         }
+    }
+
+    /// Applies an optimally tiled FP16 transform cached in the shared-memory pool.
+    ///
+    /// `parameterBaseVectorIndex` is the beginning of the layer's complete optimal-layout
+    /// parameter block, measured in `uint4` elements. This inference-only path keeps persistent
+    /// weights disjoint from the activation scratch reused by each layer.
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic, spirv)]
+    public OutputVector linearTransformFromSharedMemory<OutputVector, bool Bias = false>(
+        uint parameterBaseVectorIndex)
+        where OutputVector : IVector<T>
+    {
+        typealias TiledMMA = TiledMMAHelper<
+            T,
+            N,
+            OutputVector.Size,
+            SubgroupSize,
+            TargetEnum.SPIR_V,
+            ShMemSize,
+            false,
+            SubgroupCount>;
+        let result = TiledMMA.forwardFromShared<Bias>(
+            This(data),
+            parameterBaseVectorIndex);
+        return OutputVector(result.data);
     }
 
     // Backward of linear transformation without bias

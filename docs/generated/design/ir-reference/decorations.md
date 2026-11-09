@@ -269,6 +269,7 @@ ones by `addVarDecorations` (line 3271 onward) in
 | `import` | `IRImportDecoration` | (variadic, `min=1`) | | `import` declaration | Marks an inst as imported under a mangled name. |
 | `export` | `IRExportDecoration` | (variadic, `min=1`) | | `export` declaration | Marks an inst as exported under a mangled name. |
 | `public` | `IRPublicDecoration` | — | | `public` modifier (`PublicModifier`) | Public visibility. |
+| `hgbcExport` | `IRHGBCExportDecoration` | — | | `public` modifier (`PublicModifier`) | Marks a source-public declaration for HGBC host-API reflection without affecting physical type legalization. |
 | `hlslExport` | `IRHLSLExportDecoration` | — | | `export` modifier (`HLSLExportModifier`) | HLSL export. |
 | `downstreamModuleExport` | `IRDownstreamModuleExportDecoration` | — | | (synthesized) | Marks an inst as exported through the downstream module bridge. |
 | `downstreamModuleImport` | `IRDownstreamModuleImportDecoration` | — | | (synthesized) | Marks an inst as imported through the downstream module bridge. |

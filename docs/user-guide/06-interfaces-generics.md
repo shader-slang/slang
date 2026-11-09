@@ -1152,6 +1152,29 @@ void test()
 Note that a variadic type pack parameter must appear at the end of a parameter list. If a generic type contains more than one
 type pack parameter, then each type pack must contain the same number of arguments at instantiation sites.
 
+Parameter packs can also use `out`, `inout`, or `__ref`. The direction applies to each
+element, and expanding a mutable tuple into an output pack preserves writes to the tuple:
+
+```csharp
+void writeValues<each T>(Tuple<expand each T> source, out expand each T values)
+{
+    expand ((each values) = (each source));
+}
+
+void testOutputs()
+{
+    Tuple<uint, float> values;
+    writeValues(makeTuple(uint(3), 2.0), expand each values);
+    // values now contains (3, 2.0).
+}
+```
+
+Expanded output arguments must name addressable storage. An expansion over a
+property with `get`/`set` accessors or a swizzle that needs copyback is diagnosed.
+Passing individual properties and swizzles as ordinary `out` or `inout` arguments
+still uses their usual copyback behavior, including when those arguments form a pack.
+Read-only `__constref` parameter packs are not supported.
+
 ### Variadic Value Parameters
 
 In addition to variadic type parameters, Slang also supports variadic _value_ parameters. A variadic value parameter declares a pack of compile-time integer values:
@@ -1229,6 +1252,32 @@ struct Dims<let each D : int>
 
 int typeCount<each T>() { return countof(T); }
 ```
+
+### Finding a Type in a Pack
+
+`__index_of_type_in_pack<T, Pack>` is a compile-time integer expression that returns
+the zero-based position of `T` in a type pack:
+
+```csharp
+int indexOf<T, each Pack>()
+{
+    return __index_of_type_in_pack<T, Pack>;
+}
+
+// indexOf<float, int, float, bool>() returns 1.
+typealias IndexedArray<T, each Pack> = int[__index_of_type_in_pack<T, Pack> + 1];
+```
+
+The searched type must occur exactly once. An absent type (including lookup in an
+empty pack) or multiple matches produces a compiler diagnostic. Type aliases match
+their underlying type; distinct nominal types remain distinct even if they have
+the same fields. The second operand must be a type pack, not a value pack or a
+single type. Forwarded packs and type expansions are supported.
+
+Queries involving generic types remain symbolic until specialization determines
+the complete pack and its element types. Their evaluation is independent of debug
+information and optimization level, and they can be used in generic value
+arguments and array sizes.
 
 ### Constraining Pack Counts
 
@@ -1383,6 +1432,10 @@ even before specialization has determined which branch is taken.
 
 Slang's core module provides several interfaces for generic programming.
 The experimental [`slang.numerics`](a3-02-numerics.md) module provides a more systematic set of numeric interfaces for builtin and user-defined scalar and shaped types.
+
+`IDifferentiableFuncWithDiffThis<TResult, TParams...>` also supports differentiating a
+callable receiver that implements `IDifferentiablePtrType`. Its ordinary inputs are optionally
+differentiable, allowing types such as `uint` alongside `float`.
 
 ### General-Purpose Interfaces
 

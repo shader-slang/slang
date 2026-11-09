@@ -27,6 +27,12 @@ list(
 )
 list(TRANSFORM SLANG_FIDDLE_OUTPUTS PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
 
+set(SLANG_HGBC_FORMAT_INPUT "${slang_SOURCE_DIR}/include/slang-hgbc-format.h")
+set(SLANG_HGBC_FORMAT_FIDDLE_OUTPUT
+    "${SLANG_FIDDLE_OUTPUT_DIR}/slang-hgbc-format.h.fiddle"
+)
+list(APPEND SLANG_FIDDLE_OUTPUTS ${SLANG_HGBC_FORMAT_FIDDLE_OUTPUT})
+
 #
 # slang-fiddle is a many-input / many-output generator that uses
 # `writeAllTextIfChanged()` to avoid touching outputs whose content has
@@ -48,8 +54,15 @@ add_custom_command(
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
+    COMMAND
+        slang-fiddle -i "${slang_SOURCE_DIR}/include/" -o
+        "${SLANG_FIDDLE_OUTPUT_DIR}/" slang-hgbc-format.h
     COMMAND ${CMAKE_COMMAND} -E touch ${SLANG_FIDDLE_STAMP}
-    DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
+    DEPENDS
+        ${SLANG_FIDDLE_INPUTS}
+        ${SLANG_FIDDLE_LUA_INPUTS}
+        ${SLANG_HGBC_FORMAT_INPUT}
+        slang-fiddle
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
@@ -245,8 +258,12 @@ add_custom_target(
         ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/slang-tag-version.h"
         "${slang_BINARY_DIR}/$<CONFIG>/include/slang-tag-version.h"
+    COMMAND
+        ${CMAKE_COMMAND} -E copy "${SLANG_HGBC_FORMAT_FIDDLE_OUTPUT}"
+        "${slang_BINARY_DIR}/$<CONFIG>/include/slang-hgbc-format.h.fiddle"
 )
 set_target_properties(copy_slang_headers PROPERTIES FOLDER "generated")
+add_dependencies(copy_slang_headers slang-fiddle-output)
 
 #
 # Slang itself
@@ -292,11 +309,17 @@ set(slang_link_args
     SPIRV-Headers::SPIRV-Headers
     libcmark-gfm
 )
-set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
+set(
+    slang_interface_args
+    INCLUDE_DIRECTORIES_PUBLIC
+    ${slang_SOURCE_DIR}/include
+    ${SLANG_FIDDLE_OUTPUT_DIR}
+)
 set(slang_public_lib_args
     PUBLIC_HEADERS
     ${slang_SOURCE_DIR}/include/slang*.h
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/*.h
+    ${SLANG_HGBC_FORMAT_FIDDLE_OUTPUT}
     LINK_WITH_PRIVATE
     $<IF:$<BOOL:${SLANG_EMBED_CORE_MODULE}>,slang-embedded-core-module,slang-no-embedded-core-module>
     $<IF:$<BOOL:${SLANG_EMBED_CORE_MODULE_SOURCE}>,slang-embedded-core-module-source,slang-no-embedded-core-module-source>

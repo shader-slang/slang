@@ -13,7 +13,6 @@
 #include "compiler-core/slang-name.h"
 #include "core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
-#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -49,7 +48,6 @@ LegalVal LegalVal::pair(
 {
     if (ordinaryVal.flavor == LegalVal::Flavor::none)
         return specialVal;
-
     if (specialVal.flavor == LegalVal::Flavor::none)
         return ordinaryVal;
 
@@ -204,6 +202,87 @@ static LegalVal legalizeOperand(IRTypeLegalizationContext* context, IRInst* irVa
     return LegalVal::simple(irValue);
 }
 
+/// Append the physical IR operands represented by one legalized logical value.
+///
+/// Type legalization can erase a value whose type is empty, or split a value into multiple
+/// ordinary/resource operands. Variadic operand lists such as call and dispatch arguments must use
+/// the same recursive flattening so that their physical arguments continue to match legalized
+/// function signatures.
+static void appendLegalValueOperands(ShortList<IRInst*>& operands, LegalVal const& value)
+{
+    switch (value.flavor)
+    {
+    case LegalVal::Flavor::none:
+        break;
+
+    case LegalVal::Flavor::simple:
+        operands.add(value.getSimple());
+        break;
+
+    case LegalVal::Flavor::implicitDeref:
+        appendLegalValueOperands(operands, value.getImplicitDeref());
+        break;
+
+    case LegalVal::Flavor::pair:
+        {
+            auto pairValue = value.getPair();
+            appendLegalValueOperands(operands, pairValue->ordinaryVal);
+            appendLegalValueOperands(operands, pairValue->specialVal);
+        }
+        break;
+
+    case LegalVal::Flavor::tuple:
+        for (auto element : value.getTuple()->elements)
+        {
+            appendLegalValueOperands(operands, element.val);
+        }
+        break;
+
+    default:
+        SLANG_UNEXPECTED("unhandled legalized value flavor");
+    }
+}
+
+/// Append the physical parameter types represented by one legalized logical type.
+///
+/// Function signatures and their call arguments must use the same recursive ordering. In
+/// particular, an empty closure contributes no parameter while a split value contributes each of
+/// its physical types.
+static void appendLegalParameterTypes(List<IRType*>& parameterTypes, LegalType const& type)
+{
+    switch (type.flavor)
+    {
+    case LegalType::Flavor::none:
+        break;
+
+    case LegalType::Flavor::simple:
+        parameterTypes.add(type.getSimple());
+        break;
+
+    case LegalType::Flavor::implicitDeref:
+        appendLegalParameterTypes(parameterTypes, type.getImplicitDeref()->valueType);
+        break;
+
+    case LegalType::Flavor::pair:
+        {
+            auto pairType = type.getPair();
+            appendLegalParameterTypes(parameterTypes, pairType->ordinaryType);
+            appendLegalParameterTypes(parameterTypes, pairType->specialType);
+        }
+        break;
+
+    case LegalType::Flavor::tuple:
+        for (auto element : type.getTuple()->elements)
+        {
+            appendLegalParameterTypes(parameterTypes, element.type);
+        }
+        break;
+
+    default:
+        SLANG_UNEXPECTED("unhandled legalized parameter type flavor");
+    }
+}
+
 /// Helper type for legalization an IR `call` instruction
 struct LegalCallBuilder
 {
@@ -221,48 +300,8 @@ struct LegalCallBuilder
     /// The legalized arguments for the call
     ShortList<IRInst*> m_args;
 
-    /// Add a logical argument to the call (which may map to zero or mmore actual arguments)
-    void addArg(LegalVal const& val)
-    {
-        // In order to add the argument(s) for `val`,
-        // we will recurse over its structure.
-
-        switch (val.flavor)
-        {
-        case LegalVal::Flavor::none:
-            break;
-
-        case LegalVal::Flavor::simple:
-            m_args.add(val.getSimple());
-            break;
-
-        case LegalVal::Flavor::implicitDeref:
-            addArg(val.getImplicitDeref());
-            break;
-
-        case LegalVal::Flavor::pair:
-            {
-                auto pairVal = val.getPair();
-                addArg(pairVal->ordinaryVal);
-                addArg(pairVal->specialVal);
-            }
-            break;
-
-        case LegalVal::Flavor::tuple:
-            {
-                auto tuplePsuedoVal = val.getTuple();
-                for (auto elem : val.getTuple()->elements)
-                {
-                    addArg(elem.val);
-                }
-            }
-            break;
-
-        default:
-            SLANG_UNEXPECTED("uhandled val flavor");
-            break;
-        }
-    }
+    /// Add a logical argument to the call (which may map to zero or more actual arguments).
+    void addArg(LegalVal const& val) { appendLegalValueOperands(m_args, val); }
 
     /// Build a new call based on the original, given the expected `resultType`.
     ///
@@ -488,6 +527,173 @@ static LegalVal legalizeCall(IRTypeLegalizationContext* context, IRCall* callIns
     return builder.build(legalResultType);
 }
 
+/// Rebuild an HGBC compute dispatch from its legalized operands.
+///
+/// The first three operands are fixed dispatch metadata. The remaining operands are a logical
+/// function argument list, so they must be flattened just like call arguments. In particular, a
+/// captureless lambda closure legalizes to no operand, while a split value contributes every one of
+/// its physical operands.
+static LegalVal legalizeDispatchKernel(
+    IRTypeLegalizationContext* context,
+    IRDispatchKernel* dispatch,
+    LegalType const& resultType,
+    ArrayView<LegalVal> operands)
+{
+    SLANG_RELEASE_ASSERT(resultType.flavor == LegalType::Flavor::simple);
+    SLANG_RELEASE_ASSERT(operands.getCount() >= 3);
+    for (Index i = 0; i < 3; ++i)
+        SLANG_RELEASE_ASSERT(operands[i].flavor == LegalVal::Flavor::simple);
+
+    auto mapping = dispatch->findDecoration<IRShaderParameterMappingDecoration>();
+    SLANG_RELEASE_ASSERT(!mapping || mapping->getOperandCount() == dispatch->getArgCount());
+    ShortList<IRInst*> arguments;
+    ShortList<IRInst*> parameterIndices;
+    for (Index i = 3; i < operands.getCount(); ++i)
+    {
+        Index start = arguments.getCount();
+        appendLegalValueOperands(arguments, operands[i]);
+        if (mapping)
+            for (Index j = start; j < arguments.getCount(); ++j)
+                parameterIndices.add(mapping->getOperand(UInt(i - 3)));
+    }
+
+    auto newInst = context->builder->emitDispatchKernelInst(
+        resultType.getSimple(),
+        operands[0].getSimple(),
+        operands[1].getSimple(),
+        operands[2].getSimple(),
+        (Int)arguments.getCount(),
+        arguments.getArrayView().getBuffer());
+    if (mapping)
+        context->builder->addDecoration(
+            newInst,
+            kIROp_ShaderParameterMappingDecoration,
+            parameterIndices.getArrayView().getBuffer(),
+            parameterIndices.getCount());
+    return LegalVal::simple(newInst);
+}
+
+/// Preserves reflected shader-parameter identities when empty closure arguments disappear.
+/// For example, an empty vertex callback followed by a captured fragment callback leaves only
+/// fragment parameter zero. Its binding must not become vertex parameter zero after legalization.
+static LegalVal legalizeMakeGraphicsPipeline(
+    IRTypeLegalizationContext* context,
+    LegalType const& resultType,
+    ArrayView<LegalVal> operands)
+{
+    auto originalType = as<IRFuncType>(resultType.getSimple());
+    SLANG_RELEASE_ASSERT(originalType && operands.getCount() >= 5);
+    auto drawCount = cast<IRIntLit>(operands[3].getSimple())->getValue();
+    auto vertexCount = cast<IRIntLit>(operands[4].getSimple())->getValue();
+    List<IRType*> parameterTypes;
+    List<IRInst*> newOperands;
+    for (Index i = 0; i < 5; ++i)
+        newOperands.add(operands[i].getSimple());
+    UInt legalVertexCount = 0;
+    for (UInt i = 0; i < originalType->getParamCount(); ++i)
+    {
+        Index start = parameterTypes.getCount();
+        appendLegalParameterTypes(
+            parameterTypes,
+            legalizeType(context, originalType->getParamType(i)));
+        Index count = parameterTypes.getCount() - start;
+        if (i < drawCount)
+        {
+            // HGBC draw controls and typed resources have a single physical representation.
+            SLANG_RELEASE_ASSERT(count == 1);
+            continue;
+        }
+        for (Index j = 0; j < count; ++j)
+            newOperands.add(operands[5 + i - drawCount].getSimple());
+        if (i < drawCount + vertexCount)
+            legalVertexCount += UInt(count);
+    }
+    newOperands[4] =
+        context->builder->getIntValue(context->builder->getUIntType(), legalVertexCount);
+    auto type = context->builder->getFuncType(
+        parameterTypes.getCount(),
+        parameterTypes.getBuffer(),
+        originalType->getResultType());
+    return LegalVal::simple(
+        context->builder->emitMakeGraphicsPipelineInst(type, newOperands.getArrayView()));
+}
+
+/// Rebuilds an HGBC ray-tracing dispatcher after flattening its callable ABI.
+static LegalVal legalizeRayPipelineCall(
+    IRTypeLegalizationContext* context,
+    LegalType const& resultType,
+    ArrayView<LegalVal> operands)
+{
+    auto originalType = as<IRFuncType>(resultType.getSimple());
+    SLANG_RELEASE_ASSERT(
+        originalType && operands.getCount() == 11 + 2 * originalType->getParamCount());
+    List<IRInst*> newOperands;
+    for (Index i = 0; i < 11; ++i)
+    {
+        SLANG_RELEASE_ASSERT(operands[i].flavor == LegalVal::Flavor::simple);
+        newOperands.add(operands[i].getSimple());
+    }
+    List<IRType*> parameterTypes;
+    for (UInt i = 0; i < originalType->getParamCount(); ++i)
+    {
+        Index start = parameterTypes.getCount();
+        appendLegalParameterTypes(
+            parameterTypes,
+            legalizeType(context, originalType->getParamType(i)));
+        for (Index j = start; j < parameterTypes.getCount(); ++j)
+        {
+            newOperands.add(operands[11 + 2 * i].getSimple());
+            newOperands.add(operands[12 + 2 * i].getSimple());
+        }
+    }
+    auto type = context->builder->getFuncType(
+        parameterTypes.getCount(),
+        parameterTypes.getBuffer(),
+        originalType->getResultType());
+    return LegalVal::simple(context->builder->emitIntrinsicInst(
+        type,
+        kIROp_RayPipelineCall,
+        newOperands.getCount(),
+        newOperands.getBuffer()));
+}
+
+/// Rebuilds an HGBC ray-tracing dispatcher after flattening its callable ABI.
+static LegalVal legalizeMakeRayTracer(
+    IRTypeLegalizationContext* context,
+    LegalType const& resultType,
+    ArrayView<LegalVal> operands)
+{
+    SLANG_RELEASE_ASSERT(resultType.flavor == LegalType::Flavor::simple);
+    SLANG_RELEASE_ASSERT(operands.getCount() == 5);
+    for (Index i = 0; i < 5; ++i)
+        SLANG_RELEASE_ASSERT(operands[i].flavor == LegalVal::Flavor::simple);
+
+    auto originalFuncType = as<IRFuncType>(resultType.getSimple());
+    SLANG_RELEASE_ASSERT(originalFuncType);
+    List<IRType*> parameterTypes;
+    for (UInt i = 0; i < originalFuncType->getParamCount(); ++i)
+    {
+        appendLegalParameterTypes(
+            parameterTypes,
+            legalizeType(context, originalFuncType->getParamType(i)));
+    }
+    auto legalResultType = legalizeType(context, originalFuncType->getResultType());
+    SLANG_RELEASE_ASSERT(legalResultType.flavor == LegalType::Flavor::simple);
+    auto funcType = context->builder->getFuncType(
+        parameterTypes.getCount(),
+        parameterTypes.getBuffer(),
+        legalResultType.getSimple());
+
+    auto newInst = context->builder->emitMakeRayTracerInst(
+        funcType,
+        cast<IRType>(operands[0].getSimple()),
+        operands[1].getSimple(),
+        operands[2].getSimple(),
+        operands[3].getSimple(),
+        operands[4].getSimple());
+    return LegalVal::simple(newInst);
+}
+
 /// Helper type for legalizing a `returnVal` instruction
 struct LegalReturnBuilder
 {
@@ -708,28 +914,6 @@ static LegalVal legalizeRetVal(
     return LegalVal();
 }
 
-static void _addVal(ShortList<IRInst*>& rs, const LegalVal& legalVal)
-{
-    switch (legalVal.flavor)
-    {
-    case LegalVal::Flavor::simple:
-        rs.add(legalVal.getSimple());
-        break;
-    case LegalVal::Flavor::tuple:
-        for (auto element : legalVal.getTuple()->elements)
-            _addVal(rs, element.val);
-        break;
-    case LegalVal::Flavor::pair:
-        _addVal(rs, legalVal.getPair()->ordinaryVal);
-        _addVal(rs, legalVal.getPair()->specialVal);
-        break;
-    case LegalVal::Flavor::none:
-        break;
-    default:
-        SLANG_UNEXPECTED("unhandled legalized val flavor");
-    }
-}
-
 static LegalVal legalizeUnconditionalBranch(
     IRTypeLegalizationContext* context,
     ArrayView<LegalVal> args,
@@ -738,26 +922,7 @@ static LegalVal legalizeUnconditionalBranch(
     ShortList<IRInst*> newArgs;
     for (auto arg : args)
     {
-        switch (arg.flavor)
-        {
-        case LegalVal::Flavor::none:
-            break;
-        case LegalVal::Flavor::simple:
-            newArgs.add(arg.getSimple());
-            break;
-        case LegalVal::Flavor::pair:
-            _addVal(newArgs, arg.getPair()->ordinaryVal);
-            _addVal(newArgs, arg.getPair()->specialVal);
-            break;
-        case LegalVal::Flavor::tuple:
-            for (auto element : arg.getTuple()->elements)
-            {
-                _addVal(newArgs, element.val);
-            }
-            break;
-        default:
-            SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor.");
-        }
+        appendLegalValueOperands(newArgs, arg);
     }
     context->builder->emitIntrinsicInst(
         nullptr,
@@ -941,13 +1106,6 @@ static LegalVal legalizeDebugVar(
         {
             auto pointedToType = tryGetPointedToType(context->builder, type.getSimple());
 
-            // Check if the type is debuggable before creating DebugVar
-            DebugValueStoreContext debugContext;
-            if (!debugContext.isDebuggableType(pointedToType))
-            {
-                return LegalVal();
-            }
-
             auto legalVal = context->builder->emitDebugVar(
                 pointedToType,
                 originalInst->getSource(),
@@ -964,7 +1122,13 @@ static LegalVal legalizeDebugVar(
         {
             auto pairType = type.getPair();
             auto ordinaryVal = legalizeDebugVar(context, pairType->ordinaryType, originalInst);
-            return ordinaryVal;
+            // Keep the field mapping while omitting resource storage. For example, after
+            // splitting `struct S { float2 uv; Texture2D t; }`, an update to `s.t` must resolve
+            // to the absent special side instead of addressing `t` in the remaining uv struct.
+            RefPtr<PairPseudoVal> debugPair = new PairPseudoVal();
+            debugPair->ordinaryVal = ordinaryVal;
+            debugPair->pairInfo = pairType->pairInfo;
+            return LegalVal::pair(debugPair);
         }
     case LegalType::Flavor::tuple:
         {
@@ -1001,13 +1165,12 @@ static LegalVal legalizeDebugValue(
         return LegalVal();
     case LegalType::Flavor::pair:
         {
-            // The var should be legalized as a simple value, because we discard the special part
-            // for debug info insts.
-            //
-            SLANG_ASSERT(debugVar.flavor == LegalVal::Flavor::simple);
+            // Both operands retain their ordinary/special field mapping. Only the ordinary
+            // side has debug storage, so update that side using the corresponding value.
+            SLANG_ASSERT(debugVar.flavor == LegalVal::Flavor::pair);
             auto ordinaryVal = legalizeDebugValue(
                 context,
-                debugVar,
+                debugVar.getPair()->ordinaryVal,
                 debugValue.getPair()->ordinaryVal,
                 originalInst);
             return ordinaryVal;
@@ -1425,6 +1588,20 @@ static LegalVal legalizeFieldAddress(
             {
                 specialVal =
                     legalizeFieldAddress(context, specialType, pairVal->specialVal, fieldKey);
+            }
+            if (type.flavor == LegalType::Flavor::pair &&
+                pairVal->specialVal.flavor == LegalVal::Flavor::none)
+            {
+                // legalizeDebugVar deliberately omits resource storage while retaining its field
+                // mapping. For `outer.inner.texture`, keep that mapping on `outer.inner` so the
+                // next address resolves to the absent resource side. Runtime pairs with resource
+                // storage use the normal collapsing constructor below; their nested parameter-block
+                // fields can have a simpler value representation than this field's LegalType.
+                RefPtr<PairPseudoVal> fieldVal = new PairPseudoVal();
+                fieldVal->ordinaryVal = ordinaryVal;
+                fieldVal->specialVal = specialVal;
+                fieldVal->pairInfo = fieldPairInfo;
+                return LegalVal::pair(fieldVal);
             }
             return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
         }
@@ -2135,6 +2312,18 @@ static LegalVal legalizeInst(
     case kIROp_Call:
         result = legalizeCall(context, (IRCall*)inst);
         break;
+    case kIROp_DispatchKernel:
+        result = legalizeDispatchKernel(context, cast<IRDispatchKernel>(inst), type, args);
+        break;
+    case kIROp_MakeGraphicsPipeline:
+        result = legalizeMakeGraphicsPipeline(context, type, args);
+        break;
+    case kIROp_MakeRayTracer:
+        result = legalizeMakeRayTracer(context, type, args);
+        break;
+    case kIROp_RayPipelineCall:
+        result = legalizeRayPipelineCall(context, type, args);
+        break;
     case kIROp_Return:
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
@@ -2196,6 +2385,17 @@ static LegalVal legalizeInst(
         // out structured buffer
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
+    case kIROp_FormatGenericArgReflectionNameList:
+        // This instruction is compile-time-only. A complex operand here means that
+        // specialization and SCCP failed to turn its now-concrete pack into a string literal.
+        // Diagnose at the originating declaration instead of falling through to the generic
+        // legalization assertion below, which has no source context.
+        SLANG_DIAGNOSE_UNEXPECTED(
+            context->m_sink,
+            inst,
+            "FormatGenericArgReflectionNameList was not resolved before type legalization");
+        result = LegalVal::simple(context->builder->getStringValue(UnownedStringSlice()));
+        break;
     default:
         if (type.flavor == LegalType::Flavor::none)
         {
@@ -2460,8 +2660,16 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
             anyComplex = true;
     }
     // Always rebuild abort so its variadic payload is validated before
-    // target-specific legalization or emission.
+    // target-specific legalization or emission. Pipeline constructors also need rebuilding:
+    // their result is a callable ABI whose nested parameter types are otherwise treated as a simple
+    // type, even when an empty or split shader argument changes the physical call signature.
     if (inst->getOp() == kIROp_Abort)
+        anyComplex = true;
+    if (inst->getOp() == kIROp_MakeGraphicsPipeline)
+        anyComplex = true;
+    if (inst->getOp() == kIROp_MakeRayTracer)
+        anyComplex = true;
+    if (inst->getOp() == kIROp_RayPipelineCall)
         anyComplex = true;
 
     // We must also legalize the type of the instruction, since that
@@ -2688,44 +2896,7 @@ private:
     IRType* m_resultType = nullptr;
 
     /// Add a parameter of type `t` to the function signature
-    void _addParam(LegalType t)
-    {
-        // This logic is a simple recursion over the structure of `t`,
-        // with the leaf case adding parameters of simple IR type.
-
-        switch (t.flavor)
-        {
-        case LegalType::Flavor::none:
-            break;
-
-        case LegalType::Flavor::simple:
-            m_paramTypes.add(t.getSimple());
-            break;
-
-        case LegalType::Flavor::implicitDeref:
-            {
-                auto imp = t.getImplicitDeref();
-                _addParam(imp->valueType);
-            }
-            break;
-        case LegalType::Flavor::pair:
-            {
-                auto pairInfo = t.getPair();
-                _addParam(pairInfo->ordinaryType);
-                _addParam(pairInfo->specialType);
-            }
-            break;
-        case LegalType::Flavor::tuple:
-            {
-                auto tup = t.getTuple();
-                for (auto& elem : tup->elements)
-                    _addParam(elem.type);
-            }
-            break;
-        default:
-            SLANG_UNEXPECTED("unknown legalized type flavor");
-        }
-    }
+    void _addParam(LegalType t) { appendLegalParameterTypes(m_paramTypes, t); }
 
     /// Set the logical result type of the legalized function to `t`
     void _addResult(LegalType t)

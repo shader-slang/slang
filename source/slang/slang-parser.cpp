@@ -5,6 +5,7 @@
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-hgbc-format.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
@@ -224,7 +225,7 @@ public:
     // Returns the declaration, or a `GenericDecl` containing it when a generic parameter
     // clause is present.
     Decl* ParseStruct(StructDecl* decl);
-    ClassDecl* ParseClass();
+    Decl* ParseClass();
     Decl* ParseGLSLInterfaceBlock();
     Stmt* ParseStatement(
         Stmt* parentStmt = nullptr,
@@ -2275,6 +2276,42 @@ public:
             dispatch(expr->value);
     }
     void visitExpr(Expr* /*expr*/) {}
+    void visitMakeGraphicsPipelineExpr(MakeGraphicsPipelineExpr* expr)
+    {
+        dispatch(expr->baseFunction);
+        dispatch(expr->fragmentFunction);
+        dispatch(expr->settings);
+    }
+    void visitRayTraceExpr(RayTraceExpr* expr)
+    {
+        dispatch(expr->baseFunction);
+        dispatch(expr->closestHitFunction);
+        dispatch(expr->missFunction);
+        if (expr->maxRecursionDepthExpr)
+            dispatch(expr->maxRecursionDepthExpr);
+    }
+    void visitRayPipelineCallExpr(RayPipelineCallExpr* expr)
+    {
+        dispatch(expr->baseFunction);
+        if (expr->anyHitFunction)
+            dispatch(expr->anyHitFunction);
+        if (expr->intersectionFunction)
+            dispatch(expr->intersectionFunction);
+        if (expr->payloadTypeExpr.exp)
+            dispatch(expr->payloadTypeExpr.exp);
+        if (expr->attributeTypeExpr.exp)
+            dispatch(expr->attributeTypeExpr.exp);
+        if (expr->pipeline)
+            dispatch(expr->pipeline);
+        if (expr->geometrySlot)
+            dispatch(expr->geometrySlot);
+        if (expr->raySlot)
+            dispatch(expr->raySlot);
+        if (expr->extent)
+            dispatch(expr->extent);
+        if (expr->maxRecursion)
+            dispatch(expr->maxRecursion);
+    }
 };
 
 /// Parse an optional body statement for a declaration that can have a body.
@@ -2977,6 +3014,23 @@ struct TypeSpec
     Expr* expr = nullptr;
 };
 
+/// Consumes a closing angle bracket, splitting a nested generic's >> token when necessary.
+static void parseGenericClose(Parser* parser)
+{
+    if (parser->tokenReader.peekToken().type == TokenType::OpRsh)
+    {
+        parser->tokenReader.peekToken().type = TokenType::OpGreater;
+        parser->tokenReader.peekToken().loc.setRaw(
+            parser->tokenReader.peekToken().loc.getRaw() + 1);
+    }
+    else if (parser->LookAheadToken(TokenType::OpGreater))
+        parser->ReadToken(TokenType::OpGreater);
+    else
+        parser->sink->diagnose(Diagnostics::TokenTypeExpected{
+            .tokenType = "'>'",
+            .location = parser->tokenReader.peekToken().loc});
+}
+
 static Expr* parseGenericApp(Parser* parser, Expr* base)
 {
     GenericAppExpr* genericApp = parser->astBuilder->create<GenericAppExpr>();
@@ -3006,18 +3060,7 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
     genericApp->argumentDelimeterLocs.add(parser->tokenReader.peekLoc());
     parser->genericDepth--;
 
-    if (parser->tokenReader.peekToken().type == TokenType::OpRsh)
-    {
-        parser->tokenReader.peekToken().type = TokenType::OpGreater;
-        parser->tokenReader.peekToken().loc.setRaw(
-            parser->tokenReader.peekToken().loc.getRaw() + 1);
-    }
-    else if (parser->LookAheadToken(TokenType::OpGreater))
-        parser->ReadToken(TokenType::OpGreater);
-    else
-        parser->sink->diagnose(Diagnostics::TokenTypeExpected{
-            .tokenType = "'>'",
-            .location = parser->tokenReader.peekToken().loc});
+    parseGenericClose(parser);
     return genericApp;
 }
 
@@ -3343,9 +3386,134 @@ static Expr* parseDispatchKernel(Parser* parser)
     return dispatchExpr;
 }
 
+static Expr* parseDispatch(Parser* parser)
+{
+    DispatchKernelExpr* dispatchExpr = parser->astBuilder->create<DispatchKernelExpr>();
+
+    parser->ReadToken(TokenType::LParent);
+
+    dispatchExpr->baseFunction = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::Comma);
+    dispatchExpr->dispatchSize = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::RParent);
+
+    return dispatchExpr;
+}
+
+static Expr* parseMakeGraphicsPipeline(Parser* parser)
+{
+    MakeGraphicsPipelineExpr* pipelineExpr = parser->astBuilder->create<MakeGraphicsPipelineExpr>();
+
+    parser->ReadToken(TokenType::LParent);
+
+    pipelineExpr->baseFunction = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::Comma);
+    pipelineExpr->fragmentFunction = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::Comma);
+    pipelineExpr->settings = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::RParent);
+
+    return pipelineExpr;
+}
+
+static Expr* parseRayTrace(Parser* parser)
+{
+    RayTraceExpr* rayTraceExpr = parser->astBuilder->create<RayTraceExpr>();
+
+    parser->ReadToken(TokenType::LParent);
+    rayTraceExpr->baseFunction = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::Comma);
+    rayTraceExpr->closestHitFunction = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::Comma);
+    rayTraceExpr->missFunction = parser->ParseArgExpr();
+    if (AdvanceIf(parser, TokenType::Comma))
+        rayTraceExpr->maxRecursionDepthExpr = parser->ParseArgExpr();
+    parser->ReadToken(TokenType::RParent);
+
+    return rayTraceExpr;
+}
+
 static NodeBase* parseDispatchKernel(Parser* parser, void* /* unused */)
 {
     return parseDispatchKernel(parser);
+}
+
+static NodeBase* parseDispatch(Parser* parser, void* /* unused */)
+{
+    return parseDispatch(parser);
+}
+
+static NodeBase* parseMakeGraphicsPipeline(Parser* parser, void* /* unused */)
+{
+    return parseMakeGraphicsPipeline(parser);
+}
+
+static NodeBase* parseRayTrace(Parser* parser, void* /* unused */)
+{
+    return parseRayTrace(parser);
+}
+
+static Expr* parseRayPipelineCall(Parser* parser, RayPipelineCallExpr::Kind kind)
+{
+    auto expr = parser->astBuilder->create<RayPipelineCallExpr>();
+    expr->kind = kind;
+    parser->ReadToken(TokenType::LParent);
+    if (kind != RayPipelineCallExpr::Kind::Dispatch)
+    {
+        expr->pipeline = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        if (kind == RayPipelineCallExpr::Kind::Hit || kind == RayPipelineCallExpr::Kind::HitGroup)
+        {
+            expr->geometrySlot = parser->ParseArgExpr();
+            parser->ReadToken(TokenType::Comma);
+        }
+        expr->raySlot = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+    }
+    if (kind == RayPipelineCallExpr::Kind::HitGroup)
+    {
+        expr->payloadTypeExpr.exp = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        expr->attributeTypeExpr.exp = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+    }
+    expr->baseFunction = parser->ParseArgExpr();
+    if (kind == RayPipelineCallExpr::Kind::HitGroup)
+    {
+        parser->ReadToken(TokenType::Comma);
+        expr->anyHitFunction = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        expr->intersectionFunction = parser->ParseArgExpr();
+    }
+    if (kind == RayPipelineCallExpr::Kind::Dispatch)
+    {
+        parser->ReadToken(TokenType::Comma);
+        expr->extent = parser->ParseArgExpr();
+        parser->ReadToken(TokenType::Comma);
+        expr->maxRecursion = parser->ParseArgExpr();
+    }
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+
+static NodeBase* parseSetRayMiss(Parser* parser, void*)
+{
+    return parseRayPipelineCall(parser, RayPipelineCallExpr::Kind::Miss);
+}
+
+static NodeBase* parseSetRayHitShader(Parser* parser, void*)
+{
+    return parseRayPipelineCall(parser, RayPipelineCallExpr::Kind::Hit);
+}
+
+static NodeBase* parseSetRayHitGroup(Parser* parser, void*)
+{
+    return parseRayPipelineCall(parser, RayPipelineCallExpr::Kind::HitGroup);
+}
+
+static NodeBase* parseDispatchRays(Parser* parser, void*)
+{
+    return parseRayPipelineCall(parser, RayPipelineCallExpr::Kind::Dispatch);
 }
 
 // (a,b,c) style tuples, curently unused
@@ -6722,7 +6890,7 @@ Decl* Parser::ParseStruct(StructDecl* decl)
         });
 }
 
-ClassDecl* Parser::ParseClass()
+Decl* Parser::ParseClass()
 {
     ClassDecl* rs = astBuilder->create<ClassDecl>();
     ReadToken("class");
@@ -6732,10 +6900,15 @@ ClassDecl* Parser::ParseClass()
     FillPosition(rs);
     rs->nameAndLoc = expectIdentifier(this);
 
-    parseOptionalInheritanceClause(this, rs);
-
-    parseDeclBody(this, rs);
-    return rs;
+    return parseOptGenericDecl(
+        this,
+        [&](GenericDecl* genericParent)
+        {
+            parseOptionalInheritanceClause(this, rs);
+            maybeParseGenericConstraints(this, genericParent);
+            parseDeclBody(this, rs);
+            return rs;
+        });
 }
 
 Decl* Parser::ParseGLSLInterfaceBlock()
@@ -8390,6 +8563,19 @@ static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
     return alignOfExpr;
 }
 
+static NodeBase* parseIndexOfTypeInPackExpr(Parser* parser, void* /*userData*/)
+{
+    auto expr = parser->astBuilder->create<IndexOfTypeInPackExpr>();
+    parser->ReadToken(TokenType::OpLess);
+    parser->genericDepth++;
+    expr->elementType.exp = _parseGenericArg(parser);
+    parser->ReadToken(TokenType::Comma);
+    expr->packType.exp = _parseGenericArg(parser);
+    parser->genericDepth--;
+    parseGenericClose(parser);
+    return expr;
+}
+
 static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
 {
     // We could have a type or a variable or an expression
@@ -8757,6 +8943,46 @@ static bool tryParseExpression(
     return false;
 }
 
+struct LambdaModifiers
+{
+    bool isValid = false;
+    bool isMutating = false;
+    bool isDifferentiable = false;
+};
+
+/// Recognizes the tokens between a lambda parameter list and its body.
+///
+/// `!` and `~` are temporary spellings for mutating and differentiable lambdas, respectively.
+/// Keeping those spellings in this helper means selecting the permanent syntax will not affect the
+/// AST or semantic implementation.
+static LambdaModifiers peekLambdaModifiers(TokenReader tokenReader)
+{
+    LambdaModifiers result;
+    for (;;)
+    {
+        switch (tokenReader.peekTokenType())
+        {
+        case TokenType::OpNot:
+            if (result.isMutating)
+                return {};
+            result.isMutating = true;
+            tokenReader.advanceToken();
+            break;
+        case TokenType::OpBitNot:
+            if (result.isDifferentiable)
+                return {};
+            result.isDifferentiable = true;
+            tokenReader.advanceToken();
+            break;
+        case TokenType::DoubleRightArrow:
+            result.isValid = true;
+            return result;
+        default:
+            return {};
+        }
+    }
+}
+
 static Expr* parseLambdaExpr(Parser* parser)
 {
     auto lambdaExpr = parser->astBuilder->create<LambdaExpr>();
@@ -8771,6 +8997,19 @@ static Expr* parseLambdaExpr(Parser* parser)
         parser->ReadToken(TokenType::Comma);
     }
     parser->FillPosition(lambdaExpr);
+    auto lambdaModifiers = peekLambdaModifiers(parser->tokenReader);
+    SLANG_ASSERT(lambdaModifiers.isValid);
+    while (!parser->LookAheadToken(TokenType::DoubleRightArrow))
+    {
+        auto modifierToken = parser->ReadToken();
+        if (modifierToken.type == TokenType::OpNot)
+            lambdaExpr->mutatingLoc = modifierToken.loc;
+        else
+        {
+            SLANG_ASSERT(modifierToken.type == TokenType::OpBitNot);
+            lambdaExpr->differentiableLoc = modifierToken.loc;
+        }
+    }
     parser->ReadToken(TokenType::DoubleRightArrow);
     if (parser->LookAheadToken(TokenType::LBrace))
     {
@@ -9141,8 +9380,7 @@ static Expr* parseAtomicExpr(Parser* parser)
             // Disambiguate between a lambda expression and other cases.
             auto tokenReader = parser->tokenReader;
             SkipBalancedToken(&tokenReader);
-            auto nextTokenAfterParent = tokenReader.peekTokenType();
-            if (nextTokenAfterParent == TokenType::DoubleRightArrow)
+            if (peekLambdaModifiers(tokenReader).isValid)
             {
                 return parseLambdaExpr(parser);
             }
@@ -9625,6 +9863,195 @@ static IRFloatingPointValue _foldFloatPrefixOp(TokenType tokenType, IRFloatingPo
     }
 }
 
+static Expr* parseExpandExpr(Parser* parser, SourceLoc loc);
+
+/// Parses one HGBC operand without assigning it an opcode-specific meaning.
+static std::optional<HGBCAsmOperand> parseHGBCAsmOperand(Parser* parser)
+{
+    if (parser->LookAheadToken("result"))
+        return HGBCAsmOperand{HGBCAsmOperand::ResultMarker, parser->ReadToken()};
+
+    if (parser->LookAheadToken(TokenType::IntegerLiteral))
+    {
+        const Token token = parser->ReadToken();
+        const Int64 value = getIntegerLiteralValue(token, parser->sink);
+        if (value < 0 || value > 0xffffffff)
+            parser->diagnose(Diagnostics::HgbcOperandRange{.location = token.loc});
+        return HGBCAsmOperand{
+            HGBCAsmOperand::Literal,
+            token,
+            nullptr,
+            uint32_t(value),
+        };
+    }
+
+    if (AdvanceIf(parser, TokenType::OpMod))
+    {
+        if (parser->LookAheadToken(TokenType::Identifier))
+        {
+            return HGBCAsmOperand{HGBCAsmOperand::Id, parser->ReadToken()};
+        }
+        Unexpected(parser);
+        return std::nullopt;
+    }
+
+    if (AdvanceIf(parser, TokenType::DollarDollar))
+    {
+        Token token = parser->tokenReader.peekToken();
+        Expr* typeExpr = parser->ParseType();
+        return HGBCAsmOperand{HGBCAsmOperand::SlangType, token, typeExpr};
+    }
+
+    // An `&value` operand preserves the address of a source-language l-value. Consider a raw
+    // byte-stream read into an `out Header`: `$value` would materialize an OpLoad, while `&value`
+    // emits the existing Out/Ptr address so the HGBC instruction can write the caller's storage.
+    if (AdvanceIf(parser, TokenType::OpBitAnd))
+    {
+        Expr* valueExpr = parsePostfixExpr(parser);
+        return HGBCAsmOperand{HGBCAsmOperand::SlangValueAddr, Token{}, valueExpr};
+    }
+
+    if (AdvanceIf(parser, TokenType::Dollar))
+    {
+        if (parser->LookAheadToken("expand"))
+        {
+            SourceLoc loc = parser->ReadToken().loc;
+            Expr* valuePackExpr = parseExpandExpr(parser, loc);
+            return HGBCAsmOperand{HGBCAsmOperand::SlangValuePack, Token{}, valuePackExpr};
+        }
+        Expr* valueExpr = parsePostfixExpr(parser);
+        return HGBCAsmOperand{HGBCAsmOperand::SlangValue, Token{}, valueExpr};
+    }
+
+    if (parser->LookAheadToken(TokenType::Identifier))
+        return HGBCAsmOperand{HGBCAsmOperand::NamedValue, parser->ReadToken()};
+
+    Unexpected(parser);
+    return std::nullopt;
+}
+
+/// Parses one instruction and uses its descriptor to expand assignment sugar.
+static std::optional<HGBCAsmInst> parseHGBCAsmInst(Parser* parser)
+{
+    HGBCAsmInst result;
+
+    const auto resultOrOpcode = parseHGBCAsmOperand(parser);
+    if (!resultOrOpcode)
+        return std::nullopt;
+
+    std::optional<HGBCAsmOperand> resultTypeOperand;
+    std::optional<HGBCAsmOperand> resultOperand;
+    if (AdvanceIf(parser, TokenType::Colon))
+    {
+        resultTypeOperand = parseHGBCAsmOperand(parser);
+        if (!resultTypeOperand)
+            return std::nullopt;
+        parser->ReadToken(TokenType::OpAssign);
+    }
+
+    if (resultTypeOperand || AdvanceIf(parser, TokenType::OpAssign))
+    {
+        const auto opcode = parseHGBCAsmOperand(parser);
+        if (!opcode)
+            return std::nullopt;
+        result.opcode = *opcode;
+        resultOperand = *resultOrOpcode;
+    }
+    else
+    {
+        result.opcode = *resultOrOpcode;
+    }
+
+    HGBCOpcode opcode = HGBCOpcode::Return;
+    auto opcodeName = result.opcode.token.getContent();
+    if (result.opcode.flavor != HGBCAsmOperand::NamedValue ||
+        !findHGBCOpcodeByName(opcodeName.begin(), size_t(opcodeName.getLength()), opcode))
+    {
+        parser->diagnose(Diagnostics::UnrecognizedHgbcOpcode{
+            .opcode = opcodeName,
+            .location = result.opcode.token.loc});
+        return std::nullopt;
+    }
+    result.opcode.knownValue = uint32_t(opcode);
+
+    const HGBCOpcodeInfo* opcodeInfo = getHGBCOpcodeInfo(opcode);
+    SLANG_RELEASE_ASSERT(opcodeInfo);
+    if (resultOperand && opcodeInfo->resultOperandIndex < 0)
+    {
+        parser->diagnose(Diagnostics::HgbcInstructionWithoutResultId{
+            .opcode = opcodeName,
+            .location = resultOperand->token.loc});
+        return std::nullopt;
+    }
+    if (resultTypeOperand && opcodeInfo->typeOperandIndex < 0)
+    {
+        parser->diagnose(Diagnostics::HgbcInstructionWithoutResultTypeId{
+            .opcode = opcodeName,
+            .location = resultTypeOperand->token.loc});
+        return std::nullopt;
+    }
+
+    while (!(parser->LookAheadToken(TokenType::RBrace) ||
+             parser->LookAheadToken(TokenType::Semicolon) ||
+             parser->LookAheadToken(TokenType::EndOfFile)) ||
+           resultTypeOperand || resultOperand)
+    {
+        if (resultTypeOperand && result.operands.getCount() == opcodeInfo->typeOperandIndex)
+        {
+            result.operands.add(*resultTypeOperand);
+            resultTypeOperand.reset();
+            continue;
+        }
+        if (resultOperand && result.operands.getCount() == opcodeInfo->resultOperandIndex)
+        {
+            result.operands.add(*resultOperand);
+            resultOperand.reset();
+            continue;
+        }
+
+        if (auto operandValue = parseHGBCAsmOperand(parser))
+            result.operands.add(*operandValue);
+        else
+            break;
+    }
+
+    return result;
+}
+
+/// Parses a complete HGBC assembly expression with per-instruction recovery.
+static Expr* parseHGBCAsmExpr(Parser* parser, SourceLoc loc)
+{
+    HGBCAsmExpr* asmExpr = parser->astBuilder->create<HGBCAsmExpr>();
+    asmExpr->loc = loc;
+    parser->ReadToken(TokenType::LBrace);
+    while (!parser->tokenReader.isAtEnd())
+    {
+        if (parser->LookAheadToken(TokenType::RBrace))
+            break;
+
+        if (const auto inst = parseHGBCAsmInst(parser))
+        {
+            asmExpr->insts.add(*inst);
+        }
+        else
+        {
+            while (
+                !(parser->LookAheadToken(TokenType::Semicolon) ||
+                  parser->LookAheadToken(TokenType::RBrace) ||
+                  parser->LookAheadToken(TokenType::EndOfFile)))
+            {
+                parser->ReadToken();
+            }
+        }
+
+        if (parser->LookAheadToken(TokenType::RBrace))
+            break;
+        parser->ReadToken(TokenType::Semicolon);
+    }
+    parser->ReadMatchingToken(TokenType::RBrace);
+    return asmExpr;
+}
+
 static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
 {
     const auto slangTypeExprOperand = [&](auto flavor)
@@ -10047,6 +10474,10 @@ static Expr* parsePrefixExpr(Parser* parser)
                     newExpr->functionExpr = parser->astBuilder->create<IncompleteExpr>();
                 }
                 return newExpr;
+            }
+            else if (AdvanceIf(parser, "hgbc_asm"))
+            {
+                return parseHGBCAsmExpr(parser, tokenLoc);
             }
             else if (AdvanceIf(parser, "spirv_asm"))
             {
@@ -11192,9 +11623,17 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
     _makeParseExpr("__apply", parseApplyForBwd),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),
+    _makeParseExpr("dispatch", parseDispatch),
+    _makeParseExpr("__makeGraphicsPipeline", parseMakeGraphicsPipeline),
+    _makeParseExpr("raytrace", parseRayTrace),
+    _makeParseExpr("__setRayMiss", parseSetRayMiss),
+    _makeParseExpr("__setRayHitShader", parseSetRayHitShader),
+    _makeParseExpr("__setRayHitGroup", parseSetRayHitGroup),
+    _makeParseExpr("__dispatchRays", parseDispatchRays),
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+    _makeParseExpr("__index_of_type_in_pack", parseIndexOfTypeInPackExpr),
     _makeParseExpr("__first", parseFirstExpr),
     _makeParseExpr("__last", parseLastExpr),
     _makeParseExpr("__trimFirst", parseTrimFirstExpr),

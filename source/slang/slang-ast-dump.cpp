@@ -332,6 +332,25 @@ struct ASTDumpContext
     void dump(BuiltinOperationKind op) { m_writer->emit(getBuiltinOperationOpText(op)); }
     void dump(MarkupVisibility v) { m_writer->emit((int)v); }
     void dump(TypeTag tag) { m_writer->emit((int)tag); }
+    void dump(RayPipelineCallExpr::Kind kind)
+    {
+        switch (kind)
+        {
+        case RayPipelineCallExpr::Kind::Miss:
+            m_writer->emit("Miss");
+            return;
+        case RayPipelineCallExpr::Kind::Hit:
+            m_writer->emit("Hit");
+            return;
+        case RayPipelineCallExpr::Kind::HitGroup:
+            m_writer->emit("HitGroup");
+            return;
+        case RayPipelineCallExpr::Kind::Dispatch:
+            m_writer->emit("Dispatch");
+            return;
+        }
+        SLANG_UNREACHABLE("invalid ray-pipeline call kind");
+    }
     void dump(ParamPassingMode mode) { m_writer->emit((int)mode); }
     void dump(const String& string) { dump(string.getUnownedSlice()); }
 
@@ -687,6 +706,63 @@ struct ASTDumpContext
         m_writer->emit(", ");
         dump(pair.value);
         m_writer->emit(")");
+    }
+
+    void dump(const HGBCAsmOperand& operand)
+    {
+        switch (operand.flavor)
+        {
+        case HGBCAsmOperand::Id:
+            m_writer->emit("%");
+            break;
+        case HGBCAsmOperand::ResultMarker:
+            m_writer->emit("result");
+            return;
+        case HGBCAsmOperand::Literal:
+        case HGBCAsmOperand::NamedValue:
+            break;
+        case HGBCAsmOperand::SlangValue:
+            m_writer->emit("$");
+            break;
+        case HGBCAsmOperand::SlangValueAddr:
+            m_writer->emit("&");
+            break;
+        case HGBCAsmOperand::SlangValuePack:
+            m_writer->emit("$");
+            break;
+        case HGBCAsmOperand::SlangType:
+            m_writer->emit("$$");
+            break;
+        }
+
+        if (operand.expr)
+            dump(operand.expr);
+        else
+            dump(operand.token);
+    }
+
+    void dump(const HGBCAsmInst& inst)
+    {
+        dump(inst.opcode);
+        for (const HGBCAsmOperand& operand : inst.operands)
+        {
+            m_writer->emit(" ");
+            dump(operand);
+        }
+    }
+
+    void dump(const HGBCAsmExpr& expr)
+    {
+        m_writer->emit("hgbc_asm\n");
+        m_writer->emit("{\n");
+        m_writer->indent();
+        for (const HGBCAsmInst& inst : expr.insts)
+        {
+            dump(inst);
+            m_writer->emit(";\n");
+        }
+        m_writer->dedent();
+        m_writer->emit("}");
     }
 
     void dump(const SPIRVAsmOperand& operand)

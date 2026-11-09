@@ -66,6 +66,15 @@ struct OptionalTypeLoweringContext
         builder.createStructField(structType, info->valueKey, type);
         builder.createStructField(structType, info->hasValueKey, builder.getBoolType());
 
+        // Optional<T> is structural, but its replacement is a fresh nominal struct in each module.
+        // Preserve the original type's identity so an owning optional can cross module boundaries.
+        String runtimeName;
+        if (getRuntimeTypeMangledName(info->optionalType, runtimeName))
+            builder.addDecoration(
+                structType,
+                kIROp_RuntimeTypeIdentityDecoration,
+                builder.getStringValue(runtimeName.getUnownedSlice()));
+
         info->kind = LoweredOptionalTypeKind::Struct;
         return structType;
     }

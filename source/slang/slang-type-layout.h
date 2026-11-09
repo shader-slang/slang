@@ -20,6 +20,7 @@ enum class BaseType;
 class Type;
 
 struct IRLayout;
+struct IREntryPointLayout;
 struct TypeLayoutContext;
 
 //
@@ -1158,12 +1159,12 @@ class EntryPointLayout : public ScopeLayout
 {
 public:
     // The corresponding function declaration
-    DeclRef<FuncDecl> entryPoint;
+    DeclRef<FunctionDeclBase> entryPoint;
 
     ComponentType* program = nullptr;
 
-    DeclRef<FuncDecl> getFuncDeclRef() { return entryPoint; }
-    FuncDecl* getFuncDecl() { return entryPoint.getDecl(); }
+    DeclRef<FunctionDeclBase> getFuncDeclRef() { return entryPoint; }
+    FunctionDeclBase* getFuncDecl() { return entryPoint.getDecl(); }
 
     // The shader profile that was used to compile the entry point
     Profile profile;
@@ -1178,6 +1179,13 @@ public:
     // Layout for any results of the entry point
     RefPtr<VarLayout> resultLayout;
 
+    /// Assigned GPU byte base of the implicit push-constant or shader-record payload, or -1 for
+    /// legacy layout. Capture fields retain their local offsets and sizes for host-side shader
+    /// objects.
+    SlangInt uniformOffset = -1;
+    SlangInt uniformSize = -1;
+    LayoutResourceKind uniformStorageKind = LayoutResourceKind::None;
+
     enum Flag : unsigned
     {
         usesAnySampleRateInput = 0x1,
@@ -1187,6 +1195,23 @@ public:
     //    EntryPointLayout* getAbsoluteLayout(VarLayout* parentLayout);
 
     //    RefPtr<EntryPointLayout> m_absoluteLayout;
+};
+
+/// Pairs one program entry-point occurrence with its target-specific layout.
+///
+/// Consider exporting the same intersection function in two hit groups. Both records can
+/// reference the same component-owned EntryPoint, but their layouts and export names can differ.
+/// ProgramLayout owns these records in component entry-point order, so reflection and linking
+/// consume the same layout objects. TargetProgram exposes them through getEntryPoint().
+struct TargetEntryPoint
+{
+    EntryPoint* entryPoint = nullptr;
+    RefPtr<EntryPointLayout> layout;
+    String mangledName;
+
+    /// Owned by TargetProgram's layout IR module and populated when that module is built.
+    /// It is null for unspecialized or deserialized entries without a lowerable AST layout.
+    IREntryPointLayout* irLayout = nullptr;
 };
 
 /// Reflection/layout information about a specialization parameter
@@ -1251,10 +1276,12 @@ public:
     {
     }
 
-    // We catalog the requested entry points here,
-    // and any entry-point-specific parameter data
-    // will (eventually) belong there...
-    List<RefPtr<EntryPointLayout>> entryPoints;
+    /// The target program's entry-point records, in the underlying component's index order.
+    /// Layout collection builds this single table; reflection and code generation share it.
+    List<TargetEntryPoint> entryPoints;
+
+    /// Explicit coexistence sets, resolved into this program's entry-point index namespace.
+    List<List<Index>> entryPointUniformLayoutGroups;
 
     /// Reflection information on (unspecialized) specialization parameters.
     List<RefPtr<SpecializationParamLayout>> specializationParams;

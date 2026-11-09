@@ -806,7 +806,9 @@ Modifier* SemanticsVisitor::validateAttribute(
         CapabilityName capName = findCapabilityName(capNameString.getUnownedSlice());
         if (capName != CapabilityName::Invalid)
         {
-            if (isInternalCapabilityName(capName))
+            if (isInternalCapabilityName(capName) &&
+                (!entryPointAttr->getKeywordName() ||
+                 entryPointAttr->getKeywordName()->text != "host"))
                 maybeDiagnose(
                     getSink(),
                     this->getOptionSet(),
@@ -1551,6 +1553,34 @@ AttributeBase* SemanticsVisitor::checkAttribute(
         return uncheckedAttr;
     }
 
+    if (as<EntryPointAttribute>(attr) && attrName == getName("host"))
+    {
+        if (attr->args.getCount() != 0)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attrName,
+                .expected = "0",
+                .provided = (int64_t)attr->args.getCount(),
+                .attr = attr});
+            return uncheckedAttr;
+        }
+
+        // Consider this example:
+        //
+        //     [host]
+        //     void main() {}
+        //
+        // The core module maps `[host]` directly to `EntryPointAttribute`, but its
+        // declaration has no parameter because users do not write a stage argument.
+        // Add the canonical internal dispatch capability before ordinary entry-point
+        // validation so that later phases do not need to know about the source-level
+        // `[host]` spelling.
+        auto stageExpr = m_astBuilder->create<StringLiteralExpr>();
+        stageExpr->loc = attr->loc;
+        stageExpr->value = "dispatch";
+        attr->args.add(stageExpr);
+    }
+
     // Now apply type-specific validation to the attribute.
     if (!validateAttribute(attr, attrDecl, effectiveAttrTarget))
     {
@@ -1774,8 +1804,9 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::PrivateModifier:
     case ASTNodeType::InternalModifier:
         return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
-               as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
-               as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl);
+               as<CallableDecl>(decl) || as<FuncExtensionDecl>(decl) || as<TypeDefDecl>(decl) ||
+               as<PropertyDecl>(decl) || as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) ||
+               as<InheritanceDecl>(decl);
 
     case ASTNodeType::BuiltinModifier:
     case ASTNodeType::ExternModifier:

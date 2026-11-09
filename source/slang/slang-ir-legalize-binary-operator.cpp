@@ -93,9 +93,10 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
 {
     IRBuilder builder(inst);
     builder.setInsertBefore(inst);
+    CodeGenTarget target = targetProgram->getTargetReq()->getTarget();
 
     // Division by matrix is not supported on Metal and WGSL.
-    if (isDivisionByMatrix(inst))
+    if (isDivisionByMatrix(inst) && (isMetalTarget(target) || isWGPUTarget(target)))
     {
         sink->diagnose(Diagnostics::DivisionByMatrixNotSupported{.location = inst->sourceLoc});
         return;
@@ -136,13 +137,14 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
         }
     }
 
-    // For matrix divided by scalar operations, do not convert scalar divisor to dividend's matrix
-    // type. Division by matrix is not supported on Metal and WGSL.
-    if (!isMatrixDividedByScalar(inst))
+    // HGBC has one declared operand type per arithmetic record, so it needs the ordinary scalar
+    // expansion even for matrix division. Metal preserves its native matrix/scalar division, while
+    // WGSL rewrites that operation below.
+    if (!isMatrixDividedByScalar(inst) || target == CodeGenTarget::HGBC)
     {
         legalizeScalarOperandsToMatchComposite(inst);
     }
-    else if (isWGPUTarget(targetProgram->getTargetReq()->getTarget()))
+    else if (isWGPUTarget(target))
     {
         // WGSL does not support matrix division by scalar, convert it to multiplication.
         replaceMatrixDividedByScalarWithMul(inst);
@@ -174,6 +176,47 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
             builder.replaceOperand(inst->getOperands() + signedOpIndex, newOp);
         }
     }
+}
+
+/// Returns whether HGBC emits an instruction with one declared type shared by both operands.
+static bool isHGBCTypedBinaryOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_IRem:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Greater:
+    case kIROp_Less:
+    case kIROp_Geq:
+    case kIROp_Leq:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// Walks the linked HGBC program and normalizes each typed binary operation exactly once.
+static void legalizeBinaryOpsForHGBCRec(
+    IRInst* inst,
+    DiagnosticSink* sink,
+    TargetProgram* targetProgram)
+{
+    if (isHGBCTypedBinaryOp(inst->getOp()))
+        legalizeBinaryOp(inst, sink, targetProgram);
+
+    for (auto child : inst->getModifiableChildren())
+        legalizeBinaryOpsForHGBCRec(child, sink, targetProgram);
+}
+
+void legalizeBinaryOpsForHGBC(IRModule* module, DiagnosticSink* sink, TargetProgram* targetProgram)
+{
+    SLANG_ASSERT(targetProgram->getTargetReq()->getTarget() == CodeGenTarget::HGBC);
+    legalizeBinaryOpsForHGBCRec(module->getModuleInst(), sink, targetProgram);
 }
 
 void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)

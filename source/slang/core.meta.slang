@@ -736,6 +736,12 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
+/// The differential of T, or a no-gradient placeholder when T is not differentiable.
+/// This type retains optional conformance evidence until generic specialization.
+__magic_type(DifferentialOrNoneType)
+struct DifferentialOrNone<T> where optional T : IDifferentiable
+{ };
+
 __magic_type(FwdDiffFuncType)
 __intrinsic_type($(kIROp_ForwardDiffFuncType))
 struct FwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
@@ -792,7 +798,7 @@ interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
     associatedtype MinimalContext; // -> minimal_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
-    __associatedfunc ApplyForBwdFuncType<FType, This.MinimalContext> apply_bwd; // -> apply_bwd
+    static __associatedfunc ApplyForBwdFuncType<FType, This.MinimalContext> apply_bwd; // -> apply_bwd
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableRematFunc))
     static __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
@@ -829,6 +835,15 @@ struct DifferentialPair : IDifferentiable
 {
     typedef DifferentialPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
+
+    // Declare the storage that reflection and parameter layout must expose. The intrinsic
+    // accessors below and pair lowering use these same built-in field identities.
+    [KnownBuiltin($((int)KnownBuiltinDeclName::DifferentialPairPrimal))]
+    [DerivativeMember(Differential.primal)]
+    private T primal;
+    [KnownBuiltin($((int)KnownBuiltinDeclName::DifferentialPairDifferential))]
+    [DerivativeMember(Differential.differential)]
+    private T.Differential differential;
 
     __intrinsic_op($(kIROp_MakeDifferentialPair))
     [Differentiable] __init(T _primal, T.Differential _differential);
@@ -920,6 +935,13 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 {
     typedef DifferentialPtrPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
+
+    [KnownBuiltin($((int)KnownBuiltinDeclName::DifferentialPairPrimal))]
+    [DerivativeMember(Differential.primal)]
+    private T primal;
+    [KnownBuiltin($((int)KnownBuiltinDeclName::DifferentialPairDifferential))]
+    [DerivativeMember(Differential.differential)]
+    private T.Differential differential;
 
     __intrinsic_op($(kIROp_MakeDifferentialPtrPair))
     __init(T _primal, T.Differential _differential);
@@ -2094,23 +2116,37 @@ interface IFunc<TR, each TP> : IMutatingFunc<TR, expand each TP>
     TR operator()(expand each TP p);
 }
 
-/// Represents an interface for a mutating function that can take multiple differentiable parameters.
+/// Represents a mutating function with optionally differentiable input parameters.
 /// The function allows to modify the state of the object it belongs to and supports differentiation.
-interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP : IDifferentiable> : IMutatingFunc<TR, expand each TP>
+interface IDifferentiableMutatingFunc<TR : IDifferentiable, each TP> : IMutatingFunc<TR, expand each TP>
+    where optional TP : IDifferentiable
 {
-    /// Defines a mutating function that takes multiple differentiable parameters and returns a differentiable result of type `TR`.
+    /// Defines a mutating function with input parameters and a differentiable result of type `TR`.
     /// This function can modify the state of the object it is called on and supports automatic differentiation.
     [Differentiable]
     [mutating]
     TR operator()(expand each TP p);
 }
 
-/// Represents an interface for a function that can take multiple differentiable parameters and supports differentiation.
+/// Represents a function with optionally differentiable inputs and a differentiable result.
 /// This interface inherits from both `IFunc` and `IDifferentiableMutatingFunc` but is used for non-mutating differentiable functions.
-interface IDifferentiableFunc<TR : IDifferentiable, each TP : IDifferentiable> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
+interface IDifferentiableFunc<TR : IDifferentiable, each TP> : IFunc<TR, expand each TP>, IDifferentiableMutatingFunc<TR, expand each TP>
+    where optional TP : IDifferentiable
 {
-    /// Defines a non-mutating function that takes multiple differentiable parameters and returns a differentiable result of type `TR`.
+    /// Defines a non-mutating function with input parameters and a differentiable result of type `TR`.
     /// This function supports automatic differentiation.
+    [Differentiable]
+    TR operator()(expand each TP p);
+}
+
+/// Represents a differentiable function whose receiver also participates in differentiation.
+/// This is useful for callable values that store differentiable state, such as lambda captures.
+interface IDifferentiableFuncWithDiffThis<TR : IDifferentiable, each TP>
+    : IDifferentiablePtrType,
+      IFunc<TR, expand each TP>
+    where optional TP : IDifferentiable
+{
+    /// Defines a non-mutating function that differentiates its parameters and callable state.
     [Differentiable]
     TR operator()(expand each TP p);
 }
@@ -4126,7 +4162,21 @@ void __requireMaximallyReconverges();
 __intrinsic_op($(kIROp_RequireQuadDerivatives))
 void __requireQuadDerivatives();
 
-//@ public:
+// This descriptor is the compiler boundary used by primitive-stream libraries. Its data must
+// specialize to constants; it never becomes a host draw argument. The generic resource and
+// argument types define the callable ABI independently of shader resource parameters.
+__generic<Color, Assembly, Parameters, Policy, let hasDepth : bool, StateData, Depth>
+__magic_type(GraphicsPipelineDescType)
+struct __GraphicsPipelineDesc
+{
+    StateData state;
+
+    // Keep the descriptor as a value aggregate at its construction boundary. This expression
+    // is consumed by graphics-pipeline lowering and must not depend on optimizing a host call.
+    __intrinsic_op($(kIROp_MakeStruct))
+    __init(StateData state);
+}
+
 /// @category misc_types
 enum MemoryOrder
 {
@@ -4591,16 +4641,20 @@ attribute_syntax [call]                 : CallAttribute;
 
 // All Stages
 
+/// Marks a function as an HGBC host entry point, callable only from the dispatch stage.
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [host] : EntryPointAttribute;
+
 /// Marks a function as a shader entry point.
 /// @param stage The stage of the shader. Must be one of "vertex", "fragment", "compute", "geometry", "hull", "domain", "raygeneration",
 // "intersection", "anyhit", "closesthit", "miss", "callable", "task", "mesh".
-__attributeTarget(FuncDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [shader(stage)]    : EntryPointAttribute;
 
 /// Marks a function as a shader entry point.
 /// @param stage The stage of the shader. Must be one of "vertex", "fragment", "compute", "geometry", "hull", "domain", "raygeneration",
 // "intersection", "anyhit", "closesthit", "miss", "callable", "task", "mesh".
-__attributeTarget(FuncDecl)
+__attributeTarget(FunctionDeclBase)
 attribute_syntax [Shader(stage)]    : EntryPointAttribute;
 
 // Hull Shader
@@ -4723,8 +4777,10 @@ __attributeTarget(VarDeclBase)
 attribute_syntax [__vulkanHitAttributes] : VulkanHitAttributesAttribute;
 
 //@public:
-/// Mark a function or a property or subscript accessor as mutating. A mutating function receives the implicit `this` parameter
-/// as an `inout` parameter, so that mutations to members access from `this` argument will be visible to the caller.
+/// Mark a function or a property or subscript accessor as mutating. A mutating function on a value
+/// type receives the implicit `this` parameter as an `inout` parameter, so that mutations to
+/// members accessed from `this` are visible to the caller. Classes have reference semantics, so a
+/// class method receives the handle by value and mutates the referenced object.
 ///
 /// @remarks
 /// By default, Slang treats all member functions as non-mutating. For example, consider the following function:

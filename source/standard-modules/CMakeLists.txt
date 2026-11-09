@@ -62,3 +62,6 @@ add_subdirectory(numerics)
 
 # Build the experimental functional module.
 add_subdirectory(functional)
+
+# Build the host runtime, tensor, and buffer/texture utility modules.
+add_subdirectory(host)

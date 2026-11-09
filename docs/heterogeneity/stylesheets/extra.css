@@ -1,0 +1,204 @@
+:root {
+  --hs-green: #386b22;
+  --hs-ink: #20312c;
+  --hs-sidebar: #25332e;
+  --md-text-font: "Segoe UI", system-ui, sans-serif;
+  --md-code-font: Consolas, "Liberation Mono", monospace;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--hs-ink);
+  --md-primary-fg-color--light: #38634d;
+  --md-primary-fg-color--dark: #17261f;
+  --md-primary-bg-color: #fff;
+  --md-primary-bg-color--light: #dce8d8;
+  --md-accent-fg-color: var(--hs-green);
+  --md-accent-fg-color--transparent: #386b221a;
+  --md-accent-bg-color: #fff;
+  --md-default-fg-color: #2c3932;
+  --md-default-fg-color--light: #52634f;
+  --md-default-bg-color: #fff;
+  --md-typeset-a-color: var(--hs-green);
+  --md-code-fg-color: #36593c;
+  --md-code-bg-color: #f0f5ed;
+  --md-footer-bg-color: var(--hs-sidebar);
+  --md-footer-bg-color--dark: var(--hs-ink);
+}
+
+/* Keep the preview notice alongside the site name in Material's title slot. */
+.hs-header-brand {
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hs-preview-badge {
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #ffdf9114;
+  color: #ffdf91;
+  font-size: 0.6rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 37.5em) {
+  .md-header .md-header__title {
+    margin-inline: 0.2rem;
+    font-size: 0.8rem;
+  }
+
+  .hs-preview-badge {
+    padding-inline: 0.25rem;
+    font-size: 0.55rem;
+  }
+}
+
+/* Keep the forest-green navigation within Material's responsive drawer. */
+.md-sidebar--primary {
+  --md-default-fg-color: #e3ecdf;
+  --md-default-fg-color--light: #b6d59b;
+  --md-default-bg-color: var(--hs-sidebar);
+  --md-typeset-a-color: #c8e6b5;
+  --md-accent-fg-color: #d5efc4;
+  color: var(--md-default-fg-color);
+}
+
+.md-sidebar--primary .md-sidebar__scrollwrap,
+.md-nav--primary .md-nav__title {
+  background: var(--hs-sidebar);
+}
+
+.md-nav--primary .md-nav__title {
+  color: #e3ecdf;
+  box-shadow: none;
+}
+
+.md-nav--primary .md-nav__item--section > .md-nav__link {
+  color: #b6d59b;
+}
+
+.md-nav--primary .md-nav__link--active {
+  color: #d5efc4;
+  background: #b6d59b1a;
+  border-radius: 3px;
+}
+
+@media (min-width: 76.25em) {
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    padding: 12px 8px;
+    border-radius: 5px;
+  }
+}
+
+.md-grid {
+  max-width: 1440px;
+}
+
+.md-typeset {
+  line-height: 1.7;
+}
+
+.md-typeset a:focus-visible {
+  outline: 2px solid var(--hs-green);
+  outline-offset: 3px;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  color: var(--hs-ink);
+}
+
+.md-typeset p code,
+.md-typeset li code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.md-typeset .codehilite {
+  border: 1px solid #dce4dd;
+  border-radius: 4px;
+  margin-bottom: 24px;
+  padding: 0;
+  background: #f8faf7;
+}
+
+.md-typeset .codehilite pre {
+  margin: 0;
+  border: 0;
+  padding: 16px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.md-typeset .codehilite pre code {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.md-typeset .admonition.note {
+  border-color: var(--hs-green);
+  background: #f0f5eb;
+}
+
+.md-typeset .admonition.note > .admonition-title {
+  background: #386b221a;
+}
+
+.md-typeset .admonition.note > .admonition-title::before {
+  background: var(--hs-green);
+}
+
+.md-typeset .admonition.danger {
+  border: 2px solid #ae1c24;
+  background: #fff0f0;
+  color: #69141a;
+  font-size: 17px;
+  margin: 24px 0 32px;
+}
+
+.md-typeset .admonition.danger > .admonition-title {
+  background: #ae1c24;
+  color: white;
+  font-size: 20px;
+}
+
+.md-typeset .admonition.danger > .admonition-title::before {
+  background: white;
+}
+
+.md-typeset img[src*="images/"] {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  border: 1px solid #dce4dd;
+  border-radius: 4px;
+  margin-bottom: 24px;
+}
+
+.md-typeset .tooling-screenshot-placeholder {
+  display: flex;
+  min-height: 200px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px dashed #a5b4a3;
+  border-radius: 4px;
+  background: #f8faf7;
+  color: var(--md-default-fg-color--light);
+  text-align: center;
+}
+
+.md-typeset .tooling-screenshot-placeholder figcaption {
+  margin: 0;
+}

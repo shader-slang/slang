@@ -312,6 +312,46 @@ List<SemanticToken> getSemanticTokens(
                 token.type = SemanticTokenType::EnumMember;
                 maybeInsertToken(token);
             }
+            else if (auto hgbcAsmExpr = as<HGBCAsmExpr>(node))
+            {
+                for (const HGBCAsmInst& inst : hgbcAsmExpr->insts)
+                {
+                    SemanticToken opcodeToken = _createSemanticToken(
+                        manager,
+                        inst.opcode.token.loc,
+                        inst.opcode.token.getName());
+                    opcodeToken.type = SemanticTokenType::Function;
+                    maybeInsertToken(opcodeToken);
+
+                    for (const HGBCAsmOperand& operand : inst.operands)
+                    {
+                        SemanticTokenType tokenType = SemanticTokenType::NormalText;
+                        switch (operand.flavor)
+                        {
+                        case HGBCAsmOperand::NamedValue:
+                            tokenType = SemanticTokenType::EnumMember;
+                            break;
+                        case HGBCAsmOperand::ResultMarker:
+                            tokenType = SemanticTokenType::Macro;
+                            break;
+                        case HGBCAsmOperand::Id:
+                            tokenType = SemanticTokenType::String;
+                            break;
+                        default:
+                            break;
+                        }
+                        if (tokenType != SemanticTokenType::NormalText)
+                        {
+                            SemanticToken token = _createSemanticToken(
+                                manager,
+                                operand.token.loc,
+                                operand.token.getName());
+                            token.type = tokenType;
+                            maybeInsertToken(token);
+                        }
+                    }
+                }
+            }
             else if (auto spirvAsmExpr = as<SPIRVAsmExpr>(node))
             {
                 // Highlight opcodes and enums.

@@ -113,7 +113,7 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(Type* type)
 
 Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef)
 {
-    List<SubtypeWitness*> paramWitnesses;
+    List<Witness*> paramWitnesses;
 
     auto astBuilder = getCurrentASTBuilder();
     FuncType* funcType = nullptr;
@@ -172,9 +172,21 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
 
     for (auto paramType : funcType->getParamTypes())
     {
-        auto paramInfo = getParamInfoFromTypeWithModeWrapper(paramType);
-        auto witness =
-            doesTypeHaveNoDiffModifier(paramInfo.type) ? nullptr : getDiffWitness(paramInfo.type);
+        auto [paramValueType, _] = getParamInfoFromTypeWithModeWrapper(paramType);
+        Witness* witness = nullptr;
+        if (!doesTypeHaveNoDiffModifier(paramValueType))
+        {
+            witness = getDiffWitness(paramValueType);
+            if (!witness && as<ConcreteTypePack>(paramValueType))
+            {
+                // A mixed value pack retains the same optional evidence used to instantiate its
+                // callable. In particular, a uint element must not erase the float element's
+                // differential from an indexed callback's signature.
+                witness = getOptionalSubtypeWitness(
+                    paramValueType,
+                    astBuilder->getDifferentiableInterfaceType());
+            }
+        }
         paramWitnesses.add(witness);
     }
 
@@ -197,11 +209,45 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
             thisWitness = getDiffWitness(thisParamInfo->type);
     }
 
-    return astBuilder->getOrCreate<DiffTypeInfoWitness>(
-        thisParamType,
-        thisWitness,
-        returnWitness,
-        paramWitnesses);
+    List<Val*> operands;
+    operands.add(thisParamType);
+    operands.add(thisWitness);
+    operands.add(returnWitness);
+    for (auto witness : paramWitnesses)
+        operands.add(witness);
+    return DiffTypeInfoWitness::create(astBuilder, operands.getArrayView());
+}
+
+/// Constructs optional evidence element by element without weakening ordinary subtype checking.
+/// Consider `where optional T : IFoo` instantiated with the pack `<Foo, uint>`. The generic body
+/// projects the constraint alongside each type, so the argument must contain `Foo : IFoo` and an
+/// absent witness in matching positions. Passing a single absent witness discards Foo's proof and
+/// makes the lowered pack projection operate on a scalar witness table.
+Witness* SemanticsVisitor::getOptionalSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    IsSubTypeOptions options)
+{
+    if (auto pack = as<ConcreteTypePack>(subType))
+    {
+        ShortList<Witness*> witnesses;
+        for (Index i = 0; i < pack->getTypeCount(); i++)
+            witnesses.add(getOptionalSubtypeWitness(pack->getElementType(i), superType, options));
+        return OptionalWitnessPack::create(
+            m_astBuilder,
+            subType,
+            superType,
+            witnesses.getArrayView().arrayView);
+    }
+    if (auto witness = isSubtype(subType, superType, options))
+        return witness;
+    if (isAbstractTypePack(subType))
+    {
+        // An unconstrained source pack has no evidence, but still needs one absent slot per
+        // element when forwarded to an optional pack constraint. Its length is resolved later.
+        return AbsentWitnessPack::create(m_astBuilder, subType, superType);
+    }
+    return m_astBuilder->getOrCreate<NoneWitness>();
 }
 
 SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(

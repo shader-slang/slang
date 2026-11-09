@@ -30,6 +30,9 @@ Targets
 `glsl`
 > Represents the GLSL code generation target.
 
+`hgbc`
+> Represents the Host-Graph Byte-Code target.
+
 `hlsl`
 > Represents the HLSL code generation target.
 
@@ -1280,6 +1283,21 @@ Compound Capabilities
 
 `helper_lane`
 > Capabilities required to enable helper-lane demotion
+
+`hgbc_numeric_math`
+> Capabilities required for scalar, vector, and matrix numeric math in HGBC graphs
+
+`hgbc_structuredbuffer_dimensions`
+> Capabilities required to query read-only StructuredBuffer dimensions from HGBC graphs
+
+`hgbc_structuredbuffer_dimensions_rw`
+> Capabilities required to query mutable StructuredBuffer dimensions from HGBC graphs
+
+`hgbc_structuredbuffer_rw`
+> Capabilities required to use mutable StructuredBuffer handles from HGBC graphs
+
+`hgbc_texture_dimensions`
+> Capabilities required to query Texture2D dimensions from HGBC graphs
 
 `hlsl_spirv`
 > HLSL, and SPIRV code-gen targets

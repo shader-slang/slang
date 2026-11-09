@@ -391,11 +391,11 @@ static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
     {
     case kIROp_DebugLexicalBlock:
         {
-            bool validCount = inst->getOperandCount() == 4;
+            bool validCount = inst->getOperandCount() == 6;
             validate(context, validCount, inst, "invalid debug declaration operand count");
             if (!validCount)
                 return;
-            scope = inst->getOperand(3);
+            scope = cast<IRDebugLexicalBlock>(inst)->getParentScope();
             break;
         }
     case kIROp_DebugVar:
@@ -445,7 +445,7 @@ static void validateDebugScopeOperands(IRValidateContext* context, IRInst* inst)
         parents.add(inst);
         while (auto block = as<IRDebugLexicalBlock>(scope))
         {
-            if (!parents.add(block) || block->getOperandCount() != 4)
+            if (!parents.add(block) || block->getOperandCount() != 6)
             {
                 validate(context, false, inst, "invalid lexical parent chain");
                 return;
