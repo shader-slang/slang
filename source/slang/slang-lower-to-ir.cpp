@@ -10443,11 +10443,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         if (entryPoints.getCount() != 0)
             return;
-        // Return this module's declared entry-point functions, captured exactly in
-        // `generateIRForTranslationUnit` before the source-order declaration walk (see
-        // `SharedIRGenContext::m_entryPointFuncs`). Using that recorded set — rather than scanning
-        // decorations — is what keeps a non-entry `[numthreads]` helper out of the derivative-group
-        // decoration this feeds.
+        // Fill `entryPoints` with the entry-point functions that `generateIRForTranslationUnit`
+        // recorded before the source-order declaration walk (see
+        // `SharedIRGenContext::m_entryPointFuncs`). Module IR carries no `IREntryPointDecoration`,
+        // so a scan of the module's functions cannot find the entry points; the recorded list is
+        // the translation unit's requested non-generic entry points, which leaves out a called
+        // `[numthreads]` helper.
         //
         // Note the layering caveat: this runs during target-independent module lowering, yet it is
         // enumerating the front-end's declared entry points. Which functions are actually compiled
@@ -15481,18 +15482,21 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // We do, however, still lower the entry-point functions *first*, before walking the module's
     // declarations in source order below. A module-scope declaration can attach an
     // entry-point-scoped decoration to every entry point of the module (e.g. GLSL
-    // `layout(derivative_group_*NV) in;`, handled in `visitEmptyDecl`, which scans the
-    // already-lowered functions). If such a declaration precedes the entry-point function in
-    // source, the function must already be lowered when it is scanned; lowering the entry points up
-    // front makes that scan independent of source order.
+    // `layout(derivative_group_*NV) in;`, handled in `visitEmptyDecl`, which reads the
+    // `IRNumThreadsDecoration` of each recorded entry-point function). If such a declaration
+    // precedes the entry-point function in source, that function must already be lowered when the
+    // declaration is visited; lowering the entry points up front makes the result independent of
+    // source order.
     HashSet<IRInst*> seenEntryPointFuncs;
     for (auto entryPoint : translationUnit->getEntryPoints())
     {
         auto loweredFunc = getSimpleVal(context, ensureDecl(context, entryPoint->getFuncDecl()));
-        // A generic entry point lowers to an `IRGeneric` whose return value is the function; the
-        // entry-point identity belongs on that inner function, not the generic wrapper.
-        if (auto irGeneric = as<IRGeneric>(loweredFunc))
-            loweredFunc = findGenericReturnVal(irGeneric);
+        // A generic entry point lowers to an `IRGeneric`, and its `[numthreads]` operands stay
+        // generic parameters until specialization, so `visitEmptyDecl` cannot validate its
+        // thread counts here. We do not record it; the emit-time derivative-group check sees the
+        // specialized entry point.
+        if (as<IRGeneric>(loweredFunc))
+            continue;
         // The same function can be requested as an entry point more than once (e.g. duplicate
         // entries in the entry-point list); record it once.
         if (seenEntryPointFuncs.add(loweredFunc))

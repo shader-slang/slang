@@ -1,8 +1,8 @@
-// The GLSL module-scope `layout(derivative_group_quadsNV) in;` qualifier decorates every *entry
-// point* of the module. `helper` below carries `[numthreads]` but is NOT an entry point (it is only
-// called, and is not the function we compile). It must not receive the derivative-group decoration,
-// and its (3,1,1) thread count must not be validated against the quad requirement — doing so would
-// raise a spurious `E31210`. `realMain` is the selected entry point and has a valid (2,2,1) count.
+// The GLSL module-scope `layout(derivative_group_quadsNV) in;` qualifier decorates every entry
+// point of the module. `helper` below carries `[numthreads(3, 1, 1)]` but is only called, so it is
+// not an entry point: it gets neither the derivative-group decoration (whose quad check would
+// reject its 3x1 thread count with E31210) nor an entry-point `LocalSize` execution mode.
+// `realMain` is the selected entry point and has a valid 2x2 thread count.
 
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -fvk-use-entrypoint-name -target spirv -entry realMain -stage compute
 
@@ -23,6 +23,10 @@ layout(derivative_group_quadsNV) in;
 [numthreads(2, 2, 1)]
 void realMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    // CHECK: OpExecutionMode {{.*}} DerivativeGroupQuads{{NV|KHR}}
     outputBuffer.result = asint(helper(dispatchThreadID));
 }
+
+// CHECK: OpEntryPoint GLCompute %[[EP:[A-Za-z0-9_]+]] "realMain"
+// CHECK-NOT: OpExecutionMode {{%[A-Za-z0-9_]+}} LocalSize 3 1 1
+// CHECK: OpExecutionMode %[[EP]] DerivativeGroupQuads{{NV|KHR}}
+// CHECK-NOT: OpExecutionMode {{%[A-Za-z0-9_]+}} LocalSize 3 1 1
