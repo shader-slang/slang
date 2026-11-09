@@ -539,9 +539,10 @@ struct SharedIRGenContext
     // prelink into the current module after lowering.
     List<IRInst*> externalSymbolsToPrelink;
 
-    // The IR functions lowered for this translation unit's declared entry points, recorded before
-    // the source-order declaration walk so module-scope declarations that must decorate every entry
-    // point (e.g. GLSL `layout(derivative_group_*NV) in;`) have the exact set to iterate.
+    // This list holds the IR functions lowered for the translation unit's declared entry points.
+    // We record them before the source-order declaration walk, so that a module-scope declaration
+    // that decorates every entry point (such as GLSL `layout(derivative_group_*NV) in;`) has the
+    // exact set to iterate.
     List<IRInst*> m_entryPointFuncs;
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
