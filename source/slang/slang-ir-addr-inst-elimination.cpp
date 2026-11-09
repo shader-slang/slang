@@ -109,13 +109,15 @@ struct AddressInstEliminationContext
         auto argIndex = UInt(use - call->getArgs());
 
         // A reference parameter names the argument's storage, so the callee accesses that storage
-        // in place and decides itself how to read, write, and synchronize it. We pass the address
-        // through rather than a copy, because a copy that is stored back after the call would
-        // overwrite writes that other invocations or aliases made during it. The function type
-        // wraps a `groupshared` parameter's reference type in the group-shared rate, so we look
-        // inside it.
+        // in place and decides itself how to read, write, and synchronize it. When that storage
+        // is shared, such as a `groupshared` element, we pass the address through rather than a
+        // copy, because a copy that is stored back after the call would overwrite writes that
+        // other invocations made during it. A local variable is private to the invocation, so we
+        // copy it as we do for any other mutable argument. The function type wraps a `groupshared`
+        // parameter's reference type in the group-shared rate, so we look inside it.
         //
-        if (as<IRRefParamType>(unwrapAttributedType(calleeType->getParamType(argIndex))))
+        if (as<IRRefParamType>(unwrapAttributedType(calleeType->getParamType(argIndex))) &&
+            !as<IRVar>(getRootAddr(addr)))
         {
             return;
         }
