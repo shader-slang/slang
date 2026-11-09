@@ -4989,6 +4989,14 @@ warning(
 )
 
 err(
+    "entry-points-share-global-varyings",
+    38049,
+    "two entry points of a program come from a module with module-scope varyings",
+    span { loc = "entryPoint:Decl", message = "entry points '~entryPoint' and '~otherEntryPoint' both come from module '~module:Name', which declares module-scope varyings; each entry point owns all of them, so a program can contain only one of these entry points" },
+    note { message = "'~otherEntryPoint' is declared here", span { loc = "otherEntryPoint:Decl" } }
+)
+
+err(
     "geometry-shader-missing-max-vertex-count",
     38046,
     "geometry shader missing [maxvertexcount] attribute",

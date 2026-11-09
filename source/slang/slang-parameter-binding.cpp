@@ -4456,12 +4456,42 @@ static void _maybeApplyHLSLToVulkanShifts(
     }
 }
 
+/// Reports an error when two entry points of `program` come from the same module and that module
+/// declares module-scope varyings.
+///
+/// Every entry point owns all of the module-scope varyings of its module, so the two entry points
+/// would both own each of those varyings. Entry points without a function declaration
+/// (pass-through and deserialized placeholders) cannot be attributed to a module and are skipped.
+static void diagnoseEntryPointsSharingGlobalVaryings(ComponentType* program, DiagnosticSink* sink)
+{
+    Dictionary<Module*, EntryPoint*> firstEntryPointOfModule;
+    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    {
+        auto entryPoint = program->getEntryPoint(i);
+        if (!entryPoint->getFuncDecl() || entryPoint->getGlobalVaryings().getCount() == 0)
+            continue;
+        auto module = entryPoint->getModule();
+        EntryPoint* firstEntryPoint = nullptr;
+        if (!firstEntryPointOfModule.tryGetValue(module, firstEntryPoint))
+        {
+            firstEntryPointOfModule.add(module, entryPoint);
+            continue;
+        }
+        sink->diagnose(Diagnostics::EntryPointsShareGlobalVaryings{
+            .module = module->getNameObj(),
+            .entryPoint = entryPoint->getFuncDecl(),
+            .otherEntryPoint = firstEntryPoint->getFuncDecl()});
+    }
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_AST_BUILDER_RAII(targetProgram->getProgram()->getLinkage()->getASTBuilder());
 
     auto program = targetProgram->getProgram();
     auto targetReq = targetProgram->getTargetReq();
+
+    diagnoseEntryPointsSharingGlobalVaryings(program, sink);
 
     RefPtr<ProgramLayout> programLayout = new ProgramLayout();
     programLayout->targetProgram = targetProgram;
