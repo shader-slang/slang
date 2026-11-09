@@ -23,9 +23,13 @@ void compute_main(
     k(tid, buf);
 }
 
-// CHECK-HLSL: void compute_main
-
 // On the source targets, `k` is emitted as an ordinary function that the entry point calls.
+// CHECK-HLSL-NOT: [numthreads
+// CHECK-HLSL: {{^}}void [[K:k_[0-9]+]](
+// CHECK-HLSL: [numthreads(32, 1, 1)]
+// CHECK-HLSL-NEXT: void compute_main(
+// CHECK-HLSL: [[K]](
+
 // CHECK-CUDA-NOT: __global__ {{.*}}k_
 // CHECK-CUDA: __device__ void [[K:k_[0-9]+]](
 // CHECK-CUDA: extern "C" __global__ void compute_main(
@@ -46,6 +50,7 @@ void compute_main(
 // Exactly one LocalSize execution mode, targeting the entry point; none targets the callee `k`,
 // which survives as an ordinary OpFunction.
 // CHECK-SPV: OpEntryPoint GLCompute %[[EP:[A-Za-z0-9_]+]] "main"
+// CHECK-SPV-NOT: OpExecutionMode {{%[A-Za-z0-9_]+}} LocalSize
 // CHECK-SPV: OpExecutionMode %[[EP]] LocalSize
 // CHECK-SPV-NOT: OpExecutionMode {{%[A-Za-z0-9_]+}} LocalSize
 // CHECK-SPV: OpName %[[CALLEE:[A-Za-z0-9_]+]] "k"

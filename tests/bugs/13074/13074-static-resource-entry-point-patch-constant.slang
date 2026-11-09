@@ -1,6 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry hullMain -stage hull -entry constants -stage hull -O0 -validate-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=HLSL): -target hlsl -entry hullMain -stage hull -entry constants -stage hull -O0 -validate-ir
 
-// `constants` is both an entry point and the patch-constant function for `hullMain`.
+// In the SPIR-V compile, `constants` is both an entry point and the patch-constant function for
+// `hullMain`.
 // Resource-global legalization can create and initialize a local for its normal entry-point
 // invocation. `IRPatchConstantFuncDecoration` causes an additional invocation without an `IRCall`
 // argument list that the pass can extend.
@@ -8,8 +10,8 @@
 // A function is an entry point only in a compile that selects it as one. SPIR-V compiles both
 // entry points together, so `constants` is an entry point in the compile that also uses it as
 // `hullMain`'s patch-constant function. HLSL compiles each entry point separately; in the compile
-// for `hullMain`, `constants` is an ordinary patch-constant function, which
-// `13074-static-resource-patch-constant.slang` covers.
+// for `hullMain`, `constants` is an ordinary patch-constant function, so the same command line
+// reports the ordinary-function diagnostic that `13074-static-resource-patch-constant.slang` covers.
 
 Texture2D<float4> texture;
 static Texture2D<float4> cachedTexture = texture;
@@ -41,6 +43,8 @@ HullOutput hullMain()
 PatchOutput constants()
 //CHECK:    ^^^^^^^^^ entry point may be invoked through a path that cannot receive mutable resource state
 //CHECK:    ^^^^^^^^^ entry point 'constants' accesses mutable resource state and may be invoked through another path for which Slang cannot add generated resource arguments; move the shared implementation to an ordinary function and pass the resource explicitly
+//HLSL:     ^^^^^^^^^ mutable resource state is unavailable to a function whose invocations cannot all be rewritten
+//HLSL:     ^^^^^^^^^ function 'constants' may be invoked without a direct call that Slang can rewrite, so Slang cannot automatically pass the resource that it accesses; pass the resource explicitly instead
 {
     PatchOutput result;
     result.edgeFactors[0] = 1;

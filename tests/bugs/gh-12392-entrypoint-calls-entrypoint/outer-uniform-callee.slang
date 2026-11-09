@@ -44,6 +44,7 @@ void outer(uniform RWStructuredBuffer<uint> b, uniform uint n, uint3 tid: SV_Dis
 // The SPIR-V cell uses -O0 so `inner` survives as an ordinary `OpFunction`; only the entry point
 // gets the `LocalSize` execution mode.
 // CHECK-SPV: OpEntryPoint GLCompute %[[EP:[A-Za-z0-9_]+]] "main"
+// CHECK-SPV-NOT: OpExecutionMode {{%[A-Za-z0-9_]+}} LocalSize
 // CHECK-SPV: OpExecutionMode %[[EP]] LocalSize 64 1 1
 // CHECK-SPV-NOT: OpExecutionMode {{%[A-Za-z0-9_]+}} LocalSize
 // CHECK-SPV: OpName %[[CALLEE:[A-Za-z0-9_]+]] "inner"
