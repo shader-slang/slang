@@ -129,6 +129,12 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
 
+### Unused `.expected` files
+
+A test line with the `filecheck=PREFIX` or `diag=PREFIX` option checks its output with FileCheck or with the diagnostic annotations. It never reads a `.expected` file. If such a file exists for the test line, `slang-test` reports an error and the test fails. Remove the file, or remove the option from the test line.
+
+The `.expected` file of test line N is `foo.slang.N.expected`. For line 0 it is `foo.slang.expected`. The error is not reported for line 0 when another test line of the same file uses `foo.slang.expected` as its shared file.
+
 ### Exit code of tests
 
 A `SIMPLE`, `INTERPRET` or `REFLECTION` test checks the exit code of the tool, in addition to its output. This is true for tests with the `filecheck=PREFIX` option, tests with the `diag=PREFIX` option and tests that compare the output with an `.expected` file. The test fails if the exit code is not the expected one. The expected exit code is 0 by default.
@@ -151,6 +157,8 @@ The exception is a test with the `diag=PREFIX` option (see [diagnostics](../../d
 ```
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
 ```
+
+A test line cannot have both `diag=PREFIX` and `filecheck=PREFIX`. `slang-test` reports an error and the test fails, because only the `diag=` check runs and the `CHECK` lines of `filecheck=` are never run. The `diag=` check looks at the diagnostics in the standard error, and the `filecheck=` check looks at the whole output. A test that needs both checks uses one test line for each of them. For example, a `-E` test uses `DIAGNOSTIC_TEST:SIMPLE(diag=diag):-E` for the diagnostics and `TEST:SIMPLE(filecheck=CHECK):-E` for the preprocessed text in the standard output.
 
 ## Language server tests
 

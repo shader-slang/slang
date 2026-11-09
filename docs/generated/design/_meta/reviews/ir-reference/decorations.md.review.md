@@ -1,11 +1,11 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:18:32+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T08:04:36Z
 target_doc: ir-reference/decorations.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 6ca22e11b1ae848bc68390906f1d20589efa4eb3e3366532aa60f8ccaecd4b6c
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 7003d9ffd97f502ef36deaf8cec832320bcf008e9a79f32f8c5f2570288a7ffc
+source_commit: 8341c7e537a3f5cb3a60cd062066ffd630da40d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,44 +13,37 @@ checklist:
   style_consistency: partial
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 8
+finding_count: 6
 severity_breakdown:
   critical: 0
-  major: 0
-  minor: 6
-  nit: 2
+  major: 5
+  minor: 1
+  nit: 0
 ---
 
 # Review report for ir-reference/decorations.md
 
 ## Summary
 
-The page exhaustively lists all 196 concrete decoration opcodes, and all links, line citations, and front-matter values check out at the recorded commit. Eight non-blocking findings remain: several operand shapes and producer statements omit source-supported cases, one infrastructure helper is assigned to the wrong file, and a few passages miss the prompt's content/style rules. The most important correction is to document the optional predicate and type-scrutinee operands of `targetIntrinsic`.
+The document covers all 201 concrete decoration opcodes, and its explicit line-number citations match the current source. However, the reference tables do not satisfy several mandatory contract requirements. The most important gap is the producer column: many entries conceal provenance behind generic synthesis labels, including decorations actually produced during AST lowering.
 
 ## Items checked
 
-- Ran `regenerate.py show ir-reference/decorations.md`; reviewed the common and per-doc prompts, all three dependency pages, and all six resolved watched files at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Compared the table's opcode set to the stable-name entries: 196 unique table rows exactly match the 196 concrete `Decoration` leaves.
-- Verified all 13 line-number mentions, including the `1752-2702` Lua range and every cited entry point in `slang-lower-to-ir.cpp`.
-- Spot-checked more than 10 factual claims, including `nameHint`, `layout`, `targetIntrinsic`, `intrinsicOp`, `KeepAliveDecoration`, `entryPoint`, work-graph decorations, `shader64BitIndexing`, `synthesizedParameterGroup`, constrained fragment depth, `BuiltinRequirementDecoration`, and the autodiff markers.
-- Resolved all 30 markdown link occurrences (19 unique targets) and confirmed generated peer targets are present in the manifest.
-- Recomputed the watched-path digest, confirmed all mandatory front-matter keys, and measured 50,687 bytes against the 98,304-byte cap.
+- Reviewed against the **current working tree**, which the operator confirms equals the document’s `source_commit` throughout `source/`; confirmed HEAD matches the supplied review commit.
+- Read `_review.md`, `_common.md`, the document-specific prompt, and `regenerate.py show ir-reference/decorations.md`.
+- Compared all 201 opcode names with the Lua family’s concrete entries; checked family flags and identified 64 handwritten wrappers among the table entries.
+- Checked all 36 explicit line-citation expressions, including their ranges and the additional `11690` reference.
+- Spot-checked more than 10 claims, including target-intrinsic operand forms, profile packing, all 16 stage values, interpolation values and lowering, capability filtering, shader-64-bit-indexing production, work-graph lowering, synthesized parameter groups, builtin-interface marking, differentiable-call production, linkage production, and keep-alive handling.
+- Resolved all 45 relative-link occurrences, covering 23 distinct targets; verified all 10 linked generated pages occur in the manifest. Consulted dependency pages only for cross-reference checks.
+- Checked required front-matter keys, heading/table structure, Mermaid structure, Liquid safety, and the 60,206-byte document against its 98,304-byte cap.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Source`, lines 37-41 | The text places `addSimpleDecoration<T>` and the per-decoration `add*Decoration` helpers in `slang-ir.h` / `slang-ir.cpp`, but `addSimpleDecoration<T>` and most inline helpers are declared in `slang-ir-insts.h`. | `source/slang/slang-ir-insts.h:4708-4712` defines `IRBuilder::addSimpleDecoration`; `source/slang/slang-ir.cpp:7390-7393` only defines the out-of-line `addLayoutDecoration` example. | Add `slang-ir-insts.h` to the infrastructure sentence and state that `slang-ir.cpp` contains the out-of-line helper definitions. |
-| F-002 | minor | `## Source`, lines 55-58 | The blanket claim that “The autodiff markers ... are introduced by the IR passes themselves” is too broad. AST lowering directly creates call differentiability markers and the checkpoint/recompute decorations. | `source/slang/slang-lower-to-ir.cpp:5890-5943` emits `TreatCallAsDifferentiableDecoration` / `DifferentiableCallDecoration`; lines 14604-14615 emit `PreferCheckpointDecoration` / `PreferRecomputeDecoration`. | Qualify the sentence: primal/differential transcription markers come from autodiff passes, while the named call and checkpoint hints can originate in AST lowering. |
-| F-003 | minor | `targetIntrinsic` row and `### targetIntrinsic / TargetIntrinsicDecoration` | The page says `targetIntrinsic` has exactly two operands, but predicate-bearing target intrinsics have four: target capabilities, definition, predicate string, and type scrutinee. | `source/slang/slang-ir-insts.h:86-100` exposes the predicate/scrutinee accessors; lines 4884-4902 construct either the two- or four-operand form. | Change the operand cell to include optional `predicate` and `typeScrutinee`, and mention the conditional four-operand form in the notable-opcode callout. |
-| F-004 | minor | `AutoPyBindCUDA` row | The row lists only `functionNameOperand`, although lowering creates a three-operand decoration carrying optional forward- and backward-derivative functions. | `source/slang/slang-ir-insts.h:443-449` exposes operands 1 and 2; lines 5172-5183 construct all three operands. | Change the operand cell to `functionNameOperand: IRStringLit, fwdDiffFunc?, bwdDiffFunc?`. |
-| F-005 | minor | `PreferRecomputeDecoration` row | The operand cell is `—`, but lowering always appends the attribute's `sideEffectBehavior` as an integer operand. | `source/slang/slang-lower-to-ir.cpp:14608-14615` passes an `IRIntLit` containing `attr->sideEffectBehavior` to the decoration. | Replace `—` with `sideEffectBehavior: IRIntLit`. |
-| F-006 | minor | `### nodeLaunch and the work-graph node decorations`; `### shader64BitIndexing` | These callouts give backend-specific HLSL and SPIR-V consumption details even though the per-doc prompt explicitly assigns backend consumption to the emission page. | `docs/generated/design/_meta/prompts/ir-reference-decorations.md:75-81` forbids backend-specific consumption; the target describes exact HLSL text at lines 450-456 and SPIR-V emission at lines 491-494. | Keep the IR representation and producer facts, then replace backend emission details with a link to `../pipeline/06-emit.md`. |
-| F-007 | nit | Opening paragraphs, lines 12-23 | The first paragraph says what the page covers, but the intended reader appears in a separate second paragraph; the common contract requires both in the first paragraph. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first body paragraph to state coverage and audience. | Merge the audience sentence into the opening paragraph. |
-| F-008 | nit | `targetIntrinsic` row, line 150 | The summary ends with the editorial instruction `cite the glossary for target intrinsic` instead of an actual cross-reference. | `docs/generated/design/_meta/prompts/_common.md:74-79` forbids editorial commentary; the glossary link already exists later in the page. | Remove the instruction or replace `target intrinsic` with a direct relative link to `../glossary.md`. |
-
-## No-issues notes
-
-- The family hierarchy reflects the Lua nesting and uses valid Mermaid node identifiers.
-- Every table has the six required columns in the required order, with exactly one row per concrete opcode.
-- The recorded digest is valid hexadecimal and exactly matches `regenerate.py digest ir-reference/decorations.md`.
+| F-001 | major | `## Opcodes`, throughout | Twenty-two operand cells use the explicitly prohibited `(variadic, min=N)` form for Lua entries that provide only `min_operands`. This obscures the contract’s distinction between unnamed operands and variadic instructions. | `source/slang/slang-ir-insts.lua:1773` declares `layout` with `min_operands = 1`; `source/slang/slang-ir-insts.lua:1783` does likewise for `loopMaxIters`. `_common.md`, IR-reference “Operands” contract, requires `(N unnamed)` or accessor-derived names marked with `†`. | Replace all 22 cells with `(N unnamed)` using the declared count, or verified accessor names with a `†` legend. Also normalize the constructor cell and distinguish child instructions from operands in the dictionary-decoration row. |
+| F-002 | major | `## Opcodes`, AST origin column; especially lines 216–217, 270–271, 309, 356–357 | Thirty-six rows contain only `(synthesized)`, and many AST-origin rows omit the required producing function. Some labels are substantively misleading: the differentiable-call markers say `(synthesized by autodiff)`, while `import` and `export` are attributed to declarations bearing those names rather than linkage classification. | `source/slang/slang-lower-to-ir.cpp:5341` produces both call markers in `visitTreatAsDifferentiableExpr`; `:1431` selects import/export decorations through `isImportedDecl`; `:12840` lowers ray-payload read/write semantics; `:14713` lowers `NonDynamicUniformAttribute`. `_common.md` requires actual producers and rejects generic synthesis labels. | Audit every origin cell. Name the AST class/modifier plus lowering function, or the responsible pass/function. Correct these examples explicitly. Where no construction site exists, use `no producer at HEAD` and explain that status in the summary. |
+| F-003 | major | `## Source`, lines 30–34; all C++ wrapper cells | The required handwritten-wrapper markers, legend, and count are absent. Describing handwritten wrappers as merely occasional does not replace the required distinction: 64 listed wrappers are handwritten. | `source/slang/slang-ir-insts.h:138`, `:217`, and `:1805` explicitly define `IRIntrinsicOpDecoration`, `IRNameHintDecoration`, and `IRLayoutDecoration`; `source/slang/slang-ir.h.lua:151` skips generating structs already present. | Mark all 64 handwritten wrappers consistently, add the legend and count, and explain that generation supplies the remaining wrappers. |
+| F-004 | major | `## Family hierarchy`, lines 66–98 | The diagram mixes semantic table buckets with Lua nesting without distinguishing them, and omits the abstract `LinkageDecoration` and `DerivativeGroupDecoration` groups. It therefore does not provide the required schema hierarchy. | `source/slang/slang-ir-insts.lua:2252` groups `import` and `export` under `LinkageDecoration`; `:2390` groups the quad/linear variants under `DerivativeGroupDecoration`. `_common.md` requires a hierarchy mirroring Lua nesting. | Show all actual abstract groups and their nesting, including these two. Remove semantic buckets from the schema diagram or clearly separate them from actual Lua nodes. |
+| F-005 | major | `## Notable opcodes` | The specifically required `Differentiable` / `BackwardDifferentiable` callout is missing. Those historical decoration names are absent from the current family, so inventing rows would also be incorrect; the contract requires explaining unavailable requested material. | `docs/generated/design/_meta/prompts/ir-reference-decorations.md`, “Notable opcodes,” requires this coverage. `source/slang/slang-lower-to-ir.cpp:10821` describes differentiability becoming an interface conformance requirement rather than the historical decoration representation. | Add a brief callout explaining that these are not current decoration opcodes, describe the current representation at a high level, and link to `differentiation.md` and the lowering page’s differentiability section. Do not add nonexistent opcodes to the tables. |
+| F-006 | minor | Opcode summaries and source citations, including lines 108, 163, 208, 346 | Several summaries contain multiple explanatory sentences instead of one short clause; source files are also cited only as backticked basenames in several rows. Both violate explicit formatting requirements. | `_common.md`, universal source-link rule and IR-reference “Summary” contract; `docs/generated/design/_meta/prompts/ir-reference-decorations.md`, quality checklist. Examples include the multi-sentence `streamOutputTypeDecoration` summary and unlinked autodiff filenames on line 346. | Move extended explanations into existing notable-opcode callouts, reduce summaries to one short clause, and turn source-file citations into resolving relative Markdown links. |

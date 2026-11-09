@@ -1,0 +1,7 @@
+diag=CHECK1,exit-code=1
+diag=CHECK2,exit-code=1
+diag=CHECK3,exit-code=1
+diag=CHECK4,exit-code=1
+diag=CHECK5,exit-code=1
+diag=CHECK6,exit-code=1
+diag=CHECK7,exit-code=1
