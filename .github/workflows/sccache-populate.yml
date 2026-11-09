@@ -94,9 +94,9 @@ jobs:
             "sccache-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
             "sccache-windows-cl-x86_64-release-${CURRENT_COMMIT}"
             "sccache-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
+            "sccache-static-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-static-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-static-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
           )
 
           MISSING=0
@@ -539,10 +539,10 @@ jobs:
   # Populate the separate cache namespace used by the statically linked unit tests. A
   # static build shares no objects with the shared builds above, so these need
   # their own entries.
-  populate-static-unit-test-linux-aarch64:
+  populate-static-linux-aarch64:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     permissions:
       contents: read
     with:
@@ -553,10 +553,10 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       save-sccache: true
 
-  populate-static-unit-test-macos:
+  populate-static-macos:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     permissions:
       contents: read
     with:
@@ -567,10 +567,10 @@ jobs:
       runs-on: '["macos-latest"]'
       save-sccache: true
 
-  populate-static-unit-test-windows:
+  populate-static-windows:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     permissions:
       contents: read
     with:

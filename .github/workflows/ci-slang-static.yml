@@ -1,4 +1,4 @@
-name: CI Static Unit Tests
+name: CI Static
 
 # Builds and runs `slang-static-unit-test`, the unit tests that call non-exported
 # `source/slang` entry points directly. Those tests require SLANG_LIB_TYPE=STATIC, which is a
@@ -41,7 +41,7 @@ on:
         default: false
 
 jobs:
-  static-unit-test:
+  static:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 60
     permissions:
@@ -74,7 +74,7 @@ jobs:
         with:
           fetch-depth: "250"
 
-      # This cache key deliberately carries a `static-unit-test` component and
+      # This cache key deliberately carries a `static` component and
       # so shares nothing with the keys used by ci-slang-build.yml. A static
       # build cannot reuse objects from a shared build: SLANG_DYNAMIC and
       # SLANG_DYNAMIC_EXPORT are defined only for SHARED, STB_IMAGE_STATIC only
@@ -87,9 +87,9 @@ jobs:
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
-          key: sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          key: sccache-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
-            sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
+            sccache-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
 
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
@@ -257,4 +257,4 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
-          key: sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          key: sccache-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
