@@ -516,6 +516,17 @@ class ImplicitParameterGroupElementTypeModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks the `static const` alias that an unscoped enum adds to its
+// enclosing scope for one of its cases. For `[UnscopedEnum] enum E { A }`,
+// the alias `A` refers to the case `E.A`.
+FIDDLE()
+class UnscopedEnumCaseAliasModifier : public Modifier
+{
+    FIDDLE(...)
+public:
+    FIDDLE() EnumCaseDecl* enumCaseDecl = nullptr;
+};
+
 
 // An HLSL semantic
 FIDDLE(abstract)
@@ -904,6 +915,17 @@ class Attribute : public AttributeBase
 {
     FIDDLE(...)
     FIDDLE() List<Val*> intArgVals;
+};
+
+/// A synthesized marker for a variable declared in an HLSL `for` initializer.
+///
+/// The parser attaches this attribute only to initializer variables. Semantic checking and
+/// name lookup use it to allow a new initializer variable to shadow earlier locals in the
+/// same scope. This attribute has no spelling in shader code.
+FIDDLE()
+class HLSLForLoopInitializerAttribute : public Attribute
+{
+    FIDDLE(...)
 };
 
 FIDDLE()

@@ -304,6 +304,43 @@ struct InliningPassBase
             if (as<IRGlobalValueWithCode>(parent))
                 break;
         }
+
+        // A call at the global scope (e.g. the initializer of a `static const`)
+        // can only be inlined if the callee's body is valid at the global scope.
+        // A body that works through a local variable would leave a `var` and its
+        // stores at the global scope, which no target can emit. Such a call stays
+        // a call; the global-constant legalization moves it into the functions
+        // that use it, where it is inlined.
+        if (!as<IRBlock>(call->getParent()) && !isInlinableAtGlobalScope(calleeFunc))
+            return false;
+        return true;
+    }
+
+    /// Determine whether the body of `callee` can be inlined at the global scope.
+    static bool isInlinableAtGlobalScope(IRFunc* callee)
+    {
+        auto firstBlock = callee->getFirstBlock();
+        if (!firstBlock || firstBlock->getNextBlock() || !as<IRReturn>(firstBlock->getTerminator()))
+            return false;
+        for (auto inst : firstBlock->getOrdinaryInsts())
+        {
+            // Debug markers do not introduce runtime side effects or local storage.
+            if (isDebugInfoInst(inst))
+                continue;
+            if (inst == firstBlock->getTerminator())
+                continue;
+            switch (inst->getOp())
+            {
+            case kIROp_Var:
+            case kIROp_Load:
+            case kIROp_Store:
+                return false;
+            default:
+                if (inst->mightHaveSideEffects())
+                    return false;
+                break;
+            }
+        }
         return true;
     }
 
