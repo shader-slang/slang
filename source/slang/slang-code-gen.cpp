@@ -1208,6 +1208,67 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     return SLANG_FAIL;
 }
 
+/// Compiles the source code that Slang emits for `sourceTarget` with the downstream compiler that
+/// matches the target, and discards the result.
+///
+/// A test that checks only the emitted text cannot find code that the downstream compiler rejects.
+/// With `-validate-with-downstream-compiler`, the same compile that produces the binary target
+/// (for example `metal` to `metallib`) runs on the emitted source, and its errors make the compile
+/// fail. For a target that Slang does not pass to a downstream compiler, the function reports an
+/// error instead of skipping the validation silently.
+SlangResult CodeGenContext::validateEmittedSourceWithDownstream(CodeGenTarget sourceTarget)
+{
+    CodeGenTarget binaryTarget = CodeGenTarget::None;
+    switch (sourceTarget)
+    {
+    case CodeGenTarget::Metal:
+        binaryTarget = CodeGenTarget::MetalLib;
+        break;
+    case CodeGenTarget::HLSL:
+        {
+            // DXC does not accept the shader models before 6.0, and FXC does not accept the
+            // models from 6.0, so the shader model of the entry point selects the compiler.
+            Profile profile;
+            if (getEntryPointCount() == 1)
+                profile =
+                    getEffectiveProfile(getEntryPoint(getSingleEntryPointIndex()), getTargetReq());
+            else
+                profile =
+                    getEffectiveTargetProfile(getTargetReq(), getTargetProgram()->getOptionSet());
+            binaryTarget = (profile.getFamily() == ProfileFamily::DX &&
+                            profile.getVersion() < ProfileVersion::DX_6_0)
+                               ? CodeGenTarget::DXBytecode
+                               : CodeGenTarget::DXIL;
+        }
+        break;
+    case CodeGenTarget::GLSL:
+        binaryTarget = CodeGenTarget::SPIRV;
+        break;
+    case CodeGenTarget::WGSL:
+        binaryTarget = CodeGenTarget::WGSLSPIRV;
+        break;
+    case CodeGenTarget::CUDASource:
+        binaryTarget = CodeGenTarget::PTX;
+        break;
+    case CodeGenTarget::CPPSource:
+        binaryTarget = CodeGenTarget::ShaderSharedLibrary;
+        break;
+    case CodeGenTarget::HostCPPSource:
+        binaryTarget = CodeGenTarget::HostSharedLibrary;
+        break;
+    default:
+        getSink()->diagnose(Diagnostics::ValidateWithDownstreamCompilerUnsupportedTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(sourceTarget))});
+        return SLANG_FAIL;
+    }
+
+    // We call `emitWithDownstreamForEntryPoints` directly instead of `_emitEntryPoints`, because
+    // the latter emits SPIR-V without a downstream compiler when the user chooses that.
+    CodeGenContext validationContext(this, binaryTarget);
+    ComPtr<IArtifact> binaryArtifact;
+    return validationContext.emitWithDownstreamForEntryPoints(binaryArtifact);
+}
+
 // Helper class for recording compile time.
 struct CompileTimerRAII
 {
@@ -1258,6 +1319,17 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostLLVMIR:
     case CodeGenTarget::ShaderLLVMIR:
         {
+            // Most of these targets come out of a downstream compiler already, so emitting them
+            // validates them. The VM and LLVM IR targets are produced by Slang itself.
+            if (shouldValidateWithDownstreamCompiler() &&
+                (target == CodeGenTarget::HostVM || target == CodeGenTarget::HostLLVMIR ||
+                 target == CodeGenTarget::ShaderLLVMIR))
+            {
+                getSink()->diagnose(Diagnostics::ValidateWithDownstreamCompilerUnsupportedTarget{
+                    .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
+                return SLANG_FAIL;
+            }
+
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
             maybeDumpIntermediate(outArtifact);
@@ -1285,6 +1357,10 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
             SLANG_RETURN_ON_FAIL(subContext.emitEntryPointsSource(sourceArtifact));
 
             subContext.maybeDumpIntermediate(sourceArtifact);
+
+            if (shouldValidateWithDownstreamCompiler())
+                SLANG_RETURN_ON_FAIL(validateEmittedSourceWithDownstream(target));
+
             outArtifact = sourceArtifact;
             return SLANG_OK;
         }
@@ -1392,6 +1468,12 @@ bool CodeGenContext::shouldSkipSPIRVValidation()
 {
     return getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::SkipSPIRVValidation);
+}
+
+bool CodeGenContext::shouldValidateWithDownstreamCompiler()
+{
+    return getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::ValidateWithDownstreamCompiler);
 }
 
 bool CodeGenContext::shouldDumpIR()

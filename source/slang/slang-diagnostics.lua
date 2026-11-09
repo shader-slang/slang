@@ -6006,6 +6006,12 @@ err(
     span { loc = "location", message = "'~type:IRInst' has no HostVM layout and cannot be used at runtime" }
 )
 
+err(
+    "validate-with-downstream-compiler-unsupported-target",
+    52015,
+    "'-validate-with-downstream-compiler' cannot be used with target '~target', because no downstream compiler or validator is defined for this target"
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
