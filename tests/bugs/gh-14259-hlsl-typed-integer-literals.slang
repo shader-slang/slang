@@ -125,7 +125,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output.Store<int>(148, (0 - int(s)) >> 1);
 
     // Every word starts as the sentinel `AAAAAAAA`, so a store of the wrong width shows up as a
-    // word that keeps it or as a neighbour that it overwrites. The last word is never written.
+    // word that keeps it or as a neighbour that it overwrites. Words 0-9 hold the `int64_t` values,
+    // 10-15 the `uint64_t` values, 16-20 the `int` values, 21-23 the `uint` values, 24-25 the
+    // `bool` values, whose spelling does not change, and 26-29 the `int16_t` and `uint16_t` values,
+    // two to a word. Words 30-36 hold the shift results. Word 37 holds `(0 - s) >> 1`, which is -1
+    // only when the zero is a signed `int`; with an unsigned zero it would be 7FFFFFFF. Word 38 is
+    // never written.
     // BUF: 0
     // BUF-NEXT: 80000000
     // BUF-NEXT: FFFFFFFF

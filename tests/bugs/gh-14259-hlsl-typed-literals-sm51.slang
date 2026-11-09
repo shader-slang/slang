@@ -52,6 +52,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // HLSL-DAG: 65504.0h * oneH_0
     // HLSL-DAG: (-1.0h / 0.0h) * oneH_0
 
+    // The DXBC lines check that FXC accepts the typed literals and compiles signed and unsigned
+    // shifts and `double` products; they cannot tie an instruction to one literal. The buffer words
+    // of the dx12 lane are the check that FXC gives each literal its type.
     // DXBC-DAG: ishr
     // DXBC-DAG: ushr
     // DXBC-DAG: dmul
