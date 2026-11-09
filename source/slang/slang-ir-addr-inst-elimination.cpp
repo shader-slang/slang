@@ -108,18 +108,26 @@ struct AddressInstEliminationContext
         SLANG_RELEASE_ASSERT(calleeType);
         auto argIndex = UInt(use - call->getArgs());
 
-        // A reference parameter names the argument's storage, so the callee accesses that storage
-        // in place and decides itself how to read, write, and synchronize it. When that storage
-        // is shared, such as a `groupshared` element, we pass the address through rather than a
-        // copy, because a copy that is stored back after the call would overwrite writes that
-        // other invocations made during it. A local variable is private to the invocation, so we
-        // copy it as we do for any other mutable argument. The function type wraps a `groupshared`
-        // parameter's reference type in the group-shared rate, so we look inside it.
+        // The function type wraps a `groupshared` parameter's reference type in the group-shared
+        // rate, so we look inside it.
         //
-        if (as<IRRefParamType>(unwrapAttributedType(calleeType->getParamType(argIndex))) &&
-            !as<IRVar>(getRootAddr(addr)))
+        auto paramType = unwrapAttributedType(calleeType->getParamType(argIndex));
+
+        // A reference parameter names the argument's storage, so the callee accesses that storage
+        // in place and decides itself how to read, write, and synchronize it.
+        //
+        if (as<IRRefParamType>(paramType))
         {
-            return;
+            // Storage other than a local variable, such as a `groupshared` element, may be shared,
+            // and a copy that is stored back after the call would overwrite writes that other
+            // invocations made during it, so we pass its address through.
+            //
+            if (!as<IRVar>(getRootAddr(addr)))
+                return;
+
+            // A local variable is private to the invocation, so we copy it below as we do for
+            // any other mutable argument.
+            //
         }
 
         builder.setInsertBefore(call);
