@@ -3497,8 +3497,8 @@ err(
 err(
     "invariant-requires-position-output",
     31233,
-    "'invariant' is only allowed on a declaration with the 'SV_Position' semantic",
-    span { loc = "modifier:Modifier", message = "only the vertex position output can be marked invariant" }
+    "'invariant' is only allowed on a struct field, parameter or function return value with the 'SV_Position' semantic",
+    span { loc = "modifier:Modifier", message = "only a position output can be marked invariant" }
 )
 
 err(

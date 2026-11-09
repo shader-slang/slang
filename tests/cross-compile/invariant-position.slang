@@ -28,6 +28,8 @@
 //TEST:SIMPLE(filecheck=WGSL_FRAG): -target wgsl -entry fragmentInput -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=HLSL): -target hlsl -entry outputField -stage vertex
 //DIAGNOSTIC_TEST:SIMPLE(diag=HLSL_RETURN): -target hlsl -entry returnValue -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=HLSL_MESH): -target hlsl -entry meshOutput -stage mesh -profile sm_6_5
+//TEST:SIMPLE(filecheck=HLSL_FRAG): -target hlsl -entry fragmentInput -stage fragment
 
 struct VSOut
 {
@@ -137,3 +139,7 @@ void meshOutput(out indices uint3 triangles[1], out vertices MeshVertex vertices
 
 //HLSL: warning E56116
 //HLSL_RETURN: warning E56116
+//HLSL_MESH: warning E56116
+// HLSL_FRAG-NOT: E56116
+// HLSL_FRAG: SV_TARGET
+// HLSL_FRAG-NOT: E56116

@@ -2542,8 +2542,14 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // unlinking each modifier before checking it, so we validate it here.
     if (auto invariantModifier = syntaxNode->findModifier<InvariantModifier>())
     {
+        // A position output is a struct field, a parameter or a function's return value. Globals
+        // and locals with the semantic are not outputs, so they are rejected too.
+        auto decl = as<Decl>(syntaxNode);
+        bool isOutputPlace = as<FuncDecl>(decl) || as<ParamDecl>(decl) ||
+                             (as<VarDeclBase>(decl) && as<StructDecl>(decl->parentDecl));
         auto semantic = syntaxNode->findModifier<HLSLSimpleSemantic>();
-        if (!semantic || !semantic->name.getContent().caseInsensitiveEquals(toSlice("SV_Position")))
+        if (!isOutputPlace || !semantic ||
+            !semantic->name.getContent().caseInsensitiveEquals(toSlice("SV_Position")))
         {
             getSink()->diagnose(
                 Diagnostics::InvariantRequiresPositionOutput{.modifier = invariantModifier});
