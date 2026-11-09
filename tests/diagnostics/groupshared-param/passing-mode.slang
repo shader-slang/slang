@@ -12,51 +12,58 @@ static const uint N = 8;
 // --- Rejected: `in` / `out` / `inout` on a `groupshared` parameter ---
 
 void badIn(uint tid, in groupshared uint s[N])
+//diag:              ^^ cannot use the 'in' passing mode
+//diag:              ^^ remove this, or use 'const groupshared' for a read-only reference
 {
     s[tid] = tid;
 }
-//diag: cannot use the 'in' passing mode -- use bare 'groupshared'
 
 void badOut(uint tid, out groupshared uint s[N])
+//diag:               ^^^ cannot use the 'out' passing mode
+//diag:               ^^^ remove this, or use 'const groupshared' for a read-only reference
 {
     s[tid] = tid;
 }
-//diag: cannot use the 'out' passing mode -- use bare 'groupshared'
 
 void badInOut(uint tid, inout groupshared uint s[N])
+//diag:                 ^^^^^ cannot use the 'inout' passing mode
+//diag:                 ^^^^^ remove this, or use 'const groupshared' for a read-only reference
 {
     s[tid] = tid;
 }
-//diag: cannot use the 'inout' passing mode -- use bare 'groupshared'
 
 void badInOutSpaced(uint tid, in out groupshared uint s[N])
+//diag:                       ^^ cannot use the 'inout' passing mode
+//diag:                       ^^ remove this, or use 'const groupshared' for a read-only reference
 {
     s[tid] = tid;
 }
-//diag: cannot use the 'inout' passing mode -- use bare 'groupshared'
 
 // --- Rejected: `__borrow` / `__constref` on a `groupshared` parameter ---
 
 uint badBorrow(uint tid, __borrow groupshared uint s[N])
+//diag:                  ^^^^^^^^ cannot use the 'borrow' passing mode
+//diag:                  ^^^^^^^^ remove this, or use 'const groupshared' for a read-only reference
 {
     return s[tid];
 }
-//diag: cannot use the 'borrow' passing mode -- use bare 'groupshared'
 
 uint badConstRef(uint tid, __constref groupshared uint s[N])
+//diag:                    ^^^^^^^^^^ cannot use the 'borrow' passing mode
+//diag:                    ^^^^^^^^^^ remove this, or use 'const groupshared' for a read-only reference
 {
     return s[tid];
 }
-//diag: cannot use the 'borrow' passing mode -- use bare 'groupshared'
 
 // A doubled `__constref` reports the duplicate once and E30707 once.
 uint badDoubleConstRef(uint tid, __constref __constref groupshared uint s[N])
 //diag:                                     ^^^^^^^^^^ duplicate modifier
 //diag:                                     ^^^^^^^^^^ modifier '__constref' is redundant or conflicting with existing modifier '__constref'
+//diag:                          ^^^^^^^^^^ cannot use the 'borrow' passing mode
+//diag:                          ^^^^^^^^^^ remove this, or use 'const groupshared' for a read-only reference
 {
     return s[tid];
 }
-//diag: cannot use the 'borrow' passing mode -- use bare 'groupshared'
 
 groupshared uint doubleConstRefStorage[N];
 

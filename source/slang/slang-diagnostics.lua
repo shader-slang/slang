@@ -4007,8 +4007,8 @@ err(
 err(
     "groupshared-parameter-must-be-reference",
     30707, -- 30706 reserved for #11885 (duplicate-system-value-semantic)
-    "a 'groupshared' parameter is passed by reference, so it cannot use the '~mode:ParamPassingMode' passing mode -- use bare 'groupshared' for a read-write reference or 'const groupshared' for a read-only reference",
-    span { loc = "modifier:Modifier" }
+    "a 'groupshared' parameter is passed by reference, so it cannot use the '~mode:ParamPassingMode' passing mode",
+    span { loc = "modifier:Modifier", message = "remove this, or use 'const groupshared' for a read-only reference" }
 )
 
 err(

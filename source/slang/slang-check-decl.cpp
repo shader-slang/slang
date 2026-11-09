@@ -15189,15 +15189,29 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     // A `groupshared` parameter names thread-group-shared memory that other invocations can access
     // during the call, so it must be a reference to that memory. A written `in`, `out`, `inout`, or
-    // `__borrow` (or its alias `__constref`) gives the parameter a mode that is not a reference.
+    // `__borrow` (or its alias `__constref`) gives the parameter a mode that is not a reference,
+    // and we point the error at that keyword, since it is the one to remove.
     //
-    if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
     {
         auto mode = getExplicitlyDeclaredParamPassingMode(paramDecl);
         if (!isByReferenceParamPassingMode(mode))
+        {
+            Modifier* modeModifier = nullptr;
+            for (auto modifier : paramDecl->modifiers)
+            {
+                if (as<InModifier>(modifier) || as<OutModifier>(modifier) ||
+                    as<BorrowModifier>(modifier) || as<HLSLPayloadModifier>(modifier))
+                {
+                    modeModifier = modifier;
+                    break;
+                }
+            }
+            SLANG_ASSERT(modeModifier);
             getSink()->diagnose(Diagnostics::GroupsharedParameterMustBeReference{
                 .mode = mode,
-                .modifier = groupSharedModifier});
+                .modifier = modeModifier});
+        }
     }
 
     // Only texture types are allowed to have memory qualifiers on parameters
