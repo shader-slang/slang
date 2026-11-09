@@ -9,7 +9,7 @@
 // `float`. The dxbc
 // and dx12 lanes need FXC, so they run on Windows only. The cpu lane cross-checks the buffer
 // words; a vk lane cannot, because Vulkan does not require a multiplication to preserve an
-// infinity, a NaN or the sign of `-0.0` unless the shader asks for it.
+// infinity or a NaN unless the shader asks for it.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute -profile cs_5_1
 //TEST:SIMPLE(filecheck=DXBC):-target dxbc-assembly -entry computeMain -stage compute -profile cs_5_1
@@ -75,24 +75,21 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     output.Store(16, uint.maxValue >> s);
     output.Store(20, 12345U >> s);
     output.Store(24, asuint(0.1f * oneF));
-    output.Store(28, asuint(s == 1 ? -0.0f : oneF));
     output.Store(32, asuint((1.0f / 0.0f) * oneF));
     output.Store(36, asuint((-1.0f / 0.0f) * oneF));
     output.Store(40, asuint((0.0f / 0.0f) * oneF));
     storeDouble(44, 0.1l * oneD);
     storeDouble(52, 1.7976931348623157e+308l * oneD);
-    storeDouble(60, s == 1 ? -0.0l : oneD);
     storeDouble(68, double(1.0 / 0.0) * oneD);
     storeDouble(76, double(-1.0 / 0.0) * oneD);
     storeDouble(84, double(0.0 / 0.0) * oneD);
     output.Store(92, asuint(float(half(65504.0) * oneH)));
-    output.Store(96, asuint(float(s == 1 ? half(-0.0) : oneH)));
     output.Store(100, asuint(float(half(1.0 / 0.0) * oneH)));
     output.Store(104, asuint(float(half(-1.0 / 0.0) * oneH)));
     output.Store(108, asuint(float(half(0.0 / 0.0) * oneH)));
 
-    // Each `-0.0` word comes from a choice between the literal and a run-time value rather than
-    // from a multiplication, so the word reads the sign bit of the `-0.0` literal itself.
+    // On D3D12 with FXC, a stored `-0.0` literal does not keep its sign bit, so this test stores
+    // no `-0.0`; the SM 6.6 tests check `-0.0` with dxc. Words 7, 15-16 and 24 stay unwritten.
     // The NaN words accept a quiet NaN of either sign, because the sign and payload of a NaN that
     // a multiplication returns differ between targets. The last word is never written.
     // BUF: C0000000
@@ -102,7 +99,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // BUF-NEXT: 7FFFFFFF
     // BUF-NEXT: 181C
     // BUF-NEXT: 3DCCCCCD
-    // BUF-NEXT: 80000000
+    // BUF-NEXT: AAAAAAAA
     // BUF-NEXT: 7F800000
     // BUF-NEXT: FF800000
     // BUF-NEXT: {{[7F]F[C-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]}}
@@ -110,8 +107,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // BUF-NEXT: 3FB99999
     // BUF-NEXT: FFFFFFFF
     // BUF-NEXT: 7FEFFFFF
-    // BUF-NEXT: 0
-    // BUF-NEXT: 80000000
+    // BUF-NEXT: AAAAAAAA
+    // BUF-NEXT: AAAAAAAA
     // BUF-NEXT: 0
     // BUF-NEXT: 7FF00000
     // BUF-NEXT: 0
@@ -119,7 +116,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // BUF-NEXT: {{[0-9A-F]+}}
     // BUF-NEXT: {{[7F]FF[89A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]}}
     // BUF-NEXT: 477FE000
-    // BUF-NEXT: 80000000
+    // BUF-NEXT: AAAAAAAA
     // BUF-NEXT: 7F800000
     // BUF-NEXT: FF800000
     // BUF-NEXT: {{[7F]F[C-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]}}
