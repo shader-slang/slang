@@ -4479,7 +4479,7 @@ protected:
                 result.permittedTypes.add(getGroupThreadIdType(builder));
                 break;
             }
-        case SystemValueSemanticName::WorkgroupSize:
+        case SystemValueSemanticName::DispatchedWorkgroupSize:
             {
                 // The threadgroup size the host passed to the dispatch. It matches
                 // `[numthreads]` only if the host dispatches with that size.

@@ -16,7 +16,7 @@ in uint __builtinWaveIndex : SV_WaveIndex;
 in uint __builtinWaveCount : SV_WaveCount;
 in uint __builtinGroupIndex : SV_GroupIndex;
 in uint3 __builtinWorkgroupCount : SV_WorkgroupCount;
-in uint3 __builtinWorkgroupSize : SV_WorkgroupSize;
+in uint3 __builtinDispatchedWorkgroupSize : SV_DispatchedWorkgroupSize;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -8609,7 +8609,7 @@ uint3 DispatchedWorkgroupSize()
     __target_switch
     {
     case metal:
-        return __builtinWorkgroupSize;
+        return __builtinDispatchedWorkgroupSize;
     case cuda:
         return cudaBlockDim();
     default:
