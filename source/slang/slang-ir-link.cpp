@@ -1273,9 +1273,7 @@ IRFunc* specializeIRForEntryPoint(
         // module, and other consumers already tolerate it by gating on `getFuncDeclRef()`
         // (parameter binding and layout), so we correspondingly fall back to an empty module name
         // here rather than dereferencing null. The operand is purely informational and has no
-        // downstream reader for a freshly-constructed decoration. Reproducible via
-        // `tests/bugs/link-time-constant-array-size-main.slang` (the `-r` cell); whether a dummy
-        // entry point should be asked for its module at all is tracked in shader-slang/slang#12778.
+        // downstream reader for a freshly-constructed decoration.
         auto entryPointModule = entryPoint->getModule();
         UnownedStringSlice moduleName = entryPointModule
                                             ? UnownedStringSlice(entryPointModule->getName())

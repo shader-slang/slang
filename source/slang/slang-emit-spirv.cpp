@@ -6536,9 +6536,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // `LocalSize` is an entry-point execution mode. A `[numthreads]` function that is
                 // only *called* (not selected as the entry point) reaches here as an ordinary
                 // callee still carrying `IRNumThreadsDecoration`; emitting an `OpExecutionMode`
-                // against its id would target a non-`OpEntryPoint` and produce invalid SPIR-V
-                // (#12397). Gate on the parent being an entry point, matching the sibling
-                // `OutputTopologyDecoration` case below.
+                // against its id would target a non-`OpEntryPoint` and produce invalid SPIR-V.
+                // We therefore emit the mode only when the parent is an entry point, as the
+                // sibling `OutputTopologyDecoration` case below does.
                 if (!decoration->getParent()->findDecoration<IREntryPointDecoration>())
                     break;
                 auto numThreads = cast<IRNumThreadsDecoration>(decoration);

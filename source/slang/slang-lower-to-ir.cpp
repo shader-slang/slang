@@ -10446,14 +10446,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // `generateIRForTranslationUnit` before the source-order declaration walk (see
         // `SharedIRGenContext::m_entryPointFuncs`). Using that recorded set — rather than scanning
         // decorations — is what keeps a non-entry `[numthreads]` helper out of the derivative-group
-        // decoration this feeds (#12392).
+        // decoration this feeds.
         //
         // Note the layering caveat: this runs during target-independent module lowering, yet it is
         // enumerating the front-end's declared entry points. Which functions are actually compiled
         // as entry points is a per-invocation codegen decision that is not known here, so eagerly
-        // decorating all declared entry points is a known approximation. Eliminating this reliance
-        // (by representing the module-scope derivative-group request as a module-level fact and
-        // propagating it to the selected entry points after selection) is tracked in #12777.
+        // decorating all declared entry points is an approximation. The principled representation
+        // is a module-level fact for the module-scope derivative-group request, propagated to the
+        // selected entry points after selection.
         for (auto entryPointFunc : context->shared->m_entryPointFuncs)
             entryPoints.add(entryPointFunc);
     }
