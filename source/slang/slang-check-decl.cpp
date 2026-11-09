@@ -5535,6 +5535,49 @@ void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
     }
 }
 
+/// Appends to `outFuncs` every function in `containerDecl` that has a `[shader(...)]` attribute,
+/// including functions in namespaces, `__include`d files and types, in declaration order.
+static void collectShaderAttributedFuncs(ContainerDecl* containerDecl, List<FuncDecl*>& outFuncs)
+{
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        auto innerDecl = memberDecl;
+        if (auto genericDecl = as<GenericDecl>(innerDecl))
+            innerDecl = genericDecl->inner;
+        if (auto funcDecl = as<FuncDecl>(innerDecl))
+        {
+            if (funcDecl->hasModifier<EntryPointAttribute>())
+                outFuncs.add(funcDecl);
+        }
+        else if (
+            as<NamespaceDeclBase>(memberDecl) || as<FileDecl>(memberDecl) ||
+            as<StructDecl>(memberDecl))
+        {
+            collectShaderAttributedFuncs(as<ContainerDecl>(memberDecl), outFuncs);
+        }
+    }
+}
+
+/// Warns when `moduleDecl`, which declares module-scope varyings, has more than one function with a
+/// `[shader(...)]` attribute.
+///
+/// Each entry point owns every module-scope varying of its module, so two entry points from such
+/// a module cannot be part of one program; composing them is an error (E38049). A `[shader]`
+/// attribute is only evidence that a function will be an entry point, so at module level we warn
+/// about the potential conflict, whatever the stages of the functions.
+static void diagnoseShaderFunctionsSharingGlobalVaryings(
+    DiagnosticSink* sink,
+    ModuleDecl* moduleDecl)
+{
+    List<FuncDecl*> shaderFuncs;
+    collectShaderAttributedFuncs(moduleDecl, shaderFuncs);
+    if (shaderFuncs.getCount() < 2)
+        return;
+    sink->diagnose(Diagnostics::ShaderFunctionsShareGlobalVaryings{
+        .func = shaderFuncs[1],
+        .firstFunc = shaderFuncs[0]});
+}
+
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
     // When we are dealing with code from the core modules,
@@ -5757,6 +5800,9 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // Furthermore, because a fully checked function will have checked
     // its body, this also means that all function bodies and the
     // declarations they contain should be fully checked.
+
+    if (moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+        diagnoseShaderFunctionsSharingGlobalVaryings(getSink(), moduleDecl);
 }
 
 static bool _hasNoDiffReturnSignature(CallableDecl* decl, Type* type)

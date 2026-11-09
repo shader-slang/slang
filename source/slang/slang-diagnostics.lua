@@ -3981,6 +3981,14 @@ err(
 )
 
 warning(
+    "shader-functions-share-global-varyings",
+    30628,
+    "several '[shader]' functions in a module with module-scope varyings",
+    span { loc = "func:Decl", message = "'~func' and '~firstFunc' both have a '[shader]' attribute in a module that declares module-scope varyings; if both become entry points of one program, each would own all of those varyings" },
+    note { message = "'~firstFunc' is declared here", span { loc = "firstFunc:Decl" } }
+)
+
+warning(
     "deprecated-global-varying",
     30627,
     "module-scope varying '~decl:Decl' is deprecated",
