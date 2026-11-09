@@ -782,6 +782,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
             if (metalTracker->getRequiresLogging())
                 options.flags |= CompileOptions::Flag::EnableLogging;
+
+            if (metalTracker->getRequiresPreserveInvariance())
+                options.flags |= CompileOptions::Flag::PreserveInvariance;
         }
 
         if (metalLanguageVersion.isSet())

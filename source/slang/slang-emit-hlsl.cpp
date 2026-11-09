@@ -1,6 +1,7 @@
 // slang-emit-hlsl.cpp
 #include "slang-emit-hlsl.h"
 
+#include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-util-hlsl.h"
@@ -425,10 +426,80 @@ void HLSLSourceEmitter::emitParameterGroupImpl(
     _emitHLSLParameterGroup(varDecl, type);
 }
 
+// Looks through pointer, array, stream and mesh output wrappers to the type that holds the fields.
+static IRType* getOutputElementType(IRType* type)
+{
+    for (;;)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+            type = ptrType->getValueType();
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+            type = arrayType->getElementType();
+        else if (auto streamType = as<IRHLSLStreamOutputType>(type))
+            type = streamType->getElementType();
+        else if (auto meshType = as<IRMeshOutputType>(type))
+            type = meshType->getElementType();
+        else
+            return type;
+    }
+}
+
+static IRInst* findInvariantField(IRType* type)
+{
+    auto structType = as<IRStructType>(getOutputElementType(type));
+    if (!structType)
+        return nullptr;
+    for (auto field : structType->getFields())
+    {
+        if (field->getKey()->findDecoration<IRInvariantDecoration>())
+            return field->getKey();
+        if (auto nested = findInvariantField(field->getFieldType()))
+            return nested;
+    }
+    return nullptr;
+}
+
+static bool isOutputParam(IRParam* param)
+{
+    // HLSL keeps mesh outputs as array parameters marked with a `vertices` or `primitives`
+    // decoration.
+    auto type = param->getDataType();
+    return as<IROutParamTypeBase>(type) || as<IRHLSLStreamOutputType>(type) ||
+           as<IRMeshOutputType>(type) || param->findDecoration<IRVerticesDecoration>() ||
+           param->findDecoration<IRPrimitivesDecoration>();
+}
+
+// Inputs from a struct shared with the vertex stage carry `invariant` too, so only outputs count.
+static IRInst* findInvariantOutput(IRFunc* func)
+{
+    if (func->findDecoration<IRInvariantDecoration>())
+        return func;
+    if (auto field = findInvariantField(func->getResultType()))
+        return field;
+    for (auto param : func->getParams())
+    {
+        if (!isOutputParam(param))
+            continue;
+        if (param->findDecoration<IRInvariantDecoration>())
+            return param;
+        if (auto field = findInvariantField(param->getDataType()))
+            return field;
+    }
+    return nullptr;
+}
+
 void HLSLSourceEmitter::emitEntryPointAttributesImpl(
     IRFunc* irFunc,
     IREntryPointDecoration* entryPointDecor)
 {
+    // HLSL has no faithful equivalent of `invariant`, so the qualifier is dropped.
+    if (auto invariantOutput = findInvariantOutput(irFunc))
+    {
+        getSink()->diagnose(Diagnostics::InvariantQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = invariantOutput->sourceLoc});
+    }
+
     auto profile = m_effectiveProfile;
     auto stage = entryPointDecor->getProfile().getStage();
 

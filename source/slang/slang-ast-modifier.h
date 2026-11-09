@@ -743,6 +743,14 @@ class PreciseModifier : public Modifier
     FIDDLE(...)
 };
 
+// `invariant` modifier: the vertex position output is computed identically by every
+// pipeline that runs the same code on the same inputs.
+FIDDLE()
+class InvariantModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 
 // HLSL `shared` modifier (which is used by the effect system,
 // and shouldn't be confused with `groupshared`)

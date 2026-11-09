@@ -3342,6 +3342,15 @@ private:
                     layout);
                 if (flattenedStruct != structType)
                 {
+                    // A struct shared with the vertex stage carries `invariant` from its output
+                    // fields, but the qualifier is only valid on outputs.
+                    for (auto field : flattenedStruct->getFields())
+                    {
+                        if (auto invariant =
+                                field->getKey()->findDecoration<IRInvariantDecoration>())
+                            invariant->removeAndDeallocate();
+                    }
+
                     // Replace the 'old IRParam type' with a 'new IRParam type'
                     param->setFullType(flattenedStruct);
 
@@ -4243,6 +4252,8 @@ private:
         auto key = builder.createStructKey();
         builder.addNameHintDecoration(key, toSlice("output"));
         builder.addLayoutDecoration(key, resultLayout);
+        if (func->findDecoration<IRInvariantDecoration>())
+            builder.addSimpleDecoration<IRInvariantDecoration>(key);
         auto field = builder.createStructField(structType, key, returnType);
         // The field is generated, so it takes the entry point's location; a diagnostic about the
         // return value's semantic (e.g. an unsupported system value) then points at the shader.
@@ -4669,6 +4680,9 @@ protected:
         SLANG_OVERRIDE
     {
         copyNameHintAndDebugDecorations(newKey, oldKey);
+        // The Metal emitter reads `invariant` from the flattened key to emit `[[invariant]]`.
+        if (auto invariant = oldKey->findDecoration<IRInvariantDecoration>())
+            cloneDecoration(invariant, newKey);
     }
 
     UnownedStringSlice getUserSemanticNameSlice(String& loweredName, bool isUserSemantic) const

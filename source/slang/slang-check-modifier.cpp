@@ -1626,6 +1626,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::RayPayloadWriteSemantic:
     case ASTNodeType::GloballyCoherentModifier:
     case ASTNodeType::PreciseModifier:
+    case ASTNodeType::InvariantModifier:
     case ASTNodeType::IntrinsicOpModifier:
     case ASTNodeType::InlineModifier:
     case ASTNodeType::HLSLExportModifier:
@@ -1824,6 +1825,9 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::ConstExprModifier:
     case ASTNodeType::PreciseModifier:
         return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
+
+    case ASTNodeType::InvariantModifier:
+        return as<VarDeclBase>(decl) || as<FuncDecl>(decl);
 
     case ASTNodeType::ActualGlobalModifier:
     case ASTNodeType::MatrixLayoutModifier:
@@ -2531,6 +2535,31 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
                 getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
                 removeModifier(syntaxNode, ceM);
             }
+        }
+    }
+
+    // `invariant` needs the declaration's semantic, which the main loop below hides by
+    // unlinking each modifier before checking it, so we validate it here.
+    if (auto invariantModifier = syntaxNode->findModifier<InvariantModifier>())
+    {
+        // A position output is a struct field, a parameter or a function's return value. Globals
+        // and locals with the semantic are not outputs, so they are rejected too.
+        auto decl = as<Decl>(syntaxNode);
+        bool isOutputPlace = as<FuncDecl>(decl) || as<ParamDecl>(decl) ||
+                             (as<VarDeclBase>(decl) && as<StructDecl>(decl->parentDecl));
+        auto semantic = syntaxNode->findModifier<HLSLSimpleSemantic>();
+        if (!isOutputPlace || !semantic ||
+            !semantic->name.getContent().caseInsensitiveEquals(toSlice("SV_Position")))
+        {
+            getSink()->diagnose(
+                Diagnostics::InvariantRequiresPositionOutput{.modifier = invariantModifier});
+        }
+        else if (auto paramDecl = as<ParamDecl>(syntaxNode))
+        {
+            if (!paramDecl->findModifier<OutModifier>())
+                getSink()->diagnose(Diagnostics::InvariantRequiresOutputParameter{
+                    .param = paramDecl,
+                    .modifier = invariantModifier});
         }
     }
 

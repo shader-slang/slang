@@ -3226,6 +3226,10 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(inst);
         }
+        else if (as<InvariantModifier>(mod))
+        {
+            builder->addSimpleDecoration<IRInvariantDecoration>(inst);
+        }
         else if (auto formatAttr = as<FormatAttribute>(mod))
         {
             builder->addFormatDecoration(inst, formatAttr->format);
@@ -14467,6 +14471,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (as<NoInlineAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IRNoInlineDecoration>(irFunc);
+            }
+            else if (as<InvariantModifier>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRInvariantDecoration>(irFunc);
             }
             else if (as<DerivativeGroupQuadAttribute>(modifier))
             {

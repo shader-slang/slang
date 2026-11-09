@@ -266,8 +266,15 @@ void GLSLSourceEmitter::emitStructFieldAttributes(
     IRStructField* field,
     bool allowOffsetLayout)
 {
-    SLANG_UNUSED(structType);
     auto structKey = field->getKey();
+
+    // GLSL only allows `invariant` on a member of a redeclared builtin block, such as the mesh
+    // shader's `gl_MeshPerVertexEXT`, which is the only struct here with a target intrinsic name.
+    if (structKey->findDecoration<IRInvariantDecoration>() &&
+        structType->findDecoration<IRTargetIntrinsicDecoration>())
+    {
+        m_writer->emit("invariant ");
+    }
 
     if (allowOffsetLayout)
     {
@@ -1278,6 +1285,12 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
             emitType(varType, getName(var));
             m_writer->emit(";\n\n");
         }
+    }
+    else if (name == "gl_Position")
+    {
+        // GLSL marks a builtin invariant by redeclaring it with the qualifier.
+        if (var->findDecoration<IRInvariantDecoration>())
+            m_writer->emit("invariant gl_Position;\n\n");
     }
     else if (name == "gl_ShadingRateEXT")
     {

@@ -3494,6 +3494,20 @@ err(
     span { loc = "modifier:Modifier", message = "an '~mode:ParamPassingMode' parameter is meant to be written by its function, so '~param:Decl' cannot be 'const'" }
 )
 
+err(
+    "invariant-requires-position-output",
+    31233,
+    "'invariant' is only allowed on a struct field, parameter or function return value with the 'SV_Position' semantic",
+    span { loc = "modifier:Modifier", message = "only a position output can be marked invariant" }
+)
+
+err(
+    "invariant-requires-output-parameter",
+    31234,
+    "'invariant' is only allowed on an 'out' or 'inout' parameter",
+    span { loc = "modifier:Modifier", message = "'~param:Decl' is an input, so it cannot be marked invariant" }
+)
+
 -- Enums (320xx)
 
 err(
@@ -6429,6 +6443,13 @@ warning(
     56115,
     "'WaveSize(~waveSize:int)' cannot be honored on target '~target', whose wave size is always ~targetWaveSize:int; the attribute will be ignored",
     span { loc = "location", message = "the entry point runs with ~targetWaveSize:int-lane waves, so code that assumes ~waveSize:int lanes per wave computes wrong results" }
+)
+
+warning(
+    "invariant-qualifier-unsupported-on-target",
+    56116,
+    "'invariant' qualifier is not supported on target '~target' and will be ignored; the position output is not guaranteed to match across pipelines",
+    span { loc = "location" }
 )
 
 -- SPIRV (57001-57007)
