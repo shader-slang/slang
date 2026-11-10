@@ -139,16 +139,17 @@ The `.expected` file of test line N is `foo.slang.N.expected`. For line 0 it is 
 
 A `SIMPLE`, `INTERPRET` or `REFLECTION` test with the `filecheck=PREFIX` or `diag=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines or the diagnostic annotations. The test fails if the exit code is not the expected one. The expected exit code is 0 by default. A test that compares the output with an `.expected` file does not need this check, because the file contains the line `result code = N`.
 
-A test that must fail sets the expected exit code with the `exit-code=N` option:
+A test that must fail sets the expected exit code with the `exit-code=N` option. N must be `-1`, `0` or `1`. The test fails for another value. A test must never expect `-2`, because it reports an internal compiler error, which is a bug in the compiler:
 
 ```
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry main -stage compute
 ```
 
-The common exit codes of `slangc` are:
+The exit codes of `slangc` are in the output of `slangc -help`. The values that a test can expect are:
 
-- `-1`: the compilation failed, for example because of an error diagnostic.
-- `1`: the command line is not valid, for example an unknown or malformed option.
+- `0`: success.
+- `-1`: the compilation failed because of errors in the input, for example an error diagnostic.
+- `1`: the command line is not valid, for example an unknown or malformed option, or the tool failed to run.
 
 A test with an expected failure should also have a `CHECK` line for the diagnostic that it wants to see, for example `// CHECK: error[E30015]`. Without it, the test can pass for an unrelated error. A `CHECK-NOT` line alone cannot detect a failed compilation, because the error output does not contain the text that it rejects. Use the diagnostic code, such as `E36107`, and not only the word `error`. The word `error` is also part of the header `standard error` in the FileCheck input.
 
