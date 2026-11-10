@@ -38,8 +38,9 @@ When the language version is set to `legacy`, the compiler behavior will be cons
   warning. They are intended for the GLSL dialect only; declare entry-point inputs and outputs as
   parameters instead. In every language version, including GLSL source, each entry point owns all of
   the module-scope varyings of its module and is checked against them like parameters. Such a
-  variable must be at the top level of its module and cannot have a user semantic, a module that
-  declares them cannot be imported, and a program cannot contain two entry points from that module.
+  variable must be at the top level of its module and, for SPIR-V, GLSL and WGSL targets, cannot
+  have a user semantic of its own. A module that declares them cannot be imported, and a program
+  cannot contain two entry points from that module.
   See GitHub issue [#14375](https://github.com/shader-slang/slang/issues/14375).
 
 ## Slang 2025

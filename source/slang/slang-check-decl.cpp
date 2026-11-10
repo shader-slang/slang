@@ -600,15 +600,6 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         if (as<NamespaceDecl>(getParentDecl(decl)))
             getSink()->diagnose(Diagnostics::GlobalVaryingNotAtTopLevel{.decl = decl});
 
-        // Lowering to IR treats the semantic on a module-scope varying itself as a system value,
-        // so only `SV_` semantics are meaningful there. Semantics on the fields of a struct-typed
-        // varying are handled like those of a parameter.
-        if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
-        {
-            if (!semantic->name.getContent().startsWithCaseInsensitive(toSlice("sv_")))
-                getSink()->diagnose(Diagnostics::GlobalVaryingUserSemantic{.semantic = semantic});
-        }
-
         switch (getSourceLanguage())
         {
         case SourceLanguage::HLSL:

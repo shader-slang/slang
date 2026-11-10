@@ -2100,6 +2100,33 @@ static void validateVaryingTypeOfDecl(
     validateVaryingType(ctx, decl->getType());
 }
 
+/// Reports E30629 when the module-scope varying `globalVarying` has a user (non-`SV_`) semantic
+/// and one of `targets` is SPIR-V, GLSL or WGSL, and returns whether it did.
+///
+/// For those targets, lowering treats the semantic on the varying itself as a system value:
+/// SPIR-V and GLSL then fail with E49999, and WGSL gets an entry-point input with no binding.
+/// HLSL and Metal emit the user semantic as written, so we accept it there. Semantics on the
+/// fields of a struct-typed varying are laid out like those of a parameter on every target.
+static bool diagnoseGlobalVaryingUserSemantic(
+    DiagnosticSink* sink,
+    ArrayView<CodeGenTarget> targets,
+    VarDeclBase* globalVarying)
+{
+    auto semantic = globalVarying->findModifier<HLSLSimpleSemantic>();
+    if (!semantic || semantic->name.getContent().startsWithCaseInsensitive(toSlice("sv_")))
+        return false;
+    for (auto target : targets)
+    {
+        if (!isKhronosTarget(target) && !isWGPUTarget(target))
+            continue;
+        sink->diagnose(Diagnostics::GlobalVaryingUserSemantic{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
+            .semantic = semantic});
+        return true;
+    }
+    return false;
+}
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -2835,6 +2862,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         for (Index i = 0; i < globalVaryings.getCount(); ++i)
         {
+            if (diagnoseGlobalVaryingUserSemantic(sink, targets.getArrayView(), globalVaryings[i]))
+            {
+                sink->diagnose(Diagnostics::GlobalVaryingOwnedByEntryPoint{
+                    .entryPoint = entryPointName,
+                    .decl = globalVaryings[i]});
+            }
             validateVaryingTypeOfDecl(
                 astBuilder,
                 sink,

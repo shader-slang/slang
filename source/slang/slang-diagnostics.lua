@@ -3998,8 +3998,8 @@ warning(
 err(
     "global-varying-user-semantic",
     30629,
-    "user semantic on a module-scope varying",
-    span { loc = "semantic:Modifier", message = "a module-scope varying can only have a system-value ('SV_') semantic; remove the semantic, or declare the varying with a struct type whose fields carry the semantics" }
+    "user semantic on a module-scope varying is not supported when targeting ~target",
+    span { loc = "semantic:Modifier", message = "when targeting ~target, a module-scope varying can only have a system-value ('SV_') semantic; remove the semantic, or declare the varying with a struct type whose fields carry the semantics" }
 )
 
 err(
