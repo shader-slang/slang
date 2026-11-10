@@ -161,6 +161,34 @@ The exception is a test with the `diag=PREFIX` option (see [diagnostics](../../d
 
 A test line cannot have both `diag=PREFIX` and `filecheck=PREFIX`. `slang-test` reports an error and the test fails, because only the `diag=` check runs and the `CHECK` lines of `filecheck=` are never run. The `diag=` check looks at the diagnostics in the standard error, and the `filecheck=` check looks at the whole output. A test that needs both checks uses one test line for each of them. For example, a `-E` test uses `DIAGNOSTIC_TEST:SIMPLE(diag=diag):-E` for the diagnostics and `TEST:SIMPLE(filecheck=CHECK):-E` for the preprocessed text in the standard output.
 
+### Validating emitted code with the downstream compiler
+
+A `SIMPLE` test with a text target, such as `-target metal`, checks only the text that `slangc` writes. It passes even if the downstream compiler rejects that text. To check the text, add `-validate-with-downstream-compiler` to the `slangc` options of the test:
+
+```
+//TEST:SIMPLE(filecheck=CHECK): -target metal -entry main -stage compute -validate-with-downstream-compiler
+```
+
+With this option, `slangc` runs the downstream compiler or validator for the target on the emitted code, and returns an exit code other than 0 when there is a problem. The tools are:
+
+| Target               | Downstream tool                                                   |
+| -------------------- | ----------------------------------------------------------------- |
+| `spirv`, `spirv-asm` | SPIR-V validator (also runs without `SLANG_RUN_SPIRV_VALIDATION`) |
+| `metal`              | Metal compiler                                                    |
+| `hlsl`               | DXC for shader model 6.0 or higher, FXC below that                |
+| `glsl`               | glslang                                                           |
+| `wgsl`               | Tint                                                              |
+| `cuda`               | NVRTC                                                             |
+| `cpp`                | C++ compiler                                                      |
+
+Not every machine has every tool. For example, there is no Metal compiler on Linux. `slang-test` checks which tools the machine has when it starts. For a `SIMPLE` test, `slang-test` removes `-validate-with-downstream-compiler` from the `slangc` command line when the tool for the `-target` of the test is not available. At startup, `slang-test` prints a warning for each target whose validation is removed in this way, for example:
+
+```
+warning: Metal compiler not found; -validate-with-downstream-compiler is removed from SIMPLE tests with -target metal
+```
+
+Only `SIMPLE` tests do this. A test of another type that passes the option to `slangc` gets the error from `slangc` when the tool is not available. Use the option only in tests that must produce valid output. A test that expects a failed compile does not use the option; it uses `exit-code=N` instead.
+
 ## Language server tests
 
 A `LANG_SERVER` test opens the test file in `slangd` and runs the `//` directives in the file from top to bottom. Every `LANG_SERVER` test shares one `slangd` process. `initialize` replaces the workspace, but formatting, inlay-hint, commit-character and trace options carry over, so a test that changes one of them sets it back to its default before it ends.

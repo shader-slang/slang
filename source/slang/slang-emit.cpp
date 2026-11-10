@@ -3585,6 +3585,10 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
         optionSet.getBoolOption(CompilerOptionName::IncompleteLibrary))
         return false;
 
+    // `-validate-with-downstream-compiler` asks for validation without the environment variable.
+    if (optionSet.getBoolOption(CompilerOptionName::ValidateWithDownstreamCompiler))
+        return true;
+
     // Also check the environment variable SLANG_RUN_SPIRV_VALIDATION.
     // If it is set to "1", we should run validation.
     StringBuilder runSpirvValEnvVar;
