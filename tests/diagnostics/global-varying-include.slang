@@ -8,7 +8,7 @@ module "global-varying-include";
 __include global_varying_include_helper;
 
 //CHECK: module-scope varying 'gIncluded' is not supported in Slang 2025 and later
-//CHECK: module-scope 'in'/'out' variables are a GLSL feature; declare 'gIncluded' as an entry-point parameter instead
+//CHECK: module-scope varyings are a GLSL feature; declare 'gIncluded' as an entry-point parameter instead
 
 float4 main() : SV_Target
 {

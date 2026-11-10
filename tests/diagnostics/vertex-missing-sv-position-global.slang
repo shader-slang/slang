@@ -8,6 +8,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF):-target spirv -entry main -stage vertex -Wpedantic -no-codegen -warnings-disable 30627 -DWITH_POSITION
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=OFF):-lang glsl tests/diagnostics/vertex-missing-sv-position-global.slang -target spirv -entry main -stage vertex -Wpedantic -no-codegen -DUSE_GLSL
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF):-target spirv -entry main -stage vertex -Wpedantic -no-codegen -warnings-disable 30627 -DUSE_IMPORT_GLSL
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF):-target spirv -entry main -stage vertex -Wpedantic -no-codegen -warnings-disable 30627 -DUSE_INDIRECT_GLSL
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=OFF):-lang glsl tests/diagnostics/vertex-missing-sv-position-global.slang -target spirv -entry main -stage vertex -Wpedantic -no-codegen -DUSE_GLSL -DPARAM_OUTPUT -warnings-disable 38044
 
 #if defined(USE_IMPORT_GLSL)
@@ -19,6 +20,15 @@ void main()
 {
     gl_Position = float4(0, 0, 0, 1);
     gColor = float4(1);
+}
+#elif defined(USE_INDIRECT_GLSL)
+// A module that depends on the `glsl` module only through another import is treated the same way.
+import "vertex-missing-sv-position-global-helper";
+out float4 gColor;
+
+void main()
+{
+    gColor = helperColor();
 }
 #elif !defined(USE_GLSL)
 out float4 gColor;

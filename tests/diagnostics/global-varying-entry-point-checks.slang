@@ -11,12 +11,12 @@ out float gDepth : SV_Depth;
 in int2x2 gIntMatrix;
 /*CHECK:
           ^^^^^^^^^^ type cannot be used as entry-point varying for this target
-          ^^^^^^^^^^ type 'matrix<int,2,2>' cannot be used as input global variable 'gIntMatrix' of entry point 'main' when targeting spirv
+          ^^^^^^^^^^ type 'matrix<int,2,2>' cannot be used as input module-scope varying 'gIntMatrix' of entry point 'main' when targeting spirv
 */
 out int2x2 gIntOutMatrix;
 /*CHECK:
            ^^^^^^^^^^^^^ type cannot be used as entry-point varying for this target
-           ^^^^^^^^^^^^^ type 'matrix<int,2,2>' cannot be used as output global variable 'gIntOutMatrix' of entry point 'main' when targeting spirv
+           ^^^^^^^^^^^^^ type 'matrix<int,2,2>' cannot be used as output module-scope varying 'gIntOutMatrix' of entry point 'main' when targeting spirv
 */
 
 float4 main() : SV_Target

@@ -3977,14 +3977,14 @@ err(
     "global-varying-not-supported",
     30626,
     "module-scope varying '~decl:Decl' is not supported in ~language",
-    span { loc = "decl:Decl", message = "module-scope 'in'/'out' variables are a GLSL feature; declare '~decl' as an entry-point parameter instead" }
+    span { loc = "decl:Decl", message = "module-scope varyings are a GLSL feature; declare '~decl' as an entry-point parameter instead" }
 )
 
-err(
-    "global-varying-user-semantic",
-    30629,
-    "user semantic on a module-scope varying",
-    span { loc = "semantic:Modifier", message = "a module-scope varying can only have a system-value ('SV_') semantic; remove the semantic, or declare the varying with a struct type whose fields carry the semantics" }
+warning(
+    "deprecated-global-varying",
+    30627,
+    "module-scope varying '~decl:Decl' is deprecated",
+    span { loc = "decl:Decl", message = "module-scope varyings are intended for the GLSL dialect only, and support for them in Slang will be removed in a later compiler release; declare '~decl' as an entry-point parameter instead" }
 )
 
 warning(
@@ -3995,11 +3995,11 @@ warning(
     note { message = "'~firstFunc' is declared here", span { loc = "firstFunc:Decl" } }
 )
 
-warning(
-    "deprecated-global-varying",
-    30627,
-    "module-scope varying '~decl:Decl' is deprecated",
-    span { loc = "decl:Decl", message = "module-scope 'in'/'out' variables are intended for the GLSL dialect only, and support for them in Slang will be removed in a later compiler release; declare '~decl' as an entry-point parameter instead" }
+err(
+    "global-varying-user-semantic",
+    30629,
+    "user semantic on a module-scope varying",
+    span { loc = "semantic:Modifier", message = "a module-scope varying can only have a system-value ('SV_') semantic; remove the semantic, or declare the varying with a struct type whose fields carry the semantics" }
 )
 
 err(
@@ -4314,10 +4314,10 @@ err(
 )
 
 err(
-    "global-varying-not-at-module-scope",
+    "global-varying-not-at-top-level",
     31401,
     "module-scope varying '~decl:Decl' must be declared at the top level of its module",
-    span { loc = "decl:Decl", message = "'~decl' is an 'in'/'out' variable declared inside a namespace" }
+    span { loc = "decl:Decl", message = "'~decl' is declared inside a namespace" }
 )
 
 --
@@ -4980,13 +4980,6 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
-err(
-    "geometry-shader-missing-output-stream",
-    38045,
-    "geometry shader missing output stream parameter",
-    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have an output stream parameter of type PointStream<T>, LineStream<T>, or TriangleStream<T>" }
-)
-
 warning(
     "entry-point-varying-param-with-global-varyings",
     38044,
@@ -4996,11 +4989,10 @@ warning(
 )
 
 err(
-    "entry-points-share-global-varyings",
-    38049,
-    "two entry points of a program come from a module with module-scope varyings",
-    span { loc = "entryPoint:Decl", message = "entry points '~entryPoint' and '~otherEntryPoint' both come from module '~module:Name', which declares module-scope varyings; each entry point owns all of them, so a program can contain only one of these entry points" },
-    note { message = "'~otherEntryPoint' is declared here", span { loc = "otherEntryPoint:Decl" } }
+    "geometry-shader-missing-output-stream",
+    38045,
+    "geometry shader missing output stream parameter",
+    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have an output stream parameter of type PointStream<T>, LineStream<T>, or TriangleStream<T>" }
 )
 
 err(
@@ -5022,6 +5014,22 @@ err(
     38048,
     "mesh shader missing OutputVertices/OutputIndices output",
     span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must declare both an 'OutputVertices' and an 'OutputIndices' output parameter" }
+)
+
+err(
+    "entry-points-share-global-varyings",
+    38049,
+    "two entry points of a program come from a module with module-scope varyings",
+    span { loc = "entryPoint:Decl", message = "entry points '~entryPoint' and '~otherEntryPoint' both come from module '~module:Name', which declares module-scope varyings; each entry point owns all of them, so a program can contain only one of these entry points" },
+    note { message = "'~otherEntryPoint' is declared here", span { loc = "otherEntryPoint:Decl" } }
+)
+
+-- Attached to errors about a module-scope varying that do not name the entry point that owns it.
+standalone_note(
+    "global-varying-owned-by-entry-point",
+    -1,
+    "'~decl:Decl' belongs to entry point '~entryPoint:Name', which owns every module-scope varying of its module, whether or not it uses it",
+    span { loc = "decl:Decl" }
 )
 
 err(
@@ -5072,7 +5080,7 @@ err(
     "imported-module-has-global-varyings",
     38208,
     "cannot import a module that declares module-scope varyings",
-    span { loc = "location", message = "module '~module:Name' declares module-scope 'in'/'out' variables, which belong only to the entry points declared in that module" }
+    span { loc = "location", message = "module '~module:Name' declares module-scope varyings, which belong only to the entry points declared in that module" }
 )
 
 err(
@@ -6529,13 +6537,6 @@ err(
 )
 
 -- GLSL Compatibility (58001-58003)
-
-standalone_note(
-    "global-varying-owned-by-entry-point",
-    -1,
-    "'~decl:Decl' belongs to entry point '~entryPoint:Name', which owns every module-scope varying of its module, whether or not it uses it",
-    span { loc = "decl:Decl" }
-)
 
 err(
     "entry-point-must-return-void-when-global-output-present",

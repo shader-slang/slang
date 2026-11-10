@@ -238,11 +238,24 @@ public:
         m_inferredCapabilityRequirements = caps;
     }
 
-    /// Get the module-scope varyings that belong to this entry point, in declaration order. They
-    /// are inputs and outputs of the entry point just as its varying parameters are. An entry
-    /// point owns every module-scope varying declared in the module of its function, whether or
-    /// not the function uses it. Semantic checking uses this list; the IR pass
-    /// `translateGlobalVaryingVar` still finds an entry point's global varyings by reachability.
+    /// Get the module-scope varyings that this entry point owns, in declaration order. They are
+    /// inputs and outputs of the entry point just as its varying parameters are, and semantic
+    /// checking validates them as such.
+    ///
+    /// An entry point owns every module-scope varying declared in the module of its function,
+    /// whether or not the function uses it. We define ownership by declaration rather than by use
+    /// so that the inputs and outputs of an entry point follow from the declarations of its module
+    /// alone: deciding them needs no front-end walk of the call graph, and they do not change when
+    /// a function body does.
+    ///
+    /// The IR pass `translateGlobalVaryingVar` gives an entry point the module-scope varyings that
+    /// it reaches. Apart from the builtins of the `glsl` module, such as `gl_Position`, which no
+    /// entry point owns, each of those is one that the entry point owns: a module that declares
+    /// module-scope varyings cannot be imported (`visitImportDecl`), so an entry point can name
+    /// only the varyings of its own module. Checking the owned list is therefore conservative. A
+    /// program also cannot contain two entry points of one such module
+    /// (`diagnoseEntryPointsSharingGlobalVaryings`), so each varying has at most one owner in a
+    /// program.
     List<VarDeclBase*> const& getGlobalVaryings() { return m_globalVaryings; }
 
     /// Marks an entry selected through a checked structural ray-tracing conformance.
@@ -389,6 +402,8 @@ private:
     // requirements and finalized during `validateEntryPoint`.
     CapabilitySetVal* m_inferredCapabilityRequirements = nullptr;
 
+    // The module-scope varyings that the entry point owns (see `getGlobalVaryings`). `create`
+    // copies them from the module of the function; placeholder entry points own none.
     List<VarDeclBase*> m_globalVaryings;
 };
 

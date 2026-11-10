@@ -586,9 +586,11 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
     ///
     /// Module-scope varyings are a GLSL idiom: Slang and HLSL entry points declare their inputs and
     /// outputs as parameters. We therefore reject them in HLSL and in Slang 2025 and later, and
-    /// warn about them in legacy Slang. We also restrict them to the top level of the module in
-    /// every language: they exist for the GLSL dialect, which has no namespaces, so a varying
-    /// declared inside a namespace has no meaning to carry over.
+    /// warn about them in legacy Slang. We also restrict them to the top level of the module, in
+    /// every language version. The restriction is a policy that keeps the deprecated idiom to the
+    /// form that GLSL code has: GLSL has no namespaces, so a varying inside a namespace can only
+    /// come from Slang or HLSL code, which declares parameters instead, and rejecting it does not
+    /// affect the code that the idiom is kept for.
     void checkAndMarkGlobalVaryingVarDecl(VarDecl* decl)
     {
         auto moduleDecl = getModuleDecl(decl);
@@ -596,7 +598,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
             addModifier(moduleDecl, getASTBuilder()->create<HasLegacyGlobalVaryingsModifier>());
 
         if (as<NamespaceDecl>(getParentDecl(decl)))
-            getSink()->diagnose(Diagnostics::GlobalVaryingNotAtModuleScope{.decl = decl});
+            getSink()->diagnose(Diagnostics::GlobalVaryingNotAtTopLevel{.decl = decl});
 
         // Lowering to IR treats the semantic on a module-scope varying itself as a system value,
         // so only `SV_` semantics are meaningful there. Semantics on the fields of a struct-typed
@@ -629,8 +631,9 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
             // GLSL is the dialect that module-scope varyings belong to.
             break;
         default:
-            // Other source languages either cannot declare `in`/`out` variables, or are checked
-            // without a translation unit (`Unknown`), so there is no language rule to apply.
+            // No other source language has a rule for module-scope varyings. That includes
+            // `Unknown`, which `getSourceLanguage` returns when the checking context has no
+            // translation unit.
             break;
         }
     }
@@ -1667,11 +1670,13 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 }
 
 /// Is `decl` a module-scope varying, that is, a variable declared `in`, `out` or `inout` outside
-/// any function or type, either at the top level of its module or inside a namespace? (`inout`
-/// counts because `InOutModifier` derives from `OutModifier`.)
+/// any function or type? (`inout` counts because `InOutModifier` derives from `OutModifier`.) A
+/// module-scope varying is either at the top level of its module, directly in the module or in an
+/// `__include`d file, or inside a namespace, which E31401 rejects.
 ///
 /// GLSL-style shaders read their inputs and write their outputs through such variables instead of
-/// through entry-point parameters. The code calls them "global varyings".
+/// through entry-point parameters. Identifiers in the code call them "global varyings"; comments
+/// and diagnostic messages call them "module-scope varyings".
 bool isGlobalVaryingVar(VarDeclBase* decl)
 {
     if (!isGlobalDecl(decl))
@@ -5545,7 +5550,8 @@ void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
 }
 
 /// Appends to `outFuncs` every function in `containerDecl` that has a `[shader(...)]` attribute,
-/// including functions in namespaces, `__include`d files and types, in declaration order.
+/// including functions in namespaces, `__include`d files and non-generic structs, in declaration
+/// order.
 static void collectShaderAttributedFuncs(ContainerDecl* containerDecl, List<FuncDecl*>& outFuncs)
 {
     for (auto memberDecl : containerDecl->getDirectMemberDecls())
@@ -5573,9 +5579,10 @@ static void collectShaderAttributedFuncs(ContainerDecl* containerDecl, List<Func
 /// Each entry point owns every module-scope varying of its module, so two entry points from such
 /// a module cannot be part of one program; composing them is an error (E38049). A `[shader]`
 /// attribute is only evidence that a function will be an entry point, so at module level we warn
-/// about the potential conflict, whatever the stages of the functions. Functions that become
-/// entry points without one, such as a `[numthreads]` function found by entry-point discovery,
-/// are not counted here; E38049 still rejects composing them.
+/// about the potential conflict, whatever the stages of the functions. The warning counts only
+/// `[shader]` functions because that attribute is the explicit marker of an intended entry point.
+/// A function that entry-point discovery makes into an entry point without one, such as a
+/// `[numthreads]` function, is not counted, and E38049 still rejects composing it.
 static void diagnoseShaderFunctionsSharingGlobalVaryings(
     DiagnosticSink* sink,
     ModuleDecl* moduleDecl)
@@ -5812,6 +5819,9 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // its body, this also means that all function bodies and the
     // declarations they contain should be fully checked.
 
+    // `HasLegacyGlobalVaryingsModifier` is added while the modifiers of each module-scope varying
+    // are checked, so it is complete only after the loop above has checked every declaration.
+    // Only a module with the marker can have entry points that share varyings.
     if (moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
         diagnoseShaderFunctionsSharingGlobalVaryings(getSink(), moduleDecl);
 }
@@ -18901,8 +18911,12 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto importedModuleDecl = importedModule->getModuleDecl();
     decl->importedModuleDecl = importedModuleDecl;
 
-    // An entry point owns the module-scope varyings of its own module only, so an entry point of
-    // the importing module could read or write an imported varying that it does not own.
+    // Every module-scope varying that an entry point can name is one that it owns (see
+    // `EntryPoint::getGlobalVaryings`), and an entry point owns only the varyings of its own
+    // module. An import would let the entry points of the importing module, and of any module
+    // that imports it in turn, name varyings that they do not own. We therefore reject every
+    // import of a module that declares module-scope varyings, rather than check which code
+    // refers to them, which would need a front-end walk of the call graph.
     if (importedModuleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
     {
         getSink()->diagnose(Diagnostics::ImportedModuleHasGlobalVaryings{

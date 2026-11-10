@@ -25,19 +25,19 @@ public struct PublicType
 in float4 gColor;
 /*LEGACY:
           ^^^^^^ module-scope varying 'gColor' is deprecated
-          ^^^^^^ module-scope 'in'/'out' variables are intended for the GLSL dialect only, and support for them in Slang will be removed in a later compiler release; declare 'gColor' as an entry-point parameter instead
+          ^^^^^^ module-scope varyings are intended for the GLSL dialect only, and support for them in Slang will be removed in a later compiler release; declare 'gColor' as an entry-point parameter instead
 */
 /*SLANG2025:
           ^^^^^^ module-scope varying 'gColor' is not supported in Slang 2025 and later
-          ^^^^^^ module-scope 'in'/'out' variables are a GLSL feature; declare 'gColor' as an entry-point parameter instead
+          ^^^^^^ module-scope varyings are a GLSL feature; declare 'gColor' as an entry-point parameter instead
 */
 /*SLANG2026:
           ^^^^^^ module-scope varying 'gColor' is not supported in Slang 2025 and later
-          ^^^^^^ module-scope 'in'/'out' variables are a GLSL feature; declare 'gColor' as an entry-point parameter instead
+          ^^^^^^ module-scope varyings are a GLSL feature; declare 'gColor' as an entry-point parameter instead
 */
 /*HLSL:
           ^^^^^^ module-scope varying 'gColor' is not supported in HLSL
-          ^^^^^^ module-scope 'in'/'out' variables are a GLSL feature; declare 'gColor' as an entry-point parameter instead
+          ^^^^^^ module-scope varyings are a GLSL feature; declare 'gColor' as an entry-point parameter instead
 */
 
 #ifdef NESTED
@@ -46,7 +46,7 @@ namespace inner
 in float4 gNested;
 /*NESTED:
           ^^^^^^^ module-scope varying 'gNested' must be declared at the top level of its module
-          ^^^^^^^ 'gNested' is an 'in'/'out' variable declared inside a namespace
+          ^^^^^^^ 'gNested' is declared inside a namespace
 */
 }
 #endif

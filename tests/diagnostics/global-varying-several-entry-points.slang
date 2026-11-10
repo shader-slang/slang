@@ -1,12 +1,12 @@
-// Consider the example from #14375: one module holds a vertex shader that writes its outputs
-// through module-scope varyings and a fragment shader that reads its input as a parameter and
-// returns its result. Every entry point owns all module-scope varyings of its module, so
-// `fsMain` owns `gPos` and `vA` as outputs even though it uses neither. The fragment entry point
-// is therefore rejected: it returns a value while it has module-scope outputs, and `SV_Position`
-// is not a fragment output. Each error carries a note that names the owning entry point. Module
-// checking also warns that the module has two `[shader]` functions. Without `-entry`, every
-// `[shader]` function becomes an entry point, so loading the module reports the same errors. The
-// vertex entry point compiles on its own.
+// Consider a module that holds a vertex shader that writes its outputs through module-scope
+// varyings and a fragment shader that reads its input as a parameter and returns its result.
+// Every entry point owns all module-scope varyings of its module, so `fsMain` owns `gPos` and `vA`
+// as outputs even though it uses neither. The fragment entry point is therefore rejected: it
+// returns a value while it has module-scope outputs, and `SV_Position` is not a fragment output.
+// Neither error names the entry point, so each is followed by a note on `gPos` that names the
+// owning entry point. Module checking also warns that the module has two `[shader]` functions.
+// Without `-entry`, every `[shader]` function becomes an entry point, so loading the module
+// reports the same errors. The vertex entry point compiles on its own.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=FS):-target spirv -entry fsMain -stage fragment -no-codegen -warnings-disable 30627,38044
 //DIAGNOSTIC_TEST:SIMPLE(diag=FS):-target spirv -no-codegen -warnings-disable 30627,38044

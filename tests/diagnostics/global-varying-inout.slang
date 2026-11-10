@@ -20,7 +20,7 @@ void main()
 inout int2x2 gMatrix;
 /*TYPE:
              ^^^^^^^ type cannot be used as entry-point varying for this target
-             ^^^^^^^ type 'matrix<int,2,2>' cannot be used as input/output global variable 'gMatrix' of entry point 'main'
+             ^^^^^^^ type 'matrix<int,2,2>' cannot be used as input/output module-scope varying 'gMatrix' of entry point 'main'
 */
 
 void main()

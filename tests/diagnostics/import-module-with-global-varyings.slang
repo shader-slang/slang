@@ -7,7 +7,7 @@
 import "import-module-with-global-varyings-helper";
 /*CHECK:
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot import a module that declares module-scope varyings
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ module 'import-module-with-global-varyings-helper' declares module-scope 'in'/'out' variables, which belong only to the entry points declared in that module
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ module 'import-module-with-global-varyings-helper' declares module-scope varyings, which belong only to the entry points declared in that module
 */
 
 float4 main() : SV_Target

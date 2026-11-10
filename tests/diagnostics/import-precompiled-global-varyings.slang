@@ -9,7 +9,7 @@
 import "import-precompiled-global-varyings-helper";
 /*CHECK:
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot import a module that declares module-scope varyings
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ module 'import-precompiled-global-varyings-helper' declares module-scope 'in'/'out' variables
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ module 'import-precompiled-global-varyings-helper' declares module-scope varyings
 */
 
 float4 main() : SV_Target

@@ -1,8 +1,10 @@
-// Every entry point owns all module-scope varyings of its module. Two vertex shaders in this module
-// both write `gPos`, so each compiles on its own. A program that contains both entry points would
-// have two owners for `gPos`, so composing them is an error. Module checking also warns that the
-// module has two `[shader]` functions, even though both are for the same stage. The composition
-// check runs when each target's layout is computed, so a compile for two targets reports it twice.
+// Every entry point owns all module-scope varyings of its module, whether or not it uses them. A
+// program with one of the two vertex shaders in this module has one owner for `gPos`, so each
+// shader compiles on its own. A program that contains both has two owners for `gPos`, so composing
+// them is an error, which does not depend on what either shader writes. Module checking also warns
+// that the module has two `[shader]` functions, even though both are for the same stage. The
+// composition check runs when each target's layout is computed, so a compile for two targets
+// reports it twice.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=COMPOSED):-target spirv-asm -warnings-disable 30627
 //DIAGNOSTIC_TEST:SIMPLE(diag=SINGLE):-target spirv-asm -entry vsFirst -stage vertex -warnings-disable 30627
