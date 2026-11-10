@@ -1459,9 +1459,11 @@ static void addLinkageDecoration(
     }
     for (auto modifier : decl->modifiers)
     {
-        // Each modifier that keeps the declaration's definition records its own location on the
-        // export decoration, so that a later diagnostic about the kept definition can point at
-        // the modifier.
+        // Several of these modifiers add an export decoration, which keeps the function's IR from
+        // being removed as dead code, and so keeps its calls from being inlined away. We record
+        // the modifier's own source location on that decoration, so that a later diagnostic
+        // about a call that could not be inlined, such as a `groupshared` parameter on HLSL, can
+        // point at the modifier responsible.
         //
         if (as<HLSLExportModifier>(modifier))
         {

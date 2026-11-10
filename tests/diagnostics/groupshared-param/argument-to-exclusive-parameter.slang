@@ -5,8 +5,9 @@
 // because the compiler cannot tell whether another invocation accesses that storage during the call
 // (shader-slang/slang#10641). A direct argument of a mutating operator is read, modified and
 // written in place as the user expects, which keeps `g[i] += 1` and `g[i]++` silent. A call by
-// name warns even when it is always inlined or is a built-in. The test is exhaustive, so the
-// silent calls must produce no diagnostic.
+// name warns even when it is always inlined or is a built-in. A callee without a declaration, such
+// as `bwd_diff(square)`, has no parameter names, so warning 30710 identifies the parameter by its
+// position instead. The test is exhaustive, so the silent calls must produce no diagnostic.
 
 struct Counter
 {
@@ -22,6 +23,7 @@ struct Counter
 groupshared int g_a[10];
 groupshared uint g_u[10];
 groupshared Counter g_c;
+groupshared DifferentialPair<float> g_p[10];
 
 void myFunc(inout int a[10])
 {
@@ -56,6 +58,12 @@ void share(groupshared int v)
     v = 5;
 }
 
+[Differentiable]
+float square(float x)
+{
+    return x * x;
+}
+
 [numthreads(10, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
 {
@@ -80,6 +88,9 @@ void computeMain(uint i : SV_GroupIndex)
     // The implicit `this` of a `[mutating]` method.
     g_c.bump();
 
+    // The `inout` pair argument of a derivative, whose callee has no declaration.
+    bwd_diff(square)(g_p[i], 1.0);
+
     // --- Silent ---
 
     g_a[i] += 1;
@@ -99,6 +110,8 @@ void computeMain(uint i : SV_GroupIndex)
 //diag: 'inlinedSet' needs exclusive access to parameter 'v', but 'g_u[i]' is thread-group-shared memory that other invocations could access
 //diag: 'InterlockedAdd' needs exclusive access to parameter 'original_value', but 'g_u[1]' is thread-group-shared memory that other invocations could access
 //diag: 'bump' needs exclusive access to parameter 'this', but 'g_c' is thread-group-shared memory that other invocations could access
+//diag: '__bwd_diff(square)' needs exclusive access to its 'inout' parameter #1, but 'g_p[i]' is thread-group-shared memory that other invocations could access
+//diag: consider copying value through a local variable to make the access explicit
 //diag: consider copying value through a local variable to make the access explicit
 //diag: consider copying value through a local variable to make the access explicit
 //diag: consider copying value through a local variable to make the access explicit

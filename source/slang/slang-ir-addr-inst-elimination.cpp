@@ -114,21 +114,13 @@ struct AddressInstEliminationContext
         auto paramType = unwrapAttributedType(calleeType->getParamType(argIndex));
 
         // A reference parameter names the argument's storage, so the callee accesses that storage
-        // in place and decides itself how to read, write, and synchronize it.
+        // in place and decides itself how to read, write, and synchronize it. We never copy such
+        // an argument, even a local variable: the callee may reach the same storage through
+        // another parameter, or other invocations may share it, and a temporary stored back
+        // after the call would lose those accesses.
         //
         if (as<IRRefParamType>(paramType))
-        {
-            // Storage other than a local variable, such as a `groupshared` element, may be shared,
-            // and a copy that is stored back after the call would overwrite writes that other
-            // invocations made during it, so we pass its address through.
-            //
-            if (!as<IRVar>(getRootAddr(addr)))
-                return;
-
-            // A local variable is private to the invocation, so we copy it below as we do for
-            // any other mutable argument.
-            //
-        }
+            return;
 
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());

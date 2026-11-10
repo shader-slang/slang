@@ -4053,6 +4053,15 @@ warning(
     note { message = "this method can modify 'this', which requires exclusive access", span { loc = "methodLocation" } }
 )
 
+-- A call whose callee has no declaration, such as `bwd_diff(f)(...)`, has no parameter names, so
+-- this counterpart of warning 30709 identifies the parameter by its position and mode instead.
+warning(
+    "groupshared-argument-to-exclusive-parameter-at-position",
+    30710,
+    "'~callee' needs exclusive access to its '~mode:ParamPassingMode' parameter #~paramNumber:Int, but '~storageText' is thread-group-shared memory that other invocations could access",
+    span { loc = "arg:Expr", message = "consider copying value through a local variable to make the access explicit" }
+)
+
 err(
     "groupshared-argument-must-be-groupshared-lvalue",
     30711,

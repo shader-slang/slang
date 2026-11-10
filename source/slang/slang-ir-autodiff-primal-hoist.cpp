@@ -2846,14 +2846,17 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
                 return false;
         }
 
-        // Nor from an element of a reference parameter. Address elimination leaves a reference
-        // parameter in memory, so its elements are loaded through element addresses, and the
-        // storage may change before the backward pass. No function with a reference parameter is
-        // differentiated today, so this applies only once that is supported.
+        // We also can't recompute a `load` from an element of a reference parameter. Address
+        // elimination leaves a reference parameter in memory, so its elements are loaded through
+        // element addresses, and the storage may change before the backward pass. No function
+        // with a reference parameter is differentiated today, so this applies only once that is
+        // supported.
         //
-        if (auto rootParam = as<IRParam>(getRootAddr(ptr));
-            rootParam && as<IRRefParamType>(rootParam->getDataType()))
-            return false;
+        if (auto rootParam = as<IRParam>(getRootAddr(ptr)))
+        {
+            if (as<IRRefParamType>(rootParam->getDataType()))
+                return false;
+        }
     }
     else if (auto param = as<IRParam>(use.usedVal))
     {

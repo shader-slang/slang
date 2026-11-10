@@ -6152,7 +6152,7 @@ struct HigherOrderInvokeExprCheckingActions
     /// a reference parameter and a differentiability attribute. Such a function has already been
     /// rejected at its declaration, so the caller gives the expression an error type instead of
     /// building a derivative signature.
-    bool rejectDifferentiationOfFunctionWithReferenceParameter(
+    bool isDifferentiationAlreadyRejectedForReferenceParameter(
         SemanticsVisitor* semantics,
         Expr* funcExpr)
     {
@@ -6218,7 +6218,7 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        if (rejectDifferentiationOfFunctionWithReferenceParameter(semantics, funcExpr))
+        if (isDifferentiationAlreadyRejectedForReferenceParameter(semantics, funcExpr))
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             return;
@@ -6257,7 +6257,7 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        if (rejectDifferentiationOfFunctionWithReferenceParameter(semantics, funcExpr))
+        if (isDifferentiationAlreadyRejectedForReferenceParameter(semantics, funcExpr))
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             return;
@@ -7813,15 +7813,18 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
     return expr;
 }
 
-// Return the object whose declaration gives the address space of the storage that `expr` names,
-// such as `g` for `g[i].a.x`, by stripping `(...)`, `[i]`, `.field`, and single-component
+// Return the sub-expression of `expr` that determines the address space of the storage `expr`
+// names, such as `g` for `g[i].a.x`, by stripping `(...)`, `[i]`, `.field`, and single-component
 // swizzles. The groupshared checks use it to find the declaration that carries `groupshared`.
-static Expr* getObjectDeclaringAddressSpace(Expr* expr)
+//
+// TODO: This query exists only because an expression's checked information does not record its
+// address space; once it does, callers can read that instead.
+static Expr* getSubExpressionDeterminingAddressSpace(Expr* expr)
 {
-    // An address-space modifier such as `groupshared` sits on the declaration of a whole object,
-    // never on a part, so we walk out to that object. `getValidTypeForAddressOf` would walk these
-    // projections itself, but it judges a field access by the field's declaration and so loses the
-    // base object's address space (issue #14094).
+    // An address-space modifier such as `groupshared` sits on the declaration of a whole
+    // variable, never on a part of one, so we walk out to the variable. `getValidTypeForAddressOf`
+    // would walk these projections itself, but it judges a field access by the field's
+    // declaration and so loses the base variable's address space (issue #14094).
     //
     for (;;)
     {
@@ -7849,9 +7852,9 @@ static Expr* getObjectDeclaringAddressSpace(Expr* expr)
         else if (auto memberExpr = as<MemberExpr>(expr))
         {
             // We stop at a member reached through a pointer, because the pointer's own type
-            // carries the address space. We also stop at a member that is not a field of the
-            // object: a `static` field is a variable of its own, and a property or method names
-            // no part of the object's storage.
+            // carries the address space. We also stop at a member that is not a field stored in
+            // the base: a `static` field is a variable of its own, and a property or method names
+            // no part of the base's storage.
             //
             auto memberDecl = memberExpr->declRef.getDecl();
             if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
@@ -7877,18 +7880,18 @@ static bool isSpecializeWithArgTypesPlaceholder(Expr* arg)
            !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
 }
 
-// Return whether `arg`, or the operand of an implicit cast that `arg` is, has an error type. Such
-// an argument comes from an expression that already failed to check, so a storage diagnostic for
-// it would only repeat the reported error.
-static bool isErrorTypedArgument(Expr* arg)
+// Return whether `expr` has an error type, or is an implicit cast of an expression that has one.
+// The storage checks use it to skip an argument that already failed to check, since a storage
+// diagnostic for it would only repeat the reported error.
+static bool isErrorTypedOrCastFromErrorTyped(Expr* expr)
 {
-    if (as<ErrorType>(arg->type))
+    if (as<ErrorType>(expr->type))
         return true;
 
     // Coercion wraps an error-typed operand in an implicit cast to the parameter's type, so we
     // look through that cast.
     //
-    auto castExpr = as<ImplicitCastExpr>(arg);
+    auto castExpr = as<ImplicitCastExpr>(expr);
     return castExpr && as<ErrorType>(castExpr->arguments[0]->type);
 }
 
@@ -7898,9 +7901,9 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 {
     SLANG_ASSERT(arg);
 
-    // A part of an object is in the address space of the whole object, so we judge the whole.
+    // A part of a variable is in the address space of the whole variable, so we judge the whole.
     //
-    auto addressedExpr = getObjectDeclaringAddressSpace(arg);
+    auto addressedExpr = getSubExpressionDeterminingAddressSpace(arg);
     if (isSpecializeWithArgTypesPlaceholder(addressedExpr))
         return false;
 
@@ -7925,7 +7928,7 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn)
 {
     SLANG_ASSERT(paramIn && argIn && paramIn->hasModifier<HLSLGroupSharedModifier>());
-    if (isSpecializeWithArgTypesPlaceholder(argIn) || isErrorTypedArgument(argIn))
+    if (isSpecializeWithArgTypesPlaceholder(argIn) || isErrorTypedOrCastFromErrorTyped(argIn))
         return;
 
     // A `groupshared` parameter is a reference to a thread-group-shared location, so its argument
@@ -7951,9 +7954,12 @@ struct WrittenBackArgument
     // or otherwise `arg` itself.
     Expr* storage = nullptr;
 
-    // The parameter, or null for a receiver and for an argument of a call through a value of
-    // function type, which has no parameter declarations.
+    // The parameter, or null for a receiver and for an argument of a call whose callee has no
+    // declaration, such as `bwd_diff(f)(...)`.
     ParamDecl* param = nullptr;
+
+    // The position of the parameter in the callee's function type, or -1 for a receiver.
+    Index paramIndex = -1;
 
     bool isReceiver = false;
 
@@ -7982,7 +7988,8 @@ static void forEachWrittenBackArgument(
             continue;
         WrittenBackArgument written;
         written.arg = invoke->arguments[i];
-        if (isErrorTypedArgument(written.arg))
+        written.paramIndex = i;
+        if (isErrorTypedOrCastFromErrorTyped(written.arg))
             continue;
 
         // An implicitly converted argument goes through a temporary of the parameter's type, and
@@ -8041,12 +8048,6 @@ void SemanticsVisitor::checkGroupSharedArgumentsToExclusiveParams(
             if (callIsOperator && !written.isConverted())
                 return;
 
-            // The warning names the parameter, and a call through a value of function type has no
-            // parameter declarations to name.
-            //
-            if (!written.param && !written.isReceiver)
-                return;
-
             // Every invocation in the group can access thread-group-shared storage, so the
             // exclusive access holds only if no other invocation touches it during the call. The
             // compiler does not check that, so we warn.
@@ -8058,10 +8059,34 @@ void SemanticsVisitor::checkGroupSharedArgumentsToExclusiveParams(
             //
             ASTPrinter storagePrinter(m_astBuilder);
             storagePrinter.addExpr(written.storage);
+
+            // A callee without a declaration, such as `bwd_diff(f)`, has no parameter names or
+            // modifiers to point at, so we identify the parameter by its position and its mode in
+            // the function type.
+            //
+            if (!written.param && !written.isReceiver)
+            {
+                ASTPrinter calleePrinter(m_astBuilder);
+                calleePrinter.addExpr(invoke->functionExpr);
+                getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameterAtPosition{
+                    .callee = calleePrinter.getString(),
+                    .mode = funcType->getParamPassingMode(written.paramIndex),
+                    .paramNumber = int(written.paramIndex + 1),
+                    .storageText = storagePrinter.getString(),
+                    .arg = written.arg});
+                return;
+            }
+
             // The note points at what requires exclusive access: the parameter's `out` or `inout`
             // keyword, or for a receiver the `[mutating]` attribute, or else the method itself,
             // such as a `set` accessor or a method in HLSL source, where methods are mutating by
             // default.
+            //
+            // TODO: We read the passing mode and its location from the modifiers here, which
+            // duplicates what `findEffectiveThisParamInfo` and `getParamPassingMode` already
+            // decide and handles only the `[mutating]` and `out` modifiers. The locations belong
+            // in `ParamInfo`, so that this code can treat a receiver and an ordinary parameter
+            // alike through one query.
             //
             auto callee = calleeDeclRef.getDecl();
             ParamPassingMode mode = ParamPassingMode::BorrowInOut;
@@ -8138,7 +8163,7 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
 void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target, Expr* storage)
 {
     SLANG_ASSERT(target && storage);
-    if (isErrorTypedArgument(target))
+    if (isErrorTypedOrCastFromErrorTyped(target))
         return;
 
     // Consider this example:
@@ -8180,8 +8205,8 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
     while (auto parenExpr = as<ParenExpr>(wholeExpr))
         wholeExpr = parenExpr->base;
 
-    // A multi-element swizzle, such as `v.yz`, has no address of its own, so we judge the object
-    // it selects from.
+    // A multi-element swizzle, such as `v.yz`, has no address of its own, so we judge the
+    // vector or matrix it selects from.
     //
     Expr* addressedExpr = wholeExpr;
     if (auto swizzleExpr = as<SwizzleExpr>(wholeExpr))
@@ -8194,7 +8219,7 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
 
     // A write of the whole variable, such as `v = float4(0)`, stays a single store.
     //
-    auto baseExpr = getObjectDeclaringAddressSpace(addressedExpr);
+    auto baseExpr = getSubExpressionDeterminingAddressSpace(addressedExpr);
     if (baseExpr == wholeExpr)
         return;
 
