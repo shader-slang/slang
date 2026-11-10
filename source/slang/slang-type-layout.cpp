@@ -3425,7 +3425,7 @@ static bool getLLVMBuiltinTypeLayoutInfo(TargetRequest* targetReq, TargetBuiltin
         return false;
 
     // The query initializes LLVM's targets.
-    std::lock_guard<std::mutex> lock(Session::getSlangLLVMGlobalStateMutex());
+    std::lock_guard<std::mutex> lock(Session::getLLVMProcessStateMutex());
     SlangResult result = infoFunc(targetTriple, out);
     return result == SLANG_OK;
 }

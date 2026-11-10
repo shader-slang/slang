@@ -1301,7 +1301,7 @@ ISlangSharedLibrary* Session::getOrLoadSlangLLVM()
     return m_slangLLVM.get();
 }
 
-std::mutex& Session::getSlangLLVMGlobalStateMutex()
+std::mutex& Session::getLLVMProcessStateMutex()
 {
     static std::mutex mutex;
     return mutex;

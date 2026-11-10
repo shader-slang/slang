@@ -769,7 +769,7 @@ struct LLVMEmitter
         ComPtr<IArtifact> errorArtifact;
         {
             // Creating a builder initializes LLVM's targets and parses LLVM command-line options.
-            std::lock_guard<std::mutex> lock(Session::getSlangLLVMGlobalStateMutex());
+            std::lock_guard<std::mutex> lock(Session::getLLVMProcessStateMutex());
             SLANG_RETURN_ON_FAIL(builderFunc(
                 ILLVMBuilder::getTypeGuid(),
                 builder.writeRef(),
