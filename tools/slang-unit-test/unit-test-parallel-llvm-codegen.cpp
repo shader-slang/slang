@@ -11,51 +11,69 @@
 
 using namespace Slang;
 
-// Several threads make the first LLVM code generation request of a fresh global session at the
-// same time, each on its own fully linked component. That request loads slang-llvm into the global
-// session and, in the first such request of the process, initializes LLVM's process-global target
-// registry and command-line options. Each iteration uses a new global session so that every
-// iteration starts with slang-llvm not yet loaded into that session.
+// Several threads make the first LLVM code generation request of fresh global sessions at the same
+// time. The documented parallel-backend workflow fans out different linked components, entry points
+// or targets, so each thread compiles its own linked component. The threads alternate between two
+// global sessions, which load slang-llvm separately but share LLVM's process-wide state.
+//
+// Every iteration races the per-session load of slang-llvm and the creation of LLVM builders.
+// LLVM's target registry and option storage are initialized only by the first request in a
+// process, and slang-test loads slang-llvm at startup and usually runs other LLVM tests first, so
+// inside slang-test this test catches a regression of that initialization only occasionally.
 SLANG_UNIT_TEST(parallelFirstLLVMCodegen)
 {
     static constexpr int kIterationCount = 4;
     static constexpr int kThreadCount = 8;
+    static constexpr int kGlobalSessionCount = 2;
 
     for (int iteration = 0; iteration < kIterationCount; ++iteration)
     {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-
-        slang::TargetDesc targetDesc = {};
-        targetDesc.format = SLANG_SHADER_LLVM_IR;
-        slang::SessionDesc sessionDesc = {};
-        sessionDesc.targetCount = 1;
-        sessionDesc.targets = &targetDesc;
-        ComPtr<slang::ISession> session;
-        SLANG_CHECK_ABORT(
-            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
-
+        ComPtr<slang::IGlobalSession> globalSessions[kGlobalSessionCount];
+        ComPtr<slang::ISession> sessions[kGlobalSessionCount];
+        slang::IModule* modules[kGlobalSessionCount] = {};
+        ComPtr<slang::IEntryPoint> entryPoints[kGlobalSessionCount];
         ComPtr<slang::IBlob> diagnostics;
-        slang::IModule* module =
-            session->loadModule("tests/llvm/parallel-first-codegen.slang", diagnostics.writeRef());
-        SLANG_CHECK_ABORT(module != nullptr);
-        ComPtr<slang::IEntryPoint> entryPoint;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(module->findEntryPointByName("computeMain", entryPoint.writeRef())));
+        for (int sessionIndex = 0; sessionIndex < kGlobalSessionCount; ++sessionIndex)
+        {
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(
+                    SLANG_API_VERSION,
+                    globalSessions[sessionIndex].writeRef()) == SLANG_OK);
+
+            slang::TargetDesc targetDesc = {};
+            targetDesc.format = SLANG_SHADER_LLVM_IR;
+            slang::SessionDesc sessionDesc = {};
+            sessionDesc.targetCount = 1;
+            sessionDesc.targets = &targetDesc;
+            SLANG_CHECK_ABORT(
+                globalSessions[sessionIndex]->createSession(
+                    sessionDesc,
+                    sessions[sessionIndex].writeRef()) == SLANG_OK);
+
+            modules[sessionIndex] = sessions[sessionIndex]->loadModule(
+                "tests/llvm/parallel-first-codegen.slang",
+                diagnostics.writeRef());
+            SLANG_CHECK_ABORT(modules[sessionIndex] != nullptr);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(modules[sessionIndex]->findEntryPointByName(
+                "computeMain",
+                entryPoints[sessionIndex].writeRef())));
+        }
 
         ComPtr<slang::IComponentType> programs[kThreadCount];
-        for (auto& program : programs)
+        for (int threadIndex = 0; threadIndex < kThreadCount; ++threadIndex)
         {
-            slang::IComponentType* components[] = {module, entryPoint.get()};
+            int sessionIndex = threadIndex % kGlobalSessionCount;
+            slang::IComponentType* components[] = {
+                modules[sessionIndex],
+                entryPoints[sessionIndex].get()};
             ComPtr<slang::IComponentType> composite;
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(sessions[sessionIndex]->createCompositeComponentType(
                 components,
                 SLANG_COUNT_OF(components),
                 composite.writeRef(),
                 diagnostics.writeRef())));
-            SLANG_CHECK_ABORT(
-                SLANG_SUCCEEDED(composite->link(program.writeRef(), diagnostics.writeRef())));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                composite->link(programs[threadIndex].writeRef(), diagnostics.writeRef())));
         }
 
         // The workers spin until all of them are running so that their first code generation
@@ -87,10 +105,11 @@ SLANG_UNIT_TEST(parallelFirstLLVMCodegen)
         for (auto& thread : threads)
             thread.join();
 
-        // We check for slang-llvm only after the workers finish, so that their requests are the
-        // ones that load it.
+        // We check for slang-llvm only after the workers finish, because the check loads it into
+        // the process through the downstream-compiler path, and a preloaded slang-llvm makes the
+        // race much rarer. Without slang-llvm every worker fails, so results[0] stands for all.
         if (SLANG_FAILED(results[0]) &&
-            SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM)))
+            SLANG_FAILED(globalSessions[0]->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM)))
         {
             SLANG_IGNORE_TEST;
         }
