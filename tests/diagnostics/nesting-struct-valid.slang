@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 // All declaration kinds that ARE allowed inside a struct.
 // No nesting-validation diagnostics (E31400) should fire.

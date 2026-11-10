@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-E
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):-E
 //TEST:SIMPLE(filecheck=CHECK):-E
 
 // GCC: <source>:1:9: error: '##' cannot appear at either end of a macro expansion.
