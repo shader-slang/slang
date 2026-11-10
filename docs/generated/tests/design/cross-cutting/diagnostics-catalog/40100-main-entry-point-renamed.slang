@@ -15,7 +15,7 @@
 // that name in the emitted source. The compiler renames it and warns; the CHECK
 // pins the renamed-entry-point warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target metal -entry main -stage compute
 RWStructuredBuffer<int> o;
 
 [numthreads(1,1,1)]

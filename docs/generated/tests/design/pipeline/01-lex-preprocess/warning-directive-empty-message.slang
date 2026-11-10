@@ -13,7 +13,7 @@
 // message axis. The warning diagnostic must still be emitted with
 // nothing after `#warning:`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 #warning
 /*CHECK:

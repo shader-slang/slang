@@ -14,7 +14,7 @@
 // and CHECK pins the deprecation diagnostic code, which fires only if the
 // attribute was resolved and its use-site check ran.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 [deprecated("use bar instead")]
 int foo() { return 1; }

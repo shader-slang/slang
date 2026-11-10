@@ -19,7 +19,7 @@
 // diagnostic is the only evidence the extension was dropped; the companion
 // `func-extension-dropped-declaration-fails-use.slang` shows the later failure.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;

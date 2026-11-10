@@ -15,7 +15,7 @@
 // is `warning`, the user-facing name of `Severity::Warning`, distinguishing it
 // from the `error` rendering asserted in severity-name-error.slang.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 int main()
 {
     int x = (1, 2);

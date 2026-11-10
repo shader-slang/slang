@@ -16,7 +16,7 @@
 // recorded verbatim: "unknown value for option '-line-directive-mode'. Valid
 // values are 'none, source-map, default, standard, glsl'".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -line-directive-mode bogus -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -line-directive-mode bogus -entry main -stage compute
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

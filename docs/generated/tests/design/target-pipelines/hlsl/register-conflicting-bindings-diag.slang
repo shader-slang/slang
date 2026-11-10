@@ -13,7 +13,7 @@
 // The compiler must flag the overlap, since two resources cannot
 // share a single u register.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> bufA : register(u0);
 RWStructuredBuffer<float> bufB : register(u0);

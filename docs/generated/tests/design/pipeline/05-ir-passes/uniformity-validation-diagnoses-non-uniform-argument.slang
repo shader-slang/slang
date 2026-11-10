@@ -16,7 +16,7 @@
 // diagnostic to the argument position, so the test fails both if the pass
 // stops running and if it starts reporting somewhere else.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main -validate-uniformity
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main -validate-uniformity
 
 RWStructuredBuffer<int> outBuf;
 

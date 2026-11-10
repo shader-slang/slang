@@ -14,7 +14,7 @@
 // caret-anchored CHECK pins code 15611 and the unmatched-pop message at the
 // pragma's column.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 #pragma warning(pop)
 //CHECK:        ^^^ E15611
 //CHECK:        ^^^ detected #pragma warning(pop) with no corresponding #pragma warning(push)

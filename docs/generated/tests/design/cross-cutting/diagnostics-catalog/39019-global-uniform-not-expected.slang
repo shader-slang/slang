@@ -14,7 +14,7 @@
 // A global ordinary variable without `uniform` or `static`
 // becomes an implicit shader parameter, triggering E39019.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry main -profile sm_6_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry main -profile sm_6_0
 
 float someGlobal;
 

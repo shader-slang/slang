@@ -15,7 +15,7 @@
 // compiles. CHECK pins the E20101 warning code and the observed message.
 // This is a warning, so the compile succeeds.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
 
 [numthreads(1, 1, 1)]
 void main()

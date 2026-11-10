@@ -21,7 +21,7 @@
 // `-debug-info-include-source` was added in #12202 to decouple source
 // embedding from the `-g` level; this test pins the guard that came with it.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute -g0 -debug-info-include-source
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target spirv -entry main -stage compute -g0 -debug-info-include-source
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

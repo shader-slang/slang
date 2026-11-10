@@ -26,7 +26,7 @@
 // `capability-version-raise-accepted-emission.slang`. Only the pair shows that
 // the check is about the version family rather than about the atom.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -profile spirv_1_3 -capability SPV_KHR_cooperative_matrix -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target spirv -profile spirv_1_3 -capability SPV_KHR_cooperative_matrix -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 

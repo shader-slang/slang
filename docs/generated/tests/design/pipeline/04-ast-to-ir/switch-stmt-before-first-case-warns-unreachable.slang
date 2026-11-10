@@ -17,7 +17,7 @@
 // from (semantic checking itself accepts the statement, and the emitted code
 // simply drops it).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv-asm -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv-asm -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

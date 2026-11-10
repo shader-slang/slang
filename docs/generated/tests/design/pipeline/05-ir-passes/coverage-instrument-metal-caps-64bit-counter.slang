@@ -15,7 +15,7 @@
 // silently honoured or silently dropped. E45115 is pinned by code, and its
 // text is matched loosely because the message is long.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target metal -stage compute -entry main -trace-coverage -trace-coverage-counter-width 64
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target metal -stage compute -entry main -trace-coverage -trace-coverage-counter-width 64
 
 RWStructuredBuffer<int> outBuf;
 

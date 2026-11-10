@@ -15,7 +15,7 @@
 // be loaded; the CHECK pins the library-does-not-exist error so a missing
 // library never degrades into a silent no-op.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-r /nonexistent-dir-xyz/lib.slang-module -target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-r /nonexistent-dir-xyz/lib.slang-module -target hlsl -entry main -stage compute
 [numthreads(1,1,1)]
 void main() {}
 

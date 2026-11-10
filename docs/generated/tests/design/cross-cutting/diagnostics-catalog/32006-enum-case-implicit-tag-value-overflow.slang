@@ -14,7 +14,7 @@
 // Setting an explicit case to the max of int and letting the next
 // implicit case overflow triggers E32006.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 enum E
 {

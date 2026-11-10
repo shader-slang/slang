@@ -15,7 +15,7 @@
 // parameter triggers the uniformity-validation warning under
 // -validate-uniformity.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -profile cs_6_0 -validate-uniformity
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -profile cs_6_0 -validate-uniformity
 
 RWStructuredBuffer<int> output;
 

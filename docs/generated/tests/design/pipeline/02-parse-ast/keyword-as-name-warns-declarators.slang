@@ -17,7 +17,7 @@
 // on that declarator's caret span. If the check lived on only one declaration
 // path, four of the five sites would be silent.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 static int enum = 0;
 //CHECK:   ^^^^ warning E20103

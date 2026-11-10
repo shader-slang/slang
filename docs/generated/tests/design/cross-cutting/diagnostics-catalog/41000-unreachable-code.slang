@@ -14,7 +14,7 @@
 // A statement that follows an unconditional return is unreachable
 // and the IR validation pass diagnoses it.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
 
 [numthreads(1,1,1)]
 void main() {

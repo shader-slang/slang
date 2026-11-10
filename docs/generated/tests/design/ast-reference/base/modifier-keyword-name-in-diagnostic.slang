@@ -16,7 +16,7 @@
 // been stored on the modifier. The diagnostic is a warning, so the
 // declaration it adorns still checks.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 [NoSuchAttributeXyz]
 /*CHECK:

@@ -17,7 +17,7 @@
 // `16` exercises exactly that screen: the CHECK pins the stable
 // error code and the option name, so a rename of either is caught.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -trace-coverage-counter-width 16
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -entry main -stage compute -trace-coverage-counter-width 16
 //CHECK: E45113
 //CHECK: accepts only `32` or `64`
 

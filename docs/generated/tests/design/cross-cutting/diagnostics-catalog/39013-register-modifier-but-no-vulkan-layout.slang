@@ -14,7 +14,7 @@
 // A combined Sampler2D using `register(...)` for D3D but without
 // `[[vk::binding(...)]]` triggers E39013.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv -stage compute -entry main
 
 Sampler2D<float4> tex : register(t0);
 

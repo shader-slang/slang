@@ -16,7 +16,7 @@
 // the caret-anchored span the runner reports, and E40100 for the
 // entry-point rename, which are all the diagnostics this compile emits.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target metal -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 

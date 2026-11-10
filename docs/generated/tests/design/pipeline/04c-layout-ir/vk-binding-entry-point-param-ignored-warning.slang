@@ -15,7 +15,7 @@
 // diagnostic to the parameter name so a silently dropped attribute would
 // fail the test.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

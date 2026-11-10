@@ -12,7 +12,7 @@
 // Narrow-type variation on operator-shift-overflow. An `int8_t`
 // shifted by 8 exceeds the 8-bit width and the pass diagnoses it.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry main
 
 uniform int8_t a;
 uniform RWStructuredBuffer<int8_t> buf;

@@ -14,7 +14,7 @@
 // diagnostic fires regardless of target because this modifier is never honored
 // in this position. CHECK pins E38010 and the attribute name in the message.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target spirv -emit-spirv-directly
 
 struct Pc
 {

@@ -14,7 +14,7 @@
 // Two parameters with identical `register(t0)` bindings trigger
 // E39001.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl
 
 Texture2D a : register(t0);
 Texture2D b : register(t0);

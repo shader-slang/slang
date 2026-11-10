@@ -16,7 +16,7 @@
 // code, which shows the name is not in the public target set rather
 // than being an accepted-but-empty back end.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target slang -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target slang -entry main -stage compute
 //CHECK: unknown code generation target 'slang'
 // CHECK: E00013
 

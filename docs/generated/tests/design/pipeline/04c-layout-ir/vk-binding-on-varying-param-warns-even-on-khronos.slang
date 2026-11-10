@@ -15,7 +15,7 @@
 // the attribute on resource parameters - it must still be reported as
 // ignored. The caret annotation pins E38010 to the varying parameter.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv-asm -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv-asm -entry main -stage compute
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
