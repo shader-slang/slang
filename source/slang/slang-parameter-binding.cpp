@@ -4456,12 +4456,47 @@ static void _maybeApplyHLSLToVulkanShifts(
     }
 }
 
+/// Reports an error when two entry points of `program` come from the same module and that module
+/// declares module-scope varyings.
+///
+/// Every entry point owns all of the module-scope varyings of its module, so the two entry points
+/// would both own each of those varyings. Only `EntryPoint::create` fills an entry point's list, so
+/// pass-through and deserialized placeholders, which have no function declaration, own no
+/// varyings and are skipped with every other entry point whose list is empty.
+static void diagnoseEntryPointsSharingGlobalVaryings(ComponentType* program, DiagnosticSink* sink)
+{
+    Dictionary<Module*, EntryPoint*> firstEntryPointOfModule;
+    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    {
+        auto entryPoint = program->getEntryPoint(i);
+        if (entryPoint->getGlobalVaryings().getCount() == 0)
+            continue;
+        SLANG_ASSERT(entryPoint->getFuncDecl());
+        auto module = entryPoint->getModule();
+        EntryPoint* firstEntryPoint = nullptr;
+        if (!firstEntryPointOfModule.tryGetValue(module, firstEntryPoint))
+        {
+            firstEntryPointOfModule.add(module, entryPoint);
+            continue;
+        }
+        sink->diagnose(Diagnostics::EntryPointsShareGlobalVaryings{
+            .module = module->getNameObj(),
+            .entryPoint = entryPoint->getFuncDecl(),
+            .otherEntryPoint = firstEntryPoint->getFuncDecl()});
+    }
+}
+
 RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_AST_BUILDER_RAII(targetProgram->getProgram()->getLinkage()->getASTBuilder());
 
     auto program = targetProgram->getProgram();
     auto targetReq = targetProgram->getTargetReq();
+
+    // Laying out a program is the one step that code generation, `-no-codegen` checking and
+    // reflection all take once the program's entry points are fixed, so the check runs here. It
+    // runs once per target, so a compile for several targets reports it once for each.
+    diagnoseEntryPointsSharingGlobalVaryings(program, sink);
 
     RefPtr<ProgramLayout> programLayout = new ProgramLayout();
     programLayout->targetProgram = targetProgram;

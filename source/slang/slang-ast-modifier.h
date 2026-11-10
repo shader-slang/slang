@@ -137,6 +137,22 @@ class FromCoreModuleModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a module that declares GLSL-style module-scope varyings (see `isGlobalVaryingVar`). The
+// builtin core and `glsl` modules never carry it. "Legacy" names the GLSL-style idiom, which Slang
+// deprecates, not the legacy language version: a module in any source language, GLSL included,
+// gets the marker.
+//
+// `checkAndMarkGlobalVaryingVarDecl` adds the marker while declarations are checked. The marker
+// exists because `checkModule` reports W30628 before `Module::_collectShaderParams` builds the
+// list of the module's varyings (`Module::getGlobalVaryings`). Both select declarations with the
+// same test, so the marker and a non-empty list describe the same modules. `visitImportDecl` also
+// reads the marker to reject an import of such a module.
+FIDDLE()
+class HasLegacyGlobalVaryingsModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class PrefixModifier : public Modifier
 {

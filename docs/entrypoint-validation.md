@@ -7,10 +7,12 @@ preventing crashes and invalid code generation downstream.
 
 ## Scope
 
-The validation performed here is **strictly limited to entry-point parameters
-and return types**. Types that are valid internally but wrong as a shader
-varying are only rejected when they appear at an entry-point boundary; all
-other uses are left unaffected.
+The validation performed here is **strictly limited to an entry point's inputs
+and outputs**: its parameters, its return type, and the module-scope varyings
+it owns (every `in`/`out`/`inout` variable declared at module scope in the
+module of the entry-point function). Types that are valid internally but wrong
+as a shader varying are only rejected when they appear at an entry-point
+boundary; all other uses are left unaffected.
 
 ## Motivation
 
@@ -25,7 +27,8 @@ diagnostics.
 Validation lives in `validateEntryPoint()` in
 `source/slang/slang-check-shader.cpp`. After the existing return-type checks
 (resource types, array types), a validation pass walks each varying parameter
-type and the return type, checking them against a **data-driven rule table**.
+type, each module-scope varying the entry point owns, and the return type,
+checking them against a **data-driven rule table**.
 
 ### Rule Table
 

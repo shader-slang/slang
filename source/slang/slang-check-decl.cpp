@@ -576,6 +576,57 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
             }
         }
+
+        if (isGlobalVaryingVar(decl) && !isFromCoreModule(decl))
+            checkAndMarkGlobalVaryingVarDecl(decl);
+    }
+
+    /// Checks a module-scope varying (see `isGlobalVaryingVar`) declared outside the builtin core
+    /// and `glsl` modules, and adds `HasLegacyGlobalVaryingsModifier` to its module.
+    ///
+    /// Module-scope varyings are a GLSL idiom: Slang and HLSL entry points declare their inputs and
+    /// outputs as parameters. We therefore reject them in HLSL and in Slang 2025 and later, and
+    /// warn about them in legacy Slang. We also restrict them to the top level of the module, in
+    /// every language version. The restriction is a policy that keeps the deprecated idiom to the
+    /// form that GLSL code has, since GLSL has no namespaces. HLSL and Slang 2025 and later reject
+    /// every module-scope varying anyway, so the restriction changes legacy Slang only: there, a
+    /// module-scope varying inside a namespace is an error rather than a deprecation warning.
+    void checkAndMarkGlobalVaryingVarDecl(VarDecl* decl)
+    {
+        auto moduleDecl = getModuleDecl(decl);
+        if (!moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+            addModifier(moduleDecl, getASTBuilder()->create<HasLegacyGlobalVaryingsModifier>());
+
+        if (as<NamespaceDecl>(getParentDecl(decl)))
+            getSink()->diagnose(Diagnostics::GlobalVaryingNotAtTopLevel{.decl = decl});
+
+        switch (getSourceLanguage())
+        {
+        case SourceLanguage::HLSL:
+            getSink()->diagnose(
+                Diagnostics::GlobalVaryingNotSupported{.language = "HLSL", .decl = decl});
+            break;
+        case SourceLanguage::Slang:
+            if (getShared()->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2025)
+            {
+                getSink()->diagnose(Diagnostics::GlobalVaryingNotSupported{
+                    .language = "Slang 2025 and later",
+                    .decl = decl});
+            }
+            else
+            {
+                getSink()->diagnose(Diagnostics::DeprecatedGlobalVarying{.decl = decl});
+            }
+            break;
+        case SourceLanguage::GLSL:
+            // GLSL is the dialect that module-scope varyings belong to.
+            break;
+        default:
+            // No other source language has a rule for module-scope varyings. That includes
+            // `Unknown`, which `getSourceLanguage` returns when the checking context has no
+            // translation unit.
+            break;
+        }
     }
 
     void visitDecl(Decl* decl)
@@ -1607,6 +1658,21 @@ bool isGlobalDecl(Decl* decl)
 bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl)
 {
     return funcDecl->hasModifier<UnsafeForceInlineEarlyAttribute>();
+}
+
+/// Is `decl` a module-scope varying, that is, a variable declared `in`, `out` or `inout` outside
+/// any function or type? (`inout` counts because `InOutModifier` derives from `OutModifier`.) A
+/// module-scope varying is either at the top level of its module, directly in the module or in an
+/// `__include`d file, or inside a namespace, which E31401 rejects.
+///
+/// GLSL-style shaders read their inputs and write their outputs through such variables instead of
+/// through entry-point parameters. Identifiers in the code call them "global varyings"; comments
+/// and diagnostic messages call them "module-scope varyings".
+bool isGlobalVaryingVar(VarDeclBase* decl)
+{
+    if (!isGlobalDecl(decl))
+        return false;
+    return decl->hasModifier<InModifier>() || decl->hasModifier<OutModifier>();
 }
 
 /// Is `decl` a global shader parameter declaration?
@@ -5475,6 +5541,53 @@ void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
     }
 }
 
+/// Appends to `outFuncs` every function in `containerDecl` that has a `[shader(...)]` attribute,
+/// including functions in namespaces, `__include`d files and non-generic structs, in declaration
+/// order.
+static void collectShaderAttributedFuncs(ContainerDecl* containerDecl, List<FuncDecl*>& outFuncs)
+{
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        auto innerDecl = memberDecl;
+        if (auto genericDecl = as<GenericDecl>(innerDecl))
+            innerDecl = genericDecl->inner;
+        if (auto funcDecl = as<FuncDecl>(innerDecl))
+        {
+            if (funcDecl->hasModifier<EntryPointAttribute>())
+                outFuncs.add(funcDecl);
+        }
+        else if (
+            as<NamespaceDeclBase>(memberDecl) || as<FileDecl>(memberDecl) ||
+            as<StructDecl>(memberDecl))
+        {
+            collectShaderAttributedFuncs(as<ContainerDecl>(memberDecl), outFuncs);
+        }
+    }
+}
+
+/// Warns when `moduleDecl`, which declares module-scope varyings, has more than one function with a
+/// `[shader(...)]` attribute.
+///
+/// Each entry point owns every module-scope varying of its module, so two entry points from such
+/// a module cannot be part of one program; composing them is an error (E38049). A `[shader]`
+/// attribute is only evidence that a function will be an entry point, so at module level we warn
+/// about the potential conflict, whatever the stages of the functions. The warning counts only
+/// `[shader]` functions because that attribute is the explicit marker of an intended entry point.
+/// A function that entry-point discovery makes into an entry point without one, such as a
+/// `[numthreads]` function, is not counted, and E38049 still rejects composing it.
+static void diagnoseShaderFunctionsSharingGlobalVaryings(
+    DiagnosticSink* sink,
+    ModuleDecl* moduleDecl)
+{
+    List<FuncDecl*> shaderFuncs;
+    collectShaderAttributedFuncs(moduleDecl, shaderFuncs);
+    if (shaderFuncs.getCount() < 2)
+        return;
+    sink->diagnose(Diagnostics::ShaderFunctionsShareGlobalVaryings{
+        .func = shaderFuncs[1],
+        .firstFunc = shaderFuncs[0]});
+}
+
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
     // When we are dealing with code from the core modules,
@@ -5697,6 +5810,12 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // Furthermore, because a fully checked function will have checked
     // its body, this also means that all function bodies and the
     // declarations they contain should be fully checked.
+
+    // `HasLegacyGlobalVaryingsModifier` is added while the modifiers of each module-scope varying
+    // are checked, so it is complete only after the loop above has checked every declaration.
+    // Only a module with the marker can have entry points that share varyings.
+    if (moduleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+        diagnoseShaderFunctionsSharingGlobalVaryings(getSink(), moduleDecl);
 }
 
 static bool _hasNoDiffReturnSignature(CallableDecl* decl, Type* type)
@@ -18802,6 +18921,17 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     // it later during code generation.
     auto importedModuleDecl = importedModule->getModuleDecl();
     decl->importedModuleDecl = importedModuleDecl;
+
+    // An entry point owns only the module-scope varyings of its own module (see
+    // `EntryPoint::getGlobalVaryings`). An import would let the entry points of the importing
+    // module, and of any module that imports it in turn, name varyings that they do not own, so
+    // we reject every import of a module that declares module-scope varyings.
+    if (importedModuleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
+    {
+        getSink()->diagnose(Diagnostics::ImportedModuleHasGlobalVaryings{
+            .module = name,
+            .location = decl->moduleNameAndLoc.loc});
+    }
 
     // Add the declarations from the imported module into the scope
     // that the `import` declaration is set to extend.

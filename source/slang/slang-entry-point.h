@@ -238,6 +238,29 @@ public:
         m_inferredCapabilityRequirements = caps;
     }
 
+    /// Get the module-scope varyings that this entry point owns, in declaration order. They are
+    /// inputs and outputs of the entry point just as its varying parameters are, and semantic
+    /// checking validates them as such.
+    ///
+    /// An entry point owns every module-scope varying declared in the module of its function,
+    /// whether or not the function uses it. We define ownership by declaration rather than by use
+    /// so that the inputs and outputs of an entry point follow from the declarations of its module
+    /// alone: deciding them needs no front-end walk of the call graph, and they do not change when
+    /// a function body does.
+    ///
+    /// The IR pass `translateGlobalVaryingVar` gives an entry point the module-scope varyings that
+    /// it reaches. A module that declares module-scope varyings cannot be imported
+    /// (`visitImportDecl`), so the varyings that an entry point can name are those of its own
+    /// module, which it owns, and the builtins of the core and `glsl` modules, such as
+    /// `gl_Position`, which no entry point owns. Checking the owned list is therefore conservative
+    /// for code that the entry point reaches through `import`. Link-time resolution of an `extern`
+    /// declaration needs no `import`, so a function of another module that is linked in that way
+    /// can reach varyings that the checks of this list do not see. A program also cannot contain
+    /// two entry points of one module with module-scope varyings
+    /// (`diagnoseEntryPointsSharingGlobalVaryings`), so each owned varying has one owner in a
+    /// program.
+    List<VarDeclBase*> const& getGlobalVaryings() { return m_globalVaryings; }
+
     /// Marks an entry selected through a checked structural ray-tracing conformance.
     void markAsStructuralRayTracingEntryPoint()
     {
@@ -381,6 +404,10 @@ private:
     // `getInferredCapabilityRequirements`). Seeded from the function declaration's own
     // requirements and finalized during `validateEntryPoint`.
     CapabilitySetVal* m_inferredCapabilityRequirements = nullptr;
+
+    // The module-scope varyings that the entry point owns (see `getGlobalVaryings`). `create`
+    // copies them from the module of the function; placeholder entry points own none.
+    List<VarDeclBase*> m_globalVaryings;
 };
 
 } // namespace Slang

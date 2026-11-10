@@ -3974,6 +3974,35 @@ err(
 )
 
 err(
+    "global-varying-not-supported",
+    30626,
+    "module-scope varying '~decl:Decl' is not supported in ~language",
+    span { loc = "decl:Decl", message = "module-scope varyings are a GLSL feature; declare '~decl' as an entry-point parameter instead" }
+)
+
+warning(
+    "deprecated-global-varying",
+    30627,
+    "module-scope varying '~decl:Decl' is deprecated",
+    span { loc = "decl:Decl", message = "module-scope varyings are intended for the GLSL dialect only, and support for them in Slang will be removed in a later compiler release; declare '~decl' as an entry-point parameter instead" }
+)
+
+warning(
+    "shader-functions-share-global-varyings",
+    30628,
+    "several '[shader]' functions in a module with module-scope varyings",
+    span { loc = "func:Decl", message = "'~func' and '~firstFunc' both have a '[shader]' attribute in a module that declares module-scope varyings; if both become entry points of one program, each would own all of those varyings" },
+    note { message = "'~firstFunc' is declared here", span { loc = "firstFunc:Decl" } }
+)
+
+err(
+    "global-varying-user-semantic",
+    30629,
+    "user semantic on a module-scope varying is not supported when targeting ~target",
+    span { loc = "semantic:Modifier", message = "when targeting ~target, a module-scope varying can only have a system-value ('SV_') semantic; remove the semantic, or declare the varying with a struct type whose fields carry the semantics" }
+)
+
+err(
     "generic-value-parameter-type-not-supported",
     30624,
     "generic value parameter type '~type:Type' is not supported; only integer and enum types are allowed",
@@ -4282,6 +4311,13 @@ err(
     31400,
     "declaration not allowed in this context",
     span { loc = "decl:Decl", message = "~childKind declaration is not allowed inside ~parentKind." }
+)
+
+err(
+    "global-varying-not-at-top-level",
+    31401,
+    "module-scope varying '~decl:Decl' must be declared at the top level of its module",
+    span { loc = "decl:Decl", message = "'~decl' is declared inside a namespace" }
 )
 
 --
@@ -4954,6 +4990,14 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
+warning(
+    "entry-point-varying-param-with-global-varyings",
+    38044,
+    "entry point has varying parameters and also owns module-scope varyings",
+    span { loc = "param:Decl", message = "'~param' is a varying parameter of an entry point that also owns module-scope varyings; this will be an error in a future compiler release" },
+    note { message = "module-scope varying '~globalVarying' is declared here", span { loc = "globalVarying:Decl" } }
+)
+
 err(
     "geometry-shader-missing-output-stream",
     38045,
@@ -4980,6 +5024,22 @@ err(
     38048,
     "mesh shader missing OutputVertices/OutputIndices output",
     span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must declare both an 'OutputVertices' and an 'OutputIndices' output parameter" }
+)
+
+err(
+    "entry-points-share-global-varyings",
+    38049,
+    "two entry points of a program come from a module with module-scope varyings",
+    span { loc = "entryPoint:Decl", message = "entry points '~entryPoint' and '~otherEntryPoint' both come from module '~module:Name', which declares module-scope varyings; each entry point owns all of them, so a program can contain only one of these entry points" },
+    note { message = "'~otherEntryPoint' is declared here", span { loc = "otherEntryPoint:Decl" } }
+)
+
+-- Attached to errors about a module-scope varying that do not name the entry point that owns it.
+standalone_note(
+    "global-varying-owned-by-entry-point",
+    -1,
+    "'~decl:Decl' belongs to entry point '~entryPoint:Name', which owns every module-scope varying of its module, whether or not it uses it",
+    span { loc = "decl:Decl" }
 )
 
 err(
@@ -5024,6 +5084,13 @@ err(
     39999,
     "import failed due to compilation error",
     span { loc = "location", message = "import of module '~module' failed because of a compilation error" }
+)
+
+err(
+    "imported-module-has-global-varyings",
+    38208,
+    "cannot import a module that declares module-scope varyings",
+    span { loc = "location", message = "module '~module:Name' declares module-scope varyings, which belong only to the entry points declared in that module" }
 )
 
 err(
