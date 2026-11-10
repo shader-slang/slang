@@ -8,7 +8,7 @@
 // it is that compilation now ends in an ordinary error. A plain `.expected` comparison records the
 // result code, so it is what pins that.
 
-//TEST:SIMPLE(exit-code=-1): -target llvm-shader-ir -entry computeMain -stage compute
+//TEST:SIMPLE: -target llvm-shader-ir -entry computeMain -stage compute
 
 int addOne(int x)
 {

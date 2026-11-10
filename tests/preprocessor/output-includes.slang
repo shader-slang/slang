@@ -1,4 +1,4 @@
-//TEST:SIMPLE(exit-code=-1):-output-includes
+//TEST:SIMPLE:-output-includes
 
 int foo() { return 0; }
 

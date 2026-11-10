@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE:
 
 void foo()
 {

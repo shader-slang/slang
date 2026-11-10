@@ -137,7 +137,7 @@ The `.expected` file of test line N is `foo.slang.N.expected`. For line 0 it is 
 
 ### Exit code of tests
 
-A `SIMPLE`, `INTERPRET` or `REFLECTION` test checks the exit code of the tool, in addition to its output. This is true for tests with the `filecheck=PREFIX` option, tests with the `diag=PREFIX` option and tests that compare the output with an `.expected` file. The test fails if the exit code is not the expected one. The expected exit code is 0 by default.
+A `SIMPLE`, `INTERPRET` or `REFLECTION` test with the `filecheck=PREFIX` or `diag=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines or the diagnostic annotations. The test fails if the exit code is not the expected one. The expected exit code is 0 by default. A test that compares the output with an `.expected` file does not need this check, because the file contains the line `result code = N`.
 
 A test that must fail sets the expected exit code with the `exit-code=N` option:
 

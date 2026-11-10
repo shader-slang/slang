@@ -3,7 +3,7 @@
 // Regression test for a compiler crash occuring when a generic with integer
 // value parameters is specialized to a non-constant (and hence invalid) value.
 
-//TEST:SIMPLE(exit-code=-1):-target dxil-assembly -entry main -stage compute
+//TEST:SIMPLE:-target dxil-assembly -entry main -stage compute
 
 void main()
 {

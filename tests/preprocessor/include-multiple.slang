@@ -1,4 +1,4 @@
-//TEST:SIMPLE(exit-code=-1):
+//TEST:SIMPLE:
 // #include support
 
 int foo() { return 0; }

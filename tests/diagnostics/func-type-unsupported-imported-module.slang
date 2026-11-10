@@ -11,7 +11,7 @@
 // column against a source line, which a diagnostic with no position cannot satisfy.
 
 //TEST:COMPILE: tests/diagnostics/func-type-unsupported-imported-module-lib.slang -o tests/diagnostics/func-type-unsupported-imported-module-lib.slang-module
-//TEST:SIMPLE(exit-code=-1): -r tests/diagnostics/func-type-unsupported-imported-module-lib.slang-module -target cpp -entry computeMain -stage compute
+//TEST:SIMPLE: -r tests/diagnostics/func-type-unsupported-imported-module-lib.slang-module -target cpp -entry computeMain -stage compute
 
 import "func-type-unsupported-imported-module-lib";
 
