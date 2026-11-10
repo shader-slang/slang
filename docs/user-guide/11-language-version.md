@@ -36,11 +36,7 @@ When the language version is set to `legacy`, the compiler behavior will be cons
 - A `module` declaration is not required at the start of each module.
 - Module-scope `in`/`out`/`inout` variables (GLSL-style global varyings) are accepted with a deprecation
   warning. They are intended for the GLSL dialect only; declare entry-point inputs and outputs as
-  parameters instead. In every language version, including GLSL source, each entry point owns all of
-  the module-scope varyings of its module and is checked against them like parameters. Such a
-  variable must be at the top level of its module and, for SPIR-V, GLSL and WGSL targets, cannot
-  have a user semantic of its own. A module that declares them cannot be imported, and a program
-  cannot contain two entry points from that module.
+  parameters instead. The rules in [Module-scope varyings](#module-scope-varyings) apply to them.
   See GitHub issue [#14375](https://github.com/shader-slang/slang/issues/14375).
 
 ## Slang 2025
@@ -56,7 +52,8 @@ Slang language version 2025 brings these changes on top of the legacy language:
   [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
 - Module-scope `in`/`out`/`inout` variables (GLSL-style global varyings) are rejected. Declare entry-point
   inputs and outputs as parameters instead. GLSL source code is not affected by this rule. See GitHub issue
-  [#14375](https://github.com/shader-slang/slang/issues/14375) for details.
+  [#14375](https://github.com/shader-slang/slang/issues/14375) and
+  [Module-scope varyings](#module-scope-varyings) for details.
 
 ## Slang 2026
 
@@ -109,3 +106,22 @@ Slang language version 202c brings these changes on top of Slang 2026:
   targets that require a return value (SPIR-V, GLSL and WGSL). To migrate, add an explicit `return` at the end
   of the function where required. See GitHub issue
   [#12264](https://github.com/shader-slang/slang/issues/12264) for details.
+
+## Module-scope varyings
+
+Module-scope `in`/`out`/`inout` variables (GLSL-style global varyings) are accepted in GLSL source,
+accepted with a deprecation warning in legacy Slang, and rejected in Slang 2025 and later and in HLSL
+source. Where they are accepted, these rules apply whatever the source language:
+
+- Each entry point owns all of the module-scope varyings of its module, whether or not it uses them,
+  and is checked against them like parameters. All of the `.slang` input files of one `slangc`
+  command form one module. A module whose varyings carry system-value semantics that only some stages
+  accept, such as an `SV_Position` output, which a fragment shader cannot have, can therefore hold
+  entry points of those stages only.
+- A module-scope varying must be at the top level of its module, not inside a namespace.
+- For SPIR-V, GLSL and WGSL targets, a module-scope varying cannot have a user semantic of its own.
+  The fields of a struct-typed module-scope varying can.
+- A module that declares module-scope varyings cannot be imported.
+- A program cannot contain two entry points from a module that declares module-scope varyings.
+
+See GitHub issue [#14375](https://github.com/shader-slang/slang/issues/14375).
