@@ -7,9 +7,20 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=ON):-target spirv -entry main -stage vertex -Wpedantic -no-codegen -warnings-disable 30627
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF):-target spirv -entry main -stage vertex -Wpedantic -no-codegen -warnings-disable 30627 -DWITH_POSITION
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=OFF):-lang glsl tests/diagnostics/vertex-missing-sv-position-global.slang -target spirv -entry main -stage vertex -Wpedantic -no-codegen -DUSE_GLSL
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF):-target spirv -entry main -stage vertex -Wpedantic -no-codegen -warnings-disable 30627 -DUSE_IMPORT_GLSL
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=OFF):-lang glsl tests/diagnostics/vertex-missing-sv-position-global.slang -target spirv -entry main -stage vertex -Wpedantic -no-codegen -DUSE_GLSL -DPARAM_OUTPUT -warnings-disable 38044
 
-#ifndef USE_GLSL
+#if defined(USE_IMPORT_GLSL)
+// Legacy Slang that imports the `glsl` module explicitly can write `gl_Position` too.
+import glsl;
+out float4 gColor;
+
+void main()
+{
+    gl_Position = float4(0, 0, 0, 1);
+    gColor = float4(1);
+}
+#elif !defined(USE_GLSL)
 out float4 gColor;
 #ifdef WITH_POSITION
 out float4 gPosition : SV_Position;

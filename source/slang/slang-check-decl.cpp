@@ -5573,7 +5573,9 @@ static void collectShaderAttributedFuncs(ContainerDecl* containerDecl, List<Func
 /// Each entry point owns every module-scope varying of its module, so two entry points from such
 /// a module cannot be part of one program; composing them is an error (E38049). A `[shader]`
 /// attribute is only evidence that a function will be an entry point, so at module level we warn
-/// about the potential conflict, whatever the stages of the functions.
+/// about the potential conflict, whatever the stages of the functions. Functions that become
+/// entry points without one, such as a `[numthreads]` function found by entry-point discovery,
+/// are not counted here; E38049 still rejects composing them.
 static void diagnoseShaderFunctionsSharingGlobalVaryings(
     DiagnosticSink* sink,
     ModuleDecl* moduleDecl)

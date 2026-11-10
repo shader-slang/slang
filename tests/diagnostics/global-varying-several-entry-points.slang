@@ -4,10 +4,12 @@
 // `fsMain` owns `gPos` and `vA` as outputs even though it uses neither. The fragment entry point
 // is therefore rejected: it returns a value while it has module-scope outputs, and `SV_Position`
 // is not a fragment output. Each error carries a note that names the owning entry point. Module
-// checking also warns that the module has two `[shader]` functions. The vertex entry point
-// compiles on its own.
+// checking also warns that the module has two `[shader]` functions. Without `-entry`, every
+// `[shader]` function becomes an entry point, so loading the module reports the same errors. The
+// vertex entry point compiles on its own.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=FS):-target spirv -entry fsMain -stage fragment -no-codegen -warnings-disable 30627,38044
+//DIAGNOSTIC_TEST:SIMPLE(diag=FS):-target spirv -no-codegen -warnings-disable 30627,38044
 //TEST:SIMPLE(filecheck=VS):-target spirv -entry vsMain -stage vertex -warnings-disable 30627,38044
 
 out float4 gPos : SV_Position;
