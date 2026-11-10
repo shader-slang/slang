@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=4b1ba367277db66f28ee99c0d57a994e17bbd3b7489b6d7e25f42cb0fc35e3a1
+//META: doc_section_digest=a8c4fe8f82db2627965e05b91b8cd95b5dca976c67648791b7338b2ffdef93e1
 //META: purpose=Boundary: a scalar `||` with a side-effecting RHS is lowered into an explicit if/else, preserving short-circuit semantics in the emitted HLSL.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#loop-family
-//META: doc_section_digest=e6660f713acc83bad477b54d0f5111af9b9f300c42158a5d582ea3f003dc7eff
+//META: doc_section_digest=62d41f734409e853620e442a2938448e5d7be850d748cdbabc3e948d9882271a
 //META: purpose=A ForStmt is a ScopeStmt; the loop variable introduced by `initialStatement` is scoped to the body and does not leak into the surrounding scope.
 //META: intent=functional
 //META: pipeline_stage=check

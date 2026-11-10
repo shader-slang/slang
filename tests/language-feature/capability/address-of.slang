@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_FAIL): -target glsl -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_PASS): -target spirv -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_PASS,exit-code=0): -target spirv -entry computeMain -stage compute
 
 // Test that __getAddress correctly reports capabilities.
 

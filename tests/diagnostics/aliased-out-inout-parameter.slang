@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 // Test that passing the same variable to multiple out/inout parameters
 // produces a warning about potential aliasing (issue #10699).

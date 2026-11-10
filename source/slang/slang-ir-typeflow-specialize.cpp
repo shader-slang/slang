@@ -5524,7 +5524,11 @@ struct TypeFlowSpecializationContext
         //
         for (auto& kv : cloneEnv.mapOldValToNew)
         {
-            if (isGlobalInst(kv.first))
+            // The clone map also contains the module-level debug scopes copied with the
+            // function, along with their decorations (see cloneDebugScopesForFunc).
+            // Propagation info in this context exists only for instructions inside the base
+            // function.
+            if (getParentFunc(kv.first) != baseFunc)
                 continue;
 
             if (auto info = _tryGetInfo(InstWithContext(existentialSpecializedFunc, kv.first)))

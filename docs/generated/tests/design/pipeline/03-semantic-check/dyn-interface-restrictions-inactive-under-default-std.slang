@@ -3,8 +3,8 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#dyn-interface-restrictions
-//META: doc_section_digest=733bfc84d5a926cb0990d8b19fc9bdb571304a51dd223d8d0eb5820ebe12888a
-//META: purpose=The `dyn interface` validation is a no-op unless the module's language version is 2026 or later, so the same source that `-std 2026` rejects compiles under the default `-std`.
+//META: doc_section_digest=630e7c72909468c5bb7b3968c35bb00b899aedcf09b80f0e1814203509f007d2
+//META: purpose=The `dyn interface` declaration validation is a no-op unless the module's language version is 2026 or later, so the same source that `-std 2026` rejects compiles under the default `-std`.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

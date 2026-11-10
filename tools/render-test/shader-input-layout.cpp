@@ -1044,9 +1044,18 @@ struct ShaderInputLayoutParser
         for (auto& line : lines)
         {
             lineNum++;
-            if (!line.startsWith("//"))
+            // A directive line is optional spaces or tabs, `//`, any further `/`, then
+            // `TEST_INPUT:` after optional spaces or tabs. This is the prefix rule of the
+            // `//TEST` scan in slang-test's `_gatherTestsForFile`; a line the two scans
+            // disagree on is skipped here without a diagnostic. Slashes are skipped only
+            // before the spaces, so `// //TEST_INPUT:` stays an ordinary comment.
+            UnownedStringSlice commentText = line.getUnownedSlice().trimStart();
+            if (!commentText.startsWith("//"))
                 continue;
-            line = line.getUnownedSlice().tail(2).trim();
+            commentText = commentText.tail(2);
+            while (commentText.startsWith("/"))
+                commentText = commentText.tail(1);
+            line = commentText.trim();
             if (line.startsWith("TEST_INPUT:"))
             {
                 auto lineContent = line.subString(11, line.getLength() - 11);

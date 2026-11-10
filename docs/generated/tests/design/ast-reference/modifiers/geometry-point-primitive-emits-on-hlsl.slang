@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#hlsl-geometry-shader-input-primitive-modifiers
-//META: doc_section_digest=3cb505cfd0121dfc525052f30e02d849d14355332cf36d4a1c480ef07b83b2b5
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#nodes
+//META: doc_section_digest=29d86296deb73a57a4f207507e16ba645a6bf2e722162db8157e7554d2cf8004
 //META: purpose=The `point` geometry-shader input-primitive modifier and `[instance(N)]` are reproduced on the emitted HLSL entry point.
 //META: intent=functional
 //META: pipeline_stage=emit

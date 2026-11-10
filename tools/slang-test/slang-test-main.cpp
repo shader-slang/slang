@@ -669,7 +669,9 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
-        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST
+        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST.
+        // render-test's `ShaderInputLayoutParser::parse` uses the same prefix rule for
+        // `TEST_INPUT:` lines.
         while (*cursor == '/')
         {
             cursor++;
@@ -3437,12 +3439,19 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
-/// Checks the exit code of the tool under test for a FileCheck test.
+/// Checks the exit code of the tool under test for a FileCheck test or a diagnostic test.
 ///
-/// A FileCheck test only looks at the text of the output, so it does not notice when the tool
-/// fails. A test that expects a failure says so with `exit-code=N`. Tests that compare with an
-/// `.expected` file already check the result code, because it is a part of the text they compare.
-/// Diagnostic tests (`diag=`) do not check it yet (#14266).
+/// A FileCheck test or a diagnostic test only looks at the text of the output, so it does not
+/// notice when the tool fails, or when it does not fail. The expected exit code is 0 for a
+/// FileCheck test and -1 (a failed compilation) for a diagnostic test (`diag=`), because a
+/// diagnostic test usually checks an error. A test that expects another value says so with
+/// `exit-code=N`, for example a diagnostic test that has only warnings uses `exit-code=0`. N must
+/// be 0 (success), -1 (the compilation failed because of errors in the input) or 1 (the command
+/// line was invalid, or the tool failed to run), as in the exit codes that `slangc -help` lists.
+/// The test fails for another value. The exit code -2 is never an expected result, because it
+/// reports an internal compiler error, which is a bug in the compiler.
+/// Tests that compare with an `.expected` file do not need this check, because the result code is
+/// a part of the text they compare.
 ///
 /// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
 /// exit code is not the expected one, after it reports the mismatch.
@@ -3456,13 +3465,13 @@ static bool _checkExpectedExitCode(
 
     String diagPrefix;
     String fileCheckPrefix;
-    if (input.testOptions->getDiagTestPrefix(diagPrefix) ||
-        !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+    const bool isDiagTest = input.testOptions->getDiagTestPrefix(diagPrefix);
+    if (!isDiagTest && !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
         return true;
 
     auto reporter = context->getTestReporter();
 
-    int expectedExitCode = 0;
+    int expectedExitCode = isDiagTest ? -1 : 0;
     String exitCodeOption;
     if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
     {
@@ -3471,7 +3480,23 @@ static bool _checkExpectedExitCode(
         {
             reporter->message(
                 TestMessageType::TestFailure,
-                "the value of `exit-code` must be an integer");
+                "the value of `exit-code` must be -1, 0 or 1");
+            return false;
+        }
+        if (parsedExitCode == int(ToolReturnCode::InternalCompilerError))
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "`exit-code=-2` is not allowed, because -2 reports an internal compiler error. "
+                "A test must never expect an internal compiler error. Fix the compiler bug "
+                "instead");
+            return false;
+        }
+        if (parsedExitCode < -1 || parsedExitCode > 1)
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "the value of `exit-code` must be -1, 0 or 1");
             return false;
         }
         expectedExitCode = int(parsedExitCode);

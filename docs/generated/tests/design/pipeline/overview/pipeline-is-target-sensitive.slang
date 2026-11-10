@@ -1,55 +1,43 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=claude-sonnet-5-5
+//META: generated_at=2026-11-08T21:40:00Z
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/pipeline/overview.md#ir-passes
-//META: doc_section_digest=24b95a9b296c005df1a01c42c7d1bcefc9dfe72ca086bde46bde5c44986c2bf3
-//META: purpose=The IR transformation sequence between lowering and emit is target-sensitive, so one thread-group declaration is materialized in a different form on each target and dropped entirely on the targets that take it at dispatch time.
+//META: doc_section_digest=8eb46aace39b08225cdeb2b72e28b3195136184200d25f39b56909696873a5e9
+//META: purpose=The IR pass list itself branches on the target: the PyTorch binding generation runs only for the torch target, so one source with a [TorchEntryPoint] function gains a pybind module binding on `-target torch` and nothing of the kind on the C++ target.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that the pass sequence branches on the target rather than
-// producing one neutral shape that emit merely re-spells. A single
-// `numthreads(16, 1, 1)` becomes an HLSL attribute, a GLSL `layout`
-// qualifier, a SPIR-V `OpExecutionMode`, a WGSL `@workgroup_size`, and a
-// C++ comment on the exported wrapper -- while Metal and CUDA, whose
-// runtimes supply the group size at dispatch, emit no `16, 1, 1` at all.
-// The CHECKs assert the five materialized forms and the two omissions, a
-// divergence only a target-sensitive pass list can produce.
+// The overview says "target-sensitive" means whole passes are guarded by
+// target predicates inside `linkAndOptimizeIR`, naming the PyTorch binding
+// generation as an example (differences that are only spelling are left to
+// the emitter, which is why thread-group spelling is NOT used here). The
+// same module is compiled for torch and for C++. Only the torch run runs the
+// binding pass and so only it contains a `PYBIND11_MODULE` that registers
+// `addOne`; the C++ run emits the ordinary entry point and no binding.
 
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=TORCH):-target torch -line-directive-mode none
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute -line-directive-mode none
+
+[TorchEntryPoint]
+int addOne(int x)
+{
+    return x + 1;
+}
 
 RWStructuredBuffer<int> gOut;
 
 [shader("compute")]
-[numthreads(16, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+[numthreads(1, 1, 1)]
+void computeMain()
 {
-    gOut[0] = int(tid.x);
+    gOut[0] = addOne(1);
 }
 
-// HLSL: numthreads(16, 1, 1)
+// TORCH: PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
+// TORCH: m.def("addOne", &addOne, "addOne");
 
-// GLSL: local_size_x = 16, local_size_y = 1, local_size_z = 1
-
-// SPIRV: OpExecutionMode {{.*}} LocalSize 16 1 1
-
-// WGSL: @workgroup_size(16, 1, 1)
-
-// C++ keeps the group size only as a comment above the exported wrapper.
-// CPP: numthreads(16, 1, 1)
-
-// Metal and CUDA take the thread-group size from the host dispatch call, so
-// the pass list drops it before emit on those targets.
-// METAL: {{\[\[}}kernel{{\]\]}} void computeMain(
-// METAL-NOT: 16, 1, 1
-
-// CUDA: __global__ void computeMain(
-// CUDA-NOT: 16, 1, 1
+// CPP: computeMain
+// CPP-NOT: PYBIND11_MODULE
+// CPP-NOT: m.def(

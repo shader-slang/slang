@@ -1,0 +1,29 @@
+schema_version: 1
+id: llvm-cpu-switch-case-decl-undeclared-local
+bundle: design/ast-reference/statements
+suspected_kind: wrong-codegen
+title: "LLVM CPU backend: local declared in one switch case undeclared in a later case"
+observed_at: "2026-11-08T21:33:00+00:00"
+scope: emit
+evidence:
+  command: "slang-test -bindir <bin> docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang   (COMPARE_COMPUTE -cpu, LLVM direct backend)"
+  source_slang: docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang
+  observed_summary: |
+    The frontend accepts the program and `-target cpp` emits correct code (`r_0 = int(20);`),
+    but the -cpu execution path (LLVM 21.1) fails with
+    "error : use of undeclared identifier 'shared_0'" at the `shared = 20;` line under `case 2:`.
+  exit_code: 1
+expected:
+  claim: |
+    A `switch` body is a single scope, so `int shared = 10;` under `case 1:` is in scope under
+    `case 2:`; the program must compile and run on the CPU target and store 20.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/statements.md#blockstmt-and-seqstmt
+provenance:
+  agent_model: claude-sonnet-5-5
+  source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+  doc_anchor: docs/generated/design/ast-reference/statements.md#blockstmt-and-seqstmt
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out, the same source emits correct C++ through -target cpp and the frontend raises no diagnostic."

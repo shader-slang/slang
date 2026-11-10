@@ -3562,6 +3562,15 @@ IRInst* peelAddressForwardingOps(IRInst* addr)
     }
 }
 
+bool isArtificialInst(IRInst* inst)
+{
+    // Module-scope lowering has no current function to query.
+    if (!inst)
+        return false;
+
+    return inst->findDecoration<IRArtificialDecoration>() != nullptr;
+}
+
 bool isDebugInfoInst(IRInst* inst)
 {
     // Debug instructions describe source locations, variables, and scopes rather than executing at
