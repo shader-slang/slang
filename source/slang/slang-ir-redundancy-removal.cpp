@@ -453,6 +453,31 @@ static MemoryScope getMemoryScopeOfLoadStore(IRInst* inst)
     return (MemoryScope)getIntVal(memoryScope->getMemoryScope());
 }
 
+// Return true when pointer uses and control flow rule out a store-overwrite candidate.
+//
+// A false result leaves the caller to search for an overwrite; it does not prove that one exists.
+static bool canSkipStoreOverwriteSearch(IRStoreBase* store)
+{
+    // Consider this example:
+    //
+    //     void writeValue(inout int output) { output = 1; }
+    //
+    // We consider a lowered body where the pointer parameter is used only by the assignment's
+    // `IRStore`. The overwrite search succeeds only at an ordinary `IRStore` with the identical
+    // pointer operand. Stores through different pointer operands can affect the alias checks,
+    // but cannot be overwrite candidates, even when the addresses overlap.
+    // With multiple pointer uses, another use may be a store, so we still need the full search.
+    auto pointerOperand = store->getPtr();
+    SLANG_ASSERT(pointerOperand->hasUses());
+    if (pointerOperand->hasMoreThanOneUse())
+        return false;
+
+    // The search follows unconditional branches and can revisit `store` itself through a cycle.
+    // We therefore keep the search for unconditional successors, including `IRLoop` terminators.
+    auto block = cast<IRBlock>(store->getParent());
+    return !as<IRUnconditionalBranch>(block->getTerminator());
+}
+
 bool tryRemoveRedundantStore(
     IRGlobalValueWithCode* func,
     IRStoreBase* store,
@@ -543,8 +568,11 @@ bool tryRemoveRedundantStore(
     // Additionally, MemoryScope of the `store` must be a sub-set of `nextStore`,
     // otherwise we can not be certain that `nextStore` completely overwrites `store`.
     MemoryScope memoryScopeOfStore = getMemoryScopeOfLoadStore(store);
+    // We skip only the overwrite search when no candidate can exist. The separate check below
+    // for storing back an unchanged loaded value can still remove the store.
+    auto firstInstToScan = canSkipStoreOverwriteSearch(store) ? nullptr : store->getNextInst();
     HashSet<IRBlock*> visitedBlocks;
-    for (auto next = store->getNextInst(); next;)
+    for (auto next = firstInstToScan; next;)
     {
         if (auto nextStore = as<IRStore>(next))
         {
@@ -701,17 +729,42 @@ bool eliminateRedundantLoadStore(
     bool changed = false;
     for (auto block : func->getBlocks())
     {
+        // `tryRemoveRedundantLoad` can forward a value only from an earlier ordinary `IRStore`
+        // with the identical pointer operand. We record full pointer operands, including field
+        // and element addresses, rather than their roots. Stores through different pointer
+        // operands cannot supply the replacement value. The existing search still checks
+        // whether those stores may alias the load whenever an exact candidate exists.
+        //
+        // The set records pointer operands of surviving stores already processed in this block.
+        // In reachable blocks, later load and extraction rewrites cannot change those operands:
+        // SSA ordering prevents earlier stores from using values defined by those later
+        // instructions or their users.
+        // Unreachable blocks may lose a forwarding opportunity without affecting reachable code.
+        // Each block gets a fresh set, so pointer rewrites performed while processing other
+        // blocks need no index updates.
+        HashSet<IRInst*> earlierStorePointerOperands;
         IRInst* nextInst = nullptr;
         for (auto inst = block->getFirstInst(); inst; inst = nextInst)
         {
             nextInst = inst->getNextInst();
             if (auto load = as<IRLoad>(inst))
             {
+                if (!earlierStorePointerOperands.contains(load->getPtr()))
+                    continue;
                 changed |= tryRemoveRedundantLoad(func, load, calleeSideEffectCache);
             }
             else if (auto store = as<IRStoreBase>(inst))
             {
-                changed |= tryRemoveRedundantStore(func, store, calleeSideEffectCache);
+                if (tryRemoveRedundantStore(func, store, calleeSideEffectCache))
+                {
+                    changed = true;
+                    continue;
+                }
+
+                // A surviving store's operands already include any earlier forwarding rewrites.
+                // Only ordinary stores can supply values to `tryRemoveRedundantLoad`.
+                if (auto ordinaryStore = as<IRStore>(store))
+                    earlierStorePointerOperands.add(ordinaryStore->getPtr());
             }
             else if (auto getElementPtr = as<IRGetElementPtr>(inst))
             {
