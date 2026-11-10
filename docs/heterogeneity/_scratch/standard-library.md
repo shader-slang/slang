@@ -58,7 +58,7 @@ The browser slangvm package ships the corresponding sources under its package se
 Native installations ship compiled modules under `slang-standard-module-*` beside the Slang
 library. Keep that directory with the tools and rebuild it whenever the compiler changes.
 
-## Sharp edges
+## Rough edges
 
 - These APIs retain their experimental host-graph and autodiff requirements. Direct
   `slangc` use needs `-experimental-feature`; embedding clients use
@@ -77,7 +77,7 @@ library. Keep that directory with the tools and rebuild it whenever the compiler
   Static-assert messages remain in the diagnostic heading without a library source span.
   Canonical module names (`slang/...`) must match import paths for HGBC dispatch lookup.
 - Browser examples use the flag-capture and presentation workarounds described under
-  [grid dispatch sharp edges](grid-dispatch.md#sharp-edges).
+  [grid dispatch rough edges](grid-dispatch.md#rough-edges).
 - Cooperative grid dispatch and texture mapping derive the linear lane index from
   `SV_GroupThreadID`. Using `SV_GroupIndex` on these specialized generic entry points
   currently fails while converting entry-point parameters to borrow parameters.

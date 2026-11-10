@@ -1,12 +1,12 @@
 # Host functions
 
-`[host]` marks code that the VM executes on the CPU. Use it to allocate resources,
-orchestrate GPU calls, and read results.
+`[host]` marks code that the VM executes on the CPU. Unlike device code, host code can allocate resources,
+dispatch GPU work, and use host-specific APIs like window creation & input handling.
 
 <!-- runnable: host-answer -->
 
 ```slang
-import slang.runtime.compute.grid;
+import slang.runtime;
 
 [host]
 public uint answer()
@@ -24,8 +24,7 @@ void main()
 ```
 
 `answer` runs on the host; the lambda runs on the GPU. Host indexing waits for the result.
-Call concrete host exports from [Python, C++, or JavaScript](interoperability.md);
-GPU work also requires a device-capable embedding.
+Call concrete host exports from [Python, C++, or JavaScript](interoperability.md).
 
 ## Allocate buffers and textures
 
@@ -34,7 +33,7 @@ Allocate resources inside a host function:
 <!-- runnable: allocate-resources -->
 
 ```slang
-import slang.runtime.resource.simple_texture;
+import slang.runtime;
 
 [host]
 void main()

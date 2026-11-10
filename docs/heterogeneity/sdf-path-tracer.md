@@ -1,4 +1,4 @@
-# An SDF path tracer, one step at a time
+# An SDF ray tracer, one step at a time
 
 <!-- prettier-ignore -->
 ??? info "Sources"
@@ -10,7 +10,7 @@
 
 We will build an image of a sphere from a function that measures distance. Along the
 way, we will learn how to describe a surface, find it along a ray, and light it.
-These are the first pieces of a path tracer; this chapter ends with two shaded spheres
+This ray tracer uses sphere tracing; this chapter ends with two shaded spheres
 that blend into one smooth shape.
 
 Each code cell is an editable Slang file. Its filename appears above the editor.

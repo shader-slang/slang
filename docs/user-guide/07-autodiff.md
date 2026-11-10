@@ -13,7 +13,7 @@ An overview:
 - The `DifferentialPair<T>` built-in generic type is used to pass derivatives associated with each function input.
 - The `IDifferentiable` and the experimental `IDifferentiablePtrType` interfaces denote differentiable value and pointer types respectively, and allow finer control over how types behave under differentiation.
 - Further, Slang allows for user-defined derivative functions through the `[ForwardDerivative(custom_fn)]` and `[BackwardDerivative(custom_fn)]` attributes.
-- All Slang features, such as control flow, generics, interfaces, extensions, and more are compatible with automatic differentiation, though the bottom of this chapter documents some sharp edges and known issues.
+- All Slang features, such as control flow, generics, interfaces, extensions, and more are compatible with automatic differentiation, though the bottom of this chapter documents some rough edges and known issues.
 
 ## Auto-diff operations `fwd_diff` and `bwd_diff`
 

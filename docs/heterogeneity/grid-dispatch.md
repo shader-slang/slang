@@ -15,7 +15,7 @@ Callbacks use Slang's existing [lambda syntax](https://docs.shader-slang.org/en/
 <!-- runnable: grid-dispatch -->
 
 ```slang
-import slang.runtime.compute.grid;
+import slang.runtime;
 
 [host]
 void main()
@@ -80,7 +80,7 @@ The callback receives a global coordinate; you choose how to flatten it. Partial
 skip padding coordinates, so `Grid(1000).dispatch<128>(...)` calls the callback exactly
 1,000 times. Any zero dimension queues no work.
 
-### Sharp edges
+### Rough edges
 
 <!-- (should follow up but not really important enough to include in the docs)
 **Host vector conversions.** HGBC does not yet support general vector element-type

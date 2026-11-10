@@ -37,7 +37,7 @@ nav:
       - Debugging: debugging.md
       - Event tracking: event-tracking.md
   - Tutorials:
-      - An SDF path tracer: sdf-path-tracer.md
+      - An SDF ray tracer: sdf-path-tracer.md
   - Contributing to the docs: contributing.md
 
 plugins:
