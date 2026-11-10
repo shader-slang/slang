@@ -767,11 +767,15 @@ struct LLVMEmitter
         builderOpt.llvmArguments = Slice(llvmArguments.begin(), llvmArguments.getCount());
 
         ComPtr<IArtifact> errorArtifact;
-        SLANG_RETURN_ON_FAIL(builderFunc(
-            ILLVMBuilder::getTypeGuid(),
-            builder.writeRef(),
-            builderOpt,
-            errorArtifact.writeRef()));
+        {
+            // Creating a builder initializes LLVM's targets and parses LLVM command-line options.
+            std::lock_guard<std::mutex> lock(Session::getSlangLLVMGlobalStateMutex());
+            SLANG_RETURN_ON_FAIL(builderFunc(
+                ILLVMBuilder::getTypeGuid(),
+                builder.writeRef(),
+                builderOpt,
+                errorArtifact.writeRef()));
+        }
 
         if (errorArtifact)
         {

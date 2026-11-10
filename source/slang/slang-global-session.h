@@ -329,6 +329,16 @@ public:
 
     ISlangSharedLibrary* getOrLoadSlangLLVM();
 
+    /// Return the mutex held around the slang-llvm entry points that the LLVM backend calls
+    /// directly and that initialize LLVM's global state: creating an LLVM builder initializes the
+    /// target registry and parses command-line options, and the builtin type layout query
+    /// initializes the target registry. LLVM keeps that state per process without
+    /// synchronization, so one mutex is shared by every global session in the process. It is a
+    /// leaf lock: code holding it calls only into slang-llvm and never back into Slang, because
+    /// the type-layout path takes it while already holding the linkage's component-type
+    /// operation mutex.
+    static std::mutex& getSlangLLVMGlobalStateMutex();
+
     ComPtr<ISlangSharedLibraryLoader>
         m_sharedLibraryLoader; ///< The shared library loader (never null)
 
@@ -342,6 +352,8 @@ public:
     Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
 
     ComPtr<ISlangSharedLibrary> m_slangLLVM = nullptr; ///< slang-llvm, loaded on-demand.
+    // Parallel backend jobs may each make the first request that loads slang-llvm.
+    std::mutex m_slangLLVMMutex;
 
     /// For parsing command line options
     CommandOptions m_commandOptions;
