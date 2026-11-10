@@ -249,12 +249,15 @@ public:
     /// a function body does.
     ///
     /// The IR pass `translateGlobalVaryingVar` gives an entry point the module-scope varyings that
-    /// it reaches. Apart from the builtins of the `glsl` module, such as `gl_Position`, which no
-    /// entry point owns, each of those is one that the entry point owns: a module that declares
-    /// module-scope varyings cannot be imported (`visitImportDecl`), so an entry point can name
-    /// only the varyings of its own module. Checking the owned list is therefore conservative. A
-    /// program also cannot contain two entry points of one such module
-    /// (`diagnoseEntryPointsSharingGlobalVaryings`), so each varying has at most one owner in a
+    /// it reaches. A module that declares module-scope varyings cannot be imported
+    /// (`visitImportDecl`), so the varyings that an entry point can name are those of its own
+    /// module, which it owns, and the builtins of the core and `glsl` modules, such as
+    /// `gl_Position`, which no entry point owns. Checking the owned list is therefore conservative
+    /// for code that the entry point reaches through `import`. Link-time resolution of an `extern`
+    /// declaration needs no `import`, so a function of another module that is linked in that way
+    /// can reach varyings that the checks of this list do not see. A program also cannot contain
+    /// two entry points of one module with module-scope varyings
+    /// (`diagnoseEntryPointsSharingGlobalVaryings`), so each owned varying has one owner in a
     /// program.
     List<VarDeclBase*> const& getGlobalVaryings() { return m_globalVaryings; }
 

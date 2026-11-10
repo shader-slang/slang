@@ -588,9 +588,9 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
     /// outputs as parameters. We therefore reject them in HLSL and in Slang 2025 and later, and
     /// warn about them in legacy Slang. We also restrict them to the top level of the module, in
     /// every language version. The restriction is a policy that keeps the deprecated idiom to the
-    /// form that GLSL code has: GLSL has no namespaces, so a varying inside a namespace can only
-    /// come from Slang or HLSL code, which declares parameters instead, and rejecting it does not
-    /// affect the code that the idiom is kept for.
+    /// form that GLSL code has, since GLSL has no namespaces. HLSL and Slang 2025 and later reject
+    /// every module-scope varying anyway, so the restriction changes legacy Slang only: there, a
+    /// module-scope varying inside a namespace is an error rather than a deprecation warning.
     void checkAndMarkGlobalVaryingVarDecl(VarDecl* decl)
     {
         auto moduleDecl = getModuleDecl(decl);
@@ -18902,12 +18902,10 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto importedModuleDecl = importedModule->getModuleDecl();
     decl->importedModuleDecl = importedModuleDecl;
 
-    // Every module-scope varying that an entry point can name is one that it owns (see
-    // `EntryPoint::getGlobalVaryings`), and an entry point owns only the varyings of its own
-    // module. An import would let the entry points of the importing module, and of any module
-    // that imports it in turn, name varyings that they do not own. We therefore reject every
-    // import of a module that declares module-scope varyings, rather than check which code
-    // refers to them, which would need a front-end walk of the call graph.
+    // An entry point owns only the module-scope varyings of its own module (see
+    // `EntryPoint::getGlobalVaryings`). An import would let the entry points of the importing
+    // module, and of any module that imports it in turn, name varyings that they do not own, so
+    // we reject every import of a module that declares module-scope varyings.
     if (importedModuleDecl->hasModifier<HasLegacyGlobalVaryingsModifier>())
     {
         getSink()->diagnose(Diagnostics::ImportedModuleHasGlobalVaryings{

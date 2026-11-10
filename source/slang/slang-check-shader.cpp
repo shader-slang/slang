@@ -2439,12 +2439,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     // A GLSL-style entry point writes its outputs through module-scope varyings and returns `void`.
     // IR lowering repackages those outputs as the entry point's result, so a result of its own has
-    // nowhere to go. The IR pass reports the same error for outputs declared by the builtin `glsl`
-    // module, which are not in the entry point's list.
+    // nowhere to go. The IR pass `translateGlobalVaryingVar` reports the same error for outputs
+    // declared by the builtin `glsl` module, which are not in the entry point's list.
     //
     // An error about a module-scope varying is followed by a note that names the entry point that
     // owns it, because the entry point may not use the varying at all. The note follows the errors
-    // whose message does not name the entry point: this error and the system-value errors below.
+    // whose message does not name the entry point: this error, the user-semantic error and the
+    // system-value errors below.
     // The varying-type errors name the entry point in their message, and the depth-output conflict
     // is reported at a semantic rather than at a declaration, so neither has the note.
     if (hasResult)
@@ -2794,13 +2795,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     // An entry point that owns module-scope varyings passes its inputs and outputs the GLSL way,
     // so a varying parameter mixes two ways of declaring them, and we warn about every varying
-    // parameter, whatever the directions of the module-scope varyings. Uniform parameters are
+    // parameter, whatever the directions of the module-scope varyings. The warning covers the
+    // parameters that a module-scope varying of the same type could replace. Uniform parameters are
     // allowed, including resources, which the auto-uniform classification above has already made
-    // uniform, and so are builtin parameter types such as `TriangleStream<T>`, which have no
-    // module-scope equivalent. The warning restricts the parameter list only. A result is
-    // restricted only where lowering requires it: the "must return void" check above rejects a
-    // result when the entry point owns module-scope outputs, which lowering turns into the result.
-    // When the entry point owns only module-scope inputs, its result lowers as an ordinary output.
+    // uniform, and so are parameters of builtin types (`isBuiltinParameterType`), such as
+    // `TriangleStream<T>`, `InputPatch<T, N>` and `OutputVertices<T, N>`. Results are not covered:
+    // the "must return void" check above restricts them.
     if (globalVaryings.getCount() != 0)
     {
         for (auto param : entryPointFuncDecl->getParameters())
@@ -2893,14 +2893,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // We deliberately skip the check when the entry point has no outputs
     // at all: a void return type, no `out`/`inout` parameters, and no
     // module-scope outputs. An output parameter or a result counts as an
-    // output in every module, because an entry point that declares outputs
-    // in its signature is expected to declare SV_Position there as well.
-    // A module-scope output can supply SV_Position too, but it counts as
-    // an output only when the module does not import the `glsl` module
-    // (directly or through other imports). A GLSL-style entry point in a
-    // module that does may write the builtin `gl_Position` instead, which
-    // is not one of its module-scope varyings, so its module-scope outputs
-    // cannot show that SV_Position is missing.
+    // output in every module. A module-scope output counts as an output
+    // only when the module does not import the `glsl` module (directly or
+    // through other imports). A GLSL-style entry point in a module that
+    // does may write the builtin `gl_Position` instead, either itself or
+    // through a function of an imported module, and `gl_Position` is not
+    // one of its module-scope varyings, so its module-scope outputs cannot
+    // show that SV_Position is missing. In every case, an `SV_Position` on
+    // any output, in the signature or at module scope, satisfies the check.
     if (stage == Stage::Vertex)
     {
         auto astBuilder = linkage->getASTBuilder();
@@ -3338,11 +3338,11 @@ void Module::_collectShaderParams(DiagnosticSink* sink)
         {
             if (auto globalVar = as<VarDecl>(globalDecl))
             {
-                // We record two kinds of global variable as shader parameters: global shader
-                // parameters, and module-scope varyings, which the program-scope layout and
-                // reflection list alongside them. Other globals, such as `static` and
-                // `groupshared` variables, are skipped. `isGlobalShaderParameter` excludes
-                // module-scope varyings, so the two tests do not overlap.
+                // We record two kinds of global variable in the module's shader-parameter list:
+                // global shader parameters, and module-scope varyings. `isGlobalShaderParameter`
+                // does not accept module-scope varyings, but we add them to the list anyway so
+                // that program-scope layout and reflection see them. Other globals, such as
+                // `static` and `groupshared` variables, are skipped.
                 //
                 const bool isGlobalVarying = isGlobalVaryingVar(globalVar);
                 if (!isGlobalShaderParameter(globalVar) && !isGlobalVarying)

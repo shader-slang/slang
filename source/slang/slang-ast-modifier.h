@@ -142,12 +142,11 @@ class FromCoreModuleModifier : public Modifier
 // deprecates, not the legacy language version: a module in any source language, GLSL included,
 // gets the marker.
 //
-// `checkAndMarkGlobalVaryingVarDecl` adds the marker while declarations are checked, so that
-// `checkModule` can read it before `Module::_collectShaderParams` builds the list of the
-// module's varyings (`Module::getGlobalVaryings`). Both select declarations with the same test,
-// so the marker and a non-empty list describe the same modules. `visitImportDecl` reads the
-// marker to reject an import of such a module; being part of the AST, the marker is serialized
-// with a precompiled module.
+// `checkAndMarkGlobalVaryingVarDecl` adds the marker while declarations are checked. The marker
+// exists because `checkModule` reports W30628 before `Module::_collectShaderParams` builds the
+// list of the module's varyings (`Module::getGlobalVaryings`). Both select declarations with the
+// same test, so the marker and a non-empty list describe the same modules. `visitImportDecl` also
+// reads the marker to reject an import of such a module.
 FIDDLE()
 class HasLegacyGlobalVaryingsModifier : public Modifier
 {
