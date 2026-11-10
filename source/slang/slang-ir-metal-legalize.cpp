@@ -189,6 +189,16 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         return AddressSpace::Generic;
     }
 
+    virtual AddressSpace getDefaultAddressSpaceForExportedFunctionParam() override
+    {
+        // MSL has no generic address space. An exported function's reference parameter is most
+        // often bound to a caller's local variable, which this assigner places in `thread`, so
+        // `thread` gives the signature a call with a local argument would produce. A body that
+        // performs atomics through such a parameter needs `device` or `threadgroup` memory, so
+        // an uncalled export of that kind still produces MSL that the Metal compiler rejects.
+        return AddressSpace::ThreadLocal;
+    }
+
     virtual AddressSpace getLeafInstAddressSpace(IRInst* inst) override
     {
         if (as<IRGroupSharedRate>(inst->getRate()))
