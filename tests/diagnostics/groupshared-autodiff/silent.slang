@@ -9,7 +9,7 @@
 // memory and synchronize, as long as the derivative does not depend on the primal's side effects.
 // The cases that are reported are in writes.slang.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv -entry computeMain -stage compute -experimental-feature
 
 RWStructuredBuffer<float> outputBuffer;
 

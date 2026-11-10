@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):-target cuda -entry computeMain -stage compute
 
 // An `out` or `inout` parameter needs exclusive access to its argument during the call. Passing
 // thread-group-shared storage, which every invocation in the group can access, is warning 30709,
