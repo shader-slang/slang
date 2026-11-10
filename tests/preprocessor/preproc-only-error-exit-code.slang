@@ -1,12 +1,13 @@
 // Preprocessor-only compilation (`-E`) writes the preprocessed text even when preprocessing
 // reports an error, and it fails with the same exit code as any other compilation with errors,
-// so that a build that runs `slangc -E` sees the error. Warnings alone do not fail it, and neither
-// does code that is invalid only to the parser, because `-E` stops after preprocessing.
+// so that a build that runs `slangc -E` sees the error. A warning does not fail it unless
+// `-warnings-as-errors` turns it into an error. Code that is invalid only to the parser does not
+// fail it either, because `-E` stops after preprocessing.
 
 //TEST:SIMPLE(filecheck=ERROR,exit-code=-1):-E -DTRIGGER_ERROR
-//TEST:SIMPLE(filecheck=WARN):-E
+//TEST:SIMPLE(filecheck=WARN,exit-code=0):-E
 //TEST:SIMPLE(filecheck=WARN_AS_ERROR,exit-code=-1):-E -warnings-as-errors all
-//TEST:SIMPLE(filecheck=PARSE_ERROR):-E -DTRIGGER_PARSE_ERROR
+//TEST:SIMPLE(filecheck=PARSE_ERROR,exit-code=0):-E -DTRIGGER_PARSE_ERROR
 
 #ifdef TRIGGER_ERROR
 #error preprocessing failed

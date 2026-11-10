@@ -824,7 +824,9 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         parseTranslationUnit(translationUnit);
     }
 
-    // Preprocessed text was already written by `parseTranslationUnit`, so errors do not discard it.
+    // We check for errors before the preprocessor-only (`-E`) return so that `-E` fails like any
+    // other request with errors. Under `-E`, `parseTranslationUnit` has already written the
+    // preprocessed text, so failing here keeps that text.
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
