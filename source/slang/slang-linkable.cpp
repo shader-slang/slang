@@ -125,10 +125,31 @@ ComponentType::getLayout(Int targetIndex, slang::IBlob** outDiagnostics)
     auto target = linkage->targets[targetIndex];
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    auto programLayout = getTargetProgram(target)->getOrCreateLayout(&sink);
-    sink.getBlobIfNeeded(outDiagnostics);
 
-    return asExternal(programLayout);
+    SLANG_EXCEPTION_TRY
+    {
+        auto programLayout = getTargetProgram(target)->getOrCreateLayout(&sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+
+        return asExternal(programLayout);
+    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
+#endif
 }
 
 static ICastable* _findDiagnosticRepresentation(IArtifact* artifact)
@@ -654,13 +675,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetHostCallable(
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
-    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-
-    if (artifact == nullptr)
+    SLANG_EXCEPTION_TRY
+    {
+        // The diagnostics blob is written last, so that an exception from either call reaches a
+        // catch arm before `*outDiagnostics` has been assigned.
+        SlangResult result = SLANG_FAIL;
+        if (IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink))
+            result = artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
+        sink.getBlobIfNeeded(outDiagnostics);
+        return result;
+    }
+#if SLANG_HAS_EXCEPTIONS
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
         return SLANG_FAIL;
-
-    return artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+#endif
 }
 
 /// Visitor used by `ComponentType::enumerateModules`

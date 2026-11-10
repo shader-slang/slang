@@ -132,22 +132,43 @@ RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
     // FrontEndEntryPointRequest.
     //
     DiagnosticSink sink(getLinkage()->getSourceManager(), DiagnosticSink::SourceLocationLexer());
-    FrontEndCompileRequest frontEndRequest(getLinkage(), StdWriters::getSingleton(), &sink);
-    RefPtr<TranslationUnitRequest> tuRequest = new TranslationUnitRequest(&frontEndRequest);
-    tuRequest->module = this;
-    tuRequest->moduleName = m_name;
-    frontEndRequest.translationUnits.add(tuRequest);
-    FrontEndEntryPointRequest entryPointRequest(
-        &frontEndRequest,
-        0,
-        getLinkage()->getNamePool()->getName(name),
-        Profile((Stage)stage));
-    auto result = findAndValidateEntryPoint(&entryPointRequest);
-    if (outDiagnostics)
+
+    SLANG_EXCEPTION_TRY
     {
-        sink.getBlobIfNeeded(outDiagnostics);
+        FrontEndCompileRequest frontEndRequest(getLinkage(), StdWriters::getSingleton(), &sink);
+        RefPtr<TranslationUnitRequest> tuRequest = new TranslationUnitRequest(&frontEndRequest);
+        tuRequest->module = this;
+        tuRequest->moduleName = m_name;
+        frontEndRequest.translationUnits.add(tuRequest);
+        FrontEndEntryPointRequest entryPointRequest(
+            &frontEndRequest,
+            0,
+            getLinkage()->getNamePool()->getName(name),
+            Profile((Stage)stage));
+        auto result = findAndValidateEntryPoint(&entryPointRequest);
+        if (outDiagnostics)
+        {
+            sink.getBlobIfNeeded(outDiagnostics);
+        }
+        return result;
     }
-    return result;
+#if SLANG_HAS_EXCEPTIONS
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
+#endif
 }
 
 void Module::_addEntryPoint(EntryPoint* entryPoint)
