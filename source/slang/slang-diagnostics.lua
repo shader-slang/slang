@@ -3980,6 +3980,13 @@ err(
     span { loc = "decl:Decl", message = "module-scope 'in'/'out' variables are a GLSL feature; declare '~decl' as an entry-point parameter instead" }
 )
 
+err(
+    "global-varying-user-semantic",
+    30629,
+    "user semantic on a module-scope varying",
+    span { loc = "semantic:Modifier", message = "a module-scope varying can only have a system-value ('SV_') semantic; remove the semantic, or declare the varying with a struct type whose fields carry the semantics" }
+)
+
 warning(
     "shader-functions-share-global-varyings",
     30628,

@@ -10,7 +10,7 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=OFF):-lang glsl tests/diagnostics/vertex-missing-sv-position-global.slang -target spirv -entry main -stage vertex -Wpedantic -no-codegen -DUSE_GLSL -DPARAM_OUTPUT -warnings-disable 38044
 
 #ifndef USE_GLSL
-out float4 gColor : COLOR;
+out float4 gColor;
 #ifdef WITH_POSITION
 out float4 gPosition : SV_Position;
 #endif
