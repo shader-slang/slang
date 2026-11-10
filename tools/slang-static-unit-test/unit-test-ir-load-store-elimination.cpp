@@ -1,9 +1,15 @@
 // Tests for load/store redundancy elimination on hand-built IR.
 //
-// We call `eliminateRedundantLoadStore` directly so earlier optimizations cannot remove the
-// address uses and control-flow shapes we need to test. We use pointer parameters because
-// the pass could remove all stores to an otherwise unused local through its dead-variable
-// check, letting a test pass without exercising forwarding or overwrite detection.
+// These cases check that skipping impossible searches preserves the pass's elimination decisions.
+// We first check load forwarding, covering successful replacements and the writes or memory
+// scopes that require keeping a load. We then check store removal, including unconditional
+// cycles and storing back an unchanged value. The final case checks that pointer forwarding
+// does not prevent subsequent load forwarding.
+//
+// To isolate these decisions, we build IR and call `eliminateRedundantLoadStore` directly;
+// earlier optimizations could otherwise remove the address uses or control flow under test.
+// We use pointer parameters so the pass cannot remove all stores through its separate check
+// for unused local variables, which could let a test pass without exercising its intended rule.
 
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "slang/slang-ir-redundancy-removal.h"
@@ -100,7 +106,7 @@ SLANG_UNIT_TEST(irLoadStoreForwardsMatchingProjectedAddress)
     builder.createStructField(aggregateType, arrayField, arrayType);
 
     // We model `output.values[0] = 7; return output.values[0];`, with `output` passed by
-    // reference. The ordinary pointer parameter avoids the separate dead-local-store removal.
+    // reference.
     IRType* parameterTypes[] = {builder.getPtrType(aggregateType)};
     auto func = beginLoadStoreTestFunction(builder, intType, 1, parameterTypes);
     auto address = func->getFirstParam();
@@ -181,10 +187,10 @@ SLANG_UNIT_TEST(irLoadStoreRetainsLoadAfterPossibleAlias)
     SLANG_CHECK(returnInst->getOperand(0) == load);
 }
 
-// We need both a rejection and a successful replacement to check scope containment. We therefore
-// build two otherwise identical functions with opposite load/store scopes. We require the pass
-// to keep the workgroup-scoped load after an invocation-scoped store, and to forward when the
-// store has workgroup scope and the load has invocation scope.
+// We cannot assume that the value visible at workgroup scope was updated by an invocation-scoped
+// write. We check that the pass requires the store's scope to cover the load's, using opposite
+// scope orderings: the pass must keep a workgroup-scoped load after an invocation-scoped store,
+// but can forward in the reverse case.
 SLANG_UNIT_TEST(irLoadStoreRespectsLoadMemoryScope)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -348,8 +354,10 @@ SLANG_UNIT_TEST(irLoadStoreRemovesUnchangedValueStoredBack)
     SLANG_CHECK(returnInst->getOperand(0) == load);
 }
 
-// We need the pass to keep forwarding after it rewrites a pointer used by later instructions.
-// We therefore arrange two successive load replacements and check that both are performed.
+// Earlier forwarding can change a store's pointer before the traversal records it. We exercise
+// that dependency by loading a pointer from a pointer cell, storing through the loaded pointer,
+// and then loading the stored value. The pass must forward the pointer load first and record the
+// updated store address so the final load can be forwarded too.
 SLANG_UNIT_TEST(irLoadStoreTracksStoreAddressAfterPointerForwarding)
 {
     StaticUnitTestEnv env(unitTestContext);
