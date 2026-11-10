@@ -15,6 +15,7 @@
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
 #include "slang-rich-diagnostics.h"
+#include "spirv/unified1/NonSemanticShaderDebugInfo100.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
@@ -10974,6 +10975,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    // Returns the SPIR-V debug flags corresponding to `inst`'s decorations.
+    static SpvWord getSpirvDebugFlags(IRInst* inst)
+    {
+        SpvWord flags = 0;
+        if (isArtificialInst(inst))
+            flags |= NonSemanticShaderDebugInfo100FlagArtificial;
+        return flags;
+    }
+
     SpvInst* emitDebugFunction(
         SpvInstParent* parent,
         SpvInst* firstBlock,
@@ -10988,8 +10998,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // Use the parent scope bound at IR-gen so an imported function resolves to its own
             // module's compilation unit. Fall back to the module-global scope for an included or
-            // line-remapped source without a compilation unit, or an IR blob predating this
-            // operand. findDebugScope also handles a null debugFunc (no IRDebugFuncDecoration).
+            // line-remapped source without a compilation unit. findDebugScope also handles a
+            // null debugFunc (no IRDebugFuncDecoration).
             SpvInst* scope = nullptr;
             if (debugFunc)
             {
@@ -11017,7 +11027,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugFunc->getCol(),
                 scope,
                 debugFunc->getName(),
-                builder.getIntValue(builder.getUIntType(), 0),
+                builder.getIntValue(builder.getUIntType(), getSpirvDebugFlags(debugFunc)),
                 debugFunc->getLine());
         }
 

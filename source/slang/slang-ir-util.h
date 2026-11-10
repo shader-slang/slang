@@ -765,6 +765,9 @@ IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 // group") should peel with this function first, then test the terminal instruction.
 IRInst* peelAddressForwardingOps(IRInst* addr);
 
+/// Returns whether `inst` has an `[Artificial]` decoration; returns false for null.
+bool isArtificialInst(IRInst* inst);
+
 /// Return whether `inst` records source-level debug information without affecting execution.
 bool isDebugInfoInst(IRInst* inst);
 

@@ -2531,6 +2531,12 @@ local insts = {
 					min_operands = 1,
 				},
 			},
+			{
+				Artificial = {
+					-- Marks a compiler-generated entity with no corresponding user-written declaration.
+					struct_name = "ArtificialDecoration",
+				},
+			},
 			{ method = { struct_name = "MethodDecoration" } },
 			{
 				packoffset = {
@@ -3068,6 +3074,7 @@ local insts = {
 	{ DebugInlinedAt = { min_operands = 5 } },
 	{
 		DebugFunction = {
+			-- Operands are the name, line, column, source, function type, and optional lexical parent scope.
 			min_operands = 5,
 		},
 	},
