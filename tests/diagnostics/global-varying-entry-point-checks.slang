@@ -1,8 +1,8 @@
 // The semantic checker applies the entry-point signature rules to the module-scope varyings that
 // an entry point owns, which are all the module-scope varyings of its module. `main` reads none of
 // them and still must return `void`, because `gDepth` is one of its outputs, and `gIntMatrix` must
-// have a valid varying type. `-no-codegen` stops compilation before IR, so these diagnostics come
-// from the checker.
+// have a valid varying type. Compilation stops after semantic checking when the checker reports an
+// error, before IR is generated, so these diagnostics come from the checker.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage fragment -no-codegen -warnings-disable 30627
 

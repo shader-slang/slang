@@ -22,13 +22,15 @@ void main()
     gColor = float4(1);
 }
 #elif defined(USE_INDIRECT_GLSL)
-// A module that depends on the `glsl` module only through another import is treated the same way.
+// A module that depends on the `glsl` module only through another import is treated the same way,
+// because a function of the imported module can write `gl_Position` for it.
 import "vertex-missing-sv-position-global-helper";
 out float4 gColor;
 
 void main()
 {
-    gColor = helperColor();
+    helperSetPosition();
+    gColor = float4(1);
 }
 #elif !defined(USE_GLSL)
 out float4 gColor;
@@ -48,6 +50,8 @@ void main()
 #endif
 }
 #elif !defined(PARAM_OUTPUT)
+// GLSL source: the shader writes `gl_Position`, so its module-scope output does not trigger the
+// warning.
 out vec4 color;
 
 void main()
@@ -56,6 +60,8 @@ void main()
     color = vec4(1);
 }
 #else
+// GLSL source with an output parameter: the parameter counts as an output, and the module-scope
+// output supplies 'SV_Position'.
 out vec4 position : SV_Position;
 
 void main(out vec4 color : COLOR)

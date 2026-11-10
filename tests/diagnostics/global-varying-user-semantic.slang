@@ -64,6 +64,8 @@ struct VertexInput
 in VertexInput gInput;
 
 //FIELDS: OpEntryPoint Vertex
+//FIELDS-DAG: OpDecorate %gInput_position Location 0
+//FIELDS-DAG: OpDecorate %gInput_texCoord Location 1
 
 [shader("vertex")]
 float4 vsFields() : SV_Position

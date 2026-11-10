@@ -6,7 +6,8 @@
 // Neither error names the entry point, so each is followed by a note on `gPos` that names the
 // owning entry point. Module checking also warns that the module has two `[shader]` functions.
 // Without `-entry`, every `[shader]` function becomes an entry point, so loading the module
-// reports the same errors. The vertex entry point compiles on its own.
+// reports the same errors. Those checker errors stop compilation before the program is laid out,
+// so the composed-program error E38049 is not reported. The vertex entry point compiles on its own.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=FS):-target spirv -entry fsMain -stage fragment -no-codegen -warnings-disable 30627,38044
 //DIAGNOSTIC_TEST:SIMPLE(diag=FS):-target spirv -no-codegen -warnings-disable 30627,38044

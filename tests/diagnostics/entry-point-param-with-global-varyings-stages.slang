@@ -1,7 +1,8 @@
-// W38044 flags varying parameters of an entry point that owns module-scope varyings. A builtin
-// parameter type such as a geometry shader's `TriangleStream<T>` has no module-scope equivalent,
-// so it is not flagged. A compute shader's system-value parameter is flagged like any other
-// varying parameter.
+// W38044 flags varying parameters of an entry point that owns module-scope varyings. A parameter
+// of a builtin type such as a geometry shader's `TriangleStream<T>` is not one that a module-scope
+// varying of the same type could replace, so it is not flagged. A compute shader's system-value
+// parameter is flagged like any other varying parameter. The compute run uses GLSL source, where
+// the warning applies as well.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=GEOMETRY):-target spirv -entry main -stage geometry -no-codegen -warnings-disable 30627
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=COMPUTE):-lang glsl tests/diagnostics/entry-point-param-with-global-varyings-stages.slang -target spirv -entry main -stage compute -no-codegen -DUSE_COMPUTE
