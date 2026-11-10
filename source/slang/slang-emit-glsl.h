@@ -21,6 +21,7 @@ public:
 
 protected:
     virtual void beforeComputeEmitActions(IRModule* module) SLANG_OVERRIDE;
+    virtual FoldPolicy getFoldPolicy(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(
