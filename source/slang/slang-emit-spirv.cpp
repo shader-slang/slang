@@ -6294,6 +6294,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return sb.produceString();
     }
 
+    // Report whether `func` is emitted as an `OpEntryPoint` in this compile. An execution mode
+    // targets an `OpEntryPoint`, and we emit one only for a function that carries
+    // `IREntryPointDecoration`. A function can carry an entry-point attribute and still be only a
+    // callee here. Consider an imported `[shader("compute")] [numthreads(32, 1, 1)] void k(...)`
+    // that the selected entry point calls: `k` keeps `IRNumThreadsDecoration` and any
+    // `[QuadDerivatives]` or `[MaximallyReconverges]` decoration, but it has no `OpEntryPoint`,
+    // so its execution-mode decorations do not apply to this compile.
+    static bool isEmittedAsEntryPoint(IRInst* func)
+    {
+        return func->findDecoration<IREntryPointDecoration>() != nullptr;
+    }
+
     /// Emit an appropriate SPIR-V decoration for the given IR `decoration`, if necessary and
     /// possible.
     ///
@@ -6534,6 +6546,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // [3.6. Execution Mode]: LocalSize
         case kIROp_NumThreadsDecoration:
             {
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
+                    break;
                 auto numThreads = cast<IRNumThreadsDecoration>(decoration);
                 if (numThreads->getXSpecConst() || numThreads->getYSpecConst() ||
                     numThreads->getZSpecConst())
@@ -6609,6 +6623,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_InstanceDecoration:
             {
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
+                    break;
                 auto decor = as<IRInstanceDecoration>(decoration);
                 auto count = int32_t(getIntVal(decor->getCount()));
                 requireSPIRVExecutionMode(
@@ -6628,6 +6644,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_StreamOutputTypeDecoration:
             {
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
+                    break;
                 for (auto inputDecor : decoration->getParent()->getDecorations())
                 {
                     switch (inputDecor->getOp())
@@ -6690,20 +6708,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             break;
         case kIROp_MaximallyReconvergesDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeMaximallyReconvergesKHR);
             break;
         case kIROp_QuadDerivativesDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
             requireSPIRVCapability(SpvCapabilityQuadControlKHR);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeQuadDerivativesKHR);
             break;
         case kIROp_RequireFullQuadsDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
             requireSPIRVCapability(SpvCapabilityQuadControlKHR);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeRequireFullQuadsKHR);
             break;
         case kIROp_Shader64BitIndexingDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_64bit_indexing"));
             requireSPIRVCapability(SpvCapabilityShader64BitIndexingEXT);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeShader64BitIndexingEXT);
@@ -6847,6 +6873,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SpvDecorationPerVertexKHR);
             break;
         case kIROp_OutputControlPointsDecoration:
+            if (!isEmittedAsEntryPoint(decoration->getParent()))
+                break;
             requireSPIRVExecutionMode(
                 decoration,
                 dstID,
@@ -6855,6 +6883,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_DomainDecoration:
             {
+                if (!isEmittedAsEntryPoint(decoration->getParent()))
+                    break;
                 auto domain = cast<IRDomainDecoration>(decoration);
                 SpvExecutionMode mode = SpvExecutionModeMax;
                 auto domainName = as<IRStringLit>(domain->getDomain());

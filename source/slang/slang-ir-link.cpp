@@ -1263,14 +1263,25 @@ IRFunc* specializeIRForEntryPoint(
     {
         if (!nameOverride.getLength())
             nameOverride = getUnownedStringSliceText(entryPoint->getName());
-        IRInst* operands[] = {
-            context->builder->getIntValue(
-                context->builder->getIntType(),
-                entryPoint->getProfile().raw),
-            context->builder->getStringValue(nameOverride),
-            context->builder->getStringValue(
-                UnownedStringSlice(entryPoint->getModule()->getName()))};
-        context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
+
+        // The decoration records the owning module's name. A dummy entry point for a precompiled
+        // (`-r`) module, built by `EntryPoint::createDummyForDeserialize` or its pass-through
+        // variant, has no `FuncDecl` and so no owning module to name. Parameter binding and layout
+        // already recognize such an entry by testing `getFuncDeclRef()`, and we test the same
+        // condition here. The dummy's decoration gets an empty module name; nothing reads that
+        // operand from a decoration built at link time.
+        UnownedStringSlice moduleName;
+        if (entryPoint->getFuncDeclRef())
+        {
+            auto entryPointModule = entryPoint->getModule();
+            SLANG_ASSERT(entryPointModule);
+            moduleName = UnownedStringSlice(entryPointModule->getName());
+        }
+        context->builder->addEntryPointDecoration(
+            clonedFunc,
+            entryPoint->getProfile(),
+            nameOverride,
+            moduleName);
     }
 
     // Make layout directly available on native entry-point parameters. A structural `invoke`

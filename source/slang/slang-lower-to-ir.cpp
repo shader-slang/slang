@@ -539,6 +539,12 @@ struct SharedIRGenContext
     // prelink into the current module after lowering.
     List<IRInst*> externalSymbolsToPrelink;
 
+    // This list holds the IR functions lowered for the translation unit's declared entry points.
+    // We record them before the source-order declaration walk, so that a module-scope declaration
+    // that decorates every entry point (such as GLSL `layout(derivative_group_*NV) in;`) has the
+    // exact set to iterate.
+    List<IRInst*> m_entryPointFuncs;
+
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
         globalEnv.mapDeclToValue[decl] = value;
@@ -10430,9 +10436,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         if (entryPoints.getCount() != 0)
             return;
-        for (const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
-            if (d->findDecoration<IREntryPointDecoration>())
-                entryPoints.add(d);
+        // Fill `entryPoints` with the entry-point functions that `generateIRForTranslationUnit`
+        // recorded before the source-order declaration walk (see
+        // `SharedIRGenContext::m_entryPointFuncs`). Module IR carries no `IREntryPointDecoration`,
+        // so a scan of the module's functions cannot find the entry points; the recorded list is
+        // the translation unit's requested non-generic entry points, which leaves out a called
+        // `[numthreads]` helper.
+        //
+        // Note the layering caveat: this runs during target-independent module lowering, yet it is
+        // enumerating the front-end's declared entry points. Which functions are actually compiled
+        // as entry points is a per-invocation codegen decision that is not known here, so eagerly
+        // decorating all declared entry points is an approximation. The principled representation
+        // is a module-level fact for the module-scope derivative-group request, propagated to the
+        // selected entry points after selection.
+        for (auto entryPointFunc : context->shared->m_entryPointFuncs)
+            entryPoints.add(entryPointFunc);
     }
 
     LoweredValInfo visitEmptyDecl(EmptyDecl* decl)
@@ -15242,8 +15260,7 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
 // Preserve the execution mode required by an entry point's checked capabilities.
 // Consider a generic entry point specialized with a type that requires
 // `spvShader64BitIndexingEXT`. Its requirement is known only after specialization, so the
-// selected program's layout IR must carry the decoration. The source-module producer also
-// uses this helper so serialized entry points retain requirements known before specialization.
+// selected program's layout IR must carry the decoration.
 static void lowerEntryPointShader64BitIndexingRequirement(
     IRBuilder* builder,
     IRInst* entryPointInst,
@@ -15262,74 +15279,6 @@ static void lowerEntryPointShader64BitIndexingRequirement(
             }
         }
     }
-}
-
-static void lowerFrontEndEntryPointToIR(
-    IRGenContext* context,
-    EntryPoint* entryPoint,
-    String moduleName)
-{
-    // TODO: We should emit an entry point as a dedicated IR function
-    // (distinct from the IR function used if it were called normally),
-    // with a mangled name based on the original function name plus
-    // the stage for which it is being compiled as an entry point (so
-    // that entry points for distinct stages always have distinct names).
-    //
-    // For now we just have an (implicit) constraint that a given
-    // function should only be used as an entry point for one stage,
-    // and any such function should *not* be used as an ordinary function.
-
-    auto entryPointFuncDecl = entryPoint->getFuncDecl();
-
-    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
-    {
-        // If the entry point doesn't have an explicit `[shader("...")]` attribute,
-        // then we make sure to add one here, so the lowering logic knows it is an
-        // entry point.
-        auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
-        entryPointAttr->capabilitySet =
-            entryPoint->getProfile().getCapabilityName().freeze(context->astBuilder);
-        addModifier(entryPointFuncDecl, entryPointAttr);
-    }
-
-    auto builder = context->irBuilder;
-    builder->setInsertInto(builder->getModule()->getModuleInst());
-
-    auto loweredEntryPointFunc = getSimpleVal(context, ensureDecl(context, entryPointFuncDecl));
-
-    // Attach a marker decoration so that we recognize
-    // this as an entry point.
-    //
-    IRInst* instToDecorate = loweredEntryPointFunc;
-    if (auto irGeneric = as<IRGeneric>(instToDecorate))
-    {
-        instToDecorate = findGenericReturnVal(irGeneric);
-    }
-
-    // If the entry-point decorations has already been created (because the user
-    // specified duplicate entries in the entry point list), we can stop now.
-    if (instToDecorate->findDecoration<IREntryPointDecoration>())
-        return;
-
-    {
-
-        Name* entryPointName = entryPoint->getName();
-        builder->addEntryPointDecoration(
-            instToDecorate,
-            entryPoint->getProfile(),
-            entryPointName->text.getUnownedSlice(),
-            moduleName.getUnownedSlice());
-    }
-
-    // This definition is shared by every specialization. Only declaration-wide requirements
-    // belong here; the selected program's layout IR adds requirements from generic arguments.
-    // With capability checking disabled the declaration's set is null, which denotes no
-    // inferred requirements.
-    auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements;
-    lowerEntryPointShader64BitIndexingRequirement(
-        builder,
-        instToDecorate,
-        CapabilitySet{inferredCaps});
 }
 
 static void lowerProgramEntryPointToIR(
@@ -15509,20 +15458,41 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // For now, we will assume that *all* global-scope declarations
     // represent public/exported symbols.
-
-    // First, ensure that all entry points have been emitted,
-    // in case they require special handling.
+    //
+    // Note: we deliberately do *not* attach `IREntryPointDecoration`s here. Whether a given
+    // function is compiled as an entry point is a per-invocation codegen decision that is not known
+    // during (target-independent) module lowering, so the decoration is instead introduced where
+    // selection is known: on the codegen-selected functions during linking
+    // (`specializeIRForEntryPoint`).
+    //
+    // We do, however, still lower the entry-point functions *first*, before walking the module's
+    // declarations in source order below. A module-scope declaration can attach an
+    // entry-point-scoped decoration to every entry point of the module (e.g. GLSL
+    // `layout(derivative_group_*NV) in;`, handled in `visitEmptyDecl`, which reads the
+    // `IRNumThreadsDecoration` of each recorded entry-point function). If such a declaration
+    // precedes the entry-point function in source, that function must already be lowered when the
+    // declaration is visited; lowering the entry points up front makes the result independent of
+    // source order.
+    HashSet<IRInst*> seenEntryPointFuncs;
     for (auto entryPoint : translationUnit->getEntryPoints())
     {
-        List<SourceFile*> sources = translationUnit->getSourceFiles();
-        SourceFile* source = sources.getFirst();
-        PathInfo pInfo = source->getPathInfo();
-        String path = pInfo.getMostUniqueIdentity();
-        lowerFrontEndEntryPointToIR(context, entryPoint, Path::getFileNameWithoutExt(path));
+        auto loweredFunc = getSimpleVal(context, ensureDecl(context, entryPoint->getFuncDecl()));
+        // A generic entry point lowers to an `IRGeneric`, and its `[numthreads]` operands stay
+        // generic parameters until specialization, so `visitEmptyDecl` cannot validate its
+        // thread counts here. We do not record it, so it does not receive the module-scope
+        // derivative-group decoration. When the specialized entry point is emitted,
+        // `inferDerivativeGroupMode` chooses a mode from its thread counts, which are then
+        // checked against that mode.
+        if (as<IRGeneric>(loweredFunc))
+            continue;
+        // The same function can be requested as an entry point more than once (e.g. duplicate
+        // entries in the entry-point list); record it once.
+        if (seenEntryPointFuncs.add(loweredFunc))
+            sharedContext->m_entryPointFuncs.add(loweredFunc);
     }
 
     //
-    // Next, ensure that all other global declarations have
+    // Ensure that all global declarations have
     // been emitted.
     for (auto decl : translationUnit->getModuleDecl()->getDirectMemberDecls())
     {

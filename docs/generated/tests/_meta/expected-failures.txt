@@ -162,3 +162,16 @@ docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-ope
 docs/generated/tests/design/cross-cutting/ir-instructions/decoration-builtin-requirement-key-ir.slang
 docs/generated/tests/design/ir-reference/decorations/builtin-requirement-key-decoration.slang
 docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-decoration.slang
+
+# Module lowering no longer attaches `IREntryPointDecoration` (or the entry-point
+# Shader64BitIndexing decoration); a compile adds the entry-point decoration
+# when it links the entry points it selects
+# (https://github.com/shader-slang/slang/pull/12721, issues/12392). These
+# generated tests, and the design-doc sections they are anchored to
+# (pipeline/04-ast-to-ir.md, 04b-pre-link-passes.md, ir-reference/decorations.md),
+# still describe the module-lowering attach and look for `[entryPoint(` in
+# module IR. Remove once the docs and these bundles are regenerated.
+docs/generated/tests/coverage/cli-options/dump-module-ir-disassembly.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/entry-point-funcdecl-carries-entry-point-decoration.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/entry-point-shader-64bit-indexing-capability-lifted.slang
+docs/generated/tests/design/pipeline/04-ast-to-ir/non-entry-funcdecl-lacks-entry-point-decoration.slang
