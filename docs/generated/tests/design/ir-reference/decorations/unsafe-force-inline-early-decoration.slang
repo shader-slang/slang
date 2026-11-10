@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#inlining-and-optimization
-//META: doc_section_digest=920c2eb81b315af907f28c1ce483b160e67a9a325de3473075b6cc826161fb7b
+//META: doc_section_digest=be3dd448892d8840c35684e6b814bbb4a28a297daf99996e234ecacad1c060e9
 //META: purpose=A function decorated with __unsafe_force_inline_early carries an unsafeForceInlineEarly decoration with no operands.
 //META: intent=functional
 //META: pipeline_stage=lower

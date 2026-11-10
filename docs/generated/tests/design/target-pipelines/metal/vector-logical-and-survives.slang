@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=8c75e285954fdccd137cc39333dbb7fd00df278f649c17f835f709926aac9f94
+//META: doc_section_digest=c5af8ae560515f62aefb59225c78774ee7d8bd8656a9f3cf1b634fcb3e1f88e4
 //META: purpose=The Metal arm of `legalizeLogicalAndOr` keeps `&&` over vector operands as a single element-wise expression between two `bool3(...)` values.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
