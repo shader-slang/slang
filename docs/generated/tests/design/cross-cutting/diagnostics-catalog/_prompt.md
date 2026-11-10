@@ -93,6 +93,11 @@ exactly as the catalog spells it; it also makes grep trivial:
 // CHECK: E<code>
 ```
 
+The template's directive expects exit code -1, the `diag=` default for a
+code whose source gets an error. For a warning, note or info code, add
+`exit-code=0`, and for a code that `slangc` reports on the command line,
+add `exit-code=1` (`_common.md`, "Exit code of `filecheck=` tests").
+
 Use `non-exhaustive` when the compiler emits more than one
 diagnostic in response (it often does); match just your target code.
 Use the exact code (`E30019`, `W41024`, etc.) — slang-test will

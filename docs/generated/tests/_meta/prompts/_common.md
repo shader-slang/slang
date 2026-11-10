@@ -579,6 +579,16 @@ expected exit code is `0` unless the directive says otherwise with
   example `// CHECK: E30011`), so the test cannot pass on an unrelated error.
   `CHECK-NOT: error` is useless: the FileCheck input always contains the
   header `standard error`.
+- A `diag=` directive (`//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):`) checks the
+  exit code too, but its default is `-1`, because a diagnostic test usually
+  checks an error. A `diag=` test whose source gets only warnings or notes,
+  or no diagnostic at all, sets `exit-code=0`, and one that passes a bad
+  command-line option sets `exit-code=1`:
+
+  ```
+  //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
+  ```
+
 - One test line cannot carry both `diag=` and `filecheck=`. Use one line for
   each check.
 - A multi-line file numbers its test lines from 0 (`foo.slang`,
