@@ -93,10 +93,14 @@ exactly as the catalog spells it; it also makes grep trivial:
 // CHECK: E<code>
 ```
 
-The template's directive expects exit code -1, the `diag=` default for a
-code whose source gets an error. For a warning, note or info code, add
-`exit-code=0`, and for a code that `slangc` reports on the command line,
-add `exit-code=1` (`_common.md`, "Exit code of `filecheck=` tests").
+The template's directive expects exit code -1, the `diag=` default for an
+input that gets an error. The exit code depends on everything the input
+gets, not only on the target code: when it gets only warnings, notes or
+info, add `exit-code=0`. This includes a command-line warning such as E00030
+for a repeated `-stage`, but not a note that comes with an error, such as
+30509 after 30401, which keeps the default. For an error in the command line
+(an unknown option, a bad option value, conflicting options), add
+`exit-code=1` (`_common.md`, "Exit code of `filecheck=` and `diag=` tests").
 
 Use `non-exhaustive` when the compiler emits more than one
 diagnostic in response (it often does); match just your target code.

@@ -555,13 +555,13 @@ matcher will consume. A `//TEST` directive with no corresponding
 CHECK pattern is rejected by lint — such a test runs but verifies
 nothing.
 
-### Exit code of `filecheck=` tests (READ — `slang-test` enforces it)
+### Exit code of `filecheck=` and `diag=` tests (READ — `slang-test` enforces it)
 
 A `SIMPLE`, `SIMPLE_EX`, `INTERPRET` or `REFLECTION` test with
 `filecheck=PREFIX` (including the `//DIAGNOSTIC_TEST:SIMPLE(filecheck=...)`
 spelling) fails when the tool's exit code is not the expected one. The
 expected exit code is `0` unless the directive says otherwise with
-`exit-code=N`:
+`exit-code=N` (a `diag=` directive defaults to `-1`; see below):
 
 ```
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry main -stage compute
@@ -597,6 +597,8 @@ expected exit code is `0` unless the directive says otherwise with
 Run the test locally after editing the directive; the message
 `expected exit code 0, but the exit code is -1` means the directive needs
 `exit-code=-1` (negative test) or the code is wrongly rejected (positive test).
+On a `diag=` test, `expected exit code -1, but the exit code is 0` means the
+source gets only warnings or notes, so the directive needs `exit-code=0`.
 
 ### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
 

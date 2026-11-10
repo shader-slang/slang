@@ -107,7 +107,7 @@ claim in this bundle. Pick one directive per file:
   enforced when the caret is included on the CHECK line.
   The directive expects exit code -1 by default; one whose source gets
   only warnings or notes sets `exit-code=0`, and one for a command-line
-  diagnostic sets `exit-code=1`.
+  error sets `exit-code=1`. A command-line warning exits 0.
 - `//TEST:SIMPLE(filecheck=CHECK):-target hlsl` (or any text target)
   — only when you need `CHECK-NOT:` to assert that a warning was
   suppressed. The `DIAGNOSTIC_TEST` runner is exhaustive by default
