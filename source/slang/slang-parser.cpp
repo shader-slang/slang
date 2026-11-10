@@ -8759,6 +8759,46 @@ static IntegerLiteralValue _fixIntegerLiteral(
     return value;
 }
 
+/// Return whether `tokenType` can follow a pointer type suffix in expression parsing.
+///
+/// Delimiters end the type; `[`, another `*`, and `.` can continue it with an array suffix,
+/// another pointer suffix, or member access. A caller that also accepts unary dereferences must
+/// distinguish the remaining stars first.
+static bool canFollowPointerTypeSuffix(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+    case TokenType::Comma:
+    case TokenType::RParent:
+    case TokenType::OpGreater:
+    case TokenType::OpRsh:
+    case TokenType::Colon:
+    case TokenType::Semicolon:
+    case TokenType::LBracket:
+    case TokenType::OpMul:
+    case TokenType::Dot:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// Return whether the stars after a parenthesized type form pointer type suffixes.
+///
+/// Requires the next token to be `*`.
+///
+/// Consider `Holder<(dyn IFoo)**>` and `(dyn IFoo)**value`. In the first spelling, `>` ends the
+/// pointer type. In the second, `value` supplies the operand of two unary dereferences. We look
+/// past every `*` before deciding because a single `*` can begin either spelling.
+static bool isPointerTypeSuffixAfterParentheses(Parser* parser)
+{
+    SLANG_RELEASE_ASSERT(peekTokenType(parser) == TokenType::OpMul);
+    TokenReader tokens = parser->tokenReader;
+    while (tokens.peekTokenType() == TokenType::OpMul)
+        tokens.advanceToken();
+    return canFollowPointerTypeSuffix(tokens.peekTokenType());
+}
+
 static bool _isCast(Parser* parser, Expr* expr)
 {
     // These nodes always denote types, so a following `+` or `-` starts a unary cast operand.
@@ -8831,10 +8871,16 @@ static bool _isCast(Parser* parser, Expr* expr)
     case TokenType::OpBitAnd:
         {
             // A `dyn` type expression cannot be a value operand of these binary operators.
-            // We parse `(dyn IFoo)*value` as a cast of `*value`. Before a delimiter, parentheses
-            // instead group a type, as in the generic argument `Holder<(dyn IFoo)>`.
+            // A star can instead extend the grouped type, as in `Holder<(dyn IFoo)*>`; we leave
+            // those suffixes for `parsePostfixExpr`. A following operand, as in `(dyn IFoo)*value`,
+            // still makes this a cast of a dereferenced value.
             if (as<ExistentialBoxTypeExpr>(expr))
             {
+                if (tokenType == TokenType::OpMul)
+                {
+                    if (isPointerTypeSuffixAfterParentheses(parser))
+                        return false;
+                }
                 return true;
             }
 
@@ -9733,26 +9779,11 @@ static Expr* parsePostfixExpr(Parser* parser)
             break;
         case TokenType::OpMul:
             {
-                // We may have a pointer type expr, e.g. T*, or the `*` is a mul operator.
-                // We can easily disambiguate by looking ahead of `*`, if the token after it
-                // is `,`, `>`, `)` or `>>`, then it must be a type postfix.
-                auto lookahead = peekTokenType(parser, 1);
-                switch (lookahead)
-                {
-                case TokenType::Comma:
-                case TokenType::RParent:
-                case TokenType::OpGreater:
-                case TokenType::OpRsh:
-                case TokenType::Colon:
-                case TokenType::Semicolon:
-                case TokenType::LBracket:
-                case TokenType::OpMul:
-                case TokenType::Dot:
-                    expr = parsePostfixTypeSuffix(parser, expr);
-                    break;
-                default:
+                // A delimiter ends a pointer type, while another suffix can continue it.
+                // Otherwise, expression parsing leaves this `*` for multiplication.
+                if (!canFollowPointerTypeSuffix(peekTokenType(parser, 1)))
                     return expr;
-                }
+                expr = parsePostfixTypeSuffix(parser, expr);
             }
             break;
         }
