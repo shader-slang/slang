@@ -481,7 +481,9 @@ covering those constituents rather than by a row of their own.
 
 ## Doc gaps observed
 
-(none) - no gaps remain open against this bundle's source document.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#debug-info-gating](../../../../design/pipeline/04-ast-to-ir.md#debug-info-gating) | drift-from-source | The section (`04-ast-to-ir.md:514-542`) says `isSynthesizedConstructorDecl` makes `maybeEmitDebugLine` and `maybeAddDebugLocationDecoration` skip a Slang-synthesized initializer, so a debugger does not step into it. The `## Intent` debug-info gating bullet and Claim 115 restate that. #14344 removed that gating, and `isSynthesizedConstructorDecl` no longer exists. A synthesized initializer now gets the same debug records as a user-written one, and its IR function and its `DebugFunction` record are marked `[Artificial]`. `debug-info-marked-artificial-for-synthesized-member-init.slang` pins this. | Describe the `[Artificial]` marking: `IRArtificialDecoration` on the function, copied to its `IRDebugFunction`, and emitted as the NSDI `FlagArtificial` in SPIR-V. Drop the claim that a synthesized initializer gets no debug lines. |
 
 The previous off-by-one note (recursion budget 128 vs 129) was resolved in the
 doc: 128 nested calls compile and 129 is the first to fail; both depths are now
