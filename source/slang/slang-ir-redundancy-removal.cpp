@@ -453,27 +453,25 @@ static MemoryScope getMemoryScopeOfLoadStore(IRInst* inst)
     return (MemoryScope)getIntVal(memoryScope->getMemoryScope());
 }
 
-// Return true when pointer uses and control flow rule out a store-overwrite candidate.
+// Return true when the forward overwrite search can be skipped without missing a match.
 //
-// A false result leaves the caller to search for an overwrite; it does not prove that one exists.
+// Returns false when the caller still needs that search to determine whether `store` is
+// overwritten.
 static bool canSkipStoreOverwriteSearch(IRStoreBase* store)
 {
-    // Consider this example:
-    //
-    //     void writeValue(inout int output) { output = 1; }
-    //
-    // We consider a lowered body where the pointer parameter is used only by the assignment's
-    // `IRStore`. The overwrite search succeeds only at an ordinary `IRStore` with the identical
-    // pointer operand. Stores through different pointer operands can affect the alias checks,
-    // but cannot be overwrite candidates, even when the addresses overlap.
-    // With multiple pointer uses, another use may be a store, so we still need the full search.
+    // A failed overwrite search can traverse a long block suffix. To avoid that work, we first
+    // check for another use of the destination pointer, since the search only accepts stores
+    // through that same operand. One use already belongs to `store`, so we keep the full search
+    // whenever another use exists.
     auto pointerOperand = store->getPtr();
     SLANG_ASSERT(pointerOperand->hasUses());
     if (pointerOperand->hasMoreThanOneUse())
         return false;
 
-    // The search follows unconditional branches and can revisit `store` itself through a cycle.
-    // We therefore keep the search for unconditional successors, including `IRLoop` terminators.
+    // A lone use is not enough when the search can follow an unconditional branch: the walk
+    // may loop back to `store` itself. We therefore keep the walk for `IRUnconditionalBranch`,
+    // including `IRLoop`. For other terminators the search stops at the block boundary, so
+    // we can skip it once we have ruled out a distinct overwriting instruction.
     auto block = cast<IRBlock>(store->getParent());
     return !as<IRUnconditionalBranch>(block->getTerminator());
 }
@@ -568,8 +566,8 @@ bool tryRemoveRedundantStore(
     // Additionally, MemoryScope of the `store` must be a sub-set of `nextStore`,
     // otherwise we can not be certain that `nextStore` completely overwrites `store`.
     MemoryScope memoryScopeOfStore = getMemoryScopeOfLoadStore(store);
-    // We skip only the overwrite search when no candidate can exist. The separate check below
-    // for storing back an unchanged loaded value can still remove the store.
+    // We still need to try the store-back check below when no overwrite is possible, so we
+    // bypass only this walk rather than returning from `tryRemoveRedundantStore`.
     auto firstInstToScan = canSkipStoreOverwriteSearch(store) ? nullptr : store->getNextInst();
     HashSet<IRBlock*> visitedBlocks;
     for (auto next = firstInstToScan; next;)
@@ -729,19 +727,18 @@ bool eliminateRedundantLoadStore(
     bool changed = false;
     for (auto block : func->getBlocks())
     {
-        // `tryRemoveRedundantLoad` can forward a value only from an earlier ordinary `IRStore`
-        // with the identical pointer operand. We record full pointer operands, including field
-        // and element addresses, rather than their roots. Stores through different pointer
-        // operands cannot supply the replacement value. The existing search still checks
-        // whether those stores may alias the load whenever an exact candidate exists.
+        // We want to avoid walking the same block prefix for loads that cannot be forwarded.
+        // `tryRemoveRedundantLoad` needs an earlier `IRStore` with a matching pointer operand,
+        // so we record those operands as we visit stores and skip the search on a lookup miss.
+        // On a hit we still call `tryRemoveRedundantLoad` to decide whether a replacement is safe.
         //
-        // The set records pointer operands of surviving stores already processed in this block.
-        // In reachable blocks, later load and extraction rewrites cannot change those operands:
-        // SSA ordering prevents earlier stores from using values defined by those later
-        // instructions or their users.
-        // Unreachable blocks may lose a forwarding opportunity without affecting reachable code.
-        // Each block gets a fresh set, so pointer rewrites performed while processing other
-        // blocks need no index updates.
+        // We use a new index for each block because the search does not cross block boundaries.
+        // We visit instructions in block order and replace only the current load or users of
+        // the current address computation. In reachable SSA, definitions precede their uses,
+        // so these rewrites cannot change the pointer of a store we have already visited. We
+        // therefore leave recorded keys unchanged until the block ends. Unreachable code has
+        // weaker dominance rules; we may miss a forwarding opportunity there without affecting
+        // reachable behavior.
         HashSet<IRInst*> earlierStorePointerOperands;
         IRInst* nextInst = nullptr;
         for (auto inst = block->getFirstInst(); inst; inst = nextInst)
@@ -761,8 +758,12 @@ bool eliminateRedundantLoadStore(
                     continue;
                 }
 
-                // A surviving store's operands already include any earlier forwarding rewrites.
-                // Only ordinary stores can supply values to `tryRemoveRedundantLoad`.
+                // We register this store for later load searches only after
+                // `tryRemoveRedundantStore`, because that routine may delete the instruction.
+                // The pass may also have rewritten the pointer while processing an earlier load,
+                // so we record the current operand rather than gathering pointers before
+                // traversal. We index only `IRStore` because `tryRemoveRedundantLoad` reads
+                // replacement values through `IRStore::getVal`.
                 if (auto ordinaryStore = as<IRStore>(store))
                     earlierStorePointerOperands.add(ordinaryStore->getPtr());
             }
