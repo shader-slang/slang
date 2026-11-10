@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
-//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#requiredloweringpassset-flags
-//META: doc_section_digest=c3103ee2a38af2bf635bdd9987e457e5b1fbf9bc975f679755d345340e97d6dc
+//META: doc_section_digest=7a4f75f24460d63ba3108a84312df6e7ce7a66608f8ab6aeb6fd017bd306c21c
 //META: purpose=A bit-cast in the module sets the `bitcast` gate that selects `lowerBitCast`, whose HLSL result is the reinterpreting intrinsic pair — `asuint(...)` for float-to-uint and `asfloat(...)` for uint-to-float — rather than a value-converting cast.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

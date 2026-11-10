@@ -1,7 +1,7 @@
 // Test that mesh shader outputs must be declared with 'out'.
 // Both 'vertices' and 'indices' without 'out' produce warnings.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry meshMain -stage mesh
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv -entry meshMain -stage mesh
 
 struct VertexOutput
 {

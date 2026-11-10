@@ -371,6 +371,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::NoHLSLPackConstantBufferElements:
         case CompilerOptionName::EnableExperimentalPasses:
         case CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility:
+        case CompilerOptionName::HLSLMethodsMutatingByDefault:
         case CompilerOptionName::TrackLiveness:
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:

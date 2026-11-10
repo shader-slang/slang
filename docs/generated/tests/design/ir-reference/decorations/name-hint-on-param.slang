@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#naming-and-provenance
-//META: doc_section_digest=27db05e9ed21dcf7b3b3b503ce38c4b1487eb65c172fd7c96e296073bd39b0e5
+//META: doc_section_digest=6831ab52a37fd97537e855fa7a9e66d014490da47978c08179ccda7326652d30
 //META: purpose=A nameHint decoration also attaches to function parameters carrying the declared parameter name.
 //META: intent=functional
 //META: pipeline_stage=lower

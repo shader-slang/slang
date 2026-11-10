@@ -2,7 +2,7 @@
 // A plain operator function, a generic operator function, and `operator()` must all compile with no
 // diagnostic. Exhaustive mode (no `non-exhaustive`) fails if any of these regresses to emit E20020.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 struct Vec2 { float x; float y; }
 Vec2 operator+(Vec2 a, Vec2 b) { return { a.x + b.x, a.y + b.y }; }

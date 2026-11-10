@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-lang hlsl -Gec
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-lang hlsl -Gec
 
 // With `-Gec`, the parser renames each global shader parameter and adds a mutable shadow
 // variable under its original name. For a `cbuffer`, the `__transparent` modifier moves from

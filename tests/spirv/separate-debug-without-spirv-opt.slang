@@ -22,8 +22,8 @@
 // `-O0` case depend on it again.
 
 //TEST:COMMAND_LINE_SIMPLE(filecheck=O0):-target spirv -O0 -g2 -skip-spirv-validation -separate-debug-info -separate-debug-info-output separate-debug-without-spirv-opt-O0.dbg.spv -o separate-debug-without-spirv-opt-O0.spv -spirv-opt-path separate-debug-without-spirv-opt-missing-dir
-//TEST:COMMAND_LINE_SIMPLE(filecheck=O1):-target spirv -O1 -g2 -skip-spirv-validation -separate-debug-info -separate-debug-info-output separate-debug-without-spirv-opt-O1.dbg.spv -o separate-debug-without-spirv-opt-O1.spv -spirv-opt-path separate-debug-without-spirv-opt-missing-dir
-//TEST:COMMAND_LINE_SIMPLE(filecheck=BAD_PASS):-target spirv -O0 -g2 -skip-spirv-validation -Xspirv-opt --separate-debug-without-spirv-opt-bogus-pass -separate-debug-info -separate-debug-info-output separate-debug-without-spirv-opt-bad-pass.dbg.spv -o separate-debug-without-spirv-opt-bad-pass.spv
+//TEST:COMMAND_LINE_SIMPLE(filecheck=O1,exit-code=-1):-target spirv -O1 -g2 -skip-spirv-validation -separate-debug-info -separate-debug-info-output separate-debug-without-spirv-opt-O1.dbg.spv -o separate-debug-without-spirv-opt-O1.spv -spirv-opt-path separate-debug-without-spirv-opt-missing-dir
+//TEST:COMMAND_LINE_SIMPLE(filecheck=BAD_PASS,exit-code=-1):-target spirv -O0 -g2 -skip-spirv-validation -Xspirv-opt --separate-debug-without-spirv-opt-bogus-pass -separate-debug-info -separate-debug-info-output separate-debug-without-spirv-opt-bad-pass.dbg.spv -o separate-debug-without-spirv-opt-bad-pass.spv
 
 // O0: result code = 0
 // O0-NOT: E00100

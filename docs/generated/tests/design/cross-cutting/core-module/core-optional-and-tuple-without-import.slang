@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#what-the-core-module-provides
-//META: doc_section_digest=4a82c8790b727c7aae88269a6ea5191f833f130a8d6f5db56427ef3aabca8b92
+//META: doc_section_digest=11ffec405cd9ebf039d30e7bd4c76becb242deae737a81d1506f310d0c00719e
 //META: purpose=Optional<T> and Tuple<T...> are core-module types, usable from user code with no import.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -129,6 +129,38 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
 
+### Unused `.expected` files
+
+A test line with the `filecheck=PREFIX` or `diag=PREFIX` option checks its output with FileCheck or with the diagnostic annotations. It never reads a `.expected` file. If such a file exists for the test line, `slang-test` reports an error and the test fails. Remove the file, or remove the option from the test line.
+
+The `.expected` file of test line N is `foo.slang.N.expected`. For line 0 it is `foo.slang.expected`. The error is not reported for line 0 when another test line of the same file uses `foo.slang.expected` as its shared file.
+
+### Exit code of tests
+
+A `SIMPLE`, `INTERPRET` or `REFLECTION` test with the `filecheck=PREFIX` or `diag=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines or the diagnostic annotations. The test fails if the exit code is not the expected one. The expected exit code is 0 by default. A test that compares the output with an `.expected` file does not need this check, because the file contains the line `result code = N`.
+
+A test that must fail sets the expected exit code with the `exit-code=N` option. N must be `-1`, `0` or `1`. The test fails for another value. A test must never expect `-2`, because it reports an internal compiler error, which is a bug in the compiler:
+
+```
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry main -stage compute
+```
+
+The exit codes of `slangc` are in the output of `slangc -help`. The values that a test can expect are:
+
+- `0`: success.
+- `-1`: the compilation failed because of errors in the input, for example an error diagnostic.
+- `1`: the command line is not valid, for example an unknown or malformed option, or the tool failed to run.
+
+A test with an expected failure should also have a `CHECK` line for the diagnostic that it wants to see, for example `// CHECK: error[E30015]`. Without it, the test can pass for an unrelated error. A `CHECK-NOT` line alone cannot detect a failed compilation, because the error output does not contain the text that it rejects. Use the diagnostic code, such as `E36107`, and not only the word `error`. The word `error` is also part of the header `standard error` in the FileCheck input.
+
+The exception is a test with the `diag=PREFIX` option (see [diagnostics](../../docs/diagnostics.md)): its expected exit code is `-1` by default, because a diagnostic test usually checks an error. A diagnostic test that has only warnings must say `exit-code=0`:
+
+```
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
+```
+
+A test line cannot have both `diag=PREFIX` and `filecheck=PREFIX`. `slang-test` reports an error and the test fails, because only the `diag=` check runs and the `CHECK` lines of `filecheck=` are never run. The `diag=` check looks at the diagnostics in the standard error, and the `filecheck=` check looks at the whole output. A test that needs both checks uses one test line for each of them. For example, a `-E` test uses `DIAGNOSTIC_TEST:SIMPLE(diag=diag):-E` for the diagnostics and `TEST:SIMPLE(filecheck=CHECK):-E` for the preprocessed text in the standard output.
+
 ## Language server tests
 
 A `LANG_SERVER` test opens the test file in `slangd` and runs the `//` directives in the file from top to bottom. Every `LANG_SERVER` test shares one `slangd` process. `initialize` replaces the workspace, but formatting, inlay-hint, commit-character and trace options carry over, so a test that changes one of them sets it back to its default before it ends.

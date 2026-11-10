@@ -1,8 +1,8 @@
 // This test verifies that a warning is emitted if an interface
 // variable is initialized with defaults.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target spirv -entry computeMain -stage compute -std 2025 -DEXPECT_ERROR=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKERR): -target hlsl -entry computeMain -stage compute -std 2026 -DEXPECT_ERROR=1
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKERR): -target spirv -entry computeMain -stage compute -std 2026 -DEXPECT_ERROR=1
 

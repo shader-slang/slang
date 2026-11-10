@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#out--inout-argument-casts
-//META: doc_section_digest=ae3ab5a85d01268c9dfd985e9d4780ff6414522ba230669261f386fb2979871b
+//META: doc_section_digest=3d6bc9494eca7dfe819dc8113825be51fde86d8045b3a28a809c78deb26e1702
 //META: purpose=Passing an `int` l-value to an `out uint` / `inout uint` parameter materializes `outImplicitCast` / `inOutImplicitCast` on the caller's address, whereas a same-type argument produces no cast at all.
 //META: intent=functional
 //META: pipeline_stage=lower
