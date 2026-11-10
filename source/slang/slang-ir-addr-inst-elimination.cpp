@@ -93,6 +93,68 @@ struct AddressInstEliminationContext
         store->removeAndDeallocate();
     }
 
+    /// The copy of each local variable that a call receives a reference into, keyed by the call
+    /// and the variable.
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRVar*> localCopiesForCall;
+
+    /// Rewrite the reference argument `use` so that, if it names all or part of a local variable,
+    /// it names the same part of a copy of that variable made for the call. A reference argument
+    /// that names any other storage is left as is.
+    void transformReferenceCallAddr(IRBuilder& builder, IRUse* use)
+    {
+        // We find the storage that the argument refers into by walking out through its element
+        // and field addresses, and remember the path so that we can rebuild it on the copy.
+        //
+        List<IRInst*> accessChain;
+        auto root = use->get();
+        while (root->getOp() == kIROp_GetElementPtr || root->getOp() == kIROp_FieldAddress)
+        {
+            accessChain.add(root->getOperand(1));
+            root = root->getOperand(0);
+        }
+
+        // Storage that other invocations or the caller's own caller may access, such as a
+        // `groupshared` variable, is passed through in place, since a copy stored back after the
+        // call would lose their accesses during it.
+        //
+        auto rootVar = as<IRVar>(root);
+        if (!rootVar)
+            return;
+        accessChain.reverse();
+
+        // A local variable is different: nothing outside the call can access it while the call
+        // runs, so a single copy of the whole variable, shared by every reference argument of the
+        // call that names part of it, behaves exactly like the variable itself. Consider this
+        // example:
+        //
+        //     float sum2(__ref float a, __ref float b) { a += 1; return a + b; }
+        //     [Differentiable] float f(float x) { float a = 3; return no_diff(sum2(a, a)) * x; }
+        //
+        // We copy `a` once for the call to `sum2` and store the copy back after it. Both arguments
+        // point into that one copy, so `sum2` sees its write through `a` when it reads `b`.
+        //
+        // We make the copy because the backward derivative's checkpointing
+        // (`findLatestUniqueWriteUse`) assumes that at most one call writes each local variable,
+        // and a local passed by reference may be passed to several calls. Each copy is written
+        // by only its own call.
+        //
+        auto call = use->getUser();
+        auto key = KeyValuePair<IRInst*, IRInst*>(call, rootVar);
+        IRVar* copy = nullptr;
+        if (!localCopiesForCall.tryGetValue(key, copy))
+        {
+            builder.setInsertBefore(call);
+            copy = builder.emitVar(rootVar->getDataType()->getValueType());
+            builder.emitStore(copy, builder.emitLoad(rootVar));
+            builder.setInsertAfter(call);
+            builder.emitStore(rootVar, builder.emitLoad(copy));
+            localCopiesForCall.add(key, copy);
+        }
+
+        builder.setInsertBefore(call);
+        use->set(builder.emitElementAddress(copy, accessChain.getArrayView()));
+    }
+
     void transformCallAddr(IRBuilder& builder, IRUse* use)
     {
         auto addr = use->get();
@@ -113,14 +175,17 @@ struct AddressInstEliminationContext
         //
         auto paramType = unwrapAttributedType(calleeType->getParamType(argIndex));
 
-        // A reference parameter names the argument's storage, so the callee accesses that storage
-        // in place and decides itself how to read, write, and synchronize it. We never copy such
-        // an argument, even a local variable: the callee may reach the same storage through
-        // another parameter, or other invocations may share it, and a temporary stored back
-        // after the call would lose those accesses.
+        // A reference parameter names the argument's storage, so the callee accesses that storage,
+        // or a copy that behaves exactly like it, and decides itself how to read, write, and
+        // synchronize it. We never copy the argument alone: the callee may reach the same storage
+        // through another parameter, and a separate copy for each argument would hide its writes
+        // through one from its reads through the other.
         //
         if (as<IRRefParamType>(paramType))
+        {
+            transformReferenceCallAddr(builder, use);
             return;
+        }
 
         builder.setInsertBefore(call);
         auto tempVar = builder.emitVar(cast<IRPtrTypeBase>(addr->getFullType())->getValueType());
