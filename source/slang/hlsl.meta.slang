@@ -13623,13 +13623,7 @@ T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Fma $mvalue $avalue $bvalue
-    };
     default:
         return mvalue * avalue + bvalue;
     }
@@ -13642,13 +13636,9 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Fma $mvalue $avalue $bvalue
-    };
     default:
-        VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
+        return mvalue * avalue + bvalue;
     }
 }
 
