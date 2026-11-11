@@ -4025,6 +4025,49 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "groupshared-parameter-must-be-reference",
+    30707, -- 30706 reserved for #11885 (duplicate-system-value-semantic)
+    "a 'groupshared' parameter is passed by reference, so it cannot use the '~mode:ParamPassingMode' passing mode",
+    span { loc = "modifier:Modifier", message = "remove this, or use 'const groupshared' for a read-only reference" }
+)
+
+err(
+    "groupshared-parameter-of-non-inlinable-function-on-hlsl",
+    30708,
+    "'~func:IRInst' cannot have the 'groupshared' parameter '~param:IRInst' when targeting HLSL, because calls to it cannot be inlined",
+    span { loc = "modifierLocation", message = "this prevents calls to the function from being inlined" },
+    span { loc = "location", message = "'groupshared' parameter declared here" }
+)
+
+warning(
+    "groupshared-argument-to-exclusive-parameter",
+    30709,
+    "'~func:Decl' needs exclusive access to parameter '~param', but '~storageText' is thread-group-shared memory that other invocations could access",
+    span { loc = "arg:Expr", message = "consider copying value through a local variable to make the access explicit" },
+    -- At most one of these notes has a location: the parameter's `out` or `inout` keyword, the
+    -- method's `[mutating]` attribute, or a method that can modify `this` without one, such as a
+    -- `set` accessor or a method in HLSL source.
+    note { message = "'~mode:ParamPassingMode' requires exclusive access", span { loc = "modeLocation" } },
+    note { message = "'[mutating]' requires exclusive access to 'this'", span { loc = "mutatingLocation" } },
+    note { message = "this method can modify 'this', which requires exclusive access", span { loc = "methodLocation" } }
+)
+
+-- A call whose callee has no declaration, such as `bwd_diff(f)(...)`, has no parameter names, so
+-- this counterpart of warning 30709 identifies the parameter by its position and mode instead.
+warning(
+    "groupshared-argument-to-exclusive-parameter-at-position",
+    30710,
+    "'~callee' needs exclusive access to its '~mode:ParamPassingMode' parameter #~paramNumber:Int, but '~storageText' is thread-group-shared memory that other invocations could access",
+    span { loc = "arg:Expr", message = "consider copying value through a local variable to make the access explicit" }
+)
+
+err(
+    "groupshared-argument-must-be-groupshared-lvalue",
+    30711,
+    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
+    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage; pass a 'groupshared' variable or a component of one, or declare '~param' without 'groupshared' if the function does not need thread-group-shared memory" }
+)
 --
 -- 308xx: inheritance
 --
@@ -4892,6 +4935,32 @@ err(
     38034,
     "'borrow in' on differentiable parameter",
     span { loc = "modifier:Modifier", message = "cannot use 'borrow in' on a differentiable parameter." }
+)
+
+err(
+    "reference-parameter-of-differentiable-function",
+    38038,
+    "'~func:Decl' cannot be differentiated, because parameter '~param:Decl' is passed by reference",
+    span { loc = "param:Decl" },
+    -- At most one of these notes has a location: the attribute that makes the function
+    -- differentiable, or the `...DerivativeOf` attribute that names a function without one.
+    note { message = "this requests a derivative; remove it if the function needs none", span { loc = "attributeLocation" } },
+    note { message = "a user-defined derivative is declared for it here", span { loc = "derivativeOfLocation" } }
+)
+
+err(
+    "reference-parameter-of-user-defined-derivative",
+    38044,
+    "user-defined derivative '~func:Decl' cannot have parameter '~param:Decl', because it is passed by reference",
+    span { loc = "param:Decl", message = "consider passing it by value, or accessing the argument directly if it is a global" },
+    note { message = "this declares the function as a user-defined derivative", span { loc = "attributeLocation" } }
+)
+
+err(
+    "groupshared-partial-write-in-differentiated-body",
+    38039,
+    "writing part of thread-group-shared variable '~var:Decl' introduces a race condition when this function is differentiated",
+    span { loc = "target:Expr", message = "consider moving this into a function that is not differentiable or has a custom derivative" }
 )
 
 err(
