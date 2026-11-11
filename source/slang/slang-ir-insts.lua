@@ -1340,13 +1340,13 @@ local insts = {
 	-- - `dst` is a value of some type containing only ordinary data
 	{ byteAddressBufferLoad = { operands = { { "buffer" }, { "offset" }, { "alignment" } } } },
 	-- Store (almost) arbitrary-type data to a byte-address buffer
-	-- byteAddressBufferLoad(%buffer, %offset, %alignment, %src)
+	-- byteAddressBufferStore(%buffer, %offset, %alignment, %value)
 	-- where
 	-- - `buffer` is a value of some `ByteAddressBufferTypeBase` type
 	-- - `offset` is an `int`
 	-- - `alignment` is an `int`
-	-- - `src` is a value of some type containing only ordinary data
-	{ byteAddressBufferStore = { operands = { { "buffer" }, { "offset" }, { "value" }, { "alignment" } } } },
+	-- - `value` is a value of some type containing only ordinary data
+	{ byteAddressBufferStore = { operands = { { "buffer" }, { "offset" }, { "alignment" }, { "value" } } } },
 	-- Load data from a structured buffer
 	-- %dst = structuredBufferLoad(%buffer, %index)
 	-- where
