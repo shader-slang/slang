@@ -180,6 +180,7 @@ docs/generated/tests/design/name-resolution/visibility/aggregate-member-takes-mo
 docs/generated/tests/design/pipeline/03-semantic-check/dyn-interface-restrictions-inactive-under-default-std.slang
 docs/generated/tests/design/pipeline/05-ir-passes/bit-field-accessors-emit-shift-and-mask.slang
 docs/generated/tests/design/pipeline/05-ir-passes/defer-buffer-load-narrows-read-to-leaf.slang
+docs/generated/tests/design/pipeline/05-ir-passes/explicit-global-init-hlsl-keeps-declaration-initializer.slang
 docs/generated/tests/design/pipeline/05-ir-passes/lower-defer-emits-cleanup-on-scope-exit.slang
 docs/generated/tests/design/pipeline/05-ir-passes/lower-enum-type-emits-integer-on-hlsl.slang
 docs/generated/tests/design/pipeline/05-ir-passes/specialize-stage-switch-resolves-stage-conditional.slang
