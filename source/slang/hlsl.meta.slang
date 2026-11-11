@@ -13616,6 +13616,11 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
+// The floating-point overloads above lower to fused multiply-add intrinsics (`GLSL.std.450 Fma`,
+// GLSL `fma`, the prelude's `F*_fma` helpers, `llvm.fma`) that are defined only for
+// floating-point types. HLSL defines `mad` for integer operands, so the integer overloads use it
+// there and compute `mvalue * avalue + bvalue` in `T` on every other target, with the same
+// overflow behavior as any other integer arithmetic in `T`.
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
