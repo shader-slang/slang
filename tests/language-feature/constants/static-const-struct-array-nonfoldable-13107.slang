@@ -21,7 +21,9 @@
 // analysis doesn't make these constructors look foldable.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
-//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -g2 -O0
+// TODO(#14217): Remove `no-downstream-validation` when #14217 is fixed.
+// With `-g`, the compiler emits unused `__device__` globals that call a constructor, and NVRTC rejects them.
+//TEST:SIMPLE(filecheck=CUDA,no-downstream-validation): -target cuda -entry computeMain -stage compute -line-directive-mode none -g2 -O0
 
 struct Base
 {

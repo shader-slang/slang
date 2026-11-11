@@ -13,7 +13,10 @@
 // pre-existing behavior unrelated to this change and are intentionally not
 // asserted on here.)
 
-//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
+// TODO(#14453): Remove `no-downstream-validation` when #14453 is fixed.
+// A `DescriptorHandle` built from a `uint2` in a `static const` initializer is not diagnosed on CUDA,
+// and the CUDA output passes the `uint2` where a `RWStructuredBuffer<uint>` is expected.
+//TEST:SIMPLE(filecheck=CUDA,no-downstream-validation): -target cuda -entry computeMain -stage compute -line-directive-mode none
 
 struct Bindful
 {

@@ -357,7 +357,10 @@ static bool _isCPUHostTarget(CodeGenTarget target)
     return desc.style == ArtifactStyle::Host;
 }
 
-SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact)
+SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
+    ComPtr<IArtifact>& outArtifact,
+    IArtifact* emittedSource,
+    ExtensionTracker* emittedSourceTracker)
 {
     outArtifact.setNull();
 
@@ -368,7 +371,11 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     SourceLanguage sourceLanguage = SourceLanguage::Unknown;
 
     auto target = getTargetFormat();
-    RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
+    // The extension tracker of the emitted source holds what the emitter learned about the source,
+    // such as the CUDA shader model that it needs, so a compile of that source uses it.
+    RefPtr<ExtensionTracker> extensionTracker = emittedSource
+                                                    ? RefPtr<ExtensionTracker>(emittedSourceTracker)
+                                                    : _newExtensionTracker(target);
     PassThroughMode compilerType;
 
     SliceAllocator allocator;
@@ -529,6 +536,12 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             SLANG_ASSERT(sourceArtifact);
         }
     }
+    else if (emittedSource)
+    {
+        // The caller has emitted the source already. We do not emit it again, because that runs
+        // the IR passes a second time and reports their diagnostics a second time.
+        sourceArtifact = emittedSource;
+    }
     else
     {
         CodeGenContext sourceCodeGenContext(this, sourceTarget, extensionTracker);
@@ -537,7 +550,10 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
         SLANG_RETURN_ON_FAIL(sourceCodeGenContext.emitEntryPointsSource(sourceArtifact));
         sourceCodeGenContext.maybeDumpIntermediate(sourceArtifact);
+    }
 
+    if (!isPassThroughEnabled())
+    {
         sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget(
             (SlangCompileTarget)sourceTarget);
     }
@@ -1208,15 +1224,20 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     return SLANG_FAIL;
 }
 
-/// Compiles the source code that Slang emits for `sourceTarget` with the downstream compiler that
-/// matches the target, and discards the result.
+/// Compiles `emittedSource`, the source code that Slang emitted for `sourceTarget`, with the
+/// downstream compiler that matches the target, and discards the result.
 ///
 /// A test that checks only the emitted text cannot find code that the downstream compiler rejects.
 /// With `-validate-with-downstream-compiler`, the same compile that produces the binary target
 /// (for example `metal` to `metallib`) runs on the emitted source, and its errors make the compile
-/// fail. For a target that Slang does not pass to a downstream compiler, the function reports an
-/// error instead of skipping the validation silently.
-SlangResult CodeGenContext::validateEmittedSourceWithDownstream(CodeGenTarget sourceTarget)
+/// fail. The function compiles the source that the user gets and does not emit it again, so the
+/// IR passes do not report their diagnostics twice. `emittedSourceTracker` is the extension
+/// tracker that the emitter used for the source. For a target that Slang does not pass to a
+/// downstream compiler, the function reports an error instead of skipping the validation silently.
+SlangResult CodeGenContext::validateEmittedSourceWithDownstream(
+    CodeGenTarget sourceTarget,
+    IArtifact* emittedSource,
+    ExtensionTracker* emittedSourceTracker)
 {
     CodeGenTarget binaryTarget = CodeGenTarget::None;
     switch (sourceTarget)
@@ -1267,7 +1288,10 @@ SlangResult CodeGenContext::validateEmittedSourceWithDownstream(CodeGenTarget so
     CodeGenContext validationContext(this, binaryTarget);
     validationContext.m_targetProfile = m_targetProfile;
     ComPtr<IArtifact> binaryArtifact;
-    return validationContext.emitWithDownstreamForEntryPoints(binaryArtifact);
+    return validationContext.emitWithDownstreamForEntryPoints(
+        binaryArtifact,
+        emittedSource,
+        emittedSourceTracker);
 }
 
 // Helper class for recording compile time.
@@ -1361,7 +1385,8 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
             subContext.maybeDumpIntermediate(sourceArtifact);
 
             if (shouldValidateWithDownstreamCompiler())
-                SLANG_RETURN_ON_FAIL(validateEmittedSourceWithDownstream(target));
+                SLANG_RETURN_ON_FAIL(
+                    validateEmittedSourceWithDownstream(target, sourceArtifact, extensionTracker));
 
             outArtifact = sourceArtifact;
             return SLANG_OK;

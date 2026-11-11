@@ -189,6 +189,19 @@ warning: Metal compiler not found; -validate-with-downstream-compiler is removed
 
 Only `SIMPLE` tests do this. A test of another type that passes the option to `slangc` gets the error from `slangc` when the tool is not available. Use the option only in tests that must produce valid output. A test that expects a failed compile does not use the option; it uses `exit-code=N` instead.
 
+`slang-test` adds `-validate-with-downstream-compiler` to some `SIMPLE` tests for you. It does this for a `SIMPLE` test that has all of these properties:
+
+1. The test uses a `filecheck=` or `diag=` option, and its expected exit code is 0, either by default or with `exit-code=0`.
+2. The target of the test is in the list of the targets that get the option by default. At this time, the list has only `cuda`. We add the other targets one at a time, because many tests emit code that the downstream compiler rejects.
+3. The test does not have the option `no-downstream-validation`.
+
+A test that emits code that the downstream compiler rejects on purpose, or that has a known problem with the emitted code, sets `no-downstream-validation`. Fix the emitted code when you can, and then remove the option from the test. A comment line above the test explains the reason, but it moves the line numbers of the file, so do not add one to a test that depends on them:
+
+```
+// The emitted code does not compile with NVRTC yet (issue #NNNN).
+//TEST:SIMPLE(filecheck=CHECK,no-downstream-validation): -target cuda -entry computeMain -stage compute
+```
+
 ## Language server tests
 
 A `LANG_SERVER` test opens the test file in `slangd` and runs the `//` directives in the file from top to bottom. Every `LANG_SERVER` test shares one `slangd` process. `initialize` replaces the workspace, but formatting, inlay-hint, commit-character and trace options carry over, so a test that changes one of them sets it back to its default before it ends.

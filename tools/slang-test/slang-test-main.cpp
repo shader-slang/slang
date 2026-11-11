@@ -66,6 +66,8 @@ using namespace Slang;
 // Constants for slang-test specific options
 static const char* kPreserveEmbeddedSourceOption = "-preserve-embedded-source";
 static const char* kValidateWithDownstreamCompilerOption = "-validate-with-downstream-compiler";
+/// The test option that keeps `runSimpleTest` from adding the option above to a test by default.
+static const char* kNoDownstreamValidationTestOption = "no-downstream-validation";
 
 // Options for a particular test
 struct TestOptions
@@ -3552,6 +3554,51 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
+/// Returns true if the exit code of the tool under test is checked for the test, which is the case
+/// for a FileCheck test and for a diagnostic test (`diag=`). See `_checkExpectedExitCode`.
+static bool _hasExitCodeCheck(const TestInput& input)
+{
+    String prefix;
+    return input.testOptions->getDiagTestPrefix(prefix) ||
+           input.testOptions->getFileCheckPrefix(prefix);
+}
+
+/// Gets the exit code that a FileCheck test or a diagnostic test expects: the value of `exit-code`,
+/// or the default. The default is 0 for a FileCheck test and -1 (a failed compilation) for a
+/// diagnostic test, because a diagnostic test usually checks an error.
+///
+/// Returns false and sets `outError` if the value of `exit-code` is not valid.
+static bool _getExpectedExitCode(const TestInput& input, int& outExpectedExitCode, String& outError)
+{
+    String diagPrefix;
+    outExpectedExitCode = input.testOptions->getDiagTestPrefix(diagPrefix) ? -1 : 0;
+
+    String exitCodeOption;
+    if (!input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
+        return true;
+
+    Int parsedExitCode = 0;
+    if (SLANG_FAILED(StringUtil::parseInt(exitCodeOption.getUnownedSlice(), parsedExitCode)))
+    {
+        outError = "the value of `exit-code` must be -1, 0 or 1";
+        return false;
+    }
+    if (parsedExitCode == int(ToolReturnCode::InternalCompilerError))
+    {
+        outError = "`exit-code=-2` is not allowed, because -2 reports an internal compiler error. "
+                   "A test must never expect an internal compiler error. Fix the compiler bug "
+                   "instead";
+        return false;
+    }
+    if (parsedExitCode < -1 || parsedExitCode > 1)
+    {
+        outError = "the value of `exit-code` must be -1, 0 or 1";
+        return false;
+    }
+    outExpectedExitCode = int(parsedExitCode);
+    return true;
+}
+
 /// Checks the exit code of the tool under test for a FileCheck test or a diagnostic test.
 ///
 /// A FileCheck test or a diagnostic test only looks at the text of the output, so it does not
@@ -3576,43 +3623,17 @@ static bool _checkExpectedExitCode(
 {
     outMismatch = false;
 
-    String diagPrefix;
-    String fileCheckPrefix;
-    const bool isDiagTest = input.testOptions->getDiagTestPrefix(diagPrefix);
-    if (!isDiagTest && !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+    if (!_hasExitCodeCheck(input))
         return true;
 
     auto reporter = context->getTestReporter();
 
-    int expectedExitCode = isDiagTest ? -1 : 0;
-    String exitCodeOption;
-    if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
+    int expectedExitCode = 0;
+    String error;
+    if (!_getExpectedExitCode(input, expectedExitCode, error))
     {
-        Int parsedExitCode = 0;
-        if (SLANG_FAILED(StringUtil::parseInt(exitCodeOption.getUnownedSlice(), parsedExitCode)))
-        {
-            reporter->message(
-                TestMessageType::TestFailure,
-                "the value of `exit-code` must be -1, 0 or 1");
-            return false;
-        }
-        if (parsedExitCode == int(ToolReturnCode::InternalCompilerError))
-        {
-            reporter->message(
-                TestMessageType::TestFailure,
-                "`exit-code=-2` is not allowed, because -2 reports an internal compiler error. "
-                "A test must never expect an internal compiler error. Fix the compiler bug "
-                "instead");
-            return false;
-        }
-        if (parsedExitCode < -1 || parsedExitCode > 1)
-        {
-            reporter->message(
-                TestMessageType::TestFailure,
-                "the value of `exit-code` must be -1, 0 or 1");
-            return false;
-        }
-        expectedExitCode = int(parsedExitCode);
+        reporter->message(TestMessageType::TestFailure, error.getBuffer());
+        return false;
     }
 
     if (resultCode != expectedExitCode)
@@ -3624,6 +3645,46 @@ static bool _checkExpectedExitCode(
         outMismatch = true;
     }
     return true;
+}
+
+/// Returns true if `runSimpleTest` adds `-validate-with-downstream-compiler` to the `SIMPLE` tests
+/// with this target, unless the test has the option `no-downstream-validation`.
+///
+/// A target is added to this list when the `SIMPLE` tests of the target pass with the option, so
+/// that the downstream compiler checks all the code that the tests emit. We add the targets one at
+/// a time, because many tests emit code that the downstream compiler rejects.
+static bool _isDownstreamValidationDefaultTarget(SlangCompileTarget target)
+{
+    return target == SLANG_CUDA_SOURCE;
+}
+
+/// Returns true if `runSimpleTest` adds `-validate-with-downstream-compiler` to the test.
+///
+/// The test must expect the exit code 0, either by default or with `exit-code=0`: a test that
+/// expects a failed compilation does not emit code to validate. The option is not added if the
+/// test has it already, if the test opts out with `no-downstream-validation`, or if `slang-test`
+/// has no downstream tool for the target.
+static bool _shouldAddDownstreamValidationOption(
+    TestContext* context,
+    const TestInput& input,
+    SlangCompileTarget target)
+{
+    if (input.testOptions->command != "SIMPLE" || !_isDownstreamValidationDefaultTarget(target))
+        return false;
+    if (input.testOptions->commandOptions.containsKey(kNoDownstreamValidationTestOption))
+        return false;
+    if (input.testOptions->args.indexOf(kValidateWithDownstreamCompilerOption) != Index(-1))
+        return false;
+
+    const PassThroughFlags validationFlags =
+        _getValidationPassThroughFlags(input.testOptions->args);
+    if ((validationFlags & context->availableBackendFlags) == 0)
+        return false;
+
+    int expectedExitCode = 0;
+    String error;
+    return _hasExitCodeCheck(input) && _getExpectedExitCode(input, expectedExitCode, error) &&
+           expectedExitCode == 0;
 }
 
 TestResult runSimpleTest(TestContext* context, TestInput& input)
@@ -3657,6 +3718,9 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     const bool removeValidationOption =
         (validationFlags & context->availableBackendFlags) == 0 && validationFlags != 0;
 
+    // See what kind of target it is
+    const SlangCompileTarget target = _findTargetInArgs(input.testOptions->args);
+
     for (auto arg : input.testOptions->args)
     {
         // Filter out slang-test specific options that shouldn't be passed to slangc
@@ -3666,6 +3730,8 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
             continue;
         cmdLine.addArg(arg);
     }
+    if (_shouldAddDownstreamValidationOption(context, input, target))
+        cmdLine.addArg(kValidateWithDownstreamCompilerOption);
 
     // If we can't set up for simple compilation, it's because some external resource isn't
     // available such as NVAPI headers. In that case we just ignore the test.
@@ -3683,9 +3749,6 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     {
         return TestResult::Pass;
     }
-
-    // See what kind of target it is
-    const SlangCompileTarget target = _findTargetInArgs(input.testOptions->args);
 
     // If it's executable we run it and use it's output
     if (target == SLANG_HOST_EXECUTABLE)

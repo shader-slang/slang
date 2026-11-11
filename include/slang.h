@@ -1372,7 +1372,8 @@ typedef uint32_t SlangSizeT;
         // code with the downstream compiler or validator that matches the target (for example the
         // Metal compiler for `metal`, or the SPIR-V validator for `spirv`). The compile fails if
         // the downstream tool is not available, cannot run, or reports an error, and also if the
-        // target has no downstream tool.
+        // target has no downstream tool. NVRTC compiles only device code, so a `cuda` shader with
+        // host code, such as a function with the `CudaHost` attribute, fails with this option.
         ValidateWithDownstreamCompiler = 165,
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,

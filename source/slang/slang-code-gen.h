@@ -259,8 +259,17 @@ protected:
 
     SlangResult emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact);
 
-    SlangResult emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact);
-    SlangResult validateEmittedSourceWithDownstream(CodeGenTarget sourceTarget);
+    /* Emits the entry points with a downstream compiler. If `emittedSource` is not null, the
+    downstream compiler compiles it and the source is not emitted again. `emittedSourceTracker` is
+    then the extension tracker that was used to emit `emittedSource`. */
+    SlangResult emitWithDownstreamForEntryPoints(
+        ComPtr<IArtifact>& outArtifact,
+        IArtifact* emittedSource = nullptr,
+        ExtensionTracker* emittedSourceTracker = nullptr);
+    SlangResult validateEmittedSourceWithDownstream(
+        CodeGenTarget sourceTarget,
+        IArtifact* emittedSource,
+        ExtensionTracker* emittedSourceTracker);
 
     /* Determines a suitable filename to identify the input for a given entry point being compiled.
     If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file

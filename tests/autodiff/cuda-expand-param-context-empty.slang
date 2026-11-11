@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -validate-ir
+//TEST:SIMPLE(filecheck=CUDA,no-downstream-validation): -target cuda -line-directive-mode none -validate-ir
 
 // A custom derivative with no primal parameters has an empty captured-parameter
 // context. Expanding it must preserve the output seed and the derivative call.

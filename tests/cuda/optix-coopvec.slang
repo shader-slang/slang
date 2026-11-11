@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec
+//TEST:SIMPLE(filecheck=CHECK,no-downstream-validation): -target cuda -capability optix_coopvec
 
 // Note - Validated locally.Enable with latest optix and cuda SDK
 // TODO: GitHub issue #8556 needs to be resolved to enable the test when OptiX 9.0+ is released
@@ -100,7 +100,7 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     resultCopy.copyFrom<float>(vec2);
 
     CoopVec<float, 4> resultFMA = fma(vec1, vec2, vec3);
-    
+
     CoopVec<float, 4> vec = coopVecLoad<4, float>(input1);
     let resultMul = coopVecMatMulAdd<float, 4, 4>(
         vec,
@@ -169,11 +169,11 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 
     CoopVec<float, 4> resultMax = max(vec1, vec2);
     CoopVec<float, 4> resultMin = min(vec1, vec2);
-    
+
     CoopVec<float, 4> resultVecMul = vec1 * vec2;
     CoopVec<half, 4> trainingVec1 = coopVecLoad<4, half>(input1);
     CoopVec<half, 4> trainingVec2 = coopVecLoad<4, half>(input2);
-    
+
     outputMat.Store<float>(0, float(1));
     coopVecOuterProductAccumulate(
         trainingVec1,
@@ -191,13 +191,13 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
         outputMat2,
         0,
     );
-    
+
     CoopVec<float, 4> resultStep = step(vec1, vec2);
 
     CoopVec<float, 4> resultSub = vec1 - vec2;
-    
+
     CoopVec<float, 4> resultLog2 = log2(vec1);
-    
+
     CoopVec<float, 4> resultExp2 = exp2(vec1);
 
     for(int i = 0; i < resultTan.getCount(); ++i)
