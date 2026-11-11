@@ -138,8 +138,8 @@ void computeMain()
         uint2x2(allOnes, two, seven, allOnes),
         uint2x2(three, allOnes, 1, allOnes),
         uint2x2(five, ten, 0, 0));
-    // Only the lanes that differ from the `uint3` case are read back: `2 * 0xFFFFFFFF + 10` wraps
-    // to 8 and `0xFFFFFFFF * 0xFFFFFFFF` wraps to 1.
+    // One wrapped lane from each matrix row is read back, so both row-wise calls are checked:
+    // `2 * 0xFFFFFFFF + 10` wraps to 8 and `0xFFFFFFFF * 0xFFFFFFFF` wraps to 1.
     outBuf[19] = int(u22[0][1]);
     // CHECK-NEXT: {{^}}8{{$}}
     outBuf[20] = int(u22[1][1]);
