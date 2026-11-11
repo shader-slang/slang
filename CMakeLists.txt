@@ -977,6 +977,13 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     # unresolved-symbol errors at link time. Static consumers should use
     # find_package(slang) instead, which the export above now supports.
     if(UNIX AND NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
+        # Keep a relative includedir relative to the .pc file's relocatable
+        # prefix, but use an absolute one as is.
+        if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
+            set(SLANG_PC_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}")
+        else()
+            set(SLANG_PC_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+        endif()
         configure_file(
             "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
             "${PROJECT_BINARY_DIR}/slang-compiler.pc"
