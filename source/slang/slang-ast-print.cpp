@@ -855,21 +855,18 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             sb << "__primal(";
         }
-        else if (
-            const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr);
-            forwardDiffExpr)
+        else if (const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr);
+                 forwardDiffExpr)
         {
             sb << "__fwd_diff(";
         }
-        else if (
-            const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr);
-            backwardDiffExpr)
+        else if (const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr);
+                 backwardDiffExpr)
         {
             sb << "__bwd_diff(";
         }
-        else if (
-            const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr);
-            dispatchKernelExpr)
+        else if (const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr);
+                 dispatchKernelExpr)
         {
             sb << "__dispatch_kernel(";
         }

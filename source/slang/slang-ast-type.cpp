@@ -1015,9 +1015,8 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(
-                            getCurrentASTBuilder()->getOutParamType(
-                                _getNoDiffType(astBuilder, paramInfo.type)));
+                        newParamTypes.add(getCurrentASTBuilder()->getOutParamType(
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -1031,9 +1030,8 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(
-                            getCurrentASTBuilder()->getBorrowInOutParamType(
-                                _getNoDiffType(astBuilder, paramInfo.type)));
+                        newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -1057,9 +1055,8 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(
-                            getCurrentASTBuilder()->getConstRefParamType(
-                                _getNoDiffType(astBuilder, paramInfo.type)));
+                        newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
