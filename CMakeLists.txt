@@ -908,6 +908,16 @@ install(
     DESTINATION share/doc/slang
     PATTERN ".*" EXCLUDE
 )
+# With SLANG_EMBED_CORE_MODULE=OFF, slang-compiler and its PUBLIC_HEADERS are
+# only installed by the "generators" component, so install the public headers
+# for a default install here.
+if(NOT SLANG_EMBED_CORE_MODULE)
+    install(
+        DIRECTORY "${slang_SOURCE_DIR}/include/"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        PATTERN ".*" EXCLUDE
+    )
+endif()
 include(SlangUserSkills)
 slang_install_user_skills()
 include(CPack)
