@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: 81b9bf99f9379fb9fd8dcb82308357fc736c12a7fe7fd8190eb6452a6af8f585
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:45:00+00:00
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: 5c80cd9c727c75e9d50ceed8a5b87bc3765f30ed822e7692c577c25b27dff99e
 source_doc: docs/generated/design/ast-reference/base.md
-source_doc_digest: 7a6e4ce1e37b832e536d92b516233432432eeab672ca22cdf5f4d6cab03a04ba
+source_doc_digest: efc0c00e16a96409aab93918884f91859201463beaf308d36fd814bb6e9f4d9e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -154,6 +154,7 @@ completeness and carried in `## Untested claims` with reason
 | `Type::m_astBuilderForReflection` is kept for the reflection API only and is not used for semantic checking.                                                                                                                  | needs-unit-test       | [#type-val](../../../../design/ast-reference/base.md#type-val)                                           | Reachable only through the reflection API (`ISession` / `IComponentType`), which no `//TEST` directive drives; a C++ unit test could assert the field is untouched during checking.                 |
 | `Val` uses a generic `m_operands: List<ValNodeOperand>` list rather than per-class fields for deduplication and substitution.                                                                                                 | internal-source-fact  | [#val-nodebase](../../../../design/ast-reference/base.md#val-nodebase)                                   | A storage-layout choice. The deduplication _behaviour_ is covered by `val-type-dedup-same-overload.slang` and `val-intval-generic-arg-dedup.slang`; the operand-list representation is not visible. |
 | `Val`s are not syntax nodes and therefore carry no `SourceLoc`.                                                                                                                                                               | internal-source-fact  | [#val-nodebase](../../../../design/ast-reference/base.md#val-nodebase)                                   | An absence of state. Diagnostics that mention a type are anchored at the syntax that spelled it, so no program text can show whether the value itself also stored a location.                       |
+| `QualType` carries value-category and access flags (`isLeftValue`, `hasReadOnlyOnTarget`, `isWriteOnly`, `isReadOnlyMemoryLocation`); `isReadOnlyMemoryLocation` is never set together with `isLeftValue`, and a `__ref_readonly` parameter is one. | implementation-detail | [#support-types](../../../../design/ast-reference/base.md#support-types) | `__ref_readonly` is rejected in user code (E30133) without `-experimental-feature`, and the flag combination has no other user-level spelling; the l-value half is covered by `expr-qualtype-rvalue-not-assignable.slang`. |
 
 ## Doc gaps observed
 

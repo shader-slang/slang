@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#-disambiguation
-//META: doc_section_digest=5bdf1269b8206a09e76ed3099e3be23084e5fadaadeeb860053823b4f5e48c23
+//META: doc_section_digest=9af1f98685cb612077da94d031ef06cdcc2d4768b2522616e45c9ae531a49988
 //META: purpose=Inside a generic argument list `<` keeps its normal precedence, so a parenthesized `<` comparison is a valid generic argument.
 //META: intent=functional
 //META: pipeline_stage=parse

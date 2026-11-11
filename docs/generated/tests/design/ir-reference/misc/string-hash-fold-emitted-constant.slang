@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#getstringhash
-//META: doc_section_digest=fafa30090d995addef159bd1bcc6fec7e9b68cdafe21f467253dcff09023bf48
+//META: doc_section_digest=2e49a7038974c54373eb64a6a67281810cb65f3247508b881fd7e7f8fe060368
 //META: purpose=The hash is resolved before code generation, so the string literal's bytes never reach the emitted target code on any text-emit backend.
 //META: intent=functional
 //META: pipeline_stage=emit

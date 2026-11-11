@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -experimental-feature
 
 // Test the potential-aliasing warning for reference, borrow, `out`, and `inout` parameters. Each
 // parameter is named by the keyword of its passing mode, so a read-only or write-only reference

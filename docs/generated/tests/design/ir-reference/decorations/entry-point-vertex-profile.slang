@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#entrypoint--entrypointdecoration
-//META: doc_section_digest=239b3b10e4e9d8be973f2eaabb57e2c9b4895c336d9deb91257482e7db7e69a9
+//META: doc_section_digest=f91249d2e8a42fc3ec6ad95c39ad5d65e4982723fb7beeb3095464f47cc54d67
 //META: purpose=Boundary - a [shader("vertex")] entry point lowers to an entryPoint decoration whose profile integer is 1, distinct from the compute encoding.
 //META: intent=boundary
 //META: pipeline_stage=lower

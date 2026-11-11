@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#legacy-bridge
-//META: doc_section_digest=9a4db90ca15d01457ccb4eccfe22540d5c691579087cfee38dbcfcddcd38b792
+//META: doc_section_digest=6e5ebd9b813484e58a166e9960a401e7ac7afa23540f9e4e485f666f15ca1bf8
 //META: purpose=LegacyBackwardDifferentiate carries three function operands read as apply_bwd, remat and propagate at positions 0, 1 and 2.
 //META: intent=functional
 //META: pipeline_stage=lower

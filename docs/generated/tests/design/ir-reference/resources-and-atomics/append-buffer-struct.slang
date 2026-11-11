@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#append-and-consume-buffers
-//META: doc_section_digest=c3eeb3e0997e1c247e69158701167cf8e76357c6737ebdd1ee7577346eec31dc
+//META: doc_section_digest=15f1e60f440b7b3872eedb1a557e23652128d2b360ca043f0d0b361c0dbb8325
 //META: purpose=`AppendStructuredBuffer<S>::Append(s)` on a struct element type still lowers to a single `StructuredBufferAppend(%buf, %s)` opcode regardless of element-type shape.
 //META: intent=functional
 //META: pipeline_stage=lower

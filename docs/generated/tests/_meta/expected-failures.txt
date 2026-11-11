@@ -107,7 +107,8 @@ docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.
 # accepted silently by the frontend, but the C++ emitted with debug info
 # (`-g2`, which the `-cpu` COMPARE_COMPUTE path uses) references an
 # undeclared `shared_0`, so clang rejects the generated file. (Will become
-# a tracking issue after human triage.)
+# a tracking issue after human triage.) The LLVM CPU backend reports the same
+# shape of failure: _meta/findings/llvm-cpu-switch-case-decl-undeclared-local.yaml
 docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang (cpu)
 
 # Pending: docs/generated/tests/_meta/findings/metal-append-buffer-params-missing-binding-slot.yaml
@@ -137,31 +138,12 @@ docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-bu
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
 
-# https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
-# construction is rejected inside a generic function's array bound with
-# E33070 "expected a function, got 'typeof(Size)'", while the same spelling
-# compiles in an ordinary expression. Recorded in
-# _meta/findings/enum-cast-in-generic-array-bound-rejected.yaml.
-docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
-
-# Surfaced on nightly run 34310111817 (first failed on the 2026-09-02
-# nightly and every nightly since):
-# https://github.com/shader-slang/slang/actions/runs/34310111817
-# Compiler bug, bisected to
-# https://github.com/shader-slang/slang/pull/12574. `prelinkIR` now clones
-# an imported interface's definition into the user module instead of
-# re-deriving it. `builtinRequirementKey` is hoistable, so the linker's
-# cloner (`cloneInst` in slang-ir-link.cpp) dedups the cloned key onto the
-# one lowering already created — and then runs `cloneDecorationsAndChildren`
-# on that pre-existing inst anyway, so it ends up with
-# `BuiltinRequirementDecoration` twice. slang-ir-clone.cpp guards against
-# exactly this case (see PR #12569); the linker's cloner has no equivalent
-# guard. All three tests pin "the role decoration is immediately followed by
-# the key built from the same ordinal", which the duplicated line breaks.
-# Remove once the linker stops grafting decorations onto a dedup hit.
-docs/generated/tests/design/cross-cutting/ir-instructions/decoration-builtin-requirement-key-ir.slang
-docs/generated/tests/design/ir-reference/decorations/builtin-requirement-key-decoration.slang
-docs/generated/tests/design/ir-reference/differentiation/builtin-requirement-decoration.slang
+# Pending: docs/generated/tests/_meta/findings/torch-ordinary-entry-param-sigsegv.yaml
+# `-target torch` on an ordinary compute entry point that has a parameter
+# (e.g. `uint3 tid : SV_DispatchThreadID`) and no Torch attribute dies with
+# SIGSEGV (exit 139) instead of emitting an empty pybind module. The same
+# entry point without a parameter compiles. Remove once the crash is fixed.
+docs/generated/tests/design/pipeline/overview/torch-ordinary-entry-with-param-has-nothing-to-bind.slang
 
 # https://github.com/shader-slang/slang/issues/14259 — the HLSL emitter writes a
 # nonzero `int` constant as `NL` rather than `int(N)` and the `int` minimum as

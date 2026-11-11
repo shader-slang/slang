@@ -652,8 +652,9 @@ struct IRGenContext
     DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
     // Declaration scope is independent of the basic block where a variable is eventually stored.
     IRInst* currentDebugScope = nullptr;
-    // Insert lexical metadata before this function so its enclosing generic owns it.
-    IRInst* debugScopeOwner = nullptr;
+    // The IR value for the function being lowered, or null outside function lowering.
+    // Lexical debug metadata is inserted before it in the enclosing module or generic.
+    IRInst* irFunc = nullptr;
     // The function scope already covers this body; it needs no additional lexical block.
     Stmt* debugFunctionBody = nullptr;
 
@@ -690,6 +691,18 @@ struct IRGenContext
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : astBuilder(inAstBuilder), shared(inShared), env(&inShared->globalEnv), irBuilder(nullptr)
     {
+    }
+
+    /// Clears the enclosing function's control-flow and debug context.
+    /// Preserves `thisType`, `thisTypeWitness`, and the declaration environment.
+    void clearEnclosingFunctionContext()
+    {
+        returnDestination = LoweredValInfo();
+        catchHandler = nullptr;
+        funcDecl = nullptr;
+        currentDebugScope = nullptr;
+        irFunc = nullptr;
+        debugFunctionBody = nullptr;
     }
 
     void setGlobalValue(Decl* decl, LoweredValInfo value) { shared->setGlobalValue(decl, value); }
@@ -1459,9 +1472,15 @@ static void addLinkageDecoration(
     }
     for (auto modifier : decl->modifiers)
     {
+        // Several of these modifiers add an export decoration, which keeps the function's IR from
+        // being removed as dead code, and so keeps its calls from being inlined away. We record
+        // the modifier's own source location on that decoration, so that a later diagnostic
+        // about a call that could not be inlined, such as a `groupshared` parameter on HLSL, can
+        // point at the modifier responsible.
+        //
         if (as<HLSLExportModifier>(modifier))
         {
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
             builder->addKeepAliveDecoration(inst);
         }
         else if (as<ExternCppModifier>(modifier))
@@ -1479,13 +1498,13 @@ static void addLinkageDecoration(
         else if (as<DllExportAttribute>(modifier))
         {
             builder->addDllExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
             builder->addKeepAliveDecoration(inst);
         }
         else if (as<CudaDeviceExportAttribute>(modifier))
         {
             builder->addCudaDeviceExportDecoration(inst, decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
             builder->addExternCppDecoration(inst, decl->getName()->text.getUnownedSlice());
             builder->addKeepAliveDecoration(inst);
         }
@@ -1502,7 +1521,7 @@ static void addLinkageDecoration(
 
             // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
         }
         else if (as<TorchEntryPointAttribute>(modifier))
         {
@@ -1512,7 +1531,7 @@ static void addLinkageDecoration(
 
             // Temp decorations to get this function through the linker.
             builder->addKeepAliveDecoration(inst);
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
         }
         else if (auto pyExportModifier = as<PyExportAttribute>(modifier))
         {
@@ -1520,7 +1539,7 @@ static void addLinkageDecoration(
                 inst,
                 pyExportModifier->name.getLength() ? pyExportModifier->name.getUnownedSlice()
                                                    : decl->getName()->text.getUnownedSlice());
-            builder->addHLSLExportDecoration(inst);
+            builder->addHLSLExportDecoration(inst)->sourceLoc = modifier->loc;
         }
         else if (auto knownBuiltinModifier = as<KnownBuiltinAttribute>(modifier))
         {
@@ -3749,11 +3768,22 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
         else
             return ParamPassingMode::Out;
     }
-    else
-    {
-        // No direction modifier, or just `in`:
+    if (paramDecl->hasModifier<InModifier>())
         return ParamPassingMode::In;
+
+    // On a parameter with no passing-mode keyword, `groupshared` names the address space of a
+    // reference, so it implies `__ref`. Semantic checking reports a `groupshared` parameter whose
+    // written keyword gives it any other mode.
+    //
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        // As on a `__ref` parameter, `const` makes the reference read-only.
+        //
+        if (paramDecl->hasModifier<ConstModifier>())
+            return ParamPassingMode::RefReadOnly;
+        return ParamPassingMode::RefReadWrite;
     }
+    return ParamPassingMode::In;
 }
 
 
@@ -3770,6 +3800,24 @@ ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
     auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, paramDecl->getType());
     return actualMode;
+}
+
+AddressSpace getReferenceParamAddressSpace(ParamDecl* paramDecl)
+{
+    SLANG_RELEASE_ASSERT(isByReferenceParamPassingMode(getParamPassingMode(paramDecl)));
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+        return AddressSpace::GroupShared;
+    return AddressSpace::Generic;
+}
+
+bool hasReferenceParameter(CallableDecl* callableDecl)
+{
+    for (auto paramDecl : callableDecl->getParameters())
+    {
+        if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            return true;
+    }
+    return false;
 }
 
 DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
@@ -9525,38 +9573,6 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     return humaneLoc;
 }
 
-// Returns true if `funcDecl` is a constructor that Slang synthesized (a default
-// or member-wise initializer) rather than one the user wrote. Such a function has
-// no user-authored body; its source locations are inherited from the struct and
-// member declarations (see `createCtor` and `synthesizeCtorBodyForMemberVar` in
-// slang-check-decl.cpp). Emitting source-level debug info for it would let a
-// debugger step into the compiler-generated initializer and walk the struct/member
-// declaration lines, so callers suppress debug info for these functions (#11550).
-//
-// Discriminating by flavor (not by the `$init` name) is required: a user-written
-// `__init` is also mangled to `<Type>.$init`, but carries `UserDefined` flavor and
-// must keep its debug info. The IR `IRConstructorDecoration` is attached only after
-// the function's `IRDebugLocationDecoration`, so the AST flavor is what is available in time.
-//
-// The two `maybe*` call sites below (`maybeAddDebugLocationDecoration` on the IRFunc
-// and `maybeEmitDebugLine` on the body) self-gate on this predicate and are BOTH
-// load-bearing and non-redundant: a function's `IRDebugLocationDecoration` and its
-// body's `DebugLine`s are produced independently, so neither gate subsumes the other.
-// They key on `context->funcDecl`, which is the function currently being lowered (the
-// ctor's own IRFunc for the decoration, and the ctor again for the statements lowered
-// under its sub-context); module-level lowering runs with `funcDecl == nullptr`, so the
-// gate is a no-op there. A third caller, at the constructor-lowering site, gates the
-// `this` debug-variable emission (#11565); it is independently load-bearing because the
-// `addNameHint` there, unlike these two helpers, has no internal synthesized-ctor gate.
-static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
-{
-    auto ctorDecl = as<ConstructorDecl>(funcDecl);
-    if (!ctorDecl)
-        return false;
-    return ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault) ||
-           ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
-}
-
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -9568,9 +9584,10 @@ void maybeEmitDebugLine(
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
-    // A synthesized initializer has no user-authored source, so it must not emit
-    // steppable debug lines (see isSynthesizedConstructorDecl).
-    if (isSynthesizedConstructorDecl(context->funcDecl))
+    // Minimal debug info carries only line information and cannot mark the function being
+    // lowered as artificial, so we omit the lines of an artificial function; otherwise its
+    // generated statements would appear to be user-written.
+    if (context->debugInfoLevel == DebugInfoLevel::Minimal && isArtificialInst(context->irFunc))
         return;
 
     if (!allowNullStmt)
@@ -9604,12 +9621,19 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
-    // A synthesized initializer must not receive a source-level debug location:
-    // giving its IRFunc one would produce a DebugFunction/DebugScope (and, via
-    // insertDebugValueStore, param DebugVar/DebugValue) and let a debugger step
-    // into compiler-generated code (see isSynthesizedConstructorDecl).
-    if (isSynthesizedConstructorDecl(context->funcDecl))
-        return;
+    // Minimal debug info carries only line information and cannot mark an entity artificial,
+    // so at that level we omit locations that would make generated code look user-written.
+    if (context->debugInfoLevel == DebugInfoLevel::Minimal)
+    {
+        // An artificial entity's own location.
+        if (isArtificialInst(inst))
+            return;
+
+        // An entity's location is also omitted when the function being lowered is artificial.
+        // Outside function lowering there is no function, and the query returns false for null.
+        if (isArtificialInst(context->irFunc))
+            return;
+    }
 
     IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
     if (!debugSourceInst)
@@ -9674,6 +9698,10 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
                 locationDecor->getSource(),
                 debugType,
                 parentScope);
+            // Inlining can remove the executable function while its debug scopes remain.
+            // The debug record retains the function's artificial status independently.
+            if (isArtificialInst(irFunc))
+                builder.addDecoration(debugFuncCallee, kIROp_ArtificialDecoration);
 
             // Add a decoration to link the function to its debug function
             builder.addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
@@ -9707,7 +9735,7 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
     IRBuilder builder(*context->irBuilder);
     // Keep metadata inside the generic that owns the function. Its normal clone environment
     // then remaps lexical parents and declaration scopes together with the function body.
-    builder.setInsertBefore(context->debugScopeOwner);
+    builder.setInsertBefore(context->irFunc);
     return builder.emitDebugLexicalBlock(
         source,
         builder.getIntValue(builder.getUIntType(), loc.line),
@@ -11355,12 +11383,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.thisType = outerContext->thisType;
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
 
-            subContextStorage.returnDestination = LoweredValInfo();
-            subContextStorage.catchHandler = nullptr;
-            subContextStorage.funcDecl = nullptr;
-            subContextStorage.currentDebugScope = nullptr;
-            subContextStorage.debugScopeOwner = nullptr;
-            subContextStorage.debugFunctionBody = nullptr;
+            subContextStorage.clearEnclosingFunctionContext();
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -13906,6 +13929,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInst* irFunc = subBuilder->createFunc();
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
         irFunc->sourceLoc = decl->loc;
+        subContext->irFunc = irFunc;
+        if (decl->hasModifier<ArtificialModifier>())
+            subBuilder->addDecoration(irFunc, kIROp_ArtificialDecoration);
 
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
@@ -13974,6 +14000,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             context->setGlobalValue(decl, LoweredValInfo::simple(synthOp));
 
             irFunc = synthOp;
+            subContext->irFunc = irFunc;
         }
 
         addNameHint(subContext, irFunc, decl);
@@ -14005,7 +14032,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         irFunc->setFullType(irFuncType);
 
         subContext->currentDebugScope = maybeEmitDebugFunction(subContext, irFunc);
-        subContext->debugScopeOwner = irFunc;
         subContext->debugFunctionBody = decl->body;
         subBuilder->setInsertInto(irFunc);
 
@@ -14325,23 +14351,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     }
                 }
 
-                // For a user-written initializer compiled with debug info, expose the object
-                // under construction as a `this` debug variable, so a debugger stopped inside
+                // For a constructor compiled with debug info, expose the object under
+                // construction as a `this` debug variable, so a debugger stopped inside
                 // `__init` can inspect the members being initialized just as it can inside a
                 // `[mutating]` method. `thisStorage` is exactly that object (the value the
-                // initializer constructs and returns). Naming it lets the debug-var pass in
+                // constructor constructs and returns). Naming it lets the debug-var pass in
                 // slang-ir-insert-debug-value-store.cpp surface it: a return-destination
                 // parameter is emitted by that pass's parameter loop, whereas a fresh local is
                 // emitted by its local-var loop only if it also carries an
-                // IRDebugLocationDecoration, which we add below. Synthesized initializers are
-                // excluded via the shared isSynthesizedConstructorDecl() predicate: they have no
-                // user-authored body, so a steppable `this` would only expose compiler-generated
-                // code (the same rationale that suppresses their debug lines for #11550). Unlike
-                // maybeAddDebugLocationDecoration/maybeEmitDebugLine, addNameHint has no internal
-                // synthesized-ctor gate, so this outer check is the only thing keeping a
-                // synthesized initializer's object from being named `this`.
-                if (thisStorage && !isSynthesizedConstructorDecl(constructorDecl) &&
-                    subContext->debugInfoLevel != DebugInfoLevel::None)
+                // IRDebugLocationDecoration, which we add below.
+                if (thisStorage && subContext->debugInfoLevel != DebugInfoLevel::None)
                 {
                     addNameHint(subContext, thisStorage, "this");
 
@@ -14492,7 +14511,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (as<NoRefInlineAttribute>(modifier))
             {
-                getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
+                // Preserve the attribute's location so that a diagnostic about the call boundary
+                // it keeps can point at `[noRefInline]` itself.
+                //
+                auto decoration =
+                    getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
+                decoration->sourceLoc = modifier->loc;
             }
             else if (auto instanceAttr = as<InstanceAttribute>(modifier))
             {
@@ -14888,22 +14912,24 @@ LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl)
     }
 
     IRBuilder subIRBuilder(context->irBuilder->getModule());
-    if (as<VarDecl>(decl) && decl->findModifier<LocalTempVarModifier>())
-    {
-        // Do not modify insert location.
-        subIRBuilder.setInsertLoc(context->irBuilder->getInsertLoc());
-    }
-    else
-    {
-        subIRBuilder.setInsertInto(subIRBuilder.getModule());
-    }
-
     IRGenEnv subEnv;
     subEnv.outer = context->env;
 
     IRGenContext subContext = *context;
     subContext.irBuilder = &subIRBuilder;
     subContext.env = &subEnv;
+
+    if (as<VarDecl>(decl) && decl->findModifier<LocalTempVarModifier>())
+    {
+        // Local temporaries are lowered in their enclosing function's scope.
+        subIRBuilder.setInsertLoc(context->irBuilder->getInsertLoc());
+    }
+    else
+    {
+        subIRBuilder.setInsertInto(subIRBuilder.getModule());
+        // A module declaration is independent of the function that first references it.
+        subContext.clearEnclosingFunctionContext();
+    }
 
     auto result = lowerDecl(&subContext, decl);
 

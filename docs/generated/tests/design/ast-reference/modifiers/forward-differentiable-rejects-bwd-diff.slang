@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#differentiable-attribute-family
-//META: doc_section_digest=df9843ec03c45db964221cccc955eef1e7d6d5189748b4ed076e3d1239bf9327
+//META: doc_section_digest=26638fd86ec5c70772b8785345490b0ec9d7a8615adf9756f19b99197dda84c5
 //META: purpose=`[ForwardDifferentiable]` marks only forward mode, so `bwd_diff` on such a function is rejected.
 //META: intent=negative
 //META: pipeline_stage=check
