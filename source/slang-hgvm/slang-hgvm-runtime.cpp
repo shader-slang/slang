@@ -152,6 +152,23 @@ SlangResult IHGVMHostServices::resizeSurface(
     return fail(outError, "HGVM surface resizing is unavailable in this host");
 }
 
+SlangResult IHGVMHostServices::getSurfaceDimensions(
+    HGVMHostObject* surface,
+    uint32_t& outWidth,
+    uint32_t& outHeight,
+    String& outError)
+{
+    SLANG_UNUSED(surface);
+    outWidth = outHeight = 0;
+    return fail(outError, "HGVM surface dimensions are unavailable in this host");
+}
+
+SlangResult IHGVMHostServices::waitForSurface(HGVMHostObject* surface, String& outError)
+{
+    SLANG_UNUSED(surface);
+    return fail(outError, "HGVM surface waiting is unavailable in this host");
+}
+
 SlangResult IHGVMHostServices::acquireSurfaceTexture(
     HGVMHostObject* surface,
     ComPtr<rhi::ITexture>& outTexture,

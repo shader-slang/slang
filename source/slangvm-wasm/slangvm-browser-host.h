@@ -33,6 +33,12 @@ public:
         RefPtr<HGVMHostObject>& outSurface,
         String& outError) override;
     SlangResult resizeSurface(HGVMHostObject*, uint32_t, uint32_t, String& outError) override;
+    SlangResult getSurfaceDimensions(
+        HGVMHostObject*,
+        uint32_t& outWidth,
+        uint32_t& outHeight,
+        String& outError) override;
+    SlangResult waitForSurface(HGVMHostObject*, String& outError) override;
     SlangResult acquireSurfaceTexture(
         HGVMHostObject*,
         ComPtr<rhi::ITexture>& outTexture,

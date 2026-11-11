@@ -4228,9 +4228,11 @@ __intrinsic_type($(kIROp_AtomicType))
 [require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 struct Atomic<T : IAtomicable>
 {
-    /// Atomically load the stored `T` value
+    /// Atomically load the stored `T` value.
+    /// The receiver must retain its storage identity: `buffer[i].load()` must not copy
+    /// the atomic into a temporary when the buffer subscript also has get/set accessors.
     __intrinsic_op($(kIROp_AtomicLoad))
-    [constref] T load(MemoryOrder order = MemoryOrder.Relaxed);
+    [__ref] T load(MemoryOrder order = MemoryOrder.Relaxed);
 
     /// Atomically store a new `T` value
     __intrinsic_op($(kIROp_AtomicStore))

@@ -306,22 +306,46 @@ SlangResult BrowserHostServices::resizeSurface(
     return m_impl->configure(surface, width, height, outError);
 }
 
-SlangResult BrowserHostServices::acquireSurfaceTexture(
+SlangResult BrowserHostServices::getSurfaceDimensions(
     HGVMHostObject* object,
-    ComPtr<rhi::ITexture>& outTexture,
+    uint32_t& outWidth,
+    uint32_t& outHeight,
     String& outError)
 {
     SLANG_RETURN_ON_FAIL(m_impl->requireOpen(outError));
     auto surface = m_impl->getObject<BrowserSurface>(object, HGVMHostObjectKind::Surface, outError);
     if (!surface)
         return SLANG_E_INVALID_ARG;
+    outWidth = surface->image ? surface->image->getDesc().size.width : 0;
+    outHeight = surface->image ? surface->image->getDesc().size.height : 0;
+    return SLANG_OK;
+}
+
+SlangResult BrowserHostServices::waitForSurface(HGVMHostObject* object, String& outError)
+{
+    SLANG_RETURN_ON_FAIL(m_impl->requireOpen(outError));
+    auto surface = m_impl->getObject<BrowserSurface>(object, HGVMHostObjectKind::Surface, outError);
+    if (!surface)
+        return SLANG_E_INVALID_ARG;
     if (surface->acquired)
-        return fail(outError, "The HGVM browser surface image has already been acquired");
+        return fail(outError, "Cannot wait for an HGVM surface with an acquired image");
+    // Browser frame pacing belongs to processWindowEvents. The graph renders into an offscreen
+    // image; reserving a canvas texture here would let it expire during a later suspension.
     uint32_t width, height;
     SLANG_RETURN_ON_FAIL(m_impl->getSize(surface->window, width, height, outError));
     if (!surface->image || !width || !height || width != surface->image->getDesc().size.width ||
         height != surface->image->getDesc().size.height)
         return SLANG_E_NOT_AVAILABLE;
+    return SLANG_OK;
+}
+
+SlangResult BrowserHostServices::acquireSurfaceTexture(
+    HGVMHostObject* object,
+    ComPtr<rhi::ITexture>& outTexture,
+    String& outError)
+{
+    SLANG_RETURN_ON_FAIL(waitForSurface(object, outError));
+    auto surface = static_cast<BrowserSurface*>(object);
     surface->acquired = true;
     outTexture = surface->image;
     return SLANG_OK;

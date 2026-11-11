@@ -5,6 +5,10 @@
 //TEST:INTERPRET(hgvm,filecheck=FORMAT): -api vulkan -entry wrongAcquireFormat
 //TEST:INTERPRET(hgvm,filecheck=FORMAT): -api vulkan -entry missingAddress
 //TEST:INTERPRET(hgvm,filecheck=PRESENT): -api vulkan -entry wrongPresentResult
+//TEST:INTERPRET(hgvm,filecheck=PRESENT): -api vulkan -entry wrongWaitResult
+//TEST:INTERPRET(hgvm,filecheck=PRESENT): -api vulkan -entry wrongWaitSurface
+//TEST:INTERPRET(hgvm,filecheck=DIMENSIONS): -api vulkan -entry wrongDimensionResult
+//TEST:INTERPRET(hgvm,filecheck=DIMENSIONS): -api vulkan -entry wrongDimensionSurface
 //RESIZE: result code = 1
 //RESIZE: requires a bool result, Surface operand, and uint dimensions
 //BOOL: result code = 1
@@ -13,6 +17,8 @@
 //FORMAT: result texture format must match the Surface operand
 //PRESENT: result code = 1
 //PRESENT: requires a bool result and Surface operand
+//DIMENSIONS: result code = 1
+//DIMENSIONS: requires a uint2 result and Surface operand
 
 [host]
 void wrongDimensions(Surface<43> surface)
@@ -59,4 +65,40 @@ void wrongPresentResult(Surface<43> surface)
         result : $$uint = OpTryPresentSurface $surface;
     };
     print(result);
+}
+
+[host]
+void wrongWaitResult(Surface<43> surface)
+{
+    uint result = hgbc_asm {
+        result : $$uint = OpWaitForSurface $surface;
+    };
+    print(result);
+}
+
+[host]
+void wrongWaitSurface(uint surface)
+{
+    bool result = hgbc_asm {
+        result : $$bool = OpWaitForSurface $surface;
+    };
+    print(result);
+}
+
+[host]
+void wrongDimensionResult(Surface<43> surface)
+{
+    uint result = hgbc_asm {
+        result : $$uint = OpGetSurfaceDimensions $surface;
+    };
+    print(result);
+}
+
+[host]
+void wrongDimensionSurface(uint surface)
+{
+    uint2 result = hgbc_asm {
+        result : $$uint2 = OpGetSurfaceDimensions $surface;
+    };
+    print(result.x);
 }

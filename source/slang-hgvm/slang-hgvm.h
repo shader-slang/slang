@@ -138,6 +138,17 @@ public:
         uint32_t width,
         uint32_t height,
         String& outError);
+    /// Reports configured image dimensions without acquiring a texture. Unconfigured surfaces
+    /// return zero dimensions so callers can allocate offscreen targets before acquisition.
+    virtual SlangResult getSurfaceDimensions(
+        HGVMHostObject* surface,
+        uint32_t& outWidth,
+        uint32_t& outHeight,
+        String& outError);
+    /// Waits for image availability without exposing a texture or activating surface submission
+    /// synchronization. A host may reserve an image until acquisition or reconfiguration.
+    /// Return SLANG_E_NOT_AVAILABLE when the drawable area is temporarily unavailable.
+    virtual SlangResult waitForSurface(HGVMHostObject* surface, String& outError);
     /// Return SLANG_E_NOT_AVAILABLE without a texture when the surface is temporarily invalid.
     /// Acquisition must not resize or replace the surface's images.
     virtual SlangResult acquireSurfaceTexture(

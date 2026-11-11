@@ -2484,6 +2484,32 @@ M.opcodes = {
             }),
         }
     ),
+    opcode(
+        "WaitForSurface",
+        0xd2,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                ref_id("surface"),
+            }),
+        }
+    ),
+    opcode(
+        "GetSurfaceDimensions",
+        0xd3,
+        "FUNC",
+        {
+            inline_asm = true,
+            operands = operands({
+                type_id("type"),
+                result_id("result"),
+                ref_id("surface"),
+            }),
+        }
+    ),
 }
 
 local operand_kinds = {

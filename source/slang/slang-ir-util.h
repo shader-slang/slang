@@ -575,6 +575,26 @@ IRVarLayout* findVarLayout(IRInst* value);
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 
+/// Visits module-level functions and global-variable initializers, excluding generic bodies.
+/// Generic functions retain block parameters until specialization. Phi elimination and passes
+/// that require its output must process the same code bodies and leave those templates intact.
+template<typename F>
+static void forEachNonGenericGlobalWithCode(IRModule* module, const F& f)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Func:
+        case kIROp_GlobalVar:
+            f(cast<IRGlobalValueWithCode>(inst));
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 // Run an operation over every block in a module
 template<typename F>
 static void overAllBlocks(IRModule* module, F f)

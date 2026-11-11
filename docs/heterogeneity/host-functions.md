@@ -48,6 +48,27 @@ Allocation reserves storage; initialize contents before reading. See
 [resource indexing and transfers](resources.md#resource-indexing-and-transfers) for
 single-element access, range views, uploads, readbacks, and buffer-to-buffer copies.
 
+## Surface waits and input timing
+
+For an interactive native window, call `waitForSurface(surface)` before pumping the next frame's
+input with `processWindowEvents(window)` and `pollInputEvent(window)`. The wait reserves an
+available presentation image internally. Input handling and offscreen rendering can then submit
+GPU work, including picking and readbacks. Call `tryAcquireSurfaceTexture` only when that work
+is finished, immediately before the final blit and `tryPresentSurface`.
+
+`waitForSurface` returns `false` if the drawable area is unavailable or the swapchain needs an
+explicit `resizeSurface`. Repeated waits reuse the reservation, and resizing or releasing the
+surface discards it. Acquisition also works without a preceding wait. This is an image
+availability wait; it does not promise a particular display time or presentation queue depth.
+
+Use `surface.getDimensions()` to size the initial offscreen target without acquiring an image.
+It returns the configured image dimensions, or zero dimensions for an unconfigured surface.
+Keep acquired textures local to a drawing helper so their references are released before resize.
+
+In the browser, `processWindowEvents` already yields to the browser's frame scheduler.
+`waitForSurface` checks readiness there; canvas acquisition stays inside final presentation so
+a suspended computation cannot retain an expired canvas texture.
+
 ## Behind the scenes
 
 **Reference counting.** Resource values retain their allocations. Copies and closures keep

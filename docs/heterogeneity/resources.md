@@ -278,7 +278,6 @@ Import `slang.tensor.differentiable` for derivative-aware operations:
 | `input.dmap((uint1 i, float x) ~ => x * x)` | New differentiable tensor                                    |
 | `input.dmapTo(output, transform)`           | Write a distinct output tensor                               |
 | `input.dsum()` / `input.dsumTo(output)`     | Differentiable float sum                                     |
-| `dreduce`                                   | No general operation with this name yet; use `dsum` for sums |
 
 See [chained differentiable compute calls](automatic-differentiation.md) for an end-to-end
 backward pass, gradient allocation, and output.

@@ -1,6 +1,5 @@
 #include "slang-ir-legalize-hgbc-control-flow.h"
 
-#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 
@@ -9,17 +8,23 @@ namespace Slang
 void legalizeControlFlowForHGBC(IRModule* module)
 {
     List<IRInst*> terminators;
-    InstPassBase context(module);
-    context.processAllInsts(
-        [&](IRInst* inst)
+    forEachNonGenericGlobalWithCode(
+        module,
+        [&](IRGlobalValueWithCode* code)
         {
-            switch (inst->getOp())
+            for (auto block : code->getBlocks())
             {
-            case kIROp_Loop:
-            case kIROp_IfElse:
-            case kIROp_Switch:
-                terminators.add(inst);
-                break;
+                auto terminator = block->getTerminator();
+                if (!terminator)
+                    continue;
+                switch (terminator->getOp())
+                {
+                case kIROp_Loop:
+                case kIROp_IfElse:
+                case kIROp_Switch:
+                    terminators.add(terminator);
+                    break;
+                }
             }
         });
 

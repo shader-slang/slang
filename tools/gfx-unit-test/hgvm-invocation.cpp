@@ -819,6 +819,99 @@ SLANG_UNIT_TEST(hgvmHostWindowInvocation)
     SLANG_CHECK(SLANG_FAILED((*function)(makeArrayView(args), value, error)));
 }
 
+SLANG_UNIT_TEST(hgvmSurfaceWaitInvocation)
+{
+    struct Host : IHGVMHostServices
+    {
+        SlangResult waitResult = SLANG_OK;
+        int waits = 0;
+        int queries = 0;
+
+        SlangResult createSurface(
+            HGVMHostObject* window,
+            rhi::Format,
+            uint32_t,
+            RefPtr<HGVMHostObject>& surface,
+            String&) override
+        {
+            SLANG_CHECK(window->getOwner() == this);
+            surface = new HGVMHostObject(HGVMHostObjectKind::Surface, this);
+            return SLANG_OK;
+        }
+
+        SlangResult getSurfaceDimensions(
+            HGVMHostObject* surface,
+            uint32_t& width,
+            uint32_t& height,
+            String&) override
+        {
+            SLANG_CHECK(surface->getOwner() == this);
+            ++queries;
+            width = 320;
+            height = 240;
+            return SLANG_OK;
+        }
+
+        SlangResult waitForSurface(HGVMHostObject* surface, String& error) override
+        {
+            SLANG_CHECK(surface->getOwner() == this);
+            ++waits;
+            if (waitResult == SLANG_E_ABORT)
+                error = "Surface wait cancelled";
+            return waitResult;
+        }
+    };
+    // A fake surface keeps this test independent of native windows and presentation APIs.
+    auto program = compileHGVMTestProgram(unitTestContext->slangGlobalSession, R"(
+        __target_intrinsic(hgbc, "OpWindowType")
+        public struct Window {}
+        [host] uint main(Window window)
+        {
+            Surface<43> surface = hgbc_asm {
+                result : $$Surface<43> = OpCreateSurface $window $2u;
+            };
+            uint2 dimensions = hgbc_asm {
+                result : $$uint2 = OpGetSurfaceDimensions $surface;
+            };
+            bool ready = hgbc_asm { result : $$bool = OpWaitForSurface $surface; };
+            if (!ready) return 0;
+            ready = hgbc_asm { result : $$bool = OpWaitForSurface $surface; };
+            return ready ? dimensions.x + dimensions.y : 1;
+        }
+    )");
+    RefPtr<Host> host = new Host;
+    Desc desc;
+    desc.hostServices = host;
+    Interpreter vm(desc);
+    RefPtr<BoundFunction> function;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        vm.bindFunction(program, program->findFunctionExport("main")->id, function, error)));
+    RefPtr<HGVMHostObject> window = new HGVMHostObject(HGVMHostObjectKind::Window, host);
+    Argument arguments[] = {Argument::fromHostObject(window)};
+    auto references = window->debugGetReferenceCount();
+    Value value;
+    uint32_t result = 0;
+    SlangResult invocationResult = (*function)(makeArrayView(arguments), value, error);
+    if (SLANG_FAILED(invocationResult))
+        fprintf(stderr, "%s\n", error.getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(invocationResult));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(value.getScalarData(ScalarType::UInt32, &result, sizeof(result), error)));
+    SLANG_CHECK(result == 560 && host->waits == 2 && host->queries == 1);
+
+    host->waitResult = SLANG_E_NOT_AVAILABLE;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED((*function)(makeArrayView(arguments), value, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(value.getScalarData(ScalarType::UInt32, &result, sizeof(result), error)));
+    SLANG_CHECK(result == 0 && host->waits == 3 && host->queries == 2);
+
+    host->waitResult = SLANG_E_ABORT;
+    SLANG_CHECK(SLANG_FAILED((*function)(makeArrayView(arguments), value, error)));
+    SLANG_CHECK(error.contains("Surface wait cancelled"));
+    SLANG_CHECK(window->debugGetReferenceCount() == references);
+}
+
 SLANG_UNIT_TEST(hgvmScalarInvocation)
 {
     auto program = compileHGVMTestProgram(unitTestContext->slangGlobalSession, R"(

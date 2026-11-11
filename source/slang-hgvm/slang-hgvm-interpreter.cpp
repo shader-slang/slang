@@ -3038,6 +3038,8 @@ private:
         case HGBCOpcode::CloseWindow:
         case HGBCOpcode::SetWindowTitle:
         case HGBCOpcode::CreateSurface:
+        case HGBCOpcode::GetSurfaceDimensions:
+        case HGBCOpcode::WaitForSurface:
         case HGBCOpcode::AcquireSurfaceTexture:
         case HGBCOpcode::PresentSurface:
         case HGBCOpcode::TryAcquireSurfaceTexture:
@@ -4312,7 +4314,7 @@ private:
             record.operands[0]);
     }
 
-    /// Emits acquisition or presentation with one direct surface location.
+    /// Emits a unary surface operation with one direct surface location.
     void stageSurfaceOperation(const HGBC::Record& record)
     {
         Address resultAddress;
@@ -4982,6 +4984,8 @@ private:
                 case HGBCOpcode::CreateSurface:
                     stageCreateSurface(record);
                     break;
+                case HGBCOpcode::GetSurfaceDimensions:
+                case HGBCOpcode::WaitForSurface:
                 case HGBCOpcode::AcquireSurfaceTexture:
                 case HGBCOpcode::PresentSurface:
                 case HGBCOpcode::TryPresentSurface:
@@ -10362,7 +10366,7 @@ struct InterpreterState
         advance(header);
     }
 
-    /// Submits device work before entering either potentially blocking host surface operation.
+    /// Submits device work before entering a potentially blocking host surface operation.
     ///
     /// Consider an offscreen render followed by `acquireSurfaceTexture()`: acquisition can wait
     /// for VSync to release a swap-chain image. Submit the independent render first so the GPU can
@@ -10381,6 +10385,31 @@ struct InterpreterState
         String hostError;
         switch (opcode)
         {
+        case HGBCOpcode::GetSurfaceDimensions:
+            {
+                // Metadata queries leave independent GPU work buffered and do not acquire an
+                // image, so a caller can size its first offscreen frame before rendering.
+                AddressRef<uint32_t> dimensions =
+                    resolveAddress<uint32_t>(record.header.resultAddress, 2 * sizeof(uint32_t));
+                SlangResult result = hostServices->getSurfaceDimensions(
+                    surface->object,
+                    dimensions.get()[0],
+                    dimensions.get()[1],
+                    hostError);
+                requireHostSuccess("HGVM host surface dimension query failed", result, hostError);
+            }
+            break;
+        case HGBCOpcode::WaitForSurface:
+            {
+                // Submit independent work before waiting, but leave surface synchronization
+                // inactive so input processing can still issue picker/readback submissions.
+                deviceState->submitPendingCommands();
+                SlangResult result = hostServices->waitForSurface(surface->object, hostError);
+                if (result != SLANG_E_NOT_AVAILABLE)
+                    requireHostSuccess("HGVM host surface wait failed", result, hostError);
+                writeValue(record.header.resultAddress, result != SLANG_E_NOT_AVAILABLE);
+            }
+            break;
         case HGBCOpcode::AcquireSurfaceTexture:
             {
                 deviceState->submitPendingCommands();
@@ -11173,6 +11202,8 @@ struct InterpreterState
                 case HGBCOpcode::CreateSurface:
                     executeCreateSurface(header);
                     break;
+                case HGBCOpcode::GetSurfaceDimensions:
+                case HGBCOpcode::WaitForSurface:
                 case HGBCOpcode::AcquireSurfaceTexture:
                 case HGBCOpcode::PresentSurface:
                 case HGBCOpcode::TryPresentSurface:

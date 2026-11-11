@@ -189,14 +189,6 @@ _Ambient-occlusion bunny: 64 accumulated frames, with 32 visibility rays per sur
 
 ## Rough edges
 
-**Hardware type aliases.** `HWRaytracingContext<>` can be used as a type namespace without
-constructing a context. For example, `HWRaytracingContext<>.TriangleGeometry` and
-`HWRaytracingContext<PrimaryRay>.TriangleGeometry` are identical. Constructing a context still
-requires 1–15 ray types. `AccelerationStructure` aliases Slang's native
-`RaytracingAccelerationStructure`, so its descriptor handles also work with `RayQuery`.
-This is the hardware implementation; a software context interface and portable hit-information
-API are future work.
-
 **Single `HWRaytracingContext<...>` instance.** A dispatch currently accepts one distinct context tracker. Copies of that context and handlers referring to their own context are supported; combining independent trackers is not.
 A context supports 1–15 ray types. Set a sufficient recursion depth when handlers trace secondary rays.
 

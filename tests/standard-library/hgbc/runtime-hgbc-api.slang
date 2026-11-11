@@ -31,8 +31,10 @@ void main()
     bool isOpen = processWindowEvents(window);
     InputEvent inputEvent = pollInputEvent(window);
     DefaultSurface surface = createSurface(window);
+    uint2 surfaceSize = surface.getDimensions();
+    print(surfaceSize.x);
     DefaultSurfaceTarget recoveredSurfaceTexture;
-    if (resizeSurface(surface, 32, 32) &&
+    if (resizeSurface(surface, 32, 32) && waitForSurface(surface) &&
         tryAcquireSurfaceTexture(surface, recoveredSurfaceTexture))
         print(tryPresentSurface(surface));
     DefaultSurfaceTarget surfaceTexture = acquireSurfaceTexture(surface);
@@ -112,6 +114,8 @@ void main()
 // CHECK-DAG: OpAcquireSurfaceTexture
 // CHECK-DAG: OpPresentSurface
 // CHECK-DAG: OpResizeSurface
+// CHECK-DAG: OpWaitForSurface
+// CHECK-DAG: OpGetSurfaceDimensions
 // CHECK-DAG: OpTryAcquireSurfaceTexture
 // CHECK-DAG: OpTryPresentSurface
 // CHECK-DAG: OpCloseWindow

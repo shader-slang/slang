@@ -185,7 +185,7 @@ try {
 }
 ```
 
-#### Example: Objects containing reference-counted fields.
+### Example: Objects containing reference-counted fields.
 
 Reference-counted GPU resources, such as textures, are managed by the VM. When returned from an invocation, `slangvm` wraps them in ref-counted host objects. This allows the actual object to stay in the VM's memory as long as references to it exist (even if they are from outside Slang)
 
@@ -250,7 +250,7 @@ Python, C++, and JavaScript. Creating or using a GPU resource still requires a s
 passing its handle does not convert it to a host-library resource.
 
 **Limited support for parameter passing modes.** Export concrete host functions with supported value parameters.
-Borrowed pointers, `out`/`inout`/`ref` parameters.
+`out`/`inout`/`ref` parameters are not yet fully supported on the inter-op boundary, and passing raw pointers requires manual lifetime management.
 
 **Reloading.** A VM uses a source snapshot. Create a fresh VM after changing source files.
 The [native/Python API notes](../../source/slangvm/README.md)

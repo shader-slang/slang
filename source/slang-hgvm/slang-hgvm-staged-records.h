@@ -911,7 +911,7 @@ struct CreateSurface
     rhi::Format requestedFormat = rhi::Format::Undefined;
 };
 
-/// Acquires or presents one surface through its direct managed-handle location.
+/// Queries, waits for, acquires, or presents a surface through its direct managed-handle location.
 ///
 /// Acquisition transfers a new texture wrapper into `header.resultAddress`. Presentation first
 /// submits the DeviceState batch containing the corresponding blit, then calls the host service.

@@ -90,7 +90,36 @@ public bool resizeSurface<let format : int>(Surface<format> surface, uint width,
     };
 }
 
-/// Acquires the raw surface image. Acquisition never resizes the swapchain.
+public extension<let format : int> Surface<format>
+{
+    /// Reports configured image dimensions without acquiring an image or waiting for the GPU.
+    /// Returns zero dimensions for an unconfigured surface.
+    public uint2 getDimensions()
+    {
+        return hgbc_asm
+        {
+        result:
+            $$uint2 = OpGetSurfaceDimensions $this;
+        };
+    }
+}
+
+/// Waits for the next surface image without exposing it or starting surface rendering.
+/// Pump window events after this wait to sample fresh input, then render offscreen and acquire.
+/// Repeated waits before acquisition reuse the same reservation. Resizing releases it.
+/// Returns false when the drawable area is unavailable or needs an explicit surface resize.
+/// Browser hosts use their event loop for frame pacing, so this only checks readiness there.
+public bool waitForSurface<let format : int>(Surface<format> surface)
+{
+    return hgbc_asm
+    {
+    result:
+        $$bool = OpWaitForSurface $surface;
+    };
+}
+
+/// Acquires the raw surface image, reusing a preceding waitForSurface reservation if present.
+/// Acquisition never resizes the swapchain and does not require a preceding wait.
 public RenderTarget2D<float4, format> acquireSurfaceTexture<let format : int>(
     Surface<format> surface)
 {

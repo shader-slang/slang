@@ -356,6 +356,45 @@ public:
         return configureSurface(surface, width, height, outError);
     }
 
+    SlangResult getSurfaceDimensions(
+        HGVMHostObject* value,
+        uint32_t& outWidth,
+        uint32_t& outHeight,
+        String& outError) override
+    {
+        NativeSurface* surface = getSurface(value, outError);
+        if (!surface)
+            return SLANG_E_INVALID_ARG;
+        const auto* config = surface->surface->getConfig();
+        outWidth = config ? config->width : 0;
+        outHeight = config ? config->height : 0;
+        return SLANG_OK;
+    }
+
+    SlangResult waitForSurface(HGVMHostObject* value, String& outError) override
+    {
+        NativeSurface* surface = getSurface(value, outError);
+        if (!surface)
+            return SLANG_E_INVALID_ARG;
+        if (surface->acquiredTexture)
+            return fail(outError, "Cannot wait for an HGVM surface with an acquired image");
+        // A callback can close the window between frames, destroying its native handle.
+        if (!surface->window->open)
+            return SLANG_E_NOT_AVAILABLE;
+        platform::Rect rect = surface->window->window->getClientRect();
+        if (rect.width <= 0 || rect.height <= 0 || !surface->surface->getConfig())
+            return SLANG_E_NOT_AVAILABLE;
+
+        // Keep the reservation inside RHI. Only acquireSurfaceTexture exposes the image and
+        // activates its submission synchronization, after input and offscreen work are done.
+        SlangResult result = surface->surface->waitForNextImage();
+        if (result == SLANG_E_NOT_AVAILABLE)
+            return result;
+        if (SLANG_FAILED(result))
+            return fail(outError, "RHI failed to wait for the next HGVM native surface image");
+        return SLANG_OK;
+    }
+
     SlangResult acquireSurfaceTexture(
         HGVMHostObject* value,
         ComPtr<rhi::ITexture>& outTexture,
@@ -539,7 +578,13 @@ private:
     {
         platform::Rect rect = surface->window->window->getClientRect();
         if (!width || !height || rect.width <= 0 || rect.height <= 0)
+        {
+            // A minimized surface cannot present a reserved image. Retire that reservation
+            // through the same reconfiguration lifecycle as an ordinary size change.
+            if (SLANG_FAILED(surface->surface->unconfigure()))
+                return fail(outError, "RHI failed to unconfigure the minimized HGVM surface");
             return SLANG_E_NOT_AVAILABLE;
+        }
         const rhi::SurfaceInfo& info = surface->surface->getInfo();
         rhi::Format selectedFormat = selectSurfaceFormat(info, surface->requestedFormat);
         if (selectedFormat == rhi::Format::Undefined)

@@ -2995,6 +2995,12 @@ private:
                 record,
                 getAddressedTypeId(record.operands[3]),
                 record.operands[2]);
+        case HGBCOpcode::GetSurfaceDimensions:
+            if (!isUInt2Type(record.operands[0]) ||
+                !isTypeOpcode(getEffectiveValueTypeId(record.operands[2]), HGBCOpcode::SurfaceType))
+                return fail(record, "requires a uint2 result and Surface operand");
+            return true;
+        case HGBCOpcode::WaitForSurface:
         case HGBCOpcode::TryPresentSurface:
             if (!m_program.getIndex().boolTypeIds.contains(record.operands[0]) ||
                 !isTypeOpcode(getEffectiveValueTypeId(record.operands[2]), HGBCOpcode::SurfaceType))

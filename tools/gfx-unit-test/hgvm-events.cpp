@@ -1511,6 +1511,141 @@ SLANG_UNIT_TEST(hgvmEventsLambdaLocations)
     }
 }
 
+#if SLANG_ENABLE_HGVM_EVENT_TRACKING
+static void testSurfaceWaitSubmissions(UnitTestContext* context, rhi::DeviceType api)
+{
+    auto apiFlag = api == rhi::DeviceType::Vulkan ? RenderApiFlag::Vulkan : RenderApiFlag::D3D12;
+    if (!(context->enabledApis & apiFlag))
+    {
+        SLANG_IGNORE_TEST;
+    }
+    rhi::DeviceDesc deviceDesc{};
+    deviceDesc.deviceType = api;
+    deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
+    deviceDesc.debugCallback = context->debugCallback;
+    ComPtr<rhi::IDevice> device = rhi::getRHI()->createDevice(deviceDesc);
+    SLANG_CHECK_ABORT(device);
+
+    struct Host : IHGVMHostServices
+    {
+        RefPtr<RecordingEventSink> events;
+        ComPtr<rhi::ITexture> image;
+        int waits = 0;
+        int acquisitions = 0;
+        int presentations = 0;
+
+        SlangResult createSurface(
+            HGVMHostObject*,
+            rhi::Format,
+            uint32_t,
+            RefPtr<HGVMHostObject>& surface,
+            String&) override
+        {
+            surface = new HGVMHostObject(HGVMHostObjectKind::Surface, this);
+            return SLANG_OK;
+        }
+
+        SlangResult getSurfaceDimensions(
+            HGVMHostObject*,
+            uint32_t& width,
+            uint32_t& height,
+            String&) override
+        {
+            // Metadata must not turn into an implicit submission or image acquisition.
+            SLANG_CHECK(events->count(TrackingEventKind::CommandBufferSubmit) == 0);
+            width = height = 2;
+            return SLANG_OK;
+        }
+        SlangResult waitForSurface(HGVMHostObject*, String&) override
+        {
+            SLANG_CHECK(events->count(TrackingEventKind::CommandBufferSubmit) == 1);
+            ++waits;
+            return SLANG_OK;
+        }
+        SlangResult acquireSurfaceTexture(HGVMHostObject*, ComPtr<rhi::ITexture>& texture, String&)
+            override
+        {
+            // Work between wait and acquire must be submitted before presentation sync starts.
+            SLANG_CHECK(events->count(TrackingEventKind::CommandBufferSubmit) == 2);
+            texture = image;
+            ++acquisitions;
+            return SLANG_OK;
+        }
+        SlangResult presentSurface(HGVMHostObject*, String&) override
+        {
+            SLANG_CHECK(events->count(TrackingEventKind::CommandBufferSubmit) == 3);
+            ++presentations;
+            return SLANG_OK;
+        }
+    };
+    RefPtr<Host> host = new Host;
+    host->events = new RecordingEventSink;
+    rhi::TextureDesc textureDesc{};
+    textureDesc.type = rhi::TextureType::Texture2D;
+    textureDesc.size = {2, 2, 1};
+    textureDesc.format = rhi::Format::RGBA8UnormSrgb;
+    textureDesc.usage = rhi::TextureUsage::RenderTarget;
+    textureDesc.defaultState = rhi::ResourceState::RenderTarget;
+    host->image = device->createTexture(textureDesc);
+    SLANG_CHECK_ABORT(host->image);
+    auto program = compileHGVMTestProgram(context->slangGlobalSession, R"(
+        __target_intrinsic(hgbc, "OpWindowType")
+        public struct Window {}
+        [shader("compute")] [numthreads(1,1,1)]
+        void store(uniform RWStructuredBuffer<uint> buffer, uniform uint value)
+        {
+            buffer[0] = value;
+        }
+        [host] void main(Window window)
+        {
+            Surface<43> surface = hgbc_asm {
+                result : $$Surface<43> = OpCreateSurface $window $2u;
+            };
+            let buffer = RWStructuredBuffer<uint>::alloc(1);
+            dispatch(store, uint3(1,1,1))(buffer, 12u);
+            uint2 size = hgbc_asm { result : $$uint2 = OpGetSurfaceDimensions $surface; };
+            bool ready = hgbc_asm { result : $$bool = OpWaitForSurface $surface; };
+            if (!ready) return;
+            dispatch(store, uint3(1,1,1))(buffer, size.x);
+            RenderTarget2D<float4, 43> image = hgbc_asm {
+                result : $$RenderTarget2D<float4, 43> = OpAcquireSurfaceTexture $surface;
+            };
+            dispatch(store, uint3(1,1,1))(buffer, 56u);
+            hgbc_asm { OpPresentSurface $surface; };
+        }
+    )");
+    Desc desc{};
+    desc.device = device;
+    desc.hostServices = host;
+    desc.gpuExecution = GPUExecutionMode::Buffered;
+    desc.enableEventTracking = true;
+    desc.eventSink = host->events;
+    Interpreter interpreter(desc);
+    RefPtr<BoundFunction> function;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        interpreter
+            .bindFunction(program, program->findFunctionExport("main")->id, function, error)));
+    RefPtr<HGVMHostObject> window = new HGVMHostObject(HGVMHostObjectKind::Window, host);
+    Argument arguments[] = {Argument::fromHostObject(window)};
+    Value value;
+    SlangResult result = (*function)(makeArrayView(arguments), value, error);
+    if (SLANG_FAILED(result))
+        fprintf(stderr, "%s\n", error.getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    SLANG_CHECK(host->waits == 1 && host->acquisitions == 1 && host->presentations == 1);
+}
+
+SLANG_UNIT_TEST(hgvmSurfaceWaitSubmissionsVulkan)
+{
+    testSurfaceWaitSubmissions(unitTestContext, rhi::DeviceType::Vulkan);
+}
+SLANG_UNIT_TEST(hgvmSurfaceWaitSubmissionsD3D12)
+{
+    testSurfaceWaitSubmissions(unitTestContext, rhi::DeviceType::D3D12);
+}
+#endif
+
 SLANG_UNIT_TEST(hgvmEventsVulkan)
 {
     testInterpreterEvents(unitTestContext, rhi::DeviceType::Vulkan);
