@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#size-alignment-count
-//META: doc_section_digest=51c06a6e0b203ac03018c20cb45a976514904e23b0cc64a11c4371e0ec15da9d
+//META: doc_section_digest=2dd2bfcaa2aa059f39f24fda445895796cfd89712938d9d37e820a7ca67b9e63
 //META: purpose=`countof` of a fixed-size array reports that array's element count.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -1397,6 +1397,9 @@ local insts = {
 	{ metalSetPrimitive = { operands = { { "index" }, { "elementValue" } } } },
 	{ metalSetIndices = { operands = { { "index" }, { "elementValue" } } } },
 	{ MetalCastToDepthTexture = { operands = { { "texture" } } } },
+	-- Order this thread's accesses to an `access::read_write` texture across this point
+	-- (MSL `texture.fence()`); `insertMetalTextureFences` puts one before and after each write.
+	{ metalTextureFence = { operands = { { "texture" } } } },
 	-- Construct a vector from a scalar
 	-- %dst = MakeVectorFromScalar %T %N %val
 	-- where
@@ -2528,6 +2531,12 @@ local insts = {
 					min_operands = 1,
 				},
 			},
+			{
+				Artificial = {
+					-- Marks a compiler-generated entity with no corresponding user-written declaration.
+					struct_name = "ArtificialDecoration",
+				},
+			},
 			{ method = { struct_name = "MethodDecoration" } },
 			{
 				packoffset = {
@@ -3065,6 +3074,7 @@ local insts = {
 	{ DebugInlinedAt = { min_operands = 5 } },
 	{
 		DebugFunction = {
+			-- Operands are the name, line, column, source, function type, and optional lexical parent scope.
 			min_operands = 5,
 		},
 	},

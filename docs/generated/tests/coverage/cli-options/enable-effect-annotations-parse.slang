@@ -27,7 +27,7 @@
 // DEFAULT pins the rejection, ENABLED pins the successful parse via the emitted
 // constant buffer and the use of `gColor_0` in the entry point.
 
-//TEST:SIMPLE(filecheck=DEFAULT):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=DEFAULT,exit-code=-1):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=ENABLED):-target hlsl -entry main -stage compute -enable-effect-annotations
 
 uniform float4 gColor <string uiName = "Color";>;

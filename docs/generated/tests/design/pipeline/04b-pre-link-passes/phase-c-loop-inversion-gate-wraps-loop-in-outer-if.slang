@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-c-mandatory-optimization-passes
-//META: doc_section_digest=339aa1f99eee344569651cc325281f522a4a1b164a14ae41c68d88b02639a221
+//META: doc_section_digest=8411136075cfb1ef02f4e7d52df8c86c4640843d63a083f7900740dd0f80c151
 //META: purpose=Phase C's invertLoops (C6) runs only under the LoopInversion toggle, moving the loop condition to the end of the loop and wrapping the loop in an outer if.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

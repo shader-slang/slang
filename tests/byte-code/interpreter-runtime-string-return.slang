@@ -1,4 +1,4 @@
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 // Companion to interpreter-runtime-string-diagnostic.slang (issue #13017): a runtime
 // `String` is unrepresentable however it is materialized, not only as a ternary result.
@@ -19,7 +19,6 @@ String choose(bool b)
 void main()
 {
     String s = choose(cmpF(1.0, 2.0));
-    //CHECK: result code = 1
     //CHECK-DAG: error[E52014]
     //CHECK-DAG: 'string' has no HostVM layout
     //CHECK-NOT: error[E99999]

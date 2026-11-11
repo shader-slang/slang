@@ -3,15 +3,15 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#unqualified-lookup
-//META: doc_section_digest=ce74e751abd83caf10326ac968c3af12829a5d0d24575d5595ca7f1148931ff5
-//META: purpose=A constructor gives a mutable this, so an unqualified assignment to a field inside __init initializes the object being constructed.
+//META: doc_section_digest=d1c02da07b357c8b41134fbb13a153c9451e991db3087032b3d340a5ddfdfa75
+//META: purpose=A constructor body has a mutable this (the checker's this computation makes it an l-value), so an unqualified assignment to a field inside __init initializes the object being constructed.
 //META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the constructor arm of the this-parameter-mode update,
-// which the doc lists alongside the setter as always yielding a
-// mutable `this`. The __init body writes `n` by unqualified name;
+// Verifies the constructor arm of the checker's `this` computation:
+// lookup records only a ThisExpr breadcrumb, and checking that
+// implicit `this` treats a ConstructorDecl as an l-value. The __init body writes `n` by unqualified name;
 // CHECK asserts the constructed value is 4 + 1, which is only visible
 // to the caller if the write went through a mutable receiver.
 

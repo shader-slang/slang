@@ -17,7 +17,6 @@ static const float kTableB[8] = { 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0 }
 static const float4 kVectors[2] = { float4(1.0, 2.0, 3.0, 4.0), float4(5.0, 6.0, 7.0, 8.0) };
 
 // NOPRIVATE holds only a NOT check, so it scans the whole output.
-// NOPRIVATE: result code = 0
 // NOPRIVATE-NOT: var<private>
 
 // WGSL-DAG: {{^}}const kTableA{{.*}} : array<f32, i32(8)> = array<f32, i32(8)>(

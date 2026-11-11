@@ -5,7 +5,7 @@
 //CHECK: error[E361
 
 // Selecting the same method already rejects its any-hit-only body during entry-point checking.
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=ENTRY): -experimental-feature -entry TestClosestHit -target hlsl -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ENTRY,exit-code=-1): -experimental-feature -entry TestClosestHit -target hlsl -no-codegen
 //ENTRY: error[E36107]: unavailable features in entry point
 
 import slang.raytracing.portable;

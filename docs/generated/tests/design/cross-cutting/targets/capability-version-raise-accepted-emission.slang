@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#profiles-versus-explicit--capability
-//META: doc_section_digest=aa5b75d19e741d5bc36e7de273e6e9a576a676ed130d76b894b28a5c65ebc8e9
+//META: doc_section_digest=86d885abbc7bc1dd1eef8202abb2b85827b91f65865198cb1196cac24a787374
 //META: purpose=The same capability that conflicts with `-profile spirv_1_3` is accepted when the profile pins a high enough version, when no profile is given, and when the profile names a different version family — each emitting a 1.6 module.
 //META: intent=boundary
 //META: pipeline_stage=cli-options

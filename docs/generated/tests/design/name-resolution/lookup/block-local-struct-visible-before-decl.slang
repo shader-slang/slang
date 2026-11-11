@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#block-local-shadowing
-//META: doc_section_digest=19552959c89804d1cb5ac77ef527a84d295279a3c993890fc132c3d69082efd2
+//META: doc_section_digest=24b2e37706dffd5a2f6286a13b0271a96dc30366c33fe244deca52d7be73e0e4
 //META: purpose=The hidden-until-declared rule applies only to local variables, so a struct declared later in the same block is still found by an earlier reference.
 //META: intent=boundary
 //META: pipeline_stage=check

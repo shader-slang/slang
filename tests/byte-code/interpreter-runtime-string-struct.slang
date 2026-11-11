@@ -1,4 +1,4 @@
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 // A user aggregate that contains a `String` has no HostVM layout, so a runtime value
 // of it is unrepresentable and must be diagnosed rather than silently allocated a
@@ -20,7 +20,6 @@ void main()
     Named a = {"x"};
     Named b = {"y"};
     Named r = cmpF(1.0, 2.0) ? a : b;
-    //CHECK: result code = 1
     //CHECK-NOT: error[E99999]
     //CHECK-NOT: error[E99997]
     // The aggregate `Named` (it contains a `String`) has no HostVM layout, so any runtime

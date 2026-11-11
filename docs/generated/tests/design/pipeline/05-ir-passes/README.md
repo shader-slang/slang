@@ -1,11 +1,11 @@
 ---
 generated: true
-model: gpt-5.6-sol
-generated_at: 2026-09-16T06:40:19Z
-source_commit: d3b56927b854c14fa1ac169b72da6e080ea80833
-watched_paths_digest: 6793d82d75d05d6dd52d9c36466dde9550190660d1bbfac0f3e0727805879abd
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T20:50:45Z
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: 43d37977203d50034b8827e07e2f91a77dd9ada791ea913e57368a2ec933ff40
 source_doc: docs/generated/design/pipeline/05-ir-passes.md
-source_doc_digest: 9e47cfe14a2e87583d053faa5efba3bea70e1d24dc8091589cb824d2a1419b80
+source_doc_digest: d19cb78bfc42230044ccd2734eb663e059c9b7be7d284c46f40706f69111f919
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -63,7 +63,7 @@ array-typed generic parameters" wording were re-described against the
 generic-substitution claim they actually observe, and a new test covers the
 reworded row.
 
-`size_cap_files` is 150; the bundle has 144 test files.
+`size_cap_files` is 150; the bundle has 147 test files.
 
 ## Claims
 
@@ -119,7 +119,7 @@ classified in `## Untested claims` under `implementation-detail` or
 
 21. Link pulls in IR for `import`ed modules so all symbols resolve.
 22. `validateIRModule` performs structural sanity checks — use-def and parent/child list consistency, operand dominance, one terminator per block, block parameters before ordinary instructions.
-23. It runs only when IR validation is switched on, and a failure means an earlier pass produced malformed IR — a compiler-internal invariant break that valid Slang source cannot provoke, so there is no negative test to write for it.
+23. It runs only when IR validation is switched on, and a failure means an earlier pass produced malformed IR — the doc states only that it flags earlier-pass malformed IR, with no source-level trigger.
 24. The same file hosts `validateAndRemoveAssumeAddress`, run right after linking.
 25. It also hosts `validateVectorsAndMatrices`, run late against the target's vector / matrix limits.
 26. Check recursion diagnoses unsupported recursion.
@@ -366,6 +366,7 @@ classified in `## Untested claims` under `implementation-detail` or
 | The layout pass adds resource binding decorations; the SPIR-V emit carries explicit `Binding N` / `DescriptorSet 0` decorations for each declared resource.                                                                                     | functional | [#layout-and-binding](../../../../design/pipeline/05-ir-passes.md#layout-and-binding)                                   | [`layout-pass-emits-binding-and-descriptorset-decorations.slang`](layout-pass-emits-binding-and-descriptorset-decorations.slang)             |
 | The string-hash pass replaces `getStringHash("...")` with a stable integer hash at IR level.                                                                                                                                                    | functional | [#layout-and-binding](../../../../design/pipeline/05-ir-passes.md#layout-and-binding)                                   | [`string-hash-pass-emits-numeric-hash.slang`](string-hash-pass-emits-numeric-hash.slang)                                                     |
 | The translate-global-varying-var pass routes `SV_DispatchThreadID` into a target-shaped stage-input on every text target.                                                                                                                       | functional | [#layout-and-binding](../../../../design/pipeline/05-ir-passes.md#layout-and-binding)                                   | [`translate-global-varying-var-emits-input-as-parameter.slang`](translate-global-varying-var-emits-input-as-parameter.slang)                 |
+| On HLSL, moveGlobalVarInitializationToEntryPoints leaves a scalar static global with its declaration initializer instead of moving it into the entry point. | boundary | [#layout-and-binding](../../../../design/pipeline/05-ir-passes.md#layout-and-binding) | [`explicit-global-init-hlsl-keeps-declaration-initializer.slang`](explicit-global-init-hlsl-keeps-declaration-initializer.slang) |
 | Boundary: the same one-row matrix that `validateVectorsAndMatrices` rejects elsewhere is accepted on HLSL, because the check is evaluated against the target's own matrix limits.                                                               | boundary   | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation)                           | [`validate-vectors-and-matrices-allows-one-row-matrix-on-d3d.slang`](validate-vectors-and-matrices-allows-one-row-matrix-on-d3d.slang)       |
 | Expansion (negative): check-optional-none-usage rejects `.value` on an Optional<float> with float payload — payload-type axis to the existing int / explicit-none shapes.                                                                       | expansion  | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation)                           | [`optional-none-usage-on-float-payload.slang`](optional-none-usage-on-float-payload.slang)                                                   |
 | Expansion (negative): the check-recursion pass diagnoses a 3-function cycle (A->B->C->A) — alternative input shape to direct or 2-cycle mutual recursion.                                                                                       | expansion  | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation)                           | [`recursion-check-rejects-three-cycle.slang`](recursion-check-rejects-three-cycle.slang)                                                     |
@@ -376,6 +377,7 @@ classified in `## Untested claims` under `implementation-detail` or
 | The check-recursion validation pass diagnoses unsupported recursion in the IR.                                                                                                                                                                  | negative   | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation)                           | [`recursion-check-rejects-self-recursion.slang`](recursion-check-rejects-self-recursion.slang)                                               |
 | The late `validateVectorsAndMatrices` check rejects a matrix whose row count is 1 on targets whose matrix limits disallow it.                                                                                                                   | negative   | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation)                           | [`validate-vectors-and-matrices-rejects-one-row-matrix.slang`](validate-vectors-and-matrices-rejects-one-row-matrix.slang)                   |
 | The mesh-output-reads validation pass diagnoses a read from a mesh-shader output array.                                                                                                                                                         | negative   | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation)                           | [`mesh-output-read-is-diagnosed.slang`](mesh-output-read-is-diagnosed.slang)                                                                 |
+| checkForMultiplePushConstantBlocksPerEntryPoint reports an error for an entry point that statically uses more than one push-constant block, from legalizeIRForSPIRV and from the GLSL emitter. | negative | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation) | [`check-push-constant-blocks-rejects-two-blocks.slang`](check-push-constant-blocks-rejects-two-blocks.slang) |
 | Boundary: a `[ForceUnroll]` loop with exactly one static iteration is unrolled — no `for` keyword appears in the GLSL emit.                                                                                                                     | boundary   | [#loop-transformations](../../../../design/pipeline/05-ir-passes.md#loop-transformations)                               | [`loop-unroll-single-iteration.slang`](loop-unroll-single-iteration.slang)                                                                   |
 | Boundary: a `[ForceUnroll]` loop with zero static iterations is removed entirely by the loop-unroll pass and emits a documented `E30514` warning.                                                                                               | boundary   | [#loop-transformations](../../../../design/pipeline/05-ir-passes.md#loop-transformations)                               | [`loop-unroll-zero-iterations.slang`](loop-unroll-zero-iterations.slang)                                                                     |
 | Stress: a `[ForceUnroll]` loop with 32 static iterations is fully unrolled — no `for` keyword survives in the GLSL emit.                                                                                                                        | stress     | [#loop-transformations](../../../../design/pipeline/05-ir-passes.md#loop-transformations)                               | [`loop-unroll-large-iteration-stress.slang`](loop-unroll-large-iteration-stress.slang)                                                       |
@@ -483,6 +485,7 @@ classified in `## Untested claims` under `implementation-detail` or
 | The type-flow specialization pass emits no code of its own; its one direct user surface is the dynamic-dispatch-site report, which names each call site it could not resolve statically. | functional | [#specialization-and-generics](../../../../design/pipeline/05-ir-passes.md#specialization-and-generics) | [`typeflow-report-dynamic-dispatch-sites.slang`](typeflow-report-dynamic-dispatch-sites.slang) |
 | The bit-field accessor pass fills in the getter / setter bodies with shift-and-mask arithmetic over the backing integer, so a bit-field read emits shifts and masks rather than a field access. | functional | [#type-and-value-legalization](../../../../design/pipeline/05-ir-passes.md#type-and-value-legalization) | [`bit-field-accessors-emit-shift-and-mask.slang`](bit-field-accessors-emit-shift-and-mask.slang) |
 | Matrix and vector parameters of a [CudaKernel] function are flattened into plain storage structs, a float2x2 becoming _MatrixStorage_float2x2 (_ColMajor suffixed under column-major layout) and a float3 becoming _VectorStorage_float3_. | functional | [#type-and-value-legalization](../../../../design/pipeline/05-ir-passes.md#type-and-value-legalization) | [`lower-cuda-builtin-types-storage-structs.slang`](lower-cuda-builtin-types-storage-structs.slang) |
+| legalizeRayTracingPayloads gives an empty ray payload physical storage on D3D by substituting a nonempty dummy struct. | functional | [#type-and-value-legalization](../../../../design/pipeline/05-ir-passes.md#type-and-value-legalization) | [`ray-tracing-payloads-empty-payload-gets-dummy-struct-on-hlsl.slang`](ray-tracing-payloads-empty-payload-gets-dummy-struct-on-hlsl.slang) |
 
 ## Untested claims
 
@@ -527,6 +530,10 @@ classified in `## Untested claims` under `implementation-detail` or
 | `processLateRequireCapabilityInsts` diagnoses missing capabilities as warnings or errors depending on `-restrictive-capability-check`. | needs-cli-test | [#layout-and-binding](../../../../design/pipeline/05-ir-passes.md#layout-and-binding) | The pass itself is covered by the printf-extension test above; the severity switch is a flag-mapping claim, so what would verify it is a wrapper script compiling the same shader twice and comparing the diagnostic severity. |
 | Coverage instrumentation honors `-trace-coverage-binding` / `-trace-coverage-reserved-space` for binding-slot control. | needs-cli-test | [#instrumentation](../../../../design/pipeline/05-ir-passes.md#instrumentation) | Both options take positional index / space arguments and their effect is a binding assignment on a buffer the user never declared; a wrapper script passing explicit slots and reading back the emitted register / descriptor-set is the shape that would verify it. |
 | The `counterByteWidth` can also be selected through `CompilerOptionName::TraceCoverageCounterByteWidth` in the API, spelled in bytes (`4` or `8`) rather than in bits. | needs-unit-test | [#instrumentation](../../../../design/pipeline/05-ir-passes.md#instrumentation) | The CLI half is covered above; the API half has no command-line surface, so a host program setting the option through the compile API is what would exercise the byte-spelled form. |
+| `threadSwitchOnConstantPhi` jump-threads a `switch` whose selector is a block parameter carrying a distinct constant on every path, once after force inlining at every optimization level. | needs-unit-test | [#ssa-construction-and-basic-cleanup](../../../../design/pipeline/05-ir-passes.md#ssa-construction-and-basic-cleanup) | The rewrite is internal CFG surgery; the emitted source of a reproducer depends on later simplification, so no stable footprint was found without an IR-dump test. |
+| `expandAutodiffParameterContexts` expands captured-parameter contexts for CUDA source and Metal targets only. | gpu-cuda | [#differentiation-autodiff](../../../../design/pipeline/05-ir-passes.md#differentiation-autodiff) | Needs a CUDA / Metal differentiable-call reproducer; neither backend is runnable on the agent host and no output shape was confirmed. |
+| `checkUnsupportedResourceLocals` diagnoses resource types that cannot live in mutable local storage for compiled D3D or Metal output. | needs-cli-test | [#linking-and-validation](../../../../design/pipeline/05-ir-passes.md#linking-and-validation) | No source reproducer that reaches the diagnostic on a D3D or Metal text target was found. |
+| `legalizeResourceGlobalVars` replaces mutable static resource globals and the diagnostics it raises when the replacement is unsafe. | needs-cli-test | [#type-and-value-legalization](../../../../design/pipeline/05-ir-passes.md#type-and-value-legalization) | Newly documented; reproducers for each safety-proof diagnostic were not developed within this refresh budget. |
 
 ## Doc gaps observed
 
@@ -540,8 +547,8 @@ explains that `[numthreads]` is carried by the decoration and names each
 backend's marker, the autodiff section names `s_fwd_` / `s_bwdProp_` /
 `s_bwdCallableCtx_`, the loop, inlining, layout and instrumentation rows
 gained the footprints and CLI spellings they were missing, and the
-`Validate` row now says explicitly that `validateIRModule` is not
-reachable from valid Slang source. Each of those became a test above. The
+`Validate` row states that an `IrValidationFailed` means an earlier pass
+produced malformed IR. Each of those became a test above. The
 rows below are what re-reading the filled page against the compiler
 turned up, plus the two that remain unfilled.
 

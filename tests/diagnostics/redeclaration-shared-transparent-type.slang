@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 // Two transparent variables that user code builds through `syntax` can have the same type.
 // Lookup then finds the same member through both, and the member does not conflict with
