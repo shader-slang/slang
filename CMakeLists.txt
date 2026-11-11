@@ -978,11 +978,18 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     # find_package(slang) instead, which the export above now supports.
     if(UNIX AND NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
         # Keep a relative includedir relative to the .pc file's relocatable
-        # prefix, but use an absolute one as is.
+        # prefix, but use an absolute one as is. pkg-config splits Cflags on
+        # unescaped spaces, so escape them.
+        string(
+            REPLACE " "
+            "\\ "
+            slang_pc_includedir
+            "${CMAKE_INSTALL_INCLUDEDIR}"
+        )
         if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
-            set(SLANG_PC_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}")
+            set(SLANG_PC_INCLUDEDIR "${slang_pc_includedir}")
         else()
-            set(SLANG_PC_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+            set(SLANG_PC_INCLUDEDIR "\${prefix}/${slang_pc_includedir}")
         endif()
         configure_file(
             "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
