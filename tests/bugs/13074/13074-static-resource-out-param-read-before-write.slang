@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -target cpp -entry testMain -stage compute -validate-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -O0 -target cpp -entry testMain -stage compute -validate-ir
 
 Texture2D<float4> inputTexture;
 RWStructuredBuffer<float4> output;

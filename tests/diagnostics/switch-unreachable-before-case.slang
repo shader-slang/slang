@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
 
 // A statement before the first case/default in a switch is unreachable and
 // must warn (E41000); a multi-statement leading run warns once.

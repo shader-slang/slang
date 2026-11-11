@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#globalgenericparamdecl-and-globalgenericvalueparamdecl
-//META: doc_section_digest=e16c4a24162c83091e75ad0034be9aa82cec2296d141344574cdaee52215d332
+//META: doc_section_digest=15d7605d7b182860ac8a8c83d6379a61fdb9867eee97cfc0392ad60de3bbe6ca
 //META: purpose=A module-level type_param is a specialization parameter of the module whose binding arrives from outside, so generating target code from a use of it without a binding reports E38207 at the declaration.
 //META: intent=negative
 //META: pipeline_stage=check

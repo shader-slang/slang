@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#lambdaexpr-and-lambdadecl
-//META: doc_section_digest=488c8698e5c5c5edba49863bb42e29a1d761c4be06fab55035626918cc32cbb8
+//META: doc_section_digest=88158e254118bbcaa14ae66079e66a43621c70534d5a6d5c30c9c48586b3aa21
 //META: purpose=A lambda is recognized only when a balanced parenthesized group is followed by the arrow, so there is no bare-identifier parameter form and x => x + 1 is a parse error at the arrow.
 //META: intent=negative
 //META: pipeline_stage=parse

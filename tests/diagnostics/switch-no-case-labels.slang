@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
 
 // A switch body with executable statements but no case/default label discards
 // every one of them, so the whole body is unreachable and must warn (E41000).

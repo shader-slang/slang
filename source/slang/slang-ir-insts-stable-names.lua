@@ -886,5 +886,6 @@ return {
 	["metalTextureFence"] = 910,
 	["Type.TraceProgramDescriptor"] = 911,
 	["metalTraceRay"] = 912,
-	["Type.MetalConstantBufferLayout"] = 913
+	["Decoration.Artificial"] = 913,
+	["Type.MetalConstantBufferLayout"] = 914
 }

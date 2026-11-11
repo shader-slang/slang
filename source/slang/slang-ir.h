@@ -2259,10 +2259,10 @@ public:
     // Adding or removing AST classes changes the sequential `ASTNodeType` values. We raise the
     // minimum supported version when those values change so older modules are rejected before
     // their node IDs can be decoded as different AST classes.
-    // Version 41 adds the `MetalConstantBufferLayout` IR type. Its stable opcode is appended, so
-    // the reader can continue to load version-40 modules.
-    const static UInt k_minSupportedModuleVersion = 40;
-    const static UInt k_maxSupportedModuleVersion = 41;
+    // Version 42 adds the `MetalConstantBufferLayout` IR type. Its stable opcode is appended, so
+    // the reader can continue to load version-41 modules.
+    const static UInt k_minSupportedModuleVersion = 41;
+    const static UInt k_maxSupportedModuleVersion = 42;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
