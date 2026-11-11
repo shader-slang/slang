@@ -908,11 +908,6 @@ install(
     DESTINATION share/doc/slang
     PATTERN ".*" EXCLUDE
 )
-install(
-    DIRECTORY "${slang_SOURCE_DIR}/include"
-    DESTINATION .
-    PATTERN ".*" EXCLUDE
-)
 include(SlangUserSkills)
 slang_install_user_skills()
 include(CPack)
