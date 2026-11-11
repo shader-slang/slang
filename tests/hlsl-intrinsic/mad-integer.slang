@@ -38,11 +38,11 @@
 // SPV_OPS-DAG: OpIAdd %v2short
 // SPV_OPS-DAG: OpExtInst %float %{{[A-Za-z0-9_]+}} Fma
 
-// HLSL keeps the native `mad`, which DXC lowers to `IMad`/`UMad`, for each of the 12 calls.
+// HLSL keeps the native `mad` for all 12 calls: 11 integer calls and the float control.
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 // HLSL-COUNT-12: mad(
 
-// The inputs come from a buffer so that no constant folding is involved.
+// Every `mad` call has an operand loaded from a buffer, so none of them is constant-folded.
 //TEST_INPUT:ubuffer(data=[0xFFFFFFFF 3 5 0xFFFFFFF9 6 2 10 7], stride=4):name=inBuf
 RWStructuredBuffer<uint> inBuf;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outBuf
