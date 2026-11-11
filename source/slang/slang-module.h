@@ -444,6 +444,11 @@ public:
     };
 
     RefPtr<EntryPoint> findEntryPointByName(UnownedStringSlice const& name);
+
+    /// Find the function `name` and validate it as an entry point for `stage`. Returns null with
+    /// the failure in `outDiagnostics` when validation fails or aborts with an exception; the
+    /// `SLANG_NO_THROW` COM overload above relies on this, because only this function owns the
+    /// sink.
     RefPtr<EntryPoint> findAndCheckEntryPoint(
         UnownedStringSlice const& name,
         SlangStage stage,

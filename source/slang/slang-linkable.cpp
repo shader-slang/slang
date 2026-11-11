@@ -677,11 +677,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetHostCallable(
 
     SLANG_EXCEPTION_TRY
     {
-        // The diagnostics blob is written last, so that an exception from either call reaches a
-        // catch arm before `*outDiagnostics` has been assigned.
         SlangResult result = SLANG_FAIL;
         if (IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink))
             result = artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
+        // Each catch arm below also writes `*outDiagnostics`, and `getBlobIfNeeded` overwrites the
+        // out-parameter without releasing it. We write the blob after both calls that can throw, so
+        // that it is assigned at most once and no blob leaks.
         sink.getBlobIfNeeded(outDiagnostics);
         return result;
     }

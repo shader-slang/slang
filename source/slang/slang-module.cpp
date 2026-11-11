@@ -146,10 +146,7 @@ RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
             getLinkage()->getNamePool()->getName(name),
             Profile((Stage)stage));
         auto result = findAndValidateEntryPoint(&entryPointRequest);
-        if (outDiagnostics)
-        {
-            sink.getBlobIfNeeded(outDiagnostics);
-        }
+        sink.getBlobIfNeeded(outDiagnostics);
         return result;
     }
 #if SLANG_HAS_EXCEPTIONS

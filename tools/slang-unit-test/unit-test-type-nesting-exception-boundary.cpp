@@ -7,22 +7,23 @@
 
 using namespace Slang;
 
-// A type nested deeper than the type-nesting limit raises fatal diagnostic 39997, which throws
-// `AbortCompilationException` from inside layout or entry-point checking. The public methods tested
-// here are `SLANG_NO_THROW`, so each must report that failure through its result and diagnostics
-// blob instead of letting the exception cross the API boundary and terminate the host process.
+// A type nested deeper than `kMaxTypeNestingDepth` raises fatal diagnostic 39997
+// (`maximum-type-nesting-level-exceeded`), which throws `AbortCompilationException` from inside
+// layout or entry-point checking. The public methods tested here are `SLANG_NO_THROW`, so each must
+// report that failure through its result and diagnostics blob instead of letting the exception
+// cross the API boundary and terminate the host process.
 //
 // Gated on `SLANG_HAS_EXCEPTIONS`: with exceptions disabled a fatal diagnostic terminates the
 // process in `handleSignal` instead of throwing, so there is no exception for the boundary to
 // contain.
 #if SLANG_HAS_EXCEPTIONS
 
-// The chain is well past the limit so that the tests do not depend on its exact value. A
-// `StructuredBuffer` element type is only walked by layout, so the module itself still loads.
+// The chain is well past `kMaxTypeNestingDepth` (128, `slang-check.h`) so that the tests do not
+// depend on its exact value.
 static const int kStructChainDepth = 200;
 
 // Return Slang source declaring `struct S0 { S1 inner; }` through `struct S<depth> { uint x; }`,
-// so that `S0` is nested `depth + 1` levels deep.
+// so that `S0` is the outermost of `depth + 1` nested types.
 static String makeStructChain(int depth)
 {
     StringBuilder sb;
@@ -62,6 +63,7 @@ SLANG_UNIT_TEST(getLayoutContainsTypeNestingAbort)
         createSession(unitTestContext->slangGlobalSession, SLANG_SPIRV);
     SLANG_CHECK_ABORT(session != nullptr);
 
+    // Only layout walks a `StructuredBuffer` element type, so the module itself still loads.
     String source = makeStructChain(kStructChainDepth) + "StructuredBuffer<S0> buffer;\n";
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
@@ -71,7 +73,8 @@ SLANG_UNIT_TEST(getLayoutContainsTypeNestingAbort)
         diagnostics.writeRef()));
     SLANG_CHECK_ABORT(module != nullptr);
 
-    // The aborted attempt leaves no partial layout behind, so a second call fails the same way.
+    // An abort caches neither a layout nor the layout's error state, so each later call runs layout
+    // again and reports 39997 again.
     for (int call = 0; call < 2; ++call)
     {
         ComPtr<slang::IBlob> layoutDiagnostics;
@@ -96,11 +99,11 @@ SLANG_UNIT_TEST(findAndCheckEntryPointContainsTypeNestingAbort)
         createSession(unitTestContext->slangGlobalSession, SLANG_SPIRV);
     SLANG_CHECK_ABORT(session != nullptr);
 
-    // Neither function has a `[shader]` attribute, so their parameters are first checked by
-    // `findAndCheckEntryPoint`.
+    // Neither function has a `[shader]` or `[numthreads]` attribute, so neither is discovered as an
+    // entry point at load, and both lookups below go through `findAndValidateEntryPoint`.
     String source = makeStructChain(kStructChainDepth) +
                     "void deep(S0 value, uint3 id : SV_DispatchThreadID) {}\n"
-                    "[numthreads(1, 1, 1)] void shallow(uint3 id : SV_DispatchThreadID) {}\n";
+                    "void shallow(uint3 id : SV_DispatchThreadID) {}\n";
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
         "nestedEntryPoint",
@@ -108,6 +111,7 @@ SLANG_UNIT_TEST(findAndCheckEntryPointContainsTypeNestingAbort)
         source.getBuffer(),
         diagnostics.writeRef()));
     SLANG_CHECK_ABORT(module != nullptr);
+    SLANG_CHECK_ABORT(module->getDefinedEntryPointCount() == 0);
 
     ComPtr<slang::IEntryPoint> entryPoint;
     ComPtr<slang::IBlob> entryPointDiagnostics;
@@ -119,6 +123,13 @@ SLANG_UNIT_TEST(findAndCheckEntryPointContainsTypeNestingAbort)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(entryPoint == nullptr);
     SLANG_CHECK(blobContains(entryPointDiagnostics, "39997"));
+
+    // The aborted check registers no entry point, so a second call without a diagnostics blob
+    // fails the same way.
+    SLANG_CHECK(SLANG_FAILED(
+        module
+            ->findAndCheckEntryPoint("deep", SLANG_STAGE_COMPUTE, entryPoint.writeRef(), nullptr)));
+    SLANG_CHECK(entryPoint == nullptr);
 
     // The module stays usable after the abort.
     ComPtr<slang::IEntryPoint> shallowEntryPoint;
@@ -136,10 +147,9 @@ SLANG_UNIT_TEST(getTargetHostCallableContainsTypeNestingAbort)
         createSession(unitTestContext->slangGlobalSession, SLANG_SHADER_HOST_CALLABLE);
     SLANG_CHECK_ABORT(session != nullptr);
 
-    // Layout runs before any downstream C++ compiler is invoked, so the test does not need one.
-    String source = makeStructChain(kStructChainDepth) +
-                    "StructuredBuffer<S0> buffer;\n"
-                    "[shader(\"compute\")] [numthreads(1, 1, 1)] void main() {}\n";
+    // Layout of `buffer` runs before any downstream C++ compiler is invoked, so the test does not
+    // need one.
+    String source = makeStructChain(kStructChainDepth) + "StructuredBuffer<S0> buffer;\n";
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
         "nestedHostCallable",
