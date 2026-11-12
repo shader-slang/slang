@@ -8596,9 +8596,14 @@ uint3 WorkgroupCount()
 ///
 /// On Metal and CUDA the host chooses the threadgroup (block) size at dispatch time,
 /// and it need not match `[numthreads]`: this reads the dispatched size, from
-/// `[[threads_per_threadgroup]]` on Metal and `blockDim` on CUDA. On the other
-/// targets the workgroup size is fixed by `[numthreads]` when the pipeline is
+/// `[[dispatch_threads_per_threadgroup]]` on Metal and `blockDim` on CUDA. On the
+/// other targets the workgroup size is fixed by `[numthreads]` when the pipeline is
 /// created, so this returns the same value as `WorkgroupSize()`.
+///
+/// The value is the threadgroup size the host requested, the same in every
+/// threadgroup of the dispatch. On Metal, a non-uniform dispatch (`dispatchThreads:`)
+/// runs smaller threadgroups at the edges of the grid; this still returns the
+/// requested size there, as `blockDim` does on CUDA.
 ///
 /// Use `WorkgroupSize()` when the kernel is always dispatched with its
 /// `[numthreads]` size: it is a compile-time constant on every target.
