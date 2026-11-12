@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=LEGACY): -std 2026
 //DIAGNOSTIC_TEST:SIMPLE(diag=SLANG202C): -std 202c
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR): -std 2026 -warnings-as-errors 40021
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR,exit-code=-1): -std 2026 -warnings-as-errors 40021
 //DIAGNOSTIC_TEST:SIMPLE(diag=DISABLED): -std 2026 -warnings-disable 40021
 
 struct BroadResult

@@ -1584,7 +1584,10 @@ struct PeepholeContext : InstPassBase
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
                     UInt index = 0;
-                    auto newInst = builder.emitSwizzle(resultType, inst->getOperand(0), 1, &index);
+                    // `resultType` is null on this path (the result is a scalar, not a
+                    // vector), so use the inst's actual data type for the swizzle.
+                    auto newInst =
+                        builder.emitSwizzle(inst->getDataType(), inst->getOperand(0), 1, &index);
                     inst->replaceUsesWith(newInst);
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1690,6 +1693,12 @@ struct PeepholeContext : InstPassBase
                     SLANG_ASSERT(terminator->getArgCount() > paramIndex);
                     auto arg = terminator->getArg(paramIndex);
                     if (as<IRUndefined>(arg))
+                        continue;
+                    // A back edge that passes the param its own value (a loop that never
+                    // writes it) adds no new value. Taken as the value, it would make the
+                    // param replace its uses with itself and report a change on every
+                    // iteration, so the pass would never reach a fixed point.
+                    if (arg == inst)
                         continue;
                     if (argValue == nullptr)
                         argValue = arg;

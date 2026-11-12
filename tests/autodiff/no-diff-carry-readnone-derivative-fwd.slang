@@ -7,7 +7,7 @@
 // `[__readNone]` must still cause its calls to be classified as carrying so
 // that storing the result into a `no_diff` slot is diagnosed.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost

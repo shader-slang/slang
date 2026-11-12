@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
 
 interface IRayQuery
 {

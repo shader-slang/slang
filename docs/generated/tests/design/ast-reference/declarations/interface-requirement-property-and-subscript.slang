@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#requirementdecl-style-nodes-inside-interfacedecl
-//META: doc_section_digest=61b41d7c34c3d57c8ab25ebc17ad4847ac05d606da5acd0ee3a97221870d03b4
+//META: doc_section_digest=5dc1964c7477434b28551157a3fa6fc4a600fa3374a80b5512ec1c9d08c15d4e
 //META: purpose=Interface requirements are not a distinct declaration class: a property and a subscript written in an interface body are requirements just like a method.
 //META: intent=functional
 //META: pipeline_stage=check

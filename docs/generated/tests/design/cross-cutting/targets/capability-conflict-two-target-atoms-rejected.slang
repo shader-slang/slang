@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#definition-forms
-//META: doc_section_digest=2c0608f6d4897cdbfc247f90cd3fba9250321d1c82341829952363fd26bccf89
+//META: doc_section_digest=222012023b43e7122e72f59e25f3a0031eadebb2990b9381de9fe214554d25cc
 //META: purpose=A `[require(hlsl, glsl)]` conjunction populates the `target` keyhole with two different atoms, which is an incompatible conjunction, and is rejected with `E36111: disallowed capability`.
 //META: intent=negative
 //META: pipeline_stage=check

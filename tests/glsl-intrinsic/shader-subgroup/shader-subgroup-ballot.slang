@@ -1,6 +1,7 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-ballot.slang -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-ballot.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
-//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-ballot.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+// TODO(#14249): not testing hlsl: some subgroup functions have no HLSL implementation
+//DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-ballot.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 
 // not testing cuda due to missing impl
 //DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-ballot.slang -stage compute -entry computeMain -target cuda -DTARGET_CUDA
@@ -20,7 +21,7 @@
 //#define TEST_when_glsl_subgroupBallotExclusiveBitCount_is_not_bugged
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;
@@ -66,7 +67,7 @@ bool testBroadcastX() {
         & testVBroadcastX<float, 2>()
         & testVBroadcastX<float, 3>()
         & testVBroadcastX<float, 4>()
-        & test1BroadcastX<half>() 
+        & test1BroadcastX<half>()
         & testVBroadcastX<half, 2>()
         & testVBroadcastX<half, 3>()
         & testVBroadcastX<half, 4>()
@@ -85,19 +86,19 @@ bool testBroadcastX() {
         & testVBroadcastX<double, 2>()
         & testVBroadcastX<double, 3>()
         & testVBroadcastX<double, 4>()
-        & test1BroadcastX<int8_t>() 
+        & test1BroadcastX<int8_t>()
         & testVBroadcastX<int8_t, 2>()
         & testVBroadcastX<int8_t, 3>()
         & testVBroadcastX<int8_t, 4>()
-        & test1BroadcastX<int64_t>() 
+        & test1BroadcastX<int64_t>()
         & testVBroadcastX<int64_t, 2>()
         & testVBroadcastX<int64_t, 3>()
         & testVBroadcastX<int64_t, 4>()
-        & test1BroadcastX<uint8_t>() 
+        & test1BroadcastX<uint8_t>()
         & testVBroadcastX<uint8_t, 2>()
         & testVBroadcastX<uint8_t, 3>()
         & testVBroadcastX<uint8_t, 4>()
-        & test1BroadcastX<uint64_t>() 
+        & test1BroadcastX<uint64_t>()
         & testVBroadcastX<uint64_t, 2>()
         & testVBroadcastX<uint64_t, 3>()
         & testVBroadcastX<uint64_t, 4>()
@@ -109,11 +110,11 @@ bool testBroadcastX() {
 
         // Disabled on WGPU as these built-in types are not supported as of time of writing.
 #if !defined(WGPU)
-        & test1BroadcastX<int16_t>() 
+        & test1BroadcastX<int16_t>()
         & testVBroadcastX<int16_t, 2>()
         & testVBroadcastX<int16_t, 3>()
         & testVBroadcastX<int16_t, 4>()
-        & test1BroadcastX<uint16_t>() 
+        & test1BroadcastX<uint16_t>()
         & testVBroadcastX<uint16_t, 2>()
         & testVBroadcastX<uint16_t, 3>()
         & testVBroadcastX<uint16_t, 4>()
@@ -122,7 +123,7 @@ bool testBroadcastX() {
 }
 
 bool testBallot() {
-    return true 
+    return true
         & (subgroupBallot(true).x == 0xFFFFFFFF)
 
 #if !defined(WGPU) && !defined(METAL)

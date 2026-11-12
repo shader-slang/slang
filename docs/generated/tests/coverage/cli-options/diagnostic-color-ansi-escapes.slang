@@ -28,7 +28,7 @@
 
 //TEST:SIMPLE(filecheck=ALWAYS):-target hlsl -entry main -stage compute -diagnostic-color always
 //TEST:SIMPLE(filecheck=NEVER):-target hlsl -entry main -stage compute -diagnostic-color never
-//TEST:SIMPLE(filecheck=BADVALUE):-target hlsl -entry main -stage compute -diagnostic-color bogus
+//TEST:SIMPLE(filecheck=BADVALUE,exit-code=1):-target hlsl -entry main -stage compute -diagnostic-color bogus
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

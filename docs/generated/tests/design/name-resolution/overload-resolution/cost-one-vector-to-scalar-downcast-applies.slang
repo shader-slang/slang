@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#conversion-costs
-//META: doc_section_digest=ac2c2ef8658efb348430e3e014feb776a1624731934544b00f6fa4d97ab710e8
+//META: doc_section_digest=0250e18742b3786726efc1e85a165627e5d19d2338098891f6ef00a648a8d5df
 //META: purpose=kConversionCost_OneVectorToScalar (1) makes a one-element vector argument reach a scalar parameter implicitly.
 //META: intent=boundary
 //META: pipeline_stage=check

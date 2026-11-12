@@ -2,7 +2,7 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_section_digest=c81f550a9810da4877739b3075a0cd088585204924f21fbdc02d017dbf1948e5
+//META: doc_section_digest=c302dc74b058ca543a5a7a87698d341622b83a61a0da5b402a400dbeccc44d4c
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-packbranchtypeexpr
 //META: purpose=The pointer type spelling `T*` is accepted in a parameter's type position and resolves to a pointer to `T`.
 //META: intent=functional

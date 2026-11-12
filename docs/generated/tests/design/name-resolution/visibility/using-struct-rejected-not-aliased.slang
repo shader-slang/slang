@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#edge-cases-and-failure-modes
-//META: doc_section_digest=b2029736d63943de091f689a9a0ed7f6ade82400bc257a00a34b24d27b223f09
+//META: doc_section_digest=c8df5707a8529f8b54eb08117b70cc5d32a632cfac0bf45bd758aba4031e885f
 //META: purpose=A `using` declaration only brings a namespace-like container into scope, so `using SomeStruct;` is rejected with expected-a-namespace (E30061) rather than aliasing the struct.
 //META: intent=negative
 //META: pipeline_stage=check

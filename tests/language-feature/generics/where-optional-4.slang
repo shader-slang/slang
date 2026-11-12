@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 interface IThing
 {
     void thing();

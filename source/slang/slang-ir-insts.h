@@ -2852,12 +2852,12 @@ struct IRDebugFunction : IRInst
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
 
-    // The function's lexical parent scope, or null when its source has no compilation unit (an
-    // #include'd/#line-remapped source), or for a function from an IR blob that predates this
-    // operand. The only parent scope produced is the DebugCompilationUnit of the source file the
-    // function is defined in, so an imported function resolves to its own module's compilation unit
-    // rather than the entry point's. The operand type is a general parent scope, not specifically a
-    // compilation unit, so a lexical scope can occupy it without changing the operand's meaning.
+    // The function's lexical parent scope, or null when its source has no compilation unit
+    // (an #include'd/#line-remapped source). The only parent scope produced is the
+    // DebugCompilationUnit of the source file the function is defined in, so an imported function
+    // resolves to its own module's compilation unit rather than the entry point's. The operand type
+    // is a general parent scope, not specifically a compilation unit, so a lexical scope can occupy
+    // it without changing the operand's meaning.
     IRInst* getParentScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
 };
 
@@ -5291,9 +5291,9 @@ $(type_info.return_type) $(type_info.method_name)(
     void addKeepAliveDecoration(IRInst* value) { addDecoration(value, kIROp_KeepAliveDecoration); }
 
     void addPublicDecoration(IRInst* value) { addDecoration(value, kIROp_PublicDecoration); }
-    void addHLSLExportDecoration(IRInst* value)
+    IRDecoration* addHLSLExportDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_HLSLExportDecoration);
+        return addDecoration(value, kIROp_HLSLExportDecoration);
     }
     void addHasExplicitHLSLBindingDecoration(IRInst* value)
     {

@@ -3,7 +3,7 @@
 // Tests diagnostics for deprecated/removed bracket attribute list placement
 
 //TEST:SIMPLE(filecheck=CHECK):-std 2018 -stage compute -entry main -target hlsl -DERRTEST=0
-//DIAGNOSTIC_TEST:SIMPLE(diag=WARN):-std 2025 -stage compute -entry main -target hlsl -DERRTEST=0
+//DIAGNOSTIC_TEST:SIMPLE(diag=WARN,exit-code=0):-std 2025 -stage compute -entry main -target hlsl -DERRTEST=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=ERR):-std 2026 -stage compute -entry main -target hlsl -DERRTEST=1
 
 #if ERRTEST
@@ -29,8 +29,7 @@ struct [__NonCopyableType] TestType
 #endif
 
 // No diagnostics expected before Slang 2025
-//CHECK: result code = 0
-//CHECK-NEXT: standard error = {
+//CHECK: standard error = {
 //CHECK-NEXT: }
 
 [numthreads(1, 1, 1)]

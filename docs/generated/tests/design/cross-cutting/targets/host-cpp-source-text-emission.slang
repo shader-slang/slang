@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#targets
-//META: doc_section_digest=09ecdf153c06b46e85b5bfd65a0136d6c1516c1e42e5e33b4b02ee440f2f963c
+//META: doc_section_digest=69b107f4782f9ecf7830ee47173687274ec18b773210afb33c78ee54075e5efa
 //META: purpose=The Targets table maps `SLANG_HOST_CPP_SOURCE` alone to host-side C++ source produced by the C++ emit backend; `-target host-cpp` emits C++ text containing the module's extern function.
 //META: intent=functional
 //META: pipeline_stage=emit

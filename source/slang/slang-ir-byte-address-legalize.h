@@ -10,6 +10,8 @@ class DiagnosticSink;
 
 struct ByteAddressBufferLegalizationOptions
 {
+    /// Split every constant-size vector and array load/store into per-element accesses, even when
+    /// the access is known to be aligned to its whole size.
     bool scalarizeVectorLoadStore = false;
     bool useBitCastFromUInt = false;
     bool translateToStructuredBufferOps = false;
@@ -48,6 +50,12 @@ struct ByteAddressBufferLegalizationOptions
 /// This function translates load/store operations that involve
 /// aggregate types into primitive load-store operations on
 /// scalar or vector types.
+///
+/// When `translateToStructuredBufferOps` is set, it also replaces each global
+/// byte-address buffer parameter, including one that nothing uses, with an
+/// equivalent structured-buffer parameter, so that no byte-address buffer
+/// parameter reaches the emitter unless it still has a use this pass does not
+/// translate.
 ///
 void legalizeByteAddressBufferOps(
     IRModule* module,

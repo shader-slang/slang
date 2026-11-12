@@ -3,9 +3,9 @@
 // parameter is interface-typed (dynamic dispatch), the extension method is not
 // available because it is not part of IInterface.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl -stage compute -entry computeMain
 
 #lang slang 2025
 

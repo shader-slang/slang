@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#nodes
-//META: doc_section_digest=0b0dfab9f13850a71e13b9ce6f8fb9a433ddb72267a526bf6454583638151a5b
+//META: doc_section_digest=26c797434ab51700cf84e595593cca11917ffceaff2d95c7a0504524e997316e
 //META: purpose=A NewExpr `new T(...)` passes its arguments to the class constructor, so the allocated instance carries the constructor-computed field value.
 //META: intent=functional
 //META: pipeline_stage=emit
@@ -22,12 +22,11 @@
 // with `class` replaced by `struct` (`Counter(4 + int(tid.x))`), which both
 // compile on all five targets and both store through the same expression shape.
 //
-// This test is a known expected failure: `new T(args)` on a class that declares
-// a matching `__init` currently aborts with `E99997 ... InternalError ... could
-// not resolve target declaration for call` on *every* target, HLSL included.
-// See docs/generated/tests/_meta/findings/new-expr-with-constructor-args-internal-error.yaml.
-// The per-target directives are kept so that fixing the abort restores emission
-// coverage on all five back-ends at once rather than on HLSL alone.
+// Known expected failures: HLSL, Metal and WGSL now emit this shader. GLSL
+// (directive .1) and SPIR-V (directive .2) still fail to emit a class object
+// (`E99999 ... unhandled type` and `E99997 ... Unhandled global inst in
+// spirv-emit`); see _meta/expected-failures.txt. The per-target directives are
+// kept so that fixing class emission there restores coverage at once.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute

@@ -14,7 +14,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=WO):-target spirv -entry writeOnlyParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNIFORM):-target spirv -entry uniformRefParam -stage compute -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=MULTI):-target spirv -entry multiRefParam -stage fragment -experimental-feature
-//DIAGNOSTIC_TEST:SIMPLE(diag=BORROW):-target spirv -entry constRefBorrowParam -stage fragment -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=BORROW,exit-code=0):-target spirv -entry constRefBorrowParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=RODEPTH):-target spirv -entry readOnlyDepth -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=WODEPTH):-target spirv -entry writeOnlyTwoDepths -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=REFPOS):-target spirv -entry refPosition -stage vertex -experimental-feature

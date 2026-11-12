@@ -47,8 +47,8 @@ changes every caller at once.
 
 ```mermaid
 flowchart LR
-  ci["ci.yml"] --> build & test & suites & san
-  sccache["sccache-populate.yml"] --> build
+  ci["ci.yml"] --> build & test & suites & san & static
+  sccache["sccache-populate.yml"] --> build & static
   ncov["nightly-slang-coverage-test.yml"] --> cov
   nsan["nightly-slang-sanitizer-test.yml"] --> san
   copts["cmake-options.yml"] --> coptbuild
@@ -57,6 +57,7 @@ flowchart LR
   test["ci-slang-test.yml / -container<br>ci-rhi-test.yml / -container"]
   suites["ci-falcor-test.yml<br>ci-falcor-perf-test.yml<br>ci-slang-regression-test.yml<br>ci-mdl-benchmark-test.yml<br>ci-materialx-regression-test.yml"]
   san["ci-slang-sanitizer.yml"]
+  static["ci-slang-static.yml"]
   cov["ci-slang-coverage-test.yml"]
   coptbuild["cmake-options-build.yml / -container"]
 ```
@@ -85,6 +86,7 @@ flowchart LR
 
   subgraph after["After CI"]
     cirun["ci.yml"] -->|workflow_run| post["check-ir-version.yml<br>ci-retry-yielded-bot.yml"]
+    perfnight["nightly-mdl-perf-test.yml"] -->|workflow_run| bisect["claude-perf-bisect.yml"]
   end
 ```
 
@@ -100,6 +102,9 @@ flowchart LR
 | `repository_dispatch` | Triggered by a slash command relayed from a PR comment.                                                                                                                                           |
 | `schedule`            | Cron-driven.                                                                                                                                                                                      |
 | `workflow_dispatch`   | Run manually from the Actions tab.                                                                                                                                                                |
+
+`claude-perf-bisect.yml` is the one `workflow_run` workflow that builds code: it
+builds merged master commits after a scheduled nightly, never PR code.
 
 ## 1. PR gates
 
@@ -215,6 +220,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-slang-test.yml`, `ci-slang-test-container.yml`             | Run `slang-test` for one platform.       |
 | `ci-rhi-test.yml`, `ci-rhi-test-container.yml`                 | Run the slang-rhi test suite.            |
 | `ci-slang-sanitizer.yml`                                       | Sanitizer-instrumented build and test.   |
+| `ci-slang-static.yml`                                          | Static-library build and unit tests.     |
 | `ci-slang-coverage-test.yml`                                   | Instrumented build plus coverage report. |
 | `ci-falcor-test.yml`                                           | Compile Falcor's shaders.                |
 | `ci-falcor-perf-test.yml`                                      | Falcor compiler perf test.               |
@@ -243,6 +249,7 @@ not compete for the same runners.
 | `nightly-slang-sascha-test.yml`    | nightly                            | Compiles the Sascha Willems Vulkan sample shaders.                   |
 | `nightly-slang-vkglcts-test.yml`   | nightly                            | Runs the Vulkan CTS with Slang as the shader compiler.               |
 | `nightly-mdl-perf-test.yml`        | nightly                            | Compile-performance suite for the MDL workloads.                     |
+| `claude-perf-bisect.yml`           | after a red perf nightly           | Shadow bisect of a confirmed compile-perf change.                    |
 | `ci-analytics.yml`                 | daily                              | Collects CI run statistics and publishes them.                       |
 | `pr-sweep-nightly.yml`             | nightly                            | Board-sync backstop over every open PR.                              |
 | `cmake-options.yml`                | weekly                             | Builds the matrix of non-default CMake option combinations.          |

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=claude-sonnet-5-5
+//META: generated_at=2026-11-02T10:45:10+00:00
+//META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
 //META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=e9219cdb5c991479475f495fed529b3a717626417843075cd38373dfd41801fa
+//META: doc_section_digest=76ee6e7723bb37a4f19d893a5f6a1b0f60d1fe8881e266ab68ab9b3946c62211
 //META: purpose=A DescriptorHandleType `DescriptorHandle<T>` is a bindless handle that carries a heap index; the HLSL backend recovers the concrete resource by indexing the descriptor heap with it.
 //META: intent=functional
 //META: pipeline_stage=emit
@@ -55,8 +55,8 @@ RWStructuredBuffer<float4> outBuf;
 //SPIRV-DAG: OpAccessChain %_ptr_UniformConstant_{{[0-9]+}} %__slang_resource_heap %{{[0-9]+}}
 //SPIRV-DAG: OpAccessChain %_ptr_UniformConstant_{{[0-9]+}} %__slang_resource_heap_0 %{{[0-9]+}}
 
-//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : array<texture_2d<f32>>
-//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : array<sampler>
+//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : binding_array<texture_2d<f32>>
+//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : binding_array<sampler>
 //WGSL: textureSampleLevel((_slang_resource_heap_{{[0-9]+}}[cb_0.tex_0.x]), (_slang_resource_heap_{{[0-9]+}}[cb_0.samp_0.x])
 [numthreads(1, 1, 1)]
 void computeMain()

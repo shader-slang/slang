@@ -1,7 +1,7 @@
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile cs_6_6 -entry computeMain -experimental-feature
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target wgsl -stage compute -entry computeMain -experimental-feature
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target glsl -stage compute -entry computeMain -experimental-feature
-// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -profile cs_6_6 -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target wgsl -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target glsl -stage compute -entry computeMain -experimental-feature
+// DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cpp -stage compute -entry computeMain -experimental-feature
 
 import slang.neural;
 

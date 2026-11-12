@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#aggregate-constructors
-//META: doc_section_digest=1f82b50c62ed58a098b1fecb706a884ddcf3e4428a8e0efd194a2377ef542645
+//META: doc_section_digest=81cb7db040259e3ef92a1ca250fb9ea0adfaa31cb83daa0c083596c98a915a16
 //META: purpose=A specialized `CoopVec<T, N>(args...)` constructor call collapses, after value-pack expansion, to a `makeCoopVector(...)` IR opcode with one operand per element.
 //META: intent=functional
 //META: pipeline_stage=lower
