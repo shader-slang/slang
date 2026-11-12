@@ -565,19 +565,159 @@ struct WorkgroupUniformLoadContext
         }
 
         // A local variable is uniform when every value stored to it is, and every store
-        // happens in uniform control flow.
-        if (as<IRVar>(root) && root == load->getPtr())
+        // happens in uniform control flow. That includes stores through an element or field
+        // address of the variable, which also need the element indices on their path to be
+        // uniform. A load of one element is covered the same way, conservatively: a store to
+        // any part of the variable counts.
+        if (as<IRVar>(root))
         {
-            for (auto use = root->firstUse; use; use = use->nextUse)
+            List<IRInst*> addresses;
+            addresses.add(root);
+            for (Index i = 0; i < addresses.getCount(); i++)
             {
-                auto store = as<IRStore>(use->getUser());
-                if (store && store->getPtr() == root)
+                auto address = addresses[i];
+                for (auto use = address->firstUse; use; use = use->nextUse)
                 {
-                    require(store->getVal());
-                    require(store->getParent());
+                    auto user = use->getUser();
+                    if (auto store = as<IRStore>(user))
+                    {
+                        if (store->getPtr() != address)
+                            continue;
+                        require(store->getVal());
+                        require(store->getParent());
+                        for (auto path = address; path != root;)
+                        {
+                            if (auto elementPtr = as<IRGetElementPtr>(path))
+                            {
+                                require(elementPtr->getIndex());
+                                path = elementPtr->getBase();
+                            }
+                            else
+                            {
+                                path = as<IRFieldAddress>(path)->getBase();
+                            }
+                        }
+                    }
+                    else if (auto elementPtr = as<IRGetElementPtr>(user))
+                    {
+                        if (elementPtr->getBase() == address)
+                            addresses.add(elementPtr);
+                    }
+                    else if (auto fieldAddress = as<IRFieldAddress>(user))
+                    {
+                        if (fieldAddress->getBase() == address)
+                            addresses.add(fieldAddress);
+                    }
                 }
             }
         }
+    }
+
+    // A call's result is uniform when every value the callee returns is, and so is the choice
+    // of `return`. This follows the values inside the callee and maps each parameter of the
+    // callee to this call's argument, so the other calls of the callee are not affected. Reads
+    // of groupshared memory inside the callee go through `require` as usual: rewriting such a
+    // read changes it for every call, so every call has to reach it in uniform control flow.
+    // Returns false if the callee has no body to follow.
+    bool requireUniformCallResult(IRCall* call)
+    {
+        auto callee = as<IRFunc>(call->getCallee());
+        if (!callee || !callee->getFirstBlock())
+            return false;
+        UnownedStringSlice definition;
+        IRInst* definitionInst = nullptr;
+        if (findTargetIntrinsicDefinition(callee, targetCaps, definition, definitionInst))
+            return false;
+
+        computeControlDependences(callee);
+        auto firstBlock = callee->getFirstBlock();
+
+        HashSet<IRInst*> visited;
+        List<IRInst*> values;
+        List<IRBlock*> blocks;
+        auto addValue = [&](IRInst* value)
+        {
+            if (value && visited.add(value))
+                values.add(value);
+        };
+        auto addBlock = [&](IRBlock* block)
+        {
+            if (visited.add(block))
+                blocks.add(block);
+        };
+
+        for (auto block : callee->getBlocks())
+        {
+            if (auto returnInst = as<IRReturn>(block->getTerminator()))
+            {
+                addValue(returnInst->getVal());
+                addBlock(block);
+            }
+        }
+
+        Index blockIndex = 0;
+        Index valueIndex = 0;
+        while (blockIndex < blocks.getCount() || valueIndex < values.getCount())
+        {
+            // The branches that decide which `return` runs must be uniform. Unlike
+            // `requireUniformControlFlow`, this stays inside the callee.
+            if (blockIndex < blocks.getCount())
+            {
+                auto block = blocks[blockIndex++];
+                if (auto dependences = controlDependences.tryGetValue(block))
+                {
+                    for (auto branchBlock : *dependences)
+                    {
+                        addValue(getBranchCondition(branchBlock));
+                        addBlock(branchBlock);
+                    }
+                }
+                continue;
+            }
+
+            auto value = values[valueIndex++];
+            if (auto param = as<IRParam>(value))
+            {
+                auto block = as<IRBlock>(param->getParent());
+                auto paramIndex = (UInt)getParamIndexInBlock(param);
+                if (block == firstBlock)
+                {
+                    if (paramIndex < call->getArgCount())
+                        require(call->getArg(paramIndex));
+                    continue;
+                }
+                for (auto predecessor : block->getPredecessors())
+                {
+                    if (auto branch = as<IRUnconditionalBranch>(predecessor->getTerminator()))
+                    {
+                        if (paramIndex < branch->getArgCount())
+                            addValue(branch->getArg(paramIndex));
+                    }
+                    addBlock(predecessor);
+                }
+                continue;
+            }
+
+            // Module-scope values (constants, uniform parameters) need nothing from us.
+            if (!as<IRBlock>(value->getParent()))
+                continue;
+
+            if (as<IRLoad>(value) || as<IRCall>(value))
+            {
+                require(value);
+                continue;
+            }
+
+            if (value->mightHaveSideEffects())
+                continue;
+            for (UInt i = 0; i < value->getOperandCount(); i++)
+            {
+                auto operand = value->getOperand(i);
+                if (!as<IRBlock>(operand))
+                    addValue(operand);
+            }
+        }
+        return true;
     }
 
     void requireUniformValue(IRInst* inst)
@@ -616,6 +756,12 @@ struct WorkgroupUniformLoadContext
         {
             requireUniformLoad(load);
             return;
+        }
+
+        if (auto call = as<IRCall>(inst))
+        {
+            if (requireUniformCallResult(call))
+                return;
         }
 
         // Anything else is uniform when it is a pure function of uniform operands.
