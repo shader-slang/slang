@@ -1621,8 +1621,10 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
-// Returns true if `root` is memory that `func` has exclusive access to, so that a callee
-// that is not given a pointer to it cannot change it.
+// Returns true if the memory at `root` cannot be changed while `func` runs, either by a callee
+// of `func` that is not given a pointer to it or by another invocation. That is the case for a
+// local `var` of `func`, and for an `out`, `inout` or `__borrow` parameter, whose passing mode
+// gives `func` exclusive or immutable access to its argument for the duration of the call.
 static bool isCallerExclusiveRoot(IRGlobalValueWithCode* func, IRInst* root)
 {
     // A local `var` of `func` is only reachable from `func` itself, unless a pointer to it is
@@ -1701,17 +1703,13 @@ bool canInstHaveSideEffectAtAddress(
             //
             if (!isCallerExclusiveRoot(func, getRootAddr(addr)))
             {
-                // The one exception is a callee that is side-effect free and does not read
-                // from memory: it cannot change `addr`, and it does not order anything.
+                // Only a callee that is side-effect free and does not read from memory is
+                // safe here: it cannot change `addr`, and it does not order anything. Any other
+                // callee, or an unknown one, may change `addr`.
                 //
                 auto callee = call->getCallee();
-                if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
-                {
-                }
-                else
-                {
+                if (!callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                     return true;
-                }
             }
 
             // If any pointer typed argument of the call inst may overlap addr, return true.
