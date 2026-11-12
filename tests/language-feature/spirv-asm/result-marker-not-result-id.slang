@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK_NOABORT):-target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_NOABORT,exit-code=-1):-target spirv -entry computeMain -stage compute
 
 // The `result` marker names the result of the instruction it appears in, so it can only be
 // that instruction's <result-id> operand. In an instruction with no result id, such as an
