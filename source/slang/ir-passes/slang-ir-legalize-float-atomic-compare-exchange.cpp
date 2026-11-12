@@ -176,7 +176,10 @@ struct FloatAtomicCompareExchangeLegalizer
         return IRTypeLayoutRules::get(*ruleName);
     }
 
-    // A second declaration of `buffer`, with elements of `intType` and the same binding.
+    // A second declaration of `buffer`, with elements of `intType` and the same binding. Its layout
+    // is std430, whatever the layout of `buffer` is: `findBufferLocation` gives a word index, so
+    // consecutive elements of the alias have to be one word apart. Under std140 a `uint` array
+    // element takes 16 bytes.
     IRGlobalParam* getAliasParam(IRGlobalParam* buffer, IRType* intType)
     {
         KeyValuePair<IRInst*, IRInst*> key(buffer, intType);
@@ -192,6 +195,8 @@ struct FloatAtomicCompareExchangeLegalizer
         typeOperands.add(intType);
         for (UInt i = 1; i < bufferType->getOperandCount(); i++)
             typeOperands.add(bufferType->getOperand(i));
+        if (typeOperands.getCount() > 1)
+            typeOperands[1] = getAliasDataLayout(builder);
         auto aliasType =
             builder.getType(bufferType->getOp(), typeOperands.getCount(), typeOperands.getBuffer());
 
@@ -214,6 +219,11 @@ struct FloatAtomicCompareExchangeLegalizer
         return alias;
     }
 
+    static IRType* getAliasDataLayout(IRBuilder& builder)
+    {
+        return builder.getType(kIROp_Std430BufferLayoutType);
+    }
+
     // Return an integer-typed pointer to the same memory as `ptr`, or nullptr if there is none.
     IRInst* getIntegerPointer(IRBuilder& builder, IRInst* ptr, IRType* intType)
     {
@@ -234,8 +244,14 @@ struct FloatAtomicCompareExchangeLegalizer
         if (!findBufferLocation(builder, ptr, wordSize, location))
             return nullptr;
         auto alias = getAliasParam(location.buffer, intType);
+        auto elementPtrType = location.elementPtrType;
         return builder.emitRWStructuredBufferGetElementPtr(
-            builder.getPtrType(intType, location.elementPtrType),
+            builder.getPtrType(
+                elementPtrType->getOp(),
+                intType,
+                elementPtrType->getAccessQualifier(),
+                elementPtrType->getAddressSpace(),
+                getAliasDataLayout(builder)),
             alias,
             emitIndex(builder, location));
     }
