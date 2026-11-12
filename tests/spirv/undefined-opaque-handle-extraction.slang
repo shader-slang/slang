@@ -8,6 +8,8 @@
 //TEST:SIMPLE(filecheck=SAMPLER):-target spirv -entry samplerInHelper -stage compute
 //TEST:SIMPLE(filecheck=TEXTURE):-target spirv -entry textureThroughTwoHelpers -stage compute -O0
 //TEST:SIMPLE(filecheck=TEXTURE):-target spirv -entry textureThroughTwoHelpers -stage compute
+//TEST:SIMPLE(filecheck=DIMENSIONS):-target spirv -entry dimensionsInHelper -stage compute -O0
+//TEST:SIMPLE(filecheck=DIMENSIONS):-target spirv -entry dimensionsInHelper -stage compute
 
 // TEXTURE: %[[IMAGE:[A-Za-z0-9_]+]] = OpTypeImage %float 2D 2 0 0 1
 // TEXTURE-NOT: OpUndef %[[IMAGE]]
@@ -23,6 +25,12 @@
 // SAMPLER-DAG: OpSampledImage {{.*}} %[[S]]
 // SAMPLER-NOT: OpUndef %[[IMAGE]]
 // SAMPLER-NOT: OpUndef %[[SMP]]
+
+// DIMENSIONS: %[[IMAGE:[A-Za-z0-9_]+]] = OpTypeImage
+// DIMENSIONS-NOT: OpUndef %[[IMAGE]]
+// DIMENSIONS-DAG: OpImageQuerySizeLod
+// DIMENSIONS-DAG: OpImageQueryLevels
+// DIMENSIONS: OpStore
 
 Texture2D<float4> gTexture;
 SamplerState gSampler;
@@ -62,4 +70,18 @@ void textureThroughTwoHelpers()
 {
     SamplerState s;
     outputBuffer[0] = forwardTexture(__makeCombinedTextureSampler(gTexture, s));
+}
+
+float4 queryDimensions(Sampler2D<float4> combined)
+{
+    uint width, height, levels;
+    combined.GetDimensions(0, width, height, levels);
+    return float4(width, height, levels, 0);
+}
+
+[numthreads(1, 1, 1)]
+void dimensionsInHelper()
+{
+    SamplerState s;
+    outputBuffer[0] = queryDimensions(__makeCombinedTextureSampler(gTexture, s));
 }

@@ -12,11 +12,11 @@ namespace Slang
 {
 // A `LoadFromUninitializedMemory` yields an arbitrary value of its type, and a pass may choose one
 // particular value for all of its uses. For an opaque handle such as a `Texture2D`, SPIR-V for
-// Vulkan has no undefined value at all: spirv-val rejects `OpUndef` of an image, sampler or
-// acceleration-structure type (VUID-StandaloneSpirv-OpUndef-12464). We therefore choose, once for
-// each undefined handle and so consistently for all of its uses, a handle to a descriptor that was
-// never written. Accessing a resource through such a handle is undefined behavior on Vulkan, so
-// each operation that does so may yield any result and have any effect, including none.
+// Vulkan has no undefined value at all: VUID-StandaloneSpirv-OpUndef-12464 forbids `OpUndef` of an
+// image, sampler or acceleration-structure type. We therefore choose, once for each undefined
+// handle and so consistently for all of its uses, a handle to a descriptor that was never written.
+// Accessing a resource through such a handle is undefined behavior on Vulkan, so each operation
+// that does so may yield any result and have any effect, including none.
 //
 // Consider this example:
 //
@@ -25,10 +25,10 @@ namespace Slang
 //     if (c)
 //         r = t.SampleLevel(s, uv, 0);
 //
-// By the time this pass runs, the sample is a `SPIRVAsm` block that reads
-// `makeCombinedTextureSampler(t, s)`. Sampling through the combined texture-sampler touches the
-// never-written descriptor, so we replace the result of the block with a fresh
-// `LoadFromUninitializedMemory<float4>` and remove the block. That leaves the combined
+// By the time this pass runs, the sample is a `SPIRVAsm` block with the
+// `AssumeValidResourceOperands` decoration and a `makeCombinedTextureSampler(t, s)` operand.
+// Sampling through it touches the never-written descriptor, so we replace the block's result
+// with a fresh `LoadFromUninitializedMemory<float4>` and remove the block. That leaves the combined
 // texture-sampler unused, and then `t`, and dead-code elimination removes them. Each result is a
 // frozen value rather than `Poison`. A `Poison` handle is treated like a
 // `LoadFromUninitializedMemory`, since poison may be refined to any value. Undefined values of
@@ -36,6 +36,8 @@ namespace Slang
 //
 // We rewrite only the uses that we recognize as accesses, or as deriving a value that leads to
 // accesses, such as a combined texture-sampler or an address into the contents of the resource.
+// For assembly, the `AssumeValidResourceOperands` decoration supplies the whole-block guarantee;
+// an unannotated block remains in place for diagnosis.
 // Every other use, such as a call argument or a store of the handle itself, is left in place. A
 // handle that such a use keeps alive is reported by `diagnoseUndefinedOpaqueHandles`, so a use that
 // the recognizers below miss fails compilation rather than being rewritten wrongly.
@@ -94,8 +96,8 @@ static void forEachUndefinedOpaqueHandle(IRModule* module, F const& f)
 /// Return the image that `inst` reads or writes if `inst` is a dedicated image operation, or null
 /// otherwise.
 ///
-/// Sampling, queries and ray-tracing operations do not appear here: by the time this pass runs they
-/// are `SPIRVAsm` blocks, which `rewriteUse` handles.
+/// Resource intrinsics implemented as `SPIRVAsm` blocks are handled separately by `rewriteUse`,
+/// which requires the `AssumeValidResourceOperands` decoration.
 static IRInst* getAccessedImage(IRInst* inst)
 {
     if (auto load = as<IRImageLoad>(inst))
@@ -259,12 +261,28 @@ struct UndefinedOpaqueHandleEliminationContext
     {
         auto user = use->getUser();
 
-        // We cannot see what a `SPIRVAsm` block does with its operands, so we treat a block that
-        // names the value as accessing the resource. The blocks that this pass meets come from
-        // intrinsic functions that read, write or query a resource, and for those this is exact.
+        // We cannot infer resource accesses from a SPIR-V asm block, so we require its
+        // AssumeValidResourceOperands decoration before removing it.
         if (auto asmOperand = as<IRSPIRVAsmOperand>(user))
         {
-            replaceWithUndefinedResult(asmOperand->getAsmBlock());
+            // A type function such as __imageType(missing) inspects the handle's type without
+            // accessing the resource, so its operand is not an access. We leave that use in place;
+            // if it keeps the handle alive, diagnoseUndefinedOpaqueHandles reports it.
+            auto instOperand = as<IRSPIRVAsmOperandInst>(asmOperand);
+            if (!instOperand)
+                return;
+
+            // An asm __ref parameter can carry an ImageSubscript address. The annotation
+            // covers opaque handles, not addresses into an image.
+            if (!isImageSamplerOrAccelerationStructureType(use->get()->getDataType()))
+                return;
+
+            // An unannotated block stays in place for diagnoseUndefinedOpaqueHandles.
+            auto asmBlock = instOperand->getAsmBlock();
+            if (!asmBlock->findDecoration<IRAssumeValidResourceOperandsDecoration>())
+                return;
+
+            replaceWithUndefinedResult(asmBlock);
             return;
         }
 

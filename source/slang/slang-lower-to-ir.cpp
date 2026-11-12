@@ -5650,6 +5650,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         const auto type = lowerType(context, expr->type);
         const auto spirvAsmInst = builder->emitSPIRVAsm(type);
+        if (expr->assumeValidResourceOperands)
+            builder->addDecoration(spirvAsmInst, kIROp_AssumeValidResourceOperandsDecoration);
 
         const auto lowerOperand = [&](const SPIRVAsmOperand& operand) -> IRSPIRVAsmOperand*
         {
