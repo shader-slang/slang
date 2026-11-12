@@ -2,7 +2,7 @@
 // bitwise one on the same memory, through a bitcast of the pointer.
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type -emit-spirv-directly -render-feature double,int64,atomic-int64
 
 //TEST_INPUT: set floats = ubuffer(data=[0.0 2.0], stride=4)
 uniform Atomic<float>* floats;

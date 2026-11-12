@@ -16,6 +16,8 @@ struct FloatAtomicCompareExchangeLegalizer
 {
     IRModule* m_module;
     TargetRequest* m_targetReq;
+    // The code that is emitted, which is GLSL when SPIR-V is emitted through GLSL.
+    CodeGenTarget m_target;
     DiagnosticSink* m_sink;
 
     // The integer-element declaration created for each (buffer parameter, integer type) pair.
@@ -222,7 +224,7 @@ struct FloatAtomicCompareExchangeLegalizer
         // A physical storage buffer pointer can be bitcast to another pointee type in SPIR-V.
         if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
         {
-            if (!isSPIRV(m_targetReq->getTarget()))
+            if (!isSPIRV(m_target))
                 return nullptr;
             return builder.emitBitCast(builder.getPtrType(intType, ptrType), ptr);
         }
@@ -267,11 +269,10 @@ struct FloatAtomicCompareExchangeLegalizer
         if (!intPtr)
         {
             m_sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = isSPIRV(m_targetReq->getTarget())
-                                 ? "floating point atomic compare-exchange outside a "
-                                   "RWStructuredBuffer or a physical storage buffer"
-                                 : "floating point atomic compare-exchange outside a "
-                                   "RWStructuredBuffer",
+                .operation = isSPIRV(m_target) ? "floating point atomic compare-exchange outside a "
+                                                 "RWStructuredBuffer or a physical storage buffer"
+                                               : "floating point atomic compare-exchange outside a "
+                                                 "RWStructuredBuffer",
                 .location = cas->sourceLoc});
             return;
         }
@@ -322,9 +323,10 @@ struct FloatAtomicCompareExchangeLegalizer
 void legalizeFloatAtomicCompareExchange(
     IRModule* module,
     TargetRequest* targetReq,
+    CodeGenTarget target,
     DiagnosticSink* sink)
 {
-    FloatAtomicCompareExchangeLegalizer legalizer{module, targetReq, sink};
+    FloatAtomicCompareExchangeLegalizer legalizer{module, targetReq, target, sink};
     legalizer.processModule();
 }
 
