@@ -300,6 +300,10 @@ struct WorkgroupUniformLoadContext
     List<IRInst*> workList;
     HashSet<IRInst*> required;
 
+    // Blocks whose choice must be uniform (see `requireUniformBranchChoice`).
+    List<IRBlock*> choiceWorkList;
+    HashSet<IRBlock*> choiceRequired;
+
     List<IRLoad*> loadsToReplace;
 
     static IRInst* getBranchCondition(IRBlock* block)
@@ -502,6 +506,16 @@ struct WorkgroupUniformLoadContext
             workList.add(inst);
     }
 
+    // Require the branches that decide whether `block` runs to be uniform, without requiring the
+    // function itself to be called in uniform control flow. That is what a value needs: a value
+    // that a block picks (a phi input, a store) is uniform when the choice of block is, wherever
+    // the function is called from. A barrier needs more, see `requireUniformControlFlow`.
+    void requireUniformBranchChoice(IRBlock* block)
+    {
+        if (block && choiceRequired.add(block))
+            choiceWorkList.add(block);
+    }
+
     template<typename F>
     static void forEachCallOf(IRInst* callee, const F& f)
     {
@@ -513,6 +527,11 @@ struct WorkgroupUniformLoadContext
         }
     }
 
+    // A block that must be reached in uniform control flow needs the branches that decide whether
+    // it runs to be uniform and to be reached in uniform control flow themselves, and it needs the
+    // function to be called in uniform control flow. The second part holds for every such block,
+    // not only for the entry block: a block that post-dominates the entry has no control
+    // dependences, but it still runs on every call.
     void requireUniformControlFlow(IRBlock* block)
     {
         auto code = as<IRGlobalValueWithCode>(block->getParent());
@@ -527,99 +546,191 @@ struct WorkgroupUniformLoadContext
                 require(branchBlock);
             }
         }
-        // The whole function runs in uniform control flow only if every call to it does.
-        if (block == code->getFirstBlock())
+        auto firstBlock = code->getFirstBlock();
+        if (block != firstBlock)
         {
+            require(firstBlock);
+        }
+        else
+        {
+            // The whole function runs in uniform control flow only if every call to it does.
             forEachCallOf(code, [&](IRCall* call) { require(call->getParent()); });
         }
     }
 
-    void requireUniformLoad(IRLoad* load)
+    void processUniformBranchChoice(IRBlock* block)
     {
-        IRInst* root = load->getPtr();
+        auto code = as<IRGlobalValueWithCode>(block->getParent());
+        if (!code)
+            return;
+        computeControlDependences(code);
+        if (auto dependences = controlDependences.tryGetValue(block))
+        {
+            for (auto branchBlock : *dependences)
+            {
+                require(getBranchCondition(branchBlock));
+                requireUniformBranchChoice(branchBlock);
+            }
+        }
+    }
+
+    // Returns true if `to` can run after `from` in the same function, along the instruction order
+    // of a block or along at least one control-flow edge (which includes a loop back edge).
+    static bool canReach(IRInst* from, IRInst* to)
+    {
+        auto fromBlock = as<IRBlock>(from->getParent());
+        auto toBlock = as<IRBlock>(to->getParent());
+        if (!fromBlock || !toBlock)
+            return true;
+        if (fromBlock == toBlock)
+        {
+            for (auto inst = from->getNextInst(); inst; inst = inst->getNextInst())
+            {
+                if (inst == to)
+                    return true;
+            }
+        }
+        HashSet<IRBlock*> visited;
+        List<IRBlock*> stack;
+        for (auto successor : fromBlock->getSuccessors())
+        {
+            if (visited.add(successor))
+                stack.add(successor);
+        }
+        while (stack.getCount())
+        {
+            auto block = stack.getLast();
+            stack.removeLast();
+            if (block == toBlock)
+                return true;
+            for (auto successor : block->getSuccessors())
+            {
+                if (visited.add(successor))
+                    stack.add(successor);
+            }
+        }
+        return false;
+    }
+
+    // Returns the variable or global that `ptr` addresses, through element and field addresses.
+    // Calls `onIndex` for each element index on the way.
+    template<typename F>
+    static IRInst* getAddressRoot(IRInst* ptr, const F& onIndex)
+    {
         for (;;)
         {
-            if (auto elementPtr = as<IRGetElementPtr>(root))
+            if (auto elementPtr = as<IRGetElementPtr>(ptr))
             {
-                require(elementPtr->getIndex());
-                root = elementPtr->getBase();
+                onIndex(elementPtr->getIndex());
+                ptr = elementPtr->getBase();
             }
-            else if (auto fieldAddress = as<IRFieldAddress>(root))
+            else if (auto fieldAddress = as<IRFieldAddress>(ptr))
             {
-                root = fieldAddress->getBase();
+                ptr = fieldAddress->getBase();
             }
             else
             {
-                break;
+                return ptr;
             }
         }
+    }
 
-        auto ptrType = as<IRPtrTypeBase>(load->getPtr()->getDataType());
-        bool isGroupShared = as<IRGroupSharedRate>(root->getRate()) ||
-                             (ptrType && ptrType->getAddressSpace() == AddressSpace::GroupShared);
-        if (as<IRGlobalVar>(root) && isGroupShared)
+    // Visit each write to the memory at `root` (a local variable or a pointer parameter) that can
+    // reach `reader`, or every write if `reader` is null. A write is a store, or a call that is
+    // passed an address in that memory (an `out` or `inout` argument, or the output temporary of a
+    // call that returns an array). A write through an element or field address also needs the
+    // element indices on its path. Conservatively, a write to any part of the memory counts.
+    //
+    // Calls `onValue` for each value that a write needs to be uniform, `onBlock` for each block
+    // that holds a write, and `onCallWrite(call, argIndex)` for each call that writes the memory.
+    template<typename FValue, typename FBlock, typename FCall>
+    static void forEachWrite(
+        IRInst* root,
+        IRInst* reader,
+        const FValue& onValue,
+        const FBlock& onBlock,
+        const FCall& onCallWrite)
+    {
+        List<IRInst*> addresses;
+        addresses.add(root);
+        for (Index i = 0; i < addresses.getCount(); i++)
         {
-            loadsToReplace.add(load);
-            require(load->getParent());
-            return;
-        }
-
-        // A local variable is uniform when every value stored to it is, and every store
-        // happens in uniform control flow. That includes stores through an element or field
-        // address of the variable, which also need the element indices on their path to be
-        // uniform. A load of one element is covered the same way, conservatively: a store to
-        // any part of the variable counts.
-        if (as<IRVar>(root))
-        {
-            List<IRInst*> addresses;
-            addresses.add(root);
-            for (Index i = 0; i < addresses.getCount(); i++)
+            auto address = addresses[i];
+            for (auto use = address->firstUse; use; use = use->nextUse)
             {
-                auto address = addresses[i];
-                for (auto use = address->firstUse; use; use = use->nextUse)
+                auto user = use->getUser();
+                bool isWrite = false;
+                if (auto store = as<IRStore>(user))
                 {
-                    auto user = use->getUser();
-                    if (auto store = as<IRStore>(user))
+                    if (store->getPtr() == address && (!reader || canReach(store, reader)))
                     {
-                        if (store->getPtr() != address)
-                            continue;
-                        require(store->getVal());
-                        require(store->getParent());
-                        for (auto path = address; path != root;)
+                        onValue(store->getVal());
+                        isWrite = true;
+                    }
+                }
+                else if (auto call = as<IRCall>(user))
+                {
+                    if (call->getCallee() != address && (!reader || canReach(call, reader)))
+                    {
+                        for (UInt arg = 0; arg < call->getArgCount(); arg++)
                         {
-                            if (auto elementPtr = as<IRGetElementPtr>(path))
-                            {
-                                require(elementPtr->getIndex());
-                                path = elementPtr->getBase();
-                            }
-                            else
-                            {
-                                path = as<IRFieldAddress>(path)->getBase();
-                            }
+                            if (call->getArg(arg) == address)
+                                onCallWrite(call, arg);
                         }
+                        isWrite = true;
                     }
-                    else if (auto elementPtr = as<IRGetElementPtr>(user))
-                    {
-                        if (elementPtr->getBase() == address)
-                            addresses.add(elementPtr);
-                    }
-                    else if (auto fieldAddress = as<IRFieldAddress>(user))
-                    {
-                        if (fieldAddress->getBase() == address)
-                            addresses.add(fieldAddress);
-                    }
+                }
+                else if (auto elementPtr = as<IRGetElementPtr>(user))
+                {
+                    if (elementPtr->getBase() == address)
+                        addresses.add(elementPtr);
+                }
+                else if (auto fieldAddress = as<IRFieldAddress>(user))
+                {
+                    if (fieldAddress->getBase() == address)
+                        addresses.add(fieldAddress);
+                }
+
+                if (isWrite)
+                {
+                    onBlock(as<IRBlock>(user->getParent()));
+                    getAddressRoot(address, onValue);
                 }
             }
         }
     }
 
-    // A call's result is uniform when every value the callee returns is, and so is the choice
-    // of `return`. This follows the values inside the callee and maps each parameter of the
-    // callee to this call's argument, so the other calls of the callee are not affected. Reads
-    // of groupshared memory inside the callee go through `require` as usual: rewriting such a
-    // read changes it for every call, so every call has to reach it in uniform control flow.
-    // Returns false if the callee has no body to follow.
-    bool requireUniformCallResult(IRCall* call)
+    // The values and blocks that one call of a callee needs to be uniform. Each parameter of the
+    // callee stands for the argument of that call, so other calls of the callee are not affected.
+    struct CallSlice
+    {
+        HashSet<IRInst*> visited;
+        List<IRInst*> values;
+        List<IRBlock*> blocks;
+
+        void addValue(IRInst* value)
+        {
+            if (value && visited.add(value))
+                values.add(value);
+        }
+        void addBlock(IRBlock* block)
+        {
+            if (block && visited.add(block))
+                blocks.add(block);
+        }
+    };
+
+    // Callees that `traceCallee` is following, so that a recursive call is not followed again.
+    HashSet<IRInst*> activeCallees;
+
+    // Require uniform what `call` gives back: its result if `outArgIndex` is -1, otherwise what
+    // the callee writes through the pointer parameter `outArgIndex`. This follows the values
+    // inside the callee, through nested calls and local variables, and maps each parameter of the
+    // callee to this call's argument. That argument goes to `outer` when this call is itself
+    // inside a callee being followed, and to `require` otherwise. Reads of groupshared memory go
+    // through `require` as usual: rewriting such a read changes it for every call, so every call
+    // has to reach it in uniform control flow. Returns false if the callee has no body to follow.
+    bool traceCallee(IRCall* call, Int outArgIndex, CallSlice* outer)
     {
         auto callee = as<IRFunc>(call->getCallee());
         if (!callee || !callee->getFirstBlock())
@@ -628,42 +739,57 @@ struct WorkgroupUniformLoadContext
         IRInst* definitionInst = nullptr;
         if (findTargetIntrinsicDefinition(callee, targetCaps, definition, definitionInst))
             return false;
+        if (activeCallees.contains(callee))
+            return false;
+        activeCallees.add(callee);
 
         computeControlDependences(callee);
         auto firstBlock = callee->getFirstBlock();
 
-        HashSet<IRInst*> visited;
-        List<IRInst*> values;
-        List<IRBlock*> blocks;
-        auto addValue = [&](IRInst* value)
+        auto requireArgument = [&](IRInst* arg)
         {
-            if (value && visited.add(value))
-                values.add(value);
-        };
-        auto addBlock = [&](IRBlock* block)
-        {
-            if (visited.add(block))
-                blocks.add(block);
+            if (outer)
+                outer->addValue(arg);
+            else
+                require(arg);
         };
 
-        for (auto block : callee->getBlocks())
+        CallSlice slice;
+        auto addValue = [&](IRInst* value) { slice.addValue(value); };
+        auto addBlock = [&](IRBlock* block) { slice.addBlock(block); };
+        auto followCallWrite = [&](IRCall* nested, UInt arg)
+        { traceCallee(nested, Int(arg), &slice); };
+
+        if (outArgIndex < 0)
         {
-            if (auto returnInst = as<IRReturn>(block->getTerminator()))
+            for (auto block : callee->getBlocks())
             {
-                addValue(returnInst->getVal());
-                addBlock(block);
+                if (auto returnInst = as<IRReturn>(block->getTerminator()))
+                {
+                    addValue(returnInst->getVal());
+                    addBlock(block);
+                }
+            }
+        }
+        else
+        {
+            Int paramIndex = 0;
+            for (auto param : firstBlock->getParams())
+            {
+                if (paramIndex++ == outArgIndex)
+                    forEachWrite(param, nullptr, addValue, addBlock, followCallWrite);
             }
         }
 
         Index blockIndex = 0;
         Index valueIndex = 0;
-        while (blockIndex < blocks.getCount() || valueIndex < values.getCount())
+        while (blockIndex < slice.blocks.getCount() || valueIndex < slice.values.getCount())
         {
-            // The branches that decide which `return` runs must be uniform. Unlike
-            // `requireUniformControlFlow`, this stays inside the callee.
-            if (blockIndex < blocks.getCount())
+            // The branches that decide whether the block runs must be uniform. This stays inside
+            // the callee: the value does not need the call to be in uniform control flow.
+            if (blockIndex < slice.blocks.getCount())
             {
-                auto block = blocks[blockIndex++];
+                auto block = slice.blocks[blockIndex++];
                 if (auto dependences = controlDependences.tryGetValue(block))
                 {
                     for (auto branchBlock : *dependences)
@@ -675,7 +801,7 @@ struct WorkgroupUniformLoadContext
                 continue;
             }
 
-            auto value = values[valueIndex++];
+            auto value = slice.values[valueIndex++];
             if (auto param = as<IRParam>(value))
             {
                 auto block = as<IRBlock>(param->getParent());
@@ -683,7 +809,7 @@ struct WorkgroupUniformLoadContext
                 if (block == firstBlock)
                 {
                     if (paramIndex < call->getArgCount())
-                        require(call->getArg(paramIndex));
+                        requireArgument(call->getArg(paramIndex));
                     continue;
                 }
                 for (auto predecessor : block->getPredecessors())
@@ -702,10 +828,20 @@ struct WorkgroupUniformLoadContext
             if (!as<IRBlock>(value->getParent()))
                 continue;
 
-            if (as<IRLoad>(value) || as<IRCall>(value))
+            if (auto load = as<IRLoad>(value))
             {
-                require(value);
+                auto root = getAddressRoot(load->getPtr(), addValue);
+                if (as<IRVar>(root) && isChildInstOf(root, callee))
+                    forEachWrite(root, load, addValue, addBlock, followCallWrite);
+                else
+                    require(load);
                 continue;
+            }
+
+            if (auto nested = as<IRCall>(value))
+            {
+                if (traceCallee(nested, -1, &slice))
+                    continue;
             }
 
             if (value->mightHaveSideEffects())
@@ -717,7 +853,37 @@ struct WorkgroupUniformLoadContext
                     addValue(operand);
             }
         }
+
+        activeCallees.remove(callee);
         return true;
+    }
+
+    void requireUniformLoad(IRLoad* load)
+    {
+        auto requireValue = [&](IRInst* value) { require(value); };
+        IRInst* root = getAddressRoot(load->getPtr(), requireValue);
+
+        auto ptrType = as<IRPtrTypeBase>(load->getPtr()->getDataType());
+        bool isGroupShared = as<IRGroupSharedRate>(root->getRate()) ||
+                             (ptrType && ptrType->getAddressSpace() == AddressSpace::GroupShared);
+        if (as<IRGlobalVar>(root) && isGroupShared)
+        {
+            loadsToReplace.add(load);
+            require(load->getParent());
+            return;
+        }
+
+        // A local variable is uniform when every write that can reach the load stores a uniform
+        // value, and the choice of whether each such write happens is uniform.
+        if (as<IRVar>(root))
+        {
+            forEachWrite(
+                root,
+                load,
+                requireValue,
+                [&](IRBlock* block) { requireUniformBranchChoice(block); },
+                [&](IRCall* call, UInt arg) { traceCallee(call, Int(arg), nullptr); });
+        }
     }
 
     void requireUniformValue(IRInst* inst)
@@ -747,7 +913,7 @@ struct WorkgroupUniformLoadContext
                     if (paramIndex < branch->getArgCount())
                         require(branch->getArg(paramIndex));
                 }
-                require(predecessor);
+                requireUniformBranchChoice(predecessor);
             }
             return;
         }
@@ -760,7 +926,7 @@ struct WorkgroupUniformLoadContext
 
         if (auto call = as<IRCall>(inst))
         {
-            if (requireUniformCallResult(call))
+            if (traceCallee(call, -1, nullptr))
                 return;
         }
 
@@ -796,13 +962,20 @@ struct WorkgroupUniformLoadContext
             }
         }
 
-        for (Index i = 0; i < workList.getCount(); i++)
+        Index workIndex = 0;
+        Index choiceIndex = 0;
+        while (workIndex < workList.getCount() || choiceIndex < choiceWorkList.getCount())
         {
-            auto inst = workList[i];
-            if (auto block = as<IRBlock>(inst))
-                requireUniformControlFlow(block);
-            else
-                requireUniformValue(inst);
+            if (workIndex < workList.getCount())
+            {
+                auto inst = workList[workIndex++];
+                if (auto block = as<IRBlock>(inst))
+                    requireUniformControlFlow(block);
+                else
+                    requireUniformValue(inst);
+                continue;
+            }
+            processUniformBranchChoice(choiceWorkList[choiceIndex++]);
         }
 
         for (auto load : loadsToReplace)
