@@ -22,7 +22,7 @@
 // CUDA: blockDim
 
 // HLSL-NOT: threads_per_threadgroup
-// HLSL: uint3(int3(int(4), int(2), int(1)))
+// HLSL: uint3(int3(4L, 2L, 1L))
 
 // SPV: OpEntryPoint
 // SPV-NOT: BuiltIn WorkgroupSize
