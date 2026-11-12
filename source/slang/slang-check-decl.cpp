@@ -7837,22 +7837,6 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         //
         synthesized->addMember(synParamDecl);
 
-        // The wrapper forwards each of its parameters to the candidate member, and the check
-        // of the synthesized call below compares the passing modes of the two parameters with
-        // `matchParamDirection`. That check reports a mismatch such as a `__ref` member for a
-        // `__ref_readonly` requirement, so a use of the parameter in the wrapper body is a
-        // read-write memory location for every mode but an immutable borrow; the call then
-        // type-checks and the mismatch is reported as one. This expression property describes
-        // uses inside the wrapper body; its ABI remains the independently stored
-        // `paramInfo.mode`.
-        auto paramType =
-            paramInfo.mode == ParamPassingMode::BorrowIn
-                ? ExprInfo(paramInfo.type)
-                : ExprInfo(
-                      paramInfo.type,
-                      ExprValueCategory::MemoryLocation,
-                      ExprAccess::ReadWrite);
-
         // The synthesized declaration's passing mode is copied above, but a `groupshared`
         // parameter also requires its argument to be thread-group-shared memory. The wrapper
         // forwards its own parameter as that argument, so the parameter keeps `groupshared`;
@@ -7865,9 +7849,13 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
             addModifier(synParamDecl, clonedModifier);
         }
 
-        // Create an expression that references the parameter for use in arguments.
+        // Create an expression that references the parameter for use in arguments. The
+        // reference has the same info as any use of the parameter in the wrapper body, so a
+        // requirement parameter that cannot be forwarded to the candidate's parameter makes the
+        // synthesized call fail to type-check.
         auto synArg = m_astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(synParamDecl);
+        auto paramType = getTypeForDeclRef(m_astBuilder, synArg->declRef, SourceLoc());
         synArg->type = paramType;
 
         if (auto typePack = as<ConcreteTypePack>(paramType))

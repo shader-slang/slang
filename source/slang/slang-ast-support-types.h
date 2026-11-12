@@ -2154,11 +2154,9 @@ FIDDLE() namespace Slang
     ///
     /// An `out` or `inout` parameter writes its result back to the argument, so the argument
     /// must be a storage location the caller can write. A reference parameter refers to the
-    /// argument's storage directly, so the argument must be a memory location, which the caller
-    /// can write unless the parameter is `__ref_readonly`. Reading an argument that the caller
-    /// cannot read, such as a `__ref_writeonly` parameter passed to `__ref`, is a separate
-    /// error that the check for reads of write-only storage reports. Consider this example,
-    /// where `v` is a read-write memory location of type `int4`:
+    /// argument's storage directly, so the argument must be a memory location whose access
+    /// covers the parameter's mode. Consider this example, where `v` is a read-write memory
+    /// location of type `int4`:
     ///
     /// ```
     /// void rw2(__ref int2 x);
@@ -2177,10 +2175,11 @@ FIDDLE() namespace Slang
             return argInfo.isWritableStorageLocation();
 
         case ParamPassingMode::RefReadWrite:
+            return argInfo.isMemoryLocation() && argInfo.canRead() && argInfo.canWrite();
+        case ParamPassingMode::RefReadOnly:
+            return argInfo.isMemoryLocation() && argInfo.canRead();
         case ParamPassingMode::RefWriteOnly:
             return argInfo.isMemoryLocation() && argInfo.canWrite();
-        case ParamPassingMode::RefReadOnly:
-            return argInfo.isMemoryLocation();
 
         default:
             SLANG_UNEXPECTED("parameter-passing mode does not bind storage");
