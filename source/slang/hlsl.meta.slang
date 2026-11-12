@@ -8086,22 +8086,22 @@ struct TriangleStream
 };
 
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 //@public:
 
