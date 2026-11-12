@@ -1634,6 +1634,54 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+// Returns true if the memory at `root` cannot be changed while `func` runs, either by a callee
+// of `func` that is not given a pointer to it or by another invocation. That is the case for a
+// local `var` of `func`, and for an `out`, `inout` or `__borrow` parameter, whose passing mode
+// gives `func` exclusive or immutable access to its argument for the duration of the call.
+static bool isCallerExclusiveRoot(IRGlobalValueWithCode* func, IRInst* root)
+{
+    // A local `var` of `func` is only reachable from `func` itself, unless a pointer to it is
+    // passed on (the caller checks the call's arguments for that separately).
+    //
+    if (as<IRVar>(root))
+        return isChildInstOf(root, func);
+
+    if (auto param = as<IRParam>(root))
+    {
+        // A parameter of any other block is a phi: it can carry any address that flows into
+        // the block, so it gives no guarantee.
+        //
+        if (param->getParent() != func->getFirstBlock())
+            return false;
+
+        auto type = param->getDataType();
+        if (!type)
+            return false;
+
+        // A function parameter is exclusive when its passing mode gives `func` exclusive or
+        // immutable access to the memory for the duration of the call: `out`, `inout` and
+        // `__borrow`.
+        //
+        switch (type->getOp())
+        {
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_BorrowInParamType:
+            return true;
+        }
+
+        // A `__ref` parameter or a plain pointer parameter carries no such guarantee: the
+        // memory behind it may be groupshared or device memory that other threads write.
+        //
+    }
+
+    // Everything else is not exclusive either: global variables, pointers loaded from memory
+    // (such as the kernel context on Metal, which holds pointers to the groupshared variables)
+    // and buffer element pointers.
+    //
+    return false;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
@@ -1680,20 +1728,25 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // If addr is a global variable, calling a function may change its value.
-            // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            // A call can change the value at `addr` even when no argument points to it, unless
+            // `addr` is rooted at memory that `func` has exclusive access to.
+            //
+            // That covers global variables, and also memory reached through a pointer, such
+            // as a pointer parameter or a pointer loaded from a struct. Such memory may be
+            // groupshared or device memory that other threads write, and a barrier call
+            // orders the access against those writes. On Metal, for example, groupshared
+            // variables are reached through a pointer in the kernel context, so the root of
+            // their address is a load or a parameter in `func`, not a global.
+            //
+            if (!isCallerExclusiveRoot(func, getRootAddr(addr)))
             {
+                // Only a callee that is side-effect free and does not read from memory is
+                // safe here: it cannot change `addr`, and it does not order anything. Any other
+                // callee, or an unknown one, may change `addr`.
+                //
                 auto callee = call->getCallee();
-                if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
-                {
-                    // An exception is if the callee is side-effect free and is not reading from
-                    // memory.
-                }
-                else
-                {
+                if (!callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                     return true;
-                }
             }
 
             // If any pointer typed argument of the call inst may overlap addr, return true.
