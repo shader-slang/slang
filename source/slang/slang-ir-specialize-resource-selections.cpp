@@ -15,6 +15,12 @@ namespace Slang
 // is valid in Slang IR. Several compilation targets, particularly Vulkan SPIR-V, cannot directly
 // represent all such instructions. For example, eliminating a resource-valued block parameter
 // can require a local texture or sampler variable, which Khronos targets cannot represent.
+// Memory-backed resources such as storage buffers and constant buffers lower to SPIR-V pointers,
+// so a selection between them would be a variable pointer. Selecting between two different
+// storage buffers needs the `VariablePointers` capability, because
+// `VariablePointersStorageBuffer` only allows a selected pointer to stay within one buffer, and a
+// pointer into the `Uniform` storage class cannot be selected at all. We therefore treat every
+// resource type the same way.
 //
 // This file implements `specializeResourceSelections`, a pass that attempts to eliminate
 // instructions that conditionally compute resources by moving the conditional computation to:
@@ -363,23 +369,6 @@ struct ResourceSelectionContext
         return true;
     }
 
-    /// Return whether `type` is an image, sampler, or another unstorable resource, including
-    /// arrays.
-    static bool isOpaqueResourceType(IRType* type)
-    {
-        // Storage buffers have an existing variable-pointer lowering. We leave their ordinary
-        // selections to that lowering; descriptor-heap loads remain accepted separately because
-        // replacing those loads with selected heap indices is required for storage buffers.
-        type = unwrapArray(type);
-        if (as<IRResourceTypeBase>(type))
-            return true;
-        if (as<IRSamplerStateTypeBase>(type))
-            return true;
-        if (as<IRSubpassInputType>(type))
-            return true;
-        return type->getOp() == kIROp_RaytracingAccelerationStructureType;
-    }
-
     /// Return whether an instruction conditionally computes a resource through a select or phi.
     static bool isSelection(IRInst* inst)
     {
@@ -420,6 +409,8 @@ struct ResourceSelectionContext
         case kIROp_ImageTexelPointer:
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_RWStructuredBufferGetElementPtr:
+        case kIROp_GetEquivalentStructuredBuffer:
             return true;
         default:
             return false;
@@ -524,7 +515,7 @@ struct ResourceSelectionContext
                 // references outside its owned subtree are resource arguments of the graph.
                 if (findEnclosingInstructionInBlockOfCurrentFunc(value) == consumer.inst)
                     continue;
-                if (isOpaqueResourceType(type))
+                if (isResourceType(type))
                     consumer.arguments.add(addValue(value));
             }
             for (auto child : inst->getChildren())
@@ -593,7 +584,7 @@ struct ResourceSelectionContext
                 if (block == func->getFirstBlock())
                 {
                     // Entry parameters dominate the entire body and can be named directly.
-                    if (!isOpaqueResourceType(param->getDataType()))
+                    if (!isResourceType(param->getDataType()))
                         return false;
                     value->isRoot = true;
                 }
@@ -616,7 +607,7 @@ struct ResourceSelectionContext
             }
             else if (as<IRGlobalParam>(inst))
             {
-                if (!isOpaqueResourceType(inst->getDataType()))
+                if (!isResourceType(inst->getDataType()))
                     return false;
                 value->isRoot = true;
             }
@@ -624,7 +615,7 @@ struct ResourceSelectionContext
             {
                 // `mergeUndefinedResources` has moved each local undefined resource to the entry
                 // block, where it dominates every reconstruction. A `Poison` has module scope.
-                if (!isOpaqueResourceType(inst->getDataType()))
+                if (!isResourceType(inst->getDataType()))
                     return false;
                 SLANG_ASSERT(
                     !as<IRBlock>(inst->getParent()) || inst->getParent() == func->getFirstBlock());
