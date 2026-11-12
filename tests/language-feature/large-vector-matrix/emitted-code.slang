@@ -16,8 +16,8 @@
 // SPIRV-DAG: OpTypeMatrix %v4float 4
 // SPIRV: %rowSums = OpFunction %[[F6]]
 
-// HLSL: void rowSums_0(float {{.*}}m_0[int(6)][int(6)], out float {{.*}}[int(6)])
-// HLSL: float3 firstRow_0(float3 {{.*}}m_1[int(6)])
+// HLSL: void rowSums_0(float {{.*}}m_0[6L][6L], out float {{.*}}[6L])
+// HLSL: float3 firstRow_0(float3 {{.*}}m_1[6L])
 // HLSL: float4x4 native_0
 
 // GLSL: void rowSums_0(float {{.*}}m_0[6][6], out float {{.*}}[6])
