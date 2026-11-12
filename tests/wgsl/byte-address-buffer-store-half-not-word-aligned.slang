@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry scalarMain
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry halfWordOffsetMain
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry unknownOffsetMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl -stage compute -entry scalarMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl -stage compute -entry halfWordOffsetMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl -stage compute -entry unknownOffsetMain
 
 // Only a `half2` or `half4` at an offset known to be a multiple of 4 is stored as whole words on
 // WGSL (see byte-address-buffer-store-half-pairs.slang). These stores would need a
