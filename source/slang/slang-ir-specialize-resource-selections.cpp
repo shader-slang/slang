@@ -73,6 +73,11 @@ namespace Slang
 // operation, such as a global shader parameter or a resource-valued function parameter, is a
 // *root*: its recipe refers to that existing IR value directly. A precombined texture/sampler
 // binding is a root too; we do not invent separately addressable bindings for its components.
+// An undefined resource value, such as a read of a local texture variable that was never written,
+// is also a root. Before discovering any graph, `mergeUndefinedResources` replaces the undefined
+// resources of each type in a function with one value in the entry block, so that the value is
+// available at every reconstruction, and a merge of undefined values is not a choice to dispatch
+// on.
 //
 // A *terminal consumer* is an instruction that uses a resource or resource-backed address and
 // produces an ordinary result, or only a side effect. Samples, memory operations, and calls
@@ -613,6 +618,16 @@ struct ResourceSelectionContext
             {
                 if (!isOpaqueResourceType(inst->getDataType()))
                     return false;
+                value->isRoot = true;
+            }
+            else if (as<IRUndefined>(inst))
+            {
+                // `mergeUndefinedResources` has moved each local undefined resource to the entry
+                // block, where it dominates every reconstruction. A `Poison` has module scope.
+                if (!isOpaqueResourceType(inst->getDataType()))
+                    return false;
+                SLANG_ASSERT(
+                    !as<IRBlock>(inst->getParent()) || inst->getParent() == func->getFirstBlock());
                 value->isRoot = true;
             }
             else if (isConstructor(inst))
@@ -1367,8 +1382,10 @@ struct ResourceSelectionContext
         // Recipe discovery has finished, so recursive materialization cannot invalidate the key.
         const auto& key = recipes[recipeIndex].key;
         if (key.op == kIROp_Invalid)
-            // `discoverGraph` accepts only module parameters and entry parameters as roots.
-            // Their values are available at every reconstruction, so no instruction is needed.
+            // `discoverGraph` accepts only module parameters, entry parameters and undefined
+            // values as roots, and `mergeUndefinedResources` has moved each local undefined
+            // resource to the entry block. Every root is therefore available at every
+            // reconstruction, so no instruction is needed.
             return key.operands[0].getFixedValue();
         List<IRInst*> operands;
         for (const auto& operand : key.operands)
@@ -1674,6 +1691,54 @@ struct ResourceSelectionContext
                 value->inst->removeAndDeallocate();
     }
 };
+
+/// Replace the `LoadFromUninitializedMemory` instructions of each resource type in `func` with
+/// one such instruction in the entry block. Returns whether `func` changed.
+///
+/// Consider this example, in which neither arm writes the texture field:
+///
+///     struct S { Texture2D<float4> texture; int kind; }
+///     S t;
+///     if (c) { S a; a.kind = 1; t = a; } else { S b; b.kind = 2; t = b; }
+///     use(t.texture);
+///
+/// SSA construction gives the merged field one incoming `LoadFromUninitializedMemory` per arm. Each
+/// of them may evaluate to an arbitrary value, so choosing one value for all of them, and for all
+/// of their uses, only removes behaviors. The merge then receives the same value from every arm,
+/// so it is not a resource selection, and every reconstruction can refer to that value. Without
+/// the merge, a call that takes several such fields would be dispatched once per combination of
+/// them. A combined texture-sampler built from undefined parts benefits the same way: constructors
+/// with the same operands share a recipe.
+bool mergeUndefinedResources(IRFunc* func)
+{
+    List<IRInst*> undefinedResources;
+    for (auto block : func->getBlocks())
+        for (auto inst : block->getChildren())
+            if (as<IRLoadFromUninitializedMemory>(inst))
+                if (isResourceType(inst->getDataType()))
+                    undefinedResources.add(inst);
+
+    bool changed = false;
+    auto entryBlock = func->getFirstBlock();
+    Dictionary<IRType*, IRInst*> representatives;
+    for (auto inst : undefinedResources)
+    {
+        auto type = inst->getDataType();
+        if (auto representative = representatives.tryGetValue(type))
+        {
+            inst->replaceUsesWith(*representative);
+            inst->removeAndDeallocate();
+            changed = true;
+            continue;
+        }
+        representatives.add(type, inst);
+        if (inst->getParent() == entryBlock)
+            continue;
+        inst->insertBefore(entryBlock->getFirstOrdinaryInst());
+        changed = true;
+    }
+    return changed;
+}
 } // namespace
 
 bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModule* module)
@@ -1694,6 +1759,7 @@ bool specializeResourceSelections(CodeGenContext* codeGenContext, IRModule* modu
         // `specializeResourceUsage` and the target's later unsupported-instruction checks.
         if (hasGenericAssemblyImplementation(func))
             continue;
+        changed |= mergeUndefinedResources(func);
         OrderedHashSet<IRInst*> candidates;
         for (auto block : func->getBlocks())
             for (auto inst : block->getChildren())
