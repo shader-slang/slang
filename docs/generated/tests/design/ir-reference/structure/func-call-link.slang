@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#functions-and-generics
-//META: doc_section_digest=65157f975f1cbb6740bfae10984ea872d190878fcc32a62888fced45d662037d
+//META: doc_section_digest=d9c6cf4f837d25ae755b0e257d6cddda3fedea83b491aa0f828dd84b3c990065
 //META: purpose=A function call lowers to a call opcode whose first operand is the callee func and remaining operands are the arguments.
 //META: intent=functional
 //META: pipeline_stage=lower

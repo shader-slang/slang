@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#resource-queries-and-modifiers
-//META: doc_section_digest=82493124820639f23eb628253a1c16bb3070d406dc0551639689420518cc843e
+//META: doc_section_digest=3fa57c07d0da1e5457cc82b9ee03437599d2c7fe2f0bfaf6e783d187f12c9264
 //META: purpose=The three buffer-view resource-query rows whose only surface is an underscore-prefixed core-module intrinsic reach the lowering snapshot with no inlining step in between, so `func %main` itself holds `getEquivalentStructuredBuffer`, `getStructuredBufferPtr`, and `getUntypedBufferPtr`.
 //META: intent=functional
 //META: pipeline_stage=lower

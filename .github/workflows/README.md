@@ -47,8 +47,8 @@ changes every caller at once.
 
 ```mermaid
 flowchart LR
-  ci["ci.yml"] --> build & test & suites & san
-  sccache["sccache-populate.yml"] --> build
+  ci["ci.yml"] --> build & test & suites & san & static
+  sccache["sccache-populate.yml"] --> build & static
   ncov["nightly-slang-coverage-test.yml"] --> cov
   nsan["nightly-slang-sanitizer-test.yml"] --> san
   copts["cmake-options.yml"] --> coptbuild
@@ -57,6 +57,7 @@ flowchart LR
   test["ci-slang-test.yml / -container<br>ci-rhi-test.yml / -container"]
   suites["ci-falcor-test.yml<br>ci-falcor-perf-test.yml<br>ci-slang-regression-test.yml<br>ci-mdl-benchmark-test.yml<br>ci-materialx-regression-test.yml"]
   san["ci-slang-sanitizer.yml"]
+  static["ci-slang-static.yml"]
   cov["ci-slang-coverage-test.yml"]
   coptbuild["cmake-options-build.yml / -container"]
 ```
@@ -219,6 +220,7 @@ No trigger of their own; see the first diagram for who calls them. The
 | `ci-slang-test.yml`, `ci-slang-test-container.yml`             | Run `slang-test` for one platform.       |
 | `ci-rhi-test.yml`, `ci-rhi-test-container.yml`                 | Run the slang-rhi test suite.            |
 | `ci-slang-sanitizer.yml`                                       | Sanitizer-instrumented build and test.   |
+| `ci-slang-static.yml`                                          | Static-library build and unit tests.     |
 | `ci-slang-coverage-test.yml`                                   | Instrumented build plus coverage report. |
 | `ci-falcor-test.yml`                                           | Compile Falcor's shaders.                |
 | `ci-falcor-perf-test.yml`                                      | Falcor compiler perf test.               |

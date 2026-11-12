@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#shader-specific-checks
-//META: doc_section_digest=cb835744c66906760cd040d4b867053da3041145426b47d4afb564e26340984f
+//META: doc_section_digest=73b0a54aa16472868adbc586d5469e6a6d226c42e5fd1a1ff6720178eede46b1
 //META: purpose=A system-value semantic rejects a declared type whose scalar element is in a different category, so `float` is not valid for a `uint` semantic (E30701).
 //META: intent=negative
 //META: pipeline_stage=check

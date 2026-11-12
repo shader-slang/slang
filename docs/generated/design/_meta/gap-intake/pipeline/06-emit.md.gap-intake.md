@@ -1,14 +1,14 @@
 ---
 gap_intake_report: true
-intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:41:13Z
+intake_model: claude-sonnet-5-5
+intake_at: 2026-11-02T00:00:00Z
 target_doc: pipeline/06-emit.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_before: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 gap_count: 7
 actions:
-  fixed: 7
-  rejected_bogus: 0
+  fixed: 0
+  rejected_bogus: 7
   rejected_out_of_scope: 0
   deferred: 0
   escalated_to_finding: 0
@@ -18,33 +18,16 @@ actions:
 
 ## Summary
 
-Nothing was escalated: every observation in this queue was confirmed in
-the document's watched paths, and the one `drift-from-source` gap turned
-out to be a documentation error, not a compiler defect. All seven gaps
-were fixed. Two suggested additions were only partly right and were
-written from what the source says instead: the C++ backend does *not*
-reach the global-parameter block via `slang_bit_cast` (it goes through
-the `KernelContext` struct built by an IR pass outside the watched set),
-so only the confirmed CUDA shape was documented; and the observed
-"`slangc -target slangvm` succeeds where `slangi` fails" is not a
-divergence of emit paths at all — both go through
-`CodeGenTarget::HostVM` / `emitHostVMCode`, and the difference is that
-`ByteCodeEmitter::emitEntryPoints` emits only `Stage::Dispatch` entry
-points, so a shader-stage entry point never reaches the check. The
-prelude gap generalized past its HLSL row: what is registered per
-`SourceLanguage` is a string, defaulting to the embedded header text,
-and only `slangc` and the test tools swap the C++ / CUDA preludes for an
-`#include`; that swap lives outside the watched set and was recorded as
-a second bullet under `## Paths outside the watched set`.
+Nothing was escalated. All seven gaps were reopened records of text that the previous intake cycle already added to the document; each was re-checked against the current source at 2518a942d and the existing text still matches it, so all seven are rejected-bogus (the document already says what the gap asks for). The refresh in this cycle only re-derived line citations and corrected the SPIR-V downstream conditions and the HLSL fold-policy name; it did not touch the sections these gaps anchor to except for refreshed line numbers.
 
 ## Actions
 
 | Gap ID | Action | Evidence | Fix summary |
 | --- | --- | --- | --- |
-| 16397e63407b | fixed | `source/slang/slang-emit-cpp.cpp:1000-1011` (entry-point `IRFunc` emitted under a `_` prefix as the workhorse), `:2406-2484` (the `Stage::Compute` gate and the `_Thread` / `_Group` / whole-dispatch triple, with the header-only prototype path at `:2417-2432`), `:2124-2140` (`_emitEntryPointSignature`, the shared `(varyingInput, void* entryPointParams, void* globalParams)` signature), `:930-954` (`emitEntryPointAttributesImpl` writing `SLANG_PRELUDE_EXPORT`); verified printed forms in `docs/generated/tests/design/pipeline/06-emit/cpp-prelude-and-export.slang` | added a paragraph to `### C++` describing the `_main_N` workhorse plus the three `SLANG_PRELUDE_EXPORT` shims, their shared signature, the compute-only restriction, and the header-only prototype form |
-| a0c041cb4ea5 | fixed | `source/slang/slang-emit-cuda.cpp:414-422` (`emitParameterGroupImpl`: `extern "C" __constant__ <ElementType> SLANG_globalParams;` plus the `#define <name> (&SLANG_globalParams)`), `:432-453` (`emitFunctionPreambleImpl`: `extern "C" __global__` for an entry point, `__device__` otherwise), `source/slang/slang-emit.cpp:1096-1102` (ordinary uniforms packed into `GlobalParams` on CPU and CUDA); verified printed forms in `docs/generated/tests/design/pipeline/06-emit/cuda-prelude-and-global-entry.slang` | added a paragraph to `### CUDA` naming the `GlobalParams` / `SLANG_globalParams` shim and the `__global__` / `__device__` qualifiers; the suggestion's `slang_bit_cast` claim for C++ was dropped as unconfirmed — the C++ path reaches globals through `KernelContext` (`source/slang/slang-ir-explicit-global-context.cpp`, outside the watched set) |
-| fd888a29cac2 | fixed | `source/slang/slang-emit-source-writer.cpp:467-540` (`_emitLineDirective`: `#line <line>`, the path part only when `sourceLocation.pathInfo.foundPath != m_loc.pathInfo.foundPath`, the GLSL per-path integer id from `m_mapGLSLSourcePathToID`, the quoted path for `Default` / `Standard`), `:412-425` (`None` / `SourceMap` return before printing anything); verified printed forms in `.../06-emit/glsl-line-directive-mode-numeric-file-id.slang` and `.../wgsl-line-directive-mode-none.slang` | expanded the `LineDirectiveMode` bullet under `## Source-writer abstraction` with the three emitted forms and the path-elision rule, and pointed the dispatcher's step 1 at it |
-| e5c2e132e05b | fixed | `source/slang/slang-emit-c-like.cpp:760-781` (`maybeEmitParens`: the base precedence test, then `isBitLogicalOrRelationalOrEquality(prec.leftPrecedence)` with an outer context tighter than assignment, then the unconditional force when the *outer* op is in the set), `:731-757` (the set membership); verified printed forms in `.../06-emit/precedence-forces-parens-on-bitwise-mix.slang`, `precedence-forces-parens-on-shift-mix.slang`, `precedence-forces-parens-on-relational-equality-mix.slang`, `precedence-omits-unneeded-arithmetic-parens.slang`, `precedence-keeps-semantically-required-parens.slang` | added a sentence stating the two-sided rule plus a five-row source/emitted table (`a + b * c`, `(a + b) * c`, `a \| b & c`, `a << b + c`, `a < b == c < d`) |
-| 4f4361b73eac | fixed | `source/slang/slang-global-session.cpp:125-128` (defaults are the embedded `get_slang_*_prelude()` strings, for CUDA / C++ / HLSL only), `:974-985` (`setLanguagePrelude` lets a host replace them), `prelude/CMakeLists.txt` (`slang-embed` turns each `*-prelude.h` into that string), `prelude/slang-hlsl-prelude.h:1-8` (the whole file is the `SLANG_HLSL_ENABLE_NVAPI` guard plus a warning `#pragma`), `source/slang/slang-emit-hlsl.cpp:2534,2592-2595` (`emitFrontMatterImpl` owns `#pragma pack_matrix(...)`), `source/core/slang-test-tool-util.cpp:77-111` and `source/slangc/main.cpp:103` (the C++ / CUDA `#include` swap); verified printed forms in `.../06-emit/preludes-included-by-cuda-cpp-and-hlsl.slang` | generalized past the HLSL row: added a paragraph after the prelude table stating that a prelude is a registered *string* defaulting to the embedded header text, that only C++ and CUDA are swapped for an `#include`, and that HLSL's text is the NVAPI guard (with `#pragma pack_matrix` attributed to the front matter) |
-| bc8c39ac62ab | fixed | `source/slang/slang-emit-cpp.cpp:1305-1314`, `source/slang/slang-emit-metal.cpp:200-209`, `source/slang/slang-emit-wgsl.cpp:63-72` — all three overrides drop `precise` and call `getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{...})`, so the source agrees with the observation and the document was wrong; `source/slang/slang-emit-cuda.cpp:232-239` shows a fourth override chaining to the C++ body and adding `__device__` | replaced "the latter two diagnose" with all three diagnosing, and named CUDA's additional override |
-| fea637a3d519 | fixed | `source/slang/slang-code-gen.cpp:1216-1217` (`CodeGenTarget::HostVM` → `emitHostVMCode`), `source/core/slang-type-text-util.cpp:101` (`slangvm` / `slang-vm` → `SLANG_HOST_VM`), `source/slang/slang-emit.cpp:3570-3577` (`emitHostVMCode` calls `emitVMByteCodeForEntryPoints`), `source/slang/slang-emit-vm.cpp:1250-1258` (`emitEntryPoints` skips any entry point whose stage is not `Stage::Dispatch`), `tools/slangi/main.cpp:66-71` (`slangi` requests `SLANG_STAGE_DISPATCH`) | added a paragraph to `### VM` stating that both CLI surfaces share the `HostVM` / `emitHostVMCode` path and that the `Stage::Dispatch`-only filter, not a different emit path, is why a shader-stage `-target slangvm` compile never trips the diagnostic |
+| 16397e63407b | rejected-bogus | `### C++` already says the `IRFunc` becomes a `_main_N` workhorse and that three `SLANG_PRELUDE_EXPORT` shims `main_N_Thread`, `main_N_Group`, `main_N` follow; source `source/slang/slang-emit-cpp.cpp:1003`, `:2417` (`Stage::Compute` gate), `:2430-2470` | — |
+| a0c041cb4ea5 | rejected-bogus | `### CUDA` already names `GlobalParams`, `extern "C" __constant__ ... SLANG_globalParams` and the `#define`; source `source/slang/slang-emit-cuda.cpp:421-434`, `source/slang/slang-emit.cpp:1368`. The `slang_bit_cast` claim for C++ is not confirmed in the watched set and is not documented | — |
+| fd888a29cac2 | rejected-bogus | `## Source-writer abstraction`, `LineDirectiveMode` bullet, gives `#line 12 "foo.slang"`, `#line 12 0` and the no-directive modes; step 1 of the dispatcher links to it; source `source/slang/slang-emit-source-writer.cpp:419-430,474` | — |
+| e5c2e132e05b | rejected-bogus | `## Operator precedence and parenthesization` already carries a five-row source/emitted table and the two-sided rule; source `source/slang/slang-emit-c-like.cpp:760-781` | — |
+| 4f4361b73eac | rejected-bogus | `## Preludes`, paragraph after the table, states the HLSL prelude is the `SLANG_HLSL_ENABLE_NVAPI` guard and that `#pragma pack_matrix` comes from front matter; source `source/slang/slang-global-session.cpp:125-128`, `source/slang/slang-emit-hlsl.cpp:2534` | — |
+| bc8c39ac62ab | rejected-bogus | `### Shared C-like base` already states all of C++, Metal and WGSL diagnose `PreciseQualifierUnsupportedOnTarget`; source `source/slang/slang-emit-cpp.cpp:1305`, `source/slang/slang-emit-metal.cpp:221`, `source/slang/slang-emit-wgsl.cpp:63` | — |
+| fea637a3d519 | rejected-bogus | `### VM` already explains both surfaces use `HostVM` / `emitHostVMCode` and that only `Stage::Dispatch` entry points are emitted; source `source/slang/slang-code-gen.cpp:1201`, `source/slang/slang-emit-vm.cpp:1353` | — |

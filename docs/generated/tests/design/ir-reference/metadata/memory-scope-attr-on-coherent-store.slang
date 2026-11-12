@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#attr-family
-//META: doc_section_digest=d04af1d542b300e2a0bbb935e77e3c2a63823444c7ee62a2765c374e4959f38b
+//META: doc_section_digest=12e70c571bf19ae2926df9464e48e90c1d31970ee9230263d97ca0e695907be7
 //META: purpose=The MemoryScope attribute records the memory scope of a coherent store, sitting after the Aligned attribute in the store's operand tail.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

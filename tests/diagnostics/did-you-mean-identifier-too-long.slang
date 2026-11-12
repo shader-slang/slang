@@ -4,7 +4,7 @@
 // "did you mean" suggestion. (FileCheck, not DIAGNOSTIC_TEST, to avoid
 // 260-column caret annotations.)
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
 
 float aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0;
 

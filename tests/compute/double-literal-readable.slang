@@ -23,16 +23,16 @@ void computeMain()
 
 // Simple fractions should stay readable. Whole numbers must keep a decimal point,
 // and trimming fractional zeros must not remove significant integer zeros.
-// HLSL: = 0.5;
-// HLSL: = 0.25;
-// HLSL: = 0.125;
-// HLSL: = 0.0625;
-// HLSL: = 0.00390625;
-// HLSL: = 1.0;
-// HLSL: = 10000.0;
-// HLSL: = 0.0;
-// HLSL: = -0.0;
-// HLSL: = 0.0001;
+// HLSL: = 0.5L;
+// HLSL: = 0.25L;
+// HLSL: = 0.125L;
+// HLSL: = 0.0625L;
+// HLSL: = 0.00390625L;
+// HLSL: = 1.0L;
+// HLSL: = 10000.0L;
+// HLSL: = 0.0L;
+// HLSL: = -0.0L;
+// HLSL: = 0.0001L;
 // GLSL: = 0.5LF;
 // GLSL: = 0.25LF;
 // GLSL: = 0.125LF;

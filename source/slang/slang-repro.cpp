@@ -383,6 +383,8 @@ static String _scrubName(const String& in)
         dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->m_passThrough;
         dst->legacyAllowGLSLInput = request->getLegacyAllowGLSLInput();
+        dst->areHLSLMethodsMutatingByDefault =
+            linkage->m_optionSet.getBoolOption(CompilerOptionName::HLSLMethodsMutatingByDefault);
 
         dst->useUnknownImageFormatAsDefault =
             linkage->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);
@@ -988,6 +990,11 @@ struct LoadContext
             SlangContainerFormat(requestState->containerFormat));
         externalRequest->setPassThrough(SlangPassThrough(request->m_passThrough));
         request->setLegacyAllowGLSLInput(requestState->legacyAllowGLSLInput);
+
+        // We restore both boolean values so a disabled setting also overrides the replay request.
+        linkage->m_optionSet.set(
+            CompilerOptionName::HLSLMethodsMutatingByDefault,
+            requestState->areHLSLMethodsMutatingByDefault);
 
         linkage->m_optionSet.set(
             CompilerOptionName::DefaultImageFormatUnknown,
@@ -1637,6 +1644,10 @@ static SlangResult _calcCommandLine(
     }
 
     _calcPreprocessorDefines(base, requestState->preprocessorDefinitions, cmd);
+
+    // We emit the opt-in flag so HLSL methods keep the same receiver mode after extraction.
+    if (requestState->areHLSLMethodsMutatingByDefault)
+        cmd.addArg("-fhlsl-methods-mutating-by-default");
 
     if (requestState->legacyAllowGLSLInput)
     {

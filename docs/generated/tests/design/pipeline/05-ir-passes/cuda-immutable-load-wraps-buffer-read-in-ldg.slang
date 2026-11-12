@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-16T06:40:19Z
 //META: source_commit=d3b56927b854c14fa1ac169b72da6e080ea80833
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#target-specific-lowering
-//META: doc_section_digest=557b5025d6a79f84b833cef681013d91b8a66b0574857ec5bf62d3232bf54ca2
+//META: doc_section_digest=79c80f93e7653bb012008aa7819b0c3ef28024e5d967ea6b1e4206f5d416adc5
 //META: purpose=The CUDA immutable-load pass wraps read-only `StructuredBuffer` element loads in `__ldg(&...)` on the CUDA target.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

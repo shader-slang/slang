@@ -23,5 +23,5 @@ void main_cs(uint gi : SV_GroupIndex)
 }
 
 // HLSL: for(;;)
-// HLSL: if(i_0 < int(8192))
+// HLSL: if(i_0 < 8192L)
 // HLSL: s_Stage_0[i_0] = {{.*}}[i_0];

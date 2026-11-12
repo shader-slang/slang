@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_2026): -stage compute -entry computeMain -lang slang -std 2026
-//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -stage compute -entry computeMain -lang slang -std 2026 -enable-experimental-dynamic-dispatch
+//TEST:SIMPLE(filecheck=CHECK_2026,exit-code=-1): -stage compute -entry computeMain -lang slang -std 2026
+//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP,exit-code=-1): -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP,exit-code=-1): -stage compute -entry computeMain -lang slang -std 2026 -enable-experimental-dynamic-dispatch
 
 // Validate AST side of `dyn` keyword use-cases
 
@@ -60,7 +60,7 @@ interface IBase2
 };
 
 dyn interface interface5 : IBase2
-{	
+{
 	int myFunc(int val)
 	{
 		return val*2;
@@ -72,7 +72,7 @@ dyn interface IBase3
 };
 
 dyn interface interface6 : IBase3
-{	
+{
 	int myFunc(int val)
 	{
 		return val*2;
@@ -155,7 +155,7 @@ struct structWithOpaque : IBase6
 dyn interface IBase6
 {
 };
-[__NonCopyableType] 
+[__NonCopyableType]
 struct NonCopyableStruct1
 {
     float v;

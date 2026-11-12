@@ -1095,6 +1095,20 @@ err(
 )
 
 err(
+    "structural-ray-tracing-stage-runtime-value",
+    20025,
+    "runtime use of a structural ray-tracing stage type",
+    span { loc = "location", message = "structural ray-tracing stage type '~type:type' has no runtime representation" }
+)
+
+err(
+    "structural-ray-tracing-input-storage",
+    20026,
+    "storage of a structural ray-tracing stage input",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' may only be used as an 'in' parameter or an initialized local copy" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -2883,6 +2897,13 @@ err(
 )
 
 err(
+    "unknown-builtin-name",
+    31166,
+    "unknown builtin name",
+    span { loc = "location", message = "unknown builtin name '~name'" }
+)
+
+err(
     "non-positive-num-threads",
     31102,
     "invalid 'numthreads' value",
@@ -4004,6 +4025,30 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "groupshared-parameter-must-be-reference",
+    30707, -- 30706 reserved for #11885 (duplicate-system-value-semantic)
+    "a 'groupshared' parameter is passed by reference, so it cannot use the '~mode:ParamPassingMode' passing mode",
+    span { loc = "modifier:Modifier", message = "remove this, or use 'const groupshared' for a read-only reference" }
+)
+
+err(
+    "groupshared-parameter-of-non-inlinable-function-on-hlsl",
+    30708,
+    "'~func:IRInst' cannot have the 'groupshared' parameter '~param:IRInst' when targeting HLSL, because calls to it cannot be inlined",
+    span { loc = "modifierLocation", message = "this prevents calls to the function from being inlined" },
+    span { loc = "location", message = "'groupshared' parameter declared here" }
+)
+
+-- 30709 and 30710 were warnings about thread-group-shared memory passed to an `out` or `inout`
+-- parameter, and are not reused.
+
+err(
+    "groupshared-argument-must-be-groupshared-lvalue",
+    30711,
+    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
+    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage; pass a 'groupshared' variable or a component of one, or declare '~param' without 'groupshared' if the function does not need thread-group-shared memory" }
+)
 --
 -- 308xx: inheritance
 --
@@ -4371,6 +4416,16 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Attached to "no overload for 'op=' applicable" when the binary operator `op` applies to the
+-- same arguments and its result converts to the left operand's type: Slang does not derive a
+-- compound assignment from the binary operator (issue #14038).
+standalone_note(
+    "compound-assignment-binary-operator-applies",
+    40026,
+    "'~binaryOp:String' applies to these arguments, but '~compoundOp:String' is not derived from it: declare 'operator~compoundOp' with an 'inout' first parameter, or write 'x = x ~binaryOp y'",
+    span { loc = "location" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,
@@ -4576,6 +4631,56 @@ err(
     "no stage specified for entry point",
     span { loc = "location", message = "no stage specified for entry point '~entryPoint'; use either a '[shader(\"name\")]' function attribute or the '-stage <name>' command-line option to specify a stage" }
 )
+
+err(
+    "structural-ray-tracing-entry-point-not-stage",
+    38058,
+    "invalid structural ray-tracing entry point",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement an executable structural ray-tracing stage interface" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-stage-mismatch",
+    38093,
+    "structural ray-tracing entry point stage mismatch",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement the selected '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-stage",
+    38055,
+    "ambiguous structural ray-tracing entry point stage",
+    span { loc = "stageType:Decl", message = "struct '~stageType' implements more than one executable ray-tracing stage; use '-stage <name>' to select one" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-implementation",
+    38092,
+    "ambiguous structural ray-tracing stage implementation",
+    span { loc = "stageType:Decl", message = "struct '~stageType' has multiple 'invoke' implementations for the '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-input-in-native-entry-point",
+    38057,
+    "invalid native entry point signature",
+    span { loc = "location", message = "structural ray-tracing input type '~type:Type' cannot be used in a native entry point signature" }
+)
+
+err(
+    "structural-ray-tracing-stage-implementation-must-be-struct",
+    38091,
+    "invalid structural ray-tracing stage implementation",
+    span { loc = "location", message = "structural ray-tracing stage implementation '~stageType:Type' must be declared as a struct" }
+)
+
+err(
+    "duplicate-structural-ray-tracing-entry",
+    38074,
+    "duplicate structural ray-tracing entry",
+    span { loc = "location", message = "~section entry '~entry:Type' is listed more than once in schema '~schema:Type'" }
+)
+
 
 err(
     "specialization-parameter-of-name-not-specialized",
@@ -4811,6 +4916,38 @@ err(
     38034,
     "'borrow in' on differentiable parameter",
     span { loc = "modifier:Modifier", message = "cannot use 'borrow in' on a differentiable parameter." }
+)
+
+err(
+    "reference-parameter-of-differentiable-function",
+    38038,
+    "'~func:Decl' cannot be differentiated, because parameter '~param:Decl' is passed by reference",
+    span { loc = "param:Decl" },
+    -- At most one of these notes has a location: the attribute that makes the function
+    -- differentiable, or the `...DerivativeOf` attribute that names a function without one.
+    note { message = "this requests a derivative; remove it if the function needs none", span { loc = "attributeLocation" } },
+    note { message = "a user-defined derivative is declared for it here", span { loc = "derivativeOfLocation" } }
+)
+
+err(
+    "reference-parameter-of-user-defined-derivative",
+    38044,
+    "user-defined derivative '~func:Decl' cannot have parameter '~param:Decl', because it is passed by reference",
+    span { loc = "param:Decl", message = "consider passing it by value, or accessing the argument directly if it is a global" },
+    note { message = "this declares the function as a user-defined derivative", span { loc = "attributeLocation" } }
+)
+
+err(
+    "groupshared-partial-write-in-differentiated-body",
+    38039,
+    "writing part of thread-group-shared variable '~var:Decl' introduces a race condition when this function is differentiated",
+    span { loc = "target:Expr", message = "consider moving this into a function that is not differentiable or has a custom derivative" },
+    -- For a call, at most one of these notes has a location: the parameter's `out` or `inout`
+    -- keyword, the method's `[mutating]` attribute, or a method that can modify `this` without
+    -- one, such as a `set` accessor or a method in HLSL source.
+    note { message = "the call writes its argument back because the parameter is '~mode:ParamPassingMode'", span { loc = "modeLocation" } },
+    note { message = "the call writes 'this' back because of '[mutating]'", span { loc = "mutatingLocation" } },
+    note { message = "the call writes 'this' back because this method can modify it", span { loc = "methodLocation" } }
 )
 
 err(
@@ -5925,6 +6062,12 @@ err(
     span { loc = "location", message = "'~type:IRInst' has no HostVM layout and cannot be used at runtime" }
 )
 
+err(
+    "validate-with-downstream-compiler-unsupported-target",
+    52015,
+    "'-validate-with-downstream-compiler' cannot be used with target '~target', because no downstream compiler or validator is defined for this target"
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
@@ -6252,6 +6395,20 @@ err(
     56019,
     "target cannot represent an opaque value in mutable local storage",
     span { loc = "location", message = "mutable local storage contains an opaque value of type '~type:IRInst', which target '~target:CodeGenTarget' cannot represent; use or pass the resource value directly instead of assigning it to a mutable local or `static` variable" }
+)
+
+warning(
+    "resource-selection-introduces-conditional-derivative",
+    56020,
+    "resource selection introduces conditional execution of a derivative operation",
+    span { loc = "location", message = "Slang lowers the resource selection to branches around this operation; if invocations in a derivative group select different resources, implicit LOD or derivative results may be undefined. Use explicit LOD or compute gradients before selecting the resource when applicable" }
+)
+
+warning(
+    "resource-selection-introduces-conditional-unknown-operation",
+    56021,
+    "resource selection introduces conditional execution of an operation with unknown control-flow requirements",
+    span { loc = "location", message = "Slang lowers the resource selection to branches around this operation, but cannot determine whether the operation requires other invocations to execute the same instruction; the introduced control flow may change its behavior" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

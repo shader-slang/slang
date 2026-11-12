@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#checkpointobj-and-reportcheckpointstore
-//META: doc_section_digest=d940a9239d763facc8f7d397b2e1d1deb0b71762a5f5f4d41fd4b82aec4ede64
+//META: doc_section_digest=9b275676b116d94271492b70c7736823034fbf9bc303a258e6064031f497e876
 //META: purpose=ReportCheckpointStore is the diagnostic channel for the checkpointing machinery, and its stored type and originating function are what the checkpoint-report walk prints.
 //META: intent=functional
 //META: pipeline_stage=emit

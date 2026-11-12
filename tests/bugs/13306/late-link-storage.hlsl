@@ -1,12 +1,12 @@
 //TEST:COMPILE: tests/bugs/13306/late-link-storage-definition.slang -no-codegen -DUNSIZED_DEFINITION -o tests/bugs/13306/late-link-unsized.slang-lib
 //TEST:COMPILE: tests/bugs/13306/late-link-storage-definition.slang -no-codegen -DPARAMETER_BLOCK_DEFINITION -o tests/bugs/13306/late-link-parameter-block.slang-lib
 //TEST:COMPILE: tests/bugs/13306/late-link-storage-definition.slang -no-codegen -o tests/bugs/13306/late-link-sized.slang-lib
-//TEST:SIMPLE_EX(filecheck=UNSIZED): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target spirv -entry main -validate-ir
-//TEST:SIMPLE_EX(filecheck=UNSIZED): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target spirv -entry main -validate-ir -DINITIALIZED_STATIC
-//TEST:SIMPLE_EX(filecheck=UNSIZED): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target spirv -entry main -validate-ir -Gec -DUSE_SHADOW
-//TEST:SIMPLE_EX(filecheck=UNSIZED): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target cpp -entry main -validate-ir -Gec -DUSE_SHADOW -DDEFAULT_DATA
-//TEST:SIMPLE_EX(filecheck=OPAQUE): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-parameter-block.slang-lib -target spirv -entry main -validate-ir -DINITIALIZED_STATIC
-//TEST:SIMPLE_EX(filecheck=OPAQUE): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-parameter-block.slang-lib -target spirv -entry main -validate-ir -Gec -DUSE_SHADOW
+//TEST:SIMPLE_EX(filecheck=UNSIZED,exit-code=-1): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target spirv -entry main -validate-ir
+//TEST:SIMPLE_EX(filecheck=UNSIZED,exit-code=-1): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target spirv -entry main -validate-ir -DINITIALIZED_STATIC
+//TEST:SIMPLE_EX(filecheck=UNSIZED,exit-code=-1): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target spirv -entry main -validate-ir -Gec -DUSE_SHADOW
+//TEST:SIMPLE_EX(filecheck=UNSIZED,exit-code=-1): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-unsized.slang-lib -target cpp -entry main -validate-ir -Gec -DUSE_SHADOW -DDEFAULT_DATA
+//TEST:SIMPLE_EX(filecheck=OPAQUE,exit-code=-1): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-parameter-block.slang-lib -target spirv -entry main -validate-ir -DINITIALIZED_STATIC
+//TEST:SIMPLE_EX(filecheck=OPAQUE,exit-code=-1): tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-parameter-block.slang-lib -target spirv -entry main -validate-ir -Gec -DUSE_SHADOW
 //TEST:COMPILE: tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-sized.slang-lib -target cpp -entry main -validate-ir
 //TEST:COMPILE: tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-sized.slang-lib -target cpp -entry main -validate-ir -DINITIALIZED_STATIC
 //TEST:COMPILE: tests/bugs/13306/late-link-storage.hlsl -r tests/bugs/13306/late-link-sized.slang-lib -target cpp -entry main -validate-ir -Gec -DUSE_SHADOW -DDEFAULT_DATA

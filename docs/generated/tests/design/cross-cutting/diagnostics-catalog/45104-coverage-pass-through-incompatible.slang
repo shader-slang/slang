@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=a77306016356bc8d9fdfca555712dee919e8096334564819e32f8da800749a2b
+//META: doc_section_digest=a15821cca0d66ce7b33c0ff47021cdde733341809b1782963b06573c91dfca70
 //META: purpose=Fires diagnostic E45104 (coverage-pass-through-incompatible) - `-trace-coverage` cannot be combined with `-pass-through`
 //META: intent=negative
 //META: pipeline_stage=ir-pass

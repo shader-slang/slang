@@ -1,5 +1,5 @@
 // On CUDA, a combined Sampler2D has no separate sampler argument, so the tex2Dgather location is
-// the call's first argument, with or without an offset (#14073).
+// the call's first argument (#14073).
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
 
@@ -40,31 +40,21 @@ void computeMain()
     // PTX: tld4.a.2d.v4.f32.f32
     outF[4] = stex.GatherAlpha(uv);
 
-    // CUDA ignores the offset, because tex2Dgather has no offset parameter.
+    // A plain Gather without an offset keeps its CUDA lowering on a shadow texture; only the
+    // GatherCmp* and offset overloads leave CUDA out.
     // CUDA: [[UV5:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
-    // CUDA: tex2Dgather<float4 >((globalParams_0->stex_0), (([[UV5]])).x, (([[UV5]])).y, 0)
+    // CUDA: tex2Dgather<float4 >((globalParams_0->shtex_0), (([[UV5]])).x, (([[UV5]])).y, 0)
     // PTX: tld4.r.2d.v4.f32.f32
-    outF[5] = stex.Gather(uv, int2(3, 7));
-
-    // CUDA: [[UV6:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
-    // CUDA: tex2Dgather<float4 >((globalParams_0->stex_0), (([[UV6]])).x, (([[UV6]])).y, 3)
-    // PTX: tld4.a.2d.v4.f32.f32
-    outF[6] = stex.GatherAlpha(uv, int2(3, 7));
-
-    // Only the GatherCmp* variants leave CUDA out; a plain Gather on a shadow texture keeps it.
-    // CUDA: [[UV7:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
-    // CUDA: tex2Dgather<float4 >((globalParams_0->shtex_0), (([[UV7]])).x, (([[UV7]])).y, 0)
-    // PTX: tld4.r.2d.v4.f32.f32
-    outF[7] = shtex.Gather(uv);
+    outF[5] = shtex.Gather(uv);
 
     // Integer element types keep the four-component tex2Dgather result type on the combined form.
-    // CUDA: [[UV8:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
-    // CUDA: tex2Dgather<int4 >((globalParams_0->stexI_0), (([[UV8]])).x, (([[UV8]])).y, 0)
+    // CUDA: [[UV6:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
+    // CUDA: tex2Dgather<int4 >((globalParams_0->stexI_0), (([[UV6]])).x, (([[UV6]])).y, 0)
     // PTX: tld4.r.2d.v4.s32.f32
     outI[0] = stexI.Gather(uv);
 
-    // CUDA: [[UV9:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
-    // CUDA: tex2Dgather<uint4 >((globalParams_0->stexU_0), (([[UV9]])).x, (([[UV9]])).y, 0)
+    // CUDA: [[UV7:[A-Za-z0-9_]+]] = globalParams_0->uv_0;
+    // CUDA: tex2Dgather<uint4 >((globalParams_0->stexU_0), (([[UV7]])).x, (([[UV7]])).y, 0)
     // PTX: tld4.r.2d.v4.u32.f32
     outU[0] = stexU.GatherRed(uv);
 }

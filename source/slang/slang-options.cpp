@@ -377,7 +377,16 @@ void initCommandOptions(CommandOptions& options)
             {
                 continue;
             }
-            else if (name.startsWith("GL_") || name.startsWith("SPV_") || name.startsWith("GLSL_"))
+            // A name starting with "SPV_" spells a SPIR-V extension exactly as the SPIR-V
+            // registry does. Such an atom only records which `OpExtension` a feature needs, and
+            // the `spv<Feature>` capability that implies it is the name users are meant to write.
+            // We omit the "SPV_" names here so that the help does not present two spellings for
+            // one feature. `-capability SPV_...` is still accepted for existing command lines.
+            else if (name.startsWith("SPV_"))
+            {
+                continue;
+            }
+            else if (name.startsWith("GL_") || name.startsWith("GLSL_"))
             {
                 // We'll assume it is an extension..
                 StringBuilder buf;
@@ -739,6 +748,16 @@ void initCommandOptions(CommandOptions& options)
          "-skip-spirv-validation",
          nullptr,
          "Skips spirv validation."},
+        {OptionKind::ValidateWithDownstreamCompiler,
+         "-validate-with-downstream-compiler",
+         nullptr,
+         "After emitting code, compile or validate it with the downstream compiler that matches "
+         "the target: the SPIR-V validator for `spirv`, the Metal compiler for `metal`, DXC for "
+         "`hlsl` with shader model 6.0 or higher and FXC below that, glslang for `glsl`, Tint for "
+         "`wgsl`, NVRTC for `cuda`, and the C++ compiler for `cpp`. "
+         "The exit code is not 0 if the downstream tool is not available, cannot run, or reports "
+         "an error, or if the target has no downstream tool. "
+         "`-skip-spirv-validation` has priority over this option for SPIR-V targets."},
         {OptionKind::SourceEmbedStyle,
          "-source-embed-style",
          "-source-embed-style <source-embed-style>",
@@ -1270,6 +1289,11 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Enable additional backwards-compatibility features for legacy HLSL inputs. See the "
          "user guide's HLSL backwards compatibility section for the supported behavior."},
+        {OptionKind::HLSLMethodsMutatingByDefault,
+         "-fhlsl-methods-mutating-by-default",
+         nullptr,
+         "Use `inout` for the implicit `this` parameter of HLSL methods by default. Has no effect "
+         "on Slang or GLSL inputs."},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
@@ -1627,6 +1651,7 @@ struct OptionsParser
     }
 
     void _appendUsageTitle(StringBuilder& out);
+    void _appendExitCodes(StringBuilder& out);
     void _appendMinimalUsage(StringBuilder& out);
     void _outputMinimalUsage();
 
@@ -2394,6 +2419,20 @@ void OptionsParser::_appendUsageTitle(StringBuilder& out)
     out << "Usage: slangc [options...] [--] <input files>\n\n";
 }
 
+// Describes the exit code of `slangc`. The values come from `ToolReturnCode` in
+// `slang-test-tool-util.h`, which `slangc` returns from `main`.
+void OptionsParser::_appendExitCodes(StringBuilder& out)
+{
+    out << "Exit codes:\n";
+    out << "  0   Success.\n";
+    out << "  1   The command line was invalid, or the tool failed to run.\n";
+    out << "  -1  The compilation failed because of errors in the input.\n";
+    out << "  -2  The compiler hit an unexpected failure: an internal compiler error, an\n";
+    out << "      assertion, an exception or an abort. This is a bug in the compiler.\n";
+    out << "Where the exit status has only 8 bits (for example on Linux and macOS), -1 is\n";
+    out << "reported as 255 and -2 as 254.\n";
+}
+
 void OptionsParser::_outputMinimalUsage()
 {
     // Output usage info
@@ -2743,6 +2782,8 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
         if (m_helpStyle == CommandOptionsWriter::Style::Text)
         {
             _appendUsageTitle(buf);
+            _appendExitCodes(buf);
+            buf << "\n";
         }
         else
         {
@@ -2757,6 +2798,10 @@ SlangResult OptionsParser::_parseHelp(const CommandLineArg& arg)
             buf << "slangc -h\n\n";
             buf << "# To generate this file\n";
             buf << "slangc -help-style markdown -h\n";
+            buf << "```\n";
+            buf << "\n";
+            buf << "```\n";
+            _appendExitCodes(buf);
             buf << "```\n";
         }
 
@@ -3419,6 +3464,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ValidateUniformity:
         case OptionKind::EnableExperimentalPasses:
         case OptionKind::EnableExtendedHLSLBackwardsCompatibility:
+        case OptionKind::HLSLMethodsMutatingByDefault:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
@@ -3434,6 +3480,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::SPIRVUnifiedDescriptorHeapStride:
         case OptionKind::DebugInfoIncludeSource:
         case OptionKind::SkipSPIRVValidation:
+        case OptionKind::ValidateWithDownstreamCompiler:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
         case OptionKind::TrackLiveness:
