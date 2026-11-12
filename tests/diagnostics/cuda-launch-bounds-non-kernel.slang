@@ -2,7 +2,7 @@
 // `__global__` kernel. On an ordinary device function they are ignored, with a warning;
 // on an entry point or a [CudaKernel] function there is no warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 
