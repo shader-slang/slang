@@ -546,7 +546,10 @@ void initCommandOptions(CommandOptions& options)
          "output exports or declares extern (such as [DllExport], [CudaKernel] or extern \"C\"), "
          "target intrinsics, and functions used other than by a call (a witness table entry, a "
          "function pointer). Has no effect "
-         "with -whole-program, -incomplete-library or -embed-downstream-ir. Default is off."},
+         "with -whole-program, -incomplete-library or -embed-downstream-ir. An -o file given "
+         "without -entry selects whole-program output on most targets (such as WGSL, Metal, CUDA "
+         "and C++), so the option has no effect there either: pass -entry to get per-entry-point "
+         "output that it applies to. Default is off."},
         {OptionKind::DisableNonEssentialValidations,
          "-disable-non-essential-validations",
          nullptr,
