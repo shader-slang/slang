@@ -21,7 +21,7 @@ RWStructuredBuffer<double> doubleBuffer;
 static const float kTable[3] = { bit_cast<float>(0xFFC12345u), 1.0f, bit_cast<float>(0x7F800000u) };
 
 // GLSL: const float {{.*}}[3] = float[]((0.0 / 0.0), 1.0, (1.0 / 0.0));
-// HLSL: static const float {{.*}}[int(3)] = { asfloat(0xFFC12345U), 1.0f, (1.0f / 0.0f) };
+// HLSL: static const float {{.*}}[3L] = { asfloat(0xFFC12345U), 1.0f, (1.0f / 0.0f) };
 // CPP: static const FixedArray<float, 3> {{.*}} = { { U32_asfloat(0xFFC12345U), 1.0f, SLANG_INFINITY } };
 // CUDA: __device__ static const FixedArray<float, 3> {{.*}} = { {
 // CUDA-NEXT: __builtin_bit_cast(float, 0xFFC12345U), 1.0f, __builtin_bit_cast(float, 0x7F800000U)
