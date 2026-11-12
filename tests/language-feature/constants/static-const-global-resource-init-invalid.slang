@@ -54,3 +54,16 @@ Derived derived;
 static const Derived derivedAlias = derived;
 //CHECK:             ^^^^^^^^^^^^ static const global initializer must be a compile-time constant
 //CHECK:             ^^^^^^^^^^^^ initializer of static const global 'derivedAlias' does not evaluate to a compile-time constant
+
+// Reading data through a resource handle, such as a texel or a buffer element, is a runtime
+// value. Only the handle itself is exempt, so these must still be diagnosed.
+Texture2D tex;
+StructuredBuffer<float4> sb;
+
+static const float4 texel = tex[uint2(0, 0)];
+//CHECK:            ^^^^^ static const global initializer must be a compile-time constant
+//CHECK:            ^^^^^ initializer of static const global 'texel' does not evaluate to a compile-time constant
+
+static const float4 element = sb[0];
+//CHECK:            ^^^^^^^ static const global initializer must be a compile-time constant
+//CHECK:            ^^^^^^^ initializer of static const global 'element' does not evaluate to a compile-time constant

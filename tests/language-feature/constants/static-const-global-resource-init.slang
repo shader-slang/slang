@@ -4,7 +4,8 @@
 
 // Regression test for https://github.com/shader-slang/slang/issues/14378
 // A `static const` global may alias a resource or sampler shader parameter, either
-// directly or through a struct or array made only of resources and samplers.
+// directly, through a struct or array made only of resources and samplers, or by indexing
+// an array of them.
 // Such an initializer is not a runtime value and must not be diagnosed with E31226.
 
 // SPIRV-NOT: E31226
@@ -16,6 +17,7 @@
 
 Texture2D tex;
 Texture2D tex2;
+Texture2D texParams[2];
 SamplerState samp;
 RWStructuredBuffer<float4> outputBuffer;
 
@@ -36,6 +38,7 @@ static const SamplerState aliasSamp = samp;
 static const TexSampler s0 = { tex, samp };
 static const Texture2D texArray[2] = { tex, tex2 };
 static const Texture2D aliasPbTex = pb.t;
+static const Texture2D aliasElement = texParams[1];
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -45,4 +48,5 @@ void computeMain()
     outputBuffer[1] = s0.t.SampleLevel(s0.s, uv, 0);
     outputBuffer[2] = texArray[1].SampleLevel(samp, uv, 0);
     outputBuffer[3] = aliasPbTex.SampleLevel(samp, uv, 0);
+    outputBuffer[4] = aliasElement.SampleLevel(samp, uv, 0);
 }

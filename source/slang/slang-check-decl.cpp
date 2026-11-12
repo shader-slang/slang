@@ -3668,49 +3668,33 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
-/// Returns true if `type` is a single resource or sampler handle: a texture or other
-/// `ResourceType`, a sampler, a structured buffer, or a byte-address buffer. A shader parameter
-/// of one of these types is bound once for the whole dispatch, so its value does not change
-/// while the shader runs.
+/// Returns true if every value of `type` is an opaque resource or sampler handle: a texture or
+/// other `ResourceType`, a sampler, a structured buffer, a byte-address buffer, or a non-empty
+/// struct or array made only of those. For example, `Texture2D`, `SamplerState[2]` and
+/// `struct S { Texture2D t; SamplerState s; }` qualify, but `float` and
+/// `struct S { Texture2D t; float scale; }` do not. A shader parameter of such a type is bound
+/// once for the whole dispatch, so its value does not change while the shader runs.
 ///
-/// Constant-buffer and parameter-block types are handles too, but they are not included,
-/// because the data read through them is ordinary uniform data rather than another handle.
-static bool _isSingleResourceHandleType(Type* type)
-{
-    if (as<ResourceType>(type))
-        return true;
-    if (as<SamplerStateType>(type))
-        return true;
-    if (as<HLSLStructuredBufferTypeBase>(type))
-        return true;
-    if (as<UntypedBufferResourceType>(type))
-        return true;
-    return false;
-}
-
-/// Returns true if every value of `type` is an opaque resource or sampler handle: a texture,
-/// buffer resource or sampler, or a non-empty struct or array made only of those. For example,
-/// `Texture2D`, `SamplerState[2]` and `struct S { Texture2D t; SamplerState s; }` qualify,
-/// but `float` and `struct S { Texture2D t; float scale; }` do not.
-///
-/// Constant-buffer and parameter-block types are deliberately excluded. A cbuffer member such
-/// as `Value` in `cbuffer CB { float Value; }` is read through such a handle, and that read
-/// must stay a runtime value.
+/// Constant-buffer and parameter-block types are deliberately excluded. They are handles too,
+/// but the data read through them is ordinary uniform data rather than another handle. A cbuffer
+/// member such as `Value` in `cbuffer CB { float Value; }` is read through such a handle, and
+/// that read must stay a runtime value.
 ///
 /// `activeTypes` holds the struct types currently being visited. A struct that contains itself
 /// by value, such as `struct R { Texture2D t; R r; }`, is invalid and is diagnosed elsewhere,
 /// so it does not qualify here.
-static bool _isResourceHandleOnlyTypeImpl(
+static bool _isResourceHandleOnlyType(
     ASTBuilder* astBuilder,
     Type* type,
     HashSet<Type*>& activeTypes)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
-    if (_isSingleResourceHandleType(type))
+    if (as<ResourceType>(type) || as<SamplerStateType>(type) ||
+        as<HLSLStructuredBufferTypeBase>(type) || as<UntypedBufferResourceType>(type))
         return true;
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return _isResourceHandleOnlyTypeImpl(astBuilder, arrayType->getElementType(), activeTypes);
+        return _isResourceHandleOnlyType(astBuilder, arrayType->getElementType(), activeTypes);
     if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
@@ -3732,7 +3716,7 @@ static bool _isResourceHandleOnlyTypeImpl(
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 hasField = true;
-                if (!_isResourceHandleOnlyTypeImpl(
+                if (!_isResourceHandleOnlyType(
                         astBuilder,
                         getType(astBuilder, fieldDeclRef),
                         activeTypes))
@@ -3748,44 +3732,6 @@ static bool _isResourceHandleOnlyTypeImpl(
     return false;
 }
 
-static bool _isResourceHandleOnlyType(ASTBuilder* astBuilder, Type* type)
-{
-    HashSet<Type*> activeTypes;
-    return _isResourceHandleOnlyTypeImpl(astBuilder, type, activeTypes);
-}
-
-/// Returns true if `expr` reads a resource or sampler handle out of a global shader parameter,
-/// for example `tex` or `pb.tex` in:
-///
-///     Texture2D tex;
-///     ParameterBlock<Params> pb;
-///     static const Texture2D aliasTex = tex;
-///     static const Texture2D aliasPbTex = pb.tex;
-///
-/// The handle is a uniform value for the whole dispatch, so a global `static const` may alias it.
-/// The check uses the type of `expr` itself, not the type of a base it is accessed through.
-static bool _isShaderParameterResourceHandle(ASTBuilder* astBuilder, Expr* expr)
-{
-    if (!_isResourceHandleOnlyType(astBuilder, expr->type.type))
-        return false;
-    for (;;)
-    {
-        if (auto memberExpr = as<MemberExpr>(expr))
-            expr = memberExpr->baseExpression;
-        else if (auto derefExpr = as<DerefExpr>(expr))
-            expr = derefExpr->base;
-        else if (auto parenExpr = as<ParenExpr>(expr))
-            expr = parenExpr->base;
-        else
-            break;
-    }
-    auto declRefExpr = as<DeclRefExpr>(expr);
-    if (!declRefExpr)
-        return false;
-    auto varDecl = as<VarDeclBase>(declRefExpr->declRef.getDecl());
-    return varDecl && isGlobalShaderParameter(varDecl);
-}
-
 /// Returns true if `expr` is a runtime value that cannot be a compile-time constant.
 /// This is called only after constant folding has already failed (`varDecl->val` is null),
 /// so any surviving function call is known to be non-const-evaluable — if it were a
@@ -3793,34 +3739,61 @@ static bool _isShaderParameterResourceHandle(ASTBuilder* astBuilder, Expr* expr)
 /// Used to distinguish "folding failed because of a runtime reference or call" from
 /// "folding failed because the folder doesn't handle this form" (e.g. unsupported literal type).
 ///
-/// A resource or sampler handle read from a global shader parameter is not a runtime value
-/// (see `_isShaderParameterResourceHandle`). That exemption applies only to a value that
-/// becomes part of the initializer, never to the base of a member, swizzle or index access:
-/// `Value` in `cbuffer CB { float Value; }` is a `float` read through a buffer handle, and it
-/// stays a runtime value.
-static bool _initExprIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr);
-
-/// Like `_initExprIsRuntimeValue`, but for an `expr` that is only the base of an access
-/// such as a member or index expression, so no shader-parameter handle exemption applies.
-static bool _initAccessBaseIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
+/// A resource or sampler handle read from a global shader parameter is not a runtime value,
+/// because the handle is bound once for the whole dispatch. For example, `tex` and `pb.tex` are
+/// both accepted in:
+///
+///     Texture2D tex;
+///     ParameterBlock<Params> pb;
+///     static const Texture2D aliasTex = tex;
+///     static const Texture2D aliasPbTex = pb.tex;
+///
+/// Reading data through a handle is still a runtime value. `tex[uint2(0, 0)]` reads a texel,
+/// and `Value` in `cbuffer CB { float Value; }` is a `float` read through a buffer handle. The
+/// type of such an expression is not made only of handles, so the exemption does not apply to it.
+static bool _initExprIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
 {
     if (!expr)
         return false;
     if (as<ErrorType>(expr->type.type))
         return false;
+    HashSet<Type*> activeTypes;
+    if (_isResourceHandleOnlyType(astBuilder, expr->type.type, activeTypes))
+    {
+        // Look through the accesses that only select a handle out of a larger parameter,
+        // such as `pb.tex`, to find the variable the handle is read from.
+        Expr* root = expr;
+        for (;;)
+        {
+            if (auto memberExpr = as<MemberExpr>(root))
+                root = memberExpr->baseExpression;
+            else if (auto derefExpr = as<DerefExpr>(root))
+                root = derefExpr->base;
+            else if (auto parenExpr = as<ParenExpr>(root))
+                root = parenExpr->base;
+            else
+                break;
+        }
+        if (auto rootDeclRef = as<DeclRefExpr>(root))
+        {
+            auto rootVar = as<VarDeclBase>(rootDeclRef->declRef.getDecl());
+            if (rootVar && isGlobalShaderParameter(rootVar))
+                return false;
+        }
+    }
     if (auto memberExpr = as<MemberExpr>(expr))
-        return _initAccessBaseIsRuntimeValue(astBuilder, memberExpr->baseExpression);
+        return _initExprIsRuntimeValue(astBuilder, memberExpr->baseExpression);
     if (auto derefExpr = as<DerefExpr>(expr))
-        return _initAccessBaseIsRuntimeValue(astBuilder, derefExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, derefExpr->base);
     if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
-        return _initAccessBaseIsRuntimeValue(astBuilder, builtinCastExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, builtinCastExpr->base);
     if (auto swizzleExpr = as<SwizzleExpr>(expr))
-        return _initAccessBaseIsRuntimeValue(astBuilder, swizzleExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, swizzleExpr->base);
     if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
-        return _initAccessBaseIsRuntimeValue(astBuilder, matSwizzleExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, matSwizzleExpr->base);
     if (auto indexExpr = as<IndexExpr>(expr))
     {
-        if (_initAccessBaseIsRuntimeValue(astBuilder, indexExpr->baseExpression))
+        if (_initExprIsRuntimeValue(astBuilder, indexExpr->baseExpression))
             return true;
         for (auto idx : indexExpr->indexExprs)
             if (_initExprIsRuntimeValue(astBuilder, idx))
@@ -3893,7 +3866,7 @@ static bool _initAccessBaseIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
         return true;
     }
     if (auto parenExpr = as<ParenExpr>(expr))
-        return _initAccessBaseIsRuntimeValue(astBuilder, parenExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, parenExpr->base);
     if (auto initListExpr = as<InitializerListExpr>(expr))
     {
         for (auto arg : initListExpr->args)
@@ -3902,13 +3875,6 @@ static bool _initAccessBaseIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
         return false;
     }
     return false;
-}
-
-static bool _initExprIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
-{
-    if (expr && _isShaderParameterResourceHandle(astBuilder, expr))
-        return false;
-    return _initAccessBaseIsRuntimeValue(astBuilder, expr);
 }
 
 void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
