@@ -1,6 +1,6 @@
 // A groupshared value that decides whether a barrier runs can also reach the barrier condition
 // through a local variable or array, or through a call that is not side-effect free: as its
-// result, through an `out` parameter, or through a nested call (#14390). Slang reads it through
+// result, through an `out` or `inout` parameter, or through a nested call (#14390). Slang reads it through
 // `workgroupUniformLoad` in those cases too. A call made in non-uniform control flow keeps a plain
 // load for its own argument, and so does a store that cannot reach the barrier condition.
 
@@ -25,19 +25,22 @@
 // CHECK-DAG: workgroupUniformLoad(&(gFlag_{{[0-9]+}}))
 // CHECK-DAG: workgroupUniformLoad(&(gG_{{[0-9]+}}))
 // CHECK-DAG: workgroupUniformLoad(&(gI_{{[0-9]+}}))
+// CHECK-DAG: workgroupUniformLoad(&(gK_{{[0-9]+}}))
+// CHECK-DAG: workgroupUniformLoad(&(gS_{{[0-9]+}}))
 
 // PLAIN-NOT: workgroupUniformLoad(&(gE_
 // PLAIN-NOT: workgroupUniformLoad(&(gH_
 // PLAIN-NOT: workgroupUniformLoad(&(gJ_
 
-//TEST_INPUT:ubuffer(data=[2 3 1 4 5 2 1 3 7 2 9], stride=4):name=inputBuffer
+//TEST_INPUT:ubuffer(data=[2 3 1 4 5 2 1 3 7 2 9 2 1], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
+// Every thread calls the logging helpers, so they write the log atomically.
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=logBuffer
-RWStructuredBuffer<uint> logBuffer;
+RWStructuredBuffer<Atomic<uint>> logBuffer;
 
 //TEST_INPUT:cbuffer(data=[1]):name=params
 cbuffer params
@@ -56,6 +59,8 @@ groupshared uint gG;
 groupshared uint gH;
 groupshared uint gI;
 groupshared uint gJ;
+groupshared uint gK;
+groupshared uint gS;
 
 // Reads groupshared memory itself, so the call is not side-effect free.
 uint countPlusOne()
@@ -66,7 +71,7 @@ uint countPlusOne()
 // Has a side effect, so the call is not side-effect free either.
 uint logAndDouble(uint value)
 {
-    logBuffer[0] = value;
+    logBuffer[0].add(value);
     return value * 2;
 }
 
@@ -84,20 +89,28 @@ uint readCount(uint k)
 // Writes its result through an `out` parameter.
 void readBound(out uint n)
 {
-    logBuffer[0] = 1;
+    logBuffer[0].add(1);
     n = gG;
 }
 
 // Returns the result of a nested call on its parameter.
 uint tripleLogged(uint value)
 {
-    logBuffer[0] = value + 1;
+    logBuffer[0].add(value + 1);
     return value * 3;
+}
+
+// The barrier loop reads its bound through an `inout` parameter.
+void syncTimes(inout uint n)
+{
+    for (uint i = 0; i < n; ++i)
+        GroupMemoryBarrierWithGroupSync();
+    n = 0;
 }
 
 uint outerBound(uint value)
 {
-    logBuffer[0] = value;
+    logBuffer[0].add(value);
     return tripleLogged(value);
 }
 
@@ -117,6 +130,8 @@ void computeMain(uint3 tid: SV_GroupThreadID)
         gH = inputBuffer[8];
         gI = inputBuffer[9];
         gJ = inputBuffer[10];
+        gK = inputBuffer[11];
+        gS = inputBuffer[12];
     }
     GroupMemoryBarrierWithGroupSync();
 
@@ -190,12 +205,26 @@ void computeMain(uint3 tid: SV_GroupThreadID)
     if (tid.x == 3)
         result += outerBound(gJ);
 
+    // A bound read through the callee's `inout` parameter, from a local of the caller.
+    uint syncCount = gK;
+    syncTimes(syncCount);
+    result += syncCount;
+
+    // A bound written into two components of a local vector by a swizzled store.
+    uint4 quad = uint4(0, 0, 0, 0);
+    quad.yz = uint2(gS, gS);
+    for (uint k = 0; k < quad[selector]; ++k)
+    {
+        GroupMemoryBarrierWithGroupSync();
+        result += 10000000;
+    }
+
     outputBuffer[tid.x] = result;
 }
 
-// 3 + 2 * 10 + 8 * 100 + 2 * 1000 + 2 + 3 * 10000 + 2 * 100000 + 1 + 6 * 1000000 = 6232826.
-// Thread 3 also adds 2 * 5 and 3 * 9, and reads 7 instead of 1 from `later[0]`.
-// BUF: 6232826
-// BUF-NEXT: 6232826
-// BUF-NEXT: 6232826
-// BUF-NEXT: 6232869
+// 3 + 2 * 10 + 8 * 100 + 2 * 1000 + 2 + 3 * 10000 + 2 * 100000 + 1 + 6 * 1000000 + 10000000
+// = 16232826. Thread 3 also adds 2 * 5 and 3 * 9, and reads 7 instead of 1 from `later[0]`.
+// BUF: 16232826
+// BUF-NEXT: 16232826
+// BUF-NEXT: 16232826
+// BUF-NEXT: 16232869
