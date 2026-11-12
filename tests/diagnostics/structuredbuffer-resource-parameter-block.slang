@@ -1,6 +1,7 @@
 // Regression test for #10688: a `StructuredBuffer<T>` reached through a
 // `ParameterBlock<S>` / `ConstantBuffer<S>` wrapper used to bypass validation
-// and crash type legalization with `non-simple operand(s)`.
+// and reach type legalization with an operand it had no rewrite for, which was
+// an internal error at the time and is diagnosed as E51702 today.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIRECT): -target spirv -entry main_direct -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=PB):     -target spirv -entry main_pb -stage compute
