@@ -1,8 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec
-
-// Note - Validated locally.Enable with latest optix and cuda SDK
-// TODO: GitHub issue #8556 needs to be resolved to enable the test when OptiX 9.0+ is released
-//DISABLE_TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -capability optix_coopvec
+//TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -capability optix_coopvec
 
 // CHECK-PTX: _optix_vector_load_16xi32
 // CHECK-PTX: _optix_vector_op1_16xi32
