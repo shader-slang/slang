@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 48ed11f1bf89d3da1313dbfe29f2b84e0c3209390cd00bb8bb25f63ca5db461a
+model: claude-sonnet-5-5
+generated_at: 2026-11-02T22:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: fb0c54d112f6e8200c9f5c0b19aaf2d3e968adf8b0c80f4bbc191766994f4b9f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -14,7 +14,7 @@ in `target-pipelines/`, written for compiler developers who need
 to pick the right per-target page. Each peer page documents one target's
 ordered IR-pass and downstream-tool sequence as a four-phase
 control-flow-graph view of the shared orchestrator
-`linkAndOptimizeIR` (line 1000 of
+`linkAndOptimizeIR` (line 1015 of
 [../../../../source/slang/slang-emit.cpp](../../../../source/slang/slang-emit.cpp)).
 For an unordered, topical catalog of every IR pass — grouped by
 category rather than by execution order — see
@@ -25,40 +25,16 @@ the pages here document per-target pipeline *behavior* only.
 
 ## Pages
 
-- [spirv.md](spirv.md) — SPIR-V via the direct-emit path
-  (`emitSPIRVForEntryPointsDirectly`), plus the spirv-link /
-  spirv-val / spirv-opt downstream chain. The only page with
-  iterative passes; also covers `-debug-info-include-source`,
-  `-Xspirv-opt` passthrough, descriptor-heap `ConstantBuffer`
-  access, and `OpSwitch` case literals at the selector width.
-- [hlsl.md](hlsl.md) — HLSL source with DXC (DXIL) and fxc
-  (DXBytecode) downstream. Covers the work-graph feature set (the
-  `node` stage, work-graph record types, and named-constant
-  emission such as `[NodeLaunch("broadcasting")]`) and the
-  `precise` qualifier, which reaches emitted source only on the
-  HLSL and GLSL emitters — they inherit
-  `CLikeSourceEmitter::emitTempModifiers`, while the Metal, WGSL,
-  and CPP / CUDA emitters each override it to drop the qualifier.
-- [metal.md](metal.md) — Metal source with the Apple `metal`
-  compiler downstream for `MetalLib` / `MetalLibAssembly`. Covers
-  `printf` mapped onto the MSL 3.2 shader-logging facility (which
-  makes the emitter require MSL 3.2 and enable Metal logging for
-  the downstream compile), half / float literal
-  suffixes (`1.0h` / `1.0f`), and coverage counters capped at
-  32 bits.
-- [wgsl.md](wgsl.md) — WGSL source with Tint (WGSL → SPIR-V)
-  downstream for `WGSLSPIRV` / `WGSLSPIRVAssembly`. Covers the
-  diagnostic for `precise` (WGSL has no such keyword), the
-  bool → int cast emitted as `select(T(0), T(1), cond)`, and the
-  `shouldEmitSwitchCaseTerminatingBreak()` policy override, which
-  is deliberately independent of `supportsSwitchFallThrough()`.
-- [cuda.md](cuda.md) — CUDA C++ source / header with nvrtc (PTX)
-  downstream, plus an `## Adjacent targets` section that briefly
-  cross-links PyTorch / OptiX / host-CPP paths. Covers the OptiX
-  payload write-back path when an entry point terminates from a
-  nested callee, and the autodiff gate — which is
-  target-independent, and which the PyTorch / `slangpy` binding
-  path cross-linked from that section also reaches.
+- [spirv.md](spirv.md) — SPIR-V via the direct-emit path, with the
+  spirv-link / spirv-val / spirv-opt downstream chain.
+- [hlsl.md](hlsl.md) — HLSL source, with DXC (DXIL) and fxc
+  (DXBytecode) downstream.
+- [metal.md](metal.md) — Metal source, with the Apple `metal`
+  compiler downstream for `MetalLib` / `MetalLibAssembly`.
+- [wgsl.md](wgsl.md) — WGSL source, with Tint (WGSL to SPIR-V)
+  downstream for `WGSLSPIRV` / `WGSLSPIRVAssembly`.
+- [cuda.md](cuda.md) — CUDA C++ source / header, with nvrtc (PTX)
+  downstream.
 
 ## Shared shape
 
@@ -103,9 +79,8 @@ exactly two deviations, both deliberate:
   driver* runs inside the emit step rather than inside
   `linkAndOptimizeIR` (see the comparison table below).
 
-Every page's `## Conditional gates` section now opens with a
-`### requiredLoweringPassSet.* flags` subsection; that grouping
-reflects the content-based gating described under
+Every page's `## Conditional gates` section discusses the
+content-based gating described under
 [Filtering rules](#filtering-rules).
 
 Reading any single per-target page yields the **filtered** view
@@ -118,11 +93,11 @@ is which switch arm each target lands in.
 
 | Target | CodeGenTarget enum values | Phase C entry | Phase D emitter | Downstream tools | Loops |
 | --- | --- | --- | --- | --- | --- |
-| SPIR-V | `SPIRV`, `SPIRVAssembly` | (no single entry in `linkAndOptimizeIR`; per-pass SPIR-V arms) — the `legalizeIRForSPIRV` driver ([slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 3352) runs in **Phase D**, called from `emitSPIRVFromIR` | `emitSPIRVForEntryPointsDirectly` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3670) → `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) line 12161) | spirv-link, spirv-val, spirv-opt | **Yes** — the only target with iterative passes: `simplifyIRForSpirvLegalization` and the forward-declared-pointer fixup in `emitSPIRVFromIR`, both to convergence (see note below). |
-| HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`, and their `*Assembly` variants) | (no single entry; per-pass HLSL arms, e.g. `legalizeRayPayloadAccessQualifiersForHLSL` and `validateBarrierFlagsForHLSL` in [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)) | `HLSLSourceEmitter` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)) | DXC (for `DXIL*`), fxc (for `DXBytecode*`) | **No** loops in `linkAndOptimizeIR`. |
+| SPIR-V | `SPIRV`, `SPIRVAssembly` | (no single entry in `linkAndOptimizeIR`; per-pass SPIR-V arms) — the `legalizeIRForSPIRV` driver ([slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 3433) runs in **Phase D**, called from `emitSPIRVFromIR` | `emitSPIRVForEntryPointsDirectly` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3774) → `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) line 12469) | spirv-link, spirv-val, spirv-opt | **Yes** — `simplifyIRForSpirvLegalization` and the forward-declared-pointer fixup in `emitSPIRVFromIR` both run to convergence (see note below). |
+| HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`, and their `*Assembly` variants) | (no single entry; per-pass HLSL arms, e.g. `validateBarrierFlagsForHLSL` in [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)) | `HLSLSourceEmitter` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)) | DXC (for `DXIL*`), fxc (for `DXBytecode*`) | **No** loops in `linkAndOptimizeIR`. |
 | Metal | `Metal`, `MetalLib`, `MetalLibAssembly` | `legalizeIRForMetal` ([slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp)) | `MetalSourceEmitter` ([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)) | Apple `metal` compiler (for `MetalLib*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForMetal` is single-pass. |
 | WGSL | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly` | `legalizeIRForWGSL` ([slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp)) | `WGSLSourceEmitter` ([slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)) | Tint (for `WGSLSPIRV*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForWGSL` is single-pass. |
-| CUDA | `CUDASource`, `CUDAHeader`, `PTX` | (no single entry; per-pass CUDA arms — `lowerImmutableBufferLoadForCUDA` in [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) is the one pass that exists solely for this target family) | `CUDASourceEmitter` ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp), inheriting from `CPPSourceEmitter`) | nvrtc / runtime CUDA compiler (for `PTX`) | **No** loops in `linkAndOptimizeIR`. |
+| CUDA | `CUDASource`, `CUDAHeader`, `PTX` | (no single entry; per-pass CUDA arms, e.g. `lowerImmutableBufferLoadForCUDA` in [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp)) | `CUDASourceEmitter` ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp), inheriting from `CPPSourceEmitter`) | nvrtc / runtime CUDA compiler (for `PTX`) | **No** loops at the `linkAndOptimizeIR` level; one pass has an internal fixed-point loop, documented in [cuda.md](cuda.md). |
 
 Two entries in that table need a caveat.
 
@@ -139,7 +114,7 @@ belongs to Phase D on [spirv.md](spirv.md) rather than Phase C.
 
 **The SPIR-V loop bounds are not enforced.** At
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp)
-lines 3129-3145, `simplifyIRForSpirvLegalization` declares
+lines 3130-3165, `simplifyIRForSpirvLegalization` declares
 `kMaxIterations = 8` with `iterationCounter = 0` and
 `kMaxFuncIterations = 16` with `funcIterationCount = 0`, but
 neither counter is ever incremented. The loop conditions
@@ -175,7 +150,7 @@ the CPU / Host / LLVM variants, etc.). A glance at one page does
 **not** show the global ordering of `linkAndOptimizeIR`; it shows
 only the passes reachable for that target. Where two targets
 share an arm (for example, Metal, CUDA, and the CPP targets all hit
-the `undoParameterCopy` arm at line 2345), each page that lists the
+the `undoParameterCopy` arm at line 2524), each page that lists the
 pass also documents the shared arm in its prose.
 
 ### Filtering by IR content: `RequiredLoweringPassSet`
@@ -184,43 +159,12 @@ Most backend passes are additionally skipped when the linked module
 contains no IR that needs them. The predicate is
 `struct RequiredLoweringPassSet`, declared at line 52 of
 [../../../../source/slang/slang-code-gen.h](../../../../source/slang/slang-code-gen.h)
-— a record of 34 independent `bool` flags, one per lowering
-concern (`enumType`, `taggedUnion`, `autodiff`,
-`appendConsumeStructuredBuffer`, `reinterpret`, and so on). It is
-filled by `calcRequiredLoweringPassSet` (line 470 of
+and filled by `calcRequiredLoweringPassSet` (line 409 of
 [../../../../source/slang/slang-emit.cpp](../../../../source/slang/slang-emit.cpp)),
-which walks the module and sets a flag for every construct it
-finds. `linkAndOptimizeIR` runs that scan twice — at lines 1394 and
-1520 — so constructs introduced by specialization can still turn a
-gate on. Flags accumulate rather than reset, so the second scan can
-only add.
-
-This is why every per-target page's `## Conditional gates` table
-now leads with a `### requiredLoweringPassSet.* flags` subsection:
-for most rows the gate is not a target predicate at all. Two
-properties of the mechanism cut across all five targets and are
-easy to get wrong when reading a single page:
-
-- **The autodiff gate is a branch, not a skip.** At lines
-  1446-1453 of `slang-emit.cpp`, a false
-  `requiredLoweringPassSet.autodiff` does not simply omit
-  `finalizeAutoDiffPass` — the `else` arm runs
-  `stripAutoDiffDecorations` instead. That arm is required rather
-  than merely tidy: even a module with no autodiff constructs links
-  in the core-module autodiff builtins, which carry
-  `ExportDecoration` / `HLSLExportDecoration` /
-  `KeepAliveDecoration` and are thereby pinned against dead-code
-  elimination. Stripping those decorations is
-  what lets the following `eliminateDeadCode` drop the unused
-  builtins.
-- **One flag is mutated mid-pipeline.** At line 1733,
-  `lowerTaggedUnionTypes` sets
-  `requiredLoweringPassSet.reinterpret = true` from inside its own
-  `taggedUnion` gate, because lowering a tagged union produces new
-  `reinterpret` instructions for `lowerReinterpret` a few lines
-  later to consume. Every other flag is written only by the two
-  scans, so this is the single place where the gate set is a
-  function of a pass *result* rather than of a module walk.
+which `linkAndOptimizeIR` runs twice, at lines 1085 and 1666. For
+most gates the condition is therefore not a target predicate at
+all; each per-target page's `## Conditional gates` section lists
+the flags that apply to that target.
 
 For a single, unfiltered view of every pass — independent of both
 kinds of filtering — read

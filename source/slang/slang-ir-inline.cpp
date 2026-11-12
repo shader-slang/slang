@@ -304,6 +304,43 @@ struct InliningPassBase
             if (as<IRGlobalValueWithCode>(parent))
                 break;
         }
+
+        // A call at the global scope (e.g. the initializer of a `static const`)
+        // can only be inlined if the callee's body is valid at the global scope.
+        // A body that works through a local variable would leave a `var` and its
+        // stores at the global scope, which no target can emit. Such a call stays
+        // a call; the global-constant legalization moves it into the functions
+        // that use it, where it is inlined.
+        if (!as<IRBlock>(call->getParent()) && !isInlinableAtGlobalScope(calleeFunc))
+            return false;
+        return true;
+    }
+
+    /// Determine whether the body of `callee` can be inlined at the global scope.
+    static bool isInlinableAtGlobalScope(IRFunc* callee)
+    {
+        auto firstBlock = callee->getFirstBlock();
+        if (!firstBlock || firstBlock->getNextBlock() || !as<IRReturn>(firstBlock->getTerminator()))
+            return false;
+        for (auto inst : firstBlock->getOrdinaryInsts())
+        {
+            // Debug markers do not introduce runtime side effects or local storage.
+            if (isDebugInfoInst(inst))
+                continue;
+            if (inst == firstBlock->getTerminator())
+                continue;
+            switch (inst->getOp())
+            {
+            case kIROp_Var:
+            case kIROp_Load:
+            case kIROp_Store:
+                return false;
+            default:
+                if (inst->mightHaveSideEffects())
+                    return false;
+                break;
+            }
+        }
         return true;
     }
 
@@ -972,6 +1009,19 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
     return pass.considerAllCallSites();
 }
 
+// Return whether a call to `callee` may keep its `groupshared` parameters, which are `Workgroup`
+// pointers, across the call boundary instead of being inlined away. Direct SPIR-V allows such a
+// pointer parameter under the `VariablePointers` capability, so we keep the boundary for a
+// `[noinline]` callee when the target already enables `SPV_KHR_variable_pointers`. We never enable
+// the extension only to keep a boundary.
+static bool canKeepGroupSharedParamsAcrossCall(TargetProgram* targetProgram, IRFunc* callee)
+{
+    return targetProgram->shouldEmitSPIRVDirectly() &&
+           callee->findDecoration<IRNoInlineDecoration>() &&
+           targetProgram->getTargetReq()->getTargetCaps().implies(
+               CapabilityAtom::SPV_KHR_variable_pointers);
+}
+
 namespace
 { // anonymous
 
@@ -1121,13 +1171,18 @@ struct TypeInliningPass : InliningPassBase
             return true;
         }
 
-        const auto count = Count(callee->getParamCount());
-        for (Index i = 0; i < count; ++i)
+        bool keepGroupSharedParams = canKeepGroupSharedParamsAcrossCall(targetProgram, callee);
+        Index i = 0;
+        for (auto param : callee->getParams())
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
+            bool isKeptGroupSharedParam =
+                keepGroupSharedParams && as<IRGroupSharedRate>(param->getRate());
+            if (!isKeptGroupSharedParam &&
+                doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
             {
                 return true;
             }
+            ++i;
         }
 
         return false;

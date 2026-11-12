@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=claude-sonnet-5-5
+//META: generated_at=2026-11-08T21:32:51Z
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-diagnostic-entry
-//META: doc_section_digest=3a623795b5dd78e308025c61705ad0257495b87ee059b06c6f6541a5d86c1a61
+//META: doc_section_digest=f22b494b8e869f4fe09a0366d2108166de2b12d27d47542c79c644cf98a38302
 //META: purpose=Boundary: an error entry with a companion note renders the primary error code and a separately-located `note` record.
 //META: intent=boundary
 //META: pipeline_stage=check
@@ -15,7 +15,7 @@
 // the `error[E30200]` line and a `note:` line naming the previous declaration,
 // which only appear together if the note companion survives rendering.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
 
 int dup;
 int dup;

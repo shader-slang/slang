@@ -2932,9 +2932,12 @@ protected:
     virtual UnownedStringSlice getUserSemanticNameSlice(String& loweredName, bool isUserSemantic)
         const = 0;
 
+    /// Mark the field that holds a fragment shader's non-struct return value as color output
+    /// `targetIndex` (`SV_Target<targetIndex>`).
     virtual void addFragmentShaderReturnValueDecoration(
         IRBuilder& builder,
-        IRInst* returnValueStructKey) const = 0;
+        IRInst* returnValueStructKey,
+        UInt targetIndex) const = 0;
 
 
     virtual IRVarLayout* handleGeometryStageParameterVarLayout(
@@ -4240,7 +4243,33 @@ private:
         auto key = builder.createStructKey();
         builder.addNameHintDecoration(key, toSlice("output"));
         builder.addLayoutDecoration(key, resultLayout);
-        builder.createStructField(structType, key, returnType);
+        auto field = builder.createStructField(structType, key, returnType);
+        // The field is generated, so it takes the entry point's location; a diagnostic about the
+        // return value's semantic (e.g. an unsupported system value) then points at the shader.
+        field->sourceLoc = func->sourceLoc;
+
+        // The return value's own system-value semantic (`float main() : SV_Depth`,
+        // `float4 main() : SV_Target1`). A render target keeps the color-output path below with
+        // its index; any other system value goes on the field, where
+        // ensureStructHasUserSemantic maps it (or reports it unsupported) as for a struct field.
+        UInt targetIndex = 0;
+        bool isOtherSystemValue = false;
+        if (resultLayout)
+        {
+            if (auto systemValueAttr = resultLayout->findSystemValueSemanticAttr())
+            {
+                auto name = systemValueAttr->getName();
+                if (name.startsWithCaseInsensitive(toSlice("sv_target")))
+                {
+                    targetIndex = systemValueAttr->getIndex();
+                }
+                else
+                {
+                    isOtherSystemValue = true;
+                    builder.addSemanticDecoration(key, name, (int)systemValueAttr->getIndex());
+                }
+            }
+        }
         IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
         structTypeLayoutBuilder.addField(key, resultLayout);
         auto typeLayout = structTypeLayoutBuilder.build();
@@ -4262,7 +4291,8 @@ private:
         case Stage::Compute:
         case Stage::Fragment:
             {
-                addFragmentShaderReturnValueDecoration(builder, key);
+                if (!isOtherSystemValue)
+                    addFragmentShaderReturnValueDecoration(builder, key, targetIndex);
                 break;
             }
         case Stage::Vertex:
@@ -4283,9 +4313,22 @@ private:
         List<SystemValLegalizationWorkItem> systemValWorkItems =
             collectSystemValFromEntryPoint(entryPoint);
 
-        for (auto index = 0; index < systemValWorkItems.getCount(); index++)
+        // We legalize SV_GroupIndex after all other system values. Metal computes it from the
+        // entry point's SV_GroupThreadID parameter, and legalizing that parameter afterwards
+        // would narrow it to the declared type (e.g. `uint`) and redirect every use, including
+        // the group index computation, to the narrowed value.
+        for (bool isGroupIndexPass : {false, true})
         {
-            legalizeSystemValue(entryPoint, systemValWorkItems[index]);
+            for (auto& workItem : systemValWorkItems)
+            {
+                UnownedStringSlice semanticName;
+                UnownedStringSlice semanticIndex;
+                splitNameAndIndex(workItem.attrName.getUnownedSlice(), semanticName, semanticIndex);
+                bool isGroupIndex = convertSystemValueSemanticNameToEnum(String(semanticName)) ==
+                                    SystemValueSemanticName::GroupIndex;
+                if (isGroupIndex == isGroupIndexPass)
+                    legalizeSystemValue(entryPoint, workItem);
+            }
         }
         fixUpFuncType(entryPoint.entryPointFunc);
     }
@@ -4635,10 +4678,14 @@ protected:
         return loweredName.getUnownedSlice();
     };
 
-    void addFragmentShaderReturnValueDecoration(IRBuilder& builder, IRInst* returnValueStructKey)
-        const SLANG_OVERRIDE
+    void addFragmentShaderReturnValueDecoration(
+        IRBuilder& builder,
+        IRInst* returnValueStructKey,
+        UInt targetIndex) const SLANG_OVERRIDE
     {
-        builder.addTargetSystemValueDecoration(returnValueStructKey, toSlice("color(0)"));
+        builder.addTargetSystemValueDecoration(
+            returnValueStructKey,
+            (String("color(") + String(targetIndex) + ")").getUnownedSlice());
     }
 
     IRVarLayout* handleGeometryStageParameterVarLayout(
@@ -5143,9 +5190,38 @@ protected:
 
         case SystemValueSemanticName::ClipDistance:
             {
-                // TODO: Implement this based on the 'clip-distances' feature in WGSL
-                // https: // www.w3.org/TR/webgpu/#dom-gpufeaturename-clip-distances
-                result.isUnsupported = true;
+                // WGSL's clip_distances built-in (`enable clip_distances;`, the WebGPU
+                // `clip-distances` feature) is an array<f32, N> with N <= 8: an HLSL
+                // `float d[N] : SV_ClipDistance` maps to it directly.
+                // https://www.w3.org/TR/WGSL/#built-in-values-clip_distances
+                IRType* varType = nullptr;
+                if (auto field = as<IRStructField>(parentVar))
+                    varType = field->getFieldType();
+                else if (parentVar)
+                    varType = parentVar->getDataType();
+                if (auto ptrType = as<IRPtrTypeBase>(varType))
+                    varType = ptrType->getValueType();
+                auto arrayType = as<IRArrayType>(varType);
+                auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+                if (arrayType && count && count->getValue() >= 1 && count->getValue() <= 8 &&
+                    arrayType->getElementType()->getOp() == kIROp_FloatType)
+                {
+                    result.systemValueName = toSlice("clip_distances");
+                    result.permittedTypes.add(arrayType);
+
+                    // The built-in name is attached to the struct key when `parentVar` is a
+                    // field, so the extension requirement is attached to the key as well.
+                    auto decorated = parentVar;
+                    if (auto field = as<IRStructField>(parentVar))
+                        decorated = field->getKey();
+                    builder.addRequireWGSLExtensionDecoration(decorated, toSlice("clip_distances"));
+                }
+                else
+                {
+                    // A scalar or vector SV_ClipDistance would have to be packed into the
+                    // array; not supported.
+                    result.isUnsupported = true;
+                }
             }
             break;
 
@@ -5166,7 +5242,11 @@ protected:
         case SystemValueSemanticName::DepthGreaterEqual:
         case SystemValueSemanticName::DepthLessEqual:
             {
-                result.isUnsupported = true;
+                // Conservative depth: WGSL's `frag_depth` takes a `less`/`greater` depth mode
+                // only with the `fragment_depth` language extension, which is an optimization
+                // hint; a plain frag_depth writes the same depth.
+                result.systemValueName = toSlice("frag_depth");
+                result.permittedTypes.add(builder.getBasicType(BaseType::Float));
             }
             break;
 
@@ -5188,6 +5268,15 @@ protected:
         case SystemValueSemanticName::GroupID:
             {
                 result.systemValueName = toSlice("workgroup_id");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::UInt),
+                    builder.getIntValue(builder.getIntType(), 3)));
+            }
+            break;
+
+        case SystemValueSemanticName::WorkgroupCount:
+            {
+                result.systemValueName = toSlice("num_workgroups");
                 result.permittedTypes.add(builder.getVectorType(
                     builder.getBasicType(BaseType::UInt),
                     builder.getIntValue(builder.getIntType(), 3)));
@@ -5347,12 +5436,14 @@ protected:
         return isUserSemantic ? userSemanticName : loweredName.getUnownedSlice();
     }
 
-    void addFragmentShaderReturnValueDecoration(IRBuilder& builder, IRInst* returnValueStructKey)
-        const SLANG_OVERRIDE
+    void addFragmentShaderReturnValueDecoration(
+        IRBuilder& builder,
+        IRInst* returnValueStructKey,
+        UInt targetIndex) const SLANG_OVERRIDE
     {
         IRInst* operands[] = {
             builder.getStringValue(userSemanticName),
-            builder.getIntValue(builder.getIntType(), 0)};
+            builder.getIntValue(builder.getIntType(), IRIntegerValue(targetIndex))};
         builder.addDecoration(
             returnValueStructKey,
             kIROp_SemanticDecoration,

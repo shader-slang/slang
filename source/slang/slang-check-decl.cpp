@@ -17,6 +17,7 @@
 #include "slang-ast-iterator.h"
 #include "slang-ast-print.h"
 #include "slang-ast-synthesis.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
@@ -799,8 +800,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
                                            public DeclVisitor<SemanticsDeclRedeclarationVisitor>
 {
-    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer)
-        : SemanticsDeclVisitorBase(outer)
+    SemanticsDeclRedeclarationVisitor(SemanticsContext const& outer, RedeclarationSeverity severity)
+        : SemanticsDeclVisitorBase(outer), m_severity(severity)
     {
     }
 
@@ -808,15 +809,17 @@ struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
 
 #define CASE(TYPE) \
-    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl); }
+    void visit##TYPE(TYPE* decl) { checkForRedeclaration(decl, m_severity); }
 
     CASE(EnumCaseDecl)
     CASE(FuncDecl)
-    CASE(VarDeclBase)
     CASE(SimpleTypeDecl)
     CASE(AggTypeDecl)
+    CASE(VarDeclBase)
 
 #undef CASE
+
+    RedeclarationSeverity m_severity;
 };
 
 
@@ -2091,6 +2094,20 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
             subContext = subContext.withOuterScope(outerScope);
         _dispatchDeclCheckingVisitor(decl, nextState, subContext);
 
+        // A visitor can advance `decl` past several states at once. Consider `let x = 1;`:
+        // the header visitor infers the type of `x` and marks `x` as `DefinitionChecked`. Of the
+        // skipped steps, only `ReadyForReference` compares `decl` with other declarations, so we
+        // still run it; without it, `int x; let x = 1;` would be accepted while
+        // `let x = 1; int x;` is not. Earlier compiler releases skipped it, so a conflict that it
+        // finds is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+        //
+        if (nextState < DeclCheckState::ReadyForReference &&
+            decl->checkState.getState() >= DeclCheckState::ReadyForReference)
+        {
+            SemanticsDeclRedeclarationVisitor(subContext, RedeclarationSeverity::Warning)
+                .dispatch(decl);
+        }
+
         // In the common case, the visitor will have done the necessary
         // checking, but will *not* have updated the `checkState` on
         // `decl`. In that case we will do the update here, to save
@@ -3081,6 +3098,12 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         validateArraySizeForVariable(varDecl);
     }
 
+    // Inferred variables and initialized unsized arrays finish here and skip body checking.
+    // Therefore, the body visitor will not check them for invalid RT builtin type use.
+    // Run that check here instead, now that their types and initializers are known.
+    if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
+        PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
+
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
 
@@ -3326,6 +3349,7 @@ ConstructorDecl* SemanticsDeclVisitorBase::createCtor(
 {
     auto ctor = m_astBuilder->create<ConstructorDecl>();
     addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
+    addModifier(ctor, m_astBuilder->create<ArtificialModifier>());
     auto ctorName = getName("$init");
     ctor->ownedScope = m_astBuilder->create<Scope>();
     ctor->ownedScope->containerDecl = ctor;
@@ -3840,6 +3864,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         //
         OverloadResolveContext overloadContext;
         overloadContext.loc = varDecl->nameAndLoc.loc;
+        // The implicit call has no written callee. Attribute its constructor reference to the
+        // variable too, so diagnostics on the selected constructor have a source location.
+        overloadContext.funcLoc = varDecl->nameAndLoc.loc;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
         overloadContext.sourceScope = m_outerScope;
 
@@ -3918,6 +3945,10 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
+
+    // Check after initialization and type inference: `let copy = input` is valid, while
+    // `MissInput<C> fresh;` has no initializer and must be rejected.
+    PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -5763,6 +5794,17 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
+
+            // Beyond matching modes exactly, two by-reference parameters match only if they refer
+            // to storage in the same address space. `groupshared` is currently the only way to
+            // spell an address space for a by-reference parameter, so this requires either both
+            // parameters or neither to be `groupshared`. When they differ, the requirement can
+            // still be satisfied by a synthesized wrapper whose call to the method type-checks.
+            //
+            if (isByReferenceParamPassingMode(requiredParamInfo.mode) &&
+                getReferenceParamAddressSpace(requiredParam.getDecl()) !=
+                    getReferenceParamAddressSpace(satisfyingParam.getDecl()))
+                return false;
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -6744,7 +6786,8 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     Type* satisfyingType,
     DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    SourceLoc satisfyingDeclLoc)
 {
     if (auto declRefType = as<DeclRefType>(satisfyingType))
     {
@@ -6753,6 +6796,14 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
         if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
             return false;
     }
+
+    PortableRT::diagnoseDuplicateSchemaEntries(
+        getASTBuilder(),
+        getSink(),
+        satisfyingType,
+        requiredAssociatedTypeDeclRef.getDecl(),
+        witnessTable->witnessedType,
+        satisfyingDeclLoc);
 
     // Register the satisfying type to the witness table. Any constraints
     // written on this associated type are sibling interface requirements, and
@@ -6865,7 +6916,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                subAggTypeDeclRef.getDecl()->loc);
         }
     }
     else if (auto typedefDeclRef = memberDeclRef.as<TypeDefDecl>())
@@ -6880,7 +6932,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                typedefDeclRef.getDecl()->loc);
         }
     }
     else if (auto propertyDeclRef = memberDeclRef.as<PropertyDecl>())
@@ -7688,6 +7741,18 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         if (paramInfo.mode == ParamPassingMode::BorrowIn)
             paramType.isLeftValue = false;
 
+        // The synthesized declaration's passing mode is copied above, but a `groupshared`
+        // parameter also requires its argument to be thread-group-shared memory. The wrapper
+        // forwards its own parameter as that argument, so the parameter keeps `groupshared`;
+        // otherwise the forwarded argument would be rejected as not naming shared memory.
+        //
+        if (auto groupShared = paramDeclRef.getDecl()->findModifier<HLSLGroupSharedModifier>())
+        {
+            auto clonedModifier = m_astBuilder->create<HLSLGroupSharedModifier>();
+            clonedModifier->keywordName = groupShared->keywordName;
+            addModifier(synParamDecl, clonedModifier);
+        }
+
         // Create an expression that references the parameter for use in arguments.
         auto synArg = m_astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(synParamDecl);
@@ -7752,6 +7817,7 @@ CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitnessIn
     CallableDecl* synFuncDecl = as<CallableDecl>(
         m_astBuilder->createByNodeType(requiredMemberDeclRef.getDecl()->astNodeType));
     SLANG_ASSERT(synFuncDecl);
+    addModifier(synFuncDecl, m_astBuilder->create<ArtificialModifier>());
 
     synFuncDecl->ownedScope = m_astBuilder->create<Scope>();
     synFuncDecl->ownedScope->containerDecl = synFuncDecl;
@@ -8773,6 +8839,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         //
         auto synAccessorDecl = (AccessorDecl*)m_astBuilder->createByNodeType(
             requiredAccessorDeclRef.getDecl()->astNodeType);
+        addModifier(synAccessorDecl, m_astBuilder->create<ArtificialModifier>());
         synAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
         synAccessorDecl->ownedScope->containerDecl = synAccessorDecl;
         synAccessorDecl->ownedScope->parent = getScope(context->parentDecl);
@@ -11719,6 +11786,11 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
+    PortableRT::checkStageRestrictions(
+        this,
+        superInterfaceDeclRef,
+        witnessTable,
+        inheritanceDecl->loc);
     return witnessTable;
 }
 
@@ -14818,7 +14890,22 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     return SLANG_FAIL;
 }
 
-Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
+bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl)
+{
+    auto newVarDecl = as<VarDecl>(newDecl);
+    if (!newVarDecl)
+        return false;
+    if (!newVarDecl->findModifier<HLSLForLoopInitializerAttribute>())
+        return false;
+    if (newDecl->parentDecl != oldDecl->parentDecl)
+        return false;
+    return isLocalVar(oldDecl);
+}
+
+Result SemanticsVisitor::checkRedeclaration(
+    Decl* newDecl,
+    Decl* oldDecl,
+    RedeclarationSeverity severity)
 {
     // If either of the declarations being looked at is generic, then
     // we want to consider the "inner" declaration instead when
@@ -14854,6 +14941,27 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
         return SLANG_OK;
     }
 
+    // We allow HLSL loop-initializer variables to shadow earlier locals. Lookup uses this same
+    // rule to omit an older candidate after finding a visible initializer of the same name.
+    if (isHLSLForLoopInitializerRedeclaration(newDecl, oldDecl))
+        return SLANG_OK;
+
+    // Consider `[UnscopedEnum] enum Mode { Mode, Other }`. The alias `Mode` that the parser adds
+    // for the case conflicts with the enum, but lookup tells the type and the value apart by where
+    // the name is used, and DXC and earlier Slang releases accept the code, so we warn; Slang 202c
+    // may make it an error (shader-slang/slang#13956). The failure result stops the caller's loop,
+    // so a conflict with an older declaration is reported at the enum. The case is null when user
+    // code attaches the modifier through `syntax`.
+    if (auto aliasModifier = newDecl->findModifier<UnscopedEnumCaseAliasModifier>())
+    {
+        auto caseDecl = aliasModifier->enumCaseDecl;
+        if (caseDecl && caseDecl->parentDecl == oldDecl)
+        {
+            getSink()->diagnose(Diagnostics::UnscopedEnumCaseNamedLikeEnum{.decl = newDecl});
+            return SLANG_FAIL;
+        }
+    }
+
 
     // For all other flavors of declaration, we do not
     // allow duplicate declarations with the same name.
@@ -14868,16 +14976,19 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     //   if their generic parameter lists are sufficient to
     //   tell them apart at a use site.
 
-    // We will diagnose a redeclaration error at the new declaration,
+    // We will diagnose a redeclaration at the new declaration,
     // and point to the old declaration for context.
     //
-    getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
+    if (severity == RedeclarationSeverity::Warning)
+        getSink()->diagnose(Diagnostics::RedeclarationCompatibilityWarning{.decl = newDecl});
+    else
+        getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
     getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
     return SLANG_FAIL;
 }
 
 
-void SemanticsVisitor::checkForRedeclaration(Decl* decl)
+void SemanticsVisitor::checkForRedeclaration(Decl* decl, RedeclarationSeverity severity)
 {
     // We want to consider a "new" declaration in the context
     // of some parent/container declaration, and compare it
@@ -14922,7 +15033,7 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         // whether the redeclaration should be allowed,
         // and emit an appropriate diagnostic if not.
         //
-        Result checkResult = checkRedeclaration(newDecl, oldDecl);
+        Result checkResult = checkRedeclaration(newDecl, oldDecl, severity);
 
         // The `checkRedeclaration` function will return a failure
         // status (whether or not it actually emitted a diagnostic)
@@ -14931,6 +15042,103 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
         //
         if (SLANG_FAILED(checkResult))
             break;
+    }
+}
+
+/// Return whether `decl` has an earlier declaration of the same name in `containerDecl` other
+/// than the module's own `module` declaration. `checkForRedeclaration` compares `decl` with
+/// each such declaration.
+///
+static bool hasEarlierSameNameNonModuleSibling(ContainerDecl* containerDecl, Decl* decl)
+{
+    for (auto prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(decl); prevDecl;
+         prevDecl = containerDecl->getPrevDirectMemberDeclWithSameName(prevDecl))
+    {
+        if (!as<ModuleDeclarationDecl>(prevDecl))
+            return true;
+    }
+    return false;
+}
+
+/// Return the aggregate type whose members lookup finds through the transparent variable
+/// `varDecl`, or null if its type names none. As for any member lookup, lookup takes the
+/// variable's checked type and looks through a pointer-like type such as `ConstantBuffer<T>`
+/// (see `_lookUpMembersInValue` and `_lookUpMembersInSuperTypeImpl`).
+///
+static AggTypeDecl* getAggTypeDeclVisibleThroughTransparentVar(VarDeclBase* varDecl)
+{
+    Type* type = varDecl->getType();
+    if (auto pointedToType = getPointedToTypeIfCanImplicitDeref(type))
+        type = pointedToType;
+    return isDeclRefTypeOf<AggTypeDecl>(type).getDecl();
+}
+
+/// Compare `decl` with the nearest earlier declaration of its name in `visibleDecls`, unless
+/// `checkForRedeclaration` compares it with an earlier sibling, and record `decl` as visible.
+///
+static void compareWithNearestVisibleDecl(
+    SemanticsVisitor* visitor,
+    Dictionary<Name*, Decl*>& visibleDecls,
+    Decl* decl,
+    bool hasEarlierSiblingOfSameName)
+{
+    Decl* prevDecl = nullptr;
+    if (!hasEarlierSiblingOfSameName && visibleDecls.tryGetValue(decl->getName(), prevDecl) &&
+        prevDecl != decl)
+    {
+        visitor->checkRedeclaration(decl, prevDecl, RedeclarationSeverity::Warning);
+    }
+    visibleDecls[decl->getName()] = decl;
+}
+
+/// Check the declarations that lookup in `containerDecl` finds through its transparent
+/// variables against the other declarations that lookup finds there.
+///
+/// Consider this example:
+///
+///     static const int x = 1;
+///     cbuffer CB { int x; }
+///
+/// Lookup of `x` finds both declarations, but the member `x` is not a direct member of the
+/// scope, so `checkForRedeclaration` does not compare them. We treat the members of the type
+/// of each transparent variable as declared at that variable, and compare each declaration
+/// with the nearest earlier one of its name. Earlier compiler releases did not compare these
+/// pairs, so a conflict is a warning; Slang 202c may make it an error (shader-slang/slang#13956).
+///
+void SemanticsVisitor::checkForRedeclarationOfTransparentMembers(ContainerDecl* containerDecl)
+{
+    if (containerDecl->getTransparentDirectMemberDecls().getCount() == 0)
+        return;
+
+    // For each name, the most recent declaration so far that lookup in `containerDecl` finds.
+    Dictionary<Name*, Decl*> visibleDecls;
+    for (auto memberDecl : containerDecl->getDirectMemberDecls())
+    {
+        if (memberDecl->getName() && !as<ModuleDeclarationDecl>(memberDecl) &&
+            DeclPassesLookupMask(memberDecl, LookupMask::Default))
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                memberDecl,
+                hasEarlierSameNameNonModuleSibling(containerDecl, memberDecl));
+        }
+
+        auto varDecl = as<VarDeclBase>(memberDecl);
+        if (!varDecl || !varDecl->hasModifier<TransparentModifier>())
+            continue;
+        ensureDecl(varDecl, DeclCheckState::CanUseTypeOfValueDecl);
+        auto aggTypeDecl = getAggTypeDeclVisibleThroughTransparentVar(varDecl);
+        if (!aggTypeDecl)
+            continue;
+        for (auto aggMemberDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+        {
+            compareWithNearestVisibleDecl(
+                this,
+                visibleDecls,
+                aggMemberDecl,
+                aggTypeDecl->getPrevDirectMemberDeclWithSameName(aggMemberDecl) != nullptr);
+        }
     }
 }
 
@@ -15028,6 +15236,33 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     }
 
     maybeApplyLayoutModifier(paramDecl);
+
+    // A `groupshared` parameter names thread-group-shared memory that other invocations can access
+    // during the call, so it must be a reference to that memory. A written `in`, `out`, `inout`, or
+    // `__borrow` (or its alias `__constref`) gives the parameter a mode that is not a reference,
+    // and we point the error at that keyword, since it is the one to remove.
+    //
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        auto mode = getExplicitlyDeclaredParamPassingMode(paramDecl);
+        if (!isByReferenceParamPassingMode(mode))
+        {
+            Modifier* modeModifier = nullptr;
+            for (auto modifier : paramDecl->modifiers)
+            {
+                if (as<InModifier>(modifier) || as<OutModifier>(modifier) ||
+                    as<BorrowModifier>(modifier) || as<HLSLPayloadModifier>(modifier))
+                {
+                    modeModifier = modifier;
+                    break;
+                }
+            }
+            SLANG_ASSERT(modeModifier);
+            getSink()->diagnose(Diagnostics::GroupsharedParameterMustBeReference{
+                .mode = mode,
+                .modifier = modeModifier});
+        }
+    }
 
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
@@ -15956,6 +16191,32 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
             auto paramDecl = paramDeclRef.getDecl();
             if (!paramDecl->type.type)
                 continue;
+            // A by-reference parameter names storage that the caller, and possibly other
+            // invocations, may also access, and a derivative may access it a different number of
+            // times and in a different order than the function does. We do not support one here
+            // at all, so no derivative signature is ever built for the function.
+            //
+            // TODO: Once supported, a reference parameter should be treated as `no_diff`. We do not
+            // check for `no_diff` on one now, since every one is rejected.
+            //
+            if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            {
+                // A `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute declares this
+                // function as the derivative of another one rather than requesting a derivative of
+                // this one, so it gets its own wording.
+                //
+                auto attribute = decl->findModifier<DifferentiableAttribute>();
+                if (as<DerivativeOfAttribute>(attribute))
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfUserDefinedDerivative{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+                else
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+            }
             if (!isTypeDifferentiable(paramDecl->type.type))
             {
                 if (!paramDecl->hasModifier<NoDiffModifier>())
@@ -16068,6 +16329,12 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
             }
         }
     }
+
+    // A function with a reference parameter cannot be differentiated, so it gets no derivative
+    // signature and no conformance to the derivative interfaces.
+    //
+    if (hasReferenceParameter(decl))
+        return;
 
     if (as<FunctionDeclBase>(decl))
     {
@@ -16670,7 +16937,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
+        PortableRT::diagnoseInvalidVariableType(getSink(), paramDecl);
     }
+
+    PortableRT::diagnoseInvalidReturnType(getSink(), decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -17305,6 +17575,28 @@ void SemanticsDeclBasesVisitor::_funcExtensionApply(
     }
 }
 
+// Report each reference parameter of `primalFuncDecl` as a reason that it cannot be
+// differentiated, with a note at `derivativeLoc`, where a user-defined derivative names it as its
+// primal. A primal with a differentiability attribute has already been reported at that
+// attribute by `checkDifferentiableCallableSignature`, so we report nothing for it.
+//
+static void diagnoseReferenceParametersOfPrimal(
+    DiagnosticSink* sink,
+    CallableDecl* primalFuncDecl,
+    SourceLoc derivativeLoc)
+{
+    if (primalFuncDecl->findModifier<DifferentiableAttribute>())
+        return;
+    for (auto paramDecl : primalFuncDecl->getParameters())
+    {
+        if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            sink->diagnose(Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                .func = primalFuncDecl,
+                .param = paramDecl,
+                .derivativeOfLocation = derivativeLoc});
+    }
+}
+
 static void _moveModifiersToFunc(Decl* src, Decl* dst)
 {
     Modifier** link = &src->modifiers.first;
@@ -17478,8 +17770,26 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     // conformance or synthesized members that depend on the invalid signature.
     extensionDecl->addMember(innerFunc);
 
-    // Dispatch to the appropriate helper based on the higher-order expression type.
-    if (isForwardDiff)
+    // We dispatch to the helper for the kind of higher-order expression, unless the function has a
+    // reference parameter. A function with a reference parameter cannot be differentiated, so an
+    // extension that gives it a derivative is an error, as a `[BackwardDerivativeOf]` attribute
+    // would be. We report it here unless the function's own `[Differentiable]` attribute already
+    // did.
+    //
+    auto primalFuncDecl = as<CallableDecl>(baseFuncDeclRef.getDecl());
+    SLANG_ASSERT(primalFuncDecl);
+    if (hasReferenceParameter(primalFuncDecl))
+    {
+        diagnoseReferenceParametersOfPrimal(getSink(), primalFuncDecl, diffExpr->baseFunction->loc);
+
+        // We leave the extension holding only the user's function, without a conformance or
+        // synthesized members, so the function gets no derivative. The helpers would build those
+        // from a derivative signature that cannot represent the derivative of a reference
+        // parameter, and for `bwd_diff` and `__apply` the `BwdCallableFuncType` they use gives the
+        // parameter an error type, which is an internal compiler error in lowering.
+        //
+    }
+    else if (isForwardDiff)
         _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (isBackwardDiff)
         _funcExtensionBackwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
@@ -17712,21 +18022,26 @@ ParamPassingMode SemanticsVisitor::getDefaultReceiverParamMode(Decl* decl)
     if (as<SetterDecl>(decl))
         return ParamPassingMode::BorrowInOut;
 
-    // Declarations other than `FuncDecl`s default to `in`.
-    if (!as<FuncDecl>(decl))
-        return ParamPassingMode::In;
+    // We require an explicit opt-in because existing shaders call unannotated methods on
+    // immutable receivers, such as members of a `cbuffer`.
+    if (getOptionSet().getBoolOption(CompilerOptionName::HLSLMethodsMutatingByDefault))
+    {
+        // Declarations other than `FuncDecl`s default to `in`.
+        if (!as<FuncDecl>(decl))
+            return ParamPassingMode::In;
 
-    // We default synthesized functions to `in` rather than adopting the surrounding HLSL default.
-    // For example, `visitLambdaExpr` synthesizes an `operator()` that must satisfy core `IFunc`'s
-    // `in` receiver requirement.
-    if (decl->hasModifier<SynthesizedModifier>())
-        return ParamPassingMode::In;
+        // We default synthesized functions to `in` rather than adopting the surrounding HLSL
+        // default. For example, `visitLambdaExpr` synthesizes an `operator()` that must satisfy
+        // core `IFunc`'s `in` receiver requirement.
+        if (decl->hasModifier<SynthesizedModifier>())
+            return ParamPassingMode::In;
 
-    // Imported modules finish signature checking in their own semantic context before import.
-    // Reflection and specialization read the attached mode, so this language query runs while
-    // checking a written method in its owning translation unit.
-    if (getSourceLanguage() == SourceLanguage::HLSL)
-        return ParamPassingMode::BorrowInOut;
+        // The compiler checks each imported module in its own semantic context. Reflection and
+        // specialization read the attached mode, so this language query runs while checking a
+        // written method in its owning translation unit.
+        if (getSourceLanguage() == SourceLanguage::HLSL)
+            return ParamPassingMode::BorrowInOut;
+    }
     return ParamPassingMode::In;
 }
 
@@ -18103,6 +18418,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
+    PortableRT::diagnoseInvalidPropertyType(getSink(), decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }
@@ -19405,7 +19721,7 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
                 SemanticsDeclHeaderVisitor(shared).synthesizeDifferentiabilityRequirements(
                     functionDecl);
             }
-            SemanticsDeclRedeclarationVisitor(shared).dispatch(decl);
+            SemanticsDeclRedeclarationVisitor(shared, RedeclarationSeverity::Error).dispatch(decl);
         }
         break;
 
@@ -19429,6 +19745,11 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 
     case DeclCheckState::DefinitionChecked:
         SemanticsDeclBodyVisitor(shared).dispatch(decl);
+        // Lookup in a container also finds the members of its transparent variables, which
+        // `checkForRedeclaration` does not compare. We compare them once per container, after
+        // its own members are checked.
+        if (auto containerDecl = as<ContainerDecl>(decl))
+            SemanticsVisitor(shared).checkForRedeclarationOfTransparentMembers(containerDecl);
         break;
 
     case DeclCheckState::CapabilityChecked:
@@ -20684,6 +21005,20 @@ void checkDerivativeOfAttributeImpl(
         return;
     }
 
+    // A primal with a reference parameter cannot be differentiated. If the primal has its own
+    // `[Differentiable]` attribute, `checkDifferentiableCallableSignature` has already reported
+    // that; otherwise this attribute is the only thing trying to give it a derivative, so we
+    // report the error here. Either way, `checkDerivativeAttribute` skips matching the derivative
+    // against the primal, so no derivative is attached.
+    //
+    if constexpr (!std::is_same_v<TDerivativeAttr, PrimalSubstituteAttribute>)
+    {
+        diagnoseReferenceParametersOfPrimal(
+            visitor->getSink(),
+            primalFuncDecl,
+            higherOrderFuncExpr->loc);
+    }
+
     if (auto existingModifier = _findModifier<TDerivativeAttr>(primalFuncDecl))
     {
         // The primal function already has a `[*Derivative]` attribute, this is invalid.
@@ -20958,6 +21293,12 @@ static void checkDerivativeAttribute(
 {
     SLANG_RELEASE_ASSERT(attr->funcExpr && !attr->funcExpr->type.type);
 
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check the derivative against.
+    //
+    if (hasReferenceParameter(primalDeclRef.getDecl()))
+        return;
+
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
     checkDerivativeAttributeImpl(
@@ -20988,6 +21329,12 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check its derivative against.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
@@ -21028,6 +21375,12 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // As for a forward derivative, a primal with a reference parameter has no backward derivative
+    // signature to check its derivative against.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
@@ -22163,6 +22516,34 @@ struct CapabilityDeclReferenceVisitor
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
     }
+    // Collect the capabilities of the individual conformances in a type-pack proof.
+    // Consider this example:
+    //
+    //     [require(metal)] interface IMetalItem {}
+    //     struct Items<each T> where expand each T : IMetalItem
+    //     {
+    //         static const int count = countof(T);
+    //     }
+    //     [require(hlsl)] export int emptyCount() { return Items<>.count; }
+    //
+    // SemanticsVisitor::isSubtype uses getSubtypeWitnessPack to represent the empty pack's
+    // vacuously satisfied constraint. That canonical witness retains IMetalItem as its
+    // supertype, but has no element conformances requiring Metal. Visiting every operand
+    // would incorrectly restrict emptyCount to Metal. Visit the element witnesses instead:
+    // nonempty packs still propagate each conformance's capabilities, while an empty pack
+    // contributes none. General declaration-reference collection still visits the supertype
+    // because it remains part of the proof's identity.
+    void visitTypePackSubtypeWitness(TypePackSubtypeWitness* witness)
+    {
+        // Skip this witness if this capability checker has already visited it.
+        if (!this->visitedVals.add(witness))
+            return;
+
+        // Collect requirements from each element's conformance. getCount() excludes the pack
+        // type and constraint interface, so an empty pack adds no capability requirements.
+        for (Index i = 0; i < witness->getCount(); i++)
+            this->dispatchIfNotNull(witness->getWitness(i));
+    }
     // Join a user-defined derivative's capability requirements into the differentiating
     // function, gated on the derivative carrying an explicit `[require]`. The gate is
     // essential rather than cosmetic: the core module differentiates its own builtins
@@ -23204,6 +23585,13 @@ bool isOpaqueHandleType(Type* type)
 {
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
+    // Logical RT inputs are supplied by the compiler, like patch and stream inputs/outputs.
+    // Include them in the ordinary opaque-type checks so Optional cannot store them either.
+    if (PortableRT::getStageInputKind(isDeclRefTypeOf<AggTypeDecl>(type).getDecl()) !=
+        Stage::Unknown)
+        return true;
+    if (as<TraceProgramDescriptorType>(type))
+        return true;
     if (as<ResourceType>(type))
         return true;
     if (as<SamplerStateType>(type))

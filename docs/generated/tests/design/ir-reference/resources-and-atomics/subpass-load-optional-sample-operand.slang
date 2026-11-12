@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#texture-and-image
-//META: doc_section_digest=9181b1e074afdf780bb1918cb592389fdbe5dee019af40f1c48f4b6cb9064e6b
+//META: doc_section_digest=dea38283cf7abef972fc229f2afd4d0c0e478c21f406938bc0ffa72b2564baab
 //META: purpose=`SubpassInput<T>.SubpassLoad()` reads a fragment-shader input attachment as `SubpassLoad(%input)`, and the `SubpassInputMS` overload adds the optional operand that selects an MSAA sample, giving `SubpassLoad(%inputMS, 1 : Int)`.
 //META: intent=functional
 //META: pipeline_stage=lower

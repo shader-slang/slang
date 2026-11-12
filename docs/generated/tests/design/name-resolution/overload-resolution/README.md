@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: 3952bb6ae44ce766550f6b8a475a4bfeacd527f7f82c2e8bb3067099f4e488a6
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:35:39Z
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: 4853fa4b7edaffb199a75de8fd1ba43ba367c7b4955dacabe97c1074398ca711
 source_doc: docs/generated/design/name-resolution/overload-resolution.md
-source_doc_digest: c83ec604440f6a3e9d71ebce10b680aba8f50363c6979cb0ff09972b10a420e1
+source_doc_digest: cd5a39ecc21c288127f2b33a0971c711c8a5a1921b2f97f5762aa6aa7af4cc6b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -192,7 +192,7 @@ the two tables below; every claim appears in exactly one of them.
 104. Step 3 prefers a non-extension declaration over an extension member, and an ordinary extension over a free-form one — an `extension` whose target type is a generic type parameter, spelled `extension<T : IFoo> T`.
 105. Step 3 prefers any declaration over a module declaration and the more derived interface when both candidates are interface requirements, and returns "equal" outright when either candidate is a generic callable.
 106. Step 4: if exactly one candidate is marked `ImplicitConversionModifier`, that one wins.
-107. Step 5 `compareOverloadCandidateSpecificity` prefers the smaller `getSpecializedParamCount`, so a non-generic candidate beats a specialized generic one; variadicness and default-parameter counts are not consulted.
+107. Step 5 `compareOverloadCandidateSpecificity` ranks a candidate that is the inner declaration of a generic below one that is not, so a non-generic candidate beats a generic one; variadicness and default-parameter counts are not consulted.
 108. Step 6 `getExportRank` fires only when the left candidate carries `ExternModifier` and the right carries `HLSLExportModifier`, and then prefers the `extern` one.
 109. Step 7: for non-generic flavors `getScopeRank` prefers the declaration at the shorter scope distance from the call site.
 110. Step 8 `getOverloadRank` compares the `[OverloadRank(N)]` attribute — a declaration without it ranks 0 and the higher rank wins — and the attribute is declared `@internal`, with `core.meta.slang` / `hlsl.meta.slang` its only users in the tree.
@@ -267,6 +267,8 @@ the two tables below; every claim appears in exactly one of them.
 161. `float << int` or `~1.0f` are diagnosed as `Diagnostics::BitwiseOperatorRequiresIntegerOperands` by `convertToBuiltinArithmeticOp` rather than surfacing as a "no overload for `operator<<`" message.
 162. `[NoDiscard]` is checked after a call has already been resolved, never makes a candidate more or less viable, and contributes no conversion cost.
 163. Leaving a `PartiallyAppliedGenericExpr` residual unresolved is a correctness-invariant violation, not a feature.
+164. Before Slang 202c, a frontier of tied `Applicable` candidates is resolved to the one with strictly fewest required generic parameters, with `Diagnostics::DeprecatedGenericParameterCountOverloadTieBreaker`; from 202c the fallback is skipped and the call is ambiguous.
+165. Generic candidates whose inference failed on a constraint are retained in `constraintFailedGenericCandidates` and listed, each with its does-not-conform or constraint-not-satisfied note, under the no-applicable-overload error.
 
 ## Functional coverage
 
@@ -309,6 +311,7 @@ the two tables below; every claim appears in exactly one of them.
 | C107: Default-parameter counts are not consulted by the specificity step, so an overload pair that differs only by a trailing defaulted parameter ties and is reported ambiguous. | negative | [#edge-cases-and-failure-modes](../../../../design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | [`edge-ambiguous-default-parameter-tie-diagnostic.slang`](edge-ambiguous-default-parameter-tie-diagnostic.slang) |
 | C111, C144: Two Applicable candidates that tie on every comparator step are both kept in bestCandidates and reported as an ambiguous call. | negative | [#edge-cases-and-failure-modes](../../../../design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | [`edge-ambiguous-equal-cost-candidates-diagnostic.slang`](edge-ambiguous-equal-cost-candidates-diagnostic.slang) |
 | C6, C148: Under a no-applicable-overload error each candidate note is followed by an argument-N-does-not-match note built from the recorded mismatch index and both types. | negative | [#edge-cases-and-failure-modes](../../../../design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | [`edge-no-applicable-names-offending-argument-index.slang`](edge-no-applicable-names-offending-argument-index.slang) |
+| C165: Generic candidates whose inference failed on an interface constraint are listed under the no-applicable-overload error, each followed by a does-not-conform note naming its own interface. | negative | [#edge-cases-and-failure-modes](../../../../design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | [`edge-constraint-failed-generic-candidates-listed-diagnostic.slang`](edge-constraint-failed-generic-candidates-listed-diagnostic.slang) |
 | C32, C91, C147: When several non-applicable candidates tie for best the resolver emits no-applicable-overload-for-name-with-args directly, listing the argument types it could not match. | negative | [#edge-cases-and-failure-modes](../../../../design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | [`edge-no-applicable-overload-diagnostic.slang`](edge-no-applicable-overload-diagnostic.slang) |
 | C162: [NoDiscard] is checked only after a call has been resolved, so it contributes no conversion cost and does not make a candidate more or less viable. | functional | [#edge-cases-and-failure-modes](../../../../design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes) | [`edge-nodiscard-does-not-affect-resolution.slang`](edge-nodiscard-does-not-affect-resolution.slang) |
 | C150, C157: A pack argument whose length violates a countof constraint fails as VariadicPackCountMismatch during inference and is reported with the expected and actual element counts. | negative | [#finalize-phase-completeoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#finalize-phase-completeoverloadcandidate) | [`finalize-inference-failure-pack-count-mismatch-diagnostic.slang`](finalize-inference-failure-pack-count-mismatch-diagnostic.slang) |
@@ -328,7 +331,7 @@ the two tables below; every claim appears in exactly one of them.
 | C14, C39: TryCheckOverloadCandidateArity rejects a call above the allowed argument count and the finalize re-check emits too-many-arguments. | negative | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`arity-too-many-arguments-diagnostic.slang`](arity-too-many-arguments-diagnostic.slang) |
 | C13: TryCheckOverloadCandidateArity rejects a call below the required argument count and the finalize re-check emits not-enough-arguments. | negative | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`arity-too-few-arguments-diagnostic.slang`](arity-too-few-arguments-diagnostic.slang) |
 | C27, C155: TryCheckOverloadCandidateConstraints rejects a generic candidate whose inferred type argument does not satisfy the declared interface conformance. | negative | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`constraints-type-argument-does-not-conform-diagnostic.slang`](constraints-type-argument-does-not-conform-diagnostic.slang) |
-| C24: TryCheckOverloadCandidateDirections checks the mutability of the implicit this parameter and rejects a [mutating] method invoked on an immutable base. | negative | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`directions-mutating-method-on-immutable-value-diagnostic.slang`](directions-mutating-method-on-immutable-value-diagnostic.slang) |
+| C24: TryCheckOverloadCandidateDirections checks the mutability of the effective this parameter and rejects a [mutating] method invoked on an immutable base. | negative | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`directions-mutating-method-on-immutable-value-diagnostic.slang`](directions-mutating-method-on-immutable-value-diagnostic.slang) |
 | C16, C137: TryCheckOverloadCandidateFixity rejects a postfix-only operator overload used in prefix position, so -x does not bind to a __postfix operator-. | negative | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`fixity-prefix-use-of-postfix-only-operator-diagnostic.slang`](fixity-prefix-use-of-postfix-only-operator-diagnostic.slang) |
 | C28, C158: TryCheckOverloadCandidateVisibility drops a candidate that isDeclVisibleFromScope rejects, and the finalize re-check emits decl-is-not-visible. | negative | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`visibility-private-member-not-visible-diagnostic.slang`](visibility-private-member-not-visible-diagnostic.slang) |
 | C22, C80: canCoerce accepts a single user-declared implicit-conversion initializer, so an A argument reaches a B parameter and the candidate becomes applicable. | functional | [#probe-phase-trycheckoverloadcandidate](../../../../design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate) | [`types-implicit-conversion-initializer-applies.slang`](types-implicit-conversion-initializer-applies.slang) |
@@ -360,7 +363,9 @@ the two tables below; every claim appears in exactly one of them.
 | C104: CompareLookupResultItems prefers an ordinary extension over a free-form extension whose target type is a constrained generic type parameter. | functional | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-ordinary-extension-beats-free-form-extension.slang`](tiebreak-ordinary-extension-beats-free-form-extension.slang) |
 | C110: The [OverloadRank(N)] attribute breaks a tie that every earlier comparator step leaves equal, and the higher rank wins. | functional | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-overload-rank-attribute-wins.slang`](tiebreak-overload-rank-attribute-wins.slang) |
 | C106: When exactly one of two otherwise-tied candidates carries ImplicitConversionModifier, that candidate wins instead of the pair being reported ambiguous. | functional | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-implicit-conversion-modifier-wins.slang`](tiebreak-implicit-conversion-modifier-wins.slang) |
-| C107: compareOverloadCandidateSpecificity prefers the smaller getSpecializedParamCount, so a non-generic candidate beats a specialized generic one of equal cost. | functional | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-non-generic-beats-specialized-generic.slang`](tiebreak-non-generic-beats-specialized-generic.slang) |
+| C107: compareOverloadCandidateSpecificity ranks a candidate that is the inner declaration of a generic below one that is not, so a non-generic candidate beats a generic one of equal cost. | functional | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-non-generic-beats-specialized-generic.slang`](tiebreak-non-generic-beats-specialized-generic.slang) |
+| C164: Before Slang 202c a tie that survives every comparator step is resolved by the single candidate with the fewest required generic parameters, with a deprecation warning. | boundary | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-legacy-generic-param-count-fallback-warning.slang`](tiebreak-legacy-generic-param-count-fallback-warning.slang) |
+| C164: From Slang 202c the legacy generic-parameter-count fallback no longer applies, so the same tied pair of generic overloads is reported as an ambiguous call. | negative | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-legacy-generic-param-count-fallback-removed-in-202c-diagnostic.slang`](tiebreak-legacy-generic-param-count-fallback-removed-in-202c-diagnostic.slang) |
 | C109: getScopeRank prefers the declaration at the shorter scope distance from the call site when both non-generic candidates are otherwise equal. | functional | [#tie-breaking-comparator](../../../../design/name-resolution/overload-resolution.md#tie-breaking-comparator) | [`tiebreak-closer-scope-wins.slang`](tiebreak-closer-scope-wins.slang) |
 
 ## Untested claims
@@ -402,9 +407,7 @@ the two tables below; every claim appears in exactly one of them.
 
 ## Doc gaps observed
 
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#the-builtin-operator-fast-path](../../../../design/name-resolution/overload-resolution.md#the-builtin-operator-fast-path) | drift-from-source | The section says `isGLSLOperatorScope` is true when `-allow-glsl` is set or the `glsl` module is in scope. The checker now uses the resolved GLSL source language or an explicit `glsl` import; deprecated `-allow-glsl` reaches that state only indirectly by selecting GLSL and emits a warning. | Describe resolved GLSL source and explicit `import glsl;` as the two operator-scope inputs. Mark `-allow-glsl` as deprecated and warn readers not to combine it with the explicit import. |
+NA
 
 ## Sibling-bundle overlap
 

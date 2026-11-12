@@ -1,6 +1,7 @@
 // mutating-method-on-rvalue.slang
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target hlsl -entry main
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=diag): -lang hlsl tests/diagnostics/methods/mutating-method-on-rvalue.slang -target hlsl -entry main
 
 struct Counter
 {
@@ -15,7 +16,7 @@ struct Counter
 //diag:          ^ mutating method 'increment' cannot be called on an immutable value
 //diag: ^^^^^^^^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
     }
-}
+};
 
 cbuffer C
 {

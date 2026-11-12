@@ -1297,7 +1297,10 @@ IRUse* findLatestUniqueWriteUse(IRVar* var)
             // Ignore uses from differential blocks.
             if (callInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
                 continue;
-            SLANG_RELEASE_ASSERT(!callUse);
+            // One call may receive the variable more than once, for example as two reference
+            // arguments, but no other call may write it.
+            //
+            SLANG_RELEASE_ASSERT(!callUse || callUse->getUser() == callInst);
             callUse = use;
         }
     }

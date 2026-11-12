@@ -3,7 +3,7 @@
 // `extern` declaration used to report an ambiguous call, because the extern comparison in
 // `CompareLookupResultItems` was not symmetric.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -stage compute -entry computeMain
 
 // No diagnostics are expected: `f` resolves to the definition.
 

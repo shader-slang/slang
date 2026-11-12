@@ -555,6 +555,39 @@ matcher will consume. A `//TEST` directive with no corresponding
 CHECK pattern is rejected by lint — such a test runs but verifies
 nothing.
 
+### Exit code of `filecheck=` tests (READ — `slang-test` enforces it)
+
+A `SIMPLE`, `SIMPLE_EX`, `INTERPRET` or `REFLECTION` test with
+`filecheck=PREFIX` (including the `//DIAGNOSTIC_TEST:SIMPLE(filecheck=...)`
+spelling) fails when the tool's exit code is not the expected one. The
+expected exit code is `0` unless the directive says otherwise with
+`exit-code=N`:
+
+```
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
+```
+
+- A test whose claim is "the compiler rejects X" (an error diagnostic)
+  must set `exit-code=-1`: `-1` is a failed compile.
+- A test that passes a bad command-line option or a malformed option value
+  expects `exit-code=1`: `1` is a command-line error.
+- A positive test (valid code, emitted text) keeps the default `0`. If it
+  now fails with `-1`, the code is rejected: read the diagnostic and fix
+  the test, never add `exit-code=-1` to hide it.
+- Pair every `exit-code=-1` with a `CHECK` on the diagnostic code (for
+  example `// CHECK: E30011`), so the test cannot pass on an unrelated error.
+  `CHECK-NOT: error` is useless: the FileCheck input always contains the
+  header `standard error`.
+- One test line cannot carry both `diag=` and `filecheck=`. Use one line for
+  each check.
+- A multi-line file numbers its test lines from 0 (`foo.slang`,
+  `foo.slang.1`, ...). Each line needs its own `exit-code=` if it fails.
+
+Run the test locally after editing the directive; the message
+`expected exit code 0, but the exit code is -1` means the directive needs
+`exit-code=-1` (negative test) or the code is wrongly rejected (positive test).
+
 ### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
 
 You are writing a pattern that must match the compiler's _actual_
@@ -1082,8 +1115,8 @@ pitfalls observed in earlier bundles:
   and the closesthit/anyhit signature emits without it.
 - **Entry-point stage capabilities are checked at type-check time.**
   If the core module excludes a target from the capability set for
-  a given intrinsic (e.g. `NonUniformResourceIndex` requires
-  `cpp_cuda_glsl_hlsl_spirv` and so excludes Metal), the test
+  a given intrinsic (e.g. one declared only
+  `[require(cpp_cuda_glsl_hlsl_spirv)]` excludes Metal and WGSL), the test
   rejects with E36107 before any emit happens. This is usually a
   doc-bug; see [Record a doc-gap](#record-a-doc-gap-when-the-doc-claims-a-surface-the-compiler-rejects)
   below.
@@ -1102,9 +1135,6 @@ we have already surfaced:
 - The SPIR-V doc names `-validate-spirv` as the CLI flag enabling
   spirv-val; no such flag exists. Only `SLANG_RUN_SPIRV_VALIDATION`
   (env var) and `-skip-spirv-validation` are real surfaces.
-- The Metal doc claims `NonUniformResourceIndex` is a pass-through;
-  the core module excludes Metal from its capability set, so the
-  intrinsic does not even compile.
 
 Recording the doc-gap is more valuable than working around the
 fabrication: the next doc regeneration consumes the row and fixes

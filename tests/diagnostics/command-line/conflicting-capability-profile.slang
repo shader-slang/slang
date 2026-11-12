@@ -21,28 +21,28 @@
 // would not by itself raise the emitted version and is unnecessary here.)
 
 // Case 1: `-profile` then `-capability`.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability SPV_KHR_cooperative_matrix -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1,exit-code=1):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability spvCooperativeMatrixKHR -entry main -stage compute
 //CHECK1: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Case 2: `-capability` before `-profile` (order-independent).
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2):-target spirv-asm -emit-spirv-directly -capability SPV_KHR_cooperative_matrix -profile spirv_1_4 -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,exit-code=1):-target spirv-asm -emit-spirv-directly -capability spvCooperativeMatrixKHR -profile spirv_1_4 -entry main -stage compute
 //CHECK2: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Case 3: appended `-profile <profile>+<capability>` form.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK3):-target spirv-asm -emit-spirv-directly -profile spirv_1_4+SPV_KHR_cooperative_matrix -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK3,exit-code=1):-target spirv-asm -emit-spirv-directly -profile spirv_1_4+spvCooperativeMatrixKHR -entry main -stage compute
 //CHECK3: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Case 4: a GLSL-facing alias whose SPIR-V realization requires a higher version. Its GLSL
 // realization carries no SPIR-V version atom, but the target-scoped join folds only its SPIR-V
 // realization (`spvCooperativeVectorNV`, which needs 1.6) into the SPIR-V target, so it must
 // conflict too rather than the GLSL side silently masking the requirement.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK4):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability GL_NV_cooperative_vector -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK4,exit-code=1):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability GL_NV_cooperative_vector -entry main -stage compute
 //CHECK4: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Case 5: the same conflict on the HLSL shader-model family. `atomic64`'s HLSL realization requires
 // SM 6.6 (capdef: `atomic64 = ... | _sm_6_6 | ...`), so it conflicts with the DX-family profile
 // `sm_6_0` on a D3D target. This exercises the shader-model version family, not just SPIR-V/Metal.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK5):-target hlsl -profile sm_6_0 -capability atomic64 -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK5,exit-code=1):-target hlsl -profile sm_6_0 -capability atomic64 -entry main -stage compute
 //CHECK5: requires a higher target version than the explicitly requested profile 'sm_6_0'
 
 // Case 6: a target-incompatible `-capability` given alongside a conflicting one must not mask the
@@ -51,27 +51,27 @@
 // raises the version to 1.6 and must still conflict with `-profile spirv_1_4`. (Regression guard:
 // pre-joining all `-capability` atoms into one set before the check let the incompatible `hlsl`
 // atom invalidate the combined set and silently drop the conflict.)
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK6):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability SPV_KHR_cooperative_matrix -capability hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK6,exit-code=1):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability spvCooperativeMatrixKHR -capability hlsl -entry main -stage compute
 //CHECK6: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Case 7: the same conflict on the GLSL version family. `GL_NV_compute_shader_derivatives`'s GLSL
 // realization requires `_GLSL_450`, so it conflicts with the GLSL-family profile `glsl_440` on a
 // GLSL target.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK7):-target glsl -profile glsl_440 -capability GL_NV_compute_shader_derivatives -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK7,exit-code=1):-target glsl -profile glsl_440 -capability GL_NV_compute_shader_derivatives -entry main -stage compute
 //CHECK7: requires a higher target version than the explicitly requested profile 'glsl_440'
 
 
 // Control 1: the same capability at a profile that provides a high enough version is NOT a conflict.
 // `SPV_KHR_cooperative_matrix` requires SPIR-V 1.6, and `-profile spirv_1_6` selects exactly 1.6, so
 // this must compile with no conflict diagnostic and emit a 1.6 module.
-//TEST:SIMPLE(filecheck=OK):-target spirv-asm -emit-spirv-directly -profile spirv_1_6 -capability SPV_KHR_cooperative_matrix -entry main -stage compute
+//TEST:SIMPLE(filecheck=OK):-target spirv-asm -emit-spirv-directly -profile spirv_1_6 -capability spvCooperativeMatrixKHR -entry main -stage compute
 //OK-NOT: requires a higher target version
 //OK: ; Version: 1.6
 
 // Control 2: a capability that is satisfiable at the requested version must not be rejected.
 // `SPV_KHR_ray_tracing` requires exactly SPIR-V 1.4 (capdef: `SPV_KHR_ray_tracing : _spirv_1_4`),
 // so pairing it with `-profile spirv_1_4` is on the boundary and must still compile at 1.4.
-//TEST:SIMPLE(filecheck=OK2):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability SPV_KHR_ray_tracing -entry main -stage compute
+//TEST:SIMPLE(filecheck=OK2):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability spvRayTracingKHR -entry main -stage compute
 //OK2-NOT: requires a higher target version
 //OK2: ; Version: 1.4
 
@@ -88,13 +88,13 @@
 
 // Control 4: a profile that pins no target version of the target's family (`sm_6_0` is a DX-family
 // profile) must not trigger the check, even with a capability that requires a high SPIR-V version.
-//TEST:SIMPLE(filecheck=OK4):-target spirv-asm -emit-spirv-directly -profile sm_6_0 -capability SPV_KHR_cooperative_matrix -entry main -stage compute
+//TEST:SIMPLE(filecheck=OK4):-target spirv-asm -emit-spirv-directly -profile sm_6_0 -capability spvCooperativeMatrixKHR -entry main -stage compute
 //OK4-NOT: requires a higher target version
 
 // Control 5: a GLSL text target does not emit a SPIR-V version header, so a SPIR-V-family profile
 // pins nothing there — even a capability that requires a high SPIR-V version must not be flagged.
 // (The check gates on `isSPIRV`, not `isKhronosTarget`, so the GLSL target is excluded.)
-//TEST:SIMPLE(filecheck=OK5):-target glsl -profile spirv_1_4 -capability SPV_KHR_cooperative_matrix -entry main -stage compute
+//TEST:SIMPLE(filecheck=OK5):-target glsl -profile spirv_1_4 -capability spvCooperativeMatrixKHR -entry main -stage compute
 //OK5-NOT: requires a higher target version
 
 // Control 6: the HLSL shader-model counterpart of Control 1 — a high-enough `sm` profile makes the

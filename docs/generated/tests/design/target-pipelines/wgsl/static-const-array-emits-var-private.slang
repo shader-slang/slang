@@ -1,21 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=claude-sonnet-5-5
+//META: generated_at=2026-11-02T10:45:10+00:00
+//META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#wgslsourceemitter-module-scope-array-constants
-//META: doc_section_digest=c0e1734545a83082eaa2a430271a932e672569e0bbf49f8ad49b06ef278bca3c
-//META: purpose=A module-scope static const array indexed by a runtime value emits as var<private> with an inline initializer instead of a WGSL const declaration
+//META: doc_section_digest=bc1f6ab73f8e5a4687ab0b124f858acd2d3b3e49e73ea880d6ae2d0b2e39ad9d
+//META: purpose=A module-scope static const array indexed by a runtime value emits as a WGSL const declaration with an inline initializer, with no var<private> fallback
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies emitVarKeywordImpl's module-scope-array rule: a WGSL `const`
-// array is only indexable by const-expressions, so the emitter must
-// declare a `static const` array as an addressable var<private> to keep
-// runtime indexing legal. The kernel indexes the array with a
+// Verifies that emitVarKeywordImpl emits a `static const` array as a
+// module-scope WGSL `const`, with no var<private> fallback: a WGSL `const`
+// array may be indexed by a runtime value and does not count against the
+// private-variable size limit. The kernel indexes the array with a
 // thread-id-derived value so the access cannot fold; CHECK pins the
-// var<private> keyword, the array type, and the inline `= array`
-// initializer on the module-scope declaration.
+// `const` keyword, the array type, and the inline `= array` initializer
+// on the module-scope declaration.
 
 //TEST:SIMPLE(filecheck=CHECK):-target wgsl -entry main -stage compute
 
@@ -30,5 +30,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf[tid.x] = kLut[tid.x & 3];
 }
 
-// CHECK: var<private> kLut_{{[0-9]+}} : array<i32
+// CHECK: const kLut_{{[0-9]+}} : array<i32
 // CHECK-SAME: = array

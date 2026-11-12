@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#edge-cases-and-failure-modes
-//META: doc_section_digest=991fc4058be6fd34aec1a4296d60bb722bc2f19a97c9a91c4e3f65165643bfd2
+//META: doc_section_digest=074addd0c2d66598101cf0dfc70be7e1bcffe641d2e7c455a491f14df2014a84
 //META: purpose=The operand of fwd_diff is resolved against a function-only mask, so a same-named non-function candidate accumulated from an outer scope is dropped silently rather than reported as ambiguous.
 //META: intent=functional
 //META: pipeline_stage=check

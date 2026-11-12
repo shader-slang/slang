@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -entry main -stage fragment
 
 // The module-wide analysis can prove this read uninitialized because no possible write to the
 // global exists anywhere in the module. The post-link check sees the same no-write fact and must

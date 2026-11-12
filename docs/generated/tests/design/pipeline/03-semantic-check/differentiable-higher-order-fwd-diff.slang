@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#differentiability-as-interface-conformance
-//META: doc_section_digest=1fb413b84d197eac2789f533b613f130cab11653654d7878501604b76295e997
+//META: doc_section_digest=271d83765d49a8cc6260ea11e3d23658ba1c24b0d973e153539ac4d693a801e9
 //META: purpose=The synthesized `fwd_diff` member is itself given the differentiable conformances, so `fwd_diff(fwd_diff(f))` resolves through ordinary lookup.
 //META: intent=boundary
 //META: pipeline_stage=check
