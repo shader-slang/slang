@@ -981,7 +981,8 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
         # prefix, but use an absolute one as is. pkg-config splits Cflags on
         # unescaped spaces, so escape them.
         string(
-            REPLACE " "
+            REPLACE
+            " "
             "\\ "
             slang_pc_includedir
             "${CMAKE_INSTALL_INCLUDEDIR}"
