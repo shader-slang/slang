@@ -3,8 +3,8 @@
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -vk -shaderobj -output-using-type -emit-spirv-via-glsl
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -vk -shaderobj -output-using-type -render-feature double,int64,atomic-int64
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -vk -shaderobj -output-using-type -render-feature double,int64,atomic-int64 -emit-spirv-via-glsl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=8):name=doubles
 RWStructuredBuffer<Atomic<double>> doubles;
