@@ -668,6 +668,15 @@ struct WorkgroupUniformLoadContext
                         isWrite = true;
                     }
                 }
+                else if (auto swizzledStore = as<IRSwizzledStore>(user))
+                {
+                    if (swizzledStore->getDest() == address &&
+                        (!reader || canReach(swizzledStore, reader)))
+                    {
+                        onValue(swizzledStore->getSource());
+                        isWrite = true;
+                    }
+                }
                 else if (auto call = as<IRCall>(user))
                 {
                     if (call->getCallee() != address && (!reader || canReach(call, reader)))
@@ -831,8 +840,13 @@ struct WorkgroupUniformLoadContext
             if (auto load = as<IRLoad>(value))
             {
                 auto root = getAddressRoot(load->getPtr(), addValue);
+                UInt pointerParamIndex = 0;
                 if (as<IRVar>(root) && isChildInstOf(root, callee))
                     forEachWrite(root, load, addValue, addBlock, followCallWrite);
+                else if (
+                    getFunctionParamIndex(root, pointerParamIndex) &&
+                    root->getParent() == firstBlock)
+                    requireUniformPointee(call, pointerParamIndex, outer);
                 else
                     require(load);
                 continue;
@@ -855,6 +869,54 @@ struct WorkgroupUniformLoadContext
         }
 
         activeCallees.remove(callee);
+        return true;
+    }
+
+    // A load through the pointer parameter `paramIndex` of a function reads the memory that the
+    // call's argument points to. When that is a local variable of the caller, follow its writes
+    // that can reach the call, as for a load of the variable. The values go to `outer` when the
+    // call is inside a callee being followed, and to `require` otherwise. A groupshared variable
+    // passed by reference is not followed: rewriting it would need a `workgroupUniformLoad` of
+    // the argument at the call, not of the load in the callee.
+    void requireUniformPointee(IRCall* call, UInt paramIndex, CallSlice* outer)
+    {
+        if (paramIndex >= call->getArgCount())
+            return;
+        auto requireValue = [&](IRInst* value)
+        {
+            if (outer)
+                outer->addValue(value);
+            else
+                require(value);
+        };
+        auto argRoot = getAddressRoot(call->getArg(paramIndex), requireValue);
+        if (!as<IRVar>(argRoot))
+            return;
+        forEachWrite(
+            argRoot,
+            call,
+            requireValue,
+            [&](IRBlock* block)
+            {
+                if (outer)
+                    outer->addBlock(block);
+                else
+                    requireUniformBranchChoice(block);
+            },
+            [&](IRCall* writer, UInt arg) { traceCallee(writer, Int(arg), outer); });
+    }
+
+    // Returns the index of `param` if it is a parameter of the first block of a function.
+    static bool getFunctionParamIndex(IRInst* param, UInt& outIndex)
+    {
+        auto irParam = as<IRParam>(param);
+        if (!irParam)
+            return false;
+        auto block = as<IRBlock>(irParam->getParent());
+        auto code = block ? as<IRGlobalValueWithCode>(block->getParent()) : nullptr;
+        if (!code || block != code->getFirstBlock())
+            return false;
+        outIndex = (UInt)getParamIndexInBlock(irParam);
         return true;
     }
 
@@ -883,6 +945,16 @@ struct WorkgroupUniformLoadContext
                 requireValue,
                 [&](IRBlock* block) { requireUniformBranchChoice(block); },
                 [&](IRCall* call, UInt arg) { traceCallee(call, Int(arg), nullptr); });
+            return;
+        }
+
+        UInt paramIndex = 0;
+        if (getFunctionParamIndex(root, paramIndex))
+        {
+            auto code = as<IRGlobalValueWithCode>(root->getParent()->getParent());
+            forEachCallOf(
+                code,
+                [&](IRCall* call) { requireUniformPointee(call, paramIndex, nullptr); });
         }
     }
 
