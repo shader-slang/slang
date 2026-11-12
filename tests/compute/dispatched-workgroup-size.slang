@@ -1,6 +1,7 @@
 // DispatchedWorkgroupSize() reads the workgroup size the dispatch was launched with: an
-// implicit [[threads_per_threadgroup]] parameter on Metal and blockDim on CUDA. Targets
-// whose workgroup size is fixed by [numthreads] fold it to the [numthreads] constant.
+// implicit [[dispatch_threads_per_threadgroup]] parameter on Metal and blockDim on CUDA. Both
+// are the requested size, also in the smaller edge threadgroups of a non-uniform Metal dispatch.
+// Targets whose workgroup size is fixed by [numthreads] fold it to the [numthreads] constant.
 
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
@@ -15,7 +16,7 @@
 // Run on the CPU, where the size is the [numthreads] size.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -shaderobj -output-using-type
 
-// METAL: {{\[\[}}kernel{{\]\]}} void computeMain({{.*}}uint3 [[SIZE:[A-Za-z0-9_]+]] {{\[\[}}threads_per_threadgroup{{\]\]}}
+// METAL: {{\[\[}}kernel{{\]\]}} void computeMain({{.*}}uint3 [[SIZE:[A-Za-z0-9_]+]] {{\[\[}}dispatch_threads_per_threadgroup{{\]\]}}
 // METAL: [[SIZE]]
 // METALLIB: @computeMain
 
@@ -31,7 +32,7 @@
 
 // WGSL: vec3<i32>(i32(4), i32(2), i32(1))
 
-// METALHELPER: {{\[\[}}kernel{{\]\]}} void helperOnly({{.*}}uint3 [[HSIZE:[A-Za-z0-9_]+]] {{\[\[}}threads_per_threadgroup{{\]\]}}
+// METALHELPER: {{\[\[}}kernel{{\]\]}} void helperOnly({{.*}}uint3 [[HSIZE:[A-Za-z0-9_]+]] {{\[\[}}dispatch_threads_per_threadgroup{{\]\]}}
 // METALHELPER: [[HSIZE]]
 // CUDAHELPER: blockDim
 // CUDAHELPER: void helperOnly(
