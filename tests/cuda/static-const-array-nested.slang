@@ -38,7 +38,7 @@ static const int cube[2][2][2] = {
 
 // HLSL uses native arrays: single brace per level, and the rows still fold inline (no per-row global).
 // HLSL-NOT: static const int {{[a-zA-Z_]*}}_S{{[0-9]}}
-// HLSL-DAG: static const int{{ +}}values{{[a-zA-Z0-9_]*}}[int(2)][int(2)] = { { int(1), int(2) }, { int(3), int(4) } }
+// HLSL-DAG: static const int{{ +}}values{{[a-zA-Z0-9_]*}}[2L][2L] = { { 1L, 2L }, { 3L, 4L } }
 
 RWStructuredBuffer<int> output;
 

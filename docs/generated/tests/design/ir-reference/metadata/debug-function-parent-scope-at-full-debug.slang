@@ -3,8 +3,8 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debug-info-family
-//META: doc_section_digest=3616dae83508b4ffad03f364c704966c745acf49fe621c5856bbbe38e68899eb
-//META: purpose=DebugFunction carries the optional trailing parentScope operand at full debug level, where a DebugCompilationUnit exists for it to reference.
+//META: doc_section_digest=0e7840a1f1f66c8bead87c053f09cb00e50d9fbd9153ec12c90a121dfadab0d3
+//META: purpose=DebugFunction carries the optional trailing parentScope operand at full debug level, referencing the DebugCompilationUnit.
 //META: intent=boundary
 //META: pipeline_stage=lower-to-ir
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
@@ -15,10 +15,10 @@
 // a present-form and an absent-form test, since only the pair distinguishes an
 // optional operand from a fixed one.
 //
-// `debug-function-name-line-col-file-type.slang` covers the absent form at
-// `-g1`, where only the five fixed operands are pinned. This test raises the
-// debug level to full `-g` and pins the trailing reference to the compilation
-// unit.
+// `debug-function-name-line-col-file-type.slang` pins only the five fixed
+// operands at `-g1`, and `debug-function-parent-scope-present-at-minimal.slang`
+// shows the sixth operand is present at `-g1` too. This test pins the
+// trailing reference at full `-g`. The absent form needs an `#include`d file.
 //
 // At full `-g` the `DebugSource` record embeds the entire text of this file, so
 // the dump contains a copy of these CHECK lines and a naive pattern can match

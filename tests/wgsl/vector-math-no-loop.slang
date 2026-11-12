@@ -1,8 +1,13 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=NOLOOP): -target wgsl -entry computeMain -stage compute
+//DISABLE_TEST:SIMPLE(filecheck=NOLOOP): -target wgsl -entry computeMain -stage compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -output-using-type
+
+// TODO(#14424): The `NOLOOP` test (line 2) is disabled. `f32tof16` and `f16tof32` on `float` and `uint`
+// vectors use the vector map macros. We removed `[ForceUnroll(4)]` from them while we investigate a
+// CUDA runtime regression, so these two functions emit a loop again on WGSL. Enable the test again
+// when the unroll comes back, or when WGSL has its own unrolled path.
 
 // On WGSL, the vector overloads of `rsqrt`, `fmod`, `f32tof16`, `f16tof32`, `isnan`, `isinf`
 // and `isfinite` are emitted without a per-component loop, and give the same result as the

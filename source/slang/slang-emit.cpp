@@ -3036,6 +3036,8 @@ Result linkAndOptimizeIR(
     // We check D3D and Metal resource locals after all passes that can create mutable storage.
     // Minimum-optimization mode must still reject storage that its target cannot represent.
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
+    if (isD3DTarget(targetRequest))
+        SLANG_PASS(validateGroupSharedParamsForHLSL, targetRequest->getTargetCaps(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
@@ -3584,6 +3586,10 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
     if (optionSet.getBoolOption(CompilerOptionName::SkipSPIRVValidation) ||
         optionSet.getBoolOption(CompilerOptionName::IncompleteLibrary))
         return false;
+
+    // `-validate-with-downstream-compiler` asks for validation without the environment variable.
+    if (optionSet.getBoolOption(CompilerOptionName::ValidateWithDownstreamCompiler))
+        return true;
 
     // Also check the environment variable SLANG_RUN_SPIRV_VALIDATION.
     // If it is set to "1", we should run validation.

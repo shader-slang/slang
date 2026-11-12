@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 // A conversion of a value to the type it already has resolves to that value itself, so a `try` on
 // an identity conversion of a throwing call covers the call, as in `try int(f())` where `f`
