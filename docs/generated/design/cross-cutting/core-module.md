@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 30d60dd4d9a5201bc16e2b11e8d9ec4bd7288d4f807c3352249f9fdeb6f843d7
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: d4e2be8995c8c95a45df9e148d2a3e7eca71adcea84c5108fd81038c3a296350
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -30,13 +30,12 @@ time treatments:
 3. **The standard modules** — separately compiled `.slang-module`
    files installed alongside the compiler binary and loaded on demand
    by an `import` whose qualified name maps to a subdirectory
-   (currently `import slang.neural` and
-   `import experimental.workgraph`).
+   (currently `import slang.neural`, `import experimental.workgraph`,
+   `import slang.numerics` and `import slang.functional`).
 
 Per-target preludes ([prelude/](../../../../prelude)) are a separate
-notion: those are C / C++ / CUDA headers shipped alongside emitted
-text targets so that the downstream toolchain can compile what Slang
-emits. They are not Slang source.
+notion: C / C++ / CUDA headers shipped alongside emitted text targets.
+They are not Slang source.
 
 ## Core module
 
@@ -74,40 +73,28 @@ and a `float4`:
 | SPIR-V | `OpVectorTimesMatrix` |
 | CUDA, C++ | a generated `mul_<n>` helper from the `default` body |
 
-`dot` and `length` keep their names on HLSL, GLSL, Metal and WGSL, and
-become `OpDot` and the `GLSL.std.450` `Length` extended instruction on
-SPIR-V; on CUDA and C++ they too fall through to generated `dot_<n>` /
-`length_<n>` helpers.
+`dot` and `length` keep their names on HLSL, GLSL, Metal and WGSL,
+become `OpDot` and `GLSL.std.450` `Length` on SPIR-V, and fall through
+to generated `dot_<n>` / `length_<n>` helpers on CUDA and C++.
 
 The embedding glue lives in
 [source/slang-core-module/](../../../../source/slang-core-module):
 
 - [slang-embedded-core-module.cpp](../../../../source/slang-core-module/slang-embedded-core-module.cpp)
-  — links the precompiled core module bytes into `libslang`. Used
-  when the CMake option `SLANG_EMBED_CORE_MODULE` is on (the default).
+  — links the precompiled core module bytes into `libslang` when
+  `SLANG_EMBED_CORE_MODULE` is on (the default).
 - [slang-embedded-core-module-source.cpp](../../../../source/slang-core-module/slang-embedded-core-module-source.cpp)
   — a variant that embeds the original `.slang` source rather than
-  the precompiled bytes (used by the bootstrap build flow when
-  generating the embedded artefact in the first place).
+  the precompiled bytes (used by the bootstrap build flow).
 
 When `SLANG_EMBED_CORE_MODULE=OFF` (see
 [CLAUDE.md](../../../../CLAUDE.md)), the library carries the embedded
-meta-source instead and the module is compiled out-of-line. This is
-useful during development because errors in `*.meta.slang` files no
-longer break the C++ compile of `slangc` or `slang-test`; they surface
-from the separate `generate_core_module` step, which a normal build
-still runs — a shared-library build hangs the `ALL` target
-`generate_core_module_cache` off it, and the standard-module `ALL`
-targets depend on it as well. Compiling the module at runtime is the
+meta-source instead and the module is compiled out-of-line (see
+[Building the core module](#building-the-core-module)). Compiling the module at runtime is the
 fallback used when neither an embedded module nor a valid cache is
 available (see
 [The runtime core-module cache](#the-runtime-core-module-cache)).
 
-The selection between the two embedding strategies is expressed as a
-pair of generator expressions in
-[source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt)
-(picking either `slang-embedded-core-module` /
-`slang-embedded-core-module-source` or their `slang-no-...` siblings).
 The top-level [CMakeLists.txt](../../../../CMakeLists.txt) requires at
 least one of `SLANG_EMBED_CORE_MODULE` and
 `SLANG_EMBED_CORE_MODULE_SOURCE` to be enabled.
@@ -125,17 +112,14 @@ them survive lowering into the emitted code: a `globallycoherent`
 buffer emits `globallycoherent` on HLSL, `coherent` on GLSL, and a
 `Coherent` decoration on SPIR-V.
 
-`matrix` shows how a C++-side constant is given a Slang-side type here
-rather than being passed around as a bare integer. Its fourth generic
-parameter is `let L : MatrixLayoutMode = MatrixLayoutMode.Unknown`
-([core.meta.slang](../../../../source/slang/core.meta.slang) line 2308),
+`matrix` shows how a C++-side constant is given a Slang-side type.
+Its fourth generic parameter is
+`let L : MatrixLayoutMode = MatrixLayoutMode.Unknown`
+([core.meta.slang](../../../../source/slang/core.meta.slang) line 2372),
 and `MatrixLayoutMode` is a `//@hidden:` enum immediately above it
-(line 2298) whose three cases splice their values straight out of the
-C++ macros — `Unknown = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)`,
-`RowMajor`, `ColumnMajor` — so the two definitions cannot drift apart.
-The comment on the enum gives the reason it is not an `int`: an
-unresolved layout has to stay recognizable as a generic argument where
-it sits beside the row and column counts.
+(line 2362) whose cases splice their values out of the C++ macros
+(`Unknown = $(SLANG_MATRIX_LAYOUT_MODE_UNKNOWN)`, `RowMajor`,
+`ColumnMajor`) so the two definitions cannot drift apart.
 
 The full set of declarations covers scalar / vector / matrix types,
 operator overloads mapped onto IR opcodes with the `__intrinsic_op`
@@ -147,18 +131,6 @@ and `Tuple`, and the autodiff vocabulary itself — `IDifferentiable`
 and the `DifferentialPair` magic type are declared here in
 [core.meta.slang](../../../../source/slang/core.meta.slang), not in
 the diff meta-module.
-
-Those three have small surfaces worth naming, since they are usable
-with no `import`:
-
-- `Optional<T>` — the `hasValue` and `value` properties, an implicit
-  conversion from `T`, and the `none` literal, which is also what
-  default initialization produces.
-- `Tuple<each T>` — positional members `_0`, `_1`, ..., which also
-  compose into swizzles (`t._2_1_0`); constructed with `makeTuple`.
-- `IRangedValue` — `static const This maxValue` and `minValue`,
-  supplied per scalar type by the extensions that conform each builtin
-  numeric type to the interface.
 
 The HLSL meta-module layers in HLSL-named texture / sampler / buffer
 types and the corresponding intrinsics so that HLSL code compiles
@@ -174,8 +146,7 @@ embedded by
 [source/slang-glsl-module/](../../../../source/slang-glsl-module) via
 [slang-embedded-glsl-module.cpp](../../../../source/slang-glsl-module/slang-embedded-glsl-module.cpp).
 The global session loads the GLSL builtin module at creation time when
-`SlangGlobalSessionDesc::enableGLSL` is set (the `if (desc->enableGLSL)`
-branch in
+`SlangGlobalSessionDesc::enableGLSL` is set (see
 [slang-api.cpp](../../../../source/slang/slang-api.cpp)); a later
 `import glsl` then retrieves that already-loaded builtin module via the
 `glslModuleName` special-case in
@@ -198,40 +169,33 @@ Each subdirectory under
 [source/standard-modules/](../../../../source/standard-modules) has its
 own `CMakeLists.txt`, is pulled in by an `add_subdirectory` call in
 [standard-modules/CMakeLists.txt](../../../../source/standard-modules/CMakeLists.txt),
-and produces one or more `.slang-module` artifacts. Three exist today:
+and produces one or more `.slang-module` artifacts. Four exist today:
 
 | Directory | Entry point | Module file name variable | Import path |
 | --- | --- | --- | --- |
 | [neural/](../../../../source/standard-modules/neural) | `neural.slang` | `SLANG_NEURAL_MODULE_FILE_NAME` (`neural.slang-module`) | `import slang.neural` |
 | [experimental/](../../../../source/standard-modules/experimental) | `workgraph.slang` | `SLANG_WORKGRAPH_MODULE_FILE_NAME` (`workgraph.slang-module`) | `import experimental.workgraph` |
 | [numerics/](../../../../source/standard-modules/numerics) | `numerics.slang` | none — paths are built directly in its own `CMakeLists.txt` | `import slang.numerics` |
+| [functional/](../../../../source/standard-modules/functional) | `functional.slang` | none — the path is built directly in its own `CMakeLists.txt` | `import slang.functional` |
 
-The `one subdirectory, one artifact` shape holds for the first two only.
-`numerics/` is the exception and is worth reading as the general case,
-because the runtime lookup is purely path-based and so imposes no limit
-of one module per directory: it emits four artifacts, one public and
-three private. `numerics.slang-module` lands in the `slang/` output
-directory and is what `import slang.numerics` resolves to; the other
-three — `__builtin.slang-module`, `__builtin_differentiable.slang-module`
-and `differentiable.slang-module` — land one level deeper in
-`slang/numerics/`, so they are reachable only as
-`slang.numerics.__builtin` and friends.
+The `one subdirectory, one artifact` shape holds for all but `numerics/`
+(`functional/` emits `functional.slang-module` into `slang/`). Runtime
+lookup is purely path-based, so nothing limits a directory to one
+module: `numerics/` emits four artifacts, two public entry points and
+two implementation adapters. `numerics.slang-module` lands in the
+`slang/` output directory and is what `import slang.numerics` resolves
+to; the other three — `__builtin.slang-module`,
+`__builtin_differentiable.slang-module` and `differentiable.slang-module`
+— land one level deeper in `slang/numerics/`. That nesting does not
+imply privacy: `differentiable.slang-module` is a client-facing entry
+point, imported as `slang.numerics.differentiable`.
 
 - The **neural** module declares `[ExperimentalModule] module neural;`
   in
   [neural.slang](../../../../source/standard-modules/neural/neural.slang)
-  and pulls in the rest of the directory with `__include` directives —
-  vector and storage abstractions (`ivector.slang`,
-  `inline-vector.slang`, `istorages.slang`, `bindless-storage.slang`),
-  matrix-multiply backends (`accelerate-vector-coopmat.slang`,
-  `WaveMatrix.slang`, the `mma-tiled-*.slang` family and its layout
-  helpers), layer / activation / encoder interfaces and
-  implementations (`ilayer.slang`, `iactivation.slang`,
-  `iencoder.slang`, `layers.slang`, `activations.slang`,
-  `permuto-encoder.slang`), and support code
-  (`hash-function.slang`, `shared-memory-pool.slang`,
-  `vectorized-reader.slang`,
-  `network-parameter-layout-converter.slang`). The
+  and pulls in the rest of the directory with `__include` directives
+  (vector / storage abstractions, matrix-multiply backends, layers,
+  activations, encoders). The
   `unit-test/` subdirectory holds `__include`-able test sources that
   are compiled into the module only when
   `SLANG_STANDARD_MODULE_DEVELOP_BUILD` is set, which adds `-DUNIT_TEST`
@@ -241,61 +205,66 @@ and `differentiable.slang-module` — land one level deeper in
   `[ExperimentalModule] module workgraph;` in
   [workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang)
   and holds the work-graph vocabulary: the node attributes
-  (`[NodeLaunch]`, `[NodeMaxDispatchGrid]`, `[MaxRecords]`, `[NodeID]`,
-  ...) declared with `attribute_syntax`, the input / output record
-  types (`DispatchNodeInputRecord`, `ThreadNodeInputRecord`,
-  `GroupNodeOutputRecords`, `NodeOutput`, `NodeOutputArray`, ...), and
-  the `BarrierMemoryTypeFlags` / `BarrierSemanticFlags` enums with the
-  `Barrier` overloads that consume them.
+  declared with `attribute_syntax`, the input / output record types,
+  and the barrier flag enums with the `Barrier` overloads that consume
+  them.
 - The **numerics** module declares
   `[ExperimentalModule] module numerics;` in
   [numerics.slang](../../../../source/standard-modules/numerics/numerics.slang)
   and supplies representation-independent numeric interfaces plus the
   generic operations written against them: the interface hierarchy in
-  `interfaces.slang` (`INumericShapedType` and its scalar refinement,
-  `IAdditive`, `INumeric`, `ISignedNumeric`, `IIntegerType`,
-  the comparison ladder `IEquatable` / `IPartiallyOrdered` /
-  `ITotallyOrdered`, and the componentwise forms that yield an
-  `IBooleanMask`), conformances that bind those interfaces to concrete
+  `interfaces.slang` (numeric, additive, integer and comparison
+  interfaces and their componentwise forms), conformances that bind those interfaces to concrete
   types (`builtin-conformances.slang`,
   `floating-point-conformances.slang`,
   `cooperative-vector-conformances.slang`), and `wrappers.slang`.
   A parallel `differentiable-*` set builds the annex module
   `differentiable`, which `__exported import`s `slang.numerics` and
   refines it with differentiable requirements and explicit derivative
-  rules. The two `__builtin*.slang` adapters are deliberately kept out
-  of the public import graph: because they do not import the public
-  modules, their lookup environment cannot contain the public
+  rules. The two `__builtin*.slang` adapters are implementation
+  modules that the public modules import; because the adapters do not
+  import the public numerics modules, their lookup environment cannot contain the public
   interface-generic overloads, so their calls resolve to the
   established core-module operations instead of recursively selecting a
   witness-backed overload.
 
-The `[ExperimentalModule]` attribute all three modules carry — declared
+- The **functional** module declares `[ExperimentalModule] module functional;`
+  in
+  [functional.slang](../../../../source/standard-modules/functional/functional.slang)
+  and holds higher-order element operations as public extensions on
+  `Array<T, N>`, `vector<T, N>` and `matrix<T, R, C, L>`: `map`, a
+  static `generate`, and a `__init` that builds a value from an
+  element-index function.
+
+The `[ExperimentalModule]` attribute all four modules carry — declared
 as an `attribute_syntax` in
 [core.meta.slang](../../../../source/slang/core.meta.slang) — gates the
-import rather than merely labelling the module: importing one without
+import: importing one without
 enabling experimental features fails with **E00104**, *"'<module>' is an
 experimental module, need to enable '-experimental-feature' to load this
 module"*, which names the resolved module path and the option that
 unblocks it. The check is in
 [slang-session.cpp](../../../../source/slang/slang-session.cpp) around
-line 1811 — the loaded module's IR carries an
-`IRExperimentalModuleDecoration` and `CompilerOptionName::ExperimentalFeature`
-is unset — and the diagnostic is defined as
-`need-to-enable-experiment-feature`, number `104`, in
+line 1651 — the checked `ModuleDecl` carries an
+`ExperimentalModuleAttribute` and `CompilerOptionName::ExperimentalFeature`
+is unset — and the diagnostic is `need-to-enable-experiment-feature`
+(`104`) in
 [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
-line 469.
+line 603.
 
-Both directories share the configuration defined in
+All of the directories share the configuration defined in
 [standard-modules/CMakeLists.txt](../../../../source/standard-modules/CMakeLists.txt):
 
 - `SLANG_STANDARD_MODULE_DIR_NAME` — the versioned output directory
   name (`slang-standard-module-${SLANG_VERSION_NUMERIC}`).
 - `SLANG_STANDARD_MODULE_INSTALL_DIR` — `bin/` on Windows, `lib/`
-  elsewhere, joined with the directory name above.
+  elsewhere, joined with that name.
 - The per-module file-name variables in the table.
 
-Those values are substituted into
+Those values, together with `SLANG_DISABLE_NOTE_IDS` (note IDs
+disabled by default, applied as the `DisableNotes` option in
+[slang-session.cpp](../../../../source/slang/slang-session.cpp) line 73),
+are substituted into
 [slang-standard-module-config.h.in](../../../../source/standard-modules/slang-standard-module-config.h.in)
 by `configure_file`, producing the internal header
 `slang-standard-module-config.h` behind the
@@ -321,29 +290,28 @@ the `generate_core_module` target. Loading the prebuilt core archive
 means the standard-module step does not recompile the core module.
 
 The directories choose that compiler slightly differently. When
-`SLANG_GENERATORS_PATH` is set, all three use the `slang-bootstrap`
-binary from that path instead of one built here, which is how
-cross-compilation avoids running a target-platform compiler on the
-build host. Otherwise `neural/` and `numerics/` always use the
-`slang-bootstrap` target, so neither ever requires `slangc`;
-`experimental/` uses `$<TARGET_FILE:slangc>` when
-`SLANG_EMBED_CORE_MODULE` and `SLANG_ENABLE_SLANGC` are both on, and
-falls back to `slang-bootstrap` in every other case.
+`SLANG_GENERATORS_PATH` is set, all four use the `slang-bootstrap`
+binary from that path (the cross-compilation case). Otherwise
+`neural/`, `numerics/` and `functional/` always use the
+`slang-bootstrap` target; `experimental/` uses `$<TARGET_FILE:slangc>` when
+`SLANG_EMBED_CORE_MODULE` and `SLANG_ENABLE_SLANGC` are both on, else
+`slang-bootstrap`.
 
-`numerics/` also shows why the artifacts within one directory have to be
-ordered against each other rather than merely against the core module:
-the public modules import the adapters, so each adapter's serialized
-`.slang-module` is an ordinary build dependency of the public artifact
-that imports it, and its `add_custom_command` must run first.
+`numerics/` also orders its artifacts against each other: the public
+modules import the adapters, so each adapter's serialized
+`.slang-module` is a build dependency of the public artifact that
+imports it. Its `CMakeLists.txt` also stages the base and adapter
+sources under its binary directory, passed with `-I`, because a
+bootstrap compiler given the core archive cannot load a second freshly
+serialized module that records a dependency on that core module.
 
-The standard-module mechanism is intended to grow: new modules go
-under `source/standard-modules/<name>/` with an `add_subdirectory` in
-the parent `CMakeLists.txt`.
+New modules go under `source/standard-modules/<name>/` with an
+`add_subdirectory` in the parent `CMakeLists.txt`.
 
 ## Preludes
 
-Preludes are headers whose text is prepended to textual target output
-so that the downstream toolchain can compile what Slang emits. They
+Preludes are headers whose text is placed at the head of textual target
+output so that the downstream toolchain can compile what Slang emits. They
 are **output-side** rather than input-side: they do not participate in
 front-end checking. Each `*-prelude.h` is turned into a C++ string by
 `slang-embed` at build time; the global session registers the CUDA,
@@ -351,17 +319,16 @@ C++ and HLSL strings as the default language preludes, and emit writes
 the selected string directly into the generated source (see
 [../pipeline/06-emit.md](../pipeline/06-emit.md)). The headers are
 also installed, and a caller may override a language prelude with text
-that merely `#include`s one of them. The command-line tools take that
-route, so the head of a `-target cpp` emit is the include rather than
-the header's text:
-
-```cpp
-#include "<install-dir>/slang-cpp-prelude.h"
-```
-
-and the generated entry point that follows is marked with a macro the
-header defines, `SLANG_PRELUDE_EXPORT`. `-target cuda` is the same
-shape with
+that merely `#include`s one of them. `slangc` takes that route unless
+`-embed-prelude` appears on its command line (the scan is
+`shouldEmbedPrelude` in
+[main.cpp](../../../../source/slangc/main.cpp)): otherwise it calls
+`TestToolUtil::setSessionDefaultPreludeFromExePath`, defined in
+[slang-test-tool-util.cpp](../../../../source/core/slang-test-tool-util.cpp),
+which sets the C++ and CUDA language preludes to an `#include` of the
+header found relative to the executable, so a `-target cpp` emit begins
+with `#include "<install-dir>/slang-cpp-prelude.h"` rather than the
+header's text. `-target cuda` is the same shape with
 [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h).
 
 | Prelude | Target |
@@ -377,8 +344,7 @@ shape with
 | [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h) | PyTorch glue |
 
 GLSL, Metal, WGSL, and SPIR-V do not use a `prelude/` header in the
-same way; their built-in vocabularies are emitted directly from the
-backends or handled by the downstream toolchain.
+same way; the backends emit their vocabularies directly.
 
 ## Building the core module
 
@@ -386,20 +352,17 @@ From [CLAUDE.md](../../../../CLAUDE.md) and
 [source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt):
 
 - `cmake -DSLANG_EMBED_CORE_MODULE=ON` (the default) bakes the
-  precompiled core module into `libslang`. Errors in
-  `*.meta.slang` show up at C++ build time because the embedded
-  artefact is a build product of the `*.meta.slang` sources.
+  precompiled core module into `libslang`, so errors in
+  `*.meta.slang` show up at C++ build time.
 - `cmake -DSLANG_EMBED_CORE_MODULE=OFF` keeps the C++ build of
   `slangc` and `slang-test` independent of the core-module
-  compilation. Errors in `*.meta.slang` then surface from the separate
-  `generate_core_module` step rather than from the C++ compile; a
-  normal build still runs that step, because `generate_core_module_cache`
-  and the standard-module targets are `ALL` targets that depend on it.
+  compilation; `*.meta.slang` errors surface from `generate_core_module`,
+  which a normal build still runs (the cache and standard-module `ALL`
+  targets depend on it).
 
-The `SLANG_EMBED_CORE_MODULE_SOURCE` option similarly controls
-whether the original Slang source text is embedded alongside the
-precompiled bytes (used by `slang-bootstrap` for cross-compilation
-scenarios).
+The `SLANG_EMBED_CORE_MODULE_SOURCE` option controls whether the
+original source text is embedded alongside the precompiled bytes (used
+by `slang-bootstrap`).
 
 A single `slang-bootstrap` invocation in
 [source/slang-core-module/CMakeLists.txt](../../../../source/slang-core-module/CMakeLists.txt)
@@ -421,17 +384,9 @@ produces three build products with one `-compile-core-module` run:
 These outputs are wired through the custom targets
 `generate_core_module`, `generate_glsl_module_header`, and the umbrella
 `generate_core_module_headers`. Downstream targets depend on the
-custom *targets* rather than on the generated files directly: with the
-Visual Studio generator a file-level dependency on a byproduct copies
-the producer command into each dependent project, which would run the
-core generation more than once.
-
-On Windows, when `SLANG_EMBED_CORE_MODULE` is off and
-`SLANG_LIB_TYPE` is `SHARED`, that same custom command first copies
-the `slang` shared library next to `slang-bootstrap`, because
-`slang-bootstrap` lives in `generators/` while the library is placed
-in `bin/` and the Windows loader only searches the executable's own
-directory.
+custom *targets* rather than on the generated files: with the Visual
+Studio generator a file-level dependency would copy the producer
+command into each dependent project and run core generation repeatedly.
 
 ### The runtime core-module cache
 
@@ -455,27 +410,15 @@ off and `SLANG_LIB_TYPE` is `SHARED`,
 adds a `generate_core_module_cache` target that runs the
 `slang-core-module-cache` tool
 ([tools/slang-core-module-cache/](../../../../tools/slang-core-module-cache))
-with three arguments — the linked `slang` library, the
-`slang-core-module-without-timestamp.bin` archive from above, and the
-output path `slang-core-module.bin` in the library's runtime
-(Windows) or library (elsewhere) output directory. The tool reads the
-library only to obtain its modification timestamp; it prefixes the
-existing archive rather than compiling anything. Note that the two
-`.bin` files are therefore different artifacts:
-`slang-core-module-without-timestamp.bin` is the build-time archive
-passed to `-load-core-module`, while `slang-core-module.bin` is the
-timestamp-prefixed runtime cache. Because installation preserves the
-library's timestamp, the installed cache stays valid; packaging that
-rewrites timestamps causes the runtime to reject and regenerate it.
+on the linked `slang` library and the
+`slang-core-module-without-timestamp.bin` archive, writing
+`slang-core-module.bin` beside the library. The tool reads the
+library only for its modification timestamp and prefixes the existing
+archive; nothing is recompiled. Packaging that rewrites timestamps
+makes the runtime reject and regenerate the cache.
 
-The three files behind this paragraph — `source/slang/CMakeLists.txt`,
-`source/core/slang-builtin-module-cache.{h,cpp}`, and
-`tools/slang-core-module-cache/` — are outside this page's
-`watched_paths`, which cover only `source/slang-core-module/*`,
-`source/slang-glsl-module/*`, `source/standard-modules/**`,
-`prelude/*.h`, and the four `*.meta.slang` files. They should be added
-to the manifest entry for this page so that changes to the cache
-mechanism mark it stale.
+These cache files are outside this page's `watched_paths`, so changes
+to the mechanism do not mark it stale.
 
 ## Adding a new built-in
 
@@ -496,22 +439,17 @@ To add an intrinsic visible to user code:
    [prelude/](../../../../prelude) and arrange for the emit backend
    to bring it into scope (see
    [../pipeline/06-emit.md](../pipeline/06-emit.md)).
-4. Rebuild. Either way the `*.meta.slang` text must be re-run through
-   `slang-generate` and re-embedded in the library, so touch the
-   changed meta file and rebuild the `generate_core_module_headers`
-   target before rebuilding the tools; the exact command sequence is
-   in [CLAUDE.md](../../../../CLAUDE.md). With
-   `SLANG_EMBED_CORE_MODULE=ON` the rebuild also reproduces the
-   embedded compiled module, so meta-source errors surface during the
-   C++ build; with `OFF` they surface from the `generate_core_module`
-   step of the same build instead.
+4. Rebuild. Touch the changed meta file and rebuild the
+   `generate_core_module_headers` target before rebuilding the tools;
+   the exact command sequence is in
+   [CLAUDE.md](../../../../CLAUDE.md). Meta-source errors surface
+   during the C++ build with `SLANG_EMBED_CORE_MODULE=ON`, or from the
+   `generate_core_module` step with `OFF`.
 5. Add tests under [tests/](../../../../tests).
 
 ## What is not in this document
 
-- The full intrinsic list. The authoritative source is the
-  `*.meta.slang` files; enumerating them here would replicate a
-  generated artefact and drift on every change.
+- The full intrinsic list; the `*.meta.slang` files are authoritative.
 - The user-visible documentation of the standard modules. Per-module
   documentation lives alongside the source (e.g. in
   [source/standard-modules/neural/](../../../../source/standard-modules/neural))

@@ -1326,6 +1326,19 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return root;
 }
 
+IRImageSubscript* getAtomicImageSubscript(IRAtomicOperation* atomic)
+{
+    return as<IRImageSubscript>(getRootAddr(atomic->getPtr()));
+}
+
+IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript)
+{
+    auto imageType = subscript->getImage()->getDataType();
+    if (auto ptrType = as<IRPtrTypeBase>(imageType))
+        imageType = ptrType->getValueType();
+    return as<IRResourceTypeBase>(imageType);
+}
+
 
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
@@ -1621,14 +1634,86 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+// Returns true if the memory at `root` cannot be changed while `func` runs, either by a callee
+// of `func` that is not given a pointer to it or by another invocation. That is the case for a
+// local `var` of `func`, and for an `out`, `inout` or `__borrow` parameter, whose passing mode
+// gives `func` exclusive or immutable access to its argument for the duration of the call.
+static bool isCallerExclusiveRoot(IRGlobalValueWithCode* func, IRInst* root)
+{
+    // A local `var` of `func` is only reachable from `func` itself, unless a pointer to it is
+    // passed on (the caller checks the call's arguments for that separately).
+    //
+    if (as<IRVar>(root))
+        return isChildInstOf(root, func);
+
+    if (auto param = as<IRParam>(root))
+    {
+        // A parameter of any other block is a phi: it can carry any address that flows into
+        // the block, so it gives no guarantee.
+        //
+        if (param->getParent() != func->getFirstBlock())
+            return false;
+
+        auto type = param->getDataType();
+        if (!type)
+            return false;
+
+        // A function parameter is exclusive when its passing mode gives `func` exclusive or
+        // immutable access to the memory for the duration of the call: `out`, `inout` and
+        // `__borrow`.
+        //
+        switch (type->getOp())
+        {
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_BorrowInParamType:
+            return true;
+        }
+
+        // A `__ref` parameter or a plain pointer parameter carries no such guarantee: the
+        // memory behind it may be groupshared or device memory that other threads write.
+        //
+    }
+
+    // Everything else is not exclusive either: global variables, pointers loaded from memory
+    // (such as the kernel context on Metal, which holds pointers to the groupshared variables)
+    // and buffer element pointers.
+    //
+    return false;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
     IRInst* addr,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
+    // A texel holds scalar or vector data, never a resource handle, on every target, so an
+    // instruction that touches only texel memory cannot change a location that holds resources.
+    // `simplifyForEmit` relies on this to re-load a texture-array element next to each of its
+    // uses: on Metal, the `ImageStore` and the fences around it all name `getElement(load(arr),
+    // i)`, and without this rule the emitter would copy the whole array of handles into a local.
+    auto addrDataType = as<IRPtrTypeBase>(addr->getDataType());
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (addrDataType && atomic && getAtomicImageSubscript(atomic))
+    {
+        if (isResourceType(addrDataType->getValueType()))
+            return false;
+    }
+
     switch (inst->getOp())
     {
+    case kIROp_ImageStore:
+    case kIROp_MetalTextureFence:
+        {
+            if (addrDataType && isResourceType(addrDataType->getValueType()))
+                return false;
+
+            // Any other address may be texel memory reached through an `ImageSubscript`.
+            if (inst->mightHaveSideEffects())
+                return true;
+        }
+        break;
     case kIROp_Store:
         // If the target of the store inst may overlap addr, return true.
         if (canAddressesPotentiallyAlias(func, as<IRStore>(inst)->getPtr(), addr))
@@ -1643,20 +1728,25 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // If addr is a global variable, calling a function may change its value.
-            // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            // A call can change the value at `addr` even when no argument points to it, unless
+            // `addr` is rooted at memory that `func` has exclusive access to.
+            //
+            // That covers global variables, and also memory reached through a pointer, such
+            // as a pointer parameter or a pointer loaded from a struct. Such memory may be
+            // groupshared or device memory that other threads write, and a barrier call
+            // orders the access against those writes. On Metal, for example, groupshared
+            // variables are reached through a pointer in the kernel context, so the root of
+            // their address is a load or a parameter in `func`, not a global.
+            //
+            if (!isCallerExclusiveRoot(func, getRootAddr(addr)))
             {
+                // Only a callee that is side-effect free and does not read from memory is
+                // safe here: it cannot change `addr`, and it does not order anything. Any other
+                // callee, or an unknown one, may change `addr`.
+                //
                 auto callee = call->getCallee();
-                if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
-                {
-                    // An exception is if the callee is side-effect free and is not reading from
-                    // memory.
-                }
-                else
-                {
+                if (!callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                     return true;
-                }
             }
 
             // If any pointer typed argument of the call inst may overlap addr, return true.
@@ -1819,6 +1909,17 @@ void removeLinkageDecorations(IRInst* inst)
     }
     for (auto decoration : toRemove)
         decoration->removeAndDeallocate();
+}
+
+bool hasInterpolationMode(IRInst* inst, IRInterpolationMode mode)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        auto interpolationModeDecor = as<IRInterpolationModeDecoration>(decoration);
+        if (interpolationModeDecor && interpolationModeDecor->getMode() == mode)
+            return true;
+    }
+    return false;
 }
 
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
@@ -3512,6 +3613,15 @@ IRInst* peelAddressForwardingOps(IRInst* addr)
             return addr;
         }
     }
+}
+
+bool isArtificialInst(IRInst* inst)
+{
+    // Module-scope lowering has no current function to query.
+    if (!inst)
+        return false;
+
+    return inst->findDecoration<IRArtificialDecoration>() != nullptr;
 }
 
 bool isDebugInfoInst(IRInst* inst)

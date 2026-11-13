@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=0cc99cb5e0e3d3377473e83d6b3cf2854bebe79ada87f0ce4ea42180738db9ee
+//META: doc_section_digest=cb05174ca18de9aec7cd0f1b2d0a9f691c8420254c205a2b019628a2408e35e5
 //META: purpose=A 0-arg `<>` call to a single-type-param generic with no argument-driven inference is rejected.
 //META: intent=negative
 //META: pipeline_stage=check

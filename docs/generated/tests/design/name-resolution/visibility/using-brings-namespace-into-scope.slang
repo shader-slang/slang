@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#edge-cases-and-failure-modes
-//META: doc_section_digest=b2029736d63943de091f689a9a0ed7f6ade82400bc257a00a34b24d27b223f09
+//META: doc_section_digest=c8df5707a8529f8b54eb08117b70cc5d32a632cfac0bf45bd758aba4031e885f
 //META: purpose=A `using` declaration brings a namespace (a `NamespaceDeclBase`) into scope so its members resolve unqualified; it is a scope-import, not a per-decl re-export.
 //META: intent=functional
 //META: pipeline_stage=check

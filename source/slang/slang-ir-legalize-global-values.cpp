@@ -409,6 +409,15 @@ static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(
     HashSet<IRInst*> consumedParams;
     for (auto inst = block->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
     {
+        // Debug instructions and address calculations rooted at a debug variable do not
+        // contribute to the constructed value. Folding replaces only the call, so we skip
+        // them and the callee keeps its debug records. `getRootAddr` leaves non-address
+        // instructions unchanged, so one check covers both. For example, a DebugValue for
+        // `this.a` takes a FieldAddress rooted at the `this` DebugVar. A real store or load
+        // through such an address is not skipped, and the checks below reject it.
+        if (isDebugInfoInst(getRootAddr(inst)))
+            continue;
+
         switch (inst->getOp())
         {
         case kIROp_Var:

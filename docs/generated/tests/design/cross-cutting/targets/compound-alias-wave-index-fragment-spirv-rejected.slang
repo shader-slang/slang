@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#auto-generated-reference
-//META: doc_section_digest=418ce1f2520f3059548c0ca48faf237bfd1b12c09f7325b1c5ce28d43e4bfef2
+//META: doc_section_digest=3aa36f8eac90de1c8c457c7242960b71258e34cf130aa9ba39c4620ba403f0b9
 //META: purpose=The `subgroup_workgroup_index` compound alias restricts `WaveGetNumWaves` to compute-class stages on SPIR-V; a fragment entry point calling it is rejected by the capability system with E36107.
 //META: intent=negative
 //META: pipeline_stage=check

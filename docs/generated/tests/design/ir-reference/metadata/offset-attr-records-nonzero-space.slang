@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#size-and-offset
-//META: doc_section_digest=c9513e1455ac8d0e90436e3db8230754dc3be3e0a40bcd7e4c788a745e88d3e7
+//META: doc_section_digest=80aec4150b8f6b992009e053942ad9fdafb333290a6cb7055ecbc07f0d7637d8
 //META: purpose=An offset attribute gains a third operand holding the register space when that space is non-zero.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

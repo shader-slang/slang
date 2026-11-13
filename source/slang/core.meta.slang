@@ -1189,6 +1189,12 @@ struct $(kBaseTypes[tt].name)
     : __BuiltinType
 
 ${
+    // Each base type declares every builtin marker interface it implements, including those
+    // that its other markers already refine. A declared conformance gives a constraint such as
+    // `T : __BuiltinScalarType` a direct witness, which adds no upcast cost in overload ranking.
+    // The scalar-to-vector splat on `vector<ToType,N>` depends on this: with a transitive witness
+    // it would rank below the exact-match, explicit-only `__init(int)` of `vector<float,N>`, and
+    // `float4 v = i;` (as well as `msad4` in the core module) would fail to type-check.
     switch (kBaseTypes[tt].tag)
     {
     case BaseType::Half:
@@ -1199,6 +1205,7 @@ $}
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
+    ,  __BuiltinScalarType
 ${
         break;
     case BaseType::Int8:
@@ -1231,6 +1238,7 @@ ${
     case BaseType::Bool:
 $}
     ,  __BuiltinLogicalType
+    ,  __BuiltinScalarType
 ${
         break;
 
@@ -2985,13 +2993,41 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     __intrinsic_op(BuiltinCast)
     __init<FromType>(vector<FromType,N> value) where ToType(FromType) implicit;
 
+    // The scalar-to-vector splats build `vector<FromType,N>` and convert it with `__builtin_cast`
+    // instead of calling the coercion witness, so a source must be a valid vector element whose
+    // conversion `BuiltinCast` performs: a builtin scalar or an enum. The `where` clause still
+    // decides which element types a source can splat into, and supplies the `constraint+` cost.
+    // A user-defined conversion such as `float.__init(float3)` therefore does not make `float3`
+    // implicitly convertible to `float4`, and an enum source always splats its tag value. The enum
+    // splat is a separate overload because `__EnumType` does not refine `__BuiltinScalarType`.
     __implicit_conversion(constraint+)
     [__unsafeForceInlineEarly]
     [__readNone]
     [TreatAsDifferentiable]
-    __init<FromType>(FromType value) where ToType(FromType) implicit
+    __init<FromType : __BuiltinScalarType>(FromType value) where ToType(FromType) implicit
     {
         this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    __implicit_conversion(constraint+)
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init<FromType : __EnumType>(FromType value) where ToType(FromType) implicit
+    {
+        this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
+    }
+
+    // A one-element vector of the element type splats through its own overload, because the
+    // splats above accept only scalar and enum sources. Its cost equals that of the
+    // `vector<T,1>` -> `T` -> `vector<T,N>` path, so overload ranking does not change.
+    __implicit_conversion($(kConversionCost_OneVectorToScalar + kConversionCost_ScalarToVector))
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init(vector<ToType,1> value)
+    {
+        this = vector<ToType,N>(value[0]);
     }
 }
 

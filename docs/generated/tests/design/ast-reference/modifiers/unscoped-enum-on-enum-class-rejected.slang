@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels
-//META: doc_section_digest=ceb5d5225723810627591493eadff0fc89fc5232324a3c22bb1a0df55b36803b
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#nodes
+//META: doc_section_digest=29d86296deb73a57a4f207507e16ba645a6bf2e722162db8157e7554d2cf8004
 //META: purpose=The enum class marker exists to detect an explicit UnscopedEnum on an enum class, and that combination is rejected as a conflicting modifier.
 //META: intent=negative
 //META: pipeline_stage=check

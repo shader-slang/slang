@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T09:06:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-03T07:01:57Z
 target_doc: ast-reference/declarations.md
 review_report: ../../reviews/ast-reference/declarations.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 6
+  fixed: 4
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,21 +18,13 @@ actions:
 
 ## Summary
 
-All six findings were verified and fixed. The forbidden-content finding
-was applied narrowly, to the two spans the reviewer named concretely,
-because the same prompt separately requires short statements about which
-phase synthesizes a node. The others added the missing `AssocTypeDecl`
-callout and the `VarDeclBase` branches, corrected the `EnumDecl` and
-`optional`-modifier claims, and merged the audience sentence into the
-first paragraph. The front matter was not touched.
+All four findings were verified against the current source and fixed. The doc shrank from about 39.8 KB to about 30.3 KB, well under its cap. Front-matter `generated_at` was refreshed; the watched-paths digest is unchanged.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `docs/generated/design/_meta/prompts/ast-reference-declarations.md:63-64` forbids type-checking semantics, but lines 29-31, 40-41, and 51-52 of the same prompt require saying *that* a node is synthesized during checking. So the rule bars checking rules, not producer attribution: the `SynthesizedStructDecl`/`InheritanceDecl` lines (216-228) and the `ModuleDecl` visibility text (258-265), which already defers rules to `visibility.md`, stay. The two spans the reviewer cited by name were genuine rule exposition and were removed. | Dropped the `-experimental-feature` gating sentence from `### FuncExtensionDecl`; compressed `### FuncConstraintDecl` to its `sub`/`sup`/`callableRequirementDeclRef` shape, pointing at `pipeline/03-semantic-check.md` for the synthesis rules |
-| F-002 | fixed | Confirmed: prompt lines 53-54 require the callout; `source/slang/slang-ast-decl.h:566-570` declares `AssocTypeDecl : public AggTypeDecl`, and only the Nodes-table row and one incidental mention existed. | Added a five-sentence `### AssocTypeDecl` callout before the constraint callout, covering the `AggTypeDecl` base and `parseAssocType` (`source/slang/slang-parser.cpp:4293-4315`) |
-| F-003 | fixed | Confirmed: `optional` is read at `source/slang/slang-parser.cpp:1939`, and `OptionalConstraintModifier` is attached only at `:1952`, `:1970`, `:2025`, and `:2042`. The `TypeCoercionConstraintDecl` branch at `:2046-2058` handles only `ImplicitConversionModifier`. | Claim narrowed to the subtype, equality, `nonempty`, and pack-count branches, noting the coercion branch consumes `optional` without recording it |
-| F-004 | fixed | Confirmed: `source/slang/slang-ast-decl.h:444-473` gives `EnumDecl` only `tagType`, and `EnumCaseDecl` only `type`, `tagExpr`, and `tagVal` — no variant payload. | "tagged-union form" replaced with "enumeration form", describing `EnumCaseDecl` children as carrying a tag expression and value |
-| F-005 | fixed | Prompt line 17 requires the `VarDeclBase` branches; `source/slang/slang-ast-decl.h:339,346,583,597,605,1081,1089` declares them. | Added `VarDeclBase` edges to `VarDecl`, `ParamDecl`, `GlobalGenericValueParamDecl`, `GenericValueParamDecl`, `GenericValuePackParamDecl`, plus `VarDecl -> LetDecl` and `ParamDecl -> ModernParamDecl` |
-| F-006 | fixed | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first paragraph to state coverage and intended reader. | Audience sentence merged into the opening paragraph and the separate `Audience:` paragraph removed |
+| F-001 | fixed | `source/slang/slang-ast-decl.h` lines 321-335 (`VarDeclBase`), 428-431 (`AggTypeDecl`), 668 (`returnType`), 700 (`body`) confirm the inherited fields. | Replaced every `(inherits)` with inherited fields marked "(from ...)"; `(no additional state)` for `ScopeDecl` and `SemanticDecl`. |
+| F-002 | fixed | `source/slang/slang-check-modifier.cpp:946-960` synthesizes a modifier for a user attribute struct; `source/slang/slang-parser.cpp:11055-11066` and 11243 build it from `__attributeTarget`. | Attributed construction to `parseAttributeTargetModifier`; kept the line 1527 use-site check. |
+| F-003 | fixed | `_common.md` AST contract item 5 forbids code blocks; callouts must be 2-5 sentences. | Condensed callouts and removed both fenced Slang examples (see also F-004). |
+| F-004 | fixed | `ast-reference-declarations.md` forbids type-checking semantics and IR lowering. | Removed attribute validation and E31002 detail, global-generic diagnostics and `-specialize`, and shadow-var lowering; linked to `../pipeline/03-semantic-check.md`. |

@@ -12,7 +12,7 @@
 //TEST:SIMPLE(filecheck=HLSL):  -target hlsl  -stage compute -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=WGSL):  -target wgsl  -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain -warnings-disable 56113
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG,exit-code=0): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CUDA):  -target cuda  -stage compute -entry computeMain
 
 RWStructuredBuffer<uint> outputBuffer;
@@ -63,7 +63,7 @@ void badWorkgroupMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
 
 // CUDA cannot run a kernel at any other wave size than 32.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CUDA64): -target cuda -stage compute -entry wave64Main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CUDA64,exit-code=0): -target cuda -stage compute -entry wave64Main
 
 [shader("compute")]
 [WaveSize(64)]

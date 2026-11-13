@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#loweredvalinfo-and-the-lowering-environment
-//META: doc_section_digest=b811ef439a253bd37ab607f1ac1de7706df1cebe7013e2fd2ae6c1702a518c0c
+//META: doc_section_digest=96318f7d742d24d0592973af328b298b37325197fe3df5fb6998a8a3dea76d6e
 //META: purpose=A matrix swizzle in l-value position (`m._m00_m11 = ...`) stays symbolic as the `SwizzledMatrixLValue` flavor and resolves at the write site to a single `matrixSwizzleStore` carrying the row/column index pair per selected component.
 //META: intent=functional
 //META: pipeline_stage=lower

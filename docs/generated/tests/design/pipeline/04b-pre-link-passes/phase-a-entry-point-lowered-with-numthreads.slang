@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-a-ast-walk-and-ir-emission
-//META: doc_section_digest=2fe8dd7a16950f4d25991c1ed50ffc7708abb01cec59410111613533f4e48c3a
+//META: doc_section_digest=94881c573723d5b98cfbc42adedec7f412824c3ab543d9cbbddd55d495627a3d
 //META: purpose=Phase A's lowerFrontEndEntryPointToIR (A6) produces an IRFunc carrying the entryPoint and numThreads decorations in the LOWER-TO-IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

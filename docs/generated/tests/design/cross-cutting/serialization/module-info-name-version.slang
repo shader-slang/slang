@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#versioning-and-backwards-compatibility
-//META: doc_section_digest=c9080f0d1aa3fe7ea37fa518bb69fbe0bf0e6639c696c66bc692daba92f2d68f
+//META: doc_section_digest=58a3a4193d4b7da0d4b8c7366fdf0554c1d51097cccafc9eb1df7a910abdf03c
 //META: purpose=A serialized module stamps a serialization version into its payload at write time, and -get-module-info reads that integer back along with the module name and the writing compiler's version.
 //META: intent=functional
 //META: pipeline_stage=link

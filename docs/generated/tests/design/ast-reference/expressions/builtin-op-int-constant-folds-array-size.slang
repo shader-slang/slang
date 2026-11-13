@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#builtinoperatorexpr
-//META: doc_section_digest=81b1b9ef9946750fa4993fc9e38d2ffd230f962a9583bad2803017f58f335d29
+//META: doc_section_digest=d86992208065a1cd06198a0c8298546dee4838c3ae7ea2c807513713ba87455a
 //META: purpose=A binary builtin operator on integer scalar operands resolves to a single operation kind and constant-folds: `(13 & 6) | 1` is accepted as an array dimension and evaluates to 5.
 //META: intent=functional
 //META: pipeline_stage=check

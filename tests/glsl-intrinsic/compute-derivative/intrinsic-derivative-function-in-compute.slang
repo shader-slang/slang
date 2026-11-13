@@ -21,7 +21,7 @@
 // CHECK_SPV_LINEAR_C: "SPV_KHR_compute_shader_derivatives"
 // CHECK_SPV_LINEAR_C-NOT: "SPV_KHR_compute_shader_derivatives"
 
-//TEST:SIMPLE_EX(filecheck=CHECK_HLSL_C): -lang glsl tests/glsl-intrinsic/compute-derivative/intrinsic-derivative-function-in-compute.slang -stage compute -entry computeMain -target hlsl -DCOMPUTE
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL_C,exit-code=-1): -lang glsl tests/glsl-intrinsic/compute-derivative/intrinsic-derivative-function-in-compute.slang -stage compute -entry computeMain -target hlsl -DCOMPUTE
 // CHECK_HLSL_C: error[E41400]:
 
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL_F): -lang glsl tests/glsl-intrinsic/compute-derivative/intrinsic-derivative-function-in-compute.slang -stage fragment -entry computeMain -target glsl
@@ -123,8 +123,12 @@ bool derivativeFunc()
 #endif
 #ifdef COMPUTE
 [numthreads(2, 2, 1)]
-#endif
+// The dispatch thread ID is only valid in a compute shader. The fragment variants of this test
+// compile the same entry point, so the parameter has to be absent there.
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+#else
+void computeMain()
+#endif
 {
     // CHECK_SPV: OpEntryPoint
     outputBuffer.result = true
