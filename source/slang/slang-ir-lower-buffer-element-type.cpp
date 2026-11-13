@@ -2496,7 +2496,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
     auto targetReq = target->getTargetReq();
-    if (targetReq->getTarget() != CodeGenTarget::WGSL)
+    if (!isWGPUTarget(targetReq))
     {
         if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
@@ -2542,7 +2542,9 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             return IRTypeLayoutRuleName::Natural;
     }
 
-    if (target->getOptionSet().shouldUseDXLayout())
+    // The WebGPU targets ignore the D3D layout option, as their reflection does
+    // (WGSLLayoutRulesFamilyImpl): WGSL has no D3D constant-buffer packing.
+    if (target->getOptionSet().shouldUseDXLayout() && !isWGPUTarget(targetReq))
     {
         if (as<IRUniformParameterGroupType>(bufferType))
         {
@@ -2584,6 +2586,11 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             // with C/C++.
             auto defaultTypeOp =
                 isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
+
+            // WGSL has no scalar layout: a uniform buffer declared with `ScalarDataLayout`
+            // gets WGSL's standard layout, std430 (as its reflection does).
+            if (isWGPUTarget(targetReq) && layoutTypeOp == kIROp_ScalarBufferLayoutType)
+                return IRTypeLayoutRuleName::Std430;
 
             return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultTypeOp);
         }
