@@ -247,7 +247,15 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
         if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
         {
             Int sizeAlongAxis[kThreadGroupAxisCount];
-            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+            Int specializationConstantIds[kThreadGroupAxisCount];
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis, specializationConstantIds);
+
+            // Metal rejects function constants here, and the attribute is only a hint.
+            for (auto id : specializationConstantIds)
+            {
+                if (id >= 0)
+                    return;
+            }
 
             m_writer->emit("[[required_threads_per_threadgroup(");
             for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
