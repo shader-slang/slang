@@ -22620,6 +22620,113 @@ struct CapabilityDeclReferenceVisitor
             loc = Base::sourceLocStack.getLast();
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
     }
+    // Visit a type that names a declaration, and join the requirements of a struct type's fields.
+    //
+    // Consider this example:
+    //
+    //     struct S { float a; double b; }
+    //     RWStructuredBuffer<S> sb;
+    //     void main() { output[0] = sb[0].a; }
+    //
+    // `main` never names `b`, but emitting a value of type `S` declares `b`, so `main` requires
+    // what `double` requires. We join the field requirements wherever the struct type is used,
+    // rather than into the struct's own `inferredCapabilityRequirements`, because
+    // `getDeclaredCapabilitySet` treats that set as the declared set of the struct's member
+    // functions. Walking the specialized type also covers generic structs (`G<double>`), nested
+    // structs (`G<int>.Inner`) and base structs. Every struct type the walk reaches takes part,
+    // including one named only as a generic argument, just as naming `double` there does; a
+    // generic struct that only qualifies a name, as in `G<float>.f()`, is not a type here and adds
+    // nothing.
+    void visitDeclRefType(DeclRefType* type)
+    {
+        if (this->visitedVals.contains(type))
+            return;
+        Base::visitVal(type);
+        if (auto structDeclRef = type->getDeclRef().template as<StructDecl>())
+            joinStructFieldRequirements(structDeclRef);
+    }
+    // Visit the specialized type of each instance field of `structDeclRef` and of its base struct.
+    //
+    // A field whose type is a resource, sampler or other opaque handle is skipped: type
+    // legalization moves such fields out of the struct, so declaring the struct does not declare
+    // them, and code that reads one reaches its type through the member access instead. Metal
+    // parameter blocks are the exception, because Metal keeps their resource fields in the
+    // argument buffer, so an unused `RWStructuredBuffer<double>` field there is not caught here.
+    //
+    // Each specialized struct type is walked once, because `visitDeclRefType` records it in
+    // `visitedVals`; two specializations of one generic struct can have different field types, as
+    // in `Box<A>` and `Box<B>` where a field is `T.Assoc`. A recursive generic struct such as
+    // `struct LoopField<each T> { LoopField<T, int> next; }` produces a new specialization at every
+    // level, so we stop at `kMaxTypeNestingDepth`, the depth at which lowering reports that type.
+    void joinStructFieldRequirements(DeclRef<StructDecl> structDeclRef)
+    {
+        if (structFieldNestingDepth >= kMaxTypeNestingDepth)
+            return;
+        ++structFieldNestingDepth;
+        auto astBuilder = this->getASTBuilder();
+        for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+        {
+            auto fieldType = getType(astBuilder, fieldDeclRef);
+            Type* elementType = fieldType;
+            while (auto arrayType = as<ArrayExpressionType>(elementType))
+                elementType = arrayType->getElementType();
+            if (isOpaqueHandleType(elementType))
+                continue;
+            typename Base::PushSourceLocRAII fieldLoc(
+                this->sourceLocStack,
+                fieldDeclRef.getDecl()->loc);
+            this->dispatchIfNotNull(fieldType);
+        }
+        if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
+            this->dispatchIfNotNull(baseStructType);
+        --structFieldNestingDepth;
+    }
+    UInt structFieldNestingDepth = 0;
+    // Visit the default value of each parameter that a call leaves out, because code generation
+    // evaluates that value at the call site. Consider this example:
+    //
+    //     float scaled(float x = (float)(2.0LF)) { return x; }
+    //     void main() { output[0] = scaled(); }
+    //
+    // The checked call `scaled()` has no argument expression for `x`, but its lowering
+    // (`addDirectCallArgs`) inserts the parameter's default value, so the call uses `double`.
+    void visitInvokeExpr(InvokeExpr* expr)
+    {
+        Base::visitInvokeExpr(expr);
+        visitOmittedDefaultArguments(expr);
+    }
+    // A cast that resolves to a constructor, as in `(Wide)x`, is a call too, and its omitted
+    // arguments are filled in the same way.
+    void visitTypeCastExpr(TypeCastExpr* expr)
+    {
+        Base::visitTypeCastExpr(expr);
+        visitOmittedDefaultArguments(expr);
+    }
+    // Visit the default values of the parameters of `call`'s callee that follow its explicit
+    // arguments.
+    //
+    // Arguments map to parameters by position, as in `addDirectCallArgs`, so the omitted
+    // parameters are those from `arguments.getCount()` on. Joining capability sets is idempotent,
+    // so we visit each default value once per walk. That bound is also what makes the walk end:
+    // the synthesized constructor of `struct LoopField<each T> { LoopField<T, int> next; }` has a
+    // default value for `next` that calls the same constructor with the argument omitted (see
+    // tests/language-feature/generics/recursive-variadic-field-specialization-budget.slang).
+    void visitOmittedDefaultArguments(InvokeExpr* call)
+    {
+        auto funcDecl = _getFuncDeclFromExpr(call->functionExpr);
+        if (!funcDecl)
+            return;
+        Index argCount = call->arguments.getCount();
+        Index paramIndex = 0;
+        for (auto param : funcDecl->getParameters())
+        {
+            if (paramIndex++ < argCount)
+                continue;
+            if (visitedDefaultArgParams.add(param))
+                this->dispatchIfNotNull(param->initExpr);
+        }
+    }
+    HashSet<ParamDecl*> visitedDefaultArgParams;
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
     {
         if (decl)

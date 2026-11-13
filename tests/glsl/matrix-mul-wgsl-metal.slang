@@ -14,8 +14,8 @@
 // non-square shapes fails. Shapes follow GLSL conventions, so `float2x3` is GLSL `mat2x3`
 // (2 columns, 3 rows).
 //
-// The `matrix<double, N, N>` `*=` overload is checked only on the GLSL target, because any
-// `double` on WGSL or Metal currently ends in an internal emitter error (#10232).
+// The `matrix<double, N, N>` `*=` overload is checked only on the GLSL target, because WGSL and
+// Metal have no `double`: the overload requires the `fp64` capability.
 
 import glsl;
 
