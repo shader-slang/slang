@@ -36,12 +36,12 @@ static const int clamped = min(N, 5);
 // GLSL-DAG: otherSpelling_0[2] = int[](M_0, 64 / M_0);
 // GLSL-DAG: min(N_0, 5)
 
-// HLSL-DAG: direct_0[int(2)] = { globalParams_0.N_0, int(3) };
-// HLSL-DAG: arith_0[int(2)] = { globalParams_0.N_0 + int(1), int(3) };
-// HLSL-DAG: repeated_0[int(2)] = { globalParams_0.N_0, globalParams_0.N_0 };
-// HLSL-DAG: divided_0[int(2)] = { int(64) / globalParams_0.N_0, int(32) / globalParams_0.N_0 };
-// HLSL-DAG: otherSpelling_0[int(2)] = { globalParams_0.M_0, int(64) / globalParams_0.M_0 };
-// HLSL-DAG: min(globalParams_0.N_0, int(5))
+// HLSL-DAG: direct_0[2L] = { globalParams_0.N_0, 3L };
+// HLSL-DAG: arith_0[2L] = { globalParams_0.N_0 + 1L, 3L };
+// HLSL-DAG: repeated_0[2L] = { globalParams_0.N_0, globalParams_0.N_0 };
+// HLSL-DAG: divided_0[2L] = { 64L / globalParams_0.N_0, 32L / globalParams_0.N_0 };
+// HLSL-DAG: otherSpelling_0[2L] = { globalParams_0.M_0, 64L / globalParams_0.M_0 };
+// HLSL-DAG: min(globalParams_0.N_0, 5L)
 
 RWStructuredBuffer<int> outputBuffer;
 
