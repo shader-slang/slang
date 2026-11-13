@@ -562,12 +562,13 @@ struct SCCPContext
         return LatticeVal::getConstant(resultVal);
     }
 
-    template<typename TIntFunc, typename TFloatFunc>
+    template<typename TIntFunc, typename TUintFunc, typename TFloatFunc>
     LatticeVal evalComparisonImpl(
         IRType*,
         LatticeVal v0,
         LatticeVal v1,
         const TIntFunc& intFunc,
+        const TUintFunc& uintFunc,
         const TFloatFunc& floatFunc)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
@@ -585,20 +586,27 @@ struct SCCPContext
         auto isFloatingPointType = [](IROp op) -> bool
         { return op == kIROp_FloatType || op == kIROp_DoubleType || op == kIROp_HalfType; };
 
+        auto isUnsignedIntType = [](IRType* type) -> bool
+        { return isIntegralType(type) && !getIntTypeSigned(type); };
+
         IROp op0 = operandType0->getOp();
         IROp op1 = operandType1->getOp();
 
-        // Use floating-point path if either operand is floating-point
-        // Otherwise use integer path
         if (isFloatingPointType(op0) || isFloatingPointType(op1))
         {
             // Floating-point path - C++ operators follow IEEE 754 automatically
             resultVal =
                 getBuilder()->getBoolValue(floatFunc(c0->value.floatVal, c1->value.floatVal));
         }
+        else if (isUnsignedIntType(operandType0) || isUnsignedIntType(operandType1))
+        {
+            // Integer constants are stored signed, so a `uint64_t` above INT64_MAX holds a
+            // negative `intVal`; unsigned operands must be ordered by their unsigned value.
+            resultVal = getBuilder()->getBoolValue(uintFunc(c0->value.uintVal, c1->value.uintVal));
+        }
         else
         {
-            // Integer path - all integer types
+            // bool constants use intVal despite not being integral types.
             resultVal = getBuilder()->getBoolValue(intFunc(c0->value.intVal, c1->value.intVal));
         }
         if (!resultVal)
@@ -678,6 +686,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 == c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 == c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 == c1; });
     }
     LatticeVal evalNeq(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -687,6 +696,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 != c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 != c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 != c1; });
     }
     LatticeVal evalGeq(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -696,6 +706,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 >= c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 >= c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 >= c1; });
     }
     LatticeVal evalLeq(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -705,6 +716,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 <= c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 <= c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 <= c1; });
     }
     LatticeVal evalGreater(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -714,6 +726,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 > c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 > c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 > c1; });
     }
     LatticeVal evalLess(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -723,6 +736,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 < c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 < c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 < c1; });
     }
     LatticeVal evalAnd(IRType* type, LatticeVal v0, LatticeVal v1)
