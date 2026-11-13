@@ -331,12 +331,11 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
             {
                 if (curPathSourceFileIndex < 0 || handleLoc.pathHandle != curPathHandle)
                 {
+                    curPathHandle = handleLoc.pathHandle;
+
                     auto viewSourceManager = curView->getSourceManager();
                     const auto filePathSlice =
                         viewSourceManager->getStringSlicePool().getSlice(curPathHandle);
-
-                    // Set the handle
-                    curPathHandle = handleLoc.pathHandle;
 
                     // Get the source file index.
                     curPathSourceFileIndex = sourceMap->getSourceFileIndex(filePathSlice);
