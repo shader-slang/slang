@@ -81,7 +81,7 @@ private:
     // Sound by construction: a set has no specialization/fold/lookup form, so `resolveInst` always
     // returns it unchanged — skipping the re-walk cannot mask a resolution. This is a whitelist;
     // the other kinds reaching the same fall-through *are* non-monotonic (`SizeOf`/`AlignOf`/
-    // `GetArrayLength`, set-specialized `Specialize`) and are excluded.
+    // `GetArrayLength`) and are excluded.
     //
     // Pointer-key safety: a set can be freed mid-run (set dedup in `_replaceInstUsesWith`), but the
     // free RAUWs every reference to the dedup target before freeing, so a freed set is never
