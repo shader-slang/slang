@@ -136,9 +136,17 @@ struct StringUtil
     static String makeStringWithFormat(const char* format, ...);
 
     /// Create a string from the format string and arguments in a buffer.
+    ///
+    /// `argValueSizes[i]` is the byte width of the value stored at `ptrToArgs[i]`, and must be
+    /// parallel to `ptrToArgs`. A floating-point conversion (`%e`/`%f`/`%g`) reads a `double` iff
+    /// `argValueSizes[i] == 8`, otherwise a `float`, so a caller must set each entry to the true
+    /// scalar width of the value it stored (8 for a `double`, 4 for a `float`). The width — rather
+    /// than the `l`/`L` modifier — decides, because a caller such as the bytecode interpreter's
+    /// printf performs no `float`->`double` promotion and so may hand a plain `%f` a `double`.
     static String makeStringWithFormatFromArgArray(
         const char* format,
-        ArrayView<const void*> ptrToArgs);
+        ArrayView<const void*> ptrToArgs,
+        ConstArrayView<size_t> argValueSizes);
 
     /// Given a string held in a blob, returns as a String
     /// Returns an empty string if blob is nullptr
