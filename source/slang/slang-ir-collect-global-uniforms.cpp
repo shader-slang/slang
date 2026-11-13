@@ -179,6 +179,15 @@ struct CollectGlobalUniformParametersContext
         builder->addLayoutDecoration(wrapperParam, globalScopeVarLayout);
         builder->addNameHintDecoration(wrapperParam, UnownedTerminatedStringSlice("globalParams"));
 
+        // Mark the wrapper parameter itself (not just its element struct) as the synthesized
+        // module-scope `$Globals` group, so resource-type legalization can apply DXC
+        // `-fvk-bind-globals` semantics to it (see `globalsContainerLinkToSkipForResources` in
+        // slang-ir-legalize-types.cpp). The marker goes on the *param* deliberately: entry-point
+        // parameter collection puts this decoration on the element *struct type* instead
+        // (`paramStructType` in slang-ir-entry-point-uniforms.cpp), so a param-level check
+        // distinguishes the module `$Globals` group from entry-point groups.
+        builder->addSynthesizedParameterGroupDecoration(wrapperParam);
+
         // With the setup work out of the way, we can iterate over the global
         // parameters that were present in the layout information (they are
         // represented as the fields of the global-scope `struct` layout).
