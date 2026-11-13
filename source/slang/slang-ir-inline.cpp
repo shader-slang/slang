@@ -324,7 +324,8 @@ struct InliningPassBase
             return false;
         for (auto inst : firstBlock->getOrdinaryInsts())
         {
-            // Debug markers do not introduce runtime side effects or local storage.
+            // Debug markers do not introduce runtime side effects or local storage, and
+            // `inlineSingleBlockFuncBody` does not clone them outside a function body.
             if (isDebugInfoInst(inst))
                 continue;
             if (inst == firstBlock->getTerminator())
@@ -608,6 +609,21 @@ struct InliningPassBase
         return clonedInst;
     }
 
+    /// Return whether `inst` is outside the body of any function, that is, at module scope or
+    /// directly in the body block of a generic. A global variable's initializer block counts
+    /// as a function body, because `moveGlobalVarInitializationToEntryPoints` later moves its
+    /// code into a function. Consider `static int g = addOne(divisor);` with a `[ForceInline]`
+    /// `addOne`: the locals of `addOne` keep their debug information in that function.
+    static bool isOutsideFunctionBody(IRInst* inst)
+    {
+        for (auto parent = inst->getParent(); parent; parent = parent->getParent())
+        {
+            if (auto code = as<IRGlobalValueWithCode>(parent))
+                return as<IRGeneric>(code) != nullptr;
+        }
+        return true;
+    }
+
     /// Inline the body of the callee for `callSite`, for a callee that has only
     /// a single basic block.
     ///
@@ -638,8 +654,18 @@ struct InliningPassBase
         //
         IRInst* returnVal = nullptr;
         List<IRDebugInlinedAt*> debugInlinedInsts;
+        // A call outside any function body, such as a `static const` initializer at module scope
+        // or in the body block of an `IRGeneric`, gets no debug instructions from the callee.
+        // Nothing would move them into a function later: `inlineGlobalValuesAndRemoveIfUnused`
+        // copies a global instruction only into the functions that use it, and a `DebugValue`
+        // has no users. A cloned `DebugValue` would keep its operand, such as a load of a uniform
+        // parameter, alive outside any function.
+        bool isCallOutsideFunction = isOutsideFunctionBody(call);
+        SLANG_ASSERT(!isCallOutsideFunction || !newDebugInlinedAt);
         for (auto inst : firstBlock->getChildren())
         {
+            if (isCallOutsideFunction && isDebugInfoInst(inst))
+                continue;
             switch (inst->getOp())
             {
             default:
