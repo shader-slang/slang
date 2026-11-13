@@ -1105,6 +1105,10 @@ void MetalSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVa
     case kIROp_UIntType:
     case kIROp_Int64Type:
     case kIROp_UInt64Type:
+    // `intptr_t` / `uintptr_t` are spelled `long` / `ulong` (see emitSimpleTypeImpl), so their
+    // vectors are `long2` / `ulong3` / ... like the 64-bit integer vectors.
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
         if (elementCount > 1)
         {
             m_writer->emit(elementCount);
