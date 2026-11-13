@@ -442,9 +442,10 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         break;
     case kIROp_DescriptorHandleType:
         {
-            // If the T is already bindless for target, emit it directly.
+            // The spelling must agree with layout and AnyValue marshalling, which give the handle
+            // the representation of its resource exactly when the target is bindless.
             auto resPtrType = cast<IRDescriptorHandleType>(type);
-            if (isResourceTypeBindless(resPtrType->getResourceType()))
+            if (areResourceTypesBindlessOnTarget(getTargetReq()))
                 _emitType(resPtrType->getResourceType(), declarator);
             else
             {
