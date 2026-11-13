@@ -305,11 +305,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << prefix << vecCount;
             return SLANG_OK;
         }
-    case kIROp_TensorViewType:
-        {
-            out << "TensorView";
-            return SLANG_OK;
-        }
     case kIROp_CoopVectorType:
         {
             if (isOptixCoopVec)

@@ -5564,13 +5564,15 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
-    else if (as<TensorViewType>(type))
+    else if (auto tensorViewType = as<TensorViewType>(type))
     {
-        // TensorView<T> is a __magic_type whose layout is defined in the CUDA prelude
-        // (slang-cuda-prelude.h) as: uint8_t* data (8) + uint32_t strides[5] (20) +
-        // uint32_t sizes[5] (20) + uint32_t dimensionCount (4) + padding (4) = 56 bytes.
+        // The CUDA and Torch preludes store a pointer, five Offset byte strides,
+        // five Offset sizes, and a uint32 rank, with 8-byte alignment.
+        auto offsetLayout = _createTypeLayout(context, tensorViewType->getOffsetType());
+        auto strideSize = offsetLayout.info.size.getFiniteValue().getValidValue();
+        auto size = _roundToAlignment(size_t(8 + 10 * strideSize + 4), size_t(8));
         return createSimpleTypeLayout(
-            SimpleLayoutInfo(LayoutResourceKind::Uniform, 56, 8),
+            SimpleLayoutInfo(LayoutResourceKind::Uniform, size, 8),
             type,
             rules);
     }

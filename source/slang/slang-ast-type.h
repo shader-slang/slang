@@ -822,6 +822,7 @@ class TensorViewType : public BuiltinType
 {
     FIDDLE(...)
     Type* getElementType();
+    Type* getOffsetType();
 };
 
 // Base class for built in string types
