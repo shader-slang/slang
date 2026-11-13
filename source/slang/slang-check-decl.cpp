@@ -7995,6 +7995,34 @@ static bool matchParamDirection(ParamPassingMode implDir, ParamPassingMode reqDi
     return false;
 }
 
+/// Find the first parameter of `callee` whose passing mode cannot satisfy the corresponding
+/// parameter of the synthesized wrapper `synFuncDecl`, according to `matchParamDirection`.
+///
+/// When `skipFirstSynParam` is set, the wrapper's first parameter was consumed as the receiver of
+/// the call to `callee`, so the remaining wrapper parameters correspond to the callee's. Returns
+/// the mismatched pair, or a pair of nulls when every parameter's mode is acceptable.
+static std::pair<ParamDecl*, ParamDecl*> findParamDirectionMismatch(
+    CallableDecl* synFuncDecl,
+    CallableDecl* callee,
+    bool skipFirstSynParam)
+{
+    auto synParams = synFuncDecl->getParameters();
+    auto calleeParams = callee->getParameters();
+    auto synParamIter = synParams.begin();
+    if (skipFirstSynParam && synParamIter != synParams.end())
+        ++synParamIter;
+    auto calleeParamIter = calleeParams.begin();
+    for (; synParamIter != synParams.end() && calleeParamIter != calleeParams.end();
+         ++synParamIter, ++calleeParamIter)
+    {
+        auto synParam = *synParamIter;
+        auto calleeParam = *calleeParamIter;
+        if (!matchParamDirection(getParamPassingMode(calleeParam), getParamPassingMode(synParam)))
+            return {synParam, calleeParam};
+    }
+    return {nullptr, nullptr};
+}
+
 static void removeNonStaticLookupItems(LookupResult& lookupResult)
 {
     List<LookupResultItem> newItems;
@@ -8363,6 +8391,50 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     auto coercedCall =
         coercionContext.coerce(CoercionSite::Return, resultType, checkedExpr, &tempSink);
 
+    // The resolved callee must also have parameter directions consistent with the requirement.
+    // Consider this example:
+    //
+    // ```
+    // interface IFoo { void method(out int x); }
+    // struct X : IFoo { void method(int x) { ... } }
+    // ```
+    //
+    // The synthesized `void X::synthesized_method(out int x) { this.method(x); }` type-checks,
+    // but `X.method` must not be a witness for the requirement, because its parameter direction
+    // is inconsistent.
+    //
+    // We compare directions before looking at errors from the call, because overload resolution
+    // picks the callee before the argument for each parameter is checked against its passing
+    // mode. A mismatched direction can make that argument check fail; for example, the wrapper's
+    // `__ref_readonly` parameter cannot be forwarded to a `__ref` one. The direction mismatch is
+    // the more specific explanation of the failure, so we report it rather than a general one.
+    //
+    DeclRefExpr* calleeExpr = nullptr;
+    DeclRef<CallableDecl> callee;
+    if (auto checkedInvoke = as<InvokeExpr>(checkedCall))
+    {
+        calleeExpr = as<DeclRefExpr>(checkedInvoke->functionExpr);
+        if (calleeExpr)
+            callee = as<CallableDecl>(calleeExpr->declRef);
+    }
+    if (callee)
+    {
+        auto [synParam, calleeParam] =
+            findParamDirectionMismatch(synFuncDecl, callee.getDecl(), nonStaticSatisfiesStatic);
+        if (calleeParam)
+        {
+            if (outFailureDetails)
+            {
+                outFailureDetails->reason = WitnessSynthesisFailureReason::ParameterDirMismatch;
+                outFailureDetails->candidateMethod = calleeExpr->declRef;
+                outFailureDetails->actualDir = getParamPassingMode(calleeParam);
+                outFailureDetails->expectedDir = getParamPassingMode(synParam);
+                outFailureDetails->paramDecl = calleeParam;
+            }
+            return false;
+        }
+    }
+
     // If our overload resolution or type coercion failed,
     // then we have not been able to synthesize a witness
     // for the requirement.
@@ -8400,131 +8472,71 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         return false;
     }
 
-    // If we were able to type-check the call, we also need to make
-    // sure that the resolved callee member has consistent parameter
-    // direction as the requirement method.
-    //
-    // For example, if there is a requirement:
-    // ```
-    // interface IFoo { void method(out int x); }
-    // ```
-    // and a type:
-    // ```
-    // struct X : IFoo { void method(int x) { ... } }
-    // ```
-    // After we synthesize:
-    // ```
-    // void X::synthesized_method(out int x) { this.method(x); }
-    // ```
-    // The synthesized method will pass all type check just fine,
-    // but we don't want to allow this method to be used as a witness
-    // for the requirement due to inconsistent parameter direction.
-    // So let's check for this now.
-    //
-    if (auto checkedInvoke = as<InvokeExpr>(checkedCall))
+    if (callee)
     {
-        if (auto declRefExpr = as<DeclRefExpr>(checkedInvoke->functionExpr))
+        synFuncDecl->loc = callee.getDecl()->loc;
+
+        // The synthesized wrapper initially inherits differentiability modifiers from the
+        // interface requirement, so overload resolution can build any derivative
+        // associations it needs while checking the call.  If the resolved callee cannot
+        // provide the same differentiability, a hard [ForwardDifferentiable] or
+        // [Differentiable]/[BackwardDifferentiable] requirement cannot be satisfied by
+        // this wrapper.  For [MaybeDifferentiable], however, the modifiers were only
+        // provisional, so we can drop them and still use the wrapper as a
+        // non-differentiable witness.
+        //
+        // More generally, this is the part where we are trying to derive synthesized
+        // wrapper conformances from the callee's conformances. For now, it's
+        // differentiability specific but can be generalized later if we add more function
+        // conformance kinds.
+        //
+        if (!isFuncForwardDifferentiable(callee))
         {
-            if (auto callee = as<CallableDecl>(declRefExpr->declRef))
+            if (auto fwdDiffModifier = synFuncDecl->findModifier<ForwardDifferentiableAttribute>())
             {
-                synFuncDecl->loc = callee.getDecl()->loc;
-                auto synParams = synFuncDecl->getParameters();
-                auto calleeParams = callee.getDecl()->getParameters();
-                auto synParamIter = synParams.begin();
-                // When a non-static method satisfies a static requirement, the first
-                // parameter of the synthesized function was consumed as the base
-                // expression for the member call, so skip it in the direction check.
-                if (nonStaticSatisfiesStatic && synParamIter != synParams.end())
-                    ++synParamIter;
-                auto calleeParamIter = calleeParams.begin();
-                for (; synParamIter != synParams.end() && calleeParamIter != calleeParams.end();
-                     ++synParamIter, ++calleeParamIter)
+                // A non-optional forward-differentiable requirement cannot be fulfilled
+                // by forwarding to a callee with no forward derivative.
+                if (requiredMemberDeclRef.getDecl()->findModifier<ForwardDifferentiableAttribute>())
                 {
-                    auto synParam = *synParamIter;
-                    auto calleeParam = *calleeParamIter;
-                    if (!matchParamDirection(
-                            getParamPassingMode(calleeParam),
-                            getParamPassingMode(synParam)))
+                    if (outFailureDetails)
                     {
-                        if (outFailureDetails)
-                        {
-                            outFailureDetails->reason =
-                                WitnessSynthesisFailureReason::ParameterDirMismatch;
-                            outFailureDetails->candidateMethod = declRefExpr->declRef;
-                            outFailureDetails->actualDir = getParamPassingMode(calleeParam);
-                            outFailureDetails->expectedDir = getParamPassingMode(synParam);
-                            outFailureDetails->paramDecl = calleeParam;
-                        }
-                        return false;
+                        outFailureDetails->reason =
+                            WitnessSynthesisFailureReason::DifferentiabilityMismatch;
+                        outFailureDetails->candidateMethod = calleeExpr->declRef;
                     }
+                    return false;
                 }
 
-                // The synthesized wrapper initially inherits differentiability modifiers from the
-                // interface requirement, so overload resolution can build any derivative
-                // associations it needs while checking the call.  If the resolved callee cannot
-                // provide the same differentiability, a hard [ForwardDifferentiable] or
-                // [Differentiable]/[BackwardDifferentiable] requirement cannot be satisfied by
-                // this wrapper.  For [MaybeDifferentiable], however, the modifiers were only
-                // provisional, so we can drop them and still use the wrapper as a
-                // non-differentiable witness.
+                // If the requirement has [ForwardDifferentiable], the wrapper will already
+                // have the same modifier. We'll remove it since we know we can't derive a
+                // forward derivative, but may still want to use this for a
+                // [MaybeDifferentiable] (i.e. optional) requirement.
                 //
-                // More generally, this is the part where we are trying to derive synthesized
-                // wrapper conformances from the callee's conformances. For now, it's
-                // differentiability specific but can be generalized later if we add more function
-                // conformance kinds.
-                //
-                if (!isFuncForwardDifferentiable(callee))
-                {
-                    if (auto fwdDiffModifier =
-                            synFuncDecl->findModifier<ForwardDifferentiableAttribute>())
-                    {
-                        // A non-optional forward-differentiable requirement cannot be fulfilled
-                        // by forwarding to a callee with no forward derivative.
-                        if (requiredMemberDeclRef.getDecl()
-                                ->findModifier<ForwardDifferentiableAttribute>())
-                        {
-                            if (outFailureDetails)
-                            {
-                                outFailureDetails->reason =
-                                    WitnessSynthesisFailureReason::DifferentiabilityMismatch;
-                                outFailureDetails->candidateMethod = declRefExpr->declRef;
-                            }
-                            return false;
-                        }
-
-                        // If the requirement has [ForwardDifferentiable], the wrapper will already
-                        // have the same modifier. We'll remove it since we know we can't derive a
-                        // forward derivative, but may still want to use this for a
-                        // [MaybeDifferentiable] (i.e. optional) requirement.
-                        //
-                        removeModifier(synFuncDecl, fwdDiffModifier);
-                    }
-                }
-
-                // Similar to the ForwardDifferentiable case, but for backward differentiability.
-                if (!isFuncBackwardDifferentiable(callee))
-                {
-                    if (auto bwdDiffModifier =
-                            synFuncDecl->findModifier<BackwardDifferentiableAttribute>())
-                    {
-                        if (requiredMemberDeclRef.getDecl()
-                                ->findModifier<BackwardDifferentiableAttribute>())
-                        {
-                            if (outFailureDetails)
-                            {
-                                outFailureDetails->reason =
-                                    WitnessSynthesisFailureReason::DifferentiabilityMismatch;
-                                outFailureDetails->candidateMethod = declRefExpr->declRef;
-                            }
-                            return false;
-                        }
-                        removeModifier(synFuncDecl, bwdDiffModifier);
-                    }
-                }
-
-                markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
+                removeModifier(synFuncDecl, fwdDiffModifier);
             }
         }
+
+        // Similar to the ForwardDifferentiable case, but for backward differentiability.
+        if (!isFuncBackwardDifferentiable(callee))
+        {
+            if (auto bwdDiffModifier = synFuncDecl->findModifier<BackwardDifferentiableAttribute>())
+            {
+                if (requiredMemberDeclRef.getDecl()
+                        ->findModifier<BackwardDifferentiableAttribute>())
+                {
+                    if (outFailureDetails)
+                    {
+                        outFailureDetails->reason =
+                            WitnessSynthesisFailureReason::DifferentiabilityMismatch;
+                        outFailureDetails->candidateMethod = calleeExpr->declRef;
+                    }
+                    return false;
+                }
+                removeModifier(synFuncDecl, bwdDiffModifier);
+            }
+        }
+
+        markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
     }
 
 
