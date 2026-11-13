@@ -104,6 +104,11 @@ struct CompilerOptionSet
     /// level keeps its own list, and `TargetProgram` concatenates them once, lowest level first.
     static bool isLevelLocal(CompilerOptionName name);
 
+    // the row and column layout flags are one setting, so setting either replaces both
+    static bool isMatrixLayoutOption(CompilerOptionName name);
+    bool hasMatrixLayoutOption();
+    void clearMatrixLayoutOptions();
+
     /// Return a copy of this set without the level-local options, for seeding the option set of
     /// another level from this one.
     CompilerOptionSet copyWithoutLevelLocalOptions() const;
@@ -200,7 +205,11 @@ struct CompilerOptionSet
             else if (allowDuplicate(kv.key))
                 add(kv.key, kv.value, true);
             else
+            {
+                if (isMatrixLayoutOption(kv.key))
+                    clearMatrixLayoutOptions();
                 set(kv.key, kv.value);
+            }
         }
     }
 
@@ -217,6 +226,8 @@ struct CompilerOptionSet
             else
             {
                 if (options.containsKey(kv.key))
+                    continue;
+                if (isMatrixLayoutOption(kv.key) && hasMatrixLayoutOption())
                     continue;
                 set(kv.key, kv.value);
             }
