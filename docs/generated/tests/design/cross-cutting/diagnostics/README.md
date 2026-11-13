@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: 1fd02b253f9cc07d74750ea2c25b6f8286574f53da9306d6110c916c2eea83d1
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:32:51Z
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: e3b7c7fcf8b6488841bc0950900ff32969a2b0e7ec7f865699b18b5aad9df3bb
 source_doc: docs/generated/design/cross-cutting/diagnostics.md
-source_doc_digest: 36a849c720b2096b99269b3399cb0b5b1faf225f7fe4a666aac539d87e0844ca
+source_doc_digest: 33010d44dc29922ced67cff3335fb5fb7257f2f46a67aadd6174dc96d2d6e62c
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -89,6 +89,8 @@ appears in exactly one of the two tables.
 20. A per-id override takes precedence over group gating, which is what lets `-W<id>` force-enable a single warning from a group that is off. — `severity-override-beats-warning-group-gating.slang`
 21. The option table spells these `-W<id>` / `-Wno-<id>`, but the operand goes through `overrideDiagnostic`, which accepts an integer id **or** a diagnostic name. — `wno-flag-accepts-diagnostic-name.slang`
 
+21a. `-notes-disable <id>[,<id>...]` takes the same id-or-name operand but requires the diagnostic to be a `Note`: naming a note suppresses it while the primary error still renders, naming a non-note is rejected as unknown. — `notes-disable-suppresses-note.slang`, `notes-disable-rejects-non-note.slang`
+
 **`#warning-groups`**
 
 22. The groups are independent, not nested: a warning is gated on exactly the one group it carries. — `warning-group-wall-does-not-enable-pedantic.slang`
@@ -106,6 +108,7 @@ appears in exactly one of the two tables.
 31. `-diagnostic-color always\|never\|auto` selects the frame glyphs as well as the colour: ASCII (`-->`, `\|`, `^`, `-`) with colour off, Unicode box drawing (`╭╼`, `│`, `━`, `┬`) with colour on. — `diagnostic-color-selects-frame-glyphs.slang`
 32. Diagnostics raised while parsing the command line are attached to a synthetic source, so the renderer prints the path `command line` with no `line:column` and such a diagnostic can only be pinned by its error code. — `command-line-diagnostic-has-no-line-column.slang`
 33. `-enable-machine-readable-diagnostics` switches rendering to the tab-separated record `E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>`. — `machine-readable-diagnostic-record.slang`
+33a. `-diagnostic-format vs` renders `<file>(<line>,<col>): <severity> E<id>: <message>` in place of the boxed layout. — `diagnostic-format-vs.slang`
 
 **`#error-code-namespace`**
 
@@ -188,10 +191,13 @@ appears in exactly one of the two tables.
 | A diagnostic declared at `Severity::Warning` renders with the user-facing severity name `warning`.                                                                                        | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`severity-name-warning.slang`](severity-name-warning.slang)                                                       |
 | A per-id override takes precedence over warning-group gating, so `-W<id>` force-enables a single warning from a group that is off.                                                        | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`severity-override-beats-warning-group-gating.slang`](severity-override-beats-warning-group-gating.slang)         |
 | A per-id severity override may not lower a diagnostic that is already at `Error`: `-warnings-disable` on an error id is rejected with E31111.                                             | negative   | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`severity-override-cannot-lower-error.slang`](severity-override-cannot-lower-error.slang)                         |
+| `-notes-disable <id>` suppresses a note diagnostic while the primary error still renders. | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels) | [`notes-disable-suppresses-note.slang`](notes-disable-suppresses-note.slang) |
+| `-notes-disable` requires the named diagnostic to be a note, so naming an error id is rejected as unknown. | negative | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels) | [`notes-disable-rejects-non-note.slang`](notes-disable-rejects-non-note.slang) |
 | Boundary: `-warnings-as-errors all` promotes every surviving warning to `error`, not just one selected id.                                                                                | boundary   | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`warnings-as-errors-all-promotes-warning.slang`](warnings-as-errors-all-promotes-warning.slang)                   |
 | The -W<id> / -Wno-<id> option operand goes through overrideDiagnostic, which accepts a diagnostic name as well as an integer id, so -Wno-comma-operator-used-in-expression suppresses E41024.                                        | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`wno-flag-accepts-diagnostic-name.slang`](wno-flag-accepts-diagnostic-name.slang)                                 |
 | The final `TreatWarningsAsErrors` step of `getEffectiveMessageSeverity` promotes warning 41024 to `error` when `-warnings-as-errors 41024` selects it by id.                              | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`warnings-as-errors-promotes-warning.slang`](warnings-as-errors-promotes-warning.slang)                           |
 | -diagnostic-color selects the renderer's frame glyphs as well as its colour, so `never` draws the ASCII frame and `always` draws the Unicode box-drawing frame.                                                                       | functional | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`diagnostic-color-selects-frame-glyphs.slang`](diagnostic-color-selects-frame-glyphs.slang)                       |
+| With -diagnostic-format vs the sink renders a diagnostic as file(line,col): severity E<id>: message instead of the boxed layout. | functional | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`diagnostic-format-vs.slang`](diagnostic-format-vs.slang) |
 | A diagnostic raised while parsing the command line renders the path `command line` with no line:column, so it can only be pinned by its error code.                                                                                    | functional | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`command-line-diagnostic-has-no-line-column.slang`](command-line-diagnostic-has-no-line-column.slang)             |
 | A rendered diagnostic header is `<severity>[E<5-digit id>]: <message>` with the id zero-padded, so entry 14 prints as error[E00014] rather than error[E14].                                                                            | boundary   | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`diagnostic-header-code-zero-padded-with-e-prefix.slang`](diagnostic-header-code-zero-padded-with-e-prefix.slang) |
 | A diagnostic raised inside a macro expansion still decodes to a source location and renders the expanded identifier in its message.                                                       | functional | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`macro-expansion-stack-in-diagnostic.slang`](macro-expansion-stack-in-diagnostic.slang)                           |
@@ -231,7 +237,11 @@ appears in exactly one of the two tables.
 
 ## Doc gaps observed
 
-(none) — no gaps remain open against this bundle's source document.
+| Anchor | Kind | Gap | Suggested addition |
+| --- | --- | --- | --- |
+| [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | drift-from-source | The `-diagnostic-format vs` paragraph says notes get their own `note` header "without an id", but the compiler renders `note E40011: candidate: ...` with the id. | Say that Visual Studio notes carry their `E<id>` like errors and warnings. |
+
+Previously listed gaps were fixed on the documentation side and recorded in `docs/generated/design/_meta/doc-gap-state.json`.
 
 Every gap previously listed here was fixed on the documentation side and
 recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers

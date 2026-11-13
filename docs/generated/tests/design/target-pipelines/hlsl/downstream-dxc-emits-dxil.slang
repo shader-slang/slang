@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#downstream-dxc--fxc
-//META: doc_section_digest=a63d80f005ff8a84f7ef9717847fa74170fa4ade3547167897d525ac39223cf1
+//META: doc_section_digest=d2b70f7c177c7e83d711597b55d20014285aa7ccfee5b7c11ead561d668f0bfa
 //META: purpose=DXC is invoked as the downstream compiler when -target dxil is requested; the artifact contains DXIL bytecode whose textual disassembly contains the DXIL entry-point definition.
 //META: intent=expansion
 //META: pipeline_stage=emit

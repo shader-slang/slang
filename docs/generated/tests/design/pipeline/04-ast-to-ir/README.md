@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: bf3a74570843c35b5ff86178bb3be46495bdc1991238c701f98921137179d5f6
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T22:00:01+00:00
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: a190a9cbe47966bcec29035174d806e2ce6de71eb40d47dc78d179da08abc77b
 source_doc: docs/generated/design/pipeline/04-ast-to-ir.md
-source_doc_digest: 5550ae4589c77be3fc5854565455df77294134fc11bdc36b1ae7487f3078bbf0
+source_doc_digest: 639e43c9ab4cbd8973fd8f1b5798df81f6540656787cbc5b1b8e6417957c7d38
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -313,7 +313,7 @@ covering those constituents rather than by a row of their own.
 | A BlockStmt lowers to a sequence of basic blocks; the function body has multiple <code>block %&#123;&#123;.*&#125;&#125;</code> regions when control flow branches.                                                                                                                         | functional | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`blockstmt-lowers-to-basic-blocks.slang`](blockstmt-lowers-to-basic-blocks.slang)                                                           |
 | A ForStmt lowers to a `loop` terminator; the induction variable is carried as a block `param` (phi-style joining encoded as block parameters).                                                                                                                                              | functional | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`forstmt-lowers-to-loop-with-block-params.slang`](forstmt-lowers-to-loop-with-block-params.slang)                                           |
 | A FuncDecl lowers to an IRFunc whose body contains one or more IRBlocks; a callsite lowers to a `call` instruction.                                                                                                                                                                         | functional | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`funcdecl-lowers-to-irfunc.slang`](funcdecl-lowers-to-irfunc.slang)                                                                         |
-| A FuncDecl that calls itself lowers to a single IRFunc whose body contains a `call %self(...)` instruction targeting the same IRFunc — the doc's `InvokeExpr -> IRCall` row applied to a self-reference.                                                                                    | boundary   | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`funcdecl-recursive-call-self-references-irfunc.slang`](funcdecl-recursive-call-self-references-irfunc.slang)                               |
+| A FuncDecl that calls itself lowers to a single IRFunc whose body contains a `call %self(...)` instruction targeting the same IRFunc — the doc's `InvokeExpr -> IRCall` row applied to a self-reference (the test expects exit code -1: later passes reject recursion with E55201 on every target, after the lowering dump is printed).                                                                                    | boundary   | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`funcdecl-recursive-call-self-references-irfunc.slang`](funcdecl-recursive-call-self-references-irfunc.slang)                               |
 | A FuncDecl that returns a multi-field struct lowers to an IRFunc whose function type names the struct as its return type; the body builds the struct in an IRVar and returns its loaded value.                                                                                              | boundary   | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`funcdecl-returns-struct-lowers-to-return-val-struct.slang`](funcdecl-returns-struct-lowers-to-return-val-struct.slang)                     |
 | A FuncDecl with a default-valued parameter lowers normally; the omitted argument at the call site is materialized as a literal operand in the `call` instruction.                                                                                                                           | boundary   | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`funcdecl-default-arg-materialized-at-call-site.slang`](funcdecl-default-arg-materialized-at-call-site.slang)                               |
 | A FuncDecl with an `out int y` parameter lowers to an IRFunc whose param has type `OutParam(Int)`; writes through `y` lower to `store(%y, ...)` and the call site passes the address of a local IRVar.                                                                                      | boundary   | [#mapping-ast-constructs-to-ir](../../../../design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir)                               | [`funcdecl-out-param-lowers-to-outparam-pointer.slang`](funcdecl-out-param-lowers-to-outparam-pointer.slang)                                 |
@@ -428,6 +428,10 @@ covering those constituents rather than by a row of their own.
 | When two FuncDecls are registered as entry points in one translation unit, each lowered IRFunc carries its own `entryPoint(...)` decoration; the module-level entry-point list contains both.                                                                                               | boundary   | [#module-level-outputs](../../../../design/pipeline/04-ast-to-ir.md#module-level-outputs)                                               | [`entry-point-multiple-each-gets-entry-point-decoration.slang`](entry-point-multiple-each-gets-entry-point-decoration.slang)                 |
 | Each ordinary interface method requirement gets its own per-decl `IRStructKey` (`= key` in the dump) carrying a `key_`-prefixed mangled linkage name that unifies the key across modules.                                                                                                   | functional | [#requirement-keys](../../../../design/pipeline/04-ast-to-ir.md#requirement-keys)                                                       | [`interface-ordinary-requirement-key-per-decl.slang`](interface-ordinary-requirement-key-per-decl.slang)                                     |
 | Two structs conforming to IDifferentiable share one hoistable `builtinRequirementKey` inst per built-in requirement — both witness tables carry an entry keyed by the same key inst.                                                                                                        | boundary   | [#requirement-keys](../../../../design/pipeline/04-ast-to-ir.md#requirement-keys)                                                       | [`builtin-requirement-key-dedup-across-two-structs.slang`](builtin-requirement-key-dedup-across-two-structs.slang)                           |
+| A `switch` body with no `case` or `default` label takes `visitSwitchStmt`'s no-cases early return, which itself reports `UnreachableCode` (E41000) naming the first statement. | negative | [#diagnostics-during-lowering](../../../../design/pipeline/04-ast-to-ir.md#diagnostics-during-lowering) | [`switch-body-no-case-label-warns-unreachable.slang`](switch-body-no-case-label-warns-unreachable.slang) |
+| A `switch` body that discards nothing (`{ }`, `{ ; }`) stays silent: no E41000. | boundary | [#diagnostics-during-lowering](../../../../design/pipeline/04-ast-to-ir.md#diagnostics-during-lowering) | [`switch-body-empty-or-semicolon-stays-silent.slang`](switch-body-empty-or-semicolon-stays-silent.slang) |
+| 128 nested ordinary calls still compile (the guard runs before the counter increments); 129 is the first to report E39997. | boundary | [#diagnostics-during-lowering](../../../../design/pipeline/04-ast-to-ir.md#diagnostics-during-lowering) | [`invoke-lowering-recursion-depth-128-still-compiles.slang`](invoke-lowering-recursion-depth-128-still-compiles.slang) |
+| Names in a `-dump-ir` listing go through `scrubName`, which escapes every non-alphanumeric byte as `x` plus its hex value (`IFoo_x` prints as `IFoox5Fx`). | functional | [#generics-and-existentials](../../../../design/pipeline/04-ast-to-ir.md#generics-and-existentials) | [`dump-ir-name-scrub-escapes-underscore-as-x5F.slang`](dump-ir-name-scrub-escapes-underscore-as-x5F.slang) |
 
 ## Untested claims
 
@@ -473,21 +477,12 @@ covering those constituents rather than by a row of their own.
 | The node attributes are not core-language syntax: the shader must `import experimental.workgraph` and the compile must pass `-experimental-feature` alongside `-stage node` and a `lib_6_8` profile, and without the import `[NodeLaunch("...")]` is only an unknown-attribute warning. | needs-cli-test | [#entry-point-scoped-decorations](../../../../design/pipeline/04-ast-to-ir.md#entry-point-scoped-decorations) | The claim is about which combination of command-line options and module imports makes the attributes reachable at all; a wrapper script invoking `slangc` with and without `-experimental-feature` and comparing the warning is what would verify it. |
 | Debug-info gating discriminates by constructor *flavor*, not by the mangled `$init` name, because a user-written `__init` mangles the same way but must keep its debug info. | internal-source-fact | [#debug-info-gating](../../../../design/pipeline/04-ast-to-ir.md#debug-info-gating) | The pair of outcomes is already pinned — the synthesized initializer loses its debug lines and the user-written `__init` keeps them — but the discriminator that produced the split is a C++ predicate with no separate surface. |
 | The per-translation-unit, target-agnostic mandatory pass sequence inside `generateIRForTranslationUnit` runs before the IR module is cached on the `Module` and pulled into `linkAndOptimizeIR` by `linkIR`. | out-of-bundle | [#adjacent-pipelines](../../../../design/pipeline/04-ast-to-ir.md#adjacent-pipelines) | Pass-sequence ordering owned by [`pipeline/04b-pre-link-passes`](../04b-pre-link-passes/); this bundle observes the lowering walk's own output, not the position of the passes that follow it. |
+| `tryBorrowInterfaceFromOwningModule` lowers an interface owned by another module as a bare declaration plus a queued prelink of the owning module's definition, falling back to AST derivation in four listed cases. | out-of-bundle | [#inputs-and-outputs](../../../../design/pipeline/04-ast-to-ir.md#inputs-and-outputs) | Needs a multi-module link observed after prelink, which is owned by [`pipeline/04b-pre-link-passes`](../04b-pre-link-passes/); the single-file `-dump-ir` directive cannot reach the borrowed-declaration form. |
 
 ## Doc gaps observed
 
-(none) — no gaps remain open against this bundle's source document.
+(none) - no gaps remain open against this bundle's source document.
 
-Every gap previously listed here was fixed on the documentation side and
-recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers
-are now in the source document itself.
-
-All nine rows recorded by the previous pass have been retired: the doc-gap
-fill answered every one of them — the flavor table gained its "Slang surface
-that produces it" column, the mapping table gained its `IndexExpr` /
-`AssignExpr` / `BuiltinCastExpr` / `BreakStmt` / `Optional`-`Tuple`-`ParameterBlock`
-rows, and the `constexpr*`, generic-interface witness-entry, variadic
-pack-count, `E40017` and `E39997` claims all acquired the worked examples
-they were missing (four of this pass's new tests are built directly from
-them). The rows below are new, and all three come from running the doc's own
-worked examples against the compiler.
+The previous off-by-one note (recursion budget 128 vs 129) was resolved in the
+doc: 128 nested calls compile and 129 is the first to fail; both depths are now
+tested.

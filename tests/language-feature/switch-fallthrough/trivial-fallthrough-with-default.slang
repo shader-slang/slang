@@ -10,7 +10,7 @@
 // Verify HLSL output preserves case grouping structure for SM 6.0
 //TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute
 
-// CHECK-HLSL: case int(1):
+// CHECK-HLSL: case 1L:
 // CHECK-HLSL-NOT: break
 // CHECK-HLSL: default:
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#imagegatheroffset
-//META: doc_section_digest=5eeb11340927fb3d46b9091b182fe1e4d7413ea586367c46c238bda7d8431e23
+//META: doc_section_digest=57ab19fe86465c8bf8bea47b9e3d5843769082b65acc1d99a037644f8175be4d
 //META: purpose=`Texture2D::GatherRed(sampler, uv, offset)` reaches the IR as `imageGatherOffset(sampledImage, location, component, offset)` inside the core-module gather body pulled into the dump.
 //META: intent=functional
 //META: pipeline_stage=lower

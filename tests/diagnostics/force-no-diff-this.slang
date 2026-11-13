@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):
 
 struct MyStruct<T> where T: __BuiltinFloatingPointType
 {

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#interpolation-and-shader-io
-//META: doc_section_digest=53ad1d566b89727f915f7a684edad14e039800bbbb1330d913ea0c67195afd17
+//META: doc_section_digest=cab069de9f491d651e18ca65a976f70486f9bac662a529f4565a5ed9fa18a2a4
 //META: purpose=Boundary - a TEXCOORD with a trailing digit (TEXCOORD3) lowers to semantic("TEXCOORD3", -1 : Int); the digit stays fused with the name operand.
 //META: intent=boundary
 //META: pipeline_stage=lower

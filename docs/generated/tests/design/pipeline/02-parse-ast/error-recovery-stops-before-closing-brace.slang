@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#error-recovery
-//META: doc_section_digest=91510b9f6ea370533eb207e69c3d66655548488ad6d2f4fea5637f3e5e0e1191
+//META: doc_section_digest=838abd6dd447b44608fa9076f9ae6efe7c7794b7d28c0add0f72e45b02b15363
 //META: purpose=Recovery inside a block stops in front of the closing `}` rather than consuming it, so the next declaration parses and the partial tree still reaches semantic checking.
 //META: intent=negative
 //META: pipeline_stage=parse

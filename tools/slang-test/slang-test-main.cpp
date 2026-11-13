@@ -65,6 +65,7 @@ using namespace Slang;
 
 // Constants for slang-test specific options
 static const char* kPreserveEmbeddedSourceOption = "-preserve-embedded-source";
+static const char* kValidateWithDownstreamCompilerOption = "-validate-with-downstream-compiler";
 
 // Options for a particular test
 struct TestOptions
@@ -669,7 +670,9 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
-        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST
+        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST.
+        // render-test's `ShaderInputLayoutParser::parse` uses the same prefix rule for
+        // `TEST_INPUT:` lines.
         while (*cursor == '/')
         {
             cursor++;
@@ -1699,6 +1702,118 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
             SLANG_ASSERT(!"Unknown type");
             return 0;
         }
+    }
+}
+
+/// Returns the compile target that the arguments of a test select with `-target`, or
+/// `SLANG_TARGET_UNKNOWN` if there is none.
+static SlangCompileTarget _findTargetInArgs(const List<String>& args)
+{
+    const Index targetIndex = args.indexOf("-target");
+    if (targetIndex == Index(-1) || targetIndex + 1 >= args.getCount())
+        return SLANG_TARGET_UNKNOWN;
+    return TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
+}
+
+/// Returns true if the shader model that the arguments of a test select is 6.0 or higher.
+///
+/// The test names the shader model in `-profile` (for example `sm_6_0` or `cs_6_6`) or in
+/// `-capability` (for example `sm_6_6`). Without any of them, an HLSL target uses the shader
+/// model 5.1, as `slangc` does. A ray tracing `-stage` raises the shader model to 6.3, as
+/// `getEffectiveProfile` does. A stage that only a `[shader(...)]` attribute names is not seen
+/// here.
+static bool _usesShaderModel6OrHigher(const List<String>& args)
+{
+    const Index stageIndex = args.indexOf("-stage");
+    if (stageIndex != Index(-1) && stageIndex + 1 < args.getCount())
+    {
+        for (const char* stage :
+             {"raygeneration", "intersection", "closesthit", "anyhit", "miss", "callable"})
+        {
+            if (args[stageIndex + 1] == stage)
+                return true;
+        }
+    }
+    for (Index i = 0; i + 1 < args.getCount(); i++)
+    {
+        if (args[i] != "-profile" && args[i] != "-capability")
+            continue;
+        const UnownedStringSlice value = args[i + 1].getUnownedSlice();
+        for (const char* model : {"_6_", "_7_", "_8_", "_9_"})
+        {
+            if (value.indexOf(UnownedStringSlice(model)) != Index(-1))
+                return true;
+        }
+    }
+    return false;
+}
+
+/// Returns the flag of the downstream tool that `slangc -validate-with-downstream-compiler` uses
+/// to validate the output of the test with the given arguments, or 0 if the option needs no tool
+/// that `slang-test` can check.
+///
+/// `_getPassThroughFlagsForTarget` cannot be used for this, because it returns 0 for the text
+/// targets: a test with `-target metal` does not need a downstream compiler to run, but its
+/// validation does. A binary target such as `metallib` is not in this mapping, because `slangc`
+/// already runs its downstream compiler on it. A target with no downstream tool is not in this
+/// mapping either: `slangc` reports an error for it, and that error is a real test failure.
+static PassThroughFlags _getValidationPassThroughFlags(const List<String>& args)
+{
+    switch (_findTargetInArgs(args))
+    {
+    case SLANG_SPIRV:
+    case SLANG_SPIRV_ASM:
+    case SLANG_GLSL:
+        return PassThroughFlag::Glslang;
+    case SLANG_HLSL:
+        return _usesShaderModel6OrHigher(args) ? PassThroughFlag::Dxc : PassThroughFlag::Fxc;
+    case SLANG_METAL:
+        return PassThroughFlag::Metal;
+    case SLANG_WGSL:
+        return PassThroughFlag::Tint;
+    case SLANG_CUDA_SOURCE:
+        return PassThroughFlag::NVRTC;
+    case SLANG_CPP_SOURCE:
+    case SLANG_HOST_CPP_SOURCE:
+        return PassThroughFlag::Generic_C_CPP;
+    default:
+        return 0;
+    }
+}
+
+/// Prints a warning for each target whose `-validate-with-downstream-compiler` validation `SIMPLE`
+/// tests skip, because the machine does not have the downstream tool.
+///
+/// `runSimpleTest` removes the option from the `slangc` command line in this case. Without the
+/// warning, a run on a machine without the tool (for example, the Metal compiler on Linux) would
+/// not tell that these checks did not happen.
+static void _reportDisabledDownstreamValidation(TestContext* context)
+{
+    struct ValidationTool
+    {
+        const char* targetName;
+        PassThroughFlags flag;
+        const char* toolName;
+    };
+    static const ValidationTool tools[] = {
+        {"spirv", PassThroughFlag::Glslang, "SPIR-V validator (slang-glslang)"},
+        {"glsl", PassThroughFlag::Glslang, "glslang"},
+        {"hlsl (shader model 6 and higher)", PassThroughFlag::Dxc, "DXC"},
+        {"hlsl (shader model 5.1 and lower)", PassThroughFlag::Fxc, "FXC"},
+        {"metal", PassThroughFlag::Metal, "Metal compiler"},
+        {"wgsl", PassThroughFlag::Tint, "Tint"},
+        {"cuda", PassThroughFlag::NVRTC, "NVRTC"},
+        {"cpp", PassThroughFlag::Generic_C_CPP, "C++ compiler"},
+    };
+    for (const auto& tool : tools)
+    {
+        if (context->availableBackendFlags & tool.flag)
+            continue;
+        StdWriters::getOut().print(
+            "warning: %s not found; %s is removed from SIMPLE tests with -target %s\n",
+            tool.toolName,
+            kValidateWithDownstreamCompilerOption,
+            tool.targetName);
     }
 }
 
@@ -3437,12 +3552,19 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
-/// Checks the exit code of the tool under test for a FileCheck test.
+/// Checks the exit code of the tool under test for a FileCheck test or a diagnostic test.
 ///
-/// A FileCheck test only looks at the text of the output, so it does not notice when the tool
-/// fails. A test that expects a failure says so with `exit-code=N`. Tests that compare with an
-/// `.expected` file already check the result code, because it is a part of the text they compare.
-/// Diagnostic tests (`diag=`) do not check it yet (#14266).
+/// A FileCheck test or a diagnostic test only looks at the text of the output, so it does not
+/// notice when the tool fails, or when it does not fail. The expected exit code is 0 for a
+/// FileCheck test and -1 (a failed compilation) for a diagnostic test (`diag=`), because a
+/// diagnostic test usually checks an error. A test that expects another value says so with
+/// `exit-code=N`, for example a diagnostic test that has only warnings uses `exit-code=0`. N must
+/// be 0 (success), -1 (the compilation failed because of errors in the input) or 1 (the command
+/// line was invalid, or the tool failed to run), as in the exit codes that `slangc -help` lists.
+/// The test fails for another value. The exit code -2 is never an expected result, because it
+/// reports an internal compiler error, which is a bug in the compiler.
+/// Tests that compare with an `.expected` file do not need this check, because the result code is
+/// a part of the text they compare.
 ///
 /// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
 /// exit code is not the expected one, after it reports the mismatch.
@@ -3456,13 +3578,13 @@ static bool _checkExpectedExitCode(
 
     String diagPrefix;
     String fileCheckPrefix;
-    if (input.testOptions->getDiagTestPrefix(diagPrefix) ||
-        !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+    const bool isDiagTest = input.testOptions->getDiagTestPrefix(diagPrefix);
+    if (!isDiagTest && !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
         return true;
 
     auto reporter = context->getTestReporter();
 
-    int expectedExitCode = 0;
+    int expectedExitCode = isDiagTest ? -1 : 0;
     String exitCodeOption;
     if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
     {
@@ -3471,7 +3593,23 @@ static bool _checkExpectedExitCode(
         {
             reporter->message(
                 TestMessageType::TestFailure,
-                "the value of `exit-code` must be an integer");
+                "the value of `exit-code` must be -1, 0 or 1");
+            return false;
+        }
+        if (parsedExitCode == int(ToolReturnCode::InternalCompilerError))
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "`exit-code=-2` is not allowed, because -2 reports an internal compiler error. "
+                "A test must never expect an internal compiler error. Fix the compiler bug "
+                "instead");
+            return false;
+        }
+        if (parsedExitCode < -1 || parsedExitCode > 1)
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "the value of `exit-code` must be -1, 0 or 1");
             return false;
         }
         expectedExitCode = int(parsedExitCode);
@@ -3510,10 +3648,21 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         cmdLine.addArg("-enable-machine-readable-diagnostics");
     }
 
+    // `slangc` reports an error if `-validate-with-downstream-compiler` is given and the downstream
+    // tool for the target is missing. A test cannot know which tools the machine has, so we remove
+    // the option here when the tool is missing. Only `SIMPLE` tests do this; the test runners that
+    // pass the option to `slangc` otherwise get the error.
+    const PassThroughFlags validationFlags =
+        _getValidationPassThroughFlags(input.testOptions->args);
+    const bool removeValidationOption =
+        (validationFlags & context->availableBackendFlags) == 0 && validationFlags != 0;
+
     for (auto arg : input.testOptions->args)
     {
         // Filter out slang-test specific options that shouldn't be passed to slangc
         if (arg == kPreserveEmbeddedSourceOption)
+            continue;
+        if (removeValidationOption && arg == kValidateWithDownstreamCompilerOption)
             continue;
         cmdLine.addArg(arg);
     }
@@ -3536,16 +3685,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     }
 
     // See what kind of target it is
-    SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
-    {
-        const auto& args = input.testOptions->args;
-        const Index targetIndex = args.indexOf("-target");
-        if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
-        {
-            target =
-                TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
-        }
-    }
+    const SlangCompileTarget target = _findTargetInArgs(input.testOptions->args);
 
     // If it's executable we run it and use it's output
     if (target == SLANG_HOST_EXECUTABLE)
@@ -7573,6 +7713,8 @@ SlangResult innerMain(int argc, char** argv)
     // sm_6_6.
     _disableD3D12Backend(&context);
 #endif
+
+    _reportDisabledDownstreamValidation(&context);
 
     // If -only-api-detection mode, run API detection and exit
     if (options.apiDetectionOnly)

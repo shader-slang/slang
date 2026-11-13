@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#failure-modes
-//META: doc_section_digest=1690bc07bc351f6d57ef0cbfbdf90dd7a3a711d8e434d872c178e166712d1f85
+//META: doc_section_digest=9aab17755318b3eba1171ef991b0e4f492c51e9b08946482351cebd403903cdb
 //META: purpose=A bare discarded constructor call is deliberately excluded from the `[NoDiscard]` check, so only the discarded ordinary call in the same body is reported (E30059).
 //META: intent=boundary
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-11T00:00:00+00:00
 //META: source_commit=48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#-disambiguation
-//META: doc_section_digest=5bdf1269b8206a09e76ed3099e3be23084e5fadaadeeb860053823b4f5e48c23
+//META: doc_section_digest=9af1f98685cb612077da94d031ef06cdcc2d4768b2522616e45c9ae531a49988
 //META: purpose=Inside an open generic argument list `>` is unavailable as an operator even when parenthesised, while `<` keeps its normal precedence.
 //META: intent=negative
 //META: pipeline_stage=parse

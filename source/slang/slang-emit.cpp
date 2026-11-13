@@ -47,6 +47,7 @@
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-eliminate-undefined-opaque-handles.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -2810,6 +2811,7 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         SLANG_PASS(performIntrinsicFunctionInlining);
+        SLANG_PASS(eliminateUndefinedOpaqueHandles, codeGenContext);
     }
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
@@ -3036,6 +3038,8 @@ Result linkAndOptimizeIR(
     // We check D3D and Metal resource locals after all passes that can create mutable storage.
     // Minimum-optimization mode must still reject storage that its target cannot represent.
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
+    if (isD3DTarget(targetRequest))
+        SLANG_PASS(validateGroupSharedParamsForHLSL, targetRequest->getTargetCaps(), sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 
@@ -3584,6 +3588,10 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
     if (optionSet.getBoolOption(CompilerOptionName::SkipSPIRVValidation) ||
         optionSet.getBoolOption(CompilerOptionName::IncompleteLibrary))
         return false;
+
+    // `-validate-with-downstream-compiler` asks for validation without the environment variable.
+    if (optionSet.getBoolOption(CompilerOptionName::ValidateWithDownstreamCompiler))
+        return true;
 
     // Also check the environment variable SLANG_RUN_SPIRV_VALIDATION.
     // If it is set to "1", we should run validation.

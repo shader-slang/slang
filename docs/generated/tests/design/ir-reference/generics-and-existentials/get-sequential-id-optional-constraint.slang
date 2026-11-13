@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#getsequentialid-and-the-rtti-opcodes
-//META: doc_section_digest=a789a094a16866471bb7f9bae4e2fb95190f82569e1b003a48307aa07a9eaf9c
+//META: doc_section_digest=d30beb040d16a57ce7efa305234efe3327c699b6b660c33dd892fc6226b3052d
 //META: purpose=An optional-constraint check lowers to GetSequentialID on the constraint's witness table, yielding a UInt compared against the sentinel none id.
 //META: intent=functional
 //META: pipeline_stage=lower

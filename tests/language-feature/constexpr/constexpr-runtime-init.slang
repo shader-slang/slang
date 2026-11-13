@@ -3,7 +3,7 @@
 // as a runtime-initialized const — the rewrite does not impose a
 // compile-time-constant requirement on the initializer.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv
 
 //CHECK: constexpr on variable declarations is not a supported Slang feature
 

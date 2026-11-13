@@ -126,6 +126,18 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         case kIROp_BoolType:
         case kIROp_CharType:
             return kIROp_CUDALDG;
+        case kIROp_PtrType:
+            {
+                // `__ldg` has no pointer overload. A pointer is 64 bits on CUDA, so load its bits
+                // through the 64-bit integer overload and cast them back to the pointer type.
+                IRParam* ptrParam = nullptr;
+                auto func = createLoadFunc(builder, type, ptrParam);
+                auto bitsType = builder.getUInt64Type();
+                auto bitsPtr = builder.emitBitCast(builder.getPtrType(bitsType), ptrParam);
+                auto bits = builder.emitIntrinsicInst(bitsType, kIROp_CUDALDG, 1, &bitsPtr);
+                builder.emitReturn(builder.emitBitCast(type, bits));
+                return func;
+            }
         case kIROp_VectorType:
             {
                 // For vector types that has a direct mapping to CUDA __ldg,

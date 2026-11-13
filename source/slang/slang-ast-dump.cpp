@@ -744,7 +744,10 @@ struct ASTDumpContext
 
     void dump(const SPIRVAsmExpr& expr)
     {
-        m_writer->emit("spirv_asm\n");
+        m_writer->emit("spirv_asm");
+        if (expr.assumeValidResourceOperands)
+            m_writer->emit(" [__assumeValidResourceOperands]");
+        m_writer->emit("\n");
         m_writer->emit("{\n");
         m_writer->indent();
         for (const auto& i : expr.insts)
