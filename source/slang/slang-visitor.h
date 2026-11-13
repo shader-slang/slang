@@ -295,6 +295,11 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         e->valueArg = dispatchIfNotNull(e->valueArg);
         return e;
     }
+    Expr* visitMakeExistentialBoxExpr(MakeExistentialBoxExpr* e)
+    {
+        e->valueExpr = dispatchIfNotNull(e->valueExpr);
+        return e;
+    }
     Expr* visitModifierCastExpr(ModifierCastExpr* e)
     {
         e->valueArg = dispatchIfNotNull(e->valueArg);
@@ -341,6 +346,18 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     {
         e->value = dispatchIfNotNull(e->value);
         e->typeExpr = dispatchIfNotNull(e->typeExpr);
+        return e;
+    }
+    Expr* visitOpenedExistentialTypeTestExpr(OpenedExistentialTypeTestExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        e->targetType.exp = dispatchIfNotNull(e->targetType.exp);
+        return e;
+    }
+    Expr* visitOpenedExistentialTypeCastExpr(OpenedExistentialTypeCastExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        e->targetType.exp = dispatchIfNotNull(e->targetType.exp);
         return e;
     }
     Expr* visitMakeOptionalExpr(MakeOptionalExpr* e)
@@ -486,6 +503,11 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     {
         e->left.exp = dispatchIfNotNull(e->left.exp);
         e->right.exp = dispatchIfNotNull(e->right.exp);
+        return e;
+    }
+    Expr* visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* e)
+    {
+        e->interfaceType.exp = dispatchIfNotNull(e->interfaceType.exp);
         return e;
     }
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* e)

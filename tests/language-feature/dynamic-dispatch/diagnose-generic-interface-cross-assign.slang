@@ -26,6 +26,6 @@ void computeMain()
     IProcessor<float> obj = FloatDoubler();
     obj = IntDoubler();
 //CHECK:            ^ type mismatch in expression
-//CHECK:            ^ expected an expression of type 'IProcessor<float>', got 'IntDoubler'
+//CHECK:            ^ expected an expression of type 'dyn IProcessor<float>', got 'IntDoubler'
     outputBuffer[0] = obj.process(5.0);
 }

@@ -48,11 +48,11 @@ rt::ClosestHitInput<TestHitContext> invalidResult();
 [require(closesthit)]
 void invalidInterfaceValue(rt::IClosestHitShader stage) {}
 //CHECK:                                         ^^^^^ runtime use of a structural ray-tracing stage type
-//CHECK:                                         ^^^^^ structural ray-tracing stage type 'rt.IClosestHitShader' has no runtime representation
+//CHECK:                                         ^^^^^ structural ray-tracing stage type 'dyn rt.IClosestHitShader' has no runtime representation
 
 Optional<rt::IMissShader> invalidOptionalStage;
 //CHECK:                  ^^^^^^^^^^^^^^^^^^^^ runtime use of a structural ray-tracing stage type
-//CHECK:                  ^^^^^^^^^^^^^^^^^^^^ structural ray-tracing stage type 'Optional<rt.IMissShader>' has no runtime representation
+//CHECK:                  ^^^^^^^^^^^^^^^^^^^^ structural ray-tracing stage type 'Optional<dyn rt.IMissShader>' has no runtime representation
 
 struct InvalidPropertyContainer
 {

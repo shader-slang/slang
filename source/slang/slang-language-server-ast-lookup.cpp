@@ -364,6 +364,10 @@ public:
     {
         return dispatchIfNotNull(expr->valueArg);
     }
+    bool visitMakeExistentialBoxExpr(MakeExistentialBoxExpr* expr)
+    {
+        return dispatchIfNotNull(expr->valueExpr);
+    }
     bool visitModifierCastExpr(ModifierCastExpr* expr) { return dispatchIfNotNull(expr->valueArg); }
     bool visitLetExpr(LetExpr* expr)
     {
@@ -470,6 +474,10 @@ public:
             return true;
         return dispatchIfNotNull(expr->right.exp);
     }
+    bool visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* expr)
+    {
+        return dispatchIfNotNull(expr->interfaceType.exp);
+    }
     bool visitPointerTypeExpr(PointerTypeExpr* expr)
     {
         if (_isLocInRange(context, expr->loc, 0))
@@ -493,6 +501,18 @@ public:
         if (dispatchIfNotNull(expr->value))
             return true;
         return dispatchIfNotNull(expr->typeExpr.exp);
+    }
+    bool visitOpenedExistentialTypeTestExpr(OpenedExistentialTypeTestExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->value))
+            return true;
+        return dispatchIfNotNull(expr->targetType.exp);
+    }
+    bool visitOpenedExistentialTypeCastExpr(OpenedExistentialTypeCastExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->value))
+            return true;
+        return dispatchIfNotNull(expr->targetType.exp);
     }
     bool visitMakeOptionalExpr(MakeOptionalExpr* expr)
     {

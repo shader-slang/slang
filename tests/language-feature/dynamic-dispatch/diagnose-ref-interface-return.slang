@@ -1,17 +1,15 @@
-// Tests that ref accessors returning interface types are rejected (#10244).
+// Tests ref accessors whose return types contain existential boxes (#10244).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
 
-// Returning a reference to an interface-typed value is incompatible
-// with dynamic dispatch. Interface values are stored as existential
-// tuples (RTTI + WitnessTableID + AnyValue), and a reference into
-// that storage bypasses the pack/unpack mechanism needed for AnyValue
-// marshalling. Read-only access may appear to work, but mutation
-// through such a reference corrupts the AnyValue buffer and crashes
-// at runtime (segfault observed on CPU target).
+// These cases use the legacy convention of writing `IFoo` where the stored value has type
+// `dyn IFoo`. For boxes over non-COM, non-builtin interfaces, the compiler stores concrete
+// payloads in AnyValue storage. Taking a reference into that storage bypasses the packing
+// and unpacking used to access those payloads, so mutation through the reference can corrupt
+// the storage.
 //
-// This test verifies that the compiler rejects ref accessors when
-// the value type is or contains a dynamic-dispatch interface.
+// The compiler rejects `ref` accessors whose return types contain such boxes, including
+// boxes nested inside other types.
 
 [anyValueSize(16)]
 interface IFoo
@@ -34,7 +32,7 @@ struct ImplB : IFoo
     [mutating] void setValue(float nv) { v = nv; }
 }
 
-// Scenario 1: Property ref accessor with direct interface type.
+// Scenario 1: Property ref accessor returning `dyn IFoo`.
 struct ContainerPropRef
 {
     IFoo stored;
@@ -43,11 +41,11 @@ struct ContainerPropRef
         get { return stored; }
         ref { return stored; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'dyn IFoo' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
-// Scenario 2: Subscript ref accessor with direct interface type.
+// Scenario 2: Subscript ref accessor returning `dyn IFoo`.
 struct CollectionSubRef
 {
     IFoo items[2];
@@ -56,11 +54,11 @@ struct CollectionSubRef
         get { return items[i]; }
         ref { return items[i]; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'dyn IFoo' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
-// Scenario 3: Property ref accessor with struct containing interface.
+// Scenario 3: Property ref accessor returning a struct that contains an existential box.
 struct Wrapper
 {
     IFoo item;
@@ -74,11 +72,11 @@ struct ContainerStructRef
         get { return w; }
         ref { return w; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Wrapper' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Wrapper' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
-// Scenario 4: Property ref accessor with Tuple containing interface.
+// Scenario 4: Property ref accessor returning a tuple that contains an existential box.
 typealias TupleWithInterface = Tuple<IFoo, float>;
 
 struct ContainerTupleRef
@@ -89,11 +87,11 @@ struct ContainerTupleRef
         get { return t; }
         ref { return t; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Tuple<IFoo, float>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Tuple<dyn IFoo, float>' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
-// Scenario 5: Property ref accessor with Optional containing interface.
+// Scenario 5: Property ref accessor returning an optional existential box.
 struct ContainerOptionalRef
 {
     Optional<IFoo> opt;
@@ -102,12 +100,13 @@ struct ContainerOptionalRef
         get { return opt; }
         ref { return opt; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Optional<IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Optional<dyn IFoo>' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
-// Scenario 6: Generic struct with interface type parameter.
-// The check must apply generic substitutions to see through Box<IFoo>.
+// Scenario 6: A ref accessor returning `Box<dyn IFoo>`.
+// In the legacy spelling `Box<IFoo>`, the type argument `IFoo` is implicitly converted to
+// `dyn IFoo`, so the `T item` field has type `dyn IFoo`.
 struct Box<T>
 {
     T item;
@@ -121,11 +120,11 @@ struct ContainerGenericRef
         get { return b; }
         ref { return b; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Box<IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Box<dyn IFoo>' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
-// Scenario 7: Array of interface type.
+// Scenario 7: Array of existential boxes.
 struct ContainerArrayRef
 {
     IFoo arr[4];
@@ -134,11 +133,11 @@ struct ContainerArrayRef
         get { return arr; }
         ref { return arr; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'IFoo[4]' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'dyn IFoo[4]' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
-// Scenario 8: Nested depth > 1 (struct containing struct containing interface).
+// Scenario 8: A struct whose nested struct contains an existential box.
 struct Inner
 {
     IFoo item;
@@ -157,13 +156,13 @@ struct ContainerNestedRef
         get { return o; }
         ref { return o; }
 //CHECK:^^^ ref accessor incompatible with dynamic dispatch
-//CHECK:^^^ 'ref' accessor returning type 'Outer' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+//CHECK:^^^ 'ref' accessor returning type 'Outer' is incompatible with dynamic dispatch because the compiler uses AnyValue marshalling for an existential box in the return type.
     }
 }
 
 // --- Positive tests: these should NOT produce error 52012 ---
 
-// Positive 1: ref accessor on a concrete (non-interface) type is fine.
+// Positive 1: A ref accessor returning `float` is allowed.
 struct ContainerConcreteRef
 {
     float stored;
@@ -174,7 +173,7 @@ struct ContainerConcreteRef
     }
 }
 
-// Positive 2: get-only accessor on interface type is fine (no ref).
+// Positive 2: A get-only accessor returning an existential box is allowed.
 struct ContainerGetOnly
 {
     IFoo stored;
@@ -184,7 +183,7 @@ struct ContainerGetOnly
     }
 }
 
-// Positive 3: get/set accessor on interface type is fine (no ref).
+// Positive 3: Get/set accessors for an existential box are allowed.
 struct ContainerSetOnly
 {
     IFoo stored;
@@ -195,7 +194,8 @@ struct ContainerSetOnly
     }
 }
 
-// Positive 4: COM interface with ref accessor is fine (COM uses vtable, not AnyValue).
+// Positive 4: A ref accessor returning a COM box is allowed because the compiler uses a vtable
+// for COM interface dispatch instead of AnyValue marshalling.
 [COM("BE18F5D2-4522-4AB0-A6EE-1D157FA2B084")]
 interface ICom
 {

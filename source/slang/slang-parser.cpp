@@ -123,6 +123,22 @@ public:
     /// Returns the single effective source language used for every dialect-specific parse rule.
     SourceLanguage getSourceLanguage() const { return options.sourceLanguage; }
 
+    /// Return the module's effective version, or the caller-supplied version for a term snippet.
+    ///
+    /// Term parsing has no `ModuleDecl`; we use the caller-supplied version to parse parentheses
+    /// and type modifiers. When parsing source modules, we read the module's current version so
+    /// language-version upgrades stay visible.
+    SlangLanguageVersion getLanguageVersion()
+    {
+        return currentModule ? currentModule->languageVersion
+                             : options.optionSet.getLanguageVersion();
+    }
+
+    /// Return the root for `::` lookup in a source module or a standalone term.
+    ///
+    /// Returns the caller's program-wide lookup scope for standalone reflection terms.
+    Scope* getGlobalScope() const { return currentModule ? currentModule->ownedScope : outerScope; }
+
     int anonymousCounter = 0;
 
     // Numbers of times we are peeking the same token at `ReadToken` without advancing in
@@ -2224,6 +2240,11 @@ public:
         if (expr->base.exp)
             dispatch(expr->base.exp);
     }
+    void visitExistentialBoxTypeExpr(ExistentialBoxTypeExpr* expr)
+    {
+        if (expr->interfaceType.exp)
+            dispatch(expr->interfaceType.exp);
+    }
     void visitPointerTypeExpr(PointerTypeExpr* expr)
     {
         if (expr->base.exp)
@@ -3702,12 +3723,18 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     {
         typeExpr = parsePrefixExpr(parser);
     }
-    // Uncomment should we decide to enable (a,b,c) tuple types
-    // else if(parser->LookAheadToken(TokenType::LParent))
-    // {
-    //     typeSpec.expr = parseTupleTypeExpr(parser);
-    //     return typeSpec;
-    // }
+    else if (parser->LookAheadToken(TokenType::LParent))
+    {
+        // We already know that a type is required, so parentheses group a type expression.
+        // Using `ParseType` avoids the cast heuristics of expression parsing. For example,
+        // `typealias T = (IFoo & IBar);` must group the conjunction rather than parse a cast.
+        auto openParen = parser->ReadToken(TokenType::LParent);
+        auto parenExpr = parser->astBuilder->create<ParenExpr>();
+        parenExpr->loc = openParen.loc;
+        parenExpr->base = parser->ParseType();
+        parser->ReadToken(TokenType::RParent);
+        typeExpr = parenExpr;
+    }
     else if (AdvanceIf(parser, "functype"))
     {
         typeSpec.expr = parseFuncTypeExpr(parser);
@@ -3720,23 +3747,29 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     }
     else
     {
-        bool inGlobalScope = false;
-        if (AdvanceIf(parser, TokenType::Scope))
+        // Type expressions share registered expression syntax with generic arguments and casts.
+        // We consult the same `SyntaxDecl` machinery as `parseAtomicExpr` so a type operator has
+        // one parser callback regardless of the context in which it appears.
+        if (!tryParseUsingSyntaxDecl<Expr>(parser, &typeExpr))
         {
-            inGlobalScope = true;
+            bool inGlobalScope = false;
+            if (AdvanceIf(parser, TokenType::Scope))
+            {
+                inGlobalScope = true;
+            }
+
+            Token typeName = parser->ReadToken(TokenType::Identifier);
+
+            auto basicType = parser->astBuilder->create<VarExpr>();
+            if (inGlobalScope)
+                basicType->scope = parser->getGlobalScope();
+            else
+                basicType->scope = parser->currentLookupScope;
+            basicType->loc = typeName.loc;
+            basicType->name = typeName.getNameOrNull();
+
+            typeExpr = basicType;
         }
-
-        Token typeName = parser->ReadToken(TokenType::Identifier);
-
-        auto basicType = parser->astBuilder->create<VarExpr>();
-        if (inGlobalScope)
-            basicType->scope = parser->currentModule->ownedScope;
-        else
-            basicType->scope = parser->currentLookupScope;
-        basicType->loc = typeName.loc;
-        basicType->name = typeName.getNameOrNull();
-
-        typeExpr = basicType;
     }
 
     bool shouldLoop = true;
@@ -8130,6 +8163,18 @@ static Expr* _parseAtomicTypeExpr(Parser* parser, bool allowDecl)
     return typeSpec.expr;
 }
 
+/// Parse the qualified type primary after the `dyn` keyword.
+///
+/// Consider `typealias P = dyn N::IFoo<int>*;`. We parse `N::IFoo<int>` as the operand and leave
+/// the `*` for the enclosing type parser, which forms a pointer to the existential box. Parentheses
+/// can group a complete operand, as in `dyn (IFoo & IBar)`; semantic checking then validates it.
+static NodeBase* parseExistentialBoxTypeExpr(Parser* parser, void* /* unused */)
+{
+    auto expr = parser->astBuilder->create<ExistentialBoxTypeExpr>();
+    expr->interfaceType = TypeExp(_parseAtomicTypeExpr(parser, false));
+    return expr;
+}
+
 /// Parse a postfix type expression.
 ///
 /// A postfix type expression is an atomic type expression followed
@@ -8714,6 +8759,46 @@ static IntegerLiteralValue _fixIntegerLiteral(
     return value;
 }
 
+/// Return whether `tokenType` can follow a pointer type suffix in expression parsing.
+///
+/// Delimiters end the type; `[`, another `*`, and `.` can continue it with an array suffix,
+/// another pointer suffix, or member access. A caller that also accepts unary dereferences must
+/// distinguish the remaining stars first.
+static bool canFollowPointerTypeSuffix(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+    case TokenType::Comma:
+    case TokenType::RParent:
+    case TokenType::OpGreater:
+    case TokenType::OpRsh:
+    case TokenType::Colon:
+    case TokenType::Semicolon:
+    case TokenType::LBracket:
+    case TokenType::OpMul:
+    case TokenType::Dot:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// Return whether the stars after a parenthesized type form pointer type suffixes.
+///
+/// Requires the next token to be `*`.
+///
+/// Consider `Holder<(dyn IFoo)**>` and `(dyn IFoo)**value`. In the first spelling, `>` ends the
+/// pointer type. In the second, `value` supplies the operand of two unary dereferences. We look
+/// past every `*` before deciding because a single `*` can begin either spelling.
+static bool isPointerTypeSuffixAfterParentheses(Parser* parser)
+{
+    SLANG_RELEASE_ASSERT(peekTokenType(parser) == TokenType::OpMul);
+    TokenReader tokens = parser->tokenReader;
+    while (tokens.peekTokenType() == TokenType::OpMul)
+        tokens.advanceToken();
+    return canFollowPointerTypeSuffix(tokens.peekTokenType());
+}
+
 static bool _isCast(Parser* parser, Expr* expr)
 {
     // These nodes always denote types, so a following `+` or `-` starts a unary cast operand.
@@ -8785,6 +8870,20 @@ static bool _isCast(Parser* parser, Expr* expr)
     case TokenType::OpMul:
     case TokenType::OpBitAnd:
         {
+            // A `dyn` type expression cannot be a value operand of these binary operators.
+            // A star can instead extend the grouped type, as in `Holder<(dyn IFoo)*>`; we leave
+            // those suffixes for `parsePostfixExpr`. A following operand, as in `(dyn IFoo)*value`,
+            // still makes this a cast of a dereferenced value.
+            if (as<ExistentialBoxTypeExpr>(expr))
+            {
+                if (tokenType == TokenType::OpMul)
+                {
+                    if (isPointerTypeSuffixAfterParentheses(parser))
+                        return false;
+                }
+                return true;
+            }
+
             // + - are ambiguous, it could be a binary + or - so -> expression, or unary -> cast
             //
             // (Some::Stuff) + 3
@@ -9306,7 +9405,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 Expr* base = nullptr;
                 if (parser->LookAheadToken(TokenType::RParent))
                 {
-                    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    if (parser->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // We support empty parentheses `()` as a valid expression to construct an
                         // empty tuple in Slang 2026.
@@ -9331,7 +9430,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     //
                     Precedence exprLevel = Precedence::Comma;
                     if (parser->getSourceLanguage() == SourceLanguage::Slang &&
-                        parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                        parser->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // Setting exprLevel to Assignment here will allow the following
                         // tryParseExpression call to parse the expression until the next `)` or
@@ -9498,9 +9597,7 @@ static Expr* parseAtomicExpr(Parser* parser)
         {
             parser->ReadToken(TokenType::Scope);
             VarExpr* varExpr = parser->astBuilder->create<VarExpr>();
-            varExpr->scope = parser->currentScope;
-            while (varExpr->scope && !as<ModuleDecl>(varExpr->scope->containerDecl))
-                varExpr->scope = varExpr->scope->parent;
+            varExpr->scope = parser->getGlobalScope();
             parser->FillPosition(varExpr);
 
             auto nameToken = peekToken(parser);
@@ -9682,26 +9779,11 @@ static Expr* parsePostfixExpr(Parser* parser)
             break;
         case TokenType::OpMul:
             {
-                // We may have a pointer type expr, e.g. T*, or the `*` is a mul operator.
-                // We can easily disambiguate by looking ahead of `*`, if the token after it
-                // is `,`, `>`, `)` or `>>`, then it must be a type postfix.
-                auto lookahead = peekTokenType(parser, 1);
-                switch (lookahead)
-                {
-                case TokenType::Comma:
-                case TokenType::RParent:
-                case TokenType::OpGreater:
-                case TokenType::OpRsh:
-                case TokenType::Colon:
-                case TokenType::Semicolon:
-                case TokenType::LBracket:
-                case TokenType::OpMul:
-                case TokenType::Dot:
-                    expr = parsePostfixTypeSuffix(parser, expr);
-                    break;
-                default:
+                // A delimiter ends a pointer type, while another suffix can continue it.
+                // Otherwise, expression parsing leaves this `*` for multiplication.
+                if (!canFollowPointerTypeSuffix(peekTokenType(parser, 1)))
                     return expr;
-                }
+                expr = parsePostfixTypeSuffix(parser, expr);
             }
             break;
         }
@@ -10404,13 +10486,15 @@ Expr* parseTermFromSourceFile(
     DiagnosticSink* sink,
     Scope* outerScope,
     NamePool* namePool,
-    SourceLanguage sourceLanguage)
+    SourceLanguage sourceLanguage,
+    SlangLanguageVersion languageVersion)
 {
     ParserOptions options;
     options.sourceLanguage = sourceLanguage;
+    options.optionSet.set(CompilerOptionName::LanguageVersion, languageVersion);
     options.stage = ParsingStage::Body;
     Parser parser(astBuilder, tokens, sink, outerScope, options);
-    parser.currentScope = outerScope;
+    parser.PushScope(outerScope);
     parser.namePool = namePool;
     return parser.ParseExpression();
 }
@@ -10740,7 +10824,7 @@ static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
     if ((parser->getSourceLanguage() != SourceLanguage::GLSL) &&
-        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026))
+        (parser->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2026))
     {
         parser->sink->diagnose(Diagnostics::RemovedModifierUsage{
             .modifierName = "volatile",
@@ -10749,7 +10833,7 @@ static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
     }
     else if (
         (parser->getSourceLanguage() != SourceLanguage::GLSL) &&
-        (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
+        (parser->getLanguageVersion() >= SLANG_LANGUAGE_VERSION_2025))
     {
         parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{
             .modifierName = "volatile",
@@ -11235,8 +11319,6 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("param", getSyntaxClass<ParamModifier>()),
     _makeParseModifier("extern", getSyntaxClass<ExternModifier>()),
 
-    _makeParseModifier("dyn", getSyntaxClass<DynModifier>()),
-
     _makeParseModifier("row_major", getSyntaxClass<HLSLRowMajorLayoutModifier>()),
     _makeParseModifier("column_major", getSyntaxClass<HLSLColumnMajorLayoutModifier>()),
 
@@ -11306,6 +11388,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     // !!!!!!!!!!!!!!!!!!!!!!! Expr !!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     _makeParseExpr("this", parseThisExpr),
+    _makeParseExpr("dyn", parseExistentialBoxTypeExpr),
     _makeParseExpr("true", parseTrueExpr),
     _makeParseExpr("false", parseFalseExpr),
     _makeParseExpr("__return_val", parseReturnValExpr),

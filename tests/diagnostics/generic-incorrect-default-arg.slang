@@ -28,13 +28,13 @@ struct Impl2
 };
 
 __generic<T : ITest = Impl2>
-//CHECK:              ^^^^^ type argument doesn't conform to interface
 struct GenStruct
 {
 	T obj;
 };
 
 int test(GenStruct gs, int val)
+//CHECK: ^^^^^^^^^ type argument doesn't conform to interface
 {
 	return gs.obj.doThing(val);
 }

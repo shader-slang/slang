@@ -444,6 +444,81 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
     ctx().reset();
 }
 
+// A 202c replay must recover `dyn IFoo` separately from the interface metadata for `IFoo`.
+// We record their owning module and full names, then replay their lookup and compare the
+// recovered types.
+SLANG_UNIT_TEST(replayContextTypeReflectionExistentialBox)
+{
+    REPLAY_TEST;
+    ctx().enable();
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+
+    slang::CompilerOptionEntry languageVersion = {};
+    languageVersion.name = slang::CompilerOptionName::LanguageVersion;
+    languageVersion.value.kind = slang::CompilerOptionValueKind::Int;
+    languageVersion.value.intValue0 = SLANG_LANGUAGE_VERSION_202C;
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+    sessionDesc.compilerOptionEntries = &languageVersion;
+    sessionDesc.compilerOptionEntryCount = 1;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    const char* source = R"(
+        public interface IFoo {}
+        public dyn IFoo value;
+    )";
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "existential-box-replay",
+        "existential-box-replay.slang",
+        source,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+    auto layout = module->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+
+    auto boxType = layout->findTypeByName("dyn IFoo");
+    auto interfaceType = layout->findTypeByName("IFoo");
+    SLANG_CHECK_ABORT(boxType != nullptr);
+    SLANG_CHECK_ABORT(interfaceType != nullptr);
+    ctx().record(RecordFlag::Input, boxType);
+    ctx().record(RecordFlag::Input, interfaceType);
+
+    ctx().switchToPlayback();
+    ctx().executeNextCall(); // We replay `slang_createGlobalSession`.
+    ctx().executeNextCall(); // We replay `globalSession->findProfile`.
+    ctx().executeNextCall(); // We replay `globalSession->createSession`.
+    ctx().executeNextCall(); // We replay `session->loadModuleFromSourceString`.
+    ctx().executeNextCall(); // We replay `module->getLayout`.
+
+    slang::TypeReflection* readBox = nullptr;
+    slang::TypeReflection* readInterface = nullptr;
+    ctx().record(RecordFlag::Input, readBox);
+    ctx().record(RecordFlag::Input, readInterface);
+    SLANG_CHECK_ABORT(readBox != nullptr);
+    SLANG_CHECK_ABORT(readInterface != nullptr);
+    SLANG_CHECK(readBox != readInterface);
+    ComPtr<ISlangBlob> boxName;
+    ComPtr<ISlangBlob> interfaceName;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readBox->getFullName(boxName.writeRef())));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readInterface->getFullName(interfaceName.writeRef())));
+    SLANG_CHECK_ABORT(boxName != nullptr);
+    SLANG_CHECK_ABORT(interfaceName != nullptr);
+    SLANG_CHECK(strcmp((const char*)boxName->getBufferPointer(), "dyn IFoo") == 0);
+    SLANG_CHECK(strcmp((const char*)interfaceName->getBufferPointer(), "IFoo") == 0);
+
+    ctx().reset();
+}
+
 SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
 {
     REPLAY_TEST;

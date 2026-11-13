@@ -9,20 +9,23 @@ This chapter covers two interrelated Slang language features: interfaces and gen
 
 ## Interfaces
 
-Interfaces are used to define the methods and services a type should provide. You can define an interface as in the following example:
+An interface defines a *contract*: a set of related operations, types, and other services.
+A type can be made to *conform* to an interface, by providing all of the services defined by the interface contract.
 
-```csharp
+The following is an example of an interface declaration:
+
+```slang
 interface IFoo
 {
     int myMethod(float arg);
 }
 ```
 
-Slang's syntax for defining interfaces is similar to `interface`s in C# and `protocol`s in Swift. In this example, the `IFoo` interface establishes a contract that any type conforming to this interface must provide a method named `myMethod` that accepts a `float` argument and returns an `int` value.
+In the above example, the `IFoo` interface establishes a contract: for a type to conform to this interface, a method must be provided named `myMethod` that accepts a `float` value and returns an `int` value.
 
-A `struct` type may declare its conformance to an `interface` via the following syntax:
+A user-defined type such as a `struct` may declare that it conforms to an interface by naming that interface in its list of bases:
 
-```csharp
+```slang
 struct MyType : IFoo
 {
     int myMethod(float arg)
@@ -32,11 +35,12 @@ struct MyType : IFoo
 }
 ```
 
-By declaring the conformance to `IFoo`, the definition of `MyType` must include a method named `myMethod` with a matching signature to that defined in the `IFoo` interface to satisfy the declared conformance. If a type misses any methods required by the interface, the Slang compiler will generate an error message.
+When `MyType` declares that it conforms to `IFoo`, the Slang compiler validates that it provides a suitable `myMethod` that can satisfy the requirement declared by the interface.
+If a type does not provide some of the methods provided by the interface, the Slang compiler will diagnose an error.
 
-A `struct` type may declare multiple interface conformances:
+A user-defined type may declare multiple interface conformances:
 
-```csharp
+```slang
 interface IBar { uint myMethod2(uint2 x); }
 
 struct MyType : IFoo, IBar
@@ -70,6 +74,14 @@ struct MyType2 : IFoo
     override int getVal() { return 1; }
 }
 ```
+
+### Interfaces Aren't Types
+
+For developers coming to Slang with experience in languges like C#, Java, or C++, it may be easy to think of an interface like `IFoo` as a type, and thing of syntax like `struct MyType : IFoo` as indicating that `MyType` "inherits" from `IFoo`, and is thus a subtype.
+This intuition does not carry over to Slang, and can create confusion for developers who don't mind the difference.
+
+In Slang an interface is just a contract that types can conform to, but it is not itself a type.
+A concrete type like `MyType` may conform to an interface `IFoo`, but there is no inheritance or subtyping going on because `IFoo` isn't a type at all.
 
 ## Generics
 
@@ -639,120 +651,176 @@ void test()
 }
 ```
 
-## Interface-typed Values
+## Using Interfaces for Dynamic Dispatch
 
-So far we have been using interfaces as constraints to generic type parameters. For example, the following listing defines a generic function with a type parameter `TTransform` constrained by interface `ITransform`:
+In Slang an interface is not a type, but rather a contract that a user defined type can conform to.
+The primary way that Slang programs use interfaces is as constraints on generic type parameters, where they enable both ahead-of-time type checking and generation of efficient specialized code.
+In this way Slang is more similar to Rust or Swift, but different from familiar object-oriented languages like Java, C#, and C++.
+In this section we will discuss how Slang interfaces can be used to express more dynamic runtime behavior, similar to that of object-oriented languages.
 
-```csharp
+Consider this example of typical Slang code using interfaces and generics:
+
+```slang
 interface ITransform
 {
-    int compute(MyObject obj);
+    int compute(int value);
 }
 
-// Defining a generic method:
-int apply<TTransform : ITransform>(TTransform transform, MyObject object)
+struct AddOne : ITransform
 {
-    return transform.compute(object);
+    int compute(int value) { return value + 1; }
+}
+
+int apply<T : ITransform>(T transform, int value)
+{
+    return transform.compute(value);
 }
 ```
 
-While Slang's syntax for defining generic methods bears similarity to generics in C#/Java and templates in C++ and should be easy for users who are familiar with these languages, codebases that make heavy use of generics can quickly become verbose and difficult to read. To reduce the amount of boilerplate, Slang supports an alternate way to define the `apply` method by using the interface type `ITransform` as parameter type directly:
+In this example, `ITransform` defines a contract requiring a `compute` method, and the `AddOne` type conforms to that contract.
+The generic function `apply` then uses the interface `ITransform` to constrain the types allowed as arguments for its type parameter `T`.
+When other code calls `apply`, such as with:
 
-```csharp
-// A method that is equivalent to `apply` but uses simpler syntax:
-int apply_simple(ITransform transform, MyObject object)
+```slang
+let four = apply(AddOne(), 3);
+```
+
+the Slang compiler statically determines the exact type to use for `T` - in this case, `AddOne`.
+because it knows the type statically, the compiler can generate specialized code for this exact case.
+
+But what if a developer can't determine the type of transform to use statically?
+Perhaps they want to have a buffer with many different transforms in it, and select between them dynamically at runtime.
+For that purpose Slang provides the `dyn` keyword and the concept of an _existential box_.
+
+The following declaration is similar to the generic `apply` above, but instead uses `dyn`:
+
+```slang
+int applyBox(dyn ITransform transform, int value)
 {
-    return transform.compute(object);
+    return transform.compute(value);
 }
 ```
 
-Instead of defining a generic type parameter `TTransform` and a method parameter `transform` that has `TTransform` type, you can simply define the same `apply` function like a normal method, with a `transform` parameter whose type is an interface. From the Slang compiler's view, `apply` and `apply_simple` will be compiled to the same target code.
+The type `dyn ITransform` is an _existential box type_.
+The box holds a _payload_ of some dynamically-determined type, where that type is known to conform to `ITransform`.
+Code can call methods of the corresponding interface on an existential box: for example, the `applyBox` function calls the `compute` method from the `ITransform` interface on the existential box `transform`.
 
-In addition to parameters, Slang allows variables, and function return values to have an interface type as well:
+Because an existential box doesn't need to know the type of its payload statically, code can dynamically pick between options.
+For example:
 
-```csharp
-ITransform test(ITransform arg)
+```slang
+struct Double : ITransform
 {
-    ITransform v = arg;
-    return v;
+    int compute(int value) { return value * 2; }
+
+}
+
+int applyDynamically( int value, bool which )
+{
+    let adder : dyn ITransform = AddOne();
+    let doubler : dyn ITransform = Double();
+    let chosenTransform = which ? adder : doubler;
+    return applyBox(chosenTransform, value);
 }
 ```
 
-### Restrictions and Caveats
+In this example, instances of the concrete types `AddOne` and `Double` are stored into existential box variables `adder` and `doubler`.
+Because `adder` and `doubler` both have the same type - `dyn ITransform` - a conditional selection can be used to pick between them based on a runtime-computed value `which`.
+The `applyBox` function can then apply to the chosen transform, without having to know at compile time which option it will be.
 
-The Slang compiler always attempts to determine the actual type of an interface-typed value at compile time and specialize the code with the actual type. As long as the compiler can successfully determine the actual type, code that uses interface-typed values is equivalent to code written in the generics syntax. However, when interface types are used in function return values, the compiler will not be able to trivially propagate type information. For example:
+An existential box type can be used as the type of local variables, fields, array elements, and function return types.
 
-```csharp
-ITransform getTransform(int x)
+Currently Slang only allows an existential box type to be exprssed for contracts comprised of a single interface, such as `dyn ITransform`.
+Contracts that are defined as the conjunction of multiple interfaces are not allowed: a type like `dyn (ITransform & ITagged)` will be diagnosed as an error.
+
+### Legacy Language Behavior
+
+In Slang language versions 2026 and earlier, code is allowed to use an interface *as if* it were a concrete type, and the compiler implicitly acts as if a `dyn` keyword were inserted:
+
+```slang
+// allowed in Slang 2026 and earlier:
+let implicitBox : ITransform = AddOne();
+
+// allowed in all Slang language versions:
+let explicitBox : dyn ITransform = AddOne();
+```
+
+Developers are encouraged to always use the `dyn` keyword when working with existential boxes.
+
+In Slang 2026 and later, explicitly default-initializing a box, as in `dyn ITransform transform = {};`, is an error.
+A declaration without an initializer, such as `dyn ITransform transform;`, is allowed and leaves `transform` uninitialized.
+
+### Interaction with Generics
+
+When working with an existential box type like `dyn ITransform`, it is important to understand that while the *payload* of such an existential box must be a value of a type that conforms to `ITransform`, the existential box type itself does not.
+Put simply: the type `dyn ITransform` does not conform to the interface `ITransform`.
+
+As an example, consider the following interface, and a generic function using it as a constraint:
+
+```slang
+interface IStaticValue
 {
-    if (x == 0)
-    {
-        Type1Transform rs = {};
-        return rs;
-    }
-    else
-    {
-        Type2Transform rs = {};
-        return rs;
-    }
+    static int get();
+}
+
+int readValue<T : IStaticValue>()
+{
+    return T.get();
 }
 ```
 
-In this example, the actual type of the return value is dependent on the value of `x`, which may not be known at compile time. This means that the concrete type of the return value at invocation sites of `getTransform` may not be statically determinable. When the Slang compiler cannot infer the concrete type of an interface-typed value, it will generate code that performs a dynamic dispatch based on the concrete type of the value at runtime, which may introduce performance overhead. Note that this behavior applies to function return values in the form of `out` parameters as well:
+If a developer tried to explicitly specialize the generic `readValue` to the existential box type `dyn IStaticValue`:
 
-```csharp
-void getTransform(int x, out ITransform transform)
+```slang
+let whatValue = readValue<dyn IStaticValue>();
+```
+
+There is no implementation of the `get` requirement of `IStaticValue` that `readValue` could possibly invoke.
+The Slang compiler will diagnose an error on the above use of `readValue`, because the type `dyn IStaticValue` is not a valid argument for the generic type parameter of `readValue`.
+
+In contexts where an existential box value is passed to a generic function, the Slang compiler will try to infer a generic type argument based on what is inside of the box, instead of using the box type itself.
+For example, using the `ITransform` interface from earlier:
+
+```slang
+func transformSeven<T>(transform: T) -> int
+    where T : ITransform
 {
-    if (x == 0)
-    {
-        Type1Transform rs = {};
-        transform = rs;
-    }
-    else
-    {
-        Type2Transform rs = {};
-        transform = rs;
-    }
+    return transform.compute(7);
+}
+
+func implicitlyOpeningExistential()
+{
+    let addOne : dyn ITransform = AddOne();
+    let eight = transformSeven(addOne);
 }
 ```
 
-This `getTransform` definition can also result in dynamic dispatch code since the type of `transform` may not be statically determinable.
+In the call to `transformSeven`, rather than infer from the type of `addOne` that the type `T` should be `dyn ITransform` (which would result in an error), the Slang compiler will instead implicitly _open_ the existential box `addOne`, and infer that the type `T` should be the type of the payload inside.
+We can see by looking at the example that the type of the payload will be `AddOne` at runtime, but the Slang type checker does not take that into account.
 
-When the compiler is generating dynamic dispatch code for interface-typed values, it requires the concrete type of the interface-typed value to be free of any opaque-typed fields (e.g. resources and buffer types). A compiler error will be generated upon such attempts:
+Note that in Slang 2025 and later, the compiler places many restrictions on where existential boxes may be used with generics, with the intention that the compiler must be able to statically resolve the concrete payload type before code generation.
+Developers are advised to exercise caution and for the most part only use `dyn` in cases where they are specifically intending to make use of dynamic dispatch.
 
-```csharp
-struct MyTransform : ITransform
+### Restrictions of Dynamic Dispatch
+
+When the Slang compiler can determine the type of an existential box's payload statically (perhaps after optimizations), it will specialize code to the determined payload type, eliminating any possible overhead due to runtime dispatch.
+If a payload type cannot be determined before code generation, the compiler will emit code that dynamically selects the implementation path to use at runtime.
+The details of dynamic dispatch code depend on the compilation target, but developers should be mindful that it can add performance overhead compared to the kind of specialization typically achieved with generics.
+
+When defining an interface, if a developer wants it to be usable for dynamic dispatch on as many targets as possible, they must put an `[anyValueSize(...)]` attribute on the interface declaration.
+For example:
+
+```slang
+[anyValueSize(32)]
+interface ITransform
 {
-    StructuredBuffer<int> buffer;
-    int compute(MyObject obj)
-    {
-        return buffer[0];
-    }
-}
-
-ITransform getTransform(int x)
-{
-    MyTransform rs;
-    // Error: cannot use an opaque value as an interface-typed return value.
-    return rs;
-}
-```
-
-Assigning different values to a mutable interface-typed variable also undermines the compiler's ability to statically determine the type of the variable, and is not supported by the Slang compiler today:
-
-```csharp
-void test(int x)
-{
-    ITransform t = Type1Transform();
-    // Do something ...
-    // Assign a different type of transform to `t`:
-    // (Not supported by Slang today)
-    t = Type2Transform();
-    // Do something else...
+    int compute(int value);
 }
 ```
 
-In general, if the use of interface-typed values is restricted to function parameters only, then all code that involves interface-typed values will be compiled the same way as if the code is written using standard generics syntax.
+In this example, any type that conforms to `ITransform` needs to be able to fit inside of 32 bytes; code generation for `dyn ITransform` may rely on this assumption.
+A payload stored this way cannot contain opaque fields such as resources or buffers.
+In Slang 2026 and later, additional checks apply to interface declarations with an `[anyValueSize(...)]` attribute and to declarations of conformance to those interfaces; see [Slang 2026](11-language-version.md#slang-2026).
 
 ## Extending a Type with Additional Interface Conformances
 
@@ -790,10 +858,10 @@ extension MyObject : IBar
 }
 ```
 
-With this extension, we can use `MyObject` in places that expect an `IBar` as well:
+With this extension, we can convert a `MyObject` value to a `dyn IBar` box:
 
 ```csharp
-void use(IBar b)
+void use(dyn IBar b)
 {
     b.bar();
 }
@@ -821,7 +889,7 @@ extension MyObject : IBar, IBar2
 
 ## `is` and `as` Operator
 
-You can use the `is` operator to test if an interface-typed value is of a specific concrete type, and use the `as` operator to downcast the value into a specific type.
+You can use the `is` operator to test whether an existential box contains a value of a specific concrete type, and use the `as` operator to retrieve that value as the concrete type.
 The `as` operator returns an `Optional<T>` that is not `none` if the downcast succeeds.
 
 ```csharp
@@ -833,7 +901,7 @@ struct MyImpl : IFoo
 {
     int foo() { return 0; }
 }
-void test(IFoo foo)
+void test(dyn IFoo foo)
 {
     bool t = foo is MyImpl; // true
     Optional<MyImpl> optV = foo as MyImpl;
@@ -851,7 +919,12 @@ void main()
 // "success"
 ```
 
-In addition to casting from an interface type to a concrete type, the `as` and `is` operators can be used on generic types as well to cast a generic type into a concrete type. For example:
+The right-hand operand can name a concrete type as above, but cannot name an existential box type: `foo is dyn IFoo` and `foo as dyn IFoo` are errors.
+An interface name on the right-hand side of `is` can express a known conformance: `foo is IFoo` is true because the type of the payload stored in `foo` conforms to `IFoo`.
+An interface name is not a valid target of `as`.
+
+The `as` and `is` operators can also be used with generic parameters to test or cast a value whose type is generic.
+For example:
 
 ```csharp
 T compute<T>(T a1, T a2)
@@ -895,7 +968,7 @@ struct MyImpl3 : IFoo
     void foo() { printf("MyImpl3");}
 }
 
-void test(IFoo foo)
+void test(dyn IFoo foo)
 {
     // This syntax will be desugared to the following:
     // {
@@ -1004,10 +1077,9 @@ extension<T:IFoo> T
     int bar() { return 0; }
 }
 
-int use(IFoo foo)
+int use(dyn IFoo foo)
 {
-    // With the extension, all uses of `IFoo` typed values
-    // can assume there is a `bar` method.
+    // The extension defines `bar` for the payload's type, which conforms to `IFoo`.
     return foo.bar();
 }
 ```

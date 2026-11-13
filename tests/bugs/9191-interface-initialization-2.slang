@@ -33,7 +33,7 @@ struct HelperImpl3 : IHelper
 
 struct StructWithIfaceField2
 /*CHECKERR:
-       ^ candidate: StructWithIfaceField2.init(IHelper)
+       ^ candidate: StructWithIfaceField2.init(dyn IHelper)
 */
 {
     IHelper ifaceField;
