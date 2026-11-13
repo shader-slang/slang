@@ -190,6 +190,7 @@ def iter_manifest_entries(manifest):
                     else parse_manifest_int(counter, "v2 entry counter"),
                     "file": entry.get("file"),
                     "line": parse_manifest_int(entry["line"], "v2 entry line"),
+                    "mode": entry.get("mode", "count"),
                     "function": entry.get("function"),
                     "function_mangled": entry.get("function_mangled"),
                     "branch_site": entry.get("branch_site"),
@@ -243,10 +244,10 @@ def main():
         # ints, so the manifest stride is informational only.
         counters = load_counters_text(args.counters_text, total)
 
-    # Aggregate by (file, line). Multiple counter slots may map to the
-    # same line, and one slot may also serve several lines once the
-    # compiler coalesces markers that execute together;
-    # LCOV wants line-oriented reporting, so sum them here.
+    # Count mode aggregates statement entries, not distinct counter slots or
+    # visits to a line. Coalesced entries still represent separate statements:
+    # three entries sharing a counter containing 4 contribute 12. Boolean
+    # mode reports whether any entry executed, without an execution frequency.
     #
     # GCOV/LCOV-style output only admits real source files and positive
     # line numbers. Keep unattributable slots in the manifest/metadata,
@@ -254,6 +255,7 @@ def main():
     hits_by_line = collections.defaultdict(lambda: collections.defaultdict(int))
     functions_by_source = collections.defaultdict(dict)
     branches_by_source = collections.defaultdict(dict)
+    boolean_lines = set()
     skipped_entries = 0
     skipped_by_kind = {}
     for entry in iter_manifest_entries(manifest):
@@ -272,7 +274,6 @@ def main():
             skipped_entries += 1
             continue
         count = counters[idx]
-
         if kind == "line":
             hits_by_line[source][line] += count
         elif kind == "function":
@@ -305,6 +306,33 @@ def main():
             )
         else:
             skipped_by_kind[kind] = skipped_by_kind.get(kind, 0) + 1
+            continue
+        if entry.get("mode") == "boolean":
+            boolean_lines.add((source, line))
+
+    # Function-only and branch-only metadata is valid without statement entries.
+    # LCOV consumers still need DA at each FN/BRDA location. Fill only missing
+    # lines, preferring function-entry counts to branch outcomes when both exist.
+    # These are compatibility records for observed events, not inferred visits.
+    for source, functions in functions_by_source.items():
+        function_lines = collections.defaultdict(int)
+        for line, count in functions.values():
+            function_lines[line] += count
+        for line, count in function_lines.items():
+            hits_by_line[source].setdefault(line, count)
+    # Branch-site IDs are unique within the metadata, including across files.
+    evaluated_sites = set()
+    for source, branches in branches_by_source.items():
+        branch_lines = collections.defaultdict(int)
+        for (line, site, _), count in branches.items():
+            branch_lines[line] += count
+            if count:
+                evaluated_sites.add(site)
+        for line, count in branch_lines.items():
+            hits_by_line[source].setdefault(line, count)
+    for source, line in boolean_lines:
+        if line in hits_by_line[source]:
+            hits_by_line[source][line] = int(hits_by_line[source][line] != 0)
 
     out = sys.stdout if args.output == "-" else open(args.output, "w")
     out.write(f"TN:{args.test_name}\n")
@@ -322,7 +350,10 @@ def main():
             out.write(f"FNH:{sum(1 for _, count in functions.values() if count > 0)}\n")
         branches = branches_by_source[source]
         for (line, branch_site, branch_arm), count in sorted(branches.items()):
-            out.write(f"BRDA:{line},{branch_site},{branch_arm},{count}\n")
+            # An evaluated site's untaken arm is zero; an unevaluated site
+            # uses LCOV's '-' sentinel. Switch arms may occupy different lines.
+            taken = count if branch_site in evaluated_sites else "-"
+            out.write(f"BRDA:{line},{branch_site},{branch_arm},{taken}\n")
         if branches:
             out.write(f"BRF:{len(branches)}\n")
             out.write(f"BRH:{sum(1 for count in branches.values() if count > 0)}\n")
