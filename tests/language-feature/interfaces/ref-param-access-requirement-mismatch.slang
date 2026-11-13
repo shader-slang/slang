@@ -1,6 +1,6 @@
 // A `const __ref` parameter has the `RefReadOnly` passing mode and a plain `__ref`
-// parameter has `RefReadWrite`, so a method whose parameter uses one mode does not
-// satisfy a requirement whose parameter uses the other (shader-slang/slang#13339).
+// parameter has `RefReadWrite`. A method that needs more access than the requirement grants
+// does not satisfy it (shader-slang/slang#13339), but a method that needs less does.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 
@@ -21,16 +21,13 @@ struct WritesThroughRef : IReadOnly
 interface IReadWrite
 {
     void g(__ref uint a[8]);
-//CHECK: ^ see interface requirement declaration of 'g'
 }
 
-// Matching is exact, so a method that only reads does not satisfy a read-write
-// requirement either.
+// A method that only reads satisfies a read-write requirement, the same way an `in` method
+// satisfies an `inout` requirement.
 struct ReadsThroughConstRef : IReadWrite
 {
     void g(const __ref uint a[8]) {}
-//CHECK:                    ^ E38108
-//CHECK:                    ^ parameter 'a' direction 'ref_readonly' does not match interface requirement 'ref'.
 }
 
 groupshared uint sh[8];

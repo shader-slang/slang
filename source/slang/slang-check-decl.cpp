@@ -7977,16 +7977,21 @@ void SemanticsVisitor::_addMethodWitness(
 // Is it allowed to have an interface method parameter whose direction is `reqDir`, and an
 // implementing method parameter whose direction is `implDir`?
 //
+// Beyond an exact match, a requirement whose callers grant both read and write access can be
+// satisfied by a method that needs only one of them: an `inout` requirement by an `in` or `out`
+// method, and a `__ref` requirement by a `__ref_readonly` or `__ref_writeonly` method. A method
+// that needs more access than the requirement grants is rejected, because it could write storage
+// the caller treats as read-only or read storage the caller never initialized.
+//
 static bool matchParamDirection(ParamPassingMode implDir, ParamPassingMode reqDir)
 {
-    // If the parameter directions match exactly, then we are good.
     if (implDir == reqDir)
         return true;
-    // Otherwise, we only allow the cases where reqDir is `InOut` and implDir is `In` or `Out`.
-    if (implDir == ParamPassingMode::In && reqDir == ParamPassingMode::BorrowInOut)
-        return true;
-    if (implDir == ParamPassingMode::Out && reqDir == ParamPassingMode::BorrowInOut)
-        return true;
+    if (reqDir == ParamPassingMode::BorrowInOut)
+        return implDir == ParamPassingMode::In || implDir == ParamPassingMode::Out;
+    if (reqDir == ParamPassingMode::RefReadWrite)
+        return implDir == ParamPassingMode::RefReadOnly ||
+               implDir == ParamPassingMode::RefWriteOnly;
     return false;
 }
 
