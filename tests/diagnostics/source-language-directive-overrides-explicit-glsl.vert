@@ -2,7 +2,7 @@
 // empty tuple below requires Slang 2026, proving that both the parser mode and module-wide Slang
 // version were installed from the directive before parsing began.
 
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/diagnostics/source-language-directive-overrides-explicit-glsl.vert -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK,exit-code=0): -lang glsl tests/diagnostics/source-language-directive-overrides-explicit-glsl.vert -no-codegen
 
 #language slang 2026
 //CHECK: source-language directive selects slang and overrides the explicitly requested glsl source language

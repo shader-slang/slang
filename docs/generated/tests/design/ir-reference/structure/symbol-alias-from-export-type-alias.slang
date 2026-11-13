@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#symbolalias
-//META: doc_section_digest=df33340c4bf4fae395203cc1b56c122f7e9cf3491ebdffc3e445b13502d15254
+//META: doc_section_digest=3c5325fdfe0b619702fa9558861bad0c6a4d26977f78436c97b0793cffbc5cb2
 //META: purpose=A link-time export type alias is created during lowering as a SymbolAlias whose operand is the aliased symbol, and the conformance nested in it gets its own SymbolAlias.
 //META: intent=functional
 //META: pipeline_stage=lower

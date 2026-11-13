@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#existential-construction
-//META: doc_section_digest=20236b856e5e4e69c3ee4b9b04483298a998afa8edf2f30d24865d81a8fb23ad
+//META: doc_section_digest=fc4731125d3e1fb116f0025ce0d4b2ecc5234e8d4fae162606e0795f4acc047e
 //META: purpose=The core-module createDynamicObject builds an existential from a runtime type id, lowering to createExistentialObject(typeID, value).
 //META: intent=functional
 //META: pipeline_stage=lower

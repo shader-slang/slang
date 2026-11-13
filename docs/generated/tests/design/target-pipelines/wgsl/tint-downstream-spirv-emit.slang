@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#downstream-tint
-//META: doc_section_digest=8460973e4e20cf8209be2d83492d27f49679dce0d45ca1cafeff885b45fe6309
+//META: doc_section_digest=bbe49ec33e70c502e379ae5e4252045f994055fe757eecf0eabe3fa1f87f8ef3
 //META: purpose=The wgsl-spirv-asm target compiles the WGSL text through Tint to a SPIR-V module and then disassembles it via glslang into assembly whose OpEntryPoint names main
 //META: intent=functional
 //META: pipeline_stage=emit

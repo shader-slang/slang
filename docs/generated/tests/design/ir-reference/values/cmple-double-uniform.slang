@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#comparison
-//META: doc_section_digest=a41eec816a55db301ccafcfa867bab048ae6ed92cc99c5f791c2e8474302d15d
+//META: doc_section_digest=bf81ae64bcb3ebf34033f80837df03e474b90159b95904ac3be2fb4e350793c2
 //META: purpose=Expansion: `double <= double` lowers to `cmpLE(%a, %b)` — the doc places the float ranks under the same `cmpLE` opcode as int.
 //META: intent=expansion
 //META: pipeline_stage=lower

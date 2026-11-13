@@ -7,9 +7,9 @@
 // Regresses if `-target wgsl` starts succeeding silently with
 // invalid WGSL, or if the warning code/severity changes.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry main -trace-coverage -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry main -trace-function-coverage -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry main -trace-branch-coverage -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target wgsl -entry main -trace-coverage -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target wgsl -entry main -trace-function-coverage -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target wgsl -entry main -trace-branch-coverage -stage compute
 //CHECK: warning E45102
 
 // Verify the emitted WGSL is actually uninstrumented (the diagnostic

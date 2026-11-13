@@ -3,7 +3,7 @@
 // Tests diagnostics for deprecated/removed bracket attribute list placement
 
 //TEST:SIMPLE(filecheck=CHECK):-std 2018 -stage compute -entry main -target hlsl -DERRTEST=0
-//DIAGNOSTIC_TEST:SIMPLE(diag=WARN):-std 2025 -stage compute -entry main -target hlsl -DERRTEST=0
+//DIAGNOSTIC_TEST:SIMPLE(diag=WARN,exit-code=0):-std 2025 -stage compute -entry main -target hlsl -DERRTEST=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=ERR):-std 2026 -stage compute -entry main -target hlsl -DERRTEST=1
 
 #if ERRTEST

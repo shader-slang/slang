@@ -3,7 +3,7 @@
 // Unlike a session description, a complete command line resolves output paths: two
 // whole-program outputs for one target are an error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -o a.spv -o b.spv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target spirv -o a.spv -o b.spv
 //CHECK: multiple output paths have been specified for target 'spirv'
 
 [shader("compute")]

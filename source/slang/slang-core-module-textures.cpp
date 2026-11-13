@@ -101,10 +101,16 @@ void TextureTypeInfo::writeFuncBody(
         }
         if (spirvDefault.getLength() && spirvCombined.getLength())
         {
+            // We mark this assembly with [__assumeValidResourceOperands] because the function
+            // generated here, GetDimensions, is a query that always accesses the image. The
+            // qualifier is not valid for every function, so the assertion below stops another
+            // function from taking this path without that check. The combined path extracts only
+            // the image, so it supplies no sampler operand.
+            SLANG_ASSERT(UnownedStringSlice(funcName) == "GetDimensions");
             sb << i << "case spirv:\n";
             sb << i << "if (access == " << kCoreModule_ResourceAccessReadWrite
                << " || access == " << kCoreModule_ResourceAccessWriteOnly << ")\n";
-            sb << i << "return spirv_asm\n";
+            sb << i << "return spirv_asm [__assumeValidResourceOperands]\n";
             {
                 BraceScope spirvRWScope{i, sb, ";\n"};
                 sb << spirvRWDefault << "\n";
@@ -113,7 +119,7 @@ void TextureTypeInfo::writeFuncBody(
             sb << i << "{\n";
             {
                 sb << i << "let image = __extractImage(this);\n";
-                sb << i << "return spirv_asm\n";
+                sb << i << "return spirv_asm [__assumeValidResourceOperands]\n";
                 BraceScope spirvCombinedScope{i, sb, ";\n"};
                 sb << spirvCombined << "\n";
             }
@@ -121,7 +127,7 @@ void TextureTypeInfo::writeFuncBody(
             sb << i << "else\n";
             sb << i << "{\n";
             {
-                sb << i << "return spirv_asm\n";
+                sb << i << "return spirv_asm [__assumeValidResourceOperands]\n";
                 BraceScope spirvDefaultScope{i, sb, ";\n"};
                 sb << spirvDefault << "\n";
             }

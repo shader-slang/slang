@@ -38,13 +38,13 @@ VertexOutput vertexMain(
 // HLSL emission preserves the user-declared semantics on the
 // struct field and on the function parameter. Both must round-trip
 // through the array-recursion legalization path.
-// CHECK_HLSL-DAG: values_0[int(4)] : OUT_VALUES
+// CHECK_HLSL-DAG: values_0[4L] : OUT_VALUES
 // CHECK_HLSL-DAG: position_0 : SV_Position
-// CHECK_HLSL-DAG: inValues_0[int(4)] : IN_VALUES
+// CHECK_HLSL-DAG: inValues_0[4L] : IN_VALUES
 // CHECK_HLSL-DAG: o_0.values_0[int(0)] = inValues_0[int(0)]
-// CHECK_HLSL-DAG: o_0.values_0[int(1)] = inValues_0[int(1)] + 1.0f
-// CHECK_HLSL-DAG: o_0.values_0[int(2)] = inValues_0[int(2)] + 2.0f
-// CHECK_HLSL-DAG: o_0.values_0[int(3)] = inValues_0[int(3)] + 3.0f
+// CHECK_HLSL-DAG: o_0.values_0[1L] = inValues_0[1L] + 1.0f
+// CHECK_HLSL-DAG: o_0.values_0[2L] = inValues_0[2L] + 2.0f
+// CHECK_HLSL-DAG: o_0.values_0[3L] = inValues_0[3L] + 3.0f
 
 // SPIRV emits one Location decoration per array element (or per
 // the top-level array, depending on the SPIR-V Location-bumping

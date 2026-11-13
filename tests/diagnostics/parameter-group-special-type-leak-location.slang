@@ -4,7 +4,7 @@
 // must carry a source location pointing at the offending member / parameter
 // group, rather than being emitted with no location.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive): -target spirv -entry computeMain
 
 struct Mixed
 {

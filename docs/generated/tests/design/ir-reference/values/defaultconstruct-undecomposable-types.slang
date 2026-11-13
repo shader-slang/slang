@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#defaultconstruct
-//META: doc_section_digest=4df637a420e20a9809c679bd1353de4587a5558bbbab7fdfbd1d02ac4c82b3f2
+//META: doc_section_digest=70fa32ba53aa5066ea3a76e6f36848a1e76640420b67965c0cf7cf95009cbcf5
 //META: purpose=The `defaultConstruct` opcode does survive for the types lowering cannot decompose: an interface-typed value and an unspecialized generic type parameter both default-initialize to the nullary opcode.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,9 +18,12 @@
 // reach the nullary fallback. CHECK asserts one `defaultConstruct`
 // whose result type is the user interface `%IThing`, and a second one
 // inside `func %makeDefault` typed by the generic parameter, so each
-// observation names the undecomposable type it came from.
+// observation names the undecomposable type it came from. The surviving
+// `defaultConstruct` has no emitter on any target (code emit aborts with
+// an internal error), so the test stops after IR lowering with
+// `-skip-codegen`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -skip-codegen -dump-ir -o - -stage compute -entry main
 
 interface IThing { int get(); }
 struct Impl : IThing { int get() { return 7; } }
@@ -40,8 +43,11 @@ T makeDefault<T>()
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
+    // Impl must be used so the linkage holds a conformance for IThing;
+    // otherwise codegen rejects the program with E50100.
+    Impl im;
     IThing t = {};
-    buf[tid.x] = use(t) + makeDefault<int>();
+    buf[tid.x] = use(im) + use(t) + makeDefault<int>();
 }
 
 // IR-LABEL: func %makeDefault

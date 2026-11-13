@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-//META: doc_ref=docs/generated/design/target-pipelines/cuda.md#option-set-toggles-and-emit-side-options
-//META: doc_section_digest=c8c1f9acea26a5ada5d62c5f07eb8c833ee50d30ff427d3f509049f99b007370
+//META: doc_ref=docs/generated/design/target-pipelines/cuda.md#conditional-gates
+//META: doc_section_digest=53c4b02712abd1606ada0cd075435fc703c872ab9fb03c55c715018c720c4b38
 //META: purpose=Negative - slangc -trace-coverage-counter-width accepts only 32 or 64 and rejects any other value as E45113 on the command line, before the E45114 byte-width check inside linkAndOptimizeIR can be reached.
 //META: intent=negative
 //META: pipeline_stage=preprocess
@@ -17,7 +17,7 @@
 // part of the message; the shader body is irrelevant because the
 // option is rejected before any compilation happens.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute -trace-coverage -trace-coverage-counter-width 16
+//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target cuda -entry main -stage compute -trace-coverage -trace-coverage-counter-width 16
 
 RWStructuredBuffer<int> outputBuffer;
 

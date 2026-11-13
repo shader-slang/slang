@@ -59,6 +59,16 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// Return whether `newDecl` may shadow the same-named `oldDecl` as an HLSL loop initializer.
+///
+/// HLSL loop initializers belong to the enclosing scope, so successive loops can declare the
+/// same name. The permission applies to each variable in an initializer, including repeated
+/// names in `for (int i = 0, i = 1; ... )`. Only a new loop initializer has this permission:
+/// an ordinary `int i;` following `for (int i = 0; ... ) {}` remains a redeclaration error.
+/// Other declaration kinds and declarations from different containers do not participate.
+/// Checking and lookup use the same rule to permit the declarations and select their bindings.
+bool isHLSLForLoopInitializerRedeclaration(Decl* newDecl, Decl* oldDecl);
+
 /// How `checkRedeclaration` reports two declarations of the same name that cannot coexist.
 enum class RedeclarationSeverity
 {
@@ -4197,6 +4207,15 @@ public:
 
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
+
+    bool argumentNamesGroupSharedStorage(Expr* arg);
+    void checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn);
+    Decl* findGroupSharedVariablePartlyWrittenInDifferentiatedBody(Expr* target, Expr* storage);
+    void checkGroupSharedPartialWritesByCall(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        DeclRef<CallableDecl> calleeDeclRef,
+        List<DeclRef<ParamDecl>> const& paramDeclRefs);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,
@@ -4618,9 +4637,12 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitDeclStmt(DeclStmt* stmt);
 
-    /// Check `decl`, a local declaration whose statement has been reached, make it
-    /// visible to the code that follows its declarator, and register the lambda
-    /// captures in its initializer.
+    /// Check `decl` and its initializer, make the local declaration visible afterward,
+    /// and register the lambda captures in its initializer.
+    ///
+    /// Earlier bindings remain available while the initializer is checked.
+    /// Once an HLSL loop variable is visible, lookup selects it over earlier locals of the same
+    /// name in its scope.
     void checkDeclAtDeclarationPoint(Decl* decl);
 
     void visitBlockStmt(BlockStmt* stmt);

@@ -14,7 +14,7 @@
 // identifier), but a follow-up declaration that needs `int` to be a
 // type token at the head still wins over identifier lookup.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 void main()
 {

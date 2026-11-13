@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#edge-cases-and-failure-modes
-//META: doc_section_digest=e6dd79fac380ce187829abe90002109d7b13f470e191affc4c82a5813eb6298b
+//META: doc_section_digest=b389e40b388d5f30478f28f97f1bbbbdfb2576ddc1cea6d321380e5d95ca739d
 //META: purpose=An unsatisfied type-equality constraint (where T == int) is reported as generic-constraint-not-satisfied naming the constraint.
 //META: intent=negative
 //META: pipeline_stage=check
