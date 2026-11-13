@@ -126,6 +126,10 @@ protected:
     void emitAtomicSrcOperand(bool isImage, IRInst* operand);
     void emitAtomicSemanticOperand(IRInst* inst);
 
+    // Set while emitting a parameter of a non-fragment entry point, where Metal rejects
+    // `[[raster_order_group]]`.
+    bool m_omitRasterOrderGroup = false;
+
     static const char* kMetalBuiltinPreludeMatrixCompMult;
     static const char* kMetalBuiltinPreludeMatrixReshape;
     static const char* kMetalBuiltinPreludeVectorReshape;
