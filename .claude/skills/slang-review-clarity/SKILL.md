@@ -1,6 +1,6 @@
 ---
 name: slang-review-clarity
-description: Review Slang changes for high-level clarity. Use whenever reviewing PRs or diffs for code quality or correctness. Produces candidate review comments in a markdown file.
+description: Review Slang changes for high-level clarity and supply architectural acceptance criteria for authored changes. Use for authoring self-review or reviewing PRs and diffs for code quality. Produces candidate findings in a markdown file.
 argument-hint: "<pr-number-or-diff-path>"
 allowed-tools:
   - Bash
@@ -17,6 +17,10 @@ Generate high-level candidate comments to be used as review feedback, focused on
 This skill is intentionally broader than the normal bug-review protocol in `REVIEW.md`.
 Code need not be demonstrably wrong to warrant a comment.
 If changed code does not clearly communicate its intent and approach, or does not explain why it is correct, that is a valid candidate finding.
+
+When authoring or revising code, apply these criteria through the [authoring and self-review procedure](../slang-review-clarity-workflow/SKILL.md#authoring-and-self-review).
+That procedure defines the cumulative comparison, responsibility boundary, response to feedback, and acceptance requirements.
+Candidate discovery or filtering does not itself establish that authored work satisfies these criteria.
 
 Do not directly post comments to PRs; write candidate comments to a markdown file under
 `tmp/review-candidates/`.
@@ -41,6 +45,9 @@ gh.exe pr view <number> -R shader-slang/slang --json files -q '.files[].path' > 
 
 If the user provides a local branch or patch instead, save the equivalent diff and file list
 under `tmp/` first.
+
+These conventional input paths are shared within a checkout.
+Use an isolated checkout if concurrent sessions could overwrite them, and preserve a task-specific copy of the reviewed snapshot with the review record.
 
 Read:
 
@@ -89,6 +96,12 @@ Otherwise, identify the missing clarity and let the PR author decide how best to
 
 Code that is not commented should be held to the highest possible standard of clarity.
 If it is not manifestly obvious why a line of code is both correct and necessary, there must be a comment that speaks to it.
+
+Apply this standard to every in-scope part of the cumulative change, including earlier assigned commits and review fixes.
+Do not sample or exempt apparently trivial changes.
+For each declaration and conceptual region, record either a finding or concrete reasons its problem statement, decomposition, contracts, and invariants are sufficiently clear.
+An overall impression that the change reads well is insufficient coverage evidence.
+The fine-grained pass complements this architectural review by examining individual names, expressions, conditions, and comment sentences.
 
 ## What To Look For
 
@@ -160,20 +173,22 @@ GitHub link.
 
 ## Working Process
 
-1. Inventory the changed files and group them by feature or subsystem.
+1. Inventory the files and affected contracts in the complete cumulative change and group them by feature or subsystem.
 2. For each changed source file, read the surrounding type/function/section, not only the
    diff hunk.
 3. Identify the new or changed concepts the PR introduces.
 4. Ask whether the code teaches those concepts clearly enough for a future maintainer.
 5. Write candidates as you go. Do not wait until the end and summarize from memory.
-6. After the first pass, perform a coverage audit: revisit each changed file, changed
-   declaration, and changed conceptual section and ask what candidate would have been written
-   if the review were maximally strict. Add any credible missing candidates.
+6. After the first pass, audit every in-scope declaration and conceptual region against the inventory.
+   Record a candidate, a reference to a candidate covering the same concern, or concrete reasons the applicable criteria are satisfied.
+   Add credible missing candidates before filtering; prior acceptance or apparent simplicity does not excuse missing examination.
 7. Deduplicate candidates that ask for the same clarification at the same conceptual level.
 8. Leave borderline candidates in the file with `Scope: Probably out-of-scope` or
    `Confidence: Low` rather than silently discarding them.
 
-## Not This Skill
+## Review and Publication Boundaries
 
-Do not run the normal `REVIEW.md` severity filter here. Do not require a concrete crash,
-miscompile, or missing test. Do not post to GitHub. Do not rewrite the PR.
+Do not run the normal `REVIEW.md` severity filter here or require a concrete crash, miscompile, or missing test to establish a clarity concern.
+For review-only or candidate-generation requests, produce findings without rewriting the reviewed change or posting feedback.
+For authorized authoring or revision work, correct supported in-scope findings through the linked authoring procedure.
+This skill does not grant additional authority to publish changes or post review comments.
