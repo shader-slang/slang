@@ -2179,6 +2179,13 @@ FIDDLE() namespace Slang
         Conditional,
         And,
         Or,
+        // `min` / `max` / `abs` / `clamp` on scalar integers. These are functions, not operators,
+        // and have no IR op, but a call to the core-module built-in on compile-time constants
+        // folds to a `BuiltinOperationIntVal` of these kinds (e.g. `int arr[max(N, 4)]`).
+        Min,
+        Max,
+        Abs,
+        Clamp,
         // Sentinel for "not a builtin fast-path operator". Returned by
         // `getBuiltinOperationKindFromString` for operators the fast path does not rewrite (e.g.
         // `&&`/`||`/`?:`). Never stored on a node and never serialized, so it is kept last.
@@ -2202,5 +2209,7 @@ FIDDLE() namespace Slang
     BuiltinOperationKind getBuiltinOperationKindFromString(
         UnownedStringSlice opText,
         OperatorArity arity);
+
+    Index getBuiltinOperationArity(BuiltinOperationKind op);
 
 } // namespace Slang
