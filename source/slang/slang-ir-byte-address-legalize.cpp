@@ -931,7 +931,7 @@ struct ByteAddressBufferLegalizationContext
                         // we can bit-cast it to the correct tyep and
                         // we have our result.
                         //
-                        return m_builder.emitBitCast(vecType, unsignedVecVal);
+                        return emitBitCastToOrFromUInt(vecType, unsignedVecVal);
                     }
                 }
             }
@@ -994,7 +994,7 @@ struct ByteAddressBufferLegalizationContext
                 {
                     auto unsignedVal =
                         emitSimpleLoad(unsignedType, buffer, baseOffset, immediateOffset);
-                    return m_builder.emitBitCast(basicType, unsignedVal);
+                    return emitBitCastToOrFromUInt(basicType, unsignedVal);
                 }
             }
         }
@@ -1359,6 +1359,24 @@ struct ByteAddressBufferLegalizationContext
             return nullptr;
 
         return m_builder.getBasicType(unsignedBaseType);
+    }
+
+    // Reinterpret `value` as `type`, one of the two being the same-size unsigned integer type
+    // (or vector) of the other (see `getSameSizeUIntType`). A `bool` is converted instead of
+    // bit-cast: Metal's `as_type` and WGSL's `bitcast` reject `bool` operands and results,
+    // and a `bool` in a byte-address buffer is the word 0 or 1, which a conversion reads and
+    // writes the same way.
+    IRInst* emitBitCastToOrFromUInt(IRType* type, IRInst* value)
+    {
+        auto isBoolOrBoolVector = [](IRType* t)
+        {
+            if (auto vecType = as<IRVectorType>(t))
+                t = vecType->getElementType();
+            return as<IRBoolType>(t) != nullptr;
+        };
+        if (isBoolOrBoolVector(type) || isBoolOrBoolVector(value->getDataType()))
+            return m_builder.emitCast(type, value);
+        return m_builder.emitBitCast(type, value);
     }
 
     // When replacing byte-address buffer load/store operations with
@@ -1951,7 +1969,7 @@ struct ByteAddressBufferLegalizationContext
                     //
                     auto unsignedVecType =
                         m_builder.getVectorType(unsignedElementType, vecType->getElementCount());
-                    auto unsignedVecVal = m_builder.emitBitCast(unsignedVecType, value);
+                    auto unsignedVecVal = emitBitCastToOrFromUInt(unsignedVecType, value);
                     return emitSimpleStore(
                         unsignedVecType,
                         buffer,
@@ -1988,7 +2006,7 @@ struct ByteAddressBufferLegalizationContext
             {
                 if (auto unsignedType = getSameSizeUIntType(basicType))
                 {
-                    auto unsignedVal = m_builder.emitBitCast(unsignedType, value);
+                    auto unsignedVal = emitBitCastToOrFromUInt(unsignedType, value);
                     return emitSimpleStore(
                         unsignedType,
                         buffer,
