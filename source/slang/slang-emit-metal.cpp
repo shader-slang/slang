@@ -1182,30 +1182,37 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
         {
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
             IRConstant::FloatKind kind = constantInst->getFloatKind();
+            // MSL types `1.0 / 0.0` as `float`, so a `half` NaN/Inf is converted to `half`
+            // explicitly; otherwise `as_type<ushort>(...)` of it is a `float` -> `ushort` cast,
+            // which Metal rejects.
+            const bool isHalf =
+                inst->getDataType() && inst->getDataType()->getOp() == kIROp_HalfType;
+            const char* nonFinite = nullptr;
             switch (kind)
             {
             case IRConstant::FloatKind::Nan:
-                {
-                    m_writer->emit("(0.0 / 0.0)");
-                    return;
-                }
+                nonFinite = "(0.0 / 0.0)";
+                break;
             case IRConstant::FloatKind::PositiveInfinity:
-                {
-                    m_writer->emit("(1.0 / 0.0)");
-                    return;
-                }
+                nonFinite = "(1.0 / 0.0)";
+                break;
             case IRConstant::FloatKind::NegativeInfinity:
-                {
-                    m_writer->emit("(-1.0 / 0.0)");
-                    return;
-                }
+                nonFinite = "(-1.0 / 0.0)";
+                break;
             default:
                 break;
+            }
+            if (nonFinite)
+            {
+                if (isHalf)
+                    m_writer->emit("half");
+                m_writer->emit(nonFinite);
+                return;
             }
 
             // Suffix finite half/float literals so MSL doesn't type a bare decimal
             // as `double` (which breaks `as_type<ushort>(h)`, #11837). NaN/Inf and
-            // Double stay bare; non-finite half/float is a known remaining gap.
+            // Double stay bare (a non-finite half is converted above).
             if (auto basicType = as<IRBasicType>(inst->getDataType()))
             {
                 const char* suffix = nullptr;
