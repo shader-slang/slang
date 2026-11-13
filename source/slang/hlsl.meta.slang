@@ -17695,7 +17695,7 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1)";
+    case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1).x";
     case glsl: __intrinsic_asm "subgroupPartitionNV($1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     }
@@ -19675,7 +19675,7 @@ uint4 WaveMatch(T value)
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
-        return WaveMaskMatch(WaveGetActiveMask(), value);
+        return uint4(WaveMaskMatch(WaveGetActiveMask(), value), 0, 0, 0);
     }
 }
 
@@ -19695,7 +19695,7 @@ uint4 WaveMatch(vector<T,N> value)
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
-        return WaveMaskMatch(WaveGetActiveMask(), value);
+        return uint4(WaveMaskMatch(WaveGetActiveMask(), value), 0, 0, 0);
     }
 }
 
@@ -19715,7 +19715,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
             result &= WaveMatch(value[i]);
         return result;
     default:
-        return WaveMaskMatch(WaveGetActiveMask(), value);
+        return uint4(WaveMaskMatch(WaveGetActiveMask(), value), 0, 0, 0);
     }
 }
 

@@ -4586,11 +4586,15 @@ __inline__ __device__ T _wavePrefixExclusiveMaxMultiple(WarpMask mask, T val)
     return val;
 }
 
+// `_waveMatchScalar` and `_waveMatchMultiple` return, in `.x`, the lanes in `mask` whose
+// value equals this lane's value, so this lane's own bit is always set. `.yzw` is 0
+// because a warp has 32 lanes. Every lane in `mask` must make the call, as
+// `__match_any_sync` requires. `_waveAllEqual` above uses `__match_all_sync` instead,
+// because it asks whether all lanes in `mask` agree.
 template<typename T>
 __inline__ __device__ uint4 _waveMatchScalar(WarpMask mask, T val)
 {
-    int pred;
-    return make_uint4(__match_all_sync(mask, val, &pred), 0, 0, 0);
+    return make_uint4(__match_any_sync(mask, val), 0, 0, 0);
 }
 
 template<typename T>
@@ -4598,12 +4602,14 @@ __inline__ __device__ uint4 _waveMatchMultiple(WarpMask mask, const T& inVal)
 {
     typedef typename ElementTypeTrait<T>::Type ElemType;
     const size_t count = sizeof(T) / sizeof(ElemType);
-    int pred;
     const ElemType* src = (const ElemType*)&inVal;
     uint matchBits = 0xffffffff;
-    for (size_t i = 0; i < count && matchBits; ++i)
+    // ANDing the per-element masks leaves the lanes that match in every element. Every
+    // lane in `mask` runs every iteration, because each `__match_any_sync` must be
+    // reached by all of those lanes.
+    for (size_t i = 0; i < count; ++i)
     {
-        matchBits = matchBits & __match_all_sync(mask, src[i], &pred);
+        matchBits = matchBits & __match_any_sync(mask, src[i]);
     }
     return make_uint4(matchBits, 0, 0, 0);
 }
