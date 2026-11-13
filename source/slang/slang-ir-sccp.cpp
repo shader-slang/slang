@@ -657,7 +657,16 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 / c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                // `INT64_MIN / -1` overflows and traps (SIGFPE) on the host, so a divisor of -1
+                // folds to the wrapping negation of `c0` without dividing, as the front end's
+                // `_tryFoldConstantDivision` does.
+                if (c1 == -1)
+                    return static_cast<IRIntegerValue>(
+                        IRUnsignedIntegerValue(0) - static_cast<IRUnsignedIntegerValue>(c0));
+                return c0 / c1;
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
@@ -667,7 +676,13 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 % c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                // `INT64_MIN % -1` traps on the host like `INT64_MIN / -1`; any `x % -1` is 0.
+                if (c1 == -1)
+                    return IRIntegerValue(0);
+                return c0 % c1;
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 % c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return fmod(c0, c1); });
     }
