@@ -4,6 +4,7 @@
 #include "slang-compiler.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-large-vector-matrix-types.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
@@ -704,15 +705,46 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
     // 1-vectors are supported and are legalized/transformed properly when targetting unsupported
     // backends.
     // 0-vectors are used internally to represent conditional varying values.
+    // Vectors with more than 4 elements (up to `kMaxVectorElementCount`) have been lowered to
+    // arrays by `legalizeLargeVectorMatrixTypes`, so any vector left over that bound is invalid.
     const IRIntegerValue minCount = 0;
-    const IRIntegerValue maxCount = 4;
-    if ((elementCount < minCount) || (elementCount > maxCount))
+    if ((elementCount < minCount) || (elementCount > kMaxNativeVectorElementCount))
     {
         sink->diagnose(Diagnostics::VectorWithInvalidElementCountEncountered{
             .count = String(elementCount),
             .min = "1",
-            .max = String(maxCount),
+            .max = String(kMaxVectorElementCount),
             .location = vectorType->sourceLoc});
+    }
+}
+
+static void validateMatrixDimensions(DiagnosticSink* sink, IRMatrixType* matrixType)
+{
+    // Matrices with more than 4 rows or columns (up to `kMaxVectorElementCount`) have been
+    // lowered to arrays by `legalizeLargeVectorMatrixTypes`, which leaves a matrix unchanged when
+    // either dimension is over that bound. Check both dimensions, because the row vector type of
+    // a matrix with too many columns need not appear in the module, and report the dimension that
+    // is out of range rather than a valid one (e.g. 20, not 6, for `matrix<float, 6, 20>`).
+    IRIntLit* const counts[] = {
+        as<IRIntLit>(matrixType->getRowCount()),
+        as<IRIntLit>(matrixType->getColumnCount())};
+    IRIntLit* invalidCount = nullptr;
+    for (auto limit :
+         {IRIntegerValue(kMaxVectorElementCount), IRIntegerValue(kMaxNativeVectorElementCount)})
+    {
+        for (auto count : counts)
+        {
+            if (!invalidCount && count && count->getValue() > limit)
+                invalidCount = count;
+        }
+    }
+    if (invalidCount)
+    {
+        sink->diagnose(Diagnostics::VectorWithInvalidElementCountEncountered{
+            .count = String(invalidCount->getValue()),
+            .min = "1",
+            .max = String(kMaxVectorElementCount),
+            .location = matrixType->sourceLoc});
     }
 }
 
@@ -739,6 +771,8 @@ void validateVectorsAndMatrices(
                         .location = matrixType->sourceLoc});
                 }
             }
+
+            validateMatrixDimensions(sink, matrixType);
 
             // Matrix element type validation removed to allow integer/bool matrices
             // which will be lowered to arrays of vectors on targets that don't support them
