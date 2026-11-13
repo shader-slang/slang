@@ -648,6 +648,20 @@ struct IRTypeLegalizationContext
     /// This function is called in `legalizeTypeImpl` to decide whether a parameter block
     /// type should be legalized. Not all legalization passes need to legalize parameter block.
     virtual bool shouldLegalizeParameterBlockElementType() { return false; }
+
+    /// Customization point for a structured buffer whose element type legalized to a split
+    /// form (neither simple nor none), which `legalizeTypeImpl` cannot represent as a buffer
+    /// element; `legalizeTypeImpl` then returns the unchanged buffer type.
+    ///
+    /// An override must report an error, and its pass must stop before rewriting any value.
+    /// The resource context reports E38204, and `legalizeResourceTypes` legalizes every buffer
+    /// type before any value and returns `SLANG_FAIL` on error. The empty-type context never splits
+    /// anything; the default fails loudly if the existential context splits a buffer element.
+    virtual void handleStructuredBufferWithSplitElement(IRHLSLStructuredBufferTypeBase* bufferType)
+    {
+        SLANG_UNUSED(bufferType);
+        SLANG_UNEXPECTED("structured buffer element split outside resource type legalization");
+    }
 };
 
 // This typedef exists to support pre-existing code from when
@@ -686,7 +700,10 @@ LegalType createLegalUniformBufferTypeForExistentials(
 
 void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
+/// Split resource-typed fields out of structs and other aggregates, recursively. Returns
+/// `SLANG_FAIL`, before rewriting any value, if a structured buffer's element type would have to
+/// be split; each such buffer is reported with E38204 at its declarations.
+Result legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
