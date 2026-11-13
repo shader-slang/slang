@@ -200,6 +200,29 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
 
 struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
 {
+    // Results of `hasNonFiniteFloatLitOperand`, keyed by the aggregate (a module-scope inst or a
+    // function-local user). `maybeInlineGlobalValue` asks for the legality of `user` once per
+    // operand it keeps rather than sinks, at every use site, so without the cache an N-element
+    // table would cost O(N^2) per use.
+    Dictionary<IRInst*, bool> m_mapAggregateToHasNonFiniteOperand;
+
+    // Return true if any operand of `inst` is a NaN or infinity float literal.
+    //
+    // The WGSL emitter spells such a literal as a call to the `_slang_getNan` /
+    // `_slang_getInfinity` prelude helpers, because WGSL rejects any const-expression that
+    // evaluates to NaN or infinity. A module-scope initializer may not call a user-declared
+    // function, so an aggregate holding one of these literals cannot stay at module scope.
+    bool hasNonFiniteFloatLitOperand(IRInst* inst)
+    {
+        if (auto cached = m_mapAggregateToHasNonFiniteOperand.tryGetValue(inst))
+            return *cached;
+        bool result = false;
+        for (UInt i = 0; i < inst->getOperandCount() && !result; i++)
+            result = isNonFiniteFloatLit(inst->getOperand(i));
+        m_mapAggregateToHasNonFiniteOperand[inst] = result;
+        return result;
+    }
+
     bool isLegalGlobalInstForTarget(IRInst* inst) override
     {
         switch (inst->getOp())
@@ -211,7 +234,14 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
         case kIROp_MakeMatrix:
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MakeVectorFromScalar:
-            return true;
+            // An aggregate with a NaN or infinity operand is cloned before its first use in a
+            // dominance region, not once per function. If that use is inside a loop body, its
+            // initializer runs every iteration, and a use after the loop gets another clone. Only
+            // direct operands are checked: an outer aggregate built from a sunk inner one is sunk
+            // too, because the generic inliner sinks a legal inst whenever one of its operands is
+            // sunk. Because these ops are not hoistable, reporting a function-local aggregate as
+            // illegal also means the global operands it keeps are not wrapped in `GlobalValueRef`.
+            return !hasNonFiniteFloatLitOperand(inst);
         default:
             break;
         }
