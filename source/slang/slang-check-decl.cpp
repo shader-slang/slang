@@ -3668,6 +3668,70 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
+/// Returns true if every value of `type` is an opaque resource or sampler handle: a texture or
+/// other `ResourceType`, a sampler, a structured buffer, a byte-address buffer, or a non-empty
+/// struct or array made only of those. For example, `Texture2D`, `SamplerState[2]` and
+/// `struct S { Texture2D t; SamplerState s; }` qualify, but `float` and
+/// `struct S { Texture2D t; float scale; }` do not. A shader parameter of such a type is bound
+/// once for the whole dispatch, so its value does not change while the shader runs.
+///
+/// Constant-buffer and parameter-block types are deliberately excluded. They are handles too,
+/// but the data read through them is ordinary uniform data rather than another handle. A cbuffer
+/// member such as `Value` in `cbuffer CB { float Value; }` is read through such a handle, and
+/// that read must stay a runtime value.
+///
+/// `activeTypes` holds the struct types currently being visited. A struct that contains itself
+/// by value, such as `struct R { Texture2D t; R r; }`, is invalid and is diagnosed elsewhere,
+/// so it does not qualify here.
+static bool _isResourceHandleOnlyType(
+    ASTBuilder* astBuilder,
+    Type* type,
+    HashSet<Type*>& activeTypes)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (as<ResourceType>(type) || as<SamplerStateType>(type) ||
+        as<HLSLStructuredBufferTypeBase>(type) || as<UntypedBufferResourceType>(type))
+        return true;
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return _isResourceHandleOnlyType(astBuilder, arrayType->getElementType(), activeTypes);
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
+        {
+            // Fields inherited from a base struct are not returned by `getFields`, so a
+            // struct with a base struct does not qualify.
+            if (findBaseStructType(astBuilder, structDeclRef))
+                return false;
+            // If this struct is already being visited, it contains itself by value.
+            if (activeTypes.contains(type))
+                return false;
+            activeTypes.add(type);
+
+            // Builtin scalar types such as `float` are structs with no fields in the core
+            // module, so a struct must have at least one field to qualify.
+            bool hasField = false;
+            bool allFieldsQualify = true;
+            for (auto fieldDeclRef :
+                 getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+            {
+                hasField = true;
+                if (!_isResourceHandleOnlyType(
+                        astBuilder,
+                        getType(astBuilder, fieldDeclRef),
+                        activeTypes))
+                {
+                    allFieldsQualify = false;
+                    break;
+                }
+            }
+            activeTypes.remove(type);
+            return hasField && allFieldsQualify;
+        }
+    }
+    return false;
+}
+
 /// Returns true if `expr` is a runtime value that cannot be a compile-time or
 /// specialization-time constant.
 /// This is called only after constant folding has already failed (`varDecl->val` is null),
@@ -3675,28 +3739,65 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
 /// constant-foldable intrinsic applied to constant arguments, folding would have succeeded.
 /// Used to distinguish "folding failed because of a runtime reference or call" from
 /// "folding failed because the folder doesn't handle this form" (e.g. unsupported literal type).
-static bool _initExprIsRuntimeValue(Expr* expr)
+///
+/// A resource or sampler handle read from a global shader parameter is not a runtime value,
+/// because the handle is bound once for the whole dispatch. For example, `tex` and `pb.tex` are
+/// both accepted in:
+///
+///     Texture2D tex;
+///     ParameterBlock<Params> pb;
+///     static const Texture2D aliasTex = tex;
+///     static const Texture2D aliasPbTex = pb.tex;
+///
+/// Reading data through a handle is still a runtime value. `tex[uint2(0, 0)]` reads a texel,
+/// and `Value` in `cbuffer CB { float Value; }` is a `float` read through a buffer handle. The
+/// type of such an expression is not made only of handles, so the exemption does not apply to it.
+static bool _initExprIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
 {
     if (!expr)
         return false;
     if (as<ErrorType>(expr->type.type))
         return false;
+    HashSet<Type*> activeTypes;
+    if (_isResourceHandleOnlyType(astBuilder, expr->type.type, activeTypes))
+    {
+        // Look through the accesses that only select a handle out of a larger parameter,
+        // such as `pb.tex`, to find the variable the handle is read from.
+        Expr* root = expr;
+        for (;;)
+        {
+            if (auto memberExpr = as<MemberExpr>(root))
+                root = memberExpr->baseExpression;
+            else if (auto derefExpr = as<DerefExpr>(root))
+                root = derefExpr->base;
+            else if (auto parenExpr = as<ParenExpr>(root))
+                root = parenExpr->base;
+            else
+                break;
+        }
+        if (auto rootDeclRef = as<DeclRefExpr>(root))
+        {
+            auto rootVar = as<VarDeclBase>(rootDeclRef->declRef.getDecl());
+            if (rootVar && isGlobalShaderParameter(rootVar))
+                return false;
+        }
+    }
     if (auto memberExpr = as<MemberExpr>(expr))
-        return _initExprIsRuntimeValue(memberExpr->baseExpression);
+        return _initExprIsRuntimeValue(astBuilder, memberExpr->baseExpression);
     if (auto derefExpr = as<DerefExpr>(expr))
-        return _initExprIsRuntimeValue(derefExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, derefExpr->base);
     if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
-        return _initExprIsRuntimeValue(builtinCastExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, builtinCastExpr->base);
     if (auto swizzleExpr = as<SwizzleExpr>(expr))
-        return _initExprIsRuntimeValue(swizzleExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, swizzleExpr->base);
     if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
-        return _initExprIsRuntimeValue(matSwizzleExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, matSwizzleExpr->base);
     if (auto indexExpr = as<IndexExpr>(expr))
     {
-        if (_initExprIsRuntimeValue(indexExpr->baseExpression))
+        if (_initExprIsRuntimeValue(astBuilder, indexExpr->baseExpression))
             return true;
         for (auto idx : indexExpr->indexExprs)
-            if (_initExprIsRuntimeValue(idx))
+            if (_initExprIsRuntimeValue(astBuilder, idx))
                 return true;
         return false;
     }
@@ -3725,7 +3826,7 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         // A builtin-operator fast-path node is a pure builtin operation: it is a runtime
         // value only when one of its operands is.
         for (auto arg : builtinOpExpr->arguments)
-            if (_initExprIsRuntimeValue(arg))
+            if (_initExprIsRuntimeValue(astBuilder, arg))
                 return true;
         return false;
     }
@@ -3765,7 +3866,7 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         {
             // Pure callable: runtime only when an argument is runtime.
             for (auto arg : invokeExpr->arguments)
-                if (_initExprIsRuntimeValue(arg))
+                if (_initExprIsRuntimeValue(astBuilder, arg))
                     return true;
             return false;
         }
@@ -3773,11 +3874,11 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         return true;
     }
     if (auto parenExpr = as<ParenExpr>(expr))
-        return _initExprIsRuntimeValue(parenExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, parenExpr->base);
     if (auto initListExpr = as<InitializerListExpr>(expr))
     {
         for (auto arg : initListExpr->args)
-            if (_initExprIsRuntimeValue(arg))
+            if (_initExprIsRuntimeValue(astBuilder, arg))
                 return true;
         return false;
     }
@@ -3842,7 +3943,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // handle (e.g. unsupported literal types).
             if (isStaticConst && isGlobalDecl(varDecl) && !varDecl->val &&
                 getSink()->getErrorCount() == errorCountBeforeInitCheck &&
-                _initExprIsRuntimeValue(initExpr))
+                _initExprIsRuntimeValue(getASTBuilder(), initExpr))
             {
                 getSink()->diagnose(Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
             }
