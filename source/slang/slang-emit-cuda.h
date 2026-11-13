@@ -76,6 +76,11 @@ protected:
     {
         return m_target == CodeGenTarget::CUDAHeader;
     }
+    // A CUDA header declares the entry points that header mode keeps (`computeEmitActions`
+    // keeps only `__extern_cpp` ones), matching their definitions in the generated `.cu`.
+    // `emitFunctionPreambleImpl` supplies `extern "C"` and the `__global__` (kernel) or
+    // `__device__` (OptiX callable) qualifier; CUDA entry points need no other attributes.
+    virtual bool shouldEmitEntryPointDecl() SLANG_OVERRIDE { return shouldEmitOnlyHeader(); }
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
