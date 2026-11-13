@@ -2,7 +2,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -render-feature hardware-device
 //TEST(compute):SIMPLE(filecheck=HLSL):-target hlsl -profile cs_6_6 -entry computeMain
-//TEST(compute):SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST(compute):SIMPLE(filecheck=MTL,exit-code=-1):-target metal -entry computeMain -stage compute
 
 // Test atomics on a RWTexture2D<float>.
 
@@ -20,7 +20,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float originalValue;
     
     // HLSL: {{.*}}originalValue{{.*}} = NvInterlockedAddFp32({{.*}}t{{.*}}, {{.*}}, {{.*}}1.0{{.*}});
-    // MTL: atomic_fetch_add
+    // MSL texture atomics exist for int and uint texels only, so Metal diagnoses this.
+    // MTL: error[E55204]{{.*}}
+    // MTL: intrinsic operation 'floating point atomic operation on a texture' is not supported
     t.InterlockedAddF32(uint2(1, 0), 1.0, originalValue);
     
     AllMemoryBarrier();
