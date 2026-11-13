@@ -1818,8 +1818,34 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             switch (constantInst->getFloatKind())
             {
             case IRConstant::FloatKind::Nan:
-                nonFiniteNumerator = "0.0";
-                break;
+                {
+                    // A division would lose the NaN's sign and payload, so rebuild a `float` or
+                    // `double` NaN from its bits. Other NaNs, such as a `half` NaN, keep the
+                    // division below: `asfloat16` needs 16-bit types to be enabled.
+                    const IRFloatingPointValue value = constantInst->value.floatVal;
+                    switch (constantInst->getDataType()->getOp())
+                    {
+                    case kIROp_FloatType:
+                        m_writer->emit("asfloat(");
+                        emitHexLiteral(DoubleToFloatBits(value), 8);
+                        m_writer->emit("U)");
+                        return;
+                    case kIROp_DoubleType:
+                        {
+                            const uint64_t bits = uint64_t(DoubleAsInt64(value));
+                            m_writer->emit("asdouble(");
+                            emitHexLiteral(uint32_t(bits), 8);
+                            m_writer->emit("U, ");
+                            emitHexLiteral(uint32_t(bits >> 32), 8);
+                            m_writer->emit("U)");
+                            return;
+                        }
+                    default:
+                        break;
+                    }
+                    nonFiniteNumerator = "0.0";
+                    break;
+                }
             case IRConstant::FloatKind::PositiveInfinity:
                 nonFiniteNumerator = "1.0";
                 break;
