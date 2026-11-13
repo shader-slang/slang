@@ -408,6 +408,30 @@ void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     {
         m_writer->emit("#define SLANG_CUDA_ENABLE_FAST_MATH 1\n");
     }
+
+    // The prelude includes the CUDA SDK headers for half, bf16 and fp8, and enables its helpers
+    // for them, only under these defines. On -target ptx, Slang compiles this source itself, and
+    // the NVRTC driver (slang-nvrtc-compiler.cpp) already passes these three as -D options; it has
+    // no such option for FAST_MATH, which is why that define above is written on every path.
+    // Writing these three there too would make the source no longer start with the prelude
+    // #include, and Slang then would not pass NVRTC -pch. So we write them only for -target cuda
+    // and -target cuh output. The type flags are final once the module body has been emitted,
+    // which happens before the front matter; the tracker's finalize() only derives the SM version.
+    if (targetReq->getTarget() != CodeGenTarget::PTX)
+    {
+        if (m_extensionTracker->isBaseTypeRequired(BaseType::Half))
+        {
+            m_writer->emit("#define SLANG_CUDA_ENABLE_HALF 1\n");
+        }
+        if (m_extensionTracker->isBfloat16Required())
+        {
+            m_writer->emit("#define SLANG_CUDA_ENABLE_BF16 1\n");
+        }
+        if (m_extensionTracker->isFp8Required())
+        {
+            m_writer->emit("#define SLANG_CUDA_ENABLE_FP8 1\n");
+        }
+    }
 }
 
 void CUDASourceEmitter::emitLayoutSemanticsImpl(
