@@ -747,7 +747,7 @@ The breakdown is thus:
   * The type layout for that variable layout shows what was allocated to represent the container itself, including any implicitly-allocated constant buffer
 
   * The offsets of that variable layout show where the container is situated relative to the overall type.
-  With the current layout strategies used by the Slang compiler, all of these offsets will be zero.
+  With the current layout strategies used by the Slang compiler, these offsets are zero, with one exception: the constant buffer that is automatically introduced for the global scope (see [Wrapped in a Constant Buffer If Needed](#wrapped-in-a-constant-buffer-if-needed)) records its binding here.
 
 * Information about the element is stored as a variable layout, queried with `getElementVarLayout()`
 
@@ -1023,6 +1023,8 @@ case slang::TypeReflection::Kind::ConstantBuffer:
 ```
 
 In this case, the container variable layout reflects the relative offsets for where the automatically-introduced constant buffer is bound, and the element variable layout reflects the global scope parameters that were wrapped in this way.
+The global-scope parameters keep absolute bindings, so the global scope's variable layout stays at offset zero and the constant buffer's binding is the scope's offset plus the container's offset.
+For example, when `[[vk::binding(0)]]` is taken by an explicit parameter, the constant buffer is bound at 1: the scope reports 0 and the container reports 1.
 
 #### Wrapped in a Parameter Block If Needed
 
