@@ -577,10 +577,47 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
     }
 }
 
+// Diagnose the floating-point atomic compare-exchanges in `module`, which SPIR-V and GLSL cannot
+// express. Both have only an integer compare-exchange, and SPIR-V also requires the destination to
+// point to that integer type. Here the destination is a `float`, `half` or `double` location (a
+// buffer element, groupshared memory, a texel or a pointer), and this check cannot make it an
+// integer location: logical SPIR-V cannot bitcast a pointer, and GLSL cannot reinterpret an
+// lvalue. An aliased `uint` view of a buffer, or a bit cast of a physical `float*` to `uint*`,
+// would need a new lowering, so we diagnose those cases too. For example,
+// `Atomic<float>.compareExchange` on a `RWStructuredBuffer` element is diagnosed, whereas
+// `RWByteAddressBuffer.InterlockedCompareExchangeFloatBitwise` compiles because its core-module
+// body already runs on the buffer's `uint` words.
+// We visit only top-level functions because those are the bodies the emitters print; a generic
+// that remains at this point is not emitted, so it cannot produce invalid output.
+static void checkUnsupportedKhronosInsts(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto compareExchange = as<IRAtomicCompareExchange>(inst);
+                if (compareExchange && isFloatingType(compareExchange->getDataType()))
+                {
+                    sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                        .operation = "floating point atomic compare-exchange",
+                        .location = compareExchange->sourceLoc});
+                }
+            }
+        }
+    }
+}
+
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     if (isMetalTarget(target))
         checkUnsupportedMetalInsts(module, sink);
+    else if (isKhronosTarget(target))
+        checkUnsupportedKhronosInsts(module, sink);
 
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.

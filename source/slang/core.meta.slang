@@ -4247,6 +4247,9 @@ struct Atomic<T : IAtomicable>
     /// `successOrder` must be at least as strong as `failOrder`
     ///
     /// `failOrder` must not be `MemoryOrder.Release` or `MemoryOrder.AcquireRelease`
+    ///
+    /// SPIR-V and GLSL define compare-exchange only for integers, so a floating-point `T` is not
+    /// supported on those targets.
     __intrinsic_op($(kIROp_AtomicCompareExchange))
     [__ref] T compareExchange(
         T compareValue,

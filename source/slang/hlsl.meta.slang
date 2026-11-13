@@ -7501,7 +7501,8 @@ $}
     /// @param compareValue The value to compare to the value at `byteAddress`.
     /// @param value The value to store at `byteAddress`.
     /// @param [out] outOriginalValue The original value at `byteAddress` before the exchange operation.
-    /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
+    /// @remarks For SPIR-V and GLSL, this function runs an integer `OpAtomicCompareExchange` or
+    /// `atomicCompSwap` on the `uint` word at `byteAddress`. For HLSL, this function
     /// translates to `InterlockedCompareExchangeFloatBitwise` and requires shader model 6.6.
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
@@ -7512,8 +7513,11 @@ $}
         {
         case hlsl: __intrinsic_asm ".InterlockedCompareExchangeFloatBitwise";
         default:
-            let buf = __getEquivalentStructuredBuffer<float>(this);
-            outOriginalValue = __atomic_compare_exchange(buf[byteAddress / 4], compareValue, value);
+            // SPIR-V and GLSL compare-exchange is integer-only. Comparing the word's `uint` bits is
+            // also the bitwise comparison this method promises: a stored -0.0 does not match +0.0.
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            let originalBits = __atomic_compare_exchange(buf[byteAddress / 4], bit_cast<uint>(compareValue), bit_cast<uint>(value));
+            outOriginalValue = bit_cast<float>(originalBits);
             return;
         }
     }
@@ -7566,8 +7570,8 @@ $}
     /// @param byteAddress The address at which to perform the atomic compare-and-exchange  operation.
     /// @param compareValue The value to perform bitwise comparison to the value at `byteAddress`.
     /// @param value The value to store at `byteAddress` if the comparison is successful.
-    /// @param [out] outOriginalValue The original value at `byteAddress` before the compare-and-exchange operation.
-    /// @remarks For SPIR-V, this function maps to `OpAtomicCompareExchange`. For HLSL, this function
+    /// @remarks For SPIR-V and GLSL, this function runs an integer `OpAtomicCompareExchange` or
+    /// `atomicCompSwap` on the `uint` word at `byteAddress`. For HLSL, this function
     /// translates to `InterlockedCompareStoreFloatBitwise` and requires shader model 6.6.
     /// For CUDA, this function maps to `atomicCAS`.
     [ForceInline]
@@ -7578,8 +7582,9 @@ $}
         {
         case hlsl: __intrinsic_asm ".InterlockedCompareStoreFloatBitwise";
         default:
-            let buf = __getEquivalentStructuredBuffer<float>(this);
-            __atomic_compare_exchange(buf[byteAddress / 4], compareValue, value);
+            // SPIR-V and GLSL compare-exchange is integer-only; see InterlockedCompareExchangeFloatBitwise.
+            let buf = __getEquivalentStructuredBuffer<uint>(this);
+            __atomic_compare_exchange(buf[byteAddress / 4], bit_cast<uint>(compareValue), bit_cast<uint>(value));
             return;
         }
     }
@@ -12863,7 +12868,8 @@ $}
 /// @remarks When targeting HLSL, a call to this function with `T` being `float` will translate to a call to
 /// `InterlockedCompareExchangeFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`. SPIR-V and GLSL define
+/// compare-exchange only for integers, so a floating-point `T` is not supported on those targets.
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
@@ -12888,7 +12894,10 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
 /// @remarks When targeting HLSL, a call to this function will translate to a call to
 /// `InterlockedCompareExchangeFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V and GLSL, this function is not supported, because those targets define
+/// compare-exchange only for integers.
+/// `RWByteAddressBuffer.InterlockedCompareExchangeFloatBitwise` performs the same bitwise
+/// compare-exchange on buffer memory.
 ///
 /// On Metal, `dest` must be in device memory, such as a `RWStructuredBuffer` element or a device
 /// pointer, not a texture, a `RWBuffer` or `groupshared` memory.
@@ -12916,7 +12925,8 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 /// @remarks When targeting HLSL, a call to this function with `T` being `float` will translate to a call to
 /// `InterlockedCompareStoreFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`. SPIR-V and GLSL define
+/// compare-exchange only for integers, so a floating-point `T` is not supported on those targets.
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
@@ -12947,7 +12957,10 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
 /// @remarks When targeting HLSL, a call to this function will translate to a call to
 /// `InterlockedCompareStoreFloatBitwise`, which means the comparison is done as a bitwise comparison.
 ///
-/// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
+/// On SPIR-V and GLSL, a floating-point `T` is not supported, because those targets define
+/// compare-exchange only for integers.
+/// `RWByteAddressBuffer.InterlockedCompareStoreFloatBitwise` performs the same bitwise
+/// compare-store on buffer memory.
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
