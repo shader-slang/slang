@@ -657,7 +657,6 @@ Extensions
 
 `SPV_EXT_shader_subgroup_partitioned`
 > Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
-> Same opcodes and capability as SPV_NV_shader_subgroup_partitioned, but it requires SPIR-V 1.3.
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
@@ -848,15 +847,11 @@ Extensions
 > Represents the SPIR-V capability for group non-uniform clustered operations.
 
 `spvGroupNonUniformPartitionedEXT`
-> Represents the SPIR-V capability for group non-uniform partitioned operations (cross-vendor
-> standard). The partitioned intrinsics declare SPV_EXT_shader_subgroup_partitioned by default.
-> Use spvGroupNonUniformPartitionedNV to declare SPV_NV_shader_subgroup_partitioned instead.
+> Represents the SPIR-V capability for group non-uniform partitioned operations (cross-vendor standard).
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations (NVIDIA-specific).
-> Inherits from spvGroupNonUniformPartitionedEXT so that NV implies EXT capability. When a target
-> requests it, the partitioned intrinsics declare SPV_NV_shader_subgroup_partitioned in place of
-> SPV_EXT_shader_subgroup_partitioned in the SPIR-V that Slang emits directly.
+> Inherits from spvGroupNonUniformPartitionedEXT so that NV implies EXT capability.
 
 `spvGroupNonUniformQuad`
 > Represents the SPIR-V capability for group non-uniform quad operations.

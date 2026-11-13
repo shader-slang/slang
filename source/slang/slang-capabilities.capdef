@@ -626,7 +626,6 @@ def SPV_KHR_shader_clock : _spirv_1_0;
 def SPV_NV_shader_subgroup_partitioned : _spirv_1_0;
 
 /// Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
-/// Same opcodes and capability as SPV_NV_shader_subgroup_partitioned, but it requires SPIR-V 1.3.
 /// [EXT]
 def SPV_EXT_shader_subgroup_partitioned : _spirv_1_3;
 
@@ -867,21 +866,18 @@ def spvGroupNonUniformQuad : _spirv_1_3;
 /// [EXT]
 def spvGroupNonUniformVote : _spirv_1_3;
 
-/// Represents the SPIR-V capability for group non-uniform partitioned operations (cross-vendor
-/// standard). The partitioned intrinsics declare SPV_EXT_shader_subgroup_partitioned by default.
-/// Use spvGroupNonUniformPartitionedNV to declare SPV_NV_shader_subgroup_partitioned instead.
+/// Represents the SPIR-V capability for group non-uniform partitioned operations (cross-vendor standard).
 /// [EXT]
 def spvGroupNonUniformPartitionedEXT : _spirv_1_3 + SPV_EXT_shader_subgroup_partitioned;
 
 // The NV and EXT names of the capability, opcodes and group operations are aliases for the same
 // enumerants (e.g. 5297 for the capability, 5296 for OpGroupNonUniformPartition). As with
 // shader invocation reorder, the NV atom implies the EXT atom, so a target that requests NV also
-// satisfies every requirement written for EXT, and the partitioned intrinsics pick the NV
-// declaration through the more specific atom.
+// satisfies every requirement written for EXT. The partitioned intrinsics declare
+// SPV_EXT_shader_subgroup_partitioned by default, and SPV_NV_shader_subgroup_partitioned when the
+// target requests the NV atom.
 /// Represents the SPIR-V capability for group non-uniform partitioned operations (NVIDIA-specific).
-/// Inherits from spvGroupNonUniformPartitionedEXT so that NV implies EXT capability. When a target
-/// requests it, the partitioned intrinsics declare SPV_NV_shader_subgroup_partitioned in place of
-/// SPV_EXT_shader_subgroup_partitioned in the SPIR-V that Slang emits directly.
+/// Inherits from spvGroupNonUniformPartitionedEXT so that NV implies EXT capability.
 /// [EXT]
 def spvGroupNonUniformPartitionedNV : _spirv_1_3 + SPV_NV_shader_subgroup_partitioned + spvGroupNonUniformPartitionedEXT;
 
