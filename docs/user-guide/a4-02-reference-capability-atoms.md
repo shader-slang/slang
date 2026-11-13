@@ -655,6 +655,9 @@ Extensions
 > (the name the emitter declares); the emitter adds that `OpExtension` on the pre-1.5 path
 > (it is core from 1.5 on), while this dependency records the relationship in the model.
 
+`SPV_EXT_shader_subgroup_partitioned`
+> Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
+
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
 
@@ -843,8 +846,12 @@ Extensions
 `spvGroupNonUniformClustered`
 > Represents the SPIR-V capability for group non-uniform clustered operations.
 
+`spvGroupNonUniformPartitionedEXT`
+> Represents the SPIR-V capability for group non-uniform partitioned operations (cross-vendor standard).
+
 `spvGroupNonUniformPartitionedNV`
-> Represents the SPIR-V capability for group non-uniform partitioned operations.
+> Represents the SPIR-V capability for group non-uniform partitioned operations (NVIDIA-specific).
+> Inherits from spvGroupNonUniformPartitionedEXT so that NV implies EXT capability.
 
 `spvGroupNonUniformQuad`
 > Represents the SPIR-V capability for group non-uniform quad operations.
