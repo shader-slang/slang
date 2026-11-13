@@ -22,6 +22,7 @@
 //! Helper macro, that makes it easy to add result checking to calls in functions/methods that
 //! themselves return Result.
 #define SLANG_RETURN_ON_FAIL(x)             \
+    do                                      \
     {                                       \
         SlangResult _res = (x);             \
         if (SLANG_FAILED(_res))             \
@@ -29,10 +30,11 @@
             SLANG_HANDLE_RESULT_FAIL(_res); \
             return _res;                    \
         }                                   \
-    }
+    } while (0)
 //! Helper macro that can be used to test the return value from a call, and will return in a void
 //! method/function
 #define SLANG_RETURN_VOID_ON_FAIL(x)        \
+    do                                      \
     {                                       \
         SlangResult _res = (x);             \
         if (SLANG_FAILED(_res))             \
@@ -40,9 +42,10 @@
             SLANG_HANDLE_RESULT_FAIL(_res); \
             return;                         \
         }                                   \
-    }
+    } while (0)
 //! Helper macro that will return false on failure.
 #define SLANG_RETURN_FALSE_ON_FAIL(x)       \
+    do                                      \
     {                                       \
         SlangResult _res = (x);             \
         if (SLANG_FAILED(_res))             \
@@ -50,9 +53,10 @@
             SLANG_HANDLE_RESULT_FAIL(_res); \
             return false;                   \
         }                                   \
-    }
+    } while (0)
 //! Helper macro that will return nullptr on failure.
 #define SLANG_RETURN_NULL_ON_FAIL(x)        \
+    do                                      \
     {                                       \
         SlangResult _res = (x);             \
         if (SLANG_FAILED(_res))             \
@@ -60,7 +64,7 @@
             SLANG_HANDLE_RESULT_FAIL(_res); \
             return nullptr;                 \
         }                                   \
-    }
+    } while (0)
 
 //! Helper macro that will assert if the return code from a call is failure, also returns the
 //! failure.
