@@ -162,7 +162,15 @@ def main():
         f"on {args.repo} workflow {args.workflow}."
     )
 
-    runs = fetch_active_runs(args.repo, args.workflow)
+    # Filter by priority before fetching jobs: this run and newer bot runs
+    # cannot make us yield, regardless of their approval-waiting state.
+    runs = fetch_active_runs(
+        args.repo,
+        args.workflow,
+        include_run=lambda run: any(classify_blockers(
+            [run], self_run_id, self_run_number, bot_logins
+        )),
+    )
     human, older_bot = classify_blockers(
         runs, self_run_id, self_run_number, bot_logins
     )
