@@ -1542,6 +1542,14 @@ Result linkAndOptimizeIR(
             *metadata);
     }
 
+    // Fill in the default matrix layout where the source left it unspecified. Must run before
+    // specialization, so `row_major float4x4` and `float4x4` match as one type, and before
+    // `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for. It also
+    // runs before `lowerLValueCast`, so an `inout` layout conversion that the default makes
+    // trivial is removed instead of going through a temporary.
+    if (requiredLoweringPassSet.unresolvedMatrixLayout)
+        SLANG_PASS(specializeMatrixLayout, targetProgram);
+
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     //
     // #11917: Gated on `lValueCast` to skip this whole-module walk when no
@@ -1553,12 +1561,6 @@ Result linkAndOptimizeIR(
     // flag cannot be a false-negative.
     if (requiredLoweringPassSet.lValueCast)
         SLANG_PASS(lowerLValueCast, targetProgram);
-
-    // Fill in the default matrix layout where the source left it unspecified. Must run before
-    // specialization, so `row_major float4x4` and `float4x4` match as one type, and before
-    // `lowerEnumType`, which erases the `MatrixLayoutMode` type this pass looks for.
-    if (requiredLoweringPassSet.unresolvedMatrixLayout)
-        SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // Lower enum types early since enums and enum casts may appear in
     // specialization & not resolving them here would block specialization.
