@@ -1,5 +1,6 @@
 #include "slang-ir-entry-point-decorations.h"
 
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "core/slang-signal.h"
 #include "core/slang-string.h"
@@ -256,6 +257,152 @@ private:
 void checkEntryPointDecorations(IRModule* module, CodeGenTarget target, DiagnosticSink* sink)
 {
     CheckEntryPointDecorationsContext(module, target, sink).check();
+}
+
+// The symbol under which an emitter writes an entry point, plus the stage on SPIR-V, where each
+// execution model has its own namespace of entry-point names. Two entry points with equal keys
+// would be written under the same symbol into one output.
+struct EntryPointSymbolKey
+{
+    String symbol;
+    Stage stage = Stage::Unknown;
+
+    bool operator==(const EntryPointSymbolKey& other) const
+    {
+        return symbol == other.symbol && stage == other.stage;
+    }
+    HashCode getHashCode() const
+    {
+        return combineHash(Slang::getHashCode(symbol), Slang::getHashCode(stage));
+    }
+};
+
+// Return whether the code-generation format `target` is source code, such as CUDA source or C++
+// source, rather than a binary or IR format such as PTX or LLVM IR.
+static bool isSourceFormat(CodeGenTarget target)
+{
+    auto desc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
+    return isDerivedFrom(desc.kind, ArtifactKind::Source);
+}
+
+// Compute the key of the entry point that `decoration` describes when the emitter for the
+// code-generation format `target` writes it, and return whether the entry point has one. The key
+// mirrors the emitters: the SPIR-V emitter writes the name into `OpEntryPoint` for its execution
+// model, `CUDASourceEmitter::generateEntryPointNameImpl` adds the OptiX program-type prefix, and
+// the other emitters write the name into one namespace for all stages.
+//
+// An entry point has no key when its emitter does not write the decoration's name, so it cannot
+// collide by that name:
+//
+// * The GLSL emitter writes every entry point as `main`. A GLSL output can therefore hold a single
+//   entry point whatever the names are, which is a different error from a name collision; for
+//   `-emit-spirv-via-glsl`, glslang reports a whole-program compile as E00101.
+// * The Slang VM emitter names a function by its qualified name hint, such as `A.run`, and makes a
+//   repeated name unique.
+// * The LLVM emitter writes a named dispatcher only for a compute entry point; an entry point of
+//   another stage keeps its mangled name.
+// * The C-like emitters replace `main` with a generated `main_<n>`, as
+//   `doesTargetRenameEntryPointName` decides. The generated name is not compared. A generated
+//   name can collide with an entry point that is literally named `main_0`, as any generated
+//   `<name>_<n>` can collide with a verbatim entry-point name; that is a property of the C-like
+//   emitters' unique-name scheme, not of entry points that share a name.
+static bool computeEntryPointSymbolKey(
+    CodeGenTarget target,
+    IREntryPointDecoration* decoration,
+    EntryPointSymbolKey& outKey)
+{
+    if (target == CodeGenTarget::GLSL || target == CodeGenTarget::HostVM)
+        return false;
+
+    auto name = decoration->getName()->getStringSlice();
+    if (doesTargetRenameEntryPointName(target, name))
+        return false;
+
+    // A CPU format that is not source is written by the LLVM emitter.
+    const Stage stage = decoration->getProfile().getStage();
+    if (stage != Stage::Compute && isCPUTarget(target) && !isSourceFormat(target))
+        return false;
+
+    outKey.symbol = name;
+    if (isCUDATarget(target))
+        outKey.symbol = String(getOptiXEntryPointNamePrefix(stage)) + name;
+    else if (isSPIRV(target))
+        outKey.stage = stage;
+    return true;
+}
+
+void checkEntryPointNamesAreUnique(CodeGenContext* codeGenContext, const List<IRFunc*>& entryPoints)
+{
+    // The naming rules depend on the format that the emitter writes, such as CUDA source for a PTX
+    // target, while the diagnostic names the target that the user asked for.
+    const CodeGenTarget target = codeGenContext->getTargetFormat();
+    const String targetName = TypeTextUtil::getCompileTargetName(
+        SlangCompileTarget(codeGenContext->getFinalTargetFormat()));
+
+    Dictionary<EntryPointSymbolKey, IRFunc*> entryPointsBySymbol;
+    for (auto entryPoint : entryPoints)
+    {
+        auto decoration = entryPoint->findDecoration<IREntryPointDecoration>();
+        SLANG_ASSERT(decoration);
+
+        EntryPointSymbolKey key;
+        if (!computeEntryPointSymbolKey(target, decoration, key))
+            continue;
+
+        IRFunc* otherEntryPoint = nullptr;
+        if (!entryPointsBySymbol.tryGetValue(key, otherEntryPoint))
+        {
+            entryPointsBySymbol.add(key, entryPoint);
+            continue;
+        }
+
+        // `linkIR` returns one entry for each requested entry point, so a function requested twice,
+        // as in `-entry A -entry B -entry A`, appears twice as the same `IRFunc`.
+        if (otherEntryPoint == entryPoint)
+            continue;
+
+        codeGenContext->getSink()->diagnose(Diagnostics::DuplicateEntryPointName{
+            .symbol = key.symbol,
+            .target = targetName,
+            .location = entryPoint->sourceLoc,
+            .otherLocation = otherEntryPoint->sourceLoc});
+    }
+}
+
+UnownedStringSlice getOptiXEntryPointNamePrefix(Stage stage)
+{
+    // OptiX 7 Guide, Section 6.1 (Program input): "The type of program affects how the program
+    // can be used during the execution of the pipeline. These program types are specified by
+    // prefixing the program name" with the prefixes below. Slang cannot yet target the
+    // continuation-callable (`__continuation_callable__`) and exception (`__exception__`) types.
+    switch (stage)
+    {
+    case Stage::RayGeneration:
+        return toSlice("__raygen__");
+    case Stage::Intersection:
+        return toSlice("__intersection__");
+    case Stage::AnyHit:
+        return toSlice("__anyhit__");
+    case Stage::ClosestHit:
+        return toSlice("__closesthit__");
+    case Stage::Miss:
+        return toSlice("__miss__");
+    case Stage::Callable:
+        return toSlice("__direct_callable__");
+    default:
+        return UnownedStringSlice();
+    }
+}
+
+bool doesTargetRenameEntryPointName(CodeGenTarget target, UnownedStringSlice entryPointName)
+{
+    if (entryPointName != toSlice("main"))
+        return false;
+
+    // The C-like emitters write source formats; the LLVM emitter, which keeps `main`, does not.
+    if (!isSourceFormat(target))
+        return false;
+    return isCPUTarget(target) || isCUDATarget(target) || isMetalTarget(target);
 }
 
 OutputTopologyType convertOutputTopologyStringToEnum(String rawOutputTopology)
