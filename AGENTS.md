@@ -137,8 +137,12 @@ Conventions:
 
 Review conventions (recurring review feedback — following them avoids review round-trips):
 
-- Comment functions in complete sentences: what it does first, then why if non-obvious; include a
-  concrete example for non-trivial logic.
+- Thread comments through function bodies (literate style). Put each step of the explanation
+  immediately before the code it justifies, not in one block above the function, even if nearby
+  code is sparse. See "Comments and Documentation" in `docs/design/coding-conventions.md`.
+  Use the `slang-review-fine-grained-clarity` skill to specifically review comments.
+- Comment functions in complete sentences: what it does first, then why if surprising (not its
+  role, e.g. "Helper used by X"); include a concrete example for non-trivial logic.
 - Write explanatory comments in a conversational style. Prefer "Consider this example:" followed
   by the relevant user code over abstract labels such as "Full source shape", "AST trace", or
   "IR trace". After the example, explain what happens step by step in natural prose: which
