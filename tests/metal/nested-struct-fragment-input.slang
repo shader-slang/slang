@@ -3,24 +3,16 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage fragment -entry fragmentMain
 //TEST:SIMPLE(filecheck=WGSLSPIRV): -target wgsl-spirv-asm -stage fragment -entry fragmentMain
 
-// METAL: COARSEVERTEX_7
-// METAL: COARSEVERTEX_6
-
-// Ensure each attribute which may vary only appears once.
-// Ensure 1, 2, 3, 4 all appear
-
-// METAL-DAG: [[ATTR1:COARSEVERTEX_(1|2|3|4)]]
-
-// METAL-NOT: [[ATTR1]]
-// METAL-DAG: [[ATTR2:COARSEVERTEX_(1|2|3|4)]]
-
-// METAL: COARSEVERTEX{{(_0|())}}
-
-// METAL-NOT: [[ATTR2]]
-// METAL-DAG: [[ATTR3:COARSEVERTEX_(1|2|3|4)]]
-
-// METAL-NOT: [[ATTR3]]
-// METAL-DAG: [[ATTR4:COARSEVERTEX_(1|2|3|4)]]
+// The outer-most semantic wins (as reflection reports): every leaf of `coarseVertex`
+// takes `CoarseVertex` with consecutive indices.
+// METAL-DAG: user(COARSEVERTEX)]]
+// METAL-DAG: user(COARSEVERTEX_1)]]
+// METAL-DAG: user(COARSEVERTEX_2)]]
+// METAL-DAG: user(COARSEVERTEX_3)]]
+// METAL-DAG: user(COARSEVERTEX_4)]]
+// METAL-DAG: user(COARSEVERTEX_5)]]
+// METAL-DAG: user(COARSEVERTEX_6)]]
+// METAL-NOT: COARSEVERTEX_7
 
 // WGSL:struct pixelInput
 // WGSL-DAG:@location(0) [[VAR0:[A-Za-z_0-9]+]]
@@ -28,9 +20,9 @@
 // WGSL-DAG:@location(2) [[VAR2:[A-Za-z_0-9]+]]
 // WGSL-DAG:@location(3) [[VAR3:[A-Za-z_0-9]+]]
 // WGSL-DAG:@location(4) [[VAR4:[A-Za-z_0-9]+]]
+// WGSL-DAG:@location(5) [[VAR5:[A-Za-z_0-9]+]]
 // WGSL-DAG:@location(6) [[VAR6:[A-Za-z_0-9]+]]
-// WGSL-DAG:@location(7) [[VAR7:[A-Za-z_0-9]+]]
-// WGSL-NOT:@location(8)
+// WGSL-NOT:@location(7)
 // WGSL:}
 
 // METALLIB: @fragmentMain
@@ -79,15 +71,15 @@ float4 fragmentMain(FragmentStageInput input)
     // METAL-DAG: {{.*}}->p3{{.*}}->p3{{.*}}->p1{{.*}}=
 
     // WGSL: var [[UnpackedInput:[A-Za-z_0-9]+]] : pixelInput
-    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR7]];
+    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR0]];
 
-    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR6]];
-    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR1]];
-    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR2]];
+    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.p2{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR1]];
+    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.p2{{[A-Za-z_0-9]+}}.p2{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR2]];
+    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.p2{{[A-Za-z_0-9]+}}.p3{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR3]];
 
-    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR0]];
-    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR3]];
-    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR4]];
+    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.p3{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR4]];
+    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.p3{{[A-Za-z_0-9]+}}.p2{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR5]];
+    // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.p3{{[A-Za-z_0-9]+}}.p3{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR6]];
 
     outputBuffer[0] = input.coarseVertex.p1 + input.coarseVertex.p2.p1 + +input.coarseVertex.p3.p1;
     return float4(0, 0, 0, 0);

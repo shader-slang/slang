@@ -4,7 +4,7 @@
 // Tests three aspects:
 //  1. Flatten the nested struct for the return type of the entry-point
 //  2. For fragment shader, SV_TARGET index must be emitted as @location(index)
-//  3. For non-fragment shader, the user defined semantics should be emitted as @location(index)
+//  3. Other varyings are emitted at their layout location, ignoring semantic indices
 
 struct FragmentOutput
 {
@@ -44,8 +44,8 @@ VertexOutput vertexMain()
     return out;
 }
 
-//FRAG-DAG: @location(3) color3
-//FRAG-DAG: @location(6) color6
+//FRAG-DAG: @location(2) color3
+//FRAG-DAG: @location(3) color6
 FragmentOutput fragmentMain(VertexOutput input, float4 color3: COLOR3, float4 color6: COLOR6)
 {
     FragmentOutput out;
