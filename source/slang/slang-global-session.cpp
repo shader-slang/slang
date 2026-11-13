@@ -1289,15 +1289,22 @@ void Session::addBuiltinSource(
 
 ISlangSharedLibrary* Session::getOrLoadSlangLLVM()
 {
-    if (m_slangLLVM.get())
-        return m_slangLLVM.get();
-
-    auto result = m_sharedLibraryLoader->loadSharedLibrary("slang-llvm", m_slangLLVM.writeRef());
-
-    if (result == SLANG_FAIL)
-        return nullptr;
-
+    std::lock_guard<std::mutex> lock(m_slangLLVMMutex);
+    if (!m_slangLLVM)
+    {
+        ComPtr<ISlangSharedLibrary> library;
+        if (SLANG_FAILED(
+                m_sharedLibraryLoader->loadSharedLibrary("slang-llvm", library.writeRef())))
+            return nullptr;
+        m_slangLLVM = library;
+    }
     return m_slangLLVM.get();
+}
+
+std::mutex& Session::getLLVMProcessStateMutex()
+{
+    static std::mutex mutex;
+    return mutex;
 }
 
 SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
