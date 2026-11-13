@@ -328,8 +328,16 @@ void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
     }
 }
 
-void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
+void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst, const char* coordName)
 {
+    // `coordName` names a local that already holds the coordinate; null emits the operand.
+    auto emitCoord = [&](EmitOpInfo const& outerPrec)
+    {
+        if (coordName)
+            m_writer->emit(coordName);
+        else
+            emitOperand(inst->getCoord(), outerPrec);
+    };
     auto resourceType = getImageSubscriptResourceType(inst);
     bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
@@ -338,19 +346,19 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
         // index.
         auto coordType = as<IRVectorType>(inst->getCoord()->getDataType());
         SLANG_RELEASE_ASSERT(coordType);
-        emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
+        emitCoord(getInfo(EmitOp::Postfix));
         m_writer->emit(".");
         const char* elements[] = {"x", "y", "z", "w"};
         for (IRIntegerValue i = 0; i < getIntVal(coordType->getElementCount()) - 1; i++)
             m_writer->emit(elements[Math::Min(3, (int)i)]);
         m_writer->emit(", ");
-        emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
+        emitCoord(getInfo(EmitOp::Postfix));
         m_writer->emit(".");
         m_writer->emit(elements[Math::Min(3, (int)getIntVal(coordType->getElementCount()) - 1)]);
     }
     else
     {
-        emitOperand(inst->getCoord(), getInfo(EmitOp::General));
+        emitCoord(getInfo(EmitOp::General));
     }
 }
 
@@ -508,34 +516,67 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicCompareExchange:
         {
-            bool isImageOp = false;
+            // MSL only has a weak compare-exchange (`cmpxchg weak` in AIR), which may fail
+            // spuriously: it returns false and leaves `expected` equal to the comparand although
+            // the memory held it. Callers of the Slang op (InterlockedCompareExchange,
+            // Atomic<T>.compareExchange) detect success by comparing the returned old value with
+            // the comparand, so a spurious failure would look like a success. Retry until the
+            // exchange happened or the value really differs. The retry test compares bit
+            // patterns, like the exchange itself: with `==`, a float -0.0 in memory would pass as
+            // a +0.0 comparand, and a NaN comparand would never retry.
+            // The pointer, texture coordinate, comparand and value are evaluated once, before the
+            // loop, so every retry uses the same operands.
             auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst));
-            isImageOp = (imageSubscript != nullptr);
+            const bool isImageOp = (imageSubscript != nullptr);
+            auto valueType = inst->getDataType();
 
-            emitType(inst->getDataType(), getName(inst));
-            m_writer->emit(";\n{\n");
-            if (isImageOp)
-                m_writer->emit("vec<");
-            emitType(inst->getDataType());
-            if (isImageOp)
-                m_writer->emit(", 4>");
-            m_writer->emit(" _metal_cas_comparand");
-            m_writer->emit(" = ");
-            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            m_writer->emit(";\n");
-            if (imageSubscript)
+            auto emitCasValueType = [&]()
             {
-                emitImageOperandWithAccessor(imageSubscript->getImage());
-                m_writer->emit("atomic_compare_exchange_weak(");
-                emitAtomicImageCoord(imageSubscript);
+                if (isImageOp)
+                    m_writer->emit("vec<");
+                emitType(valueType);
+                if (isImageOp)
+                    m_writer->emit(", 4>");
+            };
+
+            emitType(valueType, getName(inst));
+            m_writer->emit(";\n{\n");
+            m_writer->indent();
+            if (isImageOp)
+            {
+                m_writer->emit("auto _metal_cas_coord = ");
+                emitOperand(imageSubscript->getCoord(), getInfo(EmitOp::General));
+                m_writer->emit(";\n");
             }
             else
             {
-                m_writer->emit("atomic_compare_exchange_weak_explicit(");
+                m_writer->emit("auto _metal_cas_ptr = ");
                 emitAtomicDestOperand(inst->getOperand(0));
+                m_writer->emit(";\n");
             }
-            m_writer->emit(", &_metal_cas_comparand, ");
+            emitCasValueType();
+            m_writer->emit(" _metal_cas_comparand = ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            emitCasValueType();
+            m_writer->emit(" _metal_cas_value = ");
             emitAtomicSrcOperand(isImageOp, inst->getOperand(2));
+            m_writer->emit(";\n");
+            emitCasValueType();
+            m_writer->emit(" _metal_cas_expected = _metal_cas_comparand;\n");
+
+            m_writer->emit("while (!");
+            if (isImageOp)
+            {
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_compare_exchange_weak(");
+                emitAtomicImageCoord(imageSubscript, "_metal_cas_coord");
+            }
+            else
+            {
+                m_writer->emit("atomic_compare_exchange_weak_explicit(_metal_cas_ptr");
+            }
+            m_writer->emit(", &_metal_cas_expected, _metal_cas_value");
             if (!isImageOp)
             {
                 m_writer->emit(", ");
@@ -543,12 +584,46 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(", ");
                 emitMemoryOrderOperand(inst->getOperand(4));
             }
-            m_writer->emit(");\n");
+            m_writer->emit(") && ");
+            const char* component = isImageOp ? ".x" : "";
+            const char* bitsType = nullptr;
+            switch (valueType->getOp())
+            {
+            case kIROp_FloatType:
+                bitsType = "uint";
+                break;
+            case kIROp_HalfType:
+                bitsType = "ushort";
+                break;
+            default:
+                break;
+            }
+            if (bitsType)
+            {
+                m_writer->emit("as_type<");
+                m_writer->emit(bitsType);
+                m_writer->emit(">(_metal_cas_expected");
+                m_writer->emit(component);
+                m_writer->emit(") == as_type<");
+                m_writer->emit(bitsType);
+                m_writer->emit(">(_metal_cas_comparand");
+                m_writer->emit(component);
+                m_writer->emit(")");
+            }
+            else
+            {
+                m_writer->emit("_metal_cas_expected");
+                m_writer->emit(component);
+                m_writer->emit(" == _metal_cas_comparand");
+                m_writer->emit(component);
+            }
+            m_writer->emit(")\n{\n}\n");
             m_writer->emit(getName(inst));
-            m_writer->emit(" = _metal_cas_comparand");
-            if (isImageOp)
-                m_writer->emit(".x");
-            m_writer->emit(";\n}\n");
+            m_writer->emit(" = _metal_cas_expected");
+            m_writer->emit(component);
+            m_writer->emit(";\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
             return true;
         }
     case kIROp_AtomicAdd:
