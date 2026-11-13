@@ -259,7 +259,7 @@ These intrinsics are specific to Slang and were added to support the subgroup ro
 ` extension), and Metal.
 
 ```
-// Supported on SPIRV, GLSL, and Metal targets.
+// Supported on SPIRV, GLSL, Metal and WGSL targets. WGSL emulates it with `subgroupShuffle`.
 T WaveRotate(T value, uint delta);
 
 // Supported on SPIRV and GLSL targets.
@@ -467,4 +467,6 @@ T WaveClusteredBitXor<T>(T expr, uint clusterSize);
 These functions operate similarly to their `WaveActive*` counterparts, except that the reductions are performed in clusters. For example, a `WaveClusteredSum(val, 4)` would mean that the wave is divided into clusters of 4 adjacent lanes, each computing their own local sum and sharing the result with each other.
 
 The `clusterSize` parameter of these function must be a compile-time constant that is 1 or greater and a power of two. It must also be less than equal to the `WaveGetLaneCount()`.
+
+On Metal and WGSL, which have no clustered subgroup operations, these functions are emulated: each lane of the cluster is read with a shuffle, and the active lanes are combined in lane order. The cost is one shuffle per lane of the cluster. Metal does not accept `bool` values, as for its other wave reductions.
 
