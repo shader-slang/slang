@@ -149,6 +149,13 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
     {
         funcType = directFuncType;
     }
+    else if (substitutedDirectFuncType)
+    {
+        // An __associatedfunc with an abstract signature, such as a generic parameter.
+        auto witness = getDiffTypeInfoWitness(substitutedDirectFuncType);
+        SLANG_RELEASE_ASSERT(witness);
+        return witness;
+    }
     else
     {
         funcType = as<FuncType>(getFuncType(astBuilder, callableDeclRef));

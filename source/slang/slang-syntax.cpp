@@ -1050,6 +1050,15 @@ List<DeclRef<ParamDecl>> getParametersForCallableSignature(
 
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
 {
+    // An __associatedfunc stores its signature directly, without parameter declarations.
+    if (hasDirectFuncType(declRef))
+    {
+        auto funcType = as<FuncType>(
+            declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve());
+        SLANG_RELEASE_ASSERT(funcType);
+        return funcType;
+    }
+
     List<Type*> paramTypes;
     auto resultType = getResultType(astBuilder, declRef);
 
