@@ -1864,14 +1864,28 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Neg:
         {
             auto opType = inst->getOperand(0)->getDataType();
+            if (auto vectorType = as<IRVectorType>(opType))
+            {
+                // WGSL has a native unary '-' for f32, f16 and i32 vectors. Use it: for floats,
+                // "T(0) - x" is not the same operation, since 0.0 - (+0.0) is +0.0 while -(+0.0)
+                // is -0.0. The generic unary emission handles the operand's precedence.
+                switch (vectorType->getElementType()->getOp())
+                {
+                case kIROp_FloatType:
+                case kIROp_HalfType:
+                case kIROp_DoubleType:
+                case kIROp_IntType:
+                    return false;
+                default:
+                    break;
+                }
+            }
             if (as<IRMatrixType>(opType) || as<IRVectorType>(opType) ||
                 (isIntegralType(opType) && !getIntTypeSigned(opType)))
             {
-                // Lower every vector/matrix negation and unsigned scalar negation uniformly to
-                // "(type(0) - op0)". (WGSL has a native unary '-' only for signed float/int
-                // scalars and vectors; matrices and unsigned types have none. For unsigned
-                // scalars, this produces valid WGSL with standard two's complement wrap-around;
-                // note that float vectors lose signed-zero distinction under this lowering.)
+                // Lower matrix negation and unsigned scalar and vector negation to
+                // "(type(0) - op0)": WGSL has no unary '-' for them. For unsigned integers the
+                // subtraction is exact, with two's complement wrap-around.
                 // The explicit parentheses wrap the whole subtraction, so its outer context is
                 // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
                 // and emit op0 as the subtraction's right-hand side. This wraps an operand that
