@@ -15,7 +15,7 @@
 // A name that is in no catalog entry is reported rather than ignored, so the
 // CHECK pins the unknown-diagnostic-name error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute -warnings-disable not-a-real-diagnostic-name
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1,non-exhaustive):-target hlsl -entry main -stage compute -warnings-disable not-a-real-diagnostic-name
 [numthreads(1,1,1)]
 void main() {}
 

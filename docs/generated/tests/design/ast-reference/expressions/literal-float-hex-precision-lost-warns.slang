@@ -15,7 +15,7 @@
 // silently and it does not reject the program either - it warns and keeps the
 // truncated conversion. CHECK pins E40019 on the literal.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry computeMain
 
 RWStructuredBuffer<float> outputBuffer;
 

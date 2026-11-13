@@ -14,7 +14,7 @@
 // A float literal that exceeds the max representable value of
 // the target type (here `half`) is converted with E40009.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 static const half g = 1.0e10h;
 

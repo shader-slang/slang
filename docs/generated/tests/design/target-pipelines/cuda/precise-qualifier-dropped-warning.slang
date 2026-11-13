@@ -16,7 +16,7 @@
 // the declaration that carries the qualifier; the value itself still
 // computes, so this is a dropped-qualifier warning and not an error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<float> outBuf;
 

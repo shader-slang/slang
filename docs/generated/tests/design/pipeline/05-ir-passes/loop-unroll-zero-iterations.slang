@@ -13,7 +13,7 @@
 // the body entirely and the diagnostic surface reports `E30514: loop
 // runs zero times`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target glsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target glsl -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

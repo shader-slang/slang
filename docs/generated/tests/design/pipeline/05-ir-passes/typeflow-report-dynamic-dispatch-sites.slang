@@ -18,7 +18,7 @@
 // the listed type names follows the type-flow merge order, so it is not
 // pinned.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main -report-dynamic-dispatch-sites
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main -report-dynamic-dispatch-sites
 
 uniform int sel;
 RWStructuredBuffer<int> outBuf;

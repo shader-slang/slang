@@ -17,7 +17,7 @@
 // entry-point rename that every Metal compile of a `main` emits, so both
 // diagnostics the run produces are accounted for.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry main -stage compute -trace-coverage -trace-coverage-counter-width 64
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target metal -entry main -stage compute -trace-coverage -trace-coverage-counter-width 64
 
 RWStructuredBuffer<float> outBuf;
 

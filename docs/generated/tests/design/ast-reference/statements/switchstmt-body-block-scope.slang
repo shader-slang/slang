@@ -17,7 +17,7 @@
 // than to the initialized outer variable, which is exactly what a
 // single body-wide scope means.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target cpp -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 

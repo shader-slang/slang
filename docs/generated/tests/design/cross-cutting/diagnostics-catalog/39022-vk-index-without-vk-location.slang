@@ -14,7 +14,7 @@
 // `[[vk::index(N)]]` without a corresponding `[[vk::location(N)]]`
 // is ignored and triggers E39022.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -stage fragment -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv -stage fragment -entry main
 
 [shader("fragment")]
 float4 main([[vk::index(1)]] float4 col : COLOR) : SV_Target

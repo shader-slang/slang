@@ -11,7 +11,7 @@
 //META: catalog_name=unknown-attribute-name
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 [unknownAttr]
 [shader("compute")][numthreads(1,1,1)]

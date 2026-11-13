@@ -15,7 +15,7 @@
 // warning; here the name survives verbatim and the compile is silent, which
 // is what the CHECK-NOT on the rename code asserts.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target metal -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

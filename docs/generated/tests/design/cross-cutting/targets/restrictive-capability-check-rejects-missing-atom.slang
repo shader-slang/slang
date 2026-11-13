@@ -21,7 +21,7 @@
 // DIAGNOSTIC_TEST's checks can hang off a distinct line of source.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-ERR):-stage compute -entry main -target hlsl -profile sm_5_0 -restrictive-capability-check -DERROR=1 -DWARN=0
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-WARN):-stage compute -entry main -target hlsl -profile sm_5_0 -DERROR=0 -DWARN=1
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK-WARN,exit-code=0):-stage compute -entry main -target hlsl -profile sm_5_0 -DERROR=0 -DWARN=1
 
 #if ERROR
 

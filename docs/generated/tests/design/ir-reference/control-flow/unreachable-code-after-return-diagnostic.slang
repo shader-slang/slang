@@ -16,7 +16,7 @@
 // pipeline would accept it silently; the CHECK pins the diagnostic code and
 // caret span on the offending statement.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;

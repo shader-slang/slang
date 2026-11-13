@@ -13,7 +13,7 @@
 
 // Minimum reproduction for diagnostic E15601.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #pragma unknown_pragma_xyz
 void main() {}
 

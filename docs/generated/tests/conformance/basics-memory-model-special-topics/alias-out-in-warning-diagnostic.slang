@@ -16,7 +16,7 @@
 // copy taken before the call -- and the section requires the behavior to be
 // undefined, not a warning, so that pairing is no longer asserted here.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 

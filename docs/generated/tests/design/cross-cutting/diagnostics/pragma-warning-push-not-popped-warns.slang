@@ -13,7 +13,7 @@
 // `#pragma warning(push)` never popped before end of file is diagnosable.
 // The caret-anchored CHECK pins code 15612 and the unmatched-push message.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 #pragma warning(push)
 //CHECK:        ^^^^ E15612
 //CHECK:        ^^^^ detected #pragma warning(push) with no corresponding #pragma warning(pop)

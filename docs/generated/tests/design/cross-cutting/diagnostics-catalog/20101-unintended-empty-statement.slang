@@ -13,7 +13,7 @@
 
 // Minimum reproduction for diagnostic E20101.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 void main() { if (true); }
 
 //CHECK: E20101

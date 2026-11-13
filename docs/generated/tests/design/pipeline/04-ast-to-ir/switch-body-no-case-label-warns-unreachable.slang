@@ -15,7 +15,7 @@
 // and names the first non-empty statement. The caret pins the statement
 // `r = 7;` (not the `switch` keyword).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv-asm -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv-asm -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

@@ -12,7 +12,7 @@
 // Pin `user-defined-warning` (15901) to its rendered code. The
 // directive's payload is interpolated via `~message`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 #warning "custom preprocessor warning"
 /*CHECK:
  ^^^^^^^ E15901

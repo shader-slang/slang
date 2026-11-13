@@ -15,7 +15,7 @@
 // INT64_MAX + 2 is always diagnosed. Only the two un-negated literals carry
 // the warning code E40004; the negated one has no CHECK on its line.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 void main()
 {

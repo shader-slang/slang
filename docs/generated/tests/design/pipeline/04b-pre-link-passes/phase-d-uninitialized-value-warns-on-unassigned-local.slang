@@ -14,7 +14,7 @@
 // `x` has no reaching definition. The annotation is placed on the use, and
 // the code CHECK pins the warning identity.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

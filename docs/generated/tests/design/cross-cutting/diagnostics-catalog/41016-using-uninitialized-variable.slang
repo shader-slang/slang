@@ -14,7 +14,7 @@
 // A function that returns a local variable without initializing it
 // triggers the uninitialized-variable warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv -entry main -stage compute
 
 int f() { int x; return x; }
 

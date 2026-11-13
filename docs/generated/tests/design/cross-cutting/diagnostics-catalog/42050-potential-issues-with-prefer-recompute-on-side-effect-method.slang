@@ -15,7 +15,7 @@
 // that has side effects (writes to a buffer) triggers a warning
 // because recomputation may execute the side effect twice.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<float> o;
 

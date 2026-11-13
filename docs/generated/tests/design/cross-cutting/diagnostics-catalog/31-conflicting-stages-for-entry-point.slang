@@ -15,7 +15,7 @@
 // second `-stage vertex` conflicts with the first `-stage compute`, and the
 // CHECK pins the conflicting-stage error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -entry main -stage compute -stage vertex
 [numthreads(1,1,1)]
 void main() {}
 

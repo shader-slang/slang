@@ -15,7 +15,7 @@
 // category is diagnosed rather than silently printing general help; the CHECK
 // pins that code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-h bogusHelpCategory
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-h bogusHelpCategory
 [numthreads(1,1,1)]
 void main() {}
 

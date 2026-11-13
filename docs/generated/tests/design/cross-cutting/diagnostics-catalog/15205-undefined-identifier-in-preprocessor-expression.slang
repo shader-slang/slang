@@ -15,7 +15,7 @@
 // but the preprocessor still warns so typos in feature checks are visible. The
 // CHECK pins that warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #if UNDEFINED_IDENTIFIER_XYZ
 #endif
 void main() {}

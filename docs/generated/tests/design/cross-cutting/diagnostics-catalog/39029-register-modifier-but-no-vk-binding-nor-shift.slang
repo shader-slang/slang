@@ -15,7 +15,7 @@
 // no `[[vk::binding(...)]]` (and no `-fvk-...-shift`) for SPIR-V
 // triggers E39029.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv -stage compute -entry main
 
 Texture2D<float> tex : register(t0);
 

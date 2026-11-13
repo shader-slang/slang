@@ -14,7 +14,7 @@
 // Assigning the literal 300 to a uint8_t triggers the integer-constant
 // overflow warning during conversion.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 [numthreads(1,1,1)]
 void main() {

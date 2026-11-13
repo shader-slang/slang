@@ -14,7 +14,7 @@
 // A function with an `out` parameter that returns without writing to
 // that parameter triggers the returning-with-uninitialized warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 void f(out int x) { return; }
 

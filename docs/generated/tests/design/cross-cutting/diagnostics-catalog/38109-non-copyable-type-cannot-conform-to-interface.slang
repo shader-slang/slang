@@ -13,7 +13,7 @@
 
 // A non-copyable type conforming to an interface produces E38109.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 interface IFoo
 {

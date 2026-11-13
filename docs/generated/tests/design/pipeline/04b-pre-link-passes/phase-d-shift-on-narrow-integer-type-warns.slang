@@ -17,7 +17,7 @@
 // still an Lsh when the validator runs. The caret pins the warning to the
 // shift operator and the annotated text names the operand type.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main
 
 uniform int16_t s;
 uniform int n;

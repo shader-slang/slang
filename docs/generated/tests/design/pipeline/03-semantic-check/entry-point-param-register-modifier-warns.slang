@@ -14,7 +14,7 @@
 // loud instead of letting the user believe the binding took effect. CHECK
 // pins E38010 and the message naming the keyword.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
