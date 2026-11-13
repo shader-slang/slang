@@ -21,8 +21,9 @@ struct GlobalInstInliningContextGeneric
     virtual bool shouldBeInlinedForTarget(IRInst* user) = 0;
     virtual IRInst* getOutsideASM(IRInst* beforeInst) = 0;
 
-    // Inline global values that can't represented by the target to their use sites.
-    // If this leaves any global unused, then remove it.
+    // Copy each global value that the target can't represent into every function, or global
+    // variable initializer, that uses it. Then remove the global, and the operands that were
+    // copied with it, once they are left without uses.
     void inlineGlobalValuesAndRemoveIfUnused(IRModule* module);
 
     // Opcodes that can exist in global scope, as long as the operands are.
