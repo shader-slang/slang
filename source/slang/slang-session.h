@@ -378,7 +378,10 @@ public:
         RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         DiagnosticSink* sink);
 
-    SourceFile* loadSourceFile(String pathFrom, String path);
+    void loadSerializedModuleFileDependencies(
+        String const& binaryModulePath,
+        ModuleChunk const* moduleChunk,
+        List<SourceFile*>& outSourceFiles);
 
     void loadParsedModule(
         RefPtr<FrontEndCompileRequest> compileRequest,
