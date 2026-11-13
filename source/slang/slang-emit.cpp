@@ -47,6 +47,7 @@
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-eliminate-undefined-opaque-handles.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -2810,6 +2811,7 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         SLANG_PASS(performIntrinsicFunctionInlining);
+        SLANG_PASS(eliminateUndefinedOpaqueHandles, codeGenContext);
     }
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);

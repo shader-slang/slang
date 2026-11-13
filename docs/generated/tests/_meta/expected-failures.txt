@@ -144,3 +144,63 @@ docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slan
 # SIGSEGV (exit 139) instead of emitting an empty pybind module. The same
 # entry point without a parameter compiles. Remove once the crash is fixed.
 docs/generated/tests/design/pipeline/overview/torch-ordinary-entry-with-param-has-nothing-to-bind.slang
+
+# https://github.com/shader-slang/slang/issues/14259 — the HLSL emitter writes a
+# nonzero `int` constant as `NL` rather than `int(N)` and the `int` minimum as
+# `(-2147483647L - 1L)`. These bundles check the old HLSL spellings and need
+# regenerating; remove each entry once its regenerated bundle passes.
+docs/generated/tests/conformance/expressions-member-access/vector-rgba-mapping.slang.1
+docs/generated/tests/conformance/types-struct/struct-static-const-initializer.slang
+docs/generated/tests/conformance/types-struct/struct-static-member-functional.slang
+docs/generated/tests/conformance/types-vector-and-matrix/matrix-elem-access.slang.1
+docs/generated/tests/conformance/types-vector-and-matrix/vector-binary-scalar-broadcast.slang.1
+docs/generated/tests/coverage/check-expr/matrix-swizzle-vector-result.slang
+docs/generated/tests/coverage/cli-options/disable-short-circuit-eager-operands.slang
+docs/generated/tests/coverage/cli-options/disable-short-circuit-eager-operands.slang.1
+docs/generated/tests/coverage/emit/matrix-reshape-row-truncation.slang
+docs/generated/tests/coverage/emit/switch-fallthrough-shared-case.slang
+docs/generated/tests/coverage/lower-to-ir/defer-scope-end-hlsl-emit.slang
+docs/generated/tests/coverage/lower-to-ir/generic-value-param-bitwise-array-size.slang.1
+docs/generated/tests/coverage/lower-to-ir/switch-fallthrough-and-shared-case.slang
+docs/generated/tests/coverage/parser/gpu-foreach-statement.slang
+docs/generated/tests/coverage/parser/target-switch-multi-statement-case.slang
+docs/generated/tests/coverage/type-layout/array-of-struct-of-resources-register-striding.slang
+docs/generated/tests/design/ast-reference/expressions/new-expr-class-instance.slang
+docs/generated/tests/design/ast-reference/expressions/tuple-expr-empty.slang
+docs/generated/tests/design/ast-reference/expressions/tuple-expr-pair-construction.slang
+docs/generated/tests/design/ast-reference/statements/targetcase-stacked-labels-share-body.slang
+docs/generated/tests/design/ast-reference/values/linktimeintval-cast-and-builtin-op-propagate.slang
+docs/generated/tests/design/ast-reference/values/linktimeintval-extern-const-polynomial-bound.slang
+docs/generated/tests/design/cross-cutting/targets/target-switch-missing-arm-falls-to-default.slang
+docs/generated/tests/design/ir-reference/misc/node-output-record-get-element-ptr.slang.1
+docs/generated/tests/design/ir-reference/resources-and-atomics/natural-stride-alignment-folded-values.slang.1
+docs/generated/tests/design/name-resolution/lookup/lookup-mask-attribute-vs-value-name.slang
+docs/generated/tests/design/name-resolution/lookup/semantic-name-not-hidden-by-value-decl.slang
+docs/generated/tests/design/name-resolution/visibility/aggregate-member-takes-module-default-2025-accepted.slang
+docs/generated/tests/design/pipeline/03-semantic-check/dyn-interface-restrictions-inactive-under-default-std.slang
+docs/generated/tests/design/pipeline/05-ir-passes/bit-field-accessors-emit-shift-and-mask.slang
+docs/generated/tests/design/pipeline/05-ir-passes/defer-buffer-load-narrows-read-to-leaf.slang
+docs/generated/tests/design/pipeline/05-ir-passes/explicit-global-init-hlsl-keeps-declaration-initializer.slang
+docs/generated/tests/design/pipeline/05-ir-passes/lower-defer-emits-cleanup-on-scope-exit.slang
+docs/generated/tests/design/pipeline/05-ir-passes/lower-enum-type-emits-integer-on-hlsl.slang
+docs/generated/tests/design/pipeline/05-ir-passes/specialize-stage-switch-resolves-stage-conditional.slang
+docs/generated/tests/design/pipeline/06-emit/int32-min-literal-emit-per-target.slang
+docs/generated/tests/design/pipeline/06-emit/wgsl-switch-keeps-early-case-break.slang.1
+docs/generated/tests/design/pipeline/06-emit/wgsl-switch-merges-shared-case-labels.slang.1
+docs/generated/tests/design/pipeline/overview/ast-to-ir-lowers-control-flow.slang
+docs/generated/tests/design/pipeline/overview/ast-to-ir-lowers-global-var.slang
+docs/generated/tests/design/pipeline/overview/ast-to-ir-lowers-nested-control-flow.slang
+docs/generated/tests/design/pipeline/overview/end-to-end-flow-all-targets.slang
+docs/generated/tests/design/pipeline/overview/preprocess-completes-before-parse.slang
+docs/generated/tests/design/syntax-reference/grammar/expr-new-class-instance.slang
+docs/generated/tests/design/syntax-reference/grammar/stmt-require-capability-multiple-atoms.slang
+docs/generated/tests/design/syntax-reference/keywords-and-builtins/boundary-rwstructuredbuffer-index-zero-emission.slang
+docs/generated/tests/design/target-pipelines/hlsl/eliminate-phis-default-options.slang
+docs/generated/tests/design/target-pipelines/hlsl/enum-lowering-to-integer.slang
+docs/generated/tests/design/target-pipelines/hlsl/int-literal-min-emits-decimal.slang
+docs/generated/tests/design/target-pipelines/hlsl/matrix-storage-colmajor-infix-under-row-major-layout.slang
+docs/generated/tests/design/target-pipelines/hlsl/matrix-storage-natural-float3x4-field-shape.slang
+docs/generated/tests/design/target-pipelines/hlsl/matrix-swizzle-store-lowered-to-elements.slang
+docs/generated/tests/design/target-pipelines/hlsl/move-global-var-init-to-entry.slang
+docs/generated/tests/design/target-pipelines/hlsl/stress-deeply-nested-if-else.slang
+docs/generated/tests/design/target-pipelines/hlsl/stress-many-case-switch.slang

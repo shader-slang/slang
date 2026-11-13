@@ -14,17 +14,17 @@
 // Warning should NOT be emitted for DXC (supports fall-through)
 // CHECK-HLSL6-NOT: warning[E41026]
 // CHECK-HLSL6: case int(0):
-// CHECK-HLSL6: x_{{.*}} = int(100)
+// CHECK-HLSL6: x_{{.*}} = 100L
 // CHECK-HLSL6-NOT: break
-// CHECK-HLSL6: case int(1):
+// CHECK-HLSL6: case 1L:
 
 // HLSL SM 5.x should NOT have fall-through - case 0 has break before case 1
 // Warning should be emitted for FXC (doesn't support fall-through)
 // CHECK-HLSL5: warning[E41026]
 // CHECK-HLSL5: case int(0):
-// CHECK-HLSL5: x_{{.*}} = int(100)
+// CHECK-HLSL5: x_{{.*}} = 100L
 // CHECK-HLSL5: break
-// CHECK-HLSL5: case int(1):
+// CHECK-HLSL5: case 1L:
 
 // WGSL should NOT have fall-through - it is restructured by duplicating the fall-through
 // target's body into case 0, with no explicit terminating break (WGSL switch cases do not

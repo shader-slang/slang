@@ -5,7 +5,7 @@
 // differentiable function without a custom derivative. A whole-variable write and an atomic stay
 // in place; they are in silent.slang. A call that takes part of shared memory as an `out` or
 // `inout` argument, including a `[mutating]` receiver, writes that part back when it returns, so
-// it is reported whatever the callee. A write in a non-differentiable helper's own body is not
+// it is reported whatever the callee, with a note at what makes the call write it. A write in a non-differentiable helper's own body is not
 // reported, even when the helper is `[ForceInline]` and so becomes part of the differentiated body.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry computeMain -stage compute -experimental-feature
@@ -98,20 +98,20 @@ float nestedWrite(uint i, float x)
 }
 
 void setElement(inout float v)
-//CHECK:        ^^^^^ 'inout' requires exclusive access
+//CHECK:        ^^^^^ the call writes its argument back because the parameter is 'inout'
 {
     v = 1.0;
 }
 
 [ForceInline]
 void setElementInlined(inout float v)
-//CHECK:               ^^^^^ 'inout' requires exclusive access
+//CHECK:               ^^^^^ the call writes its argument back because the parameter is 'inout'
 {
     v = 1.0;
 }
 
 void setElementUint(inout uint v)
-//CHECK:            ^^^^^ 'inout' requires exclusive access
+//CHECK:            ^^^^^ the call writes its argument back because the parameter is 'inout'
 {
     v = 1;
 }
@@ -122,7 +122,7 @@ struct Counter
 
     [mutating]
 /*CHECK:
-     ^^^^^^^^ '[mutating]' requires exclusive access to 'this'
+     ^^^^^^^^ the call writes 'this' back because of '[mutating]'
 */
     void bump()
     {
@@ -137,8 +137,6 @@ groupshared Counter gCounters[4];
 float callWrite(uint i, float x)
 {
     setElement(g[i]);
-//CHECK:        ^ 'setElement' needs exclusive access to parameter 'v', but 'g[i]' is thread-group-shared memory that other invocations could access
-//CHECK:        ^ consider copying value through a local variable to make the access explicit
 //CHECK:        ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
 //CHECK:        ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
@@ -148,8 +146,6 @@ float callWrite(uint i, float x)
 float inlinedCallWrite(uint i, float x)
 {
     setElementInlined(g[i]);
-//CHECK:               ^ 'setElementInlined' needs exclusive access to parameter 'v', but 'g[i]' is thread-group-shared memory that other invocations could access
-//CHECK:               ^ consider copying value through a local variable to make the access explicit
 //CHECK:               ^ writing part of thread-group-shared variable 'g' introduces a race condition when this function is differentiated
 //CHECK:               ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
@@ -159,8 +155,6 @@ float inlinedCallWrite(uint i, float x)
 float convertedCallWrite(uint i, float x)
 {
     setElementUint(gInt[i]);
-//CHECK:               ^ 'setElementUint' needs exclusive access to parameter 'v', but 'gInt[i]' is thread-group-shared memory that other invocations could access
-//CHECK:               ^ consider copying value through a local variable to make the access explicit
 //CHECK:               ^ writing part of thread-group-shared variable 'gInt' introduces a race condition when this function is differentiated
 //CHECK:               ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;
@@ -170,8 +164,6 @@ float convertedCallWrite(uint i, float x)
 float mutatingReceiverWrite(uint i, float x)
 {
     gCounters[i].bump();
-//CHECK:     ^ 'bump' needs exclusive access to parameter 'this', but 'gCounters[i]' is thread-group-shared memory that other invocations could access
-//CHECK:     ^ consider copying value through a local variable to make the access explicit
 //CHECK:     ^ writing part of thread-group-shared variable 'gCounters' introduces a race condition when this function is differentiated
 //CHECK:     ^ consider moving this into a function that is not differentiable or has a custom derivative
     return x;

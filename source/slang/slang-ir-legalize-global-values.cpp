@@ -7,6 +7,19 @@
 namespace Slang
 {
 
+// Return true if `user` is in code that runs: a function body, or the initializer of a global
+// variable, which runs when the variable is initialized (for kernel targets,
+// `moveGlobalVarInitializationToEntryPoints` later moves it into each entry point).
+static bool isUserInExecutableCode(IRInst* user)
+{
+    for (auto parent = user->getParent(); parent; parent = parent->getParent())
+    {
+        if (as<IRFunc>(parent) || as<IRGlobalVar>(parent))
+            return true;
+    }
+    return false;
+}
+
 void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRModule* module)
 {
     List<IRUse*> globalInstUsesToInline;
@@ -17,7 +30,7 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
         {
             for (auto use = globalInst->firstUse; use; use = use->nextUse)
             {
-                if (getParentFunc(use->getUser()) != nullptr)
+                if (isUserInExecutableCode(use->getUser()))
                     globalInstUsesToInline.add(use);
             }
         }
@@ -33,20 +46,38 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
         auto val = maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
         if (val != use->get())
         {
-            // Since certain globals that appear in the IR are considered illegal for all targets,
-            // e.g. calls to functions, we delete the globals we've inlined.
-            // Note that the inlining is done such that none of the descendants of the global will
-            // have any uses either.
+            // A global that is illegal for the target, such as a call, is removed below once
+            // every use has its own copy, together with the operands inlined with it.
             globalInstsToConsiderDeleting.add(use->usedValue);
 
             builder.replaceOperand(use, val);
         }
     }
 
+    // Inlining clones a global value together with the operands it needs, so once its uses are
+    // replaced, operands that were inlined with it may be left without uses as well. Dead code
+    // elimination would keep such an operand when it is a call whose callee might have side
+    // effects, and the target would then evaluate it a second time, or reject it, as a global
+    // initializer. Each use already has its own copy, so we remove the original. Children of an
+    // inlined global are recorded as inlined too, but they go away with their parent, so only
+    // module-scope operands are queued. An operand can be queued more than once, so we skip one
+    // that is no longer in the module.
+    List<IRInst*> workList;
     for (auto globalInst : globalInstsToConsiderDeleting)
+        workList.add(globalInst);
+    while (workList.getCount())
     {
-        if (!globalInst->hasUses())
-            globalInst->removeAndDeallocate();
+        auto globalInst = workList.getLast();
+        workList.removeLast();
+        if (!globalInst->getParent() || globalInst->hasUses())
+            continue;
+        for (UInt i = 0; i < globalInst->getOperandCount(); i++)
+        {
+            auto operand = globalInst->getOperand(i);
+            if (as<IRModuleInst>(operand->getParent()) && shouldInlineInst(operand))
+                workList.add(operand);
+        }
+        globalInst->removeAndDeallocate();
     }
 }
 

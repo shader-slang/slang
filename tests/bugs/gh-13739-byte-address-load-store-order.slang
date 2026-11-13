@@ -68,4 +68,4 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // HLSL: outputBuffer_0[int(0)] = [[V]].y;
 // HLSL: uint [[C:[A-Za-z0-9_]+]] = rw_0.Load(base_0 + 16U + 12U);
 // HLSL: rw_0.Store({{.*}}, 200U);
-// HLSL: outputBuffer_0[int(2)] = [[C]];
+// HLSL: outputBuffer_0[2L] = [[C]];

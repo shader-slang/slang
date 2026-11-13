@@ -4040,27 +4040,8 @@ err(
     span { loc = "location", message = "'groupshared' parameter declared here" }
 )
 
-warning(
-    "groupshared-argument-to-exclusive-parameter",
-    30709,
-    "'~func:Decl' needs exclusive access to parameter '~param', but '~storageText' is thread-group-shared memory that other invocations could access",
-    span { loc = "arg:Expr", message = "consider copying value through a local variable to make the access explicit" },
-    -- At most one of these notes has a location: the parameter's `out` or `inout` keyword, the
-    -- method's `[mutating]` attribute, or a method that can modify `this` without one, such as a
-    -- `set` accessor or a method in HLSL source.
-    note { message = "'~mode:ParamPassingMode' requires exclusive access", span { loc = "modeLocation" } },
-    note { message = "'[mutating]' requires exclusive access to 'this'", span { loc = "mutatingLocation" } },
-    note { message = "this method can modify 'this', which requires exclusive access", span { loc = "methodLocation" } }
-)
-
--- A call whose callee has no declaration, such as `bwd_diff(f)(...)`, has no parameter names, so
--- this counterpart of warning 30709 identifies the parameter by its position and mode instead.
-warning(
-    "groupshared-argument-to-exclusive-parameter-at-position",
-    30710,
-    "'~callee' needs exclusive access to its '~mode:ParamPassingMode' parameter #~paramNumber:Int, but '~storageText' is thread-group-shared memory that other invocations could access",
-    span { loc = "arg:Expr", message = "consider copying value through a local variable to make the access explicit" }
-)
+-- 30709 and 30710 were warnings about thread-group-shared memory passed to an `out` or `inout`
+-- parameter, and are not reused.
 
 err(
     "groupshared-argument-must-be-groupshared-lvalue",
@@ -4960,7 +4941,13 @@ err(
     "groupshared-partial-write-in-differentiated-body",
     38039,
     "writing part of thread-group-shared variable '~var:Decl' introduces a race condition when this function is differentiated",
-    span { loc = "target:Expr", message = "consider moving this into a function that is not differentiable or has a custom derivative" }
+    span { loc = "target:Expr", message = "consider moving this into a function that is not differentiable or has a custom derivative" },
+    -- For a call, at most one of these notes has a location: the parameter's `out` or `inout`
+    -- keyword, the method's `[mutating]` attribute, or a method that can modify `this` without
+    -- one, such as a `set` accessor or a method in HLSL source.
+    note { message = "the call writes its argument back because the parameter is '~mode:ParamPassingMode'", span { loc = "modeLocation" } },
+    note { message = "the call writes 'this' back because of '[mutating]'", span { loc = "mutatingLocation" } },
+    note { message = "the call writes 'this' back because this method can modify it", span { loc = "methodLocation" } }
 )
 
 err(
