@@ -3,6 +3,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
@@ -143,6 +144,137 @@ IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
     return textureType;
 }
 
+static IRVarLayout* rewriteNestedVarLayout(
+    LowerCombinedSamplerContext& context,
+    IRBuilder* builder,
+    IRType* type,
+    IRVarLayout* varLayout);
+
+// Return `layout`, the layout of a value of `type`, with the layout of every combined
+// texture-sampler inside `type` that this pass lowers replaced by a layout of its lowered
+// `{texture, sampler}` struct. Only the layouts on the path to such a texture-sampler are
+// rebuilt; when `type` contains none, `layout` itself is returned.
+//
+// Consider this example:
+//
+//     cbuffer C { Sampler2D a; Sampler2D b; }
+//
+// The field `b` of the constant buffer's element struct has the layout of a combined
+// texture-sampler: one texture register and one sampler register, and no field layouts. After
+// the type of `b` becomes the lowered struct, `legalizeResourceTypes` looks up the layouts of
+// its `texture` and `sampler` fields to bind the two resources it splits out, so `b` needs a
+// struct layout with those fields. The walk follows the same type and layout pairs that
+// `getFieldLayout` and `declareVars` follow: arrays, structs and uniform parameter groups.
+static IRTypeLayout* rewriteNestedTypeLayout(
+    LowerCombinedSamplerContext& context,
+    IRBuilder* builder,
+    IRType* type,
+    IRTypeLayout* layout)
+{
+    if (auto textureType = isCombinedTextureSamplerType(type))
+    {
+        auto info = context.mapTypeToLoweredInfo.tryGetValue(textureType);
+        if (!info)
+            return layout;
+
+        // The fields keep their offsets relative to this position, and the struct keeps the
+        // sizes of the combined layout, so the enclosing layouts keep their sizes and
+        // `applyOffsetToTypeLayout` can still offset the fields.
+        IRStructTypeLayout::Builder structLayoutBuilder(builder);
+        structLayoutBuilder.addResourceUsageFrom(layout);
+        for (auto fieldAttr : cast<IRStructTypeLayout>(info->typeLayout)->getFieldLayoutAttrs())
+            structLayoutBuilder.addField(fieldAttr->getFieldKey(), fieldAttr->getLayout());
+        return structLayoutBuilder.build();
+    }
+
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        auto arrayLayout = as<IRArrayTypeLayout>(layout);
+        if (!arrayLayout)
+            return layout;
+        auto elementLayout = arrayLayout->getElementTypeLayout();
+        auto newElementLayout =
+            rewriteNestedTypeLayout(context, builder, arrayType->getElementType(), elementLayout);
+        if (newElementLayout == elementLayout)
+            return layout;
+        IRArrayTypeLayout::Builder arrayLayoutBuilder(builder, newElementLayout);
+        arrayLayoutBuilder.addResourceUsageFrom(arrayLayout);
+        return arrayLayoutBuilder.build();
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        auto structLayout = as<IRStructTypeLayout>(layout);
+        if (!structLayout)
+            return layout;
+        bool changed = false;
+        IRStructTypeLayout::Builder structLayoutBuilder(builder);
+        structLayoutBuilder.addResourceUsageFrom(structLayout);
+        for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+        {
+            auto fieldLayout = fieldAttr->getLayout();
+            auto newFieldLayout = fieldLayout;
+            // The layout can still list a field that an earlier pass moved out of the struct,
+            // such as a resource that left the struct of global-scope parameters.
+            if (auto field = findStructField(structType, as<IRStructKey>(fieldAttr->getFieldKey())))
+                newFieldLayout =
+                    rewriteNestedVarLayout(context, builder, field->getFieldType(), fieldLayout);
+            changed |= newFieldLayout != fieldLayout;
+            structLayoutBuilder.addField(fieldAttr->getFieldKey(), newFieldLayout);
+        }
+        return changed ? structLayoutBuilder.build() : layout;
+    }
+
+    if (auto groupType = as<IRUniformParameterGroupType>(type))
+    {
+        auto groupLayout = as<IRParameterGroupTypeLayout>(layout);
+        if (!groupLayout)
+            return layout;
+        auto elementVarLayout = groupLayout->getElementVarLayout();
+        auto newElementVarLayout =
+            rewriteNestedVarLayout(context, builder, groupType->getElementType(), elementVarLayout);
+        if (newElementVarLayout == elementVarLayout)
+            return layout;
+        IRParameterGroupTypeLayout::Builder groupLayoutBuilder(builder);
+        groupLayoutBuilder.addResourceUsageFrom(groupLayout);
+        groupLayoutBuilder.setContainerVarLayout(groupLayout->getContainerVarLayout());
+        groupLayoutBuilder.setElementVarLayout(newElementVarLayout);
+        // The offset element layout is derived from the element layout the same way the front
+        // end derives it. For `ParameterBlock<Sampler2D>` this also moves the element's offsets
+        // into the fields of the lowered struct, because the element is now a struct.
+        groupLayoutBuilder.setOffsetElementTypeLayout(applyOffsetToTypeLayout(
+            builder,
+            newElementVarLayout->getTypeLayout(),
+            newElementVarLayout));
+        return groupLayoutBuilder.build();
+    }
+
+    return layout;
+}
+
+// Return `varLayout`, the layout of a variable of `type`, with its type layout rewritten by
+// `rewriteNestedTypeLayout`. The offsets and every other property of `varLayout` are kept.
+static IRVarLayout* rewriteNestedVarLayout(
+    LowerCombinedSamplerContext& context,
+    IRBuilder* builder,
+    IRType* type,
+    IRVarLayout* varLayout)
+{
+    auto typeLayout = varLayout->getTypeLayout();
+    auto newTypeLayout = rewriteNestedTypeLayout(context, builder, type, typeLayout);
+    if (newTypeLayout == typeLayout)
+        return varLayout;
+    IRVarLayout::Builder varLayoutBuilder(builder, newTypeLayout);
+    varLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
+    for (auto offsetAttr : varLayout->getOffsetAttrs())
+    {
+        auto info = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+        info->offset = offsetAttr->getOffset();
+        info->space = offsetAttr->getSpace();
+    }
+    return varLayoutBuilder.build();
+}
+
 void lowerCombinedTextureSamplers(
     IRModule* module,
     CodeGenContext* codeGenContext,
@@ -210,7 +342,10 @@ void lowerCombinedTextureSamplers(
         }
         auto newVarLayout = newVarLayoutBuilder.build();
         subBuilder.addLayoutDecoration(globalParam, newVarLayout);
-        varLayout->removeAndDeallocate();
+        // Layouts are deduplicated, so `varLayout` can also be the layout of a field nested in
+        // another parameter: the first `Sampler2D` field of a constant buffer has the same
+        // relative offsets as a global `Sampler2D` at t0/s0. The nested-layout loop below reads
+        // that field layout, so only the decoration is removed here.
         layoutDecor->removeAndDeallocate();
     }
 
@@ -310,6 +445,30 @@ void lowerCombinedTextureSamplers(
                 }
             }
         }
+    }
+
+    // A combined texture-sampler nested inside a global parameter (a field of a constant buffer,
+    // a parameter block or a struct) gets the layout of its lowered struct here. The loop above
+    // already did this for a parameter that is itself a combined texture-sampler or an array of
+    // them.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto globalParam = as<IRGlobalParam>(globalInst);
+        if (!globalParam || isCombinedTextureSamplerType(unwrapArray(globalParam->getFullType())))
+            continue;
+        auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+        if (!varLayout)
+            continue;
+        builder.setInsertBefore(globalParam);
+        auto newVarLayout =
+            rewriteNestedVarLayout(context, &builder, globalParam->getFullType(), varLayout);
+        if (newVarLayout == varLayout)
+            continue;
+        builder.addLayoutDecoration(globalParam, newVarLayout);
+        layoutDecor->removeAndDeallocate();
     }
 
     // Replace all other type use with the lowered struct type.
