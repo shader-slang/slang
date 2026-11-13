@@ -54,7 +54,9 @@ struct GlobalInstInliningContextGeneric
 // `makeStruct`, so that a `static const` struct table can stay a global constant.
 //
 // For CUDA, a global constant whose type contains `half` is also inlined, because CUDA
-// emits a `half` literal as a constructor call, which is a dynamic initializer.
+// emits a `half` literal as a constructor call, which is a dynamic initializer. Likewise, for
+// CUDA, a vector or matrix value computed by an operator (anything but `makeVector` or
+// `makeMatrix`) is inlined, because the CUDA prelude implements the operators as functions.
 void inlineGlobalConstantsForLegalization(IRModule* module, CodeGenTarget target);
 
 
