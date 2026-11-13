@@ -216,6 +216,18 @@ struct DeadCodeEliminationContext
             // recursively and eliminate those that are "dead" by
             // virtue of not having been found live.
             //
+            // We report the whole round's dead module-level instructions before removing any of
+            // them, because removing one first could replace its operands (for example a
+            // groupshared variable only it uses) with poison before the observer sees them.
+            if (options.removedGlobalInstObserver && root == module->getModuleInst())
+            {
+                for (auto inst : module->getGlobalInsts())
+                {
+                    if (!isInstAlive(inst))
+                        options.removedGlobalInstObserver->onRemove(inst);
+                }
+            }
+
             phiRemoved = false;
             result |= eliminateDeadInstsRec(root);
 
