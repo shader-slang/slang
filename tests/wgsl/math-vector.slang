@@ -18,135 +18,135 @@ bool Test_Vector()
     return true
         // WGSL: acos(
         // WGSL-NOT: acos(
-        && zero == acos<T>(one)
+        && all(zero == acos<T>(one))
 
         // WGSL: acosh(
         // WGSL-NOT: acosh(
-        && zero == acosh<T>(one)
+        && all(zero == acosh<T>(one))
 
         // WGSL: asin(
         // WGSL-NOT: asin(
-        && zero == asin<T>(zero)
+        && all(zero == asin<T>(zero))
 
         // WGSL: asinh(
         // WGSL-NOT: asinh(
-        && zero == asinh<T>(zero)
+        && all(zero == asinh<T>(zero))
 
         // WGSL: atan(
         // WGSL-NOT: atan(
-        && zero == atan<T>(zero)
+        && all(zero == atan<T>(zero))
 
         // WGSL: atan2(
         // WGSL-NOT: atan2(
-        && zero == atan2<T>(zero, zero)
+        && all(zero == atan2<T>(zero, zero))
 
         // WGSL: atanh(
         // WGSL-NOT: atanh(
-        && zero == atanh<T>(zero)
+        && all(zero == atanh<T>(zero))
 
         // WGSL: ceil(
         // WGSL-NOT: ceil(
-        && zero == ceil<T>(zero)
+        && all(zero == ceil<T>(zero))
 
         // WGSL: cos(
         // WGSL-NOT: cos(
-        && one == cos<T>(zero)
+        && all(one == cos<T>(zero))
 
         // WGSL: cosh(
         // WGSL-NOT: cosh(
-        && one == cosh<T>(zero)
+        && all(one == cosh<T>(zero))
 
         // WGSL: exp(
         // WGSL-NOT: exp(
-        && one == exp<T>(zero)
+        && all(one == exp<T>(zero))
 
         // WGSL: exp2(
         // WGSL-NOT: exp2(
-        && one == exp2<T>(zero)
+        && all(one == exp2<T>(zero))
 
         // WGSL: abs(
         // WGSL-NOT: abs(
-        && zero == abs<T>(zero)
+        && all(zero == abs<T>(zero))
 
         // WGSL: floor(
         // WGSL-NOT: floor(
-        && zero == floor<T>(zero)
+        && all(zero == floor<T>(zero))
 
         // WGSL: fma(
         // WGSL-NOT: fma(
-        && zero == fma(zero, zero, zero)
+        && all(zero == fma(zero, zero, zero))
 
         // WGSL: max(
         // WGSL-NOT: max(
-        && zero == max<T>(zero, zero)
+        && all(zero == max<T>(zero, zero))
 
         // WGSL: min(
         // WGSL-NOT: min(
-        && zero == min<T>(zero, zero)
+        && all(zero == min<T>(zero, zero))
 
         // WGSL: fract(
         // WGSL-NOT: fract(
-        && zero == fract<T>(zero)
+        && all(zero == fract<T>(zero))
 
         // WGSL: frexp(
         // WGSL-NOT: frexp(
-        && zero == frexp<T>(zero, outInt) && all(zeroInt == outInt)
+        && all(zero == frexp<T>(zero, outInt)) && all(zeroInt == outInt)
 
         // WGSL: ldexp(
         // WGSL-NOT: ldexp(
-        && zero == ldexp<T>(zero, zeroInt)
+        && all(zero == ldexp<T>(zero, zeroInt))
 
         // WGSL: log(
         // WGSL-NOT: log(
-        && zero == log<T>(one)
+        && all(zero == log<T>(one))
 
         // WGSL: log2(
         // WGSL-NOT: log2(
-        && zero == log2<T>(one)
+        && all(zero == log2<T>(one))
 
         // WGSL: modf(
         // WGSL-NOT: modf(
-        && zero == modf<T>(zero, outFloat1)
+        && all(zero == modf<T>(zero, outFloat1))
 
         // WGSL: pow(
         // WGSL-NOT: pow(
-        && zero == pow<T>(zero, one)
+        && all(zero == pow<T>(zero, one))
 
         // WGSL: inverseSqrt(
         // WGSL-NOT: inverseSqrt(
-        && one == rsqrt<T>(one)
+        && all(one == rsqrt<T>(one))
 
         // WGSL: ) % (
         // WGSL-NOT: ) % (
-        && zero == fmod<T>(zero, one)
+        && all(zero == fmod<T>(zero, one))
 
         // WGSL: round(
         // WGSL-NOT: round(
-        && zero == round<T>(zero)
+        && all(zero == round<T>(zero))
 
         // WGSL: sin(
         // WGSL-NOT: sin(
-        && zero == sin<T>(zero)
+        && all(zero == sin<T>(zero))
 
         // WGSL: sinh(
         // WGSL-NOT: sinh(
-        && zero == sinh<T>(zero)
+        && all(zero == sinh<T>(zero))
 
         // WGSL: sqrt(
         // WGSL-NOT: sqrt(
-        && zero == sqrt<T>(zero)
+        && all(zero == sqrt<T>(zero))
 
         // WGSL: tan(
         // WGSL-NOT: tan(
-        && zero == tan<T>(zero)
+        && all(zero == tan<T>(zero))
 
         // WGSL: tanh(
         // WGSL-NOT: tanh(
-        && zero == tanh<T>(zero)
+        && all(zero == tanh<T>(zero))
 
         // WGSL: trunc(
         // WGSL-NOT: trunc(
-        && zero == trunc<T>(zero)
+        && all(zero == trunc<T>(zero))
         ;
 
     // WGSL-LABEL: Test_Vector_1
