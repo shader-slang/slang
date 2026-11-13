@@ -4,6 +4,8 @@
 #include "core/slang-blob.h"
 #include "core/slang-performance-profiler.h"
 
+#include <exception>
+
 namespace Slang
 {
 namespace Fossil
@@ -1149,11 +1151,11 @@ SerialReader::SerialReader(
     ReadContext& context,
     Fossil::AnyValPtr valPtr,
     InitialStateType initialState)
-    : _context(context)
+    : _context(context), _uncaughtExceptionCountAtConstruction(std::uncaught_exceptions())
 {
     // We track the number of active `SerialReader`s that
     // are working with the same `ReadContext`, and will
-    // make use of this count in the destructor below.
+    // make use of this count in `flush()` and the destructor.
     //
     context._readerCount++;
 
@@ -1175,49 +1177,48 @@ SerialReader::SerialReader(
 
 SerialReader::~SerialReader()
 {
-    // If an application is designed to perform something
-    // like on-demand deserialization, it may create
-    // additional `SerialReader`s attached to the same
-    // `ReadContext`, potentially even in the body of a
-    // callback that was invoked by an operation on another
-    // `SerialReader` further up the stack.
+    // Deferred actions are run by `flush()` rather than here, because an
+    // action can throw (for example, when a serialized module refers to a
+    // declaration that can no longer be resolved), and an exception must
+    // not escape a destructor.
     //
-    // If we were to track the deferred actions that get
-    // enqueued on a per-`SerialReader` basis, and then
-    // flush them when the given `SerialReader` is destructed,
-    // it could potentially lead to very deep call stacks.
+    // The outermost reader is left with pending actions when an exception
+    // is unwinding through the scope that owns it. We drop the actions, and
+    // since any object read through the context may then be incomplete,
+    // nothing should read from this `ReadContext` again.
     //
-    // Instead, we track a single list of deferred actions
-    // on the `ReadContext`, which means that we need to
-    // figure out when to actually flush that list.
+    // Pending actions on a normal exit mean that a caller did not call
+    // `flush()`. The assertion then fails, and because its exception cannot
+    // leave a destructor, the process terminates.
     //
-    // What is implemented here is a "last one out shuts the door"
-    // policy. When a `SerialReader` is being destroyed, before
-    // it decrements the count on the shared `ReadContext`, it
-    // checks to see if it is the last remaining `SerialReader`,
-    // in which case it takes responsibility for flushing the deferred
-    // actions that were enqueued by *all* of the readers.
-    //
-    // Note that the ordering here is critical: we check whether
-    // we are the last reader and, if so, perform the `_flush()`
-    // operation all *before* decrementing the counter. If we
-    // were to decrement the count before invoking `_flush()`
-    // then any nested `SerialReader`s that get created by the
-    // deferred actions would (incorrectly) believe themselves
-    // to be the "last one out" and try to perform their own
-    // `flush()`, which could quickly lead to unbounded
-    // recursion.
-    //
-    if (_context._readerCount == 1)
+    if (_isOutermostReader())
     {
-        _flush();
+        SLANG_RELEASE_ASSERT(
+            _context._deferredActions.getCount() == 0 ||
+            std::uncaught_exceptions() > _uncaughtExceptionCountAtConstruction);
+        _context._deferredActions.clear();
     }
     _context._readerCount--;
 }
 
+bool SerialReader::_isOutermostReader() const
+{
+    return _context._readerCount == 1;
+}
+
 void SerialReader::flush()
 {
-    _flush();
+    // The actions enqueued by every reader on a `ReadContext` share one list,
+    // and only the outermost reader drains it, because letting each nested
+    // reader drain its own actions could lead to very deep call stacks. This
+    // reader is still counted while it flushes, so nested readers created by
+    // the deferred actions are not outermost and leave their actions to the
+    // loop in this reader's `_flush()`.
+    //
+    if (_isOutermostReader())
+    {
+        _flush();
+    }
 }
 
 void SerialReader::beginVariant(Scope& scope)
