@@ -21,6 +21,11 @@
       "self_hosted": true
     },
     {
+      "labels": ["Linux", "self-hosted", "falcor-bridge"],
+      "name": "Falcor Bridge (KernelVM)",
+      "self_hosted": true
+    },
+    {
       "labels": ["Windows", "self-hosted", "GCP-T4"],
       "name": "Windows GPU (GCP)",
       "self_hosted": true
@@ -150,6 +155,11 @@
     {
       "prefix": "linux-analytics-",
       "name": "Linux Analytics (GCP)",
+      "self_hosted": true
+    },
+    {
+      "prefix": "kernelvm-falcor-bridge",
+      "name": "Falcor Bridge (KernelVM)",
       "self_hosted": true
     },
     {
