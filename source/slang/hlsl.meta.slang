@@ -13616,6 +13616,11 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
+// The floating-point overloads above lower to fused multiply-add intrinsics (`GLSL.std.450 Fma`,
+// GLSL `fma`, the prelude's `F*_fma` helpers, `llvm.fma`) that are defined only for
+// floating-point types. HLSL defines `mad` for integer operands, so the integer overloads use it
+// there and compute `mvalue * avalue + bvalue` in `T` on every other supported target, with
+// the same overflow behavior as any other integer arithmetic in `T`.
 __generic<T : __BuiltinIntegerType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
@@ -13623,13 +13628,7 @@ T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
-    case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Fma $mvalue $avalue $bvalue
-    };
     default:
         return mvalue * avalue + bvalue;
     }
@@ -13642,13 +13641,9 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Fma $mvalue $avalue $bvalue
-    };
     default:
-        VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
+        return mvalue * avalue + bvalue;
     }
 }
 
