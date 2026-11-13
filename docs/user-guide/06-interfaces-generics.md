@@ -1403,11 +1403,13 @@ The following interfaces remain supported for compatibility, but new generic num
 They are not deprecated, and existing code does not need to migrate immediately.
 
 - `IArithmetic` provides methods for the `+`, `-`, `*`, `/`, `%`, and negation operations, plus explicit conversion from `int`.
-  All builtin integer and floating-point scalar, vector, and matrix types implement it.
-- `ILogical` provides methods for bitwise and logical operations, plus explicit conversion from `int`.
-  All builtin integer scalar, vector, and matrix types implement it.
-- `IInteger` combines `IArithmetic` and `ILogical` for builtin integer scalar types.
-- `IFloat` combines `IArithmetic`, `ILogical`, and `IDifferentiable` for builtin floating-point scalar, vector, and matrix types, and provides conversions to and from `float`.
+  All builtin integer and floating-point scalar and vector types, and all builtin floating-point matrix types, implement it.
+- `ILogical` provides methods for bitwise, shift, and logical operations, plus explicit conversion from `int`.
+  `bool`, enum types, and all builtin integer scalar and vector types implement it.
+  In code generic over `ILogical`, `<<`, `>>`, `<<=` and `>>=` take a scalar builtin integer amount such as `int` or `uint`, so `x << n` shifts every element of a vector `x` by the same `n`.
+  With `T = bool` such a shift yields a `bool`, while a concrete `b << n` on a `bool` value yields an `int`.
+- `IInteger` combines `IArithmetic` and `ILogical` for builtin integer scalar and vector types.
+- `IFloat` combines `IArithmetic` and `IDifferentiable` for builtin floating-point scalar, vector, and matrix types, and provides conversions to and from `float`.
 
 Operator overloads are defined for these interfaces, so existing generic code such as the following remains valid:
 

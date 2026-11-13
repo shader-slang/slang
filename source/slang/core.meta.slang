@@ -3971,8 +3971,46 @@ T operator ^=(in out T v0, T v1)
     return v0;
 }
 
+// The generic shift operators take any scalar builtin-integer shift amount `U`, so `x << 2u`
+// works in generic code, and narrow it to the `int` that the `shl` and `shr` requirements of
+// `ILogical` take. For builtin integer operands the intrinsic shifts above still win, because
+// `int : __BuiltinIntegerType` is a declared conformance and costs less than `int : ILogical`.
+// For a scalar `bool` these overloads would win over the integer shift and produce a `bool`, so
+// `convertToBuiltinArithmeticOp` promotes an infix `bool` left operand to `int` first.
+
+__generic<T : ILogical, U : __BuiltinIntegerType>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator <<(T v0, U v1)
+{
+    return v0.shl(__intCast<int>(v1));
+}
+__generic<T : ILogical, U : __BuiltinIntegerType>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator >>(T v0, U v1)
+{
+    return v0.shr(__intCast<int>(v1));
+}
+__generic<T : ILogical, U : __BuiltinIntegerType>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator <<=(in out T v0, U v1)
+{
+    v0 = v0 << v1;
+    return v0;
+}
+__generic<T : ILogical, U : __BuiltinIntegerType>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator >>=(in out T v0, U v1)
+{
+    v0 = v0 >> v1;
+    return v0;
+}
+
 // The operator overloads defined above already allows Enum types to be used
-// in logical operators, but we still provide overloads for __EnumTypes and map
+// in logical and shift operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
 // work on enum types.
 
@@ -3995,6 +4033,16 @@ __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitNot))
 __prefix T operator ~(T v0);
+
+__generic<T : __EnumType, U : __BuiltinIntegerType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_Lsh))
+T operator <<(T v0, U v1);
+
+__generic<T : __EnumType, U : __BuiltinIntegerType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_Rsh))
+T operator >>(T v0, U v1);
 
 
 // IR level type traits.
