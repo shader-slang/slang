@@ -79,8 +79,7 @@ Expr* ASTSynthesizer::emitVarExpr(VarDeclBase* var, Type* type)
 {
     auto expr = m_builder->create<VarExpr>();
     expr->declRef = makeDeclRef<Decl>(var);
-    expr->type.type = type;
-    expr->type.isLeftValue = true;
+    expr->type = ExprInfo(type, ExprValueCategory::MemoryLocation, ExprAccess::ReadWrite);
     return expr;
 }
 
@@ -88,8 +87,7 @@ Expr* ASTSynthesizer::emitVarExpr(DeclStmt* varStmt, Type* type)
 {
     auto expr = m_builder->create<VarExpr>();
     expr->declRef = makeDeclRef<Decl>(as<Decl>(varStmt->decl));
-    expr->type.type = type;
-    expr->type.isLeftValue = true;
+    expr->type = ExprInfo(type, ExprValueCategory::MemoryLocation, ExprAccess::ReadWrite);
     return expr;
 }
 
@@ -168,7 +166,7 @@ Expr* ASTSynthesizer::emitMemberExpr(Type* type, Name* name)
     return rs;
 }
 
-Expr* ASTSynthesizer::emitMemberExpr(QualType exprType, Expr* base, DeclRef<Decl> declRef)
+Expr* ASTSynthesizer::emitMemberExpr(ExprInfo exprType, Expr* base, DeclRef<Decl> declRef)
 {
     auto rs = m_builder->create<MemberExpr>();
     rs->baseExpression = base;

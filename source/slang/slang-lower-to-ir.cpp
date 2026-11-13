@@ -972,7 +972,7 @@ void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal);
 
 void lowerRelatedTypes(IRGenContext* context, Val* val, IRInst* irVal);
 
-static IRType* lowerType(IRGenContext* context, QualType const& type)
+static IRType* lowerType(IRGenContext* context, ExprInfo const& type)
 {
     return lowerType(context, type.type);
 }
@@ -5976,7 +5976,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // We start by asserting that the reference type we
             // are being asked to form is read-only.
             //
-            SLANG_ASSERT(as<ExplicitRefType>(expr->type) && !QualType(expr->type).isLeftValue);
+            SLANG_ASSERT(
+                as<ExplicitRefType>(expr->type) &&
+                !getExprInfoOfRefTarget(as<ExplicitRefType>(expr->type)).canWrite());
 
             // Now we perpetrate our hackery, by forming a simple value
             // for the operand in an SSA register and copying it into
@@ -6899,7 +6901,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             // For l-value type-equality casts, lower as an l-value so that
             // out/inout parameters work correctly through the cast.
-            if (expr->type.isLeftValue)
+            if (expr->type.isWritableStorageLocation())
             {
                 auto lval = lowerLValueExpr(context, expr->valueArg);
                 return lval;

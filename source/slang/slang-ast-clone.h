@@ -87,10 +87,10 @@ public:
         return DeclRef<T>(rewriteDeclRef(declRef.declRefBase));
     }
 
-    QualType rewriteQualType(QualType const& type);
+    ExprInfo rewriteExprInfo(ExprInfo const& type);
     TypeExp cloneTypeExp(TypeExp const& typeExp);
 
-    void cloneField(QualType& dst, QualType const& src);
+    void cloneField(ExprInfo& dst, ExprInfo const& src);
     void cloneField(ParamInfo& dst, ParamInfo const& src);
     void cloneField(TypeExp& dst, TypeExp const& src);
     void cloneField(Modifiers& dst, Modifiers const& src);

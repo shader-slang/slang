@@ -129,7 +129,7 @@ public:
 
     Expr* emitMemberExpr(Expr* base, Name* name);
     Expr* emitMemberExpr(Type* base, Name* name);
-    Expr* emitMemberExpr(QualType exprType, Expr* base, DeclRef<Decl> declRef);
+    Expr* emitMemberExpr(ExprInfo exprType, Expr* base, DeclRef<Decl> declRef);
 
     Expr* emitIndexExpr(Expr* base, Expr* index);
 

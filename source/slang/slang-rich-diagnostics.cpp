@@ -71,7 +71,7 @@ String typeToPrintableString(Type* type)
     return type ? type->toString() : "<unknown type>";
 }
 
-String qualTypeToPrintableString(QualType type)
+String exprInfoToPrintableString(ExprInfo type)
 {
     return type.type ? type.type->toString() : "<unknown type>";
 }
@@ -269,8 +269,8 @@ String declVisibilityToPrintableString(DeclVisibility visibility)
           nameToPrintableString($(base_expr))
 %           elseif ptype == "type" then
           typeToPrintableString($(base_expr))
-%           elseif ptype == "qualtype" then
-          qualTypeToPrintableString($(base_expr))
+%           elseif ptype == "exprinfo" then
+          exprInfoToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
           declToPrintableString($(base_expr))
 %           elseif ptype == "modifier" then

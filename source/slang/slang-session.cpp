@@ -764,8 +764,7 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
         // matter only its checked type.
         //
         auto argExpr = getCurrentASTBuilder()->create<VarExpr>();
-        argExpr->type = argType;
-        argExpr->type.isLeftValue = true;
+        argExpr->type = ExprInfo(argType, ExprValueCategory::MemoryLocation, ExprAccess::ReadWrite);
         argExprs.add(argExpr);
     }
 
