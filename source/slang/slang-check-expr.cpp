@@ -3878,7 +3878,13 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     }
     else
     {
-        checkGroupSharedPartialWriteInDifferentiatedBody(expr->left, expr->left);
+        if (auto var =
+                findGroupSharedVariablePartlyWrittenInDifferentiatedBody(expr->left, expr->left))
+        {
+            getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+                .var = var,
+                .target = expr->left});
+        }
     }
     expr->type = type;
     return expr;
@@ -4617,11 +4623,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when the same storage is passed to two parameters that may both be references
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
-            checkGroupSharedArgumentsToExclusiveParams(
-                invoke,
-                funcType,
-                callableDeclRef,
-                paramDeclRefs);
             checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
@@ -7958,16 +7959,13 @@ struct WrittenBackArgument
     // declaration, such as `bwd_diff(f)(...)`.
     ParamDecl* param = nullptr;
 
-    // The position of the parameter in the callee's function type, or -1 for a receiver.
-    Index paramIndex = -1;
-
     bool isReceiver = false;
 
     bool isConverted() const { return storage != arg; }
 };
 
 // Call `visit` with each argument of `invoke` that the call writes back to, other than arguments
-// that already failed to check. Warning 30709 and error 38039 both use this set.
+// that already failed to check.
 template<typename Visit>
 static void forEachWrittenBackArgument(
     SemanticsVisitor* visitor,
@@ -7988,7 +7986,6 @@ static void forEachWrittenBackArgument(
             continue;
         WrittenBackArgument written;
         written.arg = invoke->arguments[i];
-        written.paramIndex = i;
         if (isErrorTypedOrCastFromErrorTyped(written.arg))
             continue;
 
@@ -8022,98 +8019,46 @@ static void forEachWrittenBackArgument(
     }
 }
 
-// Warn about each argument of `invoke` that passes thread-group-shared storage to an `out` or
-// `inout` parameter, including the implicit `this` of a `[mutating]` method.
-void SemanticsVisitor::checkGroupSharedArgumentsToExclusiveParams(
-    InvokeExpr* invoke,
-    FuncType* funcType,
-    DeclRef<CallableDecl> calleeDeclRef,
-    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+// The source that makes a call write an argument back. At most one location is valid: the
+// parameter's `out` or `inout` keyword, the method's `[mutating]` attribute, or a method that can
+// modify `this` without one.
+struct WriteBackReason
 {
-    bool callIsOperator = as<OperatorExpr>(invoke) != nullptr;
-    forEachWrittenBackArgument(
-        this,
-        invoke,
-        funcType,
-        calleeDeclRef,
-        paramDeclRefs,
-        [&](WrittenBackArgument const& written)
-        {
-            // A mutating operator on an element of shared memory, such as `g[i] += 1`, passes the
-            // element to an `inout` parameter, but the user who wrote it already expects a
-            // read-modify-write of that element, so a warning would only be noise. An implicitly
-            // converted argument goes through a temporary of the parameter's type even for an
-            // operator, so we still check it.
-            //
-            if (callIsOperator && !written.isConverted())
-                return;
+    ParamPassingMode mode = ParamPassingMode::BorrowInOut;
+    SourceLoc modeLocation;
+    SourceLoc mutatingLocation;
+    SourceLoc methodLocation;
+};
 
-            // Every invocation in the group can access thread-group-shared storage, so the
-            // exclusive access holds only if no other invocation touches it during the call. The
-            // compiler does not check that, so we warn.
-            //
-            if (!argumentNamesGroupSharedStorage(written.storage))
-                return;
-            // We name the thread-group-shared storage itself, which for an implicitly converted
-            // argument is the operand of the conversion rather than the conversion call.
-            //
-            ASTPrinter storagePrinter(m_astBuilder);
-            storagePrinter.addExpr(written.storage);
-
-            // A callee without a declaration, such as `bwd_diff(f)`, has no parameter names or
-            // modifiers to point at, so we identify the parameter by its position and its mode in
-            // the function type.
-            //
-            if (!written.param && !written.isReceiver)
-            {
-                ASTPrinter calleePrinter(m_astBuilder);
-                calleePrinter.addExpr(invoke->functionExpr);
-                getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameterAtPosition{
-                    .callee = calleePrinter.getString(),
-                    .mode = funcType->getParamPassingMode(written.paramIndex),
-                    .paramNumber = int(written.paramIndex + 1),
-                    .storageText = storagePrinter.getString(),
-                    .arg = written.arg});
-                return;
-            }
-
-            // The note points at what requires exclusive access: the parameter's `out` or `inout`
-            // keyword, or for a receiver the `[mutating]` attribute, or else the method itself,
-            // such as a `set` accessor or a method in HLSL source, where methods are mutating by
-            // default.
-            //
-            // TODO: We read the passing mode and its location from the modifiers here, which
-            // duplicates what `findEffectiveThisParamInfo` and `getParamPassingMode` already
-            // decide and handles only the `[mutating]` and `out` modifiers. The locations belong
-            // in `ParamInfo`, so that this code can treat a receiver and an ordinary parameter
-            // alike through one query.
-            //
-            auto callee = calleeDeclRef.getDecl();
-            ParamPassingMode mode = ParamPassingMode::BorrowInOut;
-            SourceLoc modeLocation, mutatingLocation, methodLocation;
-            if (written.isReceiver)
-            {
-                if (auto mutating = callee->findModifier<MutatingAttribute>())
-                    mutatingLocation = mutating->loc;
-                else
-                    methodLocation = callee->loc;
-            }
-            else
-            {
-                mode = getParamPassingMode(written.param);
-                if (auto modeModifier = written.param->findModifier<OutModifier>())
-                    modeLocation = modeModifier->loc;
-            }
-            getSink()->diagnose(Diagnostics::GroupsharedArgumentToExclusiveParameter{
-                .func = callee,
-                .param = written.isReceiver ? "this" : getText(written.param->getName()),
-                .storageText = storagePrinter.getString(),
-                .mode = mode,
-                .arg = written.arg,
-                .modeLocation = modeLocation,
-                .mutatingLocation = mutatingLocation,
-                .methodLocation = methodLocation});
-        });
+// Return the source that makes the call to `calleeDeclRef` write `written` back. For a receiver,
+// that is the `[mutating]` attribute, or else the method itself, such as a `set` accessor or a
+// method in HLSL source, where methods are mutating by default. A callee without a declaration,
+// such as `bwd_diff(f)`, has no source to point at, so the reason has no location.
+//
+// TODO: We read the passing mode and its location from the modifiers here, which duplicates what
+// `findEffectiveThisParamInfo` and `getParamPassingMode` already decide and handles only the
+// `[mutating]` and `out` modifiers. The locations belong in `ParamInfo`, so that this code can
+// treat a receiver and an ordinary parameter alike through one query.
+static WriteBackReason getWriteBackReason(
+    WrittenBackArgument const& written,
+    DeclRef<CallableDecl> calleeDeclRef)
+{
+    WriteBackReason reason;
+    if (written.isReceiver)
+    {
+        auto callee = calleeDeclRef.getDecl();
+        if (auto mutating = callee->findModifier<MutatingAttribute>())
+            reason.mutatingLocation = mutating->loc;
+        else
+            reason.methodLocation = callee->loc;
+    }
+    else if (written.param)
+    {
+        reason.mode = getParamPassingMode(written.param);
+        if (auto modeModifier = written.param->findModifier<OutModifier>())
+            reason.modeLocation = modeModifier->loc;
+    }
+    return reason;
 }
 
 // The modes in which autodiff generates a derivative of a function from its body.
@@ -8157,14 +8102,16 @@ static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
     return modes;
 }
 
-// Report `target` if it writes part of a thread-group-shared variable in the body of a function
-// whose derivative Slang may generate from that body. `storage` is the storage that `target`
-// writes.
-void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* target, Expr* storage)
+// Return the thread-group-shared variable that `target` writes part of, if `target` is in the body
+// of a function whose derivative Slang may generate from that body, or null otherwise. `storage`
+// is the storage that `target` writes.
+Decl* SemanticsVisitor::findGroupSharedVariablePartlyWrittenInDifferentiatedBody(
+    Expr* target,
+    Expr* storage)
 {
     SLANG_ASSERT(target && storage);
     if (isErrorTypedOrCastFromErrorTyped(target))
-        return;
+        return nullptr;
 
     // Consider this example:
     //
@@ -8199,7 +8146,7 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
     // change.
     //
     if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
-        return;
+        return nullptr;
 
     Expr* wholeExpr = storage;
     while (auto parenExpr = as<ParenExpr>(wholeExpr))
@@ -8215,24 +8162,21 @@ void SemanticsVisitor::checkGroupSharedPartialWriteInDifferentiatedBody(Expr* ta
         addressedExpr = matrixSwizzleExpr->base;
 
     if (!argumentNamesGroupSharedStorage(addressedExpr))
-        return;
+        return nullptr;
 
     // A write of the whole variable, such as `v = float4(0)`, stays a single store.
     //
     auto baseExpr = getSubExpressionDeterminingAddressSpace(addressedExpr);
     if (baseExpr == wholeExpr)
-        return;
+        return nullptr;
 
     // A write to part of a `groupshared` parameter stays in place, because autodiff leaves the
     // storage behind a reference parameter in memory.
     //
     auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
     if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
-        return;
-
-    getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
-        .var = baseDeclRefExpr->declRef.getDecl(),
-        .target = target});
+        return nullptr;
+    return baseDeclRefExpr->declRef.getDecl();
 }
 
 // Report each argument of `invoke` that the call writes back to part of thread-group-shared
@@ -8247,6 +8191,7 @@ void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
     // the callee is, so in a differentiated body each such argument that is part of shared memory
     // races like an assignment to that part.
     //
+    bool callIsOperator = as<OperatorExpr>(invoke) != nullptr;
     forEachWrittenBackArgument(
         this,
         invoke,
@@ -8254,7 +8199,28 @@ void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
         calleeDeclRef,
         paramDeclRefs,
         [&](WrittenBackArgument const& written)
-        { checkGroupSharedPartialWriteInDifferentiatedBody(written.arg, written.storage); });
+        {
+            auto var = findGroupSharedVariablePartlyWrittenInDifferentiatedBody(
+                written.arg,
+                written.storage);
+            if (!var)
+                return;
+
+            // A note points at what makes the call write the argument back. A direct argument of
+            // a mutating operator, such as `g[i] += 1`, is written as plainly as by an assignment,
+            // so we report it like one, without pointing into the operator's declaration.
+            //
+            WriteBackReason reason;
+            if (!callIsOperator || written.isConverted())
+                reason = getWriteBackReason(written, calleeDeclRef);
+            getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+                .var = var,
+                .mode = reason.mode,
+                .target = written.arg,
+                .modeLocation = reason.modeLocation,
+                .mutatingLocation = reason.mutatingLocation,
+                .methodLocation = reason.methodLocation});
+        });
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)

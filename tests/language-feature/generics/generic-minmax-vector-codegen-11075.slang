@@ -1,11 +1,7 @@
-//DISABLE_TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
-//DISABLE_TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
-//DISABLE_TEST:SIMPLE(filecheck=NODYN):-target cpp -entry computeMain -stage compute
-//DISABLE_TEST:SIMPLE(filecheck=NODYN):-target cuda -entry computeMain -stage compute
-
-// TODO(#14424): These tests are disabled because the checks below need the unrolled vector map
-// macros. We removed `[ForceUnroll(4)]` from them while we investigate a CUDA runtime regression.
-// Enable these tests again when the unroll comes back.
+//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NODYN):-target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NODYN):-target cuda -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#11075: on cpp/cuda a generic `IFloat` `min`/`max` on a
 // vector lowers to per-element scalar calls, the same code the concrete vector overload emits.

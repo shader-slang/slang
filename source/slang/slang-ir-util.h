@@ -286,6 +286,12 @@ bool hasGenericAssemblyImplementation(IRFunc* func);
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 
+/// Return whether `type` is itself a texture or storage image, a sampler, a combined
+/// texture-sampler, a subpass input (including a GLSL input attachment), or an acceleration
+/// structure. Unlike a buffer, which a target can represent as a pointer to memory, a value of one
+/// of these types is an opaque handle that only dedicated operations can use.
+bool isImageSamplerOrAccelerationStructureType(IRType* type);
+
 /// Test for opaque values or invalid recursion in the by-value storage of `type`.
 ///
 /// Examines struct fields, array elements, and tuple elements. On a match, assigns the
