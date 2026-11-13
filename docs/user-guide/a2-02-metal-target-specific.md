@@ -298,6 +298,43 @@ RWTexture2D<float2> tex;
 tex[coord] = float2(1,2);  // Automatically expanded to float4(1,2,0,0)
 ```
 
+## Atomic Operations
+
+The Metal Shading Language limits 64-bit integer atomics to a min or max that
+returns `void`: `atomic_min_explicit` and `atomic_max_explicit` on a device
+`atomic_ulong` with `memory_order_relaxed`, and the `atomic_min` and
+`atomic_max` members of a `ulong` texture. Slang emits those forms for a
+`uint64_t` min or max whose original value is not used, either on device memory
+with relaxed memory order or on a texture (texture atomics take no memory
+order):
+
+```slang
+RWStructuredBuffer<uint64_t> buffer;
+
+InterlockedMin(buffer[i], key);           // atomic_min_explicit(..., memory_order_relaxed);
+uint64_t original;
+InterlockedMax(buffer[i], key, original); // error E55204: `original` is read below
+buffer[j] = original;
+```
+
+Slang decides whether the original value is used after its own optimizations,
+so an `original_value` argument that is never read normally counts as unused.
+
+Every other 64-bit integer atomic, including any `int64_t` atomic, a
+`groupshared` destination, a memory order other than `MemoryOrder.Relaxed`, and
+`Atomic<uint64_t>` methods other than `min`, `max`, `reduceMin` and
+`reduceMax`, is reported as error E55204. Apple GPUs run the 64-bit min and max
+only on some GPU families (see the Metal Feature Set Tables). Slang does not
+check the GPU family, so on other GPUs the failure comes from Metal, not from
+Slang.
+
+`-minimum-slang-optimization` skips these checks, as it skips Metal's other
+unsupported-operation checks. A supported 64-bit min or max is still emitted in
+the `void` form, but an unsupported 64-bit atomic is then emitted as an MSL call
+that the Metal compiler rejects instead of reporting E55204. With `-g` as well,
+Slang keeps a never-read `original_value` variable, so such a call also takes
+that path.
+
 ## Conservative Rasterization
 
 Since Metal doesn't support conservative rasterization, SV_InnerCoverage is always false.

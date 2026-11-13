@@ -4,6 +4,7 @@
 #include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-ir-check-unsupported-inst.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
@@ -390,9 +391,13 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
-    auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
+    // Emit `inst` as a call to `imageFunc` on a texture or `bufferFunc` on a buffer. The MSL
+    // atomics that return void are emitted with `returnsValue` false, as a bare statement; that
+    // is only valid when nothing but debug instructions uses the result of `inst`.
+    auto emitAtomicCall = [&](const char* imageFunc, const char* bufferFunc, bool returnsValue)
     {
-        emitInstResultDecl(inst);
+        if (returnsValue)
+            emitInstResultDecl(inst);
         bool isImageOp = false;
         if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
         {
@@ -415,11 +420,27 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitMemoryOrderOperand(inst->getOperand(inst->getOperandCount() - 1));
         }
-        if (isImageOp)
+        if (isImageOp && returnsValue)
             m_writer->emit(").x;\n");
         else
             m_writer->emit(");\n");
     };
+    auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
+    { emitAtomicCall(imageFunc, bufferFunc, true); };
+    // `checkUnsupportedInst` reports every other 64-bit integer atomic. It is skipped under
+    // `-minimum-slang-optimization`, and those atomics then reach the ordinary emission below.
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (atomic && is64BitIntegerAtomic(atomic, getTargetReq()) &&
+        !getUnsupportedMetal64BitAtomicReason(atomic))
+    {
+        // A null reason means `inst` is an `atomicMin` or `atomicMax`.
+        bool isMin = inst->getOp() == kIROp_AtomicMin;
+        emitAtomicCall(
+            isMin ? "atomic_min" : "atomic_max",
+            isMin ? "atomic_min_explicit" : "atomic_max_explicit",
+            false);
+        return true;
+    }
     switch (inst->getOp())
     {
     case kIROp_Discard:
