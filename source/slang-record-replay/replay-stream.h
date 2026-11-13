@@ -93,7 +93,8 @@ public:
     /// Set a mirror file for crash-safe capture.
     /// All subsequent writes will be immediately written to this file as well.
     /// @param path Path to the mirror file.
-    /// @throws Slang::Exception if file cannot be opened.
+    /// @throws Slang::Exception if the file cannot be opened, or if the path already exists and
+    /// is not a regular file (a FIFO cannot seek, and a device such as `/dev/null` keeps nothing).
     SLANG_API void setMirrorFile(const char* path);
 
     /// Save all data to a file.
