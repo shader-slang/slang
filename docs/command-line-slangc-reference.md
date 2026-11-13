@@ -1488,6 +1488,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvGroupNonUniformQuad` 
 * `spvGroupNonUniformVote` 
 * `spvGroupNonUniformPartitionedNV` 
+* `spvGroupNonUniformPartitionedEXT` 
 * `spvGroupNonUniformRotateKHR` 
 * `spvRayTracingMotionBlurNV` 
 * `spvMeshShadingEXT` 
