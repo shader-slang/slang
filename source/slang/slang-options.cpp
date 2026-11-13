@@ -757,6 +757,8 @@ void initCommandOptions(CommandOptions& options)
          "`wgsl`, NVRTC for `cuda`, and the C++ compiler for `cpp`. "
          "The exit code is not 0 if the downstream tool is not available, cannot run, or reports "
          "an error, or if the target has no downstream tool. "
+         "NVRTC compiles only device code, so a `cuda` shader with host code, such as a "
+         "function with the `CudaHost` attribute, fails with this option. "
          "`-skip-spirv-validation` has priority over this option for SPIR-V targets."},
         {OptionKind::SourceEmbedStyle,
          "-source-embed-style",

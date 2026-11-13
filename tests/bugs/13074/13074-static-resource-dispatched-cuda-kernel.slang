@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CUDA): -O0 -target cuda -validate-ir -line-directive-mode none
+//TEST:SIMPLE(filecheck=CUDA,no-downstream-validation): -O0 -target cuda -validate-ir -line-directive-mode none
 
 // `__dispatch_kernel` launches the original CUDA kernel rather than calling its ordinary-function
 // clone. Resource-global legalization gives the original kernel a local whose initializer runs for
