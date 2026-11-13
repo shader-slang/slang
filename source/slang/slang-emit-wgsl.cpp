@@ -31,6 +31,13 @@
 namespace Slang
 {
 
+// An Atomic<float> value type (stored as atomic<u32> on WGSL).
+static bool isF32AtomicValue(IRType* type)
+{
+    return type && type->getOp() == kIROp_FloatType;
+}
+
+
 // In WGSL, expression of "1.0/0.0" is not allowed, it will report compile error,
 // so to construct infinity or nan, we have to assign the float literal to a variable
 // and then use it to bypass the compile error.
@@ -754,8 +761,14 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_AtomicType:
         {
+            // WGSL has no atomic<f32>: an Atomic<float> holds the float's bits in an atomic<u32>
+            // (tryEmitF32AtomicStmt).
+            auto elementType = cast<IRAtomicType>(type)->getElementType();
             m_writer->emit("atomic<");
-            emitType(cast<IRAtomicType>(type)->getElementType());
+            if (isF32AtomicValue(elementType))
+                m_writer->emit("u32");
+            else
+                emitType(elementType);
             m_writer->emit(">");
             return;
         }
@@ -1275,8 +1288,167 @@ void WGSLSourceEmitter::emitParamTypeImpl(IRType* type, const String& name)
     emitType(type, name);
 }
 
+// WGSL atomics hold only i32, u32 (and vec2u for atomic_vec2u_min_max). An `Atomic<float>` is
+// stored as `atomic<u32>` holding the float's bits (see the kIROp_AtomicType case of
+// emitSimpleTypeImpl). Loads, stores and exchanges bitcast; add, sub, min and max are a
+// compare-exchange loop on the bits.
+bool WGSLSourceEmitter::tryEmitF32AtomicStmt(IRInst* inst)
+{
+    const char* arith = nullptr;
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicStore:
+        if (!isF32AtomicValue(inst->getOperand(1)->getDataType()))
+            return false;
+        m_writer->emit("atomicStore(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), bitcast<u32>(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit("));\n");
+        return true;
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        if (!isF32AtomicValue(inst->getDataType()))
+            return false;
+        break;
+    default:
+        return false;
+    }
+
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+        emitInstResultDecl(inst);
+        m_writer->emit("bitcast<f32>(atomicLoad(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit(")));\n");
+        return true;
+    case kIROp_AtomicExchange:
+        emitInstResultDecl(inst);
+        m_writer->emit("bitcast<f32>(atomicExchange(&(");
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        m_writer->emit("), bitcast<u32>(");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(")));\n");
+        return true;
+    case kIROp_AtomicCompareExchange:
+        {
+            // Compares the bits, as InterlockedCompareExchangeFloatBitwise does. WGSL's compare
+            // exchange is weak (it may fail although the value matched), so retry until it
+            // exchanged or the value really differs: the caller sees a strong compare exchange.
+            const String casName = getName(inst) + "_cas";
+            auto emitCas = [&]()
+            {
+                m_writer->emit("atomicCompareExchangeWeak(&(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit("), bitcast<u32>(");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit("), bitcast<u32>(");
+                emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+                m_writer->emit("))");
+            };
+            m_writer->emit("var ");
+            m_writer->emit(casName);
+            m_writer->emit(" = ");
+            emitCas();
+            m_writer->emit(";\nloop\n{\n");
+            m_writer->indent();
+            m_writer->emit("if (");
+            m_writer->emit(casName);
+            m_writer->emit(".exchanged || ");
+            m_writer->emit(casName);
+            m_writer->emit(".old_value != bitcast<u32>(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("))\n{\n    break;\n}\n");
+            m_writer->emit(casName);
+            m_writer->emit(" = ");
+            emitCas();
+            m_writer->emit(";\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
+            emitInstResultDecl(inst);
+            m_writer->emit("bitcast<f32>(");
+            m_writer->emit(casName);
+            m_writer->emit(".old_value);\n");
+            return true;
+        }
+    case kIROp_AtomicAdd:
+        arith = "+";
+        break;
+    case kIROp_AtomicSub:
+        arith = "-";
+        break;
+    default:
+        break;
+    }
+
+    // var _old = atomicLoad(&p);
+    // loop {
+    //     let _r = atomicCompareExchangeWeak(&p, _old, bitcast<u32>(op(bitcast<f32>(_old), v)));
+    //     if (_r.exchanged) { break; }
+    //     _old = _r.old_value;
+    // }
+    // var result : f32 = bitcast<f32>(_old);
+    const String oldName = getName(inst) + "_old";
+    const String resultName = getName(inst) + "_cas";
+    m_writer->emit("var ");
+    m_writer->emit(oldName);
+    m_writer->emit(" = atomicLoad(&(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit("));\nloop\n{\n");
+    m_writer->indent();
+    m_writer->emit("let ");
+    m_writer->emit(resultName);
+    m_writer->emit(" = atomicCompareExchangeWeak(&(");
+    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+    m_writer->emit("), ");
+    m_writer->emit(oldName);
+    m_writer->emit(", bitcast<u32>(");
+    if (arith)
+    {
+        m_writer->emit("bitcast<f32>(");
+        m_writer->emit(oldName);
+        m_writer->emit(") ");
+        m_writer->emit(arith);
+        m_writer->emit(" (");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(")");
+    }
+    else
+    {
+        m_writer->emit(inst->getOp() == kIROp_AtomicMin ? "min(" : "max(");
+        m_writer->emit("bitcast<f32>(");
+        m_writer->emit(oldName);
+        m_writer->emit("), ");
+        emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+        m_writer->emit(")");
+    }
+    m_writer->emit("));\nif (");
+    m_writer->emit(resultName);
+    m_writer->emit(".exchanged)\n{\n    break;\n}\n");
+    m_writer->emit(oldName);
+    m_writer->emit(" = ");
+    m_writer->emit(resultName);
+    m_writer->emit(".old_value;\n");
+    m_writer->dedent();
+    m_writer->emit("}\n");
+    emitInstResultDecl(inst);
+    m_writer->emit("bitcast<f32>(");
+    m_writer->emit(oldName);
+    m_writer->emit(");\n");
+    return true;
+}
+
 bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    if (tryEmitF32AtomicStmt(inst))
+        return true;
+
     switch (inst->getOp())
     {
     default:
