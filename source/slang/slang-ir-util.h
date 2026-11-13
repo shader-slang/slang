@@ -771,6 +771,13 @@ bool isArtificialInst(IRInst* inst);
 /// Return whether `inst` records source-level debug information without affecting execution.
 bool isDebugInfoInst(IRInst* inst);
 
+/// Return whether `inst` has a direct user other than a debug-info instruction. Under `-g`, a
+/// result stored into a local or `out` argument that is never read, as in
+/// `InterlockedAdd(buf[0], 1u, unread);`, keeps a `DebugValue` as its only user. Source emitters
+/// print nothing for debug-info instructions, so for them such a result is unused. Only direct
+/// users are checked: a debug-only use reached through another instruction counts as a use.
+bool hasNonDebugUse(IRInst* inst);
+
 /// Return whether `op` is a dedicated IR operation that reads resource contents.
 bool doesOpReadResourceContents(IROp op);
 
