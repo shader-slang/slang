@@ -286,8 +286,15 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
     // variable.
     bool targetCanEmitGlobalInitializerForHalf;
 
+    // True if the target can emit a global initializer that computes a vector or matrix
+    // value with an operator, such as `int2(10, 7) / int2(4, 2)`. CUDA cannot: its prelude
+    // implements the vector and matrix operators as `inline __device__` functions that are
+    // not `constexpr`, so NVRTC rejects them in the initializer of a `__device__` variable.
+    bool targetCanEmitGlobalInitializerForVectorOps;
+
     explicit GlobalInstLegalizationInliningContext(CodeGenTarget target)
         : targetCanEmitGlobalInitializerForHalf(target != CodeGenTarget::CUDASource)
+        , targetCanEmitGlobalInitializerForVectorOps(target != CodeGenTarget::CUDASource)
     {
     }
 
@@ -332,7 +339,40 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
         // which NVRTC rejects.
         if (as<IRCall>(inst))
             return false;
-        return isSimpleConstantType(inst->getDataType());
+        if (!isSimpleConstantType(inst->getDataType()))
+            return false;
+        if (!targetCanEmitGlobalInitializerForVectorOps && isVectorOrMatrixOperation(inst))
+            return false;
+        return true;
+    }
+
+    // Return true if `inst` computes a vector or matrix value with anything other than
+    // a constructor.
+    //
+    // Consider this example:
+    //
+    //     static const int2 arr[2] = { int2(10, 7) / int2(4, 2), int2(1, 1) };
+    //
+    // The module has `div(makeVector(10, 7), makeVector(4, 2))`. No IR pass folds a vector
+    // operation, so the `div` reaches the emitter. For CUDA it becomes a call to the
+    // prelude's `operator/`, which is a dynamic initializer. A `makeVector` or
+    // `makeMatrix` of legal operands stays legal, so a constant table still stays global.
+    // Because `shouldInlineInstImpl` inlines every user of an instruction that is not
+    // legal, the `makeArray` above is also inlined, and each function that uses `arr`
+    // builds it at run time.
+    static bool isVectorOrMatrixOperation(IRInst* inst)
+    {
+        auto type = inst->getDataType();
+        if (!as<IRVectorType>(type) && !as<IRMatrixType>(type))
+            return false;
+        switch (inst->getOp())
+        {
+        case kIROp_MakeVector:
+        case kIROp_MakeMatrix:
+            return false;
+        default:
+            return true;
+        }
     }
 
     bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override { return false; }
