@@ -509,7 +509,12 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
                                                       ? SideEffectAnalysisOptions::None
                                                       : SideEffectAnalysisOptions::UseDominanceTree;
 
-    if (inst->mightHaveSideEffects(sideEffectOptions, options.calleeSideEffectCache))
+    // A call to a `[__removableIfUnused]` callee, such as a wave operation, is the exception: it
+    // counts as having side effects everywhere else, so that no pass moves it, but it is only live
+    // if its result is used.
+    //
+    if (inst->mightHaveSideEffects(sideEffectOptions, options.calleeSideEffectCache) &&
+        !isRemovableIfUnusedCall(inst, sideEffectOptions))
     {
         return true;
     }

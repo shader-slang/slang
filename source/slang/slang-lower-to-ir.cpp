@@ -14616,6 +14616,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRNoSideEffectDecoration>(irFunc);
             }
+            else if (as<RemovableIfUnusedAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRRemovableIfUnusedDecoration>(irFunc);
+            }
             else if (as<EarlyDepthStencilAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IREarlyDepthStencilDecoration>(irFunc);
