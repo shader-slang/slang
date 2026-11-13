@@ -319,7 +319,7 @@ struct CapabilityDefParser
     List<RefPtr<CapabilityDef>> m_defs;
     CapabilitySharedContext& m_sharedContext;
 
-    TokenReader m_tokenReader;
+    LexemeReader m_tokenReader;
 
     template<AdvanceOptions advanceOptions>
     bool advanceIf(TokenType type)
@@ -342,19 +342,19 @@ struct CapabilityDefParser
     }
 
     template<AdvanceOptions advanceOptions>
-    SlangResult readToken(TokenType type, Token& nextToken)
+    SlangResult readToken(TokenType type, Lexeme& nextToken)
     {
         nextToken = m_tokenReader.advanceToken();
         if constexpr (ContainsOption<advanceOptions, AdvanceOptions::SkipComments>())
         {
-            while (nextToken.type == TokenType::BlockComment ||
-                   nextToken.type == TokenType::LineComment)
+            while (nextToken.getType() == TokenType::BlockComment ||
+                   nextToken.getType() == TokenType::LineComment)
                 nextToken = m_tokenReader.advanceToken();
         }
-        if (nextToken.type != type)
+        if (nextToken.getType() != type)
         {
             m_sink->diagnose(
-                nextToken.loc,
+                nextToken.getLoc(),
                 Diagnostics::unexpectedTokenExpectedTokenType,
                 nextToken,
                 type);
@@ -366,7 +366,7 @@ struct CapabilityDefParser
     template<AdvanceOptions advanceOptions>
     SlangResult readToken(TokenType type)
     {
-        Token nextToken;
+        Lexeme nextToken;
         return readToken<advanceOptions>(type, nextToken);
     }
 
@@ -374,7 +374,7 @@ struct CapabilityDefParser
     {
         for (;;)
         {
-            Token nameToken;
+            Lexeme nameToken;
             SLANG_RETURN_ON_FAIL(
                 readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, nameToken));
             CapabilityDef* def = nullptr;
@@ -384,7 +384,7 @@ struct CapabilityDefParser
             }
             else
             {
-                m_sink->diagnose(nameToken.loc, Diagnostics::undefinedIdentifier, nameToken);
+                m_sink->diagnose(nameToken.getLoc(), Diagnostics::undefinedIdentifier, nameToken);
                 return SLANG_FAIL;
             }
             if (!(advanceIf<AdvanceOptions::SkipComments>(TokenType::OpAdd)))
@@ -398,7 +398,7 @@ struct CapabilityDefParser
         for (;;)
         {
             CapabilityConjunctionExpr conjunction;
-            conjunction.sourceLoc = this->m_tokenReader.m_cursor->getLoc();
+            conjunction.sourceLoc = m_tokenReader.peekLoc();
             SLANG_RETURN_ON_FAIL(parseConjunction(conjunction));
             expr.conjunctions.add(conjunction);
             if (!advanceIf<AdvanceOptions::SkipComments>(TokenType::OpBitOr))
@@ -453,7 +453,7 @@ struct CapabilityDefParser
     SlangResult parseDefs()
     {
         auto tokens = m_lexer->lexAllMarkupTokens();
-        m_tokenReader = TokenReader(tokens);
+        m_tokenReader = LexemeReader(tokens);
         AutoDocInfo successiveComments = AutoDocInfo();
         HumaneSourceLoc successiveCommentLine = {};
 
@@ -481,12 +481,12 @@ struct CapabilityDefParser
             {
                 def->flavor = CapabilityFlavor::Normal;
             }
-            else if (nextToken.type == TokenType::BlockComment)
+            else if (nextToken.getType() == TokenType::BlockComment)
             {
                 // Do not auto-document
                 continue;
             }
-            else if (nextToken.type == TokenType::LineComment)
+            else if (nextToken.getType() == TokenType::LineComment)
             {
                 // Auto-document if the preceeding token to an identifier is '///'
                 // complete rules described in `source\slang\slang-capabilities.capdef`
@@ -532,17 +532,17 @@ struct CapabilityDefParser
                 }
                 continue;
             }
-            else if (nextToken.type == TokenType::EndOfFile)
+            else if (nextToken.getType() == TokenType::EndOfFile)
             {
                 break;
             }
             else
             {
-                m_sink->diagnose(nextToken.loc, Diagnostics::unexpectedToken, nextToken);
+                m_sink->diagnose(nextToken.getLoc(), Diagnostics::unexpectedToken, nextToken);
                 return SLANG_FAIL;
             }
 
-            Token nameToken;
+            Lexeme nameToken;
             SLANG_RETURN_ON_FAIL(
                 readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, nameToken));
             def->name = nameToken.getContent();
@@ -555,7 +555,7 @@ struct CapabilityDefParser
                 }
                 if (advanceIf<AdvanceOptions::SkipComments>(TokenType::OpAssign))
                 {
-                    Token rankToken;
+                    Lexeme rankToken;
                     SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(
                         TokenType::IntegerLiteral,
                         rankToken));
@@ -563,7 +563,10 @@ struct CapabilityDefParser
                 }
                 def->docComment = successiveComments;
                 if (def->docComment.comment.getLength() == 0 && !isInternalDef(def))
-                    m_sink->diagnose(nextToken.loc, Diagnostics::requiresDocComment, def->name);
+                    m_sink->diagnose(
+                        nextToken.getLoc(),
+                        Diagnostics::requiresDocComment,
+                        def->name);
             }
             else if (def->flavor == CapabilityFlavor::Alias)
             {
@@ -571,7 +574,10 @@ struct CapabilityDefParser
                 SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
                 def->docComment = successiveComments;
                 if (def->docComment.comment.getLength() == 0 && !isInternalDef(def))
-                    m_sink->diagnose(nextToken.loc, Diagnostics::requiresDocComment, def->name);
+                    m_sink->diagnose(
+                        nextToken.getLoc(),
+                        Diagnostics::requiresDocComment,
+                        def->name);
             }
             else if (def->flavor == CapabilityFlavor::Abstract)
             {
@@ -584,7 +590,7 @@ struct CapabilityDefParser
             m_defs.add(def);
             if (!m_mapNameToCapability.addIfNotExists(def->name, m_defs.getLast()))
             {
-                m_sink->diagnose(nextToken.loc, Diagnostics::redefinition, def->name);
+                m_sink->diagnose(nextToken.getLoc(), Diagnostics::redefinition, def->name);
                 return SLANG_FAIL;
             }
 
@@ -594,7 +600,7 @@ struct CapabilityDefParser
             else if (!m_sharedContext.ptrOfStage && def->name.equals("stage"))
                 m_sharedContext.ptrOfStage = m_defs.getLast();
 
-            def->sourceLoc = nameToken.loc;
+            def->sourceLoc = nameToken.getLoc();
         }
         validateInternalAtomExternalAtomPair();
         if (m_sink->getErrorCount())
@@ -1359,7 +1365,7 @@ SlangResult parseDefFile(
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
     Lexer lexer;
     NamePool namePool;
-    lexer.initialize(sourceView, sink, &namePool, sourceManager->getMemoryArena());
+    lexer.initialize(sourceView, sink, &namePool);
 
     CapabilityDefParser parser(&lexer, sink, capabilitySharedContext);
 

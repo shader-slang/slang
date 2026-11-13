@@ -98,7 +98,7 @@ bool Parser::advanceIfToken(TokenType type, Token* outToken)
 bool Parser::advanceIfMarker(Token* outToken)
 {
     const Token peekToken = m_reader.peekToken();
-    if (peekToken.type == TokenType::Identifier && _isMarker(peekToken.getContent()))
+    if (peekToken.getType() == TokenType::Identifier && _isMarker(peekToken.getContent()))
     {
         m_reader.advanceToken();
         if (outToken)
@@ -272,7 +272,7 @@ SlangResult Parser::consumeToClosingBrace(const Token* inOpenBraceToken)
     {
         openToken = m_reader.advanceToken();
     }
-    SLANG_ASSERT(openToken.type == TokenType::LBrace);
+    SLANG_ASSERT(openToken.getType() == TokenType::LBrace);
 
     while (true)
     {
@@ -316,7 +316,7 @@ SlangResult Parser::_parseEnum()
 
     if (!m_currentScope->canContainTypes())
     {
-        m_sink->diagnose(enumToken.loc, CPPDiagnostics::cannotDeclareTypeInScope);
+        m_sink->diagnose(enumToken.getLoc(), CPPDiagnostics::cannotDeclareTypeInScope);
         return SLANG_FAIL;
     }
 
@@ -339,7 +339,7 @@ SlangResult Parser::_parseEnum()
         else
         {
             m_sink->diagnose(
-                nameToken.loc,
+                nameToken.getLoc(),
                 CPPDiagnostics::expectingIdentifier,
                 nameToken.getContent());
             return SLANG_FAIL;
@@ -381,7 +381,7 @@ SlangResult Parser::_parseEnum()
 
     if (advanceIfToken(TokenType::Semicolon))
     {
-        if (nameToken.type != TokenType::Invalid)
+        if (nameToken.getType() != TokenType::Invalid)
         {
             Node* node = m_currentScope->findChild(nameToken.getContent());
             if (node)
@@ -394,7 +394,7 @@ SlangResult Parser::_parseEnum()
                     return SLANG_OK;
                 }
                 m_sink->diagnose(
-                    nameToken.loc,
+                    nameToken.getLoc(),
                     CPPDiagnostics::typeAlreadyDeclared,
                     nameToken.getContent());
                 return SLANG_FAIL;
@@ -421,7 +421,7 @@ SlangResult Parser::_parseEnum()
         if (node->findChild(caseNode->m_name.getContent()))
         {
             m_sink->diagnose(
-                caseNode->m_name.loc,
+                caseNode->m_name.getLoc(),
                 CPPDiagnostics::identifierAlreadyDefined,
                 caseNode->m_name.getContent());
             return SLANG_FAIL;
@@ -858,14 +858,14 @@ UnownedStringSlice Parser::_concatTokens(const Token* toks, Index toksCount)
         const auto token = toks[i];
 
         // Check if we need a space between tokens
-        if (_tokenConcatNeedsSpace(prevTokenType, token.type))
+        if (_tokenConcatNeedsSpace(prevTokenType, token.getType()))
         {
             buf << " ";
         }
 
         buf << token.getContent();
 
-        prevTokenType = token.type;
+        prevTokenType = token.getType();
     }
 
     StringSlicePool* typePool = m_nodeTree->m_typePool;
@@ -885,13 +885,13 @@ UnownedStringSlice Parser::_concatTokens(TokenReader::ParsingCursor start)
     {
         const Token token = m_reader.advanceToken();
         // Check if we need a space between tokens
-        if (_tokenConcatNeedsSpace(prevTokenType, token.type))
+        if (_tokenConcatNeedsSpace(prevTokenType, token.getType()))
         {
             buf << " ";
         }
         buf << token.getContent();
 
-        prevTokenType = token.type;
+        prevTokenType = token.getType();
     }
 
     StringSlicePool* typePool = m_nodeTree->m_typePool;
@@ -929,7 +929,7 @@ SlangResult Parser::_maybeParseType(
         {
             // Consume the integer typename (if there is one)
             const Token peekToken = m_reader.peekToken();
-            if (peekToken.type == TokenType::Identifier)
+            if (peekToken.getType() == TokenType::Identifier)
             {
                 const IdentifierStyle style =
                     m_nodeTree->m_identifierLookup->get(peekToken.getContent());
@@ -1151,7 +1151,7 @@ SlangResult Parser::_parseMarker()
 
     ClassLikeNode* node = as<ClassLikeNode>(m_currentScope);
 
-    if (node->m_marker.type != TokenType::Unknown)
+    if (node->m_marker.getType() != TokenType::Unknown)
     {
         m_sink->diagnose(
             m_reader.peekToken(),
@@ -1479,7 +1479,7 @@ SlangResult Parser::_parseTypeDef()
     SLANG_RETURN_ON_FAIL(_maybeParseType(toks, nameToken));
 
     // Followed by the name
-    if (nameToken.type != TokenType::Identifier)
+    if (nameToken.getType() != TokenType::Identifier)
     {
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &nameToken));
     }
@@ -1487,7 +1487,7 @@ SlangResult Parser::_parseTypeDef()
     if (Node::lookupNameInScope(m_currentScope, nameToken.getContent()))
     {
         m_sink->diagnose(
-            nameToken.loc,
+            nameToken.getLoc(),
             CPPDiagnostics::identifierAlreadyDefined,
             nameToken.getContent());
         return SLANG_FAIL;
@@ -1598,7 +1598,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     }
 
     // If don't have a name it's not a dtor or ctor, so see if it's a type
-    if (nameToken.type == TokenType::Unknown)
+    if (nameToken.getType() == TokenType::Unknown)
     {
         if (SLANG_FAILED(_maybeParseType(typeName, nameToken)))
         {
@@ -1612,7 +1612,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
         }
     }
 
-    if (nameToken.type == TokenType::Unknown)
+    if (nameToken.getType() == TokenType::Unknown)
     {
         // Has a calling convention (must be a function/method)
         Token callingConventionToken;
@@ -1627,7 +1627,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     }
 
     // Handles other scenarios, but here for catching operator overloading
-    if (nameToken.type == TokenType::Identifier)
+    if (nameToken.getType() == TokenType::Identifier)
     {
         const auto style = m_nodeTree->m_identifierLookup->get(nameToken.getContent());
         if (style != IdentifierStyle::None)
@@ -1667,7 +1667,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                     return res;
                 }
 
-                if (paramName.type != TokenType::Identifier)
+                if (paramName.getType() != TokenType::Identifier)
                 {
                     if (m_reader.peekTokenType() == TokenType::Identifier)
                     {
@@ -1676,7 +1676,8 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                 }
 
                 // If we have a name check for default value
-                if (paramName.type == TokenType::Identifier && advanceIfToken(TokenType::OpAssign))
+                if (paramName.getType() == TokenType::Identifier &&
+                    advanceIfToken(TokenType::OpAssign))
                 {
                     // Check if we have a default value
                     List<Token> exprTokens;
@@ -1818,7 +1819,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     else
     {
         // Looks like variable
-        if (!m_currentScope->canContainFields() || nameToken.type != TokenType::Identifier)
+        if (!m_currentScope->canContainFields() || nameToken.getType() != TokenType::Identifier)
         {
             _consumeToSync();
             return SLANG_OK;
@@ -2040,7 +2041,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
         m_currentScope->m_reflectionOverride = ReflectionType::Reflected;
     }
 
-    lexer.initialize(sourceView, m_sink, m_nodeTree->m_namePool, manager->getMemoryArena());
+    lexer.initialize(sourceView, m_sink, m_nodeTree->m_namePool);
     m_tokenList = lexer.lexAllSemanticTokens();
     // See if there were any errors
     if (m_sink->getErrorCount())
@@ -2231,14 +2232,15 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
         case TokenType::Pound:
             {
                 Token token = m_reader.peekToken();
-                if (token.flags & TokenFlag::AtStartOfLine)
+                if (token.getFlags() & TokenFlag::AtStartOfLine)
                 {
                     // We are just going to ignore all of these for now....
                     m_reader.advanceToken();
                     for (;;)
                     {
                         auto t = m_reader.peekToken();
-                        if (t.type == TokenType::EndOfFile || (t.flags & TokenFlag::AtStartOfLine))
+                        if (t.getType() == TokenType::EndOfFile ||
+                            (t.getFlags() & TokenFlag::AtStartOfLine))
                         {
                             break;
                         }

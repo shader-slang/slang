@@ -8,6 +8,7 @@
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-util.h"
+#include "slang-token.h"
 
 namespace Slang
 {
@@ -732,6 +733,18 @@ void SourceManager::initialize(SourceManager* p, ISlangFileSystemExt* fileSystem
     _resetLoc();
 }
 
+SourceManager::SourceManager()
+    : m_memoryArena(2048), m_slicePool(StringSlicePool::Style::Default)
+{
+}
+
+TokenPool* SourceManager::getTokenPool()
+{
+    if (!m_tokenPool)
+        m_tokenPool = new TokenPool();
+    return m_tokenPool;
+}
+
 SourceManager::~SourceManager()
 {
     _resetSource();
@@ -781,6 +794,7 @@ void SourceManager::reset()
 {
     _resetSource();
     _resetLoc();
+    m_tokenPool = nullptr;
 }
 
 UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& slice)

@@ -650,9 +650,9 @@ static LayoutSemanticInfo _extractLayoutSemanticInfo(
 
     LayoutSemanticInfo info = extractHLSLLayoutSemanticInfo(
         registerToken.getContent(),
-        registerToken.loc,
+        registerToken.getLoc(),
         spaceToken->getContent(),
-        spaceToken->loc,
+        spaceToken->getLoc(),
         getSink(context));
 
     return info;

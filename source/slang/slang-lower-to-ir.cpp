@@ -5659,14 +5659,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
             case SPIRVAsmOperand::Literal:
                 {
-                    if (operand.token.type == TokenType::IntegerLiteral)
+                    if (operand.token.getType() == TokenType::IntegerLiteral)
                     {
                         // TODO: we should sign-extend these where appropriate,
                         // difficult because it requires information on usage...
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getIntValue(builder->getUIntType(), operand.knownValue));
                     }
-                    else if (operand.token.type == TokenType::StringLiteral)
+                    else if (operand.token.getType() == TokenType::StringLiteral)
                     {
                         const auto v =
                             getStringLiteralTokenValue(operand.token, context->getSink());
@@ -13485,7 +13485,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 definition = targetMod->definitionString;
             }
-            else if (targetMod->definitionIdent.type == TokenType::Identifier)
+            else if (targetMod->definitionIdent.getType() == TokenType::Identifier)
             {
                 definition = targetMod->definitionIdent.getContent();
             }
@@ -13504,7 +13504,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             UnownedStringSlice targetName;
             auto& targetToken = targetMod->targetToken;
-            if (targetToken.type != TokenType::Unknown)
+            if (targetToken.getType() != TokenType::Unknown)
             {
                 targetName = targetToken.getContent();
             }
@@ -13655,7 +13655,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // If we find a catch-all case (marked as either *no* target
                 // token or an empty target name), then we should bail out.
                 //
-                if (targetMod->targetToken.type == TokenType::Unknown)
+                if (targetMod->targetToken.getType() == TokenType::Unknown)
                     return;
                 else if (!targetMod->targetToken.hasContent())
                     return;

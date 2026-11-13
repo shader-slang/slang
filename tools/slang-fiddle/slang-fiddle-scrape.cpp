@@ -52,7 +52,7 @@ public:
 
     TokenWithTrivia const& peek() { return *_cursor; }
 
-    SourceLoc const& peekLoc() { return peek().getLoc(); }
+    SourceLoc peekLoc() { return peek().getLoc(); }
 
     TokenType peekType() { return peek().getType(); }
 
@@ -288,7 +288,7 @@ public:
 
         if (peekType() == TokenType::OpRsh)
         {
-            peek().setType(TokenType::OpGreater);
+            peek().consumeFirstGreater();
 
             return;
         }
@@ -939,7 +939,7 @@ public:
                 // these lines, so we will read until the next end-of-line.
                 //
                 read();
-                while (!(peek().getToken().flags & TokenFlag::AtStartOfLine))
+                while (!(peek().getToken().getFlags() & TokenFlag::AtStartOfLine))
                 {
                     if (peekType() == TokenType::EndOfFile)
                         break;
@@ -1297,7 +1297,7 @@ private:
     }
 
 #if 0
-        void emitLineDirective(Token const& lexeme)
+        void emitLineDirective(Lexeme const& lexeme)
         {
             SourceLoc loc = lexeme.getLoc();
             auto humaneLoc = _sourceManager.getHumaneLoc(loc);
@@ -1326,7 +1326,7 @@ private:
         }
 
 
-        void emitTrivia(List<Token> const& trivia)
+        void emitTrivia(List<Lexeme> const& trivia)
         {
             for (auto trivium : trivia)
                 _builder.append(trivium.getContent());
@@ -1434,24 +1434,9 @@ bool AggTypeDecl::isSubTypeOf(char const* name)
     return false;
 }
 
-bool isTrivia(TokenType lexemeType)
+List<TokenWithTrivia> collectTokensWithTrivia(LexemeList const& lexemes)
 {
-    switch (lexemeType)
-    {
-    default:
-        return false;
-
-    case TokenType::LineComment:
-    case TokenType::BlockComment:
-    case TokenType::NewLine:
-    case TokenType::WhiteSpace:
-        return true;
-    }
-}
-
-List<TokenWithTrivia> collectTokensWithTrivia(TokenList const& lexemes)
-{
-    TokenReader reader(lexemes);
+    LexemeReader reader(lexemes);
 
     List<TokenWithTrivia> allTokensWithTrivia;
     for (;;)
@@ -1460,7 +1445,7 @@ List<TokenWithTrivia> collectTokensWithTrivia(TokenList const& lexemes)
         TokenWithTrivia currentTokenWithTrivia = currentTokenWithTriviaNode;
         allTokensWithTrivia.add(currentTokenWithTrivia);
 
-        while (isTrivia(reader.peekTokenType()))
+        while (reader.peekToken().is<Trivia>())
         {
             auto trivia = reader.advanceToken();
             currentTokenWithTriviaNode->leadingTrivia.add(trivia);
@@ -1469,15 +1454,15 @@ List<TokenWithTrivia> collectTokensWithTrivia(TokenList const& lexemes)
         auto token = reader.advanceToken();
         currentTokenWithTriviaNode->token = token;
 
-        if (token.type == TokenType::EndOfFile)
+        if (token.getType() == TokenType::EndOfFile)
             return allTokensWithTrivia;
 
-        while (isTrivia(reader.peekTokenType()))
+        while (reader.peekToken().is<Trivia>())
         {
             auto trivia = reader.advanceToken();
             currentTokenWithTriviaNode->trailingTrivia.add(trivia);
 
-            if (trivia.type == TokenType::NewLine)
+            if (trivia.getType() == TokenType::NewLine)
                 break;
         }
     }
@@ -1603,7 +1588,7 @@ RefPtr<SourceUnit> parseSourceUnit(
     // so that we can ignore any files we don't understand.
     //
     DiagnosticSink lexerSink;
-    lexer.initialize(inputSourceView, &lexerSink, namePool, sourceManager->getMemoryArena());
+    lexer.initialize(inputSourceView, &lexerSink, namePool);
 
     auto inputTokens = lexer.lexAllTokens();
     auto tokensWithTrivia = collectTokensWithTrivia(inputTokens);

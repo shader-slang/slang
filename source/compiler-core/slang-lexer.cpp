@@ -23,20 +23,12 @@ namespace Slang
 {
 Token TokenReader::getEndOfFileToken()
 {
-    return Token(TokenType::EndOfFile, UnownedStringSlice::fromLiteral(""), SourceLoc());
-}
-
-const Token* TokenList::begin() const
-{
-    SLANG_ASSERT(m_tokens.getCount());
-    return &m_tokens[0];
-}
-
-const Token* TokenList::end() const
-{
-    SLANG_ASSERT(m_tokens.getCount());
-    SLANG_ASSERT(m_tokens[m_tokens.getCount() - 1].type == TokenType::EndOfFile);
-    return &m_tokens[m_tokens.getCount() - 1];
+    // The owning pool and its EOF are both initialized under C++ static guards.
+    // Later default readers only copy the immutable token, so they never mutate
+    // the shared pool concurrently.
+    static RefPtr<TokenPool> pool = new TokenPool();
+    static const Token token = pool->createEndOfFile();
+    return token;
 }
 
 TokenSpan::TokenSpan()
@@ -57,12 +49,12 @@ Token& TokenReader::peekToken()
 
 TokenType TokenReader::peekTokenType() const
 {
-    return m_nextToken.type;
+    return m_nextToken.getType();
 }
 
 SourceLoc TokenReader::peekLoc() const
 {
-    return m_nextToken.loc;
+    return m_nextToken.getLoc();
 }
 
 Token TokenReader::advanceToken()
@@ -93,7 +85,12 @@ void TokenReader::_updateLookaheadToken()
     // messages that include the token that is seen.
     //
     if (m_cursor == m_end)
-        m_nextToken.type = TokenType::EndOfFile;
+    {
+        // A stored EOF already owns the trailing blank lines of a physical file.
+        // Only an ordinary token at a subrange boundary needs replacement.
+        if (m_nextToken.getType() != TokenType::EndOfFile)
+            m_nextToken.setType(TokenType::EndOfFile);
+    }
 }
 
 // Lexer
@@ -102,12 +99,13 @@ void Lexer::initialize(
     SourceView* sourceView,
     DiagnosticSink* sink,
     NamePool* namePool,
-    MemoryArena* memoryArena)
+    TokenPool* tokenPool)
 {
     m_sourceView = sourceView;
     m_sink = sink;
     m_namePool = namePool;
-    m_memoryArena = memoryArena;
+    m_tokenPool = tokenPool ? tokenPool : sourceView->getSourceManager()->getTokenPool();
+    m_isHeaderNameMode = false;
 
     auto content = sourceView->getContent();
 
@@ -240,8 +238,9 @@ static int _peek(Lexer* lexer, int offset = 0)
             // We might have a backslash-escaped newline.
             // Look at the next byte (if any) to see.
             //
-            // Note(tfoley): We are assuming a null-terminated input here,
-            // so that we can safely look at the next byte without issue.
+            // A trailing backslash has no following byte to inspect.
+            if (pos >= lexer->m_end - lexer->m_cursor)
+                break;
             int d = lexer->m_cursor[pos++];
             switch (d)
             {
@@ -249,9 +248,17 @@ static int _peek(Lexer* lexer, int offset = 0)
             case '\n':
                 {
                     // The newline was escaped, so return the code point after *that*
+                    // A splice can end the input. No logical character follows
+                    // it, and peeking must not read beyond the source buffer.
+                    if (pos >= lexer->m_end - lexer->m_cursor)
+                        return kEOF;
                     int e = lexer->m_cursor[pos++];
                     if ((d ^ e) == ('\r' ^ '\n'))
+                    {
+                        if (pos >= lexer->m_end - lexer->m_cursor)
+                            return kEOF;
                         c = lexer->m_cursor[pos++];
+                    }
                     else
                         c = e;
                     continue;
@@ -1828,7 +1835,7 @@ static void _lexRawStringLiteralBody(Lexer* lexer)
     }
 }
 
-UnownedStringSlice getRawStringLiteralTokenValue(Token const& token)
+UnownedStringSlice getRawStringLiteralTokenValue(Lexeme const& token)
 {
     auto content = token.getContent();
     if (content.getLength() <= 5)
@@ -1845,9 +1852,10 @@ UnownedStringSlice getRawStringLiteralTokenValue(Token const& token)
     return UnownedStringSlice(contentBegin, contentEnd);
 }
 
-String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
+String getStringLiteralTokenValue(Lexeme const& token, DiagnosticSink* sink)
 {
-    SLANG_ASSERT(token.type == TokenType::StringLiteral || token.type == TokenType::CharLiteral);
+    SLANG_ASSERT(
+        token.getType() == TokenType::StringLiteral || token.getType() == TokenType::CharLiteral);
 
     if (token.getContent().startsWith("R"))
         return getRawStringLiteralTokenValue(token);
@@ -1963,9 +1971,48 @@ String getFileNameTokenValue(Token const& token)
     return String(content.begin() + 1, content.end() - 1);
 }
 
+// Header names use preprocessing spelling rules: slashes and quotes inside an
+// angle-delimited name are ordinary path characters, and no physical newline
+// may terminate a valid name. The caller selects this context before lexing '<'.
+static TokenType _lexHeaderName(Lexer* lexer)
+{
+    _advance(lexer);
+    for (;;)
+    {
+        const auto next = _peek(lexer);
+        if (next == '>')
+        {
+            _advance(lexer);
+            return TokenType::HeaderName;
+        }
+        if (next == kEOF)
+        {
+            diagnose(
+                lexer->getDiagnosticSink(),
+                _getSourceLoc(lexer),
+                LexerDiagnostics::endOfFileInLiteral);
+            return TokenType::Invalid;
+        }
+        if (next == '\r' || next == '\n')
+        {
+            diagnose(
+                lexer->getDiagnosticSink(),
+                _getSourceLoc(lexer),
+                LexerDiagnostics::newlineInLiteral);
+            return TokenType::Invalid;
+        }
+        _advance(lexer);
+    }
+}
+
 static TokenType _lexTokenImpl(Lexer* lexer)
 {
     int nextCodePoint = _peek(lexer);
+    if (lexer->m_isHeaderNameMode)
+    {
+        if (nextCodePoint == '<')
+            return _lexHeaderName(lexer);
+    }
     switch (nextCodePoint)
     {
     default:
@@ -2470,187 +2517,197 @@ static TokenType _lexTokenImpl(Lexer* lexer)
     }
 }
 
+// We identify trivia without invoking the token recognizer. In particular,
+// looking for trivia after "include" must leave an adjacent '<' untouched so
+// the preprocessor can select header-name mode before that operand is lexed.
+static bool _startsTrivia(Lexer* lexer)
+{
+    if (lexer->m_cursor >= lexer->m_end)
+        return false;
+    const int c = _peek(lexer);
+    switch (c)
+    {
+    case ' ':
+    case '\t':
+    case '\r':
+    case '\n':
+        return true;
+    case '/':
+        {
+            const int next = _peek(lexer, 1);
+            if (next == '/')
+                return true;
+            return next == '*';
+        }
+    default:
+        break;
+    }
+    if (*lexer->m_cursor != '\\')
+        return false;
+    if (lexer->m_cursor + 1 >= lexer->m_end)
+        return false;
+    const auto next = lexer->m_cursor[1];
+    if (next == '\r')
+        return true;
+    return next == '\n';
+}
+
+Lexeme Lexer::lexLexeme()
+{
+    // Recognition uses logical characters, but we retain the complete byte span
+    // consumed from the `SourceView`. A splice at a lexeme boundary is its own
+    // trivia item; splices inside a token remain part of that token's spelling.
+    const auto loc = _getSourceLoc(this);
+    const auto textBegin = m_cursor;
+    auto kind = TokenType::Unknown;
+    if (m_end - m_cursor >= 2)
+    {
+        if (*m_cursor == '\\')
+        {
+            const auto next = m_cursor[1];
+            if (next == '\r' || next == '\n')
+            {
+                m_cursor += 2;
+                _handleNewLineInner(this, next);
+                kind = TokenType::EscapedNewLine;
+            }
+        }
+    }
+    if (kind == TokenType::Unknown)
+        kind = _lexTokenImpl(this);
+
+    const auto flags = m_tokenFlags;
+    switch (kind)
+    {
+    case TokenType::NewLine:
+        m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+        break;
+    case TokenType::WhiteSpace:
+    case TokenType::BlockComment:
+    case TokenType::LineComment:
+        m_tokenFlags |= TokenFlag::AfterWhitespace;
+        m_tokenFlags &= ~TokenFlag::ScrubbingNeeded;
+        break;
+    case TokenType::EscapedNewLine:
+        break;
+    default:
+        m_tokenFlags = 0;
+        break;
+    }
+
+    // We only allocate a temporary logical spelling when recognition crossed a
+    // splice. The pool then stores a stable copy and interns the full lexical state.
+    const UnownedStringSlice spelling(textBegin, m_cursor);
+    auto content = spelling;
+    StringBuilder scrubbed;
+    if (kind == TokenType::EscapedNewLine)
+    {
+        content = UnownedStringSlice();
+    }
+    else if (flags & TokenFlag::ScrubbingNeeded)
+    {
+        for (auto cursor = textBegin; cursor < m_cursor;)
+        {
+            if (*cursor == '\\')
+            {
+                if (cursor + 1 < m_cursor)
+                {
+                    const auto next = cursor[1];
+                    if (next == '\r' || next == '\n')
+                    {
+                        cursor += 2;
+                        if (cursor < m_cursor)
+                        {
+                            if ((next ^ *cursor) == ('\r' ^ '\n'))
+                                ++cursor;
+                        }
+                        continue;
+                    }
+                }
+            }
+            scrubbed.appendChar(*cursor++);
+        }
+        content = scrubbed.getUnownedSlice();
+    }
+
+    Name* name = nullptr;
+    if (m_namePool)
+    {
+        if (kind == TokenType::Identifier || kind == TokenType::CompletionRequest)
+            name = m_namePool->getName(content);
+    }
+    return m_tokenPool->createLexeme(kind, spelling, content, loc, flags, name);
+}
+
 Token Lexer::lexToken()
 {
-    for (;;)
+    // Each trivia item belongs to one cluster. Leading trivia includes blank
+    // lines left after the preceding token's first trailing newline; EOF is a
+    // normal zero-width token that can own that remaining trivia.
+    List<const LexemeObj*> leading;
+    while (_startsTrivia(this))
+        leading.add(lexLexeme().getObject());
+    const auto rawToken = lexLexeme().as<RawToken>();
+    SLANG_RELEASE_ASSERT(rawToken);
+
+    // We stop immediately after the first explicit newline. Embedded newlines
+    // do not split a block comment, and escaped newlines do not end directives.
+    List<const LexemeObj*> trailing;
+    if (rawToken.getType() != TokenType::EndOfFile)
     {
-        Token token;
-        token.loc = _getSourceLoc(this);
-
-        char const* textBegin = m_cursor;
-
-        auto tokenType = _lexTokenImpl(this);
-
-        // The flags on the token we just lexed will be based
-        // on the current state of the lexer.
-        //
-        auto tokenFlags = m_tokenFlags;
-        //
-        // Depending on what kind of token we just lexed, the
-        // flags that will be used for the *next* token might
-        // need to be updated.
-        //
-        switch (tokenType)
+        while (_startsTrivia(this))
         {
-        case TokenType::NewLine:
-            {
-                // If we just reached the end of a line, then the next token
-                // should count as being at the start of a line, and also after
-                // whitespace.
-                //
-                m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+            auto trivia = lexLexeme();
+            trailing.add(trivia.getObject());
+            if (trivia.getType() == TokenType::NewLine)
                 break;
-            }
-
-        case TokenType::WhiteSpace:
-        case TokenType::BlockComment:
-        case TokenType::LineComment:
-            {
-                // True horizontal whitespace and comments both count as whitespace.
-                //
-                // Note that a line comment does not include the terminating newline,
-                // we do not need to set `AtStartOfLine` here.
-                //
-                m_tokenFlags |= TokenFlag::AfterWhitespace;
-                break;
-            }
-
-        default:
-            {
-                // If we read some token other then the above cases, then we are
-                // neither after whitespace nor at the start of a line.
-                //
-                m_tokenFlags = 0;
-                break;
-            }
         }
-
-        token.type = tokenType;
-        token.flags = tokenFlags;
-
-        char const* textEnd = m_cursor;
-
-        // Note(tfoley): `StringBuilder::Append()` seems to crash when appending zero bytes
-        if (textEnd != textBegin)
-        {
-            // "scrubbing" token value here to remove escaped newlines...
-            //
-            // Only perform this work if we encountered an escaped newline
-            // while lexing this token (e.g., keep a flag on the lexer), or
-            // do it on-demand when the actual value of the token is needed.
-            if (tokenFlags & TokenFlag::ScrubbingNeeded)
-            {
-                // Allocate space that will always be more than enough for stripped contents
-                char* startDst = (char*)m_memoryArena->allocateUnaligned(textEnd - textBegin);
-                char* dst = startDst;
-
-                auto tt = textBegin;
-                while (tt != textEnd)
-                {
-                    char c = *tt++;
-                    if (c == '\\')
-                    {
-                        char d = *tt;
-                        switch (d)
-                        {
-                        case '\r':
-                        case '\n':
-                            {
-                                tt++;
-                                char e = *tt;
-                                if ((d ^ e) == ('\r' ^ '\n'))
-                                {
-                                    tt++;
-                                }
-                            }
-                            continue;
-
-                        default:
-                            break;
-                        }
-                    }
-                    *dst++ = c;
-                }
-                token.setContent(UnownedStringSlice(startDst, dst));
-            }
-            else
-            {
-                token.setContent(UnownedStringSlice(textBegin, textEnd));
-            }
-        }
-
-        if (m_namePool)
-        {
-            if (tokenType == TokenType::Identifier || tokenType == TokenType::CompletionRequest)
-            {
-                token.setName(m_namePool->getName(token.getContent()));
-            }
-        }
-
-        return token;
     }
+    return m_tokenPool->createToken(rawToken, leading.getArrayView(), trailing.getArrayView());
 }
 
 TokenList Lexer::lexAllSemanticTokens()
 {
-    TokenList tokenList;
+    TokenList tokens;
     for (;;)
     {
-        Token token = lexToken();
-
-        // We are only interested intokens that are semantically
-        // significant, so we will skip over forms of whitespace
-        // and comments.
-        //
-        switch (token.type)
-        {
-        default:
-            break;
-
-        case TokenType::WhiteSpace:
-        case TokenType::BlockComment:
-        case TokenType::LineComment:
-        case TokenType::NewLine:
-            continue;
-        }
-
-        tokenList.add(token);
-        if (token.type == TokenType::EndOfFile)
-            return tokenList;
+        auto token = lexToken();
+        tokens.add(token);
+        if (token.getType() == TokenType::EndOfFile)
+            return tokens;
     }
 }
 
-TokenList Lexer::lexAllMarkupTokens()
+LexemeList Lexer::lexAllMarkupTokens()
 {
-    TokenList tokenList;
+    LexemeList lexemes;
     for (;;)
     {
-        Token token = lexToken();
-        switch (token.type)
+        auto lexeme = lexLexeme();
+        switch (lexeme.getType())
         {
-        default:
-            break;
-
         case TokenType::WhiteSpace:
         case TokenType::NewLine:
+        case TokenType::EscapedNewLine:
             continue;
+        default:
+            break;
         }
-
-        tokenList.add(token);
-        if (token.type == TokenType::EndOfFile)
-            return tokenList;
+        lexemes.add(lexeme);
+        if (lexeme.getType() == TokenType::EndOfFile)
+            return lexemes;
     }
 }
 
-TokenList Lexer::lexAllTokens()
+LexemeList Lexer::lexAllTokens()
 {
-    TokenList tokenList;
+    LexemeList lexemes;
     for (;;)
     {
-        Token token = lexToken();
-        tokenList.add(token);
-        if (token.type == TokenType::EndOfFile)
-            return tokenList;
+        auto lexeme = lexLexeme();
+        lexemes.add(lexeme);
+        if (lexeme.getType() == TokenType::EndOfFile)
+            return lexemes;
     }
 }
 
@@ -2666,27 +2723,25 @@ TokenList Lexer::lexAllTokens()
 
     DiagnosticSink sink(&sourceManager, nullptr);
 
-    MemoryArena arena;
-
     NamePool namePool;
 
-    lexer.initialize(sourceView, &sink, &namePool, &arena);
+    lexer.initialize(sourceView, &sink, &namePool);
 
-    Token tok = lexer.lexToken();
+    auto tok = lexer.lexLexeme();
 
-    if (tok.type == TokenType::Invalid)
+    if (tok.getType() == TokenType::Invalid)
     {
         return UnownedStringSlice();
     }
 
-    const int offset = sourceView->getRange().getOffset(tok.loc);
+    const int offset = sourceView->getRange().getOffset(tok.getLoc());
 
     if (offset < 0 || offset >= in.getLength())
         return UnownedStringSlice();
-    if (Index(offset + tok.charsCount) > in.getLength())
+    if (Index(offset + tok.getSpellingLength()) > in.getLength())
         return UnownedStringSlice();
 
-    return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
+    return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.getSpellingLength());
 }
 
 SourceLoc Lexer::findNextLineEnd(SourceLoc from, UInt& lineCount) const

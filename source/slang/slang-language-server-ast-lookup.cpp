@@ -657,7 +657,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitLabelStmt(LabelStmt* stmt)
     {
-        if (_isLocInRange(context, stmt->label.loc, stmt->label.getContent().getLength()))
+        if (_isLocInRange(context, stmt->label.getLoc(), stmt->label.getContent().getLength()))
             return true;
         return dispatchIfNotNull(stmt->innerStmt);
     }
@@ -879,7 +879,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                 if (attribute->getKeywordName() &&
                     _isLocInRange(
                         &context,
-                        attribute->originalIdentifierToken.loc,
+                        attribute->originalIdentifierToken.getLoc(),
                         attribute->originalIdentifierToken.getContentLength()))
                 {
                     ASTLookupResult result;

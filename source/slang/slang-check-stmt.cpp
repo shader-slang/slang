@@ -180,7 +180,7 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
     // this `break` is meant to break out of.
     //
     BreakableStmt* targetOuterStmt = nullptr;
-    if (stmt->targetLabel.type == TokenType::Identifier)
+    if (stmt->targetLabel.getType() == TokenType::Identifier)
     {
         // If this is a `break` statement that specifies
         // an explicit label, then we will search for
@@ -480,7 +480,7 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
             {
                 getSink()->diagnose(Diagnostics::UnknownStageName{
                     .stageName = String(caseStmt->capabilityToken.getContent()),
-                    .location = caseStmt->capabilityToken.loc});
+                    .location = caseStmt->capabilityToken.getLoc()});
             }
             caseStmt->capability = (int32_t)canonicalStage;
         }
@@ -489,7 +489,7 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
             if (isStage)
             {
                 getSink()->diagnose(Diagnostics::TargetSwitchCaseCannotBeAStage{
-                    .location = caseStmt->capabilityToken.loc});
+                    .location = caseStmt->capabilityToken.getLoc()});
             }
             else if (
                 caseStmt->capabilityToken.getContentLength() != 0 &&
@@ -497,7 +497,7 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
             {
                 getSink()->diagnose(Diagnostics::InvalidTargetSwitchCase{
                     .capability = capabilityNameToString((CapabilityName)caseStmt->capability),
-                    .location = caseStmt->capabilityToken.loc});
+                    .location = caseStmt->capabilityToken.getLoc()});
             }
         }
 
@@ -1072,7 +1072,9 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     auto maxItersAttr = m_astBuilder->create<InferredMaxItersAttribute>();
     auto litExpr = m_astBuilder->create<IntegerLiteralExpr>();
     litExpr->type.type = m_astBuilder->getIntType();
-    litExpr->token.setName(getNamePool()->getName(String(iterations)));
+    litExpr->token = m_astBuilder->getTokenPool()->createToken(
+        TokenType::IntegerLiteral,
+        getNamePool()->getName(String(iterations)));
     maxItersAttr->args.add(litExpr);
     maxItersAttr->intArgVals.add(m_astBuilder->getIntVal(m_astBuilder->getIntType(), iterations));
     maxItersAttr->value = (int32_t)iterations;

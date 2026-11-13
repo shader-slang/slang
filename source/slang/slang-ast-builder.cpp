@@ -341,6 +341,29 @@ ASTBuilder::~ASTBuilder()
     incrementEpoch();
 }
 
+TokenPool* ASTBuilder::getTokenPool()
+{
+    if (!m_tokenPool)
+        m_tokenPool = new TokenPool();
+    return m_tokenPool;
+}
+
+void ASTBuilder::retainTokenPool(TokenPool* tokenPool)
+{
+    SLANG_RELEASE_ASSERT(tokenPool);
+
+    // We already own the pool used for synthesized tokens. For input tokens, we retain each
+    // contributing pool once because many AST nodes may refer to tokens from the same input.
+    if (tokenPool == m_tokenPool.Ptr())
+        return;
+    for (auto const& retainedPool : m_retainedTokenPools)
+    {
+        if (retainedPool.Ptr() == tokenPool)
+            return;
+    }
+    m_retainedTokenPools.add(tokenPool);
+}
+
 Val* ASTBuilder::_getOrCreateImplSlowPath(ValNodeDesc&& desc)
 {
     // The most important thing we need to determine here

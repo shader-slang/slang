@@ -5,11 +5,11 @@
 // compatibility with the preprocessor for those languages, it does strive to provide
 // the same semantics in most cases users will care about around macros, toking pasting, etc.
 //
-// The main conceptual difference from a fully C-compatible preprocessor is that
-// we do *not* implement distinct tokenization/lexing rules for the preprocessor and
-// later compiler stages. Instead, our preprocessor uses the same lexer as the rest
-// of the compiler, and operates as logical transformation from one stream of tokens
-// to another.
+// Physical tokens retain their spelling and trivia throughout preprocessing.
+// `LexerInputStream` exposes line endings as separate, zero-width
+// `EndOfDirective` tokens so that directive handlers can stop before the next line.
+// Header operands use the lexer's contextual header-name mode; macro expansion
+// transforms the remaining token stream without changing physical trivia origins.
 
 #include "compiler-core/slang-lexer.h"
 #include "core/slang-type-text-util.h"
@@ -187,10 +187,10 @@ struct InputStream
     // for cases where we only care about certain details of the input.
 
     /// Peek the type of the next token in the input stream.
-    TokenType peekTokenType() { return peekToken().type; }
+    TokenType peekTokenType() { return peekToken().getType(); }
 
     /// Peek the location of the next token in the input stream.
-    SourceLoc peekLoc() { return peekToken().loc; }
+    SourceLoc peekLoc() { return peekToken().getLoc(); }
 
     /// Get the diagnostic sink to use for messages related to this stream
     DiagnosticSink* getSink();
@@ -334,7 +334,7 @@ struct InputStreamStack
             // it is not at its end, then we return its next token.
             //
             auto token = m_top->readToken();
-            if (token.type != TokenType::EndOfFile)
+            if (token.getType() != TokenType::EndOfFile)
                 return token;
 
             // If the top stream has run out of input we try to
@@ -406,7 +406,7 @@ struct InputStreamStack
         {
             SLANG_ASSERT(top);
             auto token = top->peekToken();
-            if (token.type != TokenType::EndOfFile)
+            if (token.getType() != TokenType::EndOfFile)
                 return token;
 
             auto parent = top->getParent();
@@ -421,13 +421,12 @@ struct InputStreamStack
     }
 
     /// Return type of the token that `peekToken()` will return
-    TokenType peekTokenType() { return peekToken().type; }
+    TokenType peekTokenType() { return peekToken().getType(); }
 
     /// Return location of the token that `peekToken()` will return
-    SourceLoc peekLoc() { return peekToken().loc; }
+    SourceLoc peekLoc() { return peekToken().getLoc(); }
 
-    /// Skip over all whitespace tokens in the input stream(s) to arrive at the next non-whitespace
-    /// token
+    /// Skip line delimiters to arrive at the next ordinary token.
     void skipAllWhitespace()
     {
         for (;;)
@@ -437,14 +436,10 @@ struct InputStreamStack
             default:
                 return;
 
-                // Note: We expect `NewLine` to be the only case of whitespace we
-                // encounter right now, because all the other cases will have been
-                // filtered out by the `LexerInputStream`.
+                // Physical whitespace remains attached to tokens as trivia. The
+                // lexer stream exposes only an `EndOfDirective` sentinel.
                 //
-            case TokenType::NewLine:
-            case TokenType::WhiteSpace:
-            case TokenType::BlockComment:
-            case TokenType::LineComment:
+            case TokenType::EndOfDirective:
                 readToken();
                 break;
             }
@@ -490,7 +485,10 @@ private:
 // them directly, and then have the preprocessor or later compilation stages
 // take responsibility for actually emitting those diagnostics.
 
-/// An input stream that reads tokens directly using the Slang `Lexer`
+/// An input stream of physical tokens and preprocessor line delimiters.
+///
+/// Whitespace and comments remain attached to their physical tokens as trivia.
+/// A trailing newline also yields an `EndOfDirective` sentinel with no spelling.
 struct LexerInputStream : InputStream
 {
     typedef InputStream Super;
@@ -499,18 +497,26 @@ struct LexerInputStream : InputStream
 
     Lexer* getLexer() { return &m_lexer; }
 
-    // A common thread to many of the input stream implementations is to
-    // use a single token of lookahead in order to suppor the `peekToken()`
-    // operation with both simplicity and efficiency.
-
     Token readToken() SLANG_OVERRIDE
     {
-        auto result = m_lookaheadToken;
-        m_lookaheadToken = _readTokenImpl();
+        // We consume the cached token without fetching its successor. Directive
+        // handlers may change lexer state before the next token is requested.
+        auto result = peekToken();
+        m_hasLookaheadToken = false;
         return result;
     }
 
-    Token peekToken() SLANG_OVERRIDE { return m_lookaheadToken; }
+    Token peekToken() SLANG_OVERRIDE
+    {
+        // We fill lookahead only on demand so that consuming a directive name
+        // does not also lex its operand under the preceding lexer mode.
+        if (!m_hasLookaheadToken)
+        {
+            m_lookaheadToken = _readTokenImpl();
+            m_hasLookaheadToken = true;
+        }
+        return m_lookaheadToken;
+    }
 
     virtual SourceLoc findNextLineEndImpl(SourceLoc from, UInt& lineCount) const SLANG_OVERRIDE
     {
@@ -518,30 +524,57 @@ struct LexerInputStream : InputStream
     }
 
 private:
-    /// Read a token from the lexer, bypassing lookahead
+    /// Read a physical token or an end-of-directive sentinel, bypassing lookahead.
     Token _readTokenImpl()
     {
-        for (;;)
+        // We expose a line ending before reading the next physical token.
+        // Consider this example:
+        //
+        //     #if 0
+        //     "unfinished
+        //     #endif
+        //
+        // We return the delimiter after `0` before lexing the string, allowing
+        // the conditional handler to suppress diagnostics in the disabled branch.
+        // The newline remains trivia on the preceding physical token; the
+        // `EndOfDirective` sentinel itself has no spelling.
+        if (m_pendingEndOfDirective)
         {
-            Token token = m_lexer.lexToken();
-            switch (token.type)
-            {
-            default:
-                return token;
+            auto result = m_pendingEndOfDirective;
+            m_pendingEndOfDirective = Token();
+            return result;
+        }
 
-            case TokenType::WhiteSpace:
-            case TokenType::BlockComment:
-            case TokenType::LineComment:
+        // The lexer groups trailing trivia through the first explicit newline.
+        // We preserve the physical cluster and remember only that line delimiter
+        // for the preprocessor's next read.
+        Token token = m_lexer.lexToken();
+        for (auto trivia : token.getTrailingTrivia())
+        {
+            if (trivia.getType() == TokenType::NewLine)
+            {
+                m_pendingEndOfDirective =
+                    m_lexer.m_sourceView->getSourceManager()->getTokenPool()->createToken(
+                        TokenType::EndOfDirective,
+                        UnownedStringSlice(),
+                        trivia.getLoc(),
+                        trivia.getFlags());
                 break;
             }
         }
+        return token;
     }
 
     /// The lexer state that will provide input
     Lexer m_lexer;
 
-    /// One token of lookahead
+    /// The cached result of the next read, when `m_hasLookaheadToken` is true.
     Token m_lookaheadToken;
+
+    bool m_hasLookaheadToken = false;
+
+    /// A pending line delimiter from the preceding token's trailing trivia.
+    Token m_pendingEndOfDirective;
 };
 
 // The remaining input stream cases deal with macro expansion, so it is
@@ -812,7 +845,6 @@ struct ExpansionInputStream : InputStream
         : Super(preprocessor), m_base(base)
     {
         m_inputStreams.push(base);
-        m_lookaheadToken = _readTokenImpl();
     }
 
     Token readToken() SLANG_OVERRIDE
@@ -826,7 +858,7 @@ struct ExpansionInputStream : InputStream
         _maybeBeginMacroInvocation();
 
         Token result = m_lookaheadToken;
-        m_lookaheadToken = _readTokenImpl();
+        m_hasLookaheadToken = false;
         return result;
     }
 
@@ -844,14 +876,20 @@ struct ExpansionInputStream : InputStream
 
     Token readRawToken()
     {
-        Token result = m_lookaheadToken;
-        m_lookaheadToken = _readTokenImpl();
+        // The next physical token must remain unread until a directive handler
+        // has had an opportunity to select lexer mode and diagnostic policy.
+        Token result = peekRawToken();
+        m_hasLookaheadToken = false;
         return result;
     }
 
-    Token peekRawToken() { return m_lookaheadToken; }
+    Token peekRawToken()
+    {
+        _ensureLookaheadToken();
+        return m_lookaheadToken;
+    }
 
-    TokenType peekRawTokenType() { return peekRawToken().type; }
+    TokenType peekRawTokenType() { return peekRawToken().getType(); }
 
     void setInitiatingMacroSourceLoc(SourceLoc loc)
     {
@@ -887,8 +925,22 @@ private:
     /// another macro expansion.
     bool m_isInExpansion = false;
 
-    /// One token of lookahead
+    /// A token already consumed from `m_inputStreams`, when the cache is valid.
     Token m_lookaheadToken;
+
+    bool m_hasLookaheadToken = false;
+
+    /// Cache the next unexpanded token if it has not already been requested.
+    void _ensureLookaheadToken()
+    {
+        // We retain the underlying stack after reading its token because macro
+        // recursion checks need to know which invocations produced that token.
+        if (!m_hasLookaheadToken)
+        {
+            m_lookaheadToken = _readTokenImpl();
+            m_hasLookaheadToken = true;
+        }
+    }
 
     /// Read a token, bypassing lookahead
     Token _readTokenImpl()
@@ -1324,7 +1376,7 @@ static void reportMacroDefinitionForContentAssist(Preprocessor* preprocessor, Ma
     MacroDefinitionContentAssistInfo info;
     info.name = def->getName();
     info.loc = def->getLoc();
-    info.tokenList = def->tokens.m_tokens;
+    info.tokenList = def->tokens.getTokens();
     for (auto param : def->params)
     {
         MacroDefinitionContentAssistInfo::Param p;
@@ -1357,7 +1409,7 @@ static void reportIncludeFileForContentAssist(Preprocessor* preprocessor, Token 
     if (preprocessor->m_currentInputFile && preprocessor->m_currentInputFile->isIncludedFile())
         return;
     FileIncludeContentAssistInfo info;
-    info.loc = token.loc;
+    info.loc = token.getLoc();
     info.length = (int)token.getContentLength();
     info.path = path;
     preprocessor->contentAssistInfo->fileIncludes.add(info);
@@ -1383,9 +1435,7 @@ DiagnosticSink* InputStream::getSink()
 LexerInputStream::LexerInputStream(Preprocessor* preprocessor, SourceView* sourceView)
     : Super(preprocessor)
 {
-    MemoryArena* memoryArena = sourceView->getSourceManager()->getMemoryArena();
-    m_lexer.initialize(sourceView, GetSink(preprocessor), preprocessor->getNamePool(), memoryArena);
-    m_lookaheadToken = _readTokenImpl();
+    m_lexer.initialize(sourceView, GetSink(preprocessor), preprocessor->getNamePool());
 }
 
 InputFile::InputFile(Preprocessor* preprocessor, SourceView* sourceView)
@@ -1506,7 +1556,7 @@ MacroInvocation::Arg ExpansionInputStream::_parseMacroArg(MacroInvocation* macro
         Token token = m_inputStreams.peekToken();
         macroInvocation->m_argTokens.add(token);
 
-        switch (token.type)
+        switch (token.getType())
         {
         case TokenType::EndOfFile:
             // End of input means end of the argument.
@@ -1612,11 +1662,12 @@ void ExpansionInputStream::_parseMacroArgs(MacroDefinition* macro, MacroInvocati
             return;
 
         case TokenType::Comma:
-            // If we see a comma, then we will
-            // continue scanning for more macro
-            // arguments.
-            //
-            readRawToken();
+            // We parse arguments directly from `m_inputStreams`, while the
+            // expansion stream's cache still contains the macro name. We must
+            // consume this comma from the argument stream before reading the
+            // next argument; consuming the cached name would leave an empty
+            // argument in front of the comma.
+            m_inputStreams.readToken();
             break;
 
         default:
@@ -1642,6 +1693,9 @@ void ExpansionInputStream::_parseMacroArgs(MacroDefinition* macro, MacroInvocati
 // that macro.
 void ExpansionInputStream::_maybeBeginMacroInvocation()
 {
+    // We first obtain an unexpanded token. Its producing streams remain active
+    // while we decide whether expanding its name would recursively invoke a macro.
+    _ensureLookaheadToken();
     auto preprocessor = m_preprocessor;
 
     // We iterate because the first token in the expansion of one
@@ -1657,7 +1711,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
 
         // If the token is not an identifier, then it can't possibly name a macro.
         //
-        if (token.type != TokenType::Identifier)
+        if (token.getType() != TokenType::Identifier)
         {
             return;
         }
@@ -1674,7 +1728,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
             return;
         }
 
-        bool isStartOfLine = (token.flags & TokenFlag::AtStartOfLine) != 0;
+        bool isStartOfLine = (token.getFlags() & TokenFlag::AtStartOfLine) != 0;
         // Now we get to the slightly trickier cases.
         //
         // *If* the identifier names a macro, but we are currently in the
@@ -1717,7 +1771,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
         //
         if (!m_isInExpansion && activeStream == m_base)
         {
-            m_initiatingMacroInvocationLoc = token.loc;
+            m_initiatingMacroInvocationLoc = token.getLoc();
         }
 
         // The next steps depend on whether or not we are dealing
@@ -1740,7 +1794,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 MacroInvocation* invocation = new MacroInvocation(
                     preprocessor,
                     macro,
-                    token.loc,
+                    token.getLoc(),
                     m_initiatingMacroInvocationLoc,
                     isStartOfLine);
                 invocation->prime(busyMacros);
@@ -1777,7 +1831,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 //
                 m_inputStreams.skipAllWhitespace();
                 Token maybeLeftParen = m_inputStreams.peekToken();
-                if (maybeLeftParen.type != TokenType::LParent)
+                if (maybeLeftParen.getType() != TokenType::LParent)
                 {
                     // If we see a token other then `(` then we aren't suppsoed to be
                     // expanding the macro after all. Luckily, there is no state
@@ -1798,14 +1852,14 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 MacroInvocation* invocation = new MacroInvocation(
                     preprocessor,
                     macro,
-                    token.loc,
+                    token.getLoc(),
                     m_initiatingMacroInvocationLoc,
                     isStartOfLine);
 
                 // We start by consuming the opening `(` that we checked for above.
                 //
                 Token leftParen = m_inputStreams.readToken();
-                SLANG_ASSERT(leftParen.type == TokenType::LParent);
+                SLANG_ASSERT(leftParen.getType() == TokenType::LParent);
 
                 // Next we parse any arguments to the macro invocation, which will
                 // consist of `()`-balanced sequences of tokens separated by `,`s.
@@ -1846,7 +1900,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                             ->diagnose(Diagnostics::WrongNumberOfArgumentsToMacro{
                                 .expected = int(paramCount),
                                 .got = int(argCount),
-                                .location = leftParen.loc});
+                                .location = leftParen.getLoc()});
                         // The invocation was never pushed onto the input stream
                         // stack (which owns and eventually deletes its streams),
                         // so it must be freed here.
@@ -1868,7 +1922,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                             ->diagnose(Diagnostics::WrongNumberOfArgumentsToMacro{
                                 .expected = int(requiredArgCount),
                                 .got = int(argCount),
-                                .location = leftParen.loc});
+                                .location = leftParen.getLoc()});
                         // See the non-variadic mismatch above: not pushed, so
                         // freed here.
                         delete invocation;
@@ -1993,7 +2047,7 @@ Token MacroInvocation::_readTokenImpl()
             // That detail is handled below in the logic for switching to a new
             // macro op.
             //
-            SLANG_ASSERT(token.type != TokenType::EndOfFile);
+            SLANG_ASSERT(token.getType() != TokenType::EndOfFile);
 
             // We can safely return with our invaraints intact, because
             // the next attempt to read a token will read a non-EOF.
@@ -2003,7 +2057,7 @@ Token MacroInvocation::_readTokenImpl()
             // as well, otherwise the expanded code could be invalid.
             if (m_isStartOfLine)
             {
-                token.flags |= TokenFlag::AtStartOfLine;
+                token.setFlags(token.getFlags() | TokenFlag::AtStartOfLine);
                 m_isStartOfLine = false;
             }
             return token;
@@ -2033,7 +2087,7 @@ Token MacroInvocation::_readTokenImpl()
             // as well, otherwise the expanded code could be invalid.
             if (m_isStartOfLine)
             {
-                token.flags |= TokenFlag::AtStartOfLine;
+                token.setFlags(token.getFlags() | TokenFlag::AtStartOfLine);
                 m_isStartOfLine = false;
             }
             return token;
@@ -2087,7 +2141,7 @@ Token MacroInvocation::_readTokenImpl()
                 // this loop have been EOFs, and setting the value to the first
                 // non-EOF token read.
                 //
-                if (token.type == TokenType::EndOfFile)
+                if (token.getType() == TokenType::EndOfFile)
                 {
                     token = m_currentOpStreams.readToken();
                     tokenOpIndex = m_macroOpIndex;
@@ -2100,7 +2154,8 @@ Token MacroInvocation::_readTokenImpl()
                 // The more complicated case is a token paste (`##`).
                 //
                 Index tokenPasteTokenIndex = nextOp.index0;
-                SourceLoc tokenPasteLoc = m_macro->tokens.m_tokens[tokenPasteTokenIndex].loc;
+                SourceLoc tokenPasteLoc =
+                    m_macro->tokens.getTokens()[tokenPasteTokenIndex].getLoc();
 
                 // A `##` must always appear between two macro ops (whether literal tokens
                 // or macro parameters) and it is supposed to paste together the last
@@ -2153,7 +2208,7 @@ Token MacroInvocation::_readTokenImpl()
                 //
                 if (tokenOpIndex == nextOpIndex - 1)
                 {
-                    if (token.type != TokenType::EndOfFile)
+                    if (token.getType() != TokenType::EndOfFile)
                     {
                         pastedContent << token.getContent();
                     }
@@ -2181,7 +2236,7 @@ Token MacroInvocation::_readTokenImpl()
                 // to append that content to our paste result.
                 //
                 Token rightToken = m_currentOpStreams.readToken();
-                if (rightToken.type != TokenType::EndOfFile)
+                if (rightToken.getType() != TokenType::EndOfFile)
                     pastedContent << rightToken.getContent();
 
                 // Now we need to re-lex the token(s) that resulted from pasting, which requires
@@ -2199,8 +2254,7 @@ Token MacroInvocation::_readTokenImpl()
                 lexer.initialize(
                     sourceView,
                     GetSink(m_preprocessor),
-                    m_preprocessor->getNamePool(),
-                    sourceManager->getMemoryArena());
+                    m_preprocessor->getNamePool());
                 auto lexedTokens = lexer.lexAllSemanticTokens();
 
                 // The `lexedTokens` will always contain at least one token, representing an EOF for
@@ -2223,7 +2277,7 @@ Token MacroInvocation::_readTokenImpl()
                 // The first two cases are both considered valid token pastes, while the latter
                 // should be diagnosed as a warning, even if it is clear how we can handle it.
                 //
-                if (lexedTokens.m_tokens.getCount() > 2)
+                if (lexedTokens.getTokens().getCount() > 2)
                 {
                     getSink()->diagnose(Diagnostics::InvalidTokenPasteResult{
                         .token = pastedContent,
@@ -2249,7 +2303,7 @@ Token MacroInvocation::_readTokenImpl()
                 // (Otherwise, the `##` is being initialized as part of advancing through ops with
                 // empty expansion to the right of the op for a non-EOF `token`)
                 //
-                if ((tokenOpIndex == nextOpIndex - 1) || token.type == TokenType::EndOfFile)
+                if ((tokenOpIndex == nextOpIndex - 1) || token.getType() == TokenType::EndOfFile)
                 {
                     // Note that `tokenOpIndex` is being set here to the op index for the
                     // right-hand operand to the `##`. This is appropriate for cases where
@@ -2277,21 +2331,12 @@ void MacroInvocation::_pushSingleTokenStream(
     SourceLoc tokenLoc,
     UnownedStringSlice const& content)
 {
-    // The goal here is to push a token stream that represents a single token
-    // with exactly the given `content`, etc.
-    //
-    // We are going to keep the content alive using the slice pool for the source
-    // manager, which will also lead to it being shared if used multiple times.
-    //
+    // We create the generated spelling in the source manager's token pool.
+    // The pool owns the characters and shares identical generated tokens without
+    // attaching trivia from the macro definition or invocation.
     SourceManager* sourceManager = m_preprocessor->getSourceManager();
-    auto& pool = sourceManager->getStringSlicePool();
-    auto poolHandle = pool.add(content);
-    auto slice = pool.getSlice(poolHandle);
-
-    Token token;
-    token.type = tokenType;
-    token.setContent(slice);
-    token.loc = tokenLoc;
+    auto pool = sourceManager->getTokenPool();
+    Token token = pool->createToken(tokenType, content, tokenLoc);
 
     TokenList lexedTokens;
     lexedTokens.add(token);
@@ -2300,10 +2345,9 @@ void MacroInvocation::_pushSingleTokenStream(
     // so we will construct one that matches the location
     // for the `token`.
     //
-    Token eofToken;
-    eofToken.type = TokenType::EndOfFile;
-    eofToken.loc = token.loc;
-    eofToken.flags = TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine;
+    Token eofToken = pool->createEndOfFile(
+        token.getLoc(),
+        TokenFlag::AfterWhitespace | TokenFlag::AtStartOfLine);
     lexedTokens.add(eofToken);
 
     SingleUseInputStream* inputStream = new SingleUseInputStream(m_preprocessor, lexedTokens);
@@ -2509,7 +2553,7 @@ void MacroInvocation::_initCurrentOpStream()
             // Much of the initial logic is shared with the other parameter cases above.
             //
             Index tokenIndex = op.index0;
-            auto loc = m_macro->tokens.m_tokens[tokenIndex].loc;
+            auto loc = m_macro->tokens.getTokens()[tokenIndex].getLoc();
 
             Index paramIndex = op.index1;
             auto tokenReader = _getArgTokens(paramIndex);
@@ -2528,7 +2572,7 @@ void MacroInvocation::_initCurrentOpStream()
                 // for each token whether it was immediately preceded by whitespace,
                 // so we can check for whitespace that precedes any token except the first.
                 //
-                if (!first && (token.flags & TokenFlag::AfterWhitespace))
+                if (!first && (token.getFlags() & TokenFlag::AfterWhitespace))
                 {
                     builder.appendChar(' ');
                 }
@@ -2656,9 +2700,9 @@ inline UnownedStringSlice GetDirectiveName(PreprocessorDirectiveContext* context
 }
 
 // Get the location of the directive being parsed.
-inline SourceLoc const& GetDirectiveLoc(PreprocessorDirectiveContext* context)
+inline SourceLoc GetDirectiveLoc(PreprocessorDirectiveContext* context)
 {
-    return context->m_directiveToken.loc;
+    return context->m_directiveToken.getLoc();
 }
 
 // Wrapper to get the diagnostic sink in the context of a directive.
@@ -2698,7 +2742,7 @@ static bool IsEndOfLine(PreprocessorDirectiveContext* context)
     switch (inputStream->peekRawTokenType())
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:
+    case TokenType::EndOfDirective:
         return true;
 
     default:
@@ -2809,7 +2853,7 @@ static bool ExpectRaw(
                     .openingToken =
                         openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
-                    .openingLoc = openingToken ? openingToken->loc : SourceLoc()});
+                    .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
             case PreprocessorExpectDiag::TokenInDefinedExpr:
                 sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
@@ -2817,7 +2861,7 @@ static bool ExpectRaw(
                     .openingToken =
                         openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
-                    .openingLoc = openingToken ? openingToken->loc : SourceLoc()});
+                    .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
             case PreprocessorExpectDiag::TokenInMacroParams:
                 sink->diagnose(Diagnostics::ExpectedTokenInMacroParameters{
@@ -2865,7 +2909,7 @@ static bool Expect(
                     .openingToken =
                         openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
-                    .openingLoc = openingToken ? openingToken->loc : SourceLoc()});
+                    .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
             case PreprocessorExpectDiag::TokenInDefinedExpr:
                 sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
@@ -2873,7 +2917,7 @@ static bool Expect(
                     .openingToken =
                         openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
-                    .openingLoc = openingToken ? openingToken->loc : SourceLoc()});
+                    .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
             case PreprocessorExpectDiag::TokenInMacroParams:
                 sink->diagnose(Diagnostics::ExpectedTokenInMacroParameters{
@@ -2989,14 +3033,14 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
     switch (PeekTokenType(context))
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:
+    case TokenType::EndOfDirective:
         GetSink(context)->diagnose(
             Diagnostics::SyntaxErrorInPreprocessorExpression{.location = PeekLoc(context)});
         return 0;
     }
 
     auto token = AdvanceToken(context);
-    switch (token.type)
+    switch (token.getType())
     {
     // handle prefix unary ops
     case TokenType::OpSub:
@@ -3049,7 +3093,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
                 Name* name = nameToken.getName();
 
                 // If we saw an opening `(`, then expect one to close
-                if (leftParen.type != TokenType::Unknown)
+                if (leftParen.getType() != TokenType::Unknown)
                 {
                     if (!ExpectRaw(
                             context,
@@ -3087,7 +3131,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
                 }
 
                 // If we saw an opening `(`, then expect one to close
-                if (leftParen.type != TokenType::Unknown)
+                if (leftParen.getType() != TokenType::Unknown)
                 {
                     if (!ExpectRaw(
                             context,
@@ -3111,13 +3155,13 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
             // just evaluate to zero (possibly with a warning)
             GetSink(context)->diagnose(Diagnostics::UndefinedIdentifierInPreprocessorExpression{
                 .identifier = token.getName()->text,
-                .location = token.loc});
+                .location = token.getLoc()});
             return 0;
         }
 
     default:
         GetSink(context)->diagnose(
-            Diagnostics::SyntaxErrorInPreprocessorExpression{.location = token.loc});
+            Diagnostics::SyntaxErrorInPreprocessorExpression{.location = token.getLoc()});
         return 0;
     }
 }
@@ -3128,12 +3172,12 @@ static int GetInfixOpPrecedence(Token const& opToken)
 {
     // If token is on another line, it is not part of the
     // expression
-    if (opToken.flags & TokenFlag::AtStartOfLine)
+    if (opToken.getFlags() & TokenFlag::AtStartOfLine)
         return -1;
 
     // otherwise we look at the token type to figure
     // out what precedence it should be parse with
-    switch (opToken.type)
+    switch (opToken.getType())
     {
     default:
         // tokens that aren't infix operators should
@@ -3192,7 +3236,7 @@ static PreprocessorExpressionValue EvaluateInfixOp(
     PreprocessorExpressionValue left,
     PreprocessorExpressionValue right)
 {
-    switch (opToken.type)
+    switch (opToken.getType())
     {
     default:
         //        SLANG_INTERNAL_ERROR(getSink(preprocessor), opToken);
@@ -3207,8 +3251,8 @@ static PreprocessorExpressionValue EvaluateInfixOp(
             {
                 if (!context->m_parseError)
                 {
-                    GetSink(context)->diagnose(
-                        Diagnostics::DivideByZeroInPreprocessorExpression{.location = opToken.loc});
+                    GetSink(context)->diagnose(Diagnostics::DivideByZeroInPreprocessorExpression{
+                        .location = opToken.getLoc()});
                 }
                 return 0;
             }
@@ -3220,8 +3264,8 @@ static PreprocessorExpressionValue EvaluateInfixOp(
             {
                 if (!context->m_parseError)
                 {
-                    GetSink(context)->diagnose(
-                        Diagnostics::DivideByZeroInPreprocessorExpression{.location = opToken.loc});
+                    GetSink(context)->diagnose(Diagnostics::DivideByZeroInPreprocessorExpression{
+                        .location = opToken.getLoc()});
                 }
                 return 0;
             }
@@ -3410,13 +3454,13 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
     }
 
     // if we've already seen a `#else`, then it is an error
-    if (conditional->elseToken.type != TokenType::Unknown)
+    if (conditional->elseToken.getType() != TokenType::Unknown)
     {
         GetSink(context)->diagnose(Diagnostics::DirectiveAfterElse{
             .directive = GetDirectiveName(context),
             .elseDirective = conditional->elseToken.getContent(),
             .location = GetDirectiveLoc(context),
-            .elseLoc = conditional->elseToken.loc});
+            .elseLoc = conditional->elseToken.getLoc()});
         return;
     }
     conditional->elseToken = context->m_directiveToken;
@@ -3453,7 +3497,7 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     switch (PeekRawTokenType(context))
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:
+    case TokenType::EndOfDirective:
         GetSink(context)->diagnose(Diagnostics::DirectiveExpectsExpression{
             .directive = GetDirectiveName(context),
             .location = GetDirectiveLoc(context)});
@@ -3472,13 +3516,13 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     }
 
     // if we've already seen a `#else`, then it is an error
-    if (conditional->elseToken.type != TokenType::Unknown)
+    if (conditional->elseToken.getType() != TokenType::Unknown)
     {
         GetSink(context)->diagnose(Diagnostics::DirectiveAfterElse{
             .directive = GetDirectiveName(context),
             .elseDirective = conditional->elseToken.getContent(),
             .location = GetDirectiveLoc(context),
-            .elseLoc = conditional->elseToken.loc});
+            .elseLoc = conditional->elseToken.getLoc()});
         return;
     }
 
@@ -3599,20 +3643,46 @@ void Preprocessor::pushInputFile(InputFile* inputFile, SourceLoc loc, String fil
 // Handle a `#include` directive
 static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 {
-    // Consume the directive
+    // Consider `#include<dir/file.h>`. The operand must be lexed as one header
+    // name even without whitespace after `include`. Both input stream caches
+    // defer their next read, so we can select header mode before consuming the
+    // directive name and requesting its operand.
+    auto lexer = getInputFile(context)->getLexer();
+    lexer->setHeaderNameMode(true);
     AdvanceRawToken(context);
+    auto operandType = PeekTokenType(context);
+    lexer->setHeaderNameMode(false);
 
     Token pathToken;
     IncludeSystem::Mode includeMode = IncludeSystem::Mode::Quote;
     String path;
-    if (PeekRawTokenType(context) == TokenType::OpLess)
+    if (operandType == TokenType::HeaderName)
     {
+        // Physical angle-bracket operands preserve spaces and comment-like text
+        // inside the header name instead of interpreting that text as trivia.
+        Expect(
+            context,
+            TokenType::HeaderName,
+            PreprocessorExpectDiag::TokenInDirective,
+            &pathToken);
+        path = getFileNameTokenValue(pathToken);
+        includeMode = IncludeSystem::Mode::System;
+    }
+    else if (operandType == TokenType::OpLess)
+    {
+        // Macro expansion can supply a header as several ordinary tokens. We
+        // combine their logical spellings and preserve separating whitespace.
+        // Physical operands already took the `HeaderName` case above.
         StringBuilder pathSB;
         Expect(context, TokenType::OpLess, PreprocessorExpectDiag::TokenInDirective, &pathToken);
-        while (PeekRawTokenType(context) != TokenType::OpGreater &&
-               PeekRawTokenType(context) != TokenType::EndOfFile)
+        while (!IsEndOfLine(context))
         {
-            pathSB << AdvanceRawToken(context).getContent();
+            if (PeekTokenType(context) == TokenType::OpGreater)
+                break;
+            auto pathPart = AdvanceToken(context);
+            if (pathPart.getFlags() & TokenFlag::AfterWhitespace)
+                pathSB.appendChar(' ');
+            pathSB << pathPart.getContent();
         }
         if (!Expect(context, TokenType::OpGreater, PreprocessorExpectDiag::TokenInDirective))
             return;
@@ -3621,11 +3691,12 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     }
     else
     {
-        Expect(
-            context,
-            TokenType::StringLiteral,
-            PreprocessorExpectDiag::TokenInDirective,
-            &pathToken);
+        if (!Expect(
+                context,
+                TokenType::StringLiteral,
+                PreprocessorExpectDiag::TokenInDirective,
+                &pathToken))
+            return;
         path = getFileNameTokenValue(pathToken);
     }
 
@@ -3639,9 +3710,9 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     if (!includeSystem)
     {
         GetSink(context)->diagnose(
-            Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
+            Diagnostics::IncludeFailed{.path = path, .location = pathToken.getLoc()});
         GetSink(context)->diagnose(
-            Diagnostics::NoIncludeHandlerSpecified{.location = pathToken.loc});
+            Diagnostics::NoIncludeHandlerSpecified{.location = pathToken.getLoc()});
         return;
     }
 
@@ -3652,7 +3723,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
                 ->findFile(path, includedFromPathInfo.foundPath, filePathInfo, includeMode)))
     {
         GetSink(context)->diagnose(
-            Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
+            Diagnostics::IncludeFailed{.path = path, .location = pathToken.getLoc()});
         return;
     }
 
@@ -3660,7 +3731,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     if (!filePathInfo.hasUniqueIdentity())
     {
         GetSink(context)->diagnose(
-            Diagnostics::NoUniqueIdentity{.path = path, .location = pathToken.loc});
+            Diagnostics::NoUniqueIdentity{.path = path, .location = pathToken.getLoc()});
         return;
     }
 
@@ -3693,7 +3764,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         if (SLANG_FAILED(readFile(context, filePathInfo.foundPath, foundSourceBlob.writeRef())))
         {
             GetSink(context)->diagnose(
-                Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
+                Diagnostics::IncludeFailed{.path = path, .location = pathToken.getLoc()});
             return;
         }
 
@@ -3705,8 +3776,9 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     if (context->m_preprocessor->includedFiles.contains(fileIdentity))
     {
         // This file has already been included, we should diagnose an error and return.
-        GetSink(context)->diagnose(
-            Diagnostics::CyclicInclude{.path = pathToken.getContent(), .location = pathToken.loc});
+        GetSink(context)->diagnose(Diagnostics::CyclicInclude{
+            .path = pathToken.getContent(),
+            .location = pathToken.getLoc()});
         return;
     }
 
@@ -3742,9 +3814,9 @@ static void _parseMacroOps(
     {
         Index spanEndIndex = cursor;
         Index tokenIndex = cursor++;
-        Token const& token = macro->tokens.m_tokens[tokenIndex];
+        Token const& token = macro->tokens.getTokens()[tokenIndex];
         MacroDefinition::Op newOp;
-        switch (token.type)
+        switch (token.getType())
         {
         default:
             // Most tokens just continue our current span.
@@ -3768,12 +3840,12 @@ static void _parseMacroOps(
         case TokenType::Pound:
             {
                 auto paramNameTokenIndex = cursor;
-                auto paramNameToken = macro->tokens.m_tokens[paramNameTokenIndex];
-                if (paramNameToken.type != TokenType::Identifier)
+                auto paramNameToken = macro->tokens.getTokens()[paramNameTokenIndex];
+                if (paramNameToken.getType() != TokenType::Identifier)
                 {
                     GetSink(preprocessor)
                         ->diagnose(Diagnostics::ExpectedMacroParameterAfterStringize{
-                            .location = token.loc});
+                            .location = token.getLoc()});
                     continue;
                 }
                 auto paramName = paramNameToken.getName();
@@ -3782,7 +3854,7 @@ static void _parseMacroOps(
                 {
                     GetSink(preprocessor)
                         ->diagnose(Diagnostics::ExpectedMacroParameterAfterStringize{
-                            .location = token.loc});
+                            .location = token.getLoc()});
                     continue;
                 }
 
@@ -3798,14 +3870,14 @@ static void _parseMacroOps(
             if (macro->ops.getCount() == 0 && (spanBeginIndex == spanEndIndex))
             {
                 GetSink(preprocessor)
-                    ->diagnose(Diagnostics::TokenPasteAtStart{.location = token.loc});
+                    ->diagnose(Diagnostics::TokenPasteAtStart{.location = token.getLoc()});
                 continue;
             }
 
-            if (macro->tokens.m_tokens[cursor].type == TokenType::EndOfFile)
+            if (macro->tokens.getTokens()[cursor].getType() == TokenType::EndOfFile)
             {
                 GetSink(preprocessor)
-                    ->diagnose(Diagnostics::TokenPasteAtEnd{.location = token.loc});
+                    ->diagnose(Diagnostics::TokenPasteAtEnd{.location = token.getLoc()});
                 continue;
             }
 
@@ -3822,7 +3894,7 @@ static void _parseMacroOps(
         }
 
         if (spanBeginIndex != spanEndIndex ||
-            ((token.type == TokenType::EndOfFile) && (macro->ops.getCount() == 0)))
+            ((token.getType() == TokenType::EndOfFile) && (macro->ops.getCount() == 0)))
         {
             MacroDefinition::Op spanOp;
             spanOp.opcode = MacroDefinition::Opcode::RawSpan;
@@ -3830,7 +3902,7 @@ static void _parseMacroOps(
             spanOp.index1 = spanEndIndex;
             macro->ops.add(spanOp);
         }
-        if (token.type == TokenType::EndOfFile)
+        if (token.getType() == TokenType::EndOfFile)
             break;
 
         macro->ops.add(newOp);
@@ -3872,13 +3944,13 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
         {
             sink->diagnose(Diagnostics::BuiltinMacroRedefinition{
                 .name = name->text,
-                .location = nameToken.loc});
+                .location = nameToken.getLoc()});
         }
         else
         {
             sink->diagnose(Diagnostics::MacroRedefinition{
                 .name = name,
-                .location = nameToken.loc,
+                .location = nameToken.getLoc(),
                 .originalLocation = oldMacro->getLoc()});
         }
 
@@ -3892,8 +3964,8 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     // If macro name is immediately followed (with no space) by `(`,
     // then we have a function-like macro
     auto maybeOpenParen = PeekRawToken(context);
-    if (maybeOpenParen.type == TokenType::LParent &&
-        !(maybeOpenParen.flags & TokenFlag::AfterWhitespace))
+    if (maybeOpenParen.getType() == TokenType::LParent &&
+        !(maybeOpenParen.getFlags() & TokenFlag::AfterWhitespace))
     {
         // This is a function-like macro, so we need to remember that
         // and start capturing parameters
@@ -3942,13 +4014,13 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
                     param.isVariadic = true;
                 }
 
-                if (paramNameToken.type != TokenType::Unknown)
+                if (paramNameToken.getType() != TokenType::Unknown)
                 {
                     // If we read an explicit name for the parameter, then we can use
                     // that name directly.
                     //
                     param.nameLoc.name = paramNameToken.getName();
-                    param.nameLoc.loc = paramNameToken.loc;
+                    param.nameLoc.loc = paramNameToken.getLoc();
                 }
                 else
                 {
@@ -3957,13 +4029,13 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
                     // only case where the logic above doesn't require a name to
                     // be read is when it already sees an ellipsis ahead.
                     //
-                    SLANG_ASSERT(ellipsisToken.type != TokenType::Unknown);
+                    SLANG_ASSERT(ellipsisToken.getType() != TokenType::Unknown);
 
                     // Any unnamed variadic parameter is treated as one named `__VA_ARGS__`
                     //
                     param.nameLoc.name =
                         context->m_preprocessor->getNamePool()->getName("__VA_ARGS__");
-                    param.nameLoc.loc = ellipsisToken.loc;
+                    param.nameLoc.loc = ellipsisToken.getLoc();
                 }
 
                 // TODO(tfoley): The C standard seems to disallow certain identifiers
@@ -4036,7 +4108,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     for (;;)
     {
         Token token = PeekRawToken(context);
-        switch (token.type)
+        switch (token.getType())
         {
         default:
             // In the ordinary case, we just add the token to the definition,
@@ -4046,11 +4118,11 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             continue;
 
         case TokenType::EndOfFile:
-        case TokenType::NewLine:
+        case TokenType::EndOfDirective:
             // The end of the current line/file ends the directive, and serves
             // as the end-of-file marker for the macro's definition as well.
             //
-            token.type = TokenType::EndOfFile;
+            token.setType(TokenType::EndOfFile);
             macro->tokens.add(token);
             break;
         }
@@ -4087,7 +4159,7 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     {
         // name wasn't defined
         GetSink(context)->diagnose(
-            Diagnostics::MacroNotDefined{.name = name->text, .location = nameToken.loc});
+            Diagnostics::MacroNotDefined{.name = name->text, .location = nameToken.getLoc()});
     }
 }
 
@@ -4098,7 +4170,7 @@ static String _readDirectiveMessage(PreprocessorDirectiveContext* context)
     while (!IsEndOfLine(context))
     {
         Token token = AdvanceRawToken(context);
-        if (token.flags & TokenFlag::AfterWhitespace)
+        if (token.getFlags() & TokenFlag::AfterWhitespace)
         {
             if (result.getLength() != 0)
             {
@@ -4181,7 +4253,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         break;
 
     case TokenType::EndOfFile:
-    case TokenType::NewLine:
+    case TokenType::EndOfDirective:
         // `#line`
         _handleDefaultLineDirective(context);
         return;
@@ -4205,7 +4277,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     switch (PeekTokenType(context))
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:
+    case TokenType::EndOfDirective:
         file = sourceManager->getPathInfo(directiveLoc).foundPath;
         break;
 
@@ -4238,7 +4310,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handleUnknownPragmaDirective)
 {
     GetSink(context)->diagnose(Diagnostics::UnknownPragmaDirectiveIgnored{
         .directive = subDirectiveToken.getName()->text,
-        .location = subDirectiveToken.loc});
+        .location = subDirectiveToken.getLoc()});
     SkipToEndOfLine(context);
     return;
 }
@@ -4260,7 +4332,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     if (!issuedFromPathInfo.hasUniqueIdentity())
     {
         GetSink(context)->diagnose(
-            Diagnostics::PragmaOnceIgnored{.location = subDirectiveToken.loc});
+            Diagnostics::PragmaOnceIgnored{.location = subDirectiveToken.getLoc()});
         return;
     }
 
@@ -4280,19 +4352,21 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     AdvanceToken(context);
     Token tk = PeekToken(context);
     auto finish = [&]() -> void { SkipToEndOfLine(context); };
-    if (tk.type == TokenType::Identifier)
+    if (tk.getType() == TokenType::Identifier)
     {
         // #pragma warning (push)
         if (tk.getContent() == "push")
         {
             AdvanceToken(context);
-            context->m_preprocessor->warningStateTracker->addPragmaPush(tk.loc);
+            context->m_preprocessor->warningStateTracker->addPragmaPush(tk.getLoc());
         }
         // #pragma warning (pop)
         else if (tk.getContent() == "pop")
         {
             AdvanceToken(context);
-            context->m_preprocessor->warningStateTracker->addPragmaPop(tk.loc, GetSink(context));
+            context->m_preprocessor->warningStateTracker->addPragmaPop(
+                tk.getLoc(),
+                GetSink(context));
         }
         else
         {
@@ -4305,8 +4379,8 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
             {
                 // Read the specifier
                 // We need the raw token location because if the token is a #definition,
-                // PeekToken().loc would be where the definition is, not the invocation
-                // PeekRawToken().loc is where the invocation of the macro is located:
+                // `PeekToken().getLoc()` would be where the definition is, not the invocation.
+                // `PeekRawToken().getLoc()` is where the invocation of the macro is located:
                 // Example:
                 // #define SPEC suppress // (a)
                 // #pragma warning (SPEC : 12) (b)
@@ -4314,7 +4388,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 // and the token is 'suppress' located at the macro definition on line (a)
                 // The #pragma warning should take effect from line (b), not line (a),
                 // So we need the raw token location.
-                SourceLoc specifierLocation = PeekRawToken(context).loc;
+                SourceLoc specifierLocation = PeekRawToken(context).getLoc();
                 Token id;
                 if (PeekTokenType(context) != TokenType::Identifier)
                 {
@@ -4344,7 +4418,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 else if (id.getContent() == "suppress")
                 {
                     specifier = PragmaWarningSpecifier::Suppress;
-                    // We need to start from subDirectiveToken.loc because the next tokens
+                    // We need to start from `subDirectiveToken.getLoc()` because the next tokens
                     // might be macro invocations, and located before this #pragma warning line.
                     nextLineEnd = FindNextEndOfLine(context, specifierLocation, 2);
                     if (!nextLineEnd.isValid())
@@ -4373,9 +4447,9 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 while (true)
                 {
                     // Same logic as for the specifierLocation
-                    SourceLoc idLocation = PeekRawToken(context).loc;
+                    SourceLoc idLocation = PeekRawToken(context).getLoc();
                     Token warningNumberToken = PeekToken(context);
-                    if (warningNumberToken.type == TokenType::IntegerLiteral)
+                    if (warningNumberToken.getType() == TokenType::IntegerLiteral)
                     {
                         AdvanceToken(context);
                         int warningNumber = stringToInt(warningNumberToken.getContent());
@@ -4391,15 +4465,15 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                         break;
                     }
                 }
-                SourceLoc endLoc = PeekRawToken(context).loc;
+                SourceLoc endLoc = PeekRawToken(context).getLoc();
                 Token end = PeekToken(context);
-                if (end.type == TokenType::Semicolon)
+                if (end.getType() == TokenType::Semicolon)
                 {
                     // We need to parse the next 'spec : id-list'
                     AdvanceToken(context);
                     continue;
                 }
-                else if (end.type == TokenType::RParent)
+                else if (end.getType() == TokenType::RParent)
                 {
                     break;
                 }
@@ -4415,7 +4489,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     }
     else
     {
-        GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = tk.loc});
+        GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = tk.getLoc()});
         return finish();
     }
     if (PeekTokenType(context) != TokenType::RParent)
@@ -4472,7 +4546,7 @@ static void HandlePragmaDirective(PreprocessorDirectiveContext* context)
     Token subDirectiveToken = PeekRawToken(context);
 
     // The sub-directive had better be an identifier
-    if (subDirectiveToken.type != TokenType::Identifier)
+    if (subDirectiveToken.getType() != TokenType::Identifier)
     {
         GetSink(context)->diagnose(
             Diagnostics::ExpectedPragmaDirectiveName{.location = GetDirectiveLoc(context)});
@@ -4639,7 +4713,7 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
         {
             // Invalid/bad version, figure out the correct diagnostics
 
-            if ((!languageSpecified) && (versionToken.type == TokenType::Identifier))
+            if ((!languageSpecified) && (versionToken.getType() == TokenType::Identifier))
             {
                 // Language not specified, so we interpret the bad identifier token as a language
                 GetSink(context)->diagnose(Diagnostics::UnknownLanguage{
@@ -4647,8 +4721,8 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
                     .location = GetDirectiveLoc(context)});
             }
             else if (
-                (versionToken.type == TokenType::IntegerLiteral) ||
-                (versionToken.type == TokenType::Identifier))
+                (versionToken.getType() == TokenType::IntegerLiteral) ||
+                (versionToken.getType() == TokenType::Identifier))
             {
                 // Either:
                 // - integer literal (always interpreted as a version)
@@ -4762,13 +4836,13 @@ static void HandleDirective(PreprocessorDirectiveContext* context)
     // Try to read the directive name.
     context->m_directiveToken = PeekRawToken(context);
 
-    TokenType directiveTokenType = GetDirective(context).type;
+    TokenType directiveTokenType = GetDirective(context).getType();
 
     // An empty directive is allowed, and ignored.
     switch (directiveTokenType)
     {
     case TokenType::EndOfFile:
-    case TokenType::NewLine:
+    case TokenType::EndOfDirective:
         return;
 
     default:
@@ -4819,7 +4893,7 @@ void Preprocessor::popInputFile()
     //
     auto expansionStream = inputFile->getExpansionStream();
     Token eofToken = expansionStream->peekRawToken();
-    SLANG_ASSERT(eofToken.type == TokenType::EndOfFile);
+    SLANG_ASSERT(eofToken.getType() == TokenType::EndOfFile);
 
     // If there are any open preprocessor conditionals in the file, then
     // we need to diagnose them as an error, because they were not closed
@@ -4830,8 +4904,8 @@ void Preprocessor::popInputFile()
     {
         GetSink(this)->diagnose(Diagnostics::EndOfFileInPreprocessorConditional{
             .directive = conditional->ifToken.getContent(),
-            .location = eofToken.loc,
-            .directiveLoc = conditional->ifToken.loc});
+            .location = eofToken.getLoc(),
+            .directiveLoc = conditional->ifToken.getLoc()});
     }
 
     {
@@ -4881,14 +4955,14 @@ static Token ReadToken(Preprocessor* preprocessor)
 
         // Look at the next raw token in the input.
         Token token = expansionStream->peekRawToken();
-        if (token.type == TokenType::EndOfFile)
+        if (token.getType() == TokenType::EndOfFile)
         {
             preprocessor->popInputFile();
             continue;
         }
 
         // If we have a directive (`#` at start of line) then handle it
-        if ((token.type == TokenType::Pound) && (token.flags & TokenFlag::AtStartOfLine))
+        if ((token.getType() == TokenType::Pound) && (token.getFlags() & TokenFlag::AtStartOfLine))
         {
             // Skip the `#`
             expansionStream->readRawToken();
@@ -4913,7 +4987,7 @@ static Token ReadToken(Preprocessor* preprocessor)
         }
 
         token = expansionStream->peekToken();
-        if (token.type == TokenType::EndOfFile)
+        if (token.getType() == TokenType::EndOfFile)
         {
             preprocessor->popInputFile();
             continue;
@@ -4953,11 +5027,7 @@ static void DefineMacro(Preprocessor* preprocessor, String const& key, String co
 
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
-    lexer.initialize(
-        valueView,
-        GetSink(preprocessor),
-        preprocessor->getNamePool(),
-        sourceManager->getMemoryArena());
+    lexer.initialize(valueView, GetSink(preprocessor), preprocessor->getNamePool());
     macro->tokens = lexer.lexAllSemanticTokens();
 
     Dictionary<Name*, Index> mapParamNameToIndex;
@@ -4986,7 +5056,7 @@ static TokenList ReadAllTokens(Preprocessor* preprocessor)
     {
         Token token = ReadToken(preprocessor);
 
-        switch (token.type)
+        switch (token.getType())
         {
         default:
             tokens.add(token);
@@ -4998,10 +5068,7 @@ static TokenList ReadAllTokens(Preprocessor* preprocessor)
             tokens.add(token);
             return tokens;
 
-        case TokenType::WhiteSpace:
-        case TokenType::NewLine:
-        case TokenType::LineComment:
-        case TokenType::BlockComment:
+        case TokenType::EndOfDirective:
         case TokenType::Invalid:
             break;
         }
@@ -5052,10 +5119,10 @@ Result findMacroValue(
     for (bool first = true;; first = false)
     {
         Token token = invocation->readToken();
-        if (token.type == TokenType::EndOfFile)
+        if (token.getType() == TokenType::EndOfFile)
             break;
 
-        if (!first && (token.flags & TokenFlag::AfterWhitespace))
+        if (!first && (token.getFlags() & TokenFlag::AfterWhitespace))
             value.append(" ");
         value.append(token.getContent());
     }
@@ -5121,8 +5188,8 @@ TokenList preprocessSource(
     preprocessor.fileSystem = desc.fileSystem;
     preprocessor.namePool = desc.namePool;
 
-    preprocessor.endOfFileToken.type = TokenType::EndOfFile;
-    preprocessor.endOfFileToken.flags = TokenFlag::AtStartOfLine;
+    preprocessor.endOfFileToken =
+        desc.sourceManager->getTokenPool()->createEndOfFile(SourceLoc(), TokenFlag::AtStartOfLine);
     preprocessor.contentAssistInfo = desc.contentAssistInfo;
 
     preprocessor.warningStateTracker =
@@ -5230,11 +5297,11 @@ TokenList preprocessSource(
     StringBuilder sb;
     for (auto t : tokens)
     {
-        if (t.flags & TokenFlag::AtStartOfLine)
+        if (t.getFlags() & TokenFlag::AtStartOfLine)
         {
             sb << "\n";
         }
-        else if (t.flags & TokenFlag::AfterWhitespace)
+        else if (t.getFlags() & TokenFlag::AfterWhitespace)
         {
             sb << " ";
         }

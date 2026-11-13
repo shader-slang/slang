@@ -21,3 +21,58 @@ if(NOT MSVC)
         DIRECTORY ${slang_SOURCE_DIR}
     )
 endif()
+
+# The lexer consumes a checked-in copy of its generated kind definitions because `slang-fiddle`
+# itself links `compiler-core`. These explicit maintenance targets run after fiddle is built;
+# making either target a prerequisite of `compiler-core` would introduce a dependency cycle.
+set(SLANG_LEXEME_DEFINITION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/slang-lexeme-defs.h")
+set(SLANG_LEXEME_DEFINITION_LUA "${CMAKE_CURRENT_SOURCE_DIR}/slang-lexeme-defs.lua")
+set(SLANG_LEXEME_DEFINITION_OUTPUT "${SLANG_LEXEME_DEFINITION_HEADER}.fiddle")
+
+add_custom_target(
+    regenerate-lexeme-definitions
+    COMMAND
+        $<TARGET_FILE:slang-fiddle> -i "${CMAKE_CURRENT_SOURCE_DIR}/" -o
+        "${CMAKE_CURRENT_SOURCE_DIR}/" slang-lexeme-defs.h
+    DEPENDS
+        slang-fiddle
+        ${SLANG_LEXEME_DEFINITION_HEADER}
+        ${SLANG_LEXEME_DEFINITION_LUA}
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
+    COMMENT "Regenerating the checked-in lexeme definitions"
+    VERBATIM
+)
+
+# Fiddle can rewrite its input to update template markers. We give the check a build-only
+# input copy so checking a stale snapshot never edits the checkout being validated.
+set(SLANG_LEXEME_CHECK_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lexeme-definitions-check/$<CONFIG>")
+add_custom_target(
+    check-lexeme-definitions
+    COMMAND
+        ${CMAKE_COMMAND} -E make_directory
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/input"
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output"
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${SLANG_LEXEME_DEFINITION_HEADER}
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/input/slang-lexeme-defs.h"
+    COMMAND
+        $<TARGET_FILE:slang-fiddle> -i "${SLANG_LEXEME_CHECK_DIRECTORY}/input/" -o
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/" slang-lexeme-defs.h
+    COMMAND
+        ${CMAKE_COMMAND} -E compare_files
+        ${SLANG_LEXEME_DEFINITION_OUTPUT}
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/slang-lexeme-defs.h.fiddle"
+    DEPENDS
+        slang-fiddle
+        ${SLANG_LEXEME_DEFINITION_HEADER}
+        ${SLANG_LEXEME_DEFINITION_LUA}
+        ${SLANG_LEXEME_DEFINITION_OUTPUT}
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
+    COMMENT "Checking the checked-in lexeme definitions"
+    VERBATIM
+)
+set_target_properties(
+    regenerate-lexeme-definitions check-lexeme-definitions
+    PROPERTIES FOLDER generated
+)

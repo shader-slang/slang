@@ -10,14 +10,71 @@ struct NamePool;
 
 //
 
-struct TokenList
+/// An EOF-terminated lexical sequence that retains its referenced pools.
+///
+/// `end()` points at the stored EOF, so ordinary iteration excludes that sentinel.
+/// The sequence must contain EOF before it is exposed to a reader. Mutation goes
+/// through `add()` or `setTokens()` so borrowed values cannot bypass pool retention.
+template<typename T>
+struct LexicalList
 {
-    const Token* begin() const;
-    const Token* end() const;
+    const T* begin() const { return m_tokens.getBuffer(); }
+    const T* end() const
+    {
+        SLANG_RELEASE_ASSERT(m_tokens.getCount());
+        SLANG_RELEASE_ASSERT(m_tokens.getLast().getType() == TokenType::EndOfFile);
+        return m_tokens.getBuffer() + m_tokens.getCount() - 1;
+    }
 
-    SLANG_FORCE_INLINE void add(const Token& token) { m_tokens.add(token); }
+    void add(const T& token)
+    {
+        // Sequences usually share one pool. We inspect other retained pools
+        // only when a macro expansion or imported token changes that pool.
+        auto pool = token.getPool();
+        if (pool)
+        {
+            if (m_pools.getCount() == 0 || m_pools.getLast().get() != pool)
+            {
+                bool isRetained = false;
+                for (const auto& retained : m_pools)
+                {
+                    if (retained.get() == pool)
+                        isRetained = true;
+                }
+                if (!isRetained)
+                    m_pools.add(pool);
+            }
+        }
+        m_tokens.add(token);
+    }
 
-    List<Token> m_tokens;
+    const List<RefPtr<TokenPool>>& getPools() const { return m_pools; }
+    const List<T>& getTokens() const { return m_tokens; }
+
+    /// Replaces the sequence and retains every pool referenced by its values.
+    void setTokens(const List<T>& tokens)
+    {
+        // We retain the replacement's pools before releasing the old list, since
+        // callers may pass values borrowing storage from one of those pools.
+        LexicalList replacement;
+        for (const auto& token : tokens)
+            replacement.add(token);
+        *this = _Move(replacement);
+    }
+
+private:
+    List<T> m_tokens;
+    List<RefPtr<TokenPool>> m_pools;
+};
+
+/// An owning EOF-terminated sequence of tokens with attached trivia.
+struct TokenList : LexicalList<Token>
+{
+};
+
+/// An owning EOF-terminated sequence of atomic raw tokens and trivia.
+struct LexemeList : LexicalList<Lexeme>
+{
 };
 
 struct TokenSpan
@@ -92,6 +149,22 @@ struct TokenReader
 
     Token advanceToken();
 
+    /// Consumes a matching token and returns its typed value; otherwise returns empty.
+    template<typename T>
+    T advanceIf()
+    {
+        auto token = m_nextToken.as<T>();
+        if (token)
+            advanceToken();
+        return token;
+    }
+
+    template<typename T>
+    bool is() const
+    {
+        return m_nextToken.is<T>();
+    }
+
     int getCount() { return (int)(m_end - m_cursor); }
 
     const Token* m_cursor;
@@ -103,6 +176,34 @@ private:
     void _updateLookaheadToken();
 };
 
+/// Reads atomic lexemes, including trivia, from an EOF-terminated borrowed sequence.
+struct LexemeReader
+{
+    LexemeReader() = default;
+    explicit LexemeReader(const LexemeList& values)
+        : LexemeReader(values.begin(), values.end())
+    {
+    }
+    LexemeReader(const Lexeme* begin, const Lexeme* end)
+        : m_cursor(begin), m_end(end)
+    {
+    }
+    Lexeme peekToken() const { return m_cursor ? *m_cursor : Lexeme(); }
+    TokenType peekTokenType() const { return peekToken().getType(); }
+    SourceLoc peekLoc() const { return peekToken().getLoc(); }
+    Lexeme advanceToken()
+    {
+        auto result = peekToken();
+        if (m_cursor != m_end)
+            ++m_cursor;
+        return result;
+    }
+    bool isAtEnd() const { return m_cursor == m_end; }
+    int getCount() const { return m_cursor ? int(m_end - m_cursor) : 0; }
+    const Lexeme* m_cursor = nullptr;
+    const Lexeme* m_end = nullptr;
+};
+
 typedef unsigned int LexerFlags;
 enum
 {
@@ -112,11 +213,15 @@ enum
 
 struct Lexer
 {
+    /// Initializes scanning over a source view using the supplied lexical pool.
+    ///
+    /// When `tokenPool` is null, the source manager's pool owns the lexical data.
+    /// An explicitly supplied pool must remain alive while the lexer is used.
     void initialize(
         SourceView* sourceView,
         DiagnosticSink* sink,
         NamePool* namePool,
-        MemoryArena* memoryArena);
+        TokenPool* tokenPool = nullptr);
 
     ~Lexer();
 
@@ -130,17 +235,28 @@ struct Lexer
     /// not needed by the DiagnosticSink.
     static UnownedStringSlice sourceLocationLexer(const UnownedStringSlice& in);
 
-    /// Lex the next token in the input stream, returning an EOF token if at end.
+    /// Reads one atomic lexeme, including trivia, preserving its exact input spelling.
+    Lexeme lexLexeme();
+
+    /// Reads a token with leading and trailing trivia, returning a real EOF at end.
+    ///
+    /// Trailing trivia ends after the first `NewLine` lexeme. The lexer classifies
+    /// trivia from characters without lexing the following raw token, so callers
+    /// may change header-name mode or diagnostic suppression before that token.
     Token lexToken();
 
-    /// Lex all tokens (up to the end of the stream) that are semantically relevant
+    /// Enables contextual recognition of a physical <header-name> operand.
+    void setHeaderNameMode(bool isEnabled) { m_isHeaderNameMode = isEnabled; }
+
+    /// Reads all tokens with attached trivia, including the terminating EOF.
     TokenList lexAllSemanticTokens();
 
-    /// Lex all tokens (up to the end of the stream) that are relevant to things like markup
-    TokenList lexAllMarkupTokens();
+    /// Reads raw tokens and comments, omitting whitespace and newline trivia.
+    LexemeList lexAllMarkupTokens();
 
-    /// Lex all tokens (up to the end of the stream) whether relevant or not.
-    TokenList lexAllTokens();
+    /// Reads all atomic lexemes, including trivia and the terminating EOF.
+    LexemeList lexAllTokens();
+    LexemeList lexAllLexemes() { return lexAllTokens(); }
 
     /// Get the diagnostic sink, taking into account flags. Will return null if suppressing
     /// diagnostics.
@@ -166,12 +282,17 @@ struct Lexer
     TokenFlags m_tokenFlags;
     LexerFlags m_lexerFlags;
 
-    MemoryArena* m_memoryArena;
+    TokenPool* m_tokenPool = nullptr;
+    bool m_isHeaderNameMode = false;
 };
 
 
 // Helper routines for extracting values from tokens
-String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink);
+String getStringLiteralTokenValue(Lexeme const& token, DiagnosticSink* sink);
+inline String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
+{
+    return getStringLiteralTokenValue(token.getRawToken(), sink);
+}
 String getFileNameTokenValue(Token const& token);
 
 // Note about integer literal values. This is the underlying storage type, but

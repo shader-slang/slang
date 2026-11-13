@@ -273,8 +273,8 @@ struct ASTDumpContext
 
     void dump(const Token& token)
     {
-        ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.type) << ", ";
-        dump(token.loc);
+        ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.getType()) << ", ";
+        dump(token.getLoc());
         m_writer->emit(", ");
         dump(token.getContent());
         m_writer->emit(" }");

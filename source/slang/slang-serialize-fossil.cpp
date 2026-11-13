@@ -590,9 +590,15 @@ void SerialWriter::_popInlineValueScope()
     {
         if (layout->size == 0)
         {
+            // We retain the chunk's alignment as well as its unpadded size.
+            // For example, a `uint32_t` followed by a `bool` occupies five bytes
+            // but requires an eight-byte array stride. `ChunkBuilder::addContentsOf`
+            // aligns appended records, so their layout must describe that padding.
             layout->size = chunk->getContentSize();
+            layout->alignment = chunk->getAlignment();
         }
         SLANG_ASSERT(layout->size == chunk->getContentSize());
+        SLANG_ASSERT(layout->alignment == chunk->getAlignment());
     }
 
     _popState();

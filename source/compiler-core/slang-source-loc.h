@@ -16,6 +16,8 @@
 namespace Slang
 {
 
+class TokenPool;
+
 /** Overview:
 
 There needs to be a mechanism where we can easily and quickly track a specific locations in any
@@ -570,6 +572,9 @@ protected:
 
 struct SourceManager
 {
+    /// Returns the lexical pool owned by this manager, creating it on first use.
+    TokenPool* getTokenPool();
+
     // Initialize a source manager, with an optional parent
     void initialize(SourceManager* parent, ISlangFileSystemExt* fileSystemExt);
 
@@ -663,10 +668,7 @@ struct SourceManager
     /// Resets state. Will release all views/source
     void reset();
 
-    SourceManager()
-        : m_memoryArena(2048), m_slicePool(StringSlicePool::Style::Default)
-    {
-    }
+    SourceManager();
     ~SourceManager();
 
 protected:
@@ -692,9 +694,11 @@ protected:
 
     StringSlicePool m_slicePool;
 
-    // Memory arena that can be used for holding data to held in scope as long as the Source is
-    // Can be used for storing the decoded contents of Token. Content for example.
+    // Auxiliary allocations that share this source manager's lifetime.
     MemoryArena m_memoryArena;
+
+    /// The lexical objects produced from this manager's source views.
+    RefPtr<TokenPool> m_tokenPool;
 
     // Maps uniqueIdentities to source files
     Dictionary<String, SourceFile*> m_sourceFileMap;

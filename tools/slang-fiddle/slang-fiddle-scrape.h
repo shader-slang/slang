@@ -28,11 +28,11 @@ public:
 class TokenWithTriviaNode : public RefObject
 {
 public:
-    TokenType getType() const { return token.type; }
+    TokenType getType() const { return token.getType(); }
 
-    List<Token> leadingTrivia;
-    Token token;
-    List<Token> trailingTrivia;
+    List<Lexeme> leadingTrivia;
+    Lexeme token;
+    List<Lexeme> trailingTrivia;
     Count skipCount = 0;
 };
 
@@ -46,9 +46,9 @@ public:
     {
     }
 
-    SourceLoc const& getLoc() const { return node->token.loc; }
+    SourceLoc getLoc() const { return node->token.getLoc(); }
 
-    Token const& getToken() const { return node->token; }
+    Lexeme const& getToken() const { return node->token; }
 
     TokenType getType() const { return node ? node->getType() : TokenType::Unknown; }
 
@@ -59,10 +59,21 @@ public:
 
     Count getSkipCount() const { return node ? node->skipCount : 0; }
 
-    void setType(TokenType type) const { node->token.type = type; }
+    /// Consumes the first `>` of a `>>` lexeme, leaving its second closer as lookahead.
+    ///
+    /// Requires a non-empty `OpRsh` value. Leading trivia is consumed with the first
+    /// closer; trailing trivia remains with the second closer at its original locations.
+    void consumeFirstGreater() const
+    {
+        SLANG_RELEASE_ASSERT(node);
+        SLANG_RELEASE_ASSERT(node->token);
+        auto token = node->token;
+        node->token = token.getPool()->createSecondGreaterToken(token.as<RawToken>());
+        node->leadingTrivia.clear();
+    }
 
-    List<Token> const& getLeadingTrivia() const { return node->leadingTrivia; }
-    List<Token> const& getTrailingTrivia() const { return node->trailingTrivia; }
+    List<Lexeme> const& getLeadingTrivia() const { return node->leadingTrivia; }
+    List<Lexeme> const& getTrailingTrivia() const { return node->trailingTrivia; }
 
     operator TokenWithTriviaNode*() { return node; }
 

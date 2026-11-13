@@ -216,6 +216,24 @@ public:
         , outerScope(outerScope)
         , options(inOptions)
     {
+        // AST nodes may keep token handles after the input list is destroyed. We retain
+        // every contributing pool, avoiding repeated requests for adjacent tokens in one pool.
+        TokenPool* previousPool = nullptr;
+        for (auto cursor = _tokens.begin(); cursor; ++cursor)
+        {
+            auto pool = cursor->getPool();
+            if (pool != previousPool)
+            {
+                if (pool)
+                    astBuilder->retainTokenPool(pool);
+                previousPool = pool;
+            }
+
+            // `TokenSpan::end()` points at the sentinel read by `TokenReader`, so its pool
+            // must remain valid for the parser and any AST nodes that preserve that token.
+            if (cursor == _tokens.end())
+                break;
+        }
     }
     Parser(const Parser& other) = default;
 
@@ -428,7 +446,7 @@ static TokenType SkipToMatchingToken(TokenReader* reader, TokenType tokenType);
 // the common case, or a matched pair of tokens for `()`, `[]`, and `{}`
 static TokenType SkipBalancedToken(TokenReader* reader)
 {
-    TokenType tokenType = reader->advanceToken().type;
+    TokenType tokenType = reader->advanceToken().getType();
     switch (tokenType)
     {
     default:
@@ -765,18 +783,7 @@ bool Parser::LookAheadToken(TokenType type)
 bool Parser::LookAheadToken(const char* string)
 {
     const auto& token = tokenReader.peekToken();
-    return token.type == TokenType::Identifier && token.getContent() == string;
-}
-
-// Consume a token and return true it if matches, otherwise false
-bool AdvanceIf(Parser* parser, TokenType tokenType)
-{
-    if (parser->LookAheadToken(tokenType))
-    {
-        parser->ReadToken();
-        return true;
-    }
-    return false;
+    return token.getType() == TokenType::Identifier && token.getContent() == string;
 }
 
 bool AdvanceIf(Parser* parser, TokenType tokenType, Token* outToken)
@@ -787,6 +794,29 @@ bool AdvanceIf(Parser* parser, TokenType tokenType, Token* outToken)
         return true;
     }
     return false;
+}
+
+/// Consumes a matching token through the parser's normal read path, or returns empty.
+template<typename T>
+T advanceIf(Parser* parser)
+{
+    if (!parser->tokenReader.is<T>())
+        return T();
+    return parser->ReadToken().as<T>();
+}
+
+/// Consumes a matching token into `outToken` and returns whether a token was consumed.
+///
+/// Requires a non-null output pointer. A failed match leaves the output unchanged.
+template<typename T>
+bool advanceIf(Parser* parser, Token* outToken)
+{
+    SLANG_RELEASE_ASSERT(outToken);
+    auto token = advanceIf<T>(parser);
+    if (!token)
+        return false;
+    *outToken = token;
+    return true;
 }
 
 // Consume a token and return true it if matches, otherwise false
@@ -1025,19 +1055,11 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken)
         scopedIdentifierBuilder.append(nextIdentifier.getContent());
     }
 
-    // Make a 'token'
-    SourceManager* sourceManager = parser->sink->getSourceManager();
-    const UnownedStringSlice scopedIdentifier(
-        sourceManager->allocateStringSlice(scopedIdentifierBuilder.getUnownedSlice()));
-    Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
-
-    // Get the name pool
-    auto namePool = parser->getNamePool();
-
-    // Since it's an Identifier have to set the name.
-    token.setName(namePool->getName(token.getContent()));
-
-    return token;
+    auto name = parser->getNamePool()->getName(scopedIdentifierBuilder.getUnownedSlice());
+    return parser->astBuilder->getTokenPool()->createToken(
+        TokenType::Identifier,
+        name,
+        scopedIdSourceLoc);
 }
 
 // Parse HLSL-style `[name(arg, ...)]` style "attribute" modifiers
@@ -1045,7 +1067,7 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
 {
     parser->ReadToken(TokenType::LBracket);
 
-    const bool hasDoubleBracket = AdvanceIf(parser, TokenType::LBracket);
+    const bool hasDoubleBracket = bool(advanceIf<LBracketToken>(parser));
 
     for (;;)
     {
@@ -1067,7 +1089,7 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
         modifier->scope = parser->currentScope;
         modifier->originalIdentifierToken = originalLastToken;
 
-        if (AdvanceIf(parser, TokenType::LParent))
+        if (advanceIf<LParentToken>(parser))
         {
             // HLSL-style `[name(arg0, ...)]` attribute
 
@@ -1093,7 +1115,7 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
             break;
 
         // If there is a comma consume it. It appears that the comma is optional.
-        AdvanceIf(parser, TokenType::Comma);
+        advanceIf<CommaToken>(parser);
     }
 
     if (hasDoubleBracket)
@@ -1106,7 +1128,7 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
 static Modifier* parseUncheckedGLSLLayoutAttribute(Parser* parser, NameLoc& nameLoc)
 {
     // Only valued GLSL layout qualifiers should be parsed here.
-    if (!AdvanceIf(parser, TokenType::OpAssign))
+    if (!advanceIf<OpAssignToken>(parser))
     {
         return parser->astBuilder->create<GLSLUnparsedLayoutModifier>();
     }
@@ -1227,7 +1249,7 @@ bool tryParseUsingSyntaxDeclImpl(Parser* parser, SyntaxDecl* syntaxDecl, T** out
     {
         if (!syntax->loc.isValid())
         {
-            syntax->loc = keywordToken.loc;
+            syntax->loc = keywordToken.getLoc();
             if (genericDecl)
             {
                 genericDecl->nameAndLoc.loc = syntax->loc;
@@ -1308,7 +1330,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     parsedModifier->keywordName = nameToken.getName();
                     if (!parsedModifier->loc.isValid())
                     {
-                        parsedModifier->loc = nameToken.loc;
+                        parsedModifier->loc = nameToken.getLoc();
                     }
                     if (as<VisibilityModifier>(parsedModifier))
                     {
@@ -1322,7 +1344,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                 {
                     parsedModifier = parser->astBuilder->create<NoDiffModifier>();
                     parsedModifier->keywordName = nameToken.getName();
-                    parsedModifier->loc = nameToken.loc;
+                    parsedModifier->loc = nameToken.getLoc();
                     AddModifier(&modifierLink, parsedModifier);
                     continue;
                 }
@@ -1332,7 +1354,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     {
                         parsedModifier = parser->astBuilder->create<HLSLNoInterpolationModifier>();
                         parsedModifier->keywordName = nameToken.getName();
-                        parsedModifier->loc = nameToken.loc;
+                        parsedModifier->loc = nameToken.getLoc();
                         AddModifier(&modifierLink, parsedModifier);
                         continue;
                     }
@@ -1359,7 +1381,7 @@ static Name* getName(Parser* parser, String const& text)
 
 static bool expect(Parser* parser, TokenType tokenType)
 {
-    return parser->ReadToken(tokenType).type == tokenType;
+    return parser->ReadToken(tokenType).getType() == tokenType;
 }
 
 static NameLoc expectIdentifier(Parser* parser)
@@ -1380,7 +1402,7 @@ static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* de
         auto nameString = getFileNameTokenValue(nameToken);
         auto moduleName = getName(parser, nameString);
 
-        decl->moduleNameAndLoc = NameLoc(moduleName, nameToken.loc);
+        decl->moduleNameAndLoc = NameLoc(moduleName, nameToken.getLoc());
     }
     else
     {
@@ -1391,7 +1413,7 @@ static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* de
         {
             StringBuilder sb;
             sb << getText(moduleNameAndLoc.name);
-            while (AdvanceIf(parser, TokenType::Dot))
+            while (advanceIf<DotToken>(parser))
             {
                 sb << "/";
                 sb << parser->ReadToken(TokenType::Identifier).getContent();
@@ -1464,7 +1486,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     {
         auto nameToken = parser->ReadToken(TokenType::Identifier);
         decl->nameAndLoc.name = parser->getNamePool()->getName(nameToken.getContent());
-        decl->nameAndLoc.loc = nameToken.loc;
+        decl->nameAndLoc.loc = nameToken.getLoc();
         if (moduleDecl)
             moduleDecl->nameAndLoc = decl->nameAndLoc;
     }
@@ -1472,7 +1494,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
         decl->nameAndLoc.name = parser->getNamePool()->getName(getFileNameTokenValue(nameToken));
-        decl->nameAndLoc.loc = nameToken.loc;
+        decl->nameAndLoc.loc = nameToken.getLoc();
         if (moduleDecl)
             moduleDecl->nameAndLoc = decl->nameAndLoc;
     }
@@ -1503,7 +1525,7 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
     {
         nameToken = parser->ReadToken();
         bool isValidOperator = true;
-        switch (nameToken.type)
+        switch (nameToken.getType())
         {
         case TokenType::OpAdd:
         case TokenType::OpSub:
@@ -1548,7 +1570,7 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
 
         // Note(tfoley): Even more of a hack!
         case TokenType::QuestionMark:
-            if (AdvanceIf(parser, TokenType::Colon))
+            if (advanceIf<ColonToken>(parser))
             {
                 // Concat : onto ?
                 nameToken.setContent(UnownedStringSlice::fromLiteral("?:"));
@@ -1557,7 +1579,7 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
         default:
             parser->sink->diagnose(Diagnostics::InvalidOperator{
                 .op = nameToken.getContent(),
-                .location = nameToken.loc});
+                .location = nameToken.getLoc()});
             isValidOperator = false;
             break;
         }
@@ -1565,10 +1587,10 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
         if (outIsValidOperatorName)
             *outIsValidOperatorName = isValidOperator;
 
-        if (nameToken.type == TokenType::LParent)
-            return NameLoc(getName(parser, "()"), nameToken.loc);
+        if (nameToken.getType() == TokenType::LParent)
+            return NameLoc(getName(parser, "()"), nameToken.getLoc());
 
-        return NameLoc(getName(parser, nameToken.getContent()), nameToken.loc);
+        return NameLoc(getName(parser, nameToken.getContent()), nameToken.getLoc());
     }
     else
     {
@@ -1585,7 +1607,7 @@ static NameLoc ParseStaticMemberName(Parser* parser)
     if (parser->LookAheadToken("__subscript") && parser->LookAheadToken(TokenType::Scope, 1))
     {
         auto subscriptToken = parser->ReadToken("__subscript");
-        return NameLoc(getSubscriptOperatorName(parser->astBuilder), subscriptToken.loc);
+        return NameLoc(getSubscriptOperatorName(parser->astBuilder), subscriptToken.getLoc());
     }
     return expectIdentifier(parser);
 }
@@ -1676,7 +1698,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
             auto paramDecl = parser->astBuilder->create<GenericValuePackParamDecl>();
             parser->FillPosition(paramDecl);
             paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-            if (AdvanceIf(parser, TokenType::Colon))
+            if (advanceIf<ColonToken>(parser))
             {
                 paramDecl->type = parser->ParseTypeExp();
             }
@@ -1685,11 +1707,11 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
         auto paramDecl = parser->astBuilder->create<GenericValueParamDecl>();
         parser->FillPosition(paramDecl);
         paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-        if (AdvanceIf(parser, TokenType::Colon))
+        if (advanceIf<ColonToken>(parser))
         {
             paramDecl->type = parser->ParseTypeExp();
         }
-        if (AdvanceIf(parser, TokenType::OpAssign))
+        if (advanceIf<OpAssignToken>(parser))
         {
             paramDecl->initExpr = parser->ParseInitExpr();
         }
@@ -1782,7 +1804,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
                 parser->FillPosition(valueParamDecl);
                 valueParamDecl->type = parser->ParseTypeExp();
                 valueParamDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-                if (AdvanceIf(parser, TokenType::OpAssign))
+                if (advanceIf<OpAssignToken>(parser))
                 {
                     valueParamDecl->initExpr = parser->ParseInitExpr();
                 }
@@ -1790,7 +1812,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
             }
         }
     }
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         // The user is apply a constraint to this type parameter...
         auto paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(paramDecl));
@@ -1810,7 +1832,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     }
     if (auto typeParameter = as<GenericTypeParamDecl>(paramDecl))
     {
-        if (AdvanceIf(parser, TokenType::OpAssign))
+        if (advanceIf<OpAssignToken>(parser))
         {
             typeParameter->initType = parser->ParseTypeExp();
         }
@@ -1849,7 +1871,7 @@ static void ParseGenericDeclImpl(Parser* parser, GenericDecl* decl, const TFunc&
         if (parser->LookAheadToken(TokenType::OpGreater))
             break;
 
-        if (!AdvanceIf(parser, TokenType::Comma))
+        if (!advanceIf<CommaToken>(parser))
             break;
     }
     parser->genericDepth--;
@@ -1889,7 +1911,7 @@ static Decl* parseOptGenericDecl(Parser* parser, const ParseFunc& parseInner)
 
 static bool _isCountOfKeyword(Token const& token)
 {
-    return token.type == TokenType::Identifier && token.getContent() == "countof";
+    return token.getType() == TokenType::Identifier && token.getContent() == "countof";
 }
 
 // Pack-count constraints use the built-in `countof(...)` form. A plain
@@ -1906,12 +1928,12 @@ static bool _isCountOfCallStart(TokenReader reader)
 
 static bool _isGenericWhereClauseBoundary(Token const& token)
 {
-    if (token.type == TokenType::EndOfFile || token.type == TokenType::LBrace ||
-        token.type == TokenType::Semicolon)
+    if (token.getType() == TokenType::EndOfFile || token.getType() == TokenType::LBrace ||
+        token.getType() == TokenType::Semicolon)
     {
         return true;
     }
-    return token.type == TokenType::Identifier && token.getContent() == "where";
+    return token.getType() == TokenType::Identifier && token.getContent() == "where";
 }
 
 static bool _isPackCountConstraintOperator(TokenType tokenType)
@@ -1937,7 +1959,7 @@ static bool _isPackCountConstraintOperator(TokenType tokenType)
 static CountOfExpr* _parsePackCountConstraintCountOfExpr(Parser* parser, Token const& countOfToken)
 {
     auto countOfExpr = parser->astBuilder->create<CountOfExpr>();
-    countOfExpr->loc = countOfToken.loc;
+    countOfExpr->loc = countOfToken.getLoc();
     countOfExpr->type = parser->astBuilder->getIntType();
     parser->ReadMatchingToken(TokenType::LParent);
     countOfExpr->value = parser->ParseExpression();
@@ -1951,7 +1973,7 @@ static CountOfExpr* _parsePackCountConstraintCountOfExpr(Parser* parser, Token c
 static Token _readPackCountConstraintOperator(Parser* parser)
 {
     auto opToken = parser->tokenReader.peekToken();
-    if (_isPackCountConstraintOperator(opToken.type))
+    if (_isPackCountConstraintOperator(opToken.getType()))
     {
         parser->ReadToken();
     }
@@ -1960,10 +1982,10 @@ static Token _readPackCountConstraintOperator(Parser* parser)
         opToken = parser->ReadToken(TokenType::OpEql);
     }
 
-    if (opToken.type != TokenType::OpEql)
+    if (opToken.getType() != TokenType::OpEql)
     {
         parser->sink->diagnose(
-            Diagnostics::VariadicPackCountConstraintRequiresEquality{.location = opToken.loc});
+            Diagnostics::VariadicPackCountConstraintRequiresEquality{.location = opToken.getLoc()});
     }
     return opToken;
 }
@@ -1981,7 +2003,7 @@ static bool _hasCountOfOnRightOfPackCountComparison(Parser* parser)
         if (_isGenericWhereClauseBoundary(token))
             return false;
 
-        if (_isPackCountConstraintOperator(token.type))
+        if (_isPackCountConstraintOperator(token.getType()))
         {
             reader.advanceToken();
             return _isCountOfCallStart(reader);
@@ -2025,8 +2047,8 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         if (AdvanceIf(parser, "nonempty", &nonEmptyToken))
         {
             auto constraint = parser->astBuilder->create<NonEmptyPackConstraintDecl>();
-            constraint->whereTokenLoc = whereToken.loc;
-            constraint->loc = nonEmptyToken.loc;
+            constraint->whereTokenLoc = whereToken.getLoc();
+            constraint->loc = nonEmptyToken.getLoc();
             parser->ReadMatchingToken(TokenType::LParent);
             constraint->packExpr = parser->ParseExpression();
             parser->ReadMatchingToken(TokenType::RParent);
@@ -2042,8 +2064,8 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         if (_isCountOfCallStart(parser->tokenReader) && AdvanceIf(parser, "countof", &countOfToken))
         {
             auto constraint = parser->astBuilder->create<GenericVariadicPackCountConstraintDecl>();
-            constraint->whereTokenLoc = whereToken.loc;
-            constraint->loc = countOfToken.loc;
+            constraint->whereTokenLoc = whereToken.getLoc();
+            constraint->loc = countOfToken.getLoc();
             auto leftCountOfExpr = _parsePackCountConstraintCountOfExpr(parser, countOfToken);
             constraint->packExpr = leftCountOfExpr->value;
             _readPackCountConstraintOperator(parser);
@@ -2060,13 +2082,13 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         {
             parser->ParseExpression(Precedence::BitShift);
             auto opToken = parser->tokenReader.peekToken();
-            if (_isPackCountConstraintOperator(opToken.type))
+            if (_isPackCountConstraintOperator(opToken.getType()))
                 parser->ReadToken();
             else
                 parser->ReadToken(TokenType::OpEql);
             countOfToken = parser->ReadToken("countof");
             parser->sink->diagnose(Diagnostics::VariadicPackCountConstraintRequiresCountofOnLeft{
-                .location = countOfToken.loc});
+                .location = countOfToken.getLoc()});
             _parsePackCountConstraintCountOfExpr(parser, countOfToken);
             _skipRestOfGenericWhereClause(parser);
             continue;
@@ -2076,15 +2098,15 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         if (AdvanceIf(parser, "__hasDiffTypeInfo", &hasDiffTypeInfoToken))
         {
             auto constraint = parser->astBuilder->create<HasDiffTypeInfoConstraintDecl>();
-            constraint->whereTokenLoc = whereToken.loc;
-            constraint->loc = hasDiffTypeInfoToken.loc;
+            constraint->whereTokenLoc = whereToken.getLoc();
+            constraint->loc = hasDiffTypeInfoToken.getLoc();
             parser->ReadMatchingToken(TokenType::LParent);
             constraint->type = parser->ParseTypeExp();
             parser->ReadMatchingToken(TokenType::RParent);
             if (optional)
             {
                 parser->sink->diagnose(Diagnostics::OptionalHasDiffTypeInfoConstraintIsInvalid{
-                    .location = hasDiffTypeInfoToken.loc});
+                    .location = hasDiffTypeInfoToken.getLoc()});
             }
             AddMember(genericParent, constraint);
             continue;
@@ -2092,13 +2114,13 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
 
         auto subType = parser->ParseTypeExp();
         Token constraintToken;
-        if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
+        if (advanceIf<ColonToken>(parser, &constraintToken))
         {
             for (;;)
             {
                 auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
-                constraint->whereTokenLoc = whereToken.loc;
-                constraint->loc = constraintToken.loc;
+                constraint->whereTokenLoc = whereToken.getLoc();
+                constraint->loc = constraintToken.getLoc();
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
                 if (optional)
@@ -2108,16 +2130,16 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                         parser->astBuilder->create<OptionalConstraintModifier>());
                 }
                 AddMember(genericParent, constraint);
-                if (!AdvanceIf(parser, TokenType::Comma))
+                if (!advanceIf<CommaToken>(parser))
                     break;
             }
         }
-        else if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
+        else if (advanceIf<OpEqlToken>(parser, &constraintToken))
         {
             auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
-            constraint->whereTokenLoc = whereToken.loc;
+            constraint->whereTokenLoc = whereToken.getLoc();
             constraint->isEqualityConstraint = true;
-            constraint->loc = constraintToken.loc;
+            constraint->loc = constraintToken.getLoc();
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
             if (optional)
@@ -2126,10 +2148,10 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             }
             AddMember(genericParent, constraint);
         }
-        else if (AdvanceIf(parser, TokenType::LParent))
+        else if (advanceIf<LParentToken>(parser))
         {
             auto constraint = parser->astBuilder->create<TypeCoercionConstraintDecl>();
-            constraint->whereTokenLoc = whereToken.loc;
+            constraint->whereTokenLoc = whereToken.getLoc();
             parser->FillPosition(constraint);
             constraint->toType = subType;
             constraint->fromType = parser->ParseTypeExp();
@@ -2176,7 +2198,7 @@ static void parseParameterList(Parser* parser, ContainerDecl* decl)
     while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
     {
         AddMember(decl, parser->ParseParameter());
-        if (AdvanceIf(parser, TokenType::RParent))
+        if (advanceIf<RParentToken>(parser))
             break;
         parser->ReadToken(TokenType::Comma);
     }
@@ -2303,7 +2325,7 @@ public:
 static Stmt* parseOptBody(Parser* parser)
 {
     Token semiColonToken;
-    if (AdvanceIf(parser, TokenType::Semicolon, &semiColonToken))
+    if (advanceIf<SemicolonToken>(parser, &semiColonToken))
     {
         // empty body
         // if we see a `{` after a `;`, it is very likely an user error to
@@ -2311,7 +2333,7 @@ static Stmt* parseOptBody(Parser* parser)
         if (peekTokenType(parser) == TokenType::LBrace)
         {
             parser->sink->diagnose(
-                Diagnostics::UnexpectedBodyAfterSemicolon{.location = semiColonToken.loc});
+                Diagnostics::UnexpectedBodyAfterSemicolon{.location = semiColonToken.getLoc()});
 
             // Fall through to parse the block stmt.
         }
@@ -2337,15 +2359,15 @@ static Stmt* parseOptBody(Parser* parser)
     for (;;)
     {
         auto token = parser->ReadToken();
-        if (token.type == TokenType::EndOfFile)
+        if (token.getType() == TokenType::EndOfFile)
         {
             break;
         }
-        if (token.type == TokenType::LBrace)
+        if (token.getType() == TokenType::LBrace)
         {
             braceDepth++;
         }
-        else if (token.type == TokenType::RBrace)
+        else if (token.getType() == TokenType::RBrace)
         {
             braceDepth--;
         }
@@ -2355,9 +2377,10 @@ static Stmt* parseOptBody(Parser* parser)
             break;
         }
     }
-    Token eofToken;
-    eofToken.type = TokenType::EndOfFile;
-    eofToken.loc = parser->tokenReader.peekLoc();
+    auto eofToken = parser->astBuilder->getTokenPool()->createToken(
+        TokenType::EndOfFile,
+        UnownedStringSlice(),
+        parser->tokenReader.peekLoc());
     tokens.add(eofToken);
     return unparsedStmt;
 }
@@ -2380,7 +2403,7 @@ static void parseOptionalGenericConstraints(
 {
     if (!constraintTarget)
         constraintTarget = decl;
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         do
         {
@@ -2412,7 +2435,7 @@ static void parseOptionalGenericConstraints(
 
             paramConstraint->sup = parser->ParseTypeExp();
             AddMember(constraintTarget, paramConstraint);
-        } while (AdvanceIf(parser, TokenType::Comma));
+        } while (advanceIf<CommaToken>(parser));
     }
 }
 
@@ -2436,7 +2459,7 @@ static void parseOptionalCppStyleTrailingReceiverParamConstModifier(Parser* pars
 
 static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
 {
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         do
         {
@@ -2452,7 +2475,7 @@ static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
             if (parser->pendingModifiers->hasModifier<ExternModifier>())
                 addModifier(inheritanceDecl, parser->astBuilder->create<ExternModifier>());
 
-        } while (AdvanceIf(parser, TokenType::Comma));
+        } while (advanceIf<CommaToken>(parser));
     }
 }
 
@@ -2829,7 +2852,7 @@ static InitDeclarator parseSemanticDeclarator(Parser* parser, DeclaratorParseOpt
 static InitDeclarator parseInitDeclarator(Parser* parser, DeclaratorParseOptions options)
 {
     InitDeclarator result = parseSemanticDeclarator(parser, options);
-    if (AdvanceIf(parser, TokenType::OpAssign))
+    if (advanceIf<OpAssignToken>(parser))
     {
         result.initializer = parser->ParseInitExpr();
     }
@@ -3025,7 +3048,7 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
     genericApp->loc = base->loc;
     genericApp->functionExpr = base;
     auto opLess = parser->ReadToken(TokenType::OpLess);
-    genericApp->argumentDelimeterLocs.add(opLess.loc);
+    genericApp->argumentDelimeterLocs.add(opLess.getLoc());
     parser->genericDepth++;
 
     for (;;)
@@ -3037,7 +3060,7 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
         if (parser->LookAheadToken(TokenType::Comma))
         {
             auto commaToken = parser->ReadToken(TokenType::Comma);
-            genericApp->argumentDelimeterLocs.add(commaToken.loc);
+            genericApp->argumentDelimeterLocs.add(commaToken.getLoc());
         }
         else
         {
@@ -3047,18 +3070,22 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
     genericApp->argumentDelimeterLocs.add(parser->tokenReader.peekLoc());
     parser->genericDepth--;
 
-    if (parser->tokenReader.peekToken().type == TokenType::OpRsh)
+    if (parser->tokenReader.is<OpRshToken>())
     {
-        parser->tokenReader.peekToken().type = TokenType::OpGreater;
-        parser->tokenReader.peekToken().loc.setRaw(
-            parser->tokenReader.peekToken().loc.getRaw() + 1);
+        // The inner argument consumes the first `>` of `G<G<int>>`. We leave the
+        // second closer in lookahead with only the trivia that follows the original `>>`.
+        auto token = parser->tokenReader.peekToken();
+        auto pool = token.getPool();
+        auto secondGreater = pool->createSecondGreaterToken(token.getRawToken());
+        parser->tokenReader.peekToken() =
+            pool->createToken(secondGreater, {}, token.getTrailingTrivia().getObjects());
     }
     else if (parser->LookAheadToken(TokenType::OpGreater))
         parser->ReadToken(TokenType::OpGreater);
     else
         parser->sink->diagnose(Diagnostics::TokenTypeExpected{
             .tokenType = "'>'",
-            .location = parser->tokenReader.peekToken().loc});
+            .location = parser->tokenReader.peekToken().getLoc()});
     return genericApp;
 }
 
@@ -3278,10 +3305,10 @@ static Expr* parsePostfixTypeSuffix(Parser* parser, Expr* inTypeExpr)
             parser->ReadToken(TokenType::RBracket);
             typeExpr = arrType;
         }
-        else if (AdvanceIf(parser, TokenType::OpMul, &token))
+        else if (advanceIf<OpMulToken>(parser, &token))
         {
             PointerTypeExpr* ptrType = parser->astBuilder->create<PointerTypeExpr>();
-            ptrType->loc = token.loc;
+            ptrType->loc = token.getLoc();
             ptrType->base.exp = typeExpr;
             typeExpr = ptrType;
         }
@@ -3398,7 +3425,7 @@ static NodeBase* parseDispatchKernel(Parser* parser, void* /* unused */)
         while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
         {
             expr->members.add(parser->ParseTypeExp());
-            if(AdvanceIf(parser, TokenType::RParent))
+            if(advanceIf<RParentToken>(parser))
                 break;
             parser->ReadToken(TokenType::Comma);
         }
@@ -3413,7 +3440,7 @@ static Expr* parseFuncTypeExpr(Parser* parser)
     while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
     {
         expr->parameters.add(parser->ParseTypeExp());
-        if (AdvanceIf(parser, TokenType::RParent))
+        if (advanceIf<RParentToken>(parser))
             break;
         parser->ReadToken(TokenType::Comma);
     }
@@ -3618,21 +3645,21 @@ static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
     {
         parser->sink->diagnose(Diagnostics::UnsupportedTraditionalIntegerTypeNameInHlsl{
             .typeName = typeNameBuilder.produceString(),
-            .location = signToken.loc});
+            .location = signToken.getLoc()});
     }
     else if (!isUnsigned)
     {
-        parser->sink->diagnose(Diagnostics::SignedTypeNameInHlsl{.location = signToken.loc});
+        parser->sink->diagnose(Diagnostics::SignedTypeNameInHlsl{.location = signToken.getLoc()});
     }
     else
     {
         auto expr = parser->astBuilder->create<HLSLUnsignedTypeExpr>();
-        expr->loc = signToken.loc;
+        expr->loc = signToken.getLoc();
         return expr;
     }
 
     auto errorExpr = parser->astBuilder->create<IncompleteExpr>();
-    errorExpr->loc = signToken.loc;
+    errorExpr->loc = signToken.getLoc();
     return errorExpr;
 }
 
@@ -3721,7 +3748,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else
     {
         bool inGlobalScope = false;
-        if (AdvanceIf(parser, TokenType::Scope))
+        if (advanceIf<ScopeToken>(parser))
         {
             inGlobalScope = true;
         }
@@ -3733,7 +3760,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
             basicType->scope = parser->currentModule->ownedScope;
         else
             basicType->scope = parser->currentLookupScope;
-        basicType->loc = typeName.loc;
+        basicType->loc = typeName.getLoc();
         basicType->name = typeName.getNameOrNull();
 
         typeExpr = basicType;
@@ -3750,13 +3777,13 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         case TokenType::Scope:
             {
                 auto opToken = parser->ReadToken(TokenType::Scope);
-                typeExpr = parseStaticMemberType(parser, typeExpr, opToken.loc);
+                typeExpr = parseStaticMemberType(parser, typeExpr, opToken.getLoc());
                 break;
             }
         case TokenType::Dot:
             {
                 auto opToken = parser->ReadToken(TokenType::Dot);
-                typeExpr = parseMemberType(parser, typeExpr, opToken.loc);
+                typeExpr = parseMemberType(parser, typeExpr, opToken.getLoc());
                 break;
             }
         default:
@@ -3856,7 +3883,7 @@ static DeclBase* ParseDeclaratorDecl(
         typeSpec.expr = parseBracketTypeSuffix(parser, typeSpec.expr);
     }
 
-    if (AdvanceIf(parser, TokenType::Semicolon))
+    if (advanceIf<SemicolonToken>(parser))
     {
         // No actual variable is being declared here, but
         // that might not be an error.
@@ -3903,8 +3930,8 @@ static DeclBase* ParseDeclaratorDecl(
     {
         if (typeSpec.decl)
         {
-            if (peekToken(parser).type == TokenType::EndOfFile ||
-                (peekToken(parser).flags & TokenFlag::AtStartOfLine))
+            if (peekToken(parser).getType() == TokenType::EndOfFile ||
+                (peekToken(parser).getFlags() & TokenFlag::AtStartOfLine))
             {
                 // The token after the `}` is at the start of its
                 // own line, which means it can't be on the same line.
@@ -3961,7 +3988,7 @@ static DeclBase* ParseDeclaratorDecl(
 
     // Otherwise we are looking at a variable declaration, which could be one in a sequence...
 
-    if (AdvanceIf(parser, TokenType::Semicolon))
+    if (advanceIf<SemicolonToken>(parser))
     {
         // easy case: we only had a single declaration!
         UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
@@ -3994,7 +4021,7 @@ static DeclBase* ParseDeclaratorDecl(
         declGroupBuilder.addDecl(varDecl);
 
         // end of the sequence?
-        if (AdvanceIf(parser, TokenType::Semicolon))
+        if (advanceIf<SemicolonToken>(parser))
             return declGroupBuilder.getResult();
 
         // ad-hoc recovery, to avoid infinite loops
@@ -4016,7 +4043,7 @@ static DeclBase* ParseDeclaratorDecl(
         // same line, to predict whether `,` or `;`
         // would be more likely...
 
-        if (!AdvanceIf(parser, TokenType::Comma))
+        if (!advanceIf<CommaToken>(parser))
         {
             parser->ReadToken(TokenType::Semicolon);
             // We don't need to enter recovering mode if next token isn't semicolon.
@@ -4049,7 +4076,7 @@ static void parseHLSLRegisterNameAndOptionalComponentMask(
     HLSLLayoutSemantic* semantic)
 {
     semantic->registerName = parser->ReadToken(TokenType::Identifier);
-    if (AdvanceIf(parser, TokenType::Dot))
+    if (advanceIf<DotToken>(parser))
     {
         semantic->componentMask = parser->ReadToken(TokenType::Identifier);
     }
@@ -4074,7 +4101,7 @@ static void parseHLSLRegisterSemantic(Parser* parser, HLSLRegisterSemantic* sema
     parseHLSLRegisterNameAndOptionalComponentMask(parser, semantic);
 
     // Second argument is an optional register space
-    if (AdvanceIf(parser, TokenType::Comma))
+    if (advanceIf<CommaToken>(parser))
     {
         semantic->spaceName = parser->ReadToken(TokenType::Identifier);
     }
@@ -4202,7 +4229,7 @@ static Modifiers _parseOptSemantics(Parser* parser)
 {
     Modifiers modifiers;
 
-    if (!AdvanceIf(parser, TokenType::Colon))
+    if (!advanceIf<ColonToken>(parser))
         return modifiers;
 
     Modifier** link = &modifiers.first;
@@ -4218,14 +4245,14 @@ static Modifiers _parseOptSemantics(Parser* parser)
         }
 
         // If we see a '<', ignore the remaining.
-        if (AdvanceIf(parser, TokenType::OpLess))
+        if (advanceIf<OpLessToken>(parser))
         {
             for (;;)
             {
                 auto token = parser->tokenReader.peekToken();
-                if (token.type == TokenType::EndOfFile)
+                if (token.getType() == TokenType::EndOfFile)
                     break;
-                else if (token.type == TokenType::OpGreater)
+                else if (token.getType() == TokenType::OpGreater)
                     break;
                 else
                     parser->tokenReader.advanceToken();
@@ -4249,7 +4276,7 @@ static Modifiers _parseOptSemantics(Parser* parser)
         // to continue parsing semantics here even if we didn't
         // see a colon forces us to be careful about
         // avoiding an infinite loop here.
-        if (!AdvanceIf(parser, TokenType::Colon))
+        if (!advanceIf<ColonToken>(parser))
         {
             return modifiers;
         }
@@ -4533,7 +4560,7 @@ static NodeBase* parseFuncExtensionDecl(Parser* parser, void* /*userData*/)
             {
                 innerFunc->errorType = parser->ParseTypeExp();
             }
-            if (AdvanceIf(parser, TokenType::RightArrow))
+            if (advanceIf<RightArrowToken>(parser))
             {
                 innerFunc->returnType = parser->ParseTypeExp();
             }
@@ -4560,7 +4587,7 @@ static NodeBase* parseAssocType(Parser* parser, void*)
 
     auto nameToken = parser->ReadToken(TokenType::Identifier);
     assocTypeDecl->nameAndLoc = NameLoc(nameToken);
-    assocTypeDecl->loc = nameToken.loc;
+    assocTypeDecl->loc = nameToken.getLoc();
 
     // An associated type's constraints -- whether written as an inheritance
     // clause (`associatedtype A : IBar`) or a `where` clause
@@ -4609,7 +4636,7 @@ static NodeBase* parseInterfaceConstraintDecl(Parser* parser, void*)
 
     constraint->sub = parser->ParseTypeExp();
     Token constraintToken;
-    if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
+    if (advanceIf<OpEqlToken>(parser, &constraintToken))
     {
         constraint->isEqualityConstraint = true;
     }
@@ -4617,7 +4644,7 @@ static NodeBase* parseInterfaceConstraintDecl(Parser* parser, void*)
     {
         constraintToken = parser->ReadToken(TokenType::Colon);
     }
-    constraint->loc = constraintToken.loc;
+    constraint->loc = constraintToken.getLoc();
     constraint->sup = parser->ParseTypeExp();
     parser->ReadToken(TokenType::Semicolon);
     return constraint;
@@ -4642,7 +4669,7 @@ static NodeBase* parseGlobalGenericTypeParamDecl(Parser* parser, void*)
     GlobalGenericParamDecl* genParamDecl = parser->astBuilder->create<GlobalGenericParamDecl>();
     auto nameToken = parser->ReadToken(TokenType::Identifier);
     genParamDecl->nameAndLoc = NameLoc(nameToken);
-    genParamDecl->loc = nameToken.loc;
+    genParamDecl->loc = nameToken.getLoc();
     parseOptionalGenericConstraints(parser, genParamDecl);
     parser->ReadToken(TokenType::Semicolon);
     return genParamDecl;
@@ -4654,14 +4681,14 @@ static NodeBase* parseGlobalGenericValueParamDecl(Parser* parser, void*)
         parser->astBuilder->create<GlobalGenericValueParamDecl>();
     auto nameToken = parser->ReadToken(TokenType::Identifier);
     genericParamDecl->nameAndLoc = NameLoc(nameToken);
-    genericParamDecl->loc = nameToken.loc;
+    genericParamDecl->loc = nameToken.getLoc();
 
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         genericParamDecl->type = parser->ParseTypeExp();
     }
 
-    if (AdvanceIf(parser, TokenType::OpAssign))
+    if (advanceIf<OpAssignToken>(parser))
     {
         genericParamDecl->initExpr = parser->ParseInitExpr();
     }
@@ -4675,7 +4702,7 @@ static NodeBase* parseInterfaceDecl(Parser* parser, void* /*userData*/)
     InterfaceDecl* decl = parser->astBuilder->createInterfaceDecl(parser->tokenReader.peekLoc());
     parser->FillPosition(decl);
 
-    AdvanceIf(parser, TokenType::CompletionRequest);
+    advanceIf<CompletionRequestToken>(parser);
 
     decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
     return parseOptGenericDecl(
@@ -4803,7 +4830,7 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
             result = namespaceDecl;
         }
         parentDecl = namespaceDecl;
-    } while (AdvanceIf(parser, TokenType::Dot) || AdvanceIf(parser, TokenType::Scope));
+    } while (advanceIf<DotToken>(parser) || advanceIf<ScopeToken>(parser));
 
     // Now that we have a namespace declaration to fill in
     // (whether a new or existing one), we can parse the
@@ -4868,17 +4895,17 @@ static NodeBase* parseIgnoredBlockDecl(Parser* parser, void*)
     for (;;)
     {
         auto token = parser->ReadToken();
-        if (token.type == TokenType::RBrace)
+        if (token.getType() == TokenType::RBrace)
         {
             remaingingBraceToClose--;
             if (remaingingBraceToClose == 0)
                 break;
         }
-        else if (token.type == TokenType::LBrace)
+        else if (token.getType() == TokenType::LBrace)
         {
             remaingingBraceToClose++;
         }
-        else if (token.type == TokenType::EndOfFile)
+        else if (token.getType() == TokenType::EndOfFile)
         {
             break;
         }
@@ -4983,7 +5010,7 @@ static AccessorDecl* parseAccessorDecl(Parser* parser)
     Modifiers modifiers = ParseModifiers(parser);
 
     AccessorDecl* decl = nullptr;
-    auto loc = peekToken(parser).loc;
+    auto loc = peekToken(parser).getLoc();
     auto name = peekToken(parser).getName();
     if (AdvanceIf(parser, "get"))
     {
@@ -5047,7 +5074,7 @@ static AccessorDecl* parseAccessorDecl(Parser* parser)
 
 static void parseStorageDeclBody(Parser* parser, ContainerDecl* decl)
 {
-    if (AdvanceIf(parser, TokenType::LBrace))
+    if (advanceIf<LBraceToken>(parser))
     {
         // We want to parse nested "accessor" declarations
         Token closingToken;
@@ -5056,7 +5083,7 @@ static void parseStorageDeclBody(Parser* parser, ContainerDecl* decl)
             auto accessor = parseAccessorDecl(parser);
             AddMember(decl, accessor);
         }
-        decl->closingSourceLoc = closingToken.loc;
+        decl->closingSourceLoc = closingToken.getLoc();
     }
     else
     {
@@ -5082,7 +5109,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
 
             parseParameterList(parser, decl);
 
-            if (AdvanceIf(parser, TokenType::RightArrow))
+            if (advanceIf<RightArrowToken>(parser))
             {
                 decl->returnType = parser->ParseTypeExp();
             }
@@ -5194,7 +5221,7 @@ static Decl* parseSemanticAccessorDecl(Parser* parser)
     Modifiers modifiers = ParseModifiers(parser);
 
     Decl* decl = nullptr;
-    auto loc = peekToken(parser).loc;
+    auto loc = peekToken(parser).getLoc();
     auto name = peekToken(parser).getName();
 
     if (AdvanceIf(parser, "get"))
@@ -5231,7 +5258,7 @@ static Decl* parseSemanticAccessorDecl(Parser* parser)
 // Parse the body of a semantic declaration: { [accessor]* }
 static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
 {
-    if (AdvanceIf(parser, TokenType::LBrace))
+    if (advanceIf<LBraceToken>(parser))
     {
         Token closingToken;
         while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
@@ -5240,12 +5267,12 @@ static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
             if (accessor)
                 AddMember(decl, accessor);
         }
-        decl->closingSourceLoc = closingToken.loc;
+        decl->closingSourceLoc = closingToken.getLoc();
     }
     else
     {
         parser->sink->diagnose(Diagnostics::UnexpectedToken{
-            .tokenType = TokenTypeToString(peekToken(parser).type),
+            .tokenType = TokenTypeToString(peekToken(parser).getType()),
             .location = parser->tokenReader.peekLoc()});
     }
 }
@@ -5272,7 +5299,7 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
     decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
     maybeDiagnoseKeywordUsedAsName(parser, decl->nameAndLoc);
 
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         decl->type = parser->ParseTypeExp();
     }
@@ -5280,7 +5307,7 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
     auto modifiers = _parseOptSemantics(parser);
     _addModifiers(decl, modifiers);
 
-    if (AdvanceIf(parser, TokenType::OpAssign))
+    if (advanceIf<OpAssignToken>(parser))
     {
         decl->initExpr = parser->ParseInitExpr();
     }
@@ -5362,7 +5389,7 @@ static void parseModernParamList(Parser* parser, CallableDecl* decl)
     while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
     {
         AddMember(decl, parseModernParamDecl(parser));
-        if (AdvanceIf(parser, TokenType::RParent))
+        if (advanceIf<RParentToken>(parser))
             break;
         parser->ReadToken(TokenType::Comma);
     }
@@ -5388,7 +5415,7 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             {
                 decl->errorType = parser->ParseTypeExp();
             }
-            if (AdvanceIf(parser, TokenType::RightArrow))
+            if (advanceIf<RightArrowToken>(parser))
             {
                 decl->returnType = parser->ParseTypeExp();
             }
@@ -5438,7 +5465,7 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     typeDefDecl->nameAndLoc = declaratorInfo.nameAndLoc;
     typeDefDecl->type = TypeExp(declaratorInfo.typeSpec);
 
-    AdvanceIf(parser, TokenType::Semicolon);
+    advanceIf<SemicolonToken>(parser);
 
     return typeDefDecl;
 }
@@ -5495,7 +5522,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
 
     // Next we look for a clause that specified the AST node class.
     SyntaxClass<NodeBase> syntaxClass;
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         // User is specifying the class that should be construted
         auto classNameAndLoc = expectIdentifier(parser);
@@ -5511,7 +5538,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
 
     // Next we look for an initializer that will make this keyword
     // an alias for some existing keyword.
-    if (AdvanceIf(parser, TokenType::OpAssign))
+    if (advanceIf<OpAssignToken>(parser))
     {
         auto existingKeywordNameAndLoc = expectIdentifier(parser);
 
@@ -5572,12 +5599,12 @@ static ParamDecl* parseAttributeParamDecl(Parser* parser)
     ParamDecl* paramDecl = parser->astBuilder->create<ParamDecl>();
     paramDecl->nameAndLoc = nameAndLoc;
 
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         paramDecl->type = parser->ParseTypeExp();
     }
 
-    if (AdvanceIf(parser, TokenType::OpAssign))
+    if (advanceIf<OpAssignToken>(parser))
     {
         paramDecl->initExpr = parser->ParseInitExpr();
     }
@@ -5851,7 +5878,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
     auto nameAndLoc = expectIdentifier(parser);
 
     AttributeDecl* attrDecl = parser->astBuilder->create<AttributeDecl>();
-    if (AdvanceIf(parser, TokenType::LParent))
+    if (advanceIf<LParentToken>(parser))
     {
         while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
         {
@@ -5873,7 +5900,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
 
     // Next we look for a clause that specified the AST node class.
     SyntaxClass<NodeBase> syntaxClass;
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         // User is specifying the class that should be construted
         auto classNameAndLoc = expectIdentifier(parser);
@@ -6326,7 +6353,7 @@ static DeclBase* ParseDeclWithModifiers(
             if (!parser->isRecovering)
             {
                 parser->sink->diagnose(Diagnostics::UnexpectedToken{
-                    .tokenType = TokenTypeToString(parser->tokenReader.peekToken().type),
+                    .tokenType = TokenTypeToString(parser->tokenReader.peekToken().getType()),
                     .location = loc});
             }
             SkipBalancedToken(&parser->tokenReader);
@@ -6665,7 +6692,7 @@ static void parseDecls(Parser* parser, ContainerDecl* containerDecl, MatchedToke
                 tokenReader);
         }
     }
-    containerDecl->closingSourceLoc = closingBraceToken.loc;
+    containerDecl->closingSourceLoc = closingBraceToken.getLoc();
 }
 
 static void parseDeclBody(Parser* parser, ContainerDecl* parent)
@@ -6776,7 +6803,7 @@ Decl* Parser::ParseStruct(StructDecl* decl)
     }
 
     // Skip completion request token to prevent producing a type named completion request.
-    AdvanceIf(this, TokenType::CompletionRequest);
+    advanceIf<CompletionRequestToken>(this);
 
     if (LookAheadToken(TokenType::Identifier))
     {
@@ -6794,7 +6821,7 @@ Decl* Parser::ParseStruct(StructDecl* decl)
             // We allow for an inheritance clause on a `struct`
             // so that it can conform to interfaces.
             parseOptionalInheritanceClause(this, decl);
-            if (AdvanceIf(this, TokenType::OpAssign))
+            if (advanceIf<OpAssignToken>(this))
             {
                 decl->aliasedType = ParseTypeExp();
                 PushScope(decl);
@@ -6802,9 +6829,9 @@ Decl* Parser::ParseStruct(StructDecl* decl)
                 if (!LookAheadToken(TokenType::Semicolon))
                 {
                     this->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                        .actualToken = TokenTypeToString(this->tokenReader.peekToken().type),
+                        .actualToken = TokenTypeToString(this->tokenReader.peekToken().getType()),
                         .expectedToken = "';'",
-                        .location = this->tokenReader.peekToken().loc});
+                        .location = this->tokenReader.peekToken().getLoc()});
                 }
                 return decl;
             }
@@ -6824,7 +6851,7 @@ ClassDecl* Parser::ParseClass()
     ClassDecl* rs = astBuilder->create<ClassDecl>();
     ReadToken("class");
 
-    AdvanceIf(this, TokenType::CompletionRequest);
+    advanceIf<CompletionRequestToken>(this);
 
     FillPosition(rs);
     rs->nameAndLoc = expectIdentifier(this);
@@ -6847,7 +6874,7 @@ Decl* Parser::ParseGLSLInterfaceBlock()
 
     // As for struct, skip completion request token to prevent producing a
     // block named completion request.
-    AdvanceIf(this, TokenType::CompletionRequest);
+    advanceIf<CompletionRequestToken>(this);
     rs->nameAndLoc = expectIdentifier(this);
     parseDeclBody(this, rs);
     return rs;
@@ -6860,7 +6887,7 @@ static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 
     decl->nameAndLoc = expectIdentifier(parser);
 
-    if (AdvanceIf(parser, TokenType::OpAssign))
+    if (advanceIf<OpAssignToken>(parser))
     {
         decl->tagExpr = parser->ParseArgExpr();
     }
@@ -6891,7 +6918,7 @@ static Decl* parseEnumDecl(Parser* parser)
         }
     }
 
-    AdvanceIf(parser, TokenType::CompletionRequest);
+    advanceIf<CompletionRequestToken>(parser);
 
     parser->FillPosition(decl);
 
@@ -6908,7 +6935,7 @@ static Decl* parseEnumDecl(Parser* parser)
         {
             // enum class cannot be anonymous
             parser->sink->diagnose(
-                Diagnostics::AnonymousScopedEnum{.classLocation = classToken.loc});
+                Diagnostics::AnonymousScopedEnum{.classLocation = classToken.getLoc()});
         }
     }
     else
@@ -6932,7 +6959,7 @@ static Decl* parseEnumDecl(Parser* parser)
             if (isEnumClass)
             {
                 auto enumClassModifier = parser->astBuilder->create<EnumClassModifier>();
-                enumClassModifier->loc = classToken.loc;
+                enumClassModifier->loc = classToken.getLoc();
                 enumClassModifier->keywordName = getName(parser, classToken.getContent());
                 addModifier(decl, enumClassModifier);
             }
@@ -6947,13 +6974,13 @@ static Decl* parseEnumDecl(Parser* parser)
                 EnumCaseDecl* caseDecl = parseEnumCaseDecl(parser);
                 AddMember(decl, caseDecl);
 
-                if (AdvanceIf(parser, TokenType::RBrace))
+                if (advanceIf<RBraceToken>(parser))
                     break;
 
                 parser->ReadToken(TokenType::Comma);
             }
             parser->PopScope();
-            decl->closingSourceLoc = closingToken.loc;
+            decl->closingSourceLoc = closingToken.getLoc();
             return decl;
         });
 }
@@ -7024,7 +7051,7 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
         if (caseNames.getCount() == 0)
         {
             parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                .actualToken = TokenTypeToString(parser->tokenReader.peekToken().type),
+                .actualToken = TokenTypeToString(parser->tokenReader.peekToken().getType()),
                 .expectedToken = "'case' or 'default'",
                 .location = parser->tokenReader.peekLoc()});
             parser->isRecovering = true;
@@ -7069,11 +7096,11 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
                 {
                     parser->sink->diagnose(Diagnostics::UnknownTargetName{
                         .name = caseName.getContent(),
-                        .location = caseName.loc});
+                        .location = caseName.getLoc()});
                 }
                 targetCase->capability = (int32_t)cap;
                 targetCase->capabilityToken = caseName;
-                targetCase->loc = caseName.loc;
+                targetCase->loc = caseName.getLoc();
                 targetCase->body = bodyStmt;
                 stmt->targetCases.add(targetCase);
             }
@@ -7106,7 +7133,7 @@ static Stmt* parseIntrinsicAsmStmt(Parser* parser)
     stmt->asmText =
         getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral), parser->sink);
 
-    while (AdvanceIf(parser, TokenType::Comma))
+    while (advanceIf<CommaToken>(parser))
     {
         stmt->args.add(parser->ParseArgExpr());
     }
@@ -7251,12 +7278,13 @@ Stmt* parseCompileTimeForStmt(Parser* parser)
     if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
     {
         // $for has been removed in Slang 202c
-        parser->sink->diagnose(Diagnostics::CompileTimeForIsRemoved{.location = forTok.loc});
+        parser->sink->diagnose(Diagnostics::CompileTimeForIsRemoved{.location = forTok.getLoc()});
     }
     else if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
     {
         // we'll warn about the deprecation of $for in Slang 2025 and 2026
-        parser->sink->diagnose(Diagnostics::CompileTimeForIsDeprecated{.location = forTok.loc});
+        parser->sink->diagnose(
+            Diagnostics::CompileTimeForIsDeprecated{.location = forTok.getLoc()});
     }
 
     parser->ReadToken(TokenType::LParent);
@@ -7275,7 +7303,7 @@ Stmt* parseCompileTimeForStmt(Parser* parser)
 
     Expr* rangeBeginExpr = nullptr;
     Expr* rangeEndExpr = parser->ParseArgExpr();
-    if (AdvanceIf(parser, TokenType::Comma))
+    if (advanceIf<CommaToken>(parser))
     {
         rangeBeginExpr = rangeEndExpr;
         rangeEndExpr = parser->ParseArgExpr();
@@ -7638,7 +7666,7 @@ Stmt* Parser::parseBlockStatement(AllowCaseDefaultStatements allowCaseDefault)
     PopScope();
 
     // Save the closing braces source loc
-    blockStatement->closingSourceLoc = closingBraceToken.loc;
+    blockStatement->closingSourceLoc = closingBraceToken.getLoc();
 
     if (!body)
     {
@@ -7727,7 +7755,7 @@ Stmt* Parser::parseIfLetStatement()
 
     // insert 'let tempVarDecl = X as Y;'
     auto tempVarDecl = astBuilder->create<LetDecl>();
-    tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
+    tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.getLoc());
     tempVarDecl->initExpr = initExpr;
     tempVarDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(currentScope->containerDecl, tempVarDecl);
@@ -7759,8 +7787,8 @@ Stmt* Parser::parseIfLetStatement()
     memberExpr->name = getName(this, "value");
 
     auto varDecl = astBuilder->create<LetDecl>();
-    varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
-    varDecl->loc = identifierToken.loc;
+    varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.getLoc());
+    varDecl->loc = identifierToken.getLoc();
     varDecl->initExpr = memberExpr;
     varDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(positiveScopeDecl, varDecl);
@@ -7782,7 +7810,7 @@ Stmt* Parser::parseIfLetStatement()
         varDeclrStatement->decl = varDecl;
 
         SeqStmt* scopedBody = astBuilder->create<SeqStmt>();
-        scopedBody->loc = identifierToken.loc;
+        scopedBody->loc = identifierToken.getLoc();
         scopedBody->stmts.add(varDeclrStatement);
         scopedBody->stmts.add(ifStatement->positiveStatement);
 
@@ -7791,7 +7819,7 @@ Stmt* Parser::parseIfLetStatement()
         // variables for the binding to this lexical scope instead of the
         // enclosing function/block.
         BlockStmt* positiveScopeStmt = astBuilder->create<BlockStmt>();
-        positiveScopeStmt->loc = identifierToken.loc;
+        positiveScopeStmt->loc = identifierToken.getLoc();
         positiveScopeStmt->scopeDecl = positiveScopeDecl;
         positiveScopeStmt->body = scopedBody;
         ifStatement->positiveStatement = positiveScopeStmt;
@@ -7953,7 +7981,7 @@ CatchStmt* Parser::ParseDoCatchStatement(Stmt* body)
 
         // Optional error parameter. If not given, the catch catches all error
         // types.
-        if (AdvanceIf(this, TokenType::LParent))
+        if (advanceIf<LParentToken>(this))
         {
             ParamDecl* errorVar = parseModernParamDecl(this);
             catchStatement->errorVar = errorVar;
@@ -8071,7 +8099,7 @@ RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
     while (true)
     {
         Token capToken = ReadToken(TokenType::Identifier);
-        if (capToken.type != TokenType::Identifier)
+        if (capToken.getType() != TokenType::Identifier)
             break;
 
         UnownedStringSlice capNameStr = capToken.getContent();
@@ -8079,10 +8107,11 @@ RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
         if (capName != CapabilityName::Invalid)
             statement->requiredCaps.add(capToken);
         else
-            sink->diagnose(
-                Diagnostics::UnknownCapability{.capability = capNameStr, .location = capToken.loc});
+            sink->diagnose(Diagnostics::UnknownCapability{
+                .capability = capNameStr,
+                .location = capToken.getLoc()});
 
-        if (!AdvanceIf(this, TokenType::Comma))
+        if (!advanceIf<CommaToken>(this))
             break;
     }
 
@@ -8151,8 +8180,8 @@ static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr, bool allo
         // to gobble up another type expression and form
         // a conjunction type expression.
 
-        auto loc = peekToken(parser).loc;
-        if (AdvanceIf(parser, TokenType::OpBitAnd))
+        auto loc = peekToken(parser).getLoc();
+        if (advanceIf<OpBitAndToken>(parser))
         {
             auto rightExpr = _parsePostfixTypeExpr(parser, allowDecl);
 
@@ -8220,7 +8249,7 @@ Associativity GetAssociativityFromLevel(Precedence level)
 
 Precedence GetOpLevel(Parser* parser, const Token& token)
 {
-    switch (token.type)
+    switch (token.getType())
     {
     case TokenType::QuestionMark:
         return Precedence::TernaryConditional;
@@ -8304,7 +8333,7 @@ static Expr* parseOperator(Parser* parser)
     auto opExpr = parser->astBuilder->create<VarExpr>();
     opExpr->name = getName(parser, opToken.getContent());
     opExpr->scope = parser->currentScope;
-    opExpr->loc = opToken.loc;
+    opExpr->loc = opToken.getLoc();
 
     return opExpr;
 }
@@ -8330,7 +8359,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
             break;
 
         // Special case the "is" and "as" operators.
-        if (opToken.type == TokenType::Identifier)
+        if (opToken.getType() == TokenType::Identifier)
         {
             const auto content = opToken.getContent();
 
@@ -8340,7 +8369,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
                 isExpr->value = expr;
                 parser->ReadToken();
                 isExpr->typeExpr = parser->ParseTypeExp();
-                isExpr->loc = opToken.loc;
+                isExpr->loc = opToken.getLoc();
                 expr = isExpr;
                 continue;
             }
@@ -8350,7 +8379,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
                 asExpr->value = expr;
                 parser->ReadToken();
                 asExpr->typeExpr = parser->ParseType();
-                asExpr->loc = opToken.loc;
+                asExpr->loc = opToken.getLoc();
                 expr = asExpr;
                 continue;
             }
@@ -8360,7 +8389,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
 
         // Special case the `?:` operator since it is the
         // one non-binary case we need to deal with.
-        if (opToken.type == TokenType::QuestionMark)
+        if (opToken.getType() == TokenType::QuestionMark)
         {
             SelectExpr* select = parser->astBuilder->create<SelectExpr>();
             select->loc = op->loc;
@@ -8390,7 +8419,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
             right = parseInfixExprWithPrecedence(parser, right, nextOpPrec);
         }
 
-        if (opToken.type == TokenType::OpAssign)
+        if (opToken.getType() == TokenType::OpAssign)
         {
             AssignExpr* assignExpr = parser->astBuilder->create<AssignExpr>();
             assignExpr->loc = op->loc;
@@ -8482,7 +8511,7 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
 
     sizeOfExpr->value = parser->ParseArgExpr();
 
-    if (AdvanceIf(parser, TokenType::Comma))
+    if (advanceIf<CommaToken>(parser))
     {
         // If there is a comma, assume we also have an explicitly specified data layout.
         sizeOfExpr->dataLayout = parser->ParseArgExpr();
@@ -8504,7 +8533,7 @@ static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
 
     alignOfExpr->value = parser->ParseArgExpr();
 
-    if (AdvanceIf(parser, TokenType::Comma))
+    if (advanceIf<CommaToken>(parser))
     {
         // If there is a comma, assume we also have an explicitly specified data layout.
         alignOfExpr->dataLayout = parser->ParseArgExpr();
@@ -8705,7 +8734,7 @@ static IntegerLiteralValue _fixIntegerLiteral(
                 .literal = String(token->getContent()),
                 .type = String(BaseTypeInfo::asText(baseType)),
                 .truncatedValue = String(truncatedValue),
-                .location = token->loc});
+                .location = token->getLoc()});
         }
 
         value = truncatedValue;
@@ -8842,8 +8871,8 @@ static bool _isCast(Parser* parser, Expr* expr)
                 // Rewind
                 parser->tokenReader.setCursor(cursor);
 
-                const bool isBinary = (nextToken.flags & TokenFlag::AfterWhitespace) ==
-                                      (opToken.flags & TokenFlag::AfterWhitespace);
+                const bool isBinary = (nextToken.getFlags() & TokenFlag::AfterWhitespace) ==
+                                      (opToken.getFlags() & TokenFlag::AfterWhitespace);
 
                 // If it's binary it's not a cast
                 return !isBinary;
@@ -8891,7 +8920,7 @@ static Expr* parseLambdaExpr(Parser* parser)
     while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
     {
         AddMember(lambdaExpr->paramScopeDecl, parser->ParseParameter());
-        if (AdvanceIf(parser, TokenType::RParent))
+        if (advanceIf<RParentToken>(parser))
             break;
         parser->ReadToken(TokenType::Comma);
     }
@@ -8982,7 +9011,8 @@ static BaseType _determineIntegerLiteralType(
                 else if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
                 {
                     // This is always overflowing.
-                    sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+                    sink->diagnose(
+                        Diagnostics::IntegerLiteralTooLarge{.location = token->getLoc()});
                 }
             }
 
@@ -9004,7 +9034,8 @@ static BaseType _determineIntegerLiteralType(
                 else if (rawValue >= (static_cast<uint64_t>(INT64_MAX) + 2U))
                 {
                     // This is always overflowing.
-                    sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
+                    sink->diagnose(
+                        Diagnostics::IntegerLiteralTooLarge{.location = token->getLoc()});
                 }
             }
 
@@ -9128,7 +9159,7 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
     {
         parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
             .suffix = String(suffix),
-            .location = token.loc});
+            .location = token.getLoc()});
     }
 
     BaseType suffixBaseType;
@@ -9192,14 +9223,14 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
     case FloatingPointLiteralType::BadSignificand:
         parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralNumber{
             .number = String(errorContent),
-            .location = token.loc});
+            .location = token.getLoc()});
         diagnosed = true;
         break;
 
     case FloatingPointLiteralType::BadSuffix:
         parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
             .suffix = String(errorContent),
-            .location = token.loc});
+            .location = token.getLoc()});
         diagnosed = true;
         break;
 
@@ -9216,7 +9247,7 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
                 .literal = String(token.getContent()),
                 .type = String(BaseTypeInfo::asText(suffixBaseType)),
                 .convertedValue = String(value),
-                .location = token.loc});
+                .location = token.getLoc()});
         }
         else
         {
@@ -9224,7 +9255,7 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
                 .type = String(BaseTypeInfo::asText(suffixBaseType)),
                 .literal = String(token.getContent()),
                 .convertedValue = String(value),
-                .location = token.loc});
+                .location = token.getLoc()});
         }
         diagnosed = true;
     }
@@ -9234,7 +9265,7 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
         parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
             .literal = String(token.getContent()),
             .truncatedValue = StringUtil::makeMinimalHexFloat(value),
-            .location = token.loc});
+            .location = token.getLoc()});
         diagnosed = true;
     }
 
@@ -9285,11 +9316,11 @@ static Expr* parseAtomicExpr(Parser* parser)
 
                 auto varExpr = parser->astBuilder->create<VarExpr>();
                 varExpr->scope = parser->currentScope;
-                varExpr->loc = typeToken.loc;
+                varExpr->loc = typeToken.getLoc();
                 varExpr->name = typeToken.getName();
 
                 TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                tcexpr->loc = openParen.loc;
+                tcexpr->loc = openParen.getLoc();
 
                 tcexpr->functionExpr = varExpr;
                 tcexpr->arguments.add(parsePrefixExpr(parser));
@@ -9311,14 +9342,14 @@ static Expr* parseAtomicExpr(Parser* parser)
                         // We support empty parentheses `()` as a valid expression to construct an
                         // empty tuple in Slang 2026.
                         base = parser->astBuilder->create<TupleExpr>();
-                        base->loc = openParen.loc;
+                        base->loc = openParen.getLoc();
                     }
                     else
                     {
                         // We don't support empty parentheses `()` as a valid expression prior to
                         // Slang 2026.
-                        parser->diagnose(
-                            Diagnostics::InvalidEmptyParenthesisExpr{.location = openParen.loc});
+                        parser->diagnose(Diagnostics::InvalidEmptyParenthesisExpr{
+                            .location = openParen.getLoc()});
                         base = parser->astBuilder->create<IncompleteExpr>();
                         base->type = parser->astBuilder->getErrorType();
                     }
@@ -9361,7 +9392,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     //
                     List<Expr*> elementExprs;
                     elementExprs.add(base);
-                    while (AdvanceIf(parser, TokenType::Comma))
+                    while (advanceIf<CommaToken>(parser))
                     {
                         if (parser->LookAheadToken(TokenType::RParent))
                             break;
@@ -9370,7 +9401,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     }
                     parser->ReadToken(TokenType::RParent);
                     TupleExpr* tupleExpr = parser->astBuilder->create<TupleExpr>();
-                    tupleExpr->loc = openParen.loc;
+                    tupleExpr->loc = openParen.getLoc();
                     tupleExpr->elements = _Move(elementExprs);
                     return tupleExpr;
                 }
@@ -9386,7 +9417,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     {
                         // Parse as a cast
                         TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                        tcexpr->loc = openParen.loc;
+                        tcexpr->loc = openParen.getLoc();
 
                         tcexpr->functionExpr = base;
                         tcexpr->arguments.add(parsePrefixExpr(parser));
@@ -9396,7 +9427,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     else
                     {
                         ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
-                        parenExpr->loc = openParen.loc;
+                        parenExpr->loc = openParen.getLoc();
                         parenExpr->base = base;
                         return parenExpr;
                     }
@@ -9506,7 +9537,7 @@ static Expr* parseAtomicExpr(Parser* parser)
             auto nameToken = peekToken(parser);
             auto nameAndLoc = NameLoc(nameToken);
             varExpr->name = nameAndLoc.name;
-            if (nameToken.type == TokenType::CompletionRequest)
+            if (nameToken.getType() == TokenType::CompletionRequest)
             {
                 parser->hasSeenCompletionToken = true;
             }
@@ -9536,7 +9567,7 @@ static Expr* parseAtomicExpr(Parser* parser)
             {
                 if (!parsedExpr->loc.isValid())
                 {
-                    parsedExpr->loc = nameToken.loc;
+                    parsedExpr->loc = nameToken.getLoc();
                 }
                 return parsedExpr;
             }
@@ -9590,7 +9621,7 @@ static Expr* parsePostfixExpr(Parser* parser)
                 indexExpr->baseExpression = expr;
                 parser->FillPosition(indexExpr);
                 auto lBracket = parser->ReadToken(TokenType::LBracket);
-                indexExpr->argumentDelimeterLocs.add(lBracket.loc);
+                indexExpr->argumentDelimeterLocs.add(lBracket.getLoc());
                 while (!parser->tokenReader.isAtEnd())
                 {
                     if (!parser->LookAheadToken(TokenType::RBracket))
@@ -9602,10 +9633,10 @@ static Expr* parsePostfixExpr(Parser* parser)
                     if (!parser->LookAheadToken(TokenType::Comma))
                         break;
                     auto comma = parser->ReadToken(TokenType::Comma);
-                    indexExpr->argumentDelimeterLocs.add(comma.loc);
+                    indexExpr->argumentDelimeterLocs.add(comma.getLoc());
                 }
                 auto rBracket = parser->ReadToken(TokenType::RBracket);
-                indexExpr->argumentDelimeterLocs.add(rBracket.loc);
+                indexExpr->argumentDelimeterLocs.add(rBracket.getLoc());
                 expr = indexExpr;
             }
             break;
@@ -9617,7 +9648,7 @@ static Expr* parsePostfixExpr(Parser* parser)
                 invokeExpr->functionExpr = expr;
                 parser->FillPosition(invokeExpr);
                 auto lParen = parser->ReadToken(TokenType::LParent);
-                invokeExpr->argumentDelimeterLocs.add(lParen.loc);
+                invokeExpr->argumentDelimeterLocs.add(lParen.getLoc());
                 while (!parser->tokenReader.isAtEnd())
                 {
                     if (!parser->LookAheadToken(TokenType::RParent))
@@ -9629,10 +9660,10 @@ static Expr* parsePostfixExpr(Parser* parser)
                     if (!parser->LookAheadToken(TokenType::Comma))
                         break;
                     auto comma = parser->ReadToken(TokenType::Comma);
-                    invokeExpr->argumentDelimeterLocs.add(comma.loc);
+                    invokeExpr->argumentDelimeterLocs.add(comma.getLoc());
                 }
                 auto rParen = parser->ReadToken(TokenType::RParent);
-                invokeExpr->argumentDelimeterLocs.add(rParen.loc);
+                invokeExpr->argumentDelimeterLocs.add(rParen.getLoc());
                 expr = invokeExpr;
             }
             break;
@@ -9810,7 +9841,7 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
         parser->ReadToken(TokenType::LParent);
         auto operand = SPIRVAsmOperand{SPIRVAsmOperand::BuiltinVar, parser->ReadToken()};
         parser->ReadToken(TokenType::Colon);
-        AdvanceIf(parser, TokenType::DollarDollar);
+        advanceIf<DollarDollarToken>(parser);
         operand.type = parser->ParseTypeExp();
         parser->ReadToken(TokenType::RParent);
         return operand;
@@ -9868,7 +9899,7 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
         const auto tok = parser->ReadToken();
         const auto v = getIntegerLiteralValue(tok, parser->sink);
         if (v < 0 || v > 0xffffffff)
-            parser->diagnose(Diagnostics::SpirvOperandRange{.location = tok.loc});
+            parser->diagnose(Diagnostics::SpirvOperandRange{.location = tok.getLoc()});
         return SPIRVAsmOperand{SPIRVAsmOperand::Literal, tok, nullptr, {}, SpvWord(v)};
     }
     // A literal string
@@ -9877,7 +9908,7 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
         return SPIRVAsmOperand{SPIRVAsmOperand::Literal, parser->ReadToken()};
     }
     // A %foo id
-    else if (AdvanceIf(parser, TokenType::OpMod))
+    else if (advanceIf<OpModToken>(parser))
     {
         if (parser->LookAheadToken(TokenType::IntegerLiteral) ||
             parser->LookAheadToken(TokenType::Identifier))
@@ -9887,30 +9918,30 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
             // registers must be `__`-prefixed to read as compiler-internal
             // (shader-slang/slang#12108). Integer ids (`%6`) carry no name.
             SLANG_ASSERT(
-                !parser->options.isCoreModule || idToken.type != TokenType::Identifier ||
+                !parser->options.isCoreModule || idToken.getType() != TokenType::Identifier ||
                 idToken.getContent().startsWith("__"));
             return SPIRVAsmOperand{SPIRVAsmOperand::Id, idToken};
         }
     }
     // A &foo variable reference (for the address of foo)
-    else if (AdvanceIf(parser, TokenType::OpBitAnd))
+    else if (advanceIf<OpBitAndToken>(parser))
     {
         Expr* expr = parsePostfixExpr(parser);
         return SPIRVAsmOperand{SPIRVAsmOperand::SlangValueAddr, Token{}, expr};
     }
     // A $foo variable
-    else if (AdvanceIf(parser, TokenType::Dollar))
+    else if (advanceIf<DollarToken>(parser))
     {
         Expr* expr = parsePostfixExpr(parser);
         return SPIRVAsmOperand{SPIRVAsmOperand::SlangValue, Token{}, expr};
     }
     // A $$foo type
-    else if (AdvanceIf(parser, TokenType::DollarDollar))
+    else if (advanceIf<DollarDollarToken>(parser))
     {
         return slangTypeExprOperand(SPIRVAsmOperand::SlangType);
     }
     // A !immediateValue
-    else if (AdvanceIf(parser, TokenType::OpNot))
+    else if (advanceIf<OpNotToken>(parser))
     {
         Expr* expr = parseAtomicExpr(parser);
         return SPIRVAsmOperand{SPIRVAsmOperand::SlangImmediateValue, Token{}, expr};
@@ -9935,7 +9966,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     std::optional<SPIRVAsmOperand> resultOperand;
 
     // If we see a colon, then this `%foo : %type = OpFoo`?
-    if (AdvanceIf(parser, TokenType::Colon))
+    if (advanceIf<ColonToken>(parser))
     {
         resultTypeOperand = parseSPIRVAsmOperand(parser);
         if (!resultTypeOperand)
@@ -9945,7 +9976,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     // If we have seen a type, then insist on this syntax, otherwise allow
     // skipping this if
-    if (resultTypeOperand || AdvanceIf(parser, TokenType::OpAssign))
+    if (resultTypeOperand || advanceIf<OpAssignToken>(parser))
     {
         const auto opcode = parseSPIRVAsmOperand(parser);
         if (!opcode)
@@ -9968,7 +9999,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     {
         parser->diagnose(Diagnostics::UnrecognizedSpirvOpcode{
             .opcode = ret.opcode.token.getContent(),
-            .location = resultOperand->token.loc});
+            .location = resultOperand->token.getLoc()});
         return std::nullopt;
     }
 
@@ -9978,7 +10009,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     {
         parser->diagnose(Diagnostics::SpirvInstructionWithoutResultId{
             .opcode = ret.opcode.token.getContent(),
-            .location = resultOperand->token.loc});
+            .location = resultOperand->token.getLoc()});
         return std::nullopt;
     }
 
@@ -9987,7 +10018,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     {
         parser->diagnose(Diagnostics::SpirvInstructionWithoutResultTypeId{
             .opcode = ret.opcode.token.getContent(),
-            .location = resultTypeOperand->token.loc});
+            .location = resultTypeOperand->token.getLoc()});
     }
 
     //
@@ -10024,8 +10055,9 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
             //
             auto token = parser->tokenReader.peekToken();
             if (token.getContent().startsWith("Op") ||
-                token.type == TokenType::OpMod && (parser->LookAheadToken(TokenType::OpAssign, 2) ||
-                                                   parser->LookAheadToken(TokenType::Colon, 2)))
+                token.getType() == TokenType::OpMod &&
+                    (parser->LookAheadToken(TokenType::OpAssign, 2) ||
+                     parser->LookAheadToken(TokenType::Colon, 2)))
             {
                 parser->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
                     .opcode = ret.opcode.token.getContent(),
@@ -10036,7 +10068,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
         if (auto operand = parseSPIRVAsmOperand(parser))
         {
-            while (AdvanceIf(parser, TokenType::OpBitOr))
+            while (advanceIf<OpBitOrToken>(parser))
             {
                 if (const auto next = parseSPIRVAsmOperand(parser))
                     operand->bitwiseOrWith.add(*next);
@@ -10054,7 +10086,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
         ret.opcode.knownValue == (SpvWord)SpvOpMax)
     {
-        if (ret.opcode.token.type == TokenType::IntegerLiteral)
+        if (ret.opcode.token.getType() == TokenType::IntegerLiteral)
         {
             Int intVal = -1;
             StringUtil::parseInt(ret.opcode.token.getContent(), intVal);
@@ -10064,7 +10096,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
         {
             parser->diagnose(Diagnostics::UnrecognizedSpirvOpcode{
                 .opcode = ret.opcode.token.getContent(),
-                .location = ret.opcode.token.loc});
+                .location = ret.opcode.token.getLoc()});
             return std::nullopt;
         }
     }
@@ -10523,7 +10555,7 @@ static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* 
 
 static IROp parseIROp(Parser* parser, Token& outToken)
 {
-    if (AdvanceIf(parser, TokenType::OpSub))
+    if (advanceIf<OpSubToken>(parser))
     {
         outToken = parser->ReadToken();
         return IROp(-stringToInt(outToken.getContent()));
@@ -10543,7 +10575,7 @@ static IROp parseIROp(Parser* parser, Token& outToken)
         {
             parser->sink->diagnose(Diagnostics::Unimplemented{
                 .feature = "unknown intrinsic op",
-                .location = outToken.loc});
+                .location = outToken.getLoc()});
         }
         return op;
     }
@@ -10568,7 +10600,7 @@ static NodeBase* parseIntrinsicOpModifier(Parser* parser, void* /*userData*/)
     //
     //     __intrinsic_op
     //
-    if (AdvanceIf(parser, TokenType::LParent))
+    if (advanceIf<LParentToken>(parser))
     {
         modifier->op = parseIROp(parser, modifier->opToken);
         parser->ReadToken(TokenType::RParent);
@@ -10583,11 +10615,11 @@ static NodeBase* parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/
     auto modifier = parser->astBuilder->create<TargetIntrinsicModifier>();
     modifier->isString = false;
 
-    if (AdvanceIf(parser, TokenType::LParent))
+    if (advanceIf<LParentToken>(parser))
     {
         modifier->targetToken = parser->ReadToken(TokenType::Identifier);
 
-        if (AdvanceIf(parser, TokenType::Comma))
+        if (advanceIf<CommaToken>(parser))
         {
             if (parser->LookAheadToken(TokenType::LParent, 1))
             {
@@ -10623,7 +10655,7 @@ static NodeBase* parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/
 static NodeBase* parseSpecializedForTargetModifier(Parser* parser, void* /*userData*/)
 {
     auto modifier = parser->astBuilder->create<SpecializedForTargetModifier>();
-    if (AdvanceIf(parser, TokenType::LParent))
+    if (advanceIf<LParentToken>(parser))
     {
         modifier->targetToken = parser->ReadToken(TokenType::Identifier);
         parser->ReadToken(TokenType::RParent);
@@ -10675,7 +10707,7 @@ static SlangResult parseSemanticVersion(
 
     UnownedStringSlice content = outToken.getContent();
     // We allow specified as major.minor or as a string (in quotes)
-    switch (outToken.type)
+    switch (outToken.getType())
     {
     case TokenType::FloatingPointLiteral:
         {
@@ -10708,7 +10740,7 @@ static NodeBase* parseSPIRVVersionModifier(Parser* parser, void* /*userData*/)
         modifier->version = version;
         return modifier;
     }
-    parser->sink->diagnose(Diagnostics::InvalidSpirvVersion{.location = token.loc});
+    parser->sink->diagnose(Diagnostics::InvalidSpirvVersion{.location = token.getLoc()});
     return nullptr;
 }
 
@@ -10722,7 +10754,7 @@ static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
         modifier->version = version;
         return modifier;
     }
-    parser->sink->diagnose(Diagnostics::InvalidCudaSmVersion{.location = token.loc});
+    parser->sink->diagnose(Diagnostics::InvalidCudaSmVersion{.location = token.getLoc()});
     return nullptr;
 }
 
@@ -10876,7 +10908,7 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 numThreadsAttrib->loc = nameAndLoc.loc;
             }
 
-            if (AdvanceIf(parser, TokenType::OpAssign))
+            if (advanceIf<OpAssignToken>(parser))
             {
                 auto expr = parseAtomicExpr(parser);
                 // SLANG_ASSERT(expr);
@@ -10948,7 +10980,7 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
             listBuilder.add(modifier);
         }
 
-        if (AdvanceIf(parser, TokenType::RParent))
+        if (advanceIf<RParentToken>(parser))
             break;
         parser->ReadToken(TokenType::Comma);
     }
@@ -11040,7 +11072,7 @@ static NodeBase* parseMagicTypeModifierImpl(
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
     modifier->magicName = parser->ReadToken(TokenType::Identifier).getContent();
-    if (AdvanceIf(parser, TokenType::Comma))
+    if (advanceIf<CommaToken>(parser))
     {
         modifier->tag =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
@@ -11078,7 +11110,7 @@ static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
     IntrinsicTypeModifier* modifier = parser->astBuilder->create<IntrinsicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
     modifier->irOp = parseIROp(parser, modifier->opToken);
-    while (AdvanceIf(parser, TokenType::Comma))
+    while (advanceIf<CommaToken>(parser))
     {
         auto operand =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
@@ -11093,12 +11125,12 @@ static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userDat
     ImplicitConversionModifier* modifier = parser->astBuilder->create<ImplicitConversionModifier>();
     BuiltinConversionKind builtinKind = kBuiltinConversion_Unknown;
     ConversionCost cost = kConversionCost_Default;
-    if (AdvanceIf(parser, TokenType::LParent))
+    if (advanceIf<LParentToken>(parser))
     {
         if (AdvanceIf(parser, "constraint"))
         {
             cost = kConversionCost_TypeCoercionConstraint;
-            if (AdvanceIf(parser, TokenType::OpAdd))
+            if (advanceIf<OpAddToken>(parser))
             {
                 cost = kConversionCost_TypeCoercionConstraintPlusScalarToVector;
             }
@@ -11108,7 +11140,7 @@ static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userDat
             cost = ConversionCost(
                 stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
         }
-        if (AdvanceIf(parser, TokenType::Comma))
+        if (advanceIf<CommaToken>(parser))
         {
             builtinKind = BuiltinConversionKind(
                 stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));

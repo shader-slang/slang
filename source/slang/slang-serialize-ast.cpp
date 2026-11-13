@@ -790,23 +790,49 @@ void ASTSerialReadContext::handleName(ASTSerializer const& serializer, Name*& va
     value = _astBuilder->getNamePool()->getName(text);
 }
 
-//
-// A `Token` is *almost* an easy type to handle, and
-// the declaration for its fossilized representation
-// makes it look like it should be a simple `struct`
-// that we can let fiddle generate the implementation
-// for:
-//
+// Tokens serialize lexical values rather than pool addresses. The raw spelling,
+// logical spelling, and trivia order are preserved; deserialization interns them
+// into the receiving AST builder's pool. Locations remain occurrence data.
+struct SerializedLexeme
+{
+    TokenType kind = TokenType::Unknown;
+    String spelling;
+    String content;
+    bool hasName = false;
+};
+
+template<>
+struct FossilizedTypeTraits<SerializedLexeme>
+{
+    struct FossilizedType
+    {
+        Fossilized<TokenType> kind;
+        Fossilized<String> spelling;
+        Fossilized<String> content;
+        Fossilized<bool> hasName;
+    };
+};
+
+template<typename S>
+void serialize(S const& serializer, SerializedLexeme& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.kind);
+    serialize(serializer, value.spelling);
+    serialize(serializer, value.content);
+    serialize(serializer, value.hasName);
+}
 
 template<>
 struct FossilizedTypeTraits<Token>
 {
     struct FossilizedType
     {
-        Fossilized<decltype(Token::type)> type;
-        Fossilized<decltype(Token::loc)> loc;
-        Fossilized<decltype(Token::flags)> flags;
-        Fossilized<String> content;
+        Fossilized<SourceLoc> loc;
+        Fossilized<TokenFlags> flags;
+        Fossilized<SerializedLexeme> rawToken;
+        Fossilized<List<SerializedLexeme>> leading;
+        Fossilized<List<SerializedLexeme>> trailing;
     };
 };
 
@@ -816,62 +842,104 @@ void serialize(S const& serializer, Token& value)
     serializer.getContext()->handleToken(serializer, value);
 }
 
-//
-// The cracks start to show when we look at the logic
-// for writing a `Token`:
-//
+// We record the presence of a `Name` separately from its spelling because existing
+// clients can supply interned names for synthesized literals as well as identifiers.
+static SerializedLexeme getSerializedLexeme(Lexeme lexeme)
+{
+    if (!lexeme)
+        return SerializedLexeme();
+    SerializedLexeme result;
+    result.kind = lexeme.getType();
+    result.spelling = lexeme.getSpelling();
+    result.content = lexeme.getContent();
+    result.hasName = lexeme.getName() != nullptr;
+    return result;
+}
 
 void ASTSerialWriteContext::handleToken(ASTSerializer const& serializer, Token& value)
 {
+    // Trivia byte offsets are recoverable from original spelling lengths, but
+    // the source-location writer also needs each trivia's line metadata. It
+    // records only requested positions, so registering the raw token alone
+    // would lose line starts for leading comments in a serialized module.
+    auto loc = value.getLoc();
+    auto flags = value.getFlags();
+    auto rawToken = getSerializedLexeme(value.getRawToken());
+    List<SerializedLexeme> leading;
+    List<SerializedLexeme> trailing;
+    for (auto trivia : value.getLeadingTrivia())
+    {
+        if (_sourceLocWriter)
+            _sourceLocWriter->addSourceLoc(trivia.getLoc());
+        leading.add(getSerializedLexeme(trivia));
+    }
+    for (auto trivia : value.getTrailingTrivia())
+    {
+        if (_sourceLocWriter)
+            _sourceLocWriter->addSourceLoc(trivia.getLoc());
+        trailing.add(getSerializedLexeme(trivia));
+    }
+
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    serialize(serializer, value.type);
-    serialize(serializer, value.loc);
-
-    // The flags stored in a `Token` have one bit
-    // (`TokenFlag::Name`) that we don't want
-    // to have read in on the other side, because
-    // it relates to some aspects of the underlying
-    // in-memory representation that don't actually
-    // relate to the semantic *value* we are serializing.
-
-    TokenFlags flags = TokenFlags(value.flags & ~TokenFlag::Name);
+    serialize(serializer, loc);
     serialize(serializer, flags);
-
-    // The content of a token is basically just a
-    // string, but it can be encoded in different
-    // ways, so we extract it here for writing.
-    //
-    String content = value.getContent();
-    serialize(serializer, content);
+    serialize(serializer, rawToken);
+    serialize(serializer, leading);
+    serialize(serializer, trailing);
 }
 
-//
-// The reading logic adds yet more complexity...
-//
+// Deserialization constructs semantic lexical objects directly. Re-lexing their
+// text would depend on a preprocessing mode that is not part of serialized ASTs.
+static Lexeme createDeserializedLexeme(
+    ASTBuilder* astBuilder,
+    const SerializedLexeme& value,
+    SourceLoc loc = SourceLoc(),
+    TokenFlags flags = 0)
+{
+    Name* name = nullptr;
+    if (value.hasName)
+        name = astBuilder->getNamePool()->getName(value.content);
+    return astBuilder->getTokenPool()->createLexeme(
+        value.kind,
+        value.spelling.getUnownedSlice(),
+        value.content.getUnownedSlice(),
+        loc,
+        flags,
+        name);
+}
 
 void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& value)
 {
+    SourceLoc loc;
+    TokenFlags flags = 0;
+    SerializedLexeme rawToken;
+    List<SerializedLexeme> leading;
+    List<SerializedLexeme> trailing;
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    serialize(serializer, value.type);
-    serialize(serializer, value.loc);
+    serialize(serializer, loc);
+    serialize(serializer, flags);
+    serialize(serializer, rawToken);
+    serialize(serializer, leading);
+    serialize(serializer, trailing);
 
-    serialize(serializer, value.flags);
+    // Optional AST token fields retain their empty-value representation.
+    if (rawToken.kind == TokenType::Unknown)
+    {
+        value = Token(nullptr, loc, flags);
+        return;
+    }
 
-    String content;
-    serialize(serializer, content);
-
-    // Note that we cannot just call `value.setContent(...)`
-    // and pass in an `UnownedStringSlice` of `content`,
-    // because the `Token` will not take ownership of its own
-    // textual content.
-    //
-    // Instead, we need to get the text we just loaded
-    // into something that the `Token` can refer info,
-    // and the easiest way to accomplish that is to
-    // represent the text using a `Name`.
-    //
-    Name* name = _astBuilder->getNamePool()->getName(content);
-    value.setName(name);
+    List<const LexemeObj*> leadingObjects;
+    List<const LexemeObj*> trailingObjects;
+    for (const auto& trivia : leading)
+        leadingObjects.add(createDeserializedLexeme(_astBuilder, trivia).getObject());
+    for (const auto& trivia : trailing)
+        trailingObjects.add(createDeserializedLexeme(_astBuilder, trivia).getObject());
+    auto raw = createDeserializedLexeme(_astBuilder, rawToken, loc, flags).as<RawToken>();
+    value = _astBuilder->getTokenPool()->createToken(
+        raw,
+        leadingObjects.getArrayView(),
+        trailingObjects.getArrayView());
 }
 
 //

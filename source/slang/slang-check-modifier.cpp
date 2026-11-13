@@ -1302,7 +1302,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 getSink()->diagnose(Diagnostics::UnknownBuiltinName{
                     .name = nameExpr->value,
-                    .location = nameExpr->token.loc});
+                    .location = nameExpr->token.getLoc()});
                 return nullptr;
             }
 
@@ -2701,7 +2701,7 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 {
                     getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
                         .stageName = stageName,
-                        .location = stageToken.loc});
+                        .location = stageToken.getLoc()});
                 }
             }
         }
@@ -2716,7 +2716,7 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 {
                     getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
                         .stageName = stageName,
-                        .location = stageToken.loc});
+                        .location = stageToken.getLoc()});
                 }
             }
         }

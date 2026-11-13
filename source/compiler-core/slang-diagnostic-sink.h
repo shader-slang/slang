@@ -138,6 +138,7 @@ void printDiagnosticArg(StringBuilder& sb, Name* name);
 
 void printDiagnosticArg(StringBuilder& sb, TokenType tokenType);
 void printDiagnosticArg(StringBuilder& sb, Token const& token);
+void printDiagnosticArg(StringBuilder& sb, Lexeme const& lexeme);
 
 struct IRInst;
 void printDiagnosticArg(StringBuilder& sb, IRInst* irObject);
@@ -157,6 +158,7 @@ inline SourceLoc getDiagnosticPos(SourceLoc const& pos)
 }
 
 SourceLoc getDiagnosticPos(Token const& token);
+SourceLoc getDiagnosticPos(Lexeme const& lexeme);
 
 
 template<typename T>

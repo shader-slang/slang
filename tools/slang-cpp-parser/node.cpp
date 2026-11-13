@@ -480,7 +480,7 @@ void EnumNode::dump(int indent, StringBuilder& out)
         out << "class ";
     }
 
-    if (m_name.type != TokenType::Invalid)
+    if (m_name.getType() != TokenType::Invalid)
     {
         out << m_name.getContent();
     }
@@ -539,7 +539,7 @@ void CallableNode::dump(int indent, StringBuilder& out)
 
         const auto& param = m_params[i];
         out << param.m_type;
-        if (param.m_name.type == TokenType::Identifier)
+        if (param.m_name.getType() == TokenType::Identifier)
         {
             out << " " << param.m_name.getContent();
         }

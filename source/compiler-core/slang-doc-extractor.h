@@ -126,8 +126,8 @@ public:
 
     struct FindInfo
     {
-        SourceView* sourceView; ///< The source view the tokens were generated from
-        TokenList* tokenList;   ///< The token list
+        SourceView* sourceView; ///< The source view the lexemes were generated from.
+        LexemeList* tokenList;  ///< The lexeme list, including comments.
         Index tokenIndex;       ///< The token index location (where searches start from)
         Index lineIndex;        ///< The line number for the decl
     };
@@ -148,7 +148,7 @@ public:
         List<SearchItemOutput>& out);
 
     static MarkupFlags getFlags(MarkupType type);
-    static MarkupType findMarkupType(const Token& tok);
+    static MarkupType findMarkupType(const Lexeme& tok);
     static UnownedStringSlice removeStart(MarkupType type, const UnownedStringSlice& comment);
 
 protected:
@@ -189,7 +189,7 @@ protected:
     static bool _isTokenOnLineIndex(
         SourceView* sourceView,
         MarkupType type,
-        const Token& tok,
+        const Lexeme& tok,
         Index lineIndex);
 
     DiagnosticSink* m_sink;

@@ -78,15 +78,13 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
     auto sourceView = manager.createSourceView(sourceFile, nullptr, SourceLoc());
     DiagnosticSink sink;
     NamePool namePool;
-    MemoryArena memory;
-    memory.init(1 << 16);
-    lexer.initialize(sourceView, &sink, &namePool, &memory);
+    lexer.initialize(sourceView, &sink, &namePool);
     for (;;)
     {
-        auto headerToken = lexer.lexToken();
-        if (headerToken.type == TokenType::EndOfFile)
+        auto headerToken = lexer.lexLexeme();
+        if (headerToken.getType() == TokenType::EndOfFile)
             break;
-        if (headerToken.type != TokenType::Identifier ||
+        if (headerToken.getType() != TokenType::Identifier ||
             headerToken.getContent() != toSlice("spirv_asm"))
         {
             continue;
@@ -94,14 +92,14 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
 
         // We have found a spirv-asm block, now find the end of it.
         int braceCounter = 0;
-        Token endToken;
-        Token startToken;
+        Lexeme endToken;
+        Lexeme startToken;
         for (;;)
         {
-            auto token = lexer.lexToken();
-            if (token.type == TokenType::EndOfFile)
+            auto token = lexer.lexLexeme();
+            if (token.getType() == TokenType::EndOfFile)
                 break;
-            switch (token.type)
+            switch (token.getType())
             {
             case TokenType::RBrace:
                 braceCounter--;
@@ -122,6 +120,7 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
             case TokenType::LineComment:
             case TokenType::BlockComment:
             case TokenType::NewLine:
+            case TokenType::EscapedNewLine:
                 break;
             default:
                 if (braceCounter == 0)
@@ -130,7 +129,7 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
             }
         }
     breakLabel:;
-        if (endToken.type == TokenType::RBrace)
+        if (endToken.getType() == TokenType::RBrace)
         {
             TextRange range;
             range.offsetStart = startToken.getLoc().getRaw();
