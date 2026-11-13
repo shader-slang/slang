@@ -1375,6 +1375,11 @@ typedef uint32_t SlangSizeT;
         // target has no downstream tool.
         ValidateWithDownstreamCompiler = 165,
 
+        // `bool`: Inline every function that has exactly one call site before emitting code, so
+        // downstream compilers (DXC, FXC, Tint) do not clone large bodies once per wrapper level.
+        // Off by default.
+        InlineSingleCallFunctions = 166,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
