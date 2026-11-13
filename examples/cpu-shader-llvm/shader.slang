@@ -1,3 +1,4 @@
+// Mandelbrot example used by the cpu-shader-llvm example.
 struct MyConstantParams
 {
     int2 imageSize;
