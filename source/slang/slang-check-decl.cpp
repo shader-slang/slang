@@ -3732,7 +3732,8 @@ static bool _isResourceHandleOnlyType(
     return false;
 }
 
-/// Returns true if `expr` is a runtime value that cannot be a compile-time constant.
+/// Returns true if `expr` is a runtime value that cannot be a compile-time or
+/// specialization-time constant.
 /// This is called only after constant folding has already failed (`varDecl->val` is null),
 /// so any surviving function call is known to be non-const-evaluable — if it were a
 /// constant-foldable intrinsic applied to constant arguments, folding would have succeeded.
@@ -3806,6 +3807,13 @@ static bool _initExprIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
         {
             // References to static const globals are fine — compile-time constants.
             if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+                return false;
+            // Slang treats a specialization constant as a constant expression: it can size an
+            // array or set `numthreads`, and a `const` integer one folds to a `DeclRefIntVal`.
+            // A `uniform` or cbuffer value is not one, so it falls through to the case below.
+            // A `groupshared` global that carries the attribute is workgroup storage, not a
+            // shader parameter, so it does not qualify.
+            if (isGlobalShaderParameter(varDecl) && isSpecializationConstant(varDecl))
                 return false;
             // Any other global variable (including plain `static float foo`) is mutable.
             if (isGlobalDecl(varDecl))
