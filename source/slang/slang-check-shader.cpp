@@ -2404,6 +2404,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // Each GLSL layout lift below (`early_fragment_tests`, `local_size_*`, `derivative_group_*`)
+    // turns a standalone `layout(...) in;` into an attribute of the entry point. For a function
+    // without `[shader]` that `findAndCheckEntryPoint` validates for the first time, the lift runs
+    // after the module was lowered to IR, and the decoration for the attribute reaches the
+    // linked code only from the program's layout IR. A lift whose decoration is missing from
+    // `cloneExtraDecorationsFromInst` (slang-ir-link.cpp) is therefore silently dropped on that
+    // path.
+    //
     // GLSL puts `layout(early_fragment_tests) in;` on a standalone EmptyDecl beside the entry
     // point, not on the function; lift it onto the fragment entry point as the canonical
     // EarlyDepthStencilAttribute (as the local_size_* -> NumThreadsAttribute lift below does).
@@ -2532,6 +2540,39 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         {
             sink->diagnose(
                 Diagnostics::NodeNumThreadsAttributeRequired{.decl = entryPointFuncDecl});
+        }
+    }
+
+    // GLSL selects the compute derivative group with a standalone
+    // `layout(derivative_group_quadsNV) in;` or `layout(derivative_group_linearNV) in;`.
+    // `visitEmptyDecl` attaches that mode, and checks it against the thread-group size at the
+    // layout qualifier, for every entry point known when the module is lowered. An entry point
+    // validated after lowering misses that step, so for it we lift the mode onto the function
+    // as the canonical DerivativeGroupQuad/LinearAttribute; lowering the layout IR then checks it
+    // and reports a mismatch at the function name. The module has IR once it was lowered; a
+    // module loaded from serialized IR also has it, but that IR already carries the mode, so the
+    // linker finds nothing to copy. Entry points known at lowering keep the `visitEmptyDecl` path:
+    // lifting for them too would attach and check the mode twice, and move their diagnostics away
+    // from the layout qualifier.
+    if (auto parentDecl = getParentDecl(entryPointFuncDecl);
+        parentDecl && entryPoint->getModule()->getIRModule())
+    {
+        for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+        {
+            if (emptyDecl->findModifier<GLSLLayoutDerivativeGroupQuadAttribute>() &&
+                !entryPointFuncDecl->findModifier<DerivativeGroupQuadAttribute>())
+            {
+                addModifier(
+                    entryPointFuncDecl,
+                    getCurrentASTBuilder()->create<DerivativeGroupQuadAttribute>());
+            }
+            if (emptyDecl->findModifier<GLSLLayoutDerivativeGroupLinearAttribute>() &&
+                !entryPointFuncDecl->findModifier<DerivativeGroupLinearAttribute>())
+            {
+                addModifier(
+                    entryPointFuncDecl,
+                    getCurrentASTBuilder()->create<DerivativeGroupLinearAttribute>());
+            }
         }
     }
 
