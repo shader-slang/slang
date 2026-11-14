@@ -134,7 +134,7 @@ runs:
         llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
         # A prebuilt that a newer toolset built can need standard-library symbols
         # that MSVC 14.44 lacks, so Windows ARM64 uses a prebuilt built with 14.44.
-        toolset-key-suffix: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && '-msvc14.44' || '' }}
+        toolset: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && 'msvc14.44' || '' }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 

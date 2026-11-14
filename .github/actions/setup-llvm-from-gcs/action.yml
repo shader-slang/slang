@@ -11,8 +11,8 @@ inputs:
   llvm-hash:
     description: "Hash of build-llvm.sh and LLVM patches for cache key"
     required: true
-  toolset-key-suffix:
-    description: "Suffix of the prebuilt key that names a pinned toolset, such as -msvc14.44"
+  toolset:
+    description: "Toolset that built the prebuilt, such as msvc14.44. The key includes it. Empty keeps the key of the default toolset."
     required: false
     default: ""
   build-if-missing:
@@ -39,7 +39,7 @@ runs:
       id: download
       shell: bash
       run: |
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}${{ inputs.toolset-key-suffix }}"
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}${{ inputs.toolset != '' && format('-{0}', inputs.toolset) || '' }}"
         PUBLIC_URL="https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
 
         echo "🔍 Checking for LLVM prebuilt: ${PUBLIC_URL}"
@@ -98,7 +98,7 @@ runs:
       if: steps.download.outputs.cache-hit != 'true' && inputs.upload-if-missing == 'true' && github.ref == 'refs/heads/master'
       shell: bash
       run: |
-        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}${{ inputs.toolset-key-suffix }}"
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}${{ inputs.toolset != '' && format('-{0}', inputs.toolset) || '' }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
         LLVM_DIR="$(pwd)/build/llvm-project-install"
 
