@@ -1146,6 +1146,11 @@ struct EntryPointVaryingTypeRule
     // When null, the rule applies to all stages for which the parameter/return
     // can be a varying (see `canHaveVaryingInput` in `validateEntryPoint`).
     bool (*stagePredicate)(Stage stage);
+
+    // If true, this rule only applies to varying inputs (including the input
+    // half of an `inout` parameter), and outputs such as the return type are
+    // not checked against it.
+    bool inputOnly = false;
 };
 
 static bool _matchDifferentialPairType(Type* type)
@@ -1194,6 +1199,41 @@ static bool _matchHLSLStreamOutputType(Type* type)
 static bool _matchMeshOutputType(Type* type)
 {
     return as<MeshOutputType>(type) != nullptr;
+}
+
+// Returns true if `type` is a `struct` that inherits from another `struct`.
+//
+// Consider this example:
+//
+//     struct Base { float a; };
+//     struct Derived : Base { float b; };
+//
+// IR lowering gives `Derived` a leading field for its base, so the IR struct
+// has two fields, while the varying layout built by parameter binding only
+// walks the declared fields and records one. Varying legalization indexes the
+// layout by IR field position and reads past its end.
+//
+// Slang 2026 and later already reject the inheritance clause itself, so we
+// do not match those structs again here.
+static bool _matchStructWithStructBase(Type* type)
+{
+    auto structDeclRef = isDeclRefTypeOf<StructDecl>(type);
+    if (!structDeclRef)
+        return false;
+    auto moduleDecl = getModuleDecl(structDeclRef.getDecl());
+    if (moduleDecl && moduleDecl->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+        return false;
+    for (auto inheritanceDecl : structDeclRef.getDecl()->getMembersOfType<InheritanceDecl>())
+    {
+        if (isDeclRefTypeOf<StructDecl>(inheritanceDecl->base.type))
+            return true;
+    }
+    return false;
+}
+
+static bool _isMetalOrWGPUTarget(CodeGenTarget target)
+{
+    return isMetalTarget(target) || isWGPUTarget(target);
 }
 
 static bool _isNonGeometryStage(Stage stage)
@@ -1395,6 +1435,22 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
      "OutputIndices element type must be uint, uint2, or uint3",
      nullptr,
      _isInterfaceBlockVaryingStage},
+
+    // A `struct` that inherits from another `struct` gets a varying layout
+    // without its base members, which crashes varying legalization (issue
+    // #12463). On SPIR-V and GLSL every varying use crashes. On Metal and WGSL
+    // only inputs crash, and outputs already compile correctly, so we leave
+    // them alone. HLSL emits the struct as written and is not affected.
+    // Slang 2026 rejects struct-from-struct inheritance outright.
+    {_matchStructWithStructBase,
+     "a struct that inherits from another struct is not a valid varying type",
+     isKhronosTarget,
+     nullptr},
+    {_matchStructWithStructBase,
+     "a struct that inherits from another struct is not a valid varying input type",
+     _isMetalOrWGPUTarget,
+     nullptr,
+     true},
 };
 
 struct VaryingTypeValidationContext
@@ -1405,6 +1461,9 @@ struct VaryingTypeValidationContext
     SourceLoc loc;
     const char* direction;
     const char* context;
+    // True when the value flows into the entry point (an `in` or `inout`
+    // parameter); false for outputs such as the return type.
+    bool isInput = false;
     ArrayView<CodeGenTarget> targets;
     Stage stage;
     HashSet<Type*> seenTypes;
@@ -1462,6 +1521,9 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
         // interface-block stages). If so, skip when the entry point's stage
         // is outside that set.
         if (rule.stagePredicate && !rule.stagePredicate(ctx.stage))
+            continue;
+
+        if (rule.inputOnly && !ctx.isInput)
             continue;
 
         if (rule.targetPredicate)
@@ -2671,6 +2733,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             const auto directions = paramDirections[i];
             ctx.direction =
                 directions.isOutput ? (directions.isInput ? "input/output" : "output") : "input";
+            ctx.isInput = directions.isInput;
 
             StringBuilder contextSb;
             auto paramName = param->getName();
