@@ -296,6 +296,24 @@ You probably know the drill: comments are good, but an out-of-date comment can b
 Try to write comments that explain the "why" of your code more than the "what."
 When implementing a textbook algorithm or technique, it may help to imagine giving the reviewer of your code a brief tutorial on the topic.
 
+Comments explain contracts, rationale, invariants, risks, units, ownership, synchronization, specification linkage and non-obvious constraints.
+They do not narrate syntax, restate names, record history or authorship, quote a review thread, or compensate for unclear code.
+A comment stays understandable without a private bug, chat, prompt or pull request.
+A `TODO` names an issue or a removal condition.
+Commented-out code is deleted; version control keeps it.
+Extra context and deep dives go in the issue, the design note or the review thread, not the comment.
+
+Reviewers (and the clarity review skills under `.claude/skills/`) apply this test to every added comment:
+
+1. Does it tell a competent reader something the code does not show?
+2. Will it stay true after a routine refactor?
+3. Is it in the narrowest durable place (the declaration, not a call site; the type, not one function that uses it)?
+4. Could better naming, types, structure or a test replace it?
+
+If the answers are no, no, no, yes: delete the comment and improve the code.
+If 1 is yes but 3 is no, move it.
+A comment stays only when it passes 1 and 2 and cannot be replaced (4 is no).
+
 In cases where comments would benefit from formatting, use Markdown syntax.
 We do not currently have a setup for extracting documentation from comments, but if we add one we will ensure that it works with Markdown.
 

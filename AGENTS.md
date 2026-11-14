@@ -139,6 +139,9 @@ Review conventions (recurring review feedback — following them avoids review r
 
 - Comment functions in complete sentences: what it does first, then why if non-obvious; include a
   concrete example for non-trivial logic.
+  Comments state contracts, reasons, invariants and constraints, never mechanics or history; the
+  four-question test in `docs/design/coding-conventions.md` (Comments and Documentation) decides
+  whether a comment stays, moves, or is replaced by better code.
 - Write explanatory comments in a conversational style. Prefer "Consider this example:" followed
   by the relevant user code over abstract labels such as "Full source shape", "AST trace", or
   "IR trace". After the example, explain what happens step by step in natural prose: which

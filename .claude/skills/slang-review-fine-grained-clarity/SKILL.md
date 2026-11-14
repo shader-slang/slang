@@ -238,7 +238,7 @@ Ask:
   Truly trivial functions where the name and signature fully explain and justify the body can
   go without a strategy comment.
 - Does the code that follows a comment clearly implement the strategy the comment describes?
-  Would it be clear what the code does without the comment? If not, the *code* should be refactored to be more clear, so that it obviously does what the comment says; the comment should not be made more complicated to work around unclear code.
+  Would it be clear what the code does without the comment? If not, the _code_ should be refactored to be more clear, so that it obviously does what the comment says; the comment should not be made more complicated to work around unclear code.
 - Does the function ever have 5+ uninterrupted lines of code without a comment? Treat this as
   a scrutiny trigger, not an automatic finding.
   Is it actually obvious from nearby code and preceding comments why each of those lines of
@@ -259,7 +259,7 @@ Ask:
 - Are there cases where a large or compound expression could be made more obviously correct by breaking it up into multiple statements each declaring a well-named variable for a given sub-expression? If so, the refactoring should be pursued to improve clarity, rather than leaning entirely on comments to explain or justify the expression.
 
 As a general rule, the body of a function should read as a kind of proof of the function's correctness, with the comments providing the key steps and insights in that proof.
-A good proof is not just a sequence of statements that happen to be correct, but a clear, compelling and *structured* argument that the code is correct, necessary, and the best way to solve the problem at hand.
+A good proof is not just a sequence of statements that happen to be correct, but a clear, compelling and _structured_ argument that the code is correct, necessary, and the best way to solve the problem at hand.
 
 If a human or agent reading the code cannot come away understanding how it solves the problem and why that solution must be correct, then the code is not clear enough to be trusted.
 The author must produce code that obviously has no bugs, rather than merely having no obvious bugs.
@@ -284,7 +284,7 @@ For all types, ask:
 For enums, ask:
 
 - Does every enum case read as a value, case, or adjective of the enum concept?
-  E.g., `Color::Red`, `DiagnosticSeverity::Error`, `Status::Sending`, etc. are good; `Instruction::Add`, `Node::If`, `Edge::Call` are bad (e.g., "if" is not a node, even if it might be a *type* or kind of node).
+  E.g., `Color::Red`, `DiagnosticSeverity::Error`, `Status::Sending`, etc. are good; `Instruction::Add`, `Node::If`, `Edge::Call` are bad (e.g., "if" is not a node, even if it might be a _type_ or kind of node).
 
 For enums and tagged-union-like types, ask:
 
@@ -334,6 +334,14 @@ For every touched name and comment:
   It is more important for a contributor to know the current state of the world (which may include the location of technical debt, known issues, etc.) than to know the history of how the world came to be, and comments should reflect that.
 - If removing a bad comment would leave code unexplained, ask for a better comment, not
   for silence.
+- Apply the four-question comment test from `docs/design/coding-conventions.md` (new information?
+  survives refactor? narrowest durable place? replaceable by code or a test?) and say in the
+  candidate which answer failed. Flag, as separate candidate classes:
+  - a narrating comment that restates the code, a name, or syntax;
+  - residue of the development process: authorship, a tool or prompt, a review-thread quote, a
+    "changed in review" note, or context that lives only in a private bug or chat;
+  - terminology without precedent: a new term of art, or a new spelling of an existing one, that
+    the codebase and compiler literature do not already use and the change does not define.
 
 Use the clarity bar of a serious technical paper or textbook. Code and comments should explain
 the problem, relevant definitions, chosen decomposition, constraints, invariants, and trust
