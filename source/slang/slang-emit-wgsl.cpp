@@ -839,8 +839,15 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     }
 }
 
+// Returns true if `inst` may be declared as a WGSL `const`, that is, if its value is known when
+// the shader module is created. A module-scope value qualifies, and so does a vector, swizzle or
+// cast whose operands all qualify. A spec-const-rate value never does: an `override` declaration
+// or an expression over one is known only at pipeline creation, and a WGSL `const` cannot depend
+// on it. That check comes first because a module-scope `override` would otherwise qualify.
 static bool isStaticConst(IRInst* inst)
 {
+    if (isSpecConstRateType(inst->getFullType()))
+        return false;
     if (inst->getParent()->getOp() == kIROp_ModuleInst)
     {
         return true;
@@ -886,9 +893,10 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         break;
     default:
         // A module-scope value is a constant, so (as for HLSL's `static const`) it is emitted as
-        // a WGSL `const` whatever its type. A WGSL `const` array may be indexed by a run-time
-        // value, and a `const` is not a variable, so it does not count against the 8192-byte
-        // limit on private variables that some implementations (e.g. WebKit) enforce.
+        // a WGSL `const` whatever its type, unless it depends on an `override`. A WGSL `const`
+        // array may be indexed by a run-time value, and a `const` is not a variable, so it does not
+        // count against the 8192-byte limit on private variables that some implementations (e.g.
+        // WebKit) enforce.
         if (isStaticConst(varDecl))
             m_writer->emit("const");
         else

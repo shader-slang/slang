@@ -211,6 +211,17 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
         case kIROp_MakeMatrix:
         case kIROp_MakeMatrixFromScalar:
         case kIROp_MakeVectorFromScalar:
+            // WGSL emits a module-scope array or struct as a `const`, and a `const` cannot
+            // depend on an `override`, so an aggregate with a spec-const-rate element is
+            // inlined at its uses. Vectors and matrices follow the same rule: a matrix used in a
+            // component-wise multiply is declared rather than folded, and inlining a vector or
+            // matrix makes an array of them inline too, because `shouldInlineInstImpl` inlines a
+            // legal global with an inlined operand.
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                if (isSpecConstRateType(inst->getOperand(i)->getFullType()))
+                    return false;
+            }
             return true;
         default:
             break;
