@@ -70,7 +70,7 @@ Windows ARM64 jobs select MSVC 14.44 in `common-setup`. Runner image
 `20261112.217.1` ships MSVC 14.52.37025 as the default, and its `cl.exe` crashes
 with `C1001` ([actions/runner-images#15328](https://github.com/actions/runner-images/issues/15328)).
 The key of the Windows ARM64 LLVM prebuilt ends with `-msvc14.44`, and population
-builds it with the same toolset. Remove the pin and the key suffix when the image
+builds it with the same toolset. Remove the pin and the toolset key suffix when the image
 ships a fixed compiler.
 
 LLVM itself is built in Release mode, including for Windows Debug Slang builds

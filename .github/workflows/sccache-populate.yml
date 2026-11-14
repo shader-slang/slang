@@ -55,13 +55,13 @@ jobs:
               {"os": "linux", "compiler": "gcc", "platform": "aarch64", "runner": "ubuntu-24.04-arm"},
               {"os": "macos", "compiler": "clang", "platform": "aarch64", "runner": "macos-latest"},
               {"os": "windows", "compiler": "cl", "platform": "x86_64", "runner": ["Windows", "self-hosted", "build"]},
-              # The key suffix names the MSVC toolset that common-setup selects on Windows ARM64.
-              {"os": "windows", "compiler": "cl", "platform": "aarch64", "runner": "windows-11-vs2026-arm", "key_suffix": "-msvc14.44"},
+              # The toolset key suffix names the MSVC toolset that common-setup selects on Windows ARM64.
+              {"os": "windows", "compiler": "cl", "platform": "aarch64", "runner": "windows-11-vs2026-arm", "toolset_key_suffix": "-msvc14.44"},
           ]
           recipe_hash = os.environ["LLVM_HASH"]
           missing = []
           for config in configurations:
-              key = f"llvm-{config['os']}-{config['compiler']}-{config['platform']}-{recipe_hash}{config.get('key_suffix', '')}"
+              key = f"llvm-{config['os']}-{config['compiler']}-{config['platform']}-{recipe_hash}{config.get('toolset_key_suffix', '')}"
               url = f"https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/{key}.tar.gz"
               try:
                   with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=30):
@@ -189,7 +189,7 @@ jobs:
           compiler: ${{ matrix.compiler }}
           platform: ${{ matrix.platform }}
           llvm-hash: ${{ needs.check-changes.outputs.llvm-hash }}
-          key-suffix: ${{ matrix.key_suffix }}
+          toolset-key-suffix: ${{ matrix.toolset_key_suffix }}
           upload-if-missing: "false"
 
       - name: Validate installed LLVM and Clang packages
@@ -254,7 +254,7 @@ jobs:
         id: archive
         shell: bash
         env:
-          LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ needs.check-changes.outputs.llvm-hash }}${{ matrix.key_suffix }}
+          LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ needs.check-changes.outputs.llvm-hash }}${{ matrix.toolset_key_suffix }}
         run: |
           # Match setup-llvm-from-gcs's key and restore layout: archive the
           # install contents directly, without an enclosing directory.
