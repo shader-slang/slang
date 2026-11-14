@@ -3051,6 +3051,23 @@ struct ScopeLayoutBuilder
     RefPtr<StructTypeLayout> m_structLayout;
     UniformLayoutInfo m_structLayoutInfo;
 
+    // `m_structLayoutInfo.size` is the layout cursor, where the next parameter starts. A
+    // `[vk::offset]` can move the cursor back before the end of an earlier parameter, so we
+    // keep the end of the furthest parameter separately, and `endLayout` uses it as the size.
+    LayoutSize m_furthestUniformEnd = 0;
+
+    // The uniform byte range of each parameter laid out so far. Parameters that follow the
+    // layout cursor cannot overlap, so we compare the ranges only once a `[vk::offset]` has
+    // moved the cursor.
+    struct UniformRange
+    {
+        LayoutSize begin;
+        LayoutSize end;
+        Decl* decl;
+    };
+    List<UniformRange> m_uniformRanges;
+    bool m_hasExplicitUniformOffset = false;
+
     void beginLayout(ParameterBindingContext* context, TypeLayoutContext layoutContext)
     {
         m_context = context;
@@ -3061,6 +3078,9 @@ struct ScopeLayoutBuilder
         m_structLayout->rules = rules;
 
         m_structLayoutInfo = rules->BeginStructLayout();
+        m_furthestUniformEnd = 0;
+        m_uniformRanges.clear();
+        m_hasExplicitUniformOffset = false;
     }
 
 
@@ -3082,8 +3102,52 @@ struct ScopeLayoutBuilder
                 uniformSize,
                 LayoutOffset{varLayout->typeLayout->uniformAlignment});
 
+            // `[vk::offset(N)]` on an entry-point `uniform` parameter starts the parameter at
+            // byte N of the entry point's push constants or shader record. IR layout places the
+            // matching `EntryPointParams` field by moving its cursor to N and then aligning it
+            // (`kIROp_StructType` in `slang-ir-layout.cpp`). We take the same step, so that, for
+            // the std430, scalar and C rules, reflection reports the parameter offsets that the
+            // SPIR-V and GLSL use. Only entry-point parameters reach this branch, because
+            // `checkAttribute` rejects the attribute on global variables.
+            if (auto offsetAttr =
+                    varLayout->varDecl.getDecl()->findModifier<VkStructOffsetAttribute>();
+                offsetAttr && doesTargetHonorVkOffset(m_context->getTargetRequest()))
+            {
+                // Direct SPIR-V and reflection would round a misaligned offset up, but glslang
+                // rejects it, so we reject it on every Khronos path.
+                auto alignment = fieldInfo.alignment.getValidValue();
+                if (LayoutOffset::RawValue(offsetAttr->value) % alignment != 0)
+                {
+                    getSink(m_context)->diagnose(Diagnostics::VkOffsetMisaligned{
+                        .offset = offsetAttr->value,
+                        .alignment = int64_t(alignment),
+                        .attr = offsetAttr});
+                }
+                m_structLayoutInfo.size = offsetAttr->value;
+                m_hasExplicitUniformOffset = true;
+            }
+
             auto rules = m_layoutContext.rules;
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
+            LayoutSize uniformEnd = uniformOffset + uniformSize;
+            m_furthestUniformEnd = maximum(m_furthestUniformEnd, uniformEnd);
+
+            auto decl = varLayout->varDecl.getDecl();
+            if (m_hasExplicitUniformOffset)
+            {
+                for (auto const& range : m_uniformRanges)
+                {
+                    if (uniformOffset.compare(range.end) == std::partial_ordering::less &&
+                        range.begin.compare(uniformEnd) == std::partial_ordering::less)
+                    {
+                        getSink(m_context)->diagnose(Diagnostics::VkOffsetOverlappingParameters{
+                            .param = decl,
+                            .otherParam = range.decl});
+                        break;
+                    }
+                }
+            }
+            m_uniformRanges.add(UniformRange{uniformOffset, uniformEnd, decl});
 
             varLayout->findOrAddResourceInfo(LayoutResourceKind::Uniform)->index =
                 uniformOffset.getFiniteValue();
@@ -3109,6 +3173,7 @@ struct ScopeLayoutBuilder
         // Finish computing the layout for the ordindary data (if any).
         //
         auto rules = m_layoutContext.rules;
+        m_structLayoutInfo.size = m_furthestUniformEnd;
         rules->EndStructLayout(&m_structLayoutInfo);
 
         // Copy the final layout information computed for ordinary data
