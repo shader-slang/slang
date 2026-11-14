@@ -48,7 +48,7 @@ on:
 jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 120
+    timeout-minutes: 300 # PROBE (DO NOT MERGE)
     permissions:
       id-token: write # Required for Workload Identity
       contents: read
