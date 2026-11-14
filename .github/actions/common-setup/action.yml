@@ -52,6 +52,8 @@ runs:
         # release jobs use it to build host generators before switching to
         # their explicit cross-compilation toolchain.
         arch: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && 'arm64' || 'x64' }}
+        # PROBE (DO NOT MERGE): pin the MSVC toolset on windows-aarch64.
+        toolset: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && '14.44' || '' }}
 
     - name: Install dependencies (Linux only)
       if: inputs.os == 'linux'
@@ -125,7 +127,9 @@ runs:
         os: ${{ inputs.os }}
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
-        llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+        # PROBE (DO NOT MERGE): prebuilt LLVM for windows-aarch64 must come from the same
+        # MSVC toolset (14.44) as the pinned build, so it gets its own key.
+        llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && '-msvc14.44' || '' }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 
