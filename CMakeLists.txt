@@ -908,11 +908,16 @@ install(
     DESTINATION share/doc/slang
     PATTERN ".*" EXCLUDE
 )
-install(
-    DIRECTORY "${slang_SOURCE_DIR}/include"
-    DESTINATION .
-    PATTERN ".*" EXCLUDE
-)
+# With SLANG_EMBED_CORE_MODULE=OFF, slang-compiler and its PUBLIC_HEADERS are
+# only installed by the "generators" component, so install the public headers
+# for a default install here.
+if(NOT SLANG_EMBED_CORE_MODULE)
+    install(
+        DIRECTORY "${slang_SOURCE_DIR}/include/"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        PATTERN ".*" EXCLUDE
+    )
+endif()
 include(SlangUserSkills)
 slang_install_user_skills()
 include(CPack)
@@ -972,6 +977,21 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     # unresolved-symbol errors at link time. Static consumers should use
     # find_package(slang) instead, which the export above now supports.
     if(UNIX AND NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
+        # Keep a relative includedir relative to the .pc file's relocatable
+        # prefix, but use an absolute one as is. pkg-config splits Cflags on
+        # unescaped spaces, so escape them.
+        string(
+            REPLACE
+            " "
+            "\\ "
+            slang_pc_includedir
+            "${CMAKE_INSTALL_INCLUDEDIR}"
+        )
+        if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
+            set(SLANG_PC_INCLUDEDIR "${slang_pc_includedir}")
+        else()
+            set(SLANG_PC_INCLUDEDIR "\${prefix}/${slang_pc_includedir}")
+        endif()
         configure_file(
             "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
             "${PROJECT_BINARY_DIR}/slang-compiler.pc"
