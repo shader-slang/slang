@@ -14,8 +14,9 @@ static String getTypeFullName(slang::TypeReflection* type)
 }
 
 // `TypeReflection::getFullName` can run on a thread that has not set the current AST builder.
-// Printing `vector<float,3>` creates decl-refs for its element type, so `spReflectionType_GetFullName`
-// must set the AST builder of the type itself. Sanitizer builds report a null `ASTBuilder` here.
+// Printing `vector<float,3>` creates decl-refs for its element type, so
+// `spReflectionType_GetFullName` must set the AST builder of the type itself. Sanitizer builds
+// report a null `ASTBuilder` here.
 SLANG_UNIT_TEST(typeFullName)
 {
     const char* source = R"(
