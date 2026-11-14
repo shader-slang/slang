@@ -61,6 +61,27 @@ jobs:
         shell: bash
 
     steps:
+      # PROBE GATE (DO NOT MERGE). The new windows-aarch64 runner image has
+      # MSVC 14.52.37025; the old image has 14.51. This step stops the job
+      # at once on an old image, so the job can be retried without a
+      # 30-minute build. A failure of this step means "old image", not a
+      # build failure.
+      - name: Probe gate
+        if: inputs.os == 'windows' && inputs.platform == 'aarch64'
+        shell: pwsh
+        run: |
+          $msvc = 'C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Tools\MSVC'
+          Write-Host "PROBE-IMAGE ImageVersion=$env:ImageVersion"
+          Write-Host "PROBE-IMAGE MSVC toolsets: $((Get-ChildItem $msvc -Name) -join ', ')"
+          Write-Host "PROBE-TOOLS 14.44 hostarm64 cl: $((Get-ChildItem "$msvc\14.44*\bin\Hostarm64\arm64\cl.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName) -join ', ')"
+          Write-Host "PROBE-TOOLS 14.44 hostx64 arm64 cl: $((Get-ChildItem "$msvc\14.44*\bin\Hostx64\arm64\cl.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName) -join ', ')"
+          if (Test-Path "$msvc\14.52.37025") {
+            Write-Host "PROBE-IMAGE-NEW: new image, the build continues"
+          } else {
+            Write-Host "::error::PROBE-IMAGE-OLD: old image, stop early"
+            exit 1
+          }
+
       # Ensure Git Bash tools (gzip, tar) are in PATH for Windows
       # Needed by actions/cache before common-setup adds them
       - name: Add Git Bash to PATH (Windows)
@@ -151,6 +172,13 @@ jobs:
             echo "Expected TypeScript 5.9.3, got ${TS_VERSION}"  
             exit 1  
           fi
+
+      - name: Probe print compiler
+        if: inputs.os == 'windows' && inputs.platform == 'aarch64'
+        shell: pwsh
+        run: |
+          Write-Host "PROBE-CL $((Get-Command cl.exe).Source)"
+          cl.exe 2>&1 | Select-Object -First 1 | ForEach-Object { Write-Host "PROBE-CL-BANNER $_" }
 
       - name: Build Slang
         # Pass the workflow inputs in through `env:` rather than interpolating
