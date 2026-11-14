@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 // An undefined name passed to an `out`, `inout` or `groupshared` parameter reaches the checks that
-// ask which storage an argument names (warning 30709, error 30711). Error recovery leaves such an
+// ask which storage an argument names (errors 30711 and 38039). Error recovery leaves such an
 // argument with an error type and no declaration, and the checks must report nothing beyond the
 // undefined names themselves; the same holds for group-shared storage of an undefined type. An
 // element of an undefined name reaches the parameter through the implicit cast that coercion adds,

@@ -1086,7 +1086,10 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto spirvAsmExpr = as<SPIRVAsmExpr>(expr))
     {
-        sb << "spirv_asm {";
+        sb << "spirv_asm ";
+        if (spirvAsmExpr->assumeValidResourceOperands)
+            sb << "[__assumeValidResourceOperands] ";
+        sb << "{";
         bool first = true;
         for (auto& inst : spirvAsmExpr->insts)
         {
