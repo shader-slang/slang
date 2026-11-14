@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#makewitnesspack
-//META: doc_section_digest=fe1225ef818f5986744905f20bc687a5c35530b9db6bbd7242dde840776992ce
+//META: doc_section_digest=29b5dd3e7d7b5f608a70e1da2fdc738c186422e1bb5d97cbd275318463ccaf0e
 //META: purpose=`MakeWitnessPack` is typed as a `TypePack` of the individual witness-table types, i.e. a pack of witness tables rather than one witness table over a pack.
 //META: intent=functional
 //META: pipeline_stage=lower

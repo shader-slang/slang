@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#value-instructions
-//META: doc_section_digest=eb992431f4d874635d2da973730ce3ff72d018dedbdbec9c0f839f6aea79fa0c
+//META: doc_section_digest=31b4dd520f90edc4b02037b40da6ae302b38c57ff5b86d114951a278fb8a52e7
 //META: purpose=An equality comparison lowers to the `cmpEQ` comparison opcode.
 //META: intent=functional
 //META: pipeline_stage=lower

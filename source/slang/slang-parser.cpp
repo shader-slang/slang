@@ -10076,13 +10076,6 @@ static Expr* parseSPIRVAsmExpr(Parser* parser, SourceLoc loc)
 {
     SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
     asmExpr->loc = loc;
-    // An internal qualifier can appear between spirv_asm and its body.
-    if (AdvanceIf(parser, TokenType::LBracket))
-    {
-        parser->ReadToken("__assumeValidResourceOperands");
-        parser->ReadToken(TokenType::RBracket);
-        asmExpr->assumeValidResourceOperands = true;
-    }
     parser->ReadToken(TokenType::LBrace);
     while (!parser->tokenReader.isAtEnd())
     {

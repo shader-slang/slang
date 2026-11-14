@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#type-defining-declarations
-//META: doc_section_digest=db395f82daf94bfd107c87ddfcfd165342225cb79f4c373eaa6c86772d42cffb
+//META: doc_section_digest=b092f350bdbde298b8860c3da710d6672d2e5f235d75620d903bddf8a6158c3b
 //META: purpose=`EnumDecl` accepts an optional `'class'` keyword after `'enum'`.
 //META: intent=functional
 //META: pipeline_stage=parse

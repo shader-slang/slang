@@ -824,17 +824,14 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         parseTranslationUnit(translationUnit);
     }
 
-    // We check for errors before the preprocessor-only (`-E`) return so that `-E` fails like any
-    // other request with errors. Under `-E`, `parseTranslationUnit` has already written the
-    // preprocessed text, so failing here keeps that text.
-    if (getSink()->getErrorCount() != 0)
-        return SLANG_FAIL;
-
     if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
     {
         // If doing pre-processor output, then we are done
         return SLANG_OK;
     }
+
+    if (getSink()->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     // Perform semantic checking on the whole collection
     {

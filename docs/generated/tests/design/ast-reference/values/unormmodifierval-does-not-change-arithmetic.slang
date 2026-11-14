@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ast-reference/values.md#modifier-values
-//META: doc_section_digest=4c5c9c1e7765b6e543cea7e621ed93e8031fdc0356761ba05a209405b33bc867
+//META: doc_section_digest=cc9b5af8e7e88defd3d066b93057c4ed4b13419aa0e459c9e09a634d498558b7
 //META: purpose=A resource-format modifier value attached to a float or a vector of floats does not change that value's arithmetic semantics, so a unorm-modified operand computes the same result as the bare spelling.
 //META: intent=functional
 //META: pipeline_stage=check

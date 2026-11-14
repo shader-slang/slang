@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -emit-spirv-directly -entry main -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_IGNORE_CAPS,exit-code=0): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_IGNORE_CAPS): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities
 module test;
 
 [require(spvAtomicFloat16AddEXT)]

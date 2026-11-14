@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#assoctypedecl
-//META: doc_section_digest=9c9f01adf6122cb0dc3d48b249f6234107092edc3e147d2d88e10294fda7a2b7
+//META: doc_section_digest=a390b554283ca2f8597d535c672ba72a8777325c669c5bed9c654f8dc146d431
 //META: purpose=An AssocTypeDecl declares an associated type in an interface; the conforming type supplies a concrete alias and dispatch produces that type's value.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -16,12 +16,8 @@
 // inlined into its use sites, exactly as before the type gate was widened. This
 // test guards that regression: the tables below are reconstructed locally, not
 // emitted as constructor-initialized device globals.
-//
-// The `-g2` lane checks that skipping debug instructions in the constructor
-// analysis doesn't make these constructors look foldable.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none
-//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -line-directive-mode none -g2 -O0
 
 struct Base
 {

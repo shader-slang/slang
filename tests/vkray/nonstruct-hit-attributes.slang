@@ -87,7 +87,7 @@ void closestHitStruct(inout float4 payload, in UserAttributes attributes)
 // HLSL: struct [[userType:UserAttributes[A-Za-z0-9_]*]]
 // HLSL: struct [[arrayType:HitAttributes_t[A-Za-z0-9_]*]]
 // HLSL-NEXT: {
-// HLSL-NEXT: float [[arrayField:[A-Za-z0-9_]+]][2L];
+// HLSL-NEXT: float [[arrayField:[A-Za-z0-9_]+]][int(2)];
 // HLSL: struct [[scalarType:HitAttributes_t[A-Za-z0-9_]*]]
 // HLSL-NEXT: {
 // HLSL-NEXT: float [[scalarField:[A-Za-z0-9_]+]];
@@ -115,13 +115,13 @@ void closestHitStruct(inout float4 payload, in UserAttributes attributes)
 // HLSL: void closestHitScalar(inout RayPayload_t{{[A-Za-z0-9_]*}} {{[A-Za-z0-9_]+}}, [[scalarType]] [[chScalar:[A-Za-z0-9_]+]])
 // HLSL: = [[chScalar]].[[scalarField]];
 // HLSL: void closestHitArray(inout RayPayload_t{{[A-Za-z0-9_]*}} {{[A-Za-z0-9_]+}}, [[arrayType]] [[chArray:[A-Za-z0-9_]+]])
-// HLSL: = float2([[chArray]].[[arrayField]][int(0)], [[chArray]].[[arrayField]][1L]);
+// HLSL: = float2([[chArray]].[[arrayField]][int(0)], [[chArray]].[[arrayField]][int(1)]);
 // HLSL: void closestHitStruct(inout RayPayload_t{{[A-Za-z0-9_]*}} {{[A-Za-z0-9_]+}}, [[userType]] {{[A-Za-z0-9_]+}})
 
 // SM 6.7 adds access qualifiers only to the ray payload wrapper, never to an attribute wrapper.
 // PAQ: struct HitAttributes_t
 // PAQ-NEXT: {
-// PAQ-NEXT: float {{[A-Za-z0-9_]+}}[2L];{{$}}
+// PAQ-NEXT: float {{[A-Za-z0-9_]+}}[int(2)];{{$}}
 // PAQ: struct HitAttributes_t
 // PAQ-NEXT: {
 // PAQ-NEXT: float {{[A-Za-z0-9_]+}};{{$}}

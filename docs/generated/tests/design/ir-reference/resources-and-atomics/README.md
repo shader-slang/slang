@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-sonnet-5-5
-generated_at: 2026-11-08T20:50:56+00:00
-source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
-watched_paths_digest: 09168b7fa49b0664dbc3216f46ea8649191551f93e69bc1a00badd7941dc461b
+model: claude-opus-5[1m]
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa
 source_doc: docs/generated/design/ir-reference/resources-and-atomics.md
-source_doc_digest: 00164fe6a3c7aec80ccb5c602d24302f3d40d4d5b546ef3643bed662b6d7869f
+source_doc_digest: 35d912d66419360889e636b91372cee3200eeeef0a80e67ce19a70bb96592ea3
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -68,7 +68,7 @@ Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md), grouped
 by the source doc's own headings; claim _N_ is cited as `CN` in the two
 tables below. The page is a per-opcode catalog, so most claims read
 "surface construct X produces IR opcode Y with operand shape Z";
-**C136–C143 are internal-source facts** (C135, the `fixedArgCount` note, was removed from the doc) about the Lua declarations, the
+**C136–C143 are internal-source facts** about the Lua declarations, the
 FIDDLE-generated wrappers, and the page's own table notation, with no
 user-observable consequence, and are all classified in
 [`## Untested claims`](#untested-claims).
@@ -87,7 +87,7 @@ user-observable consequence, and are all classified in
 
 ### Sampling and combined samplers
 
-10. `sample(texture, sampler, coord)` and `sampleGrad(texture, sampler, coord, gradX)` have full generated wrappers but no code creates them and no emitter consumes them at HEAD (one classification in `doesOpReadResourceContents` lists them).
+10. `sample(texture, sampler, coord)` and `sampleGrad(texture, sampler, coord, gradX)` have full generated wrappers but no code creates or consumes them at HEAD.
 11. `makeCombinedTextureSampler(texture, sampler)` pairs a separate texture and sampler into one combined value.
 12. `MakeCombinedTextureSamplerFromHandle(handle)` builds a combined texture/sampler from a descriptor handle.
 13. `CombinedTextureSamplerGetTexture(sampler)` and `CombinedTextureSamplerGetSampler(sampler)` project the two halves, and both are consumed and removed by the combined-texture-sampler lowering pass.
@@ -120,9 +120,6 @@ user-observable consequence, and are all classified in
 31. `getUntypedBufferPtr([buffer])` is a `uint*` pointer to a byte-address buffer's data.
 32. `getRegisterIndex([resource])` is the register index the resource is bound to, and is a child of the `BindingQuery` group.
 33. `getRegisterSpace([resource])` is the register space the resource is bound to, and is a child of the same group.
-145. `getRegisterIndex` and `getRegisterSpace` are declared only for `_Texture` and `SamplerState`, so any other resource is a type error (`E30019`).
-146. On a target that cannot resolve a register and space, such as `-target cuda`, the register queries fail with `E81111`, not with a fallback value.
-147. HLSL's permission to wrap a non-arithmetic type in `NonUniformResourceIndex` is a separate deprecated overload that returns its argument unchanged and creates no `nonUniformResourceIndex` opcode.
 34. Five of these rows have no public wrapper — the underscore-prefixed declarations are the whole surface — so unlike `InterlockedAdd` or `WaveGetActiveMask` they *do* appear at the lowering snapshot, with no inlining step in between.
 
 ### Shader IO
@@ -207,7 +204,6 @@ user-observable consequence, and are all classified in
 94. What produces `getOptiXSbtDataPointer` is *where* a uniform is declared, not how large it is: only an entry-point `uniform` **parameter**, on a stage other than compute, is collected into the SBT record, one scalar is enough, the opcode is typed `ConstantBuffer(%ShaderRecordParams, DefaultLayout)`, and the emitted CUDA reads `((ShaderRecordParams_0*)optixGetSbtDataPointer())->scale_0`.
 95. A module-scope `uniform` global instead becomes an ordinary `global_param` read out of the CUDA global parameter block.
 96. A `compute` entry point is skipped by the pass — its `uniform` parameter becomes a kernel launch argument.
-144. `reportOptiXIntersection` is the write side of a portable `ReportHit` on OptiX: the core-module call has three operands and `legalizeOptiXReportIntersections` flattens the attribute aggregate so `slang-emit-cuda.cpp` emits `optixReportIntersection(tHit, hitKind, a0..aN)`.
 
 ### Descriptor heaps
 
@@ -252,6 +248,7 @@ user-observable consequence, and are all classified in
 132. Entry-point provenance is not a separate opcode: it is an `EntryPointParamDecoration` attached to the `global_param`, and the layout opcodes attach as children that backend emit walks to recover the binding.
 133. `GroupMemoryBarrierWithGroupSync` has no producer because the core-module function of the same name is implemented with `__intrinsic_asm` per target, not `__intrinsic_op`, so calling it never creates the opcode.
 134. The `IRBuilder::emitMetalSetPrimitive` and `emitMetalSetIndices` helpers are defined but never called, and both pass `kIROp_MetalSetVertex` to `createInst`, so they would produce the wrong instruction if they were called.
+135. `IROpInfo::fixedArgCount` is documented as the required-argument count but is computed as `#value.operands`, so the table records 3 for `imageSubscript` and 2 for `StructuredBufferAppend` even though those are legal with 2 and 1 operands; the field is not read anywhere in the compiler.
 
 ### Internal-source facts
 
@@ -376,10 +373,6 @@ user-observable consequence, and are all classified in
 | C48, C116, C117: The undeclared trailing memory-order operand is always materialized in lowered IR and defaults to `0 : Int` (`kIRMemoryOrder_Relaxed`), at operand 1 for `atomicLoad` and operand 2 for `atomicStore` and the read-modify-write atomics. | functional | [#the-atomic-memory-order-operand](../../../../design/ir-reference/resources-and-atomics.md#the-atomic-memory-order-operand) | [`atomic-memory-order-default-relaxed.slang`](atomic-memory-order-default-relaxed.slang) |
 | C49, C50: An explicit `MemoryOrder` argument reaches the atomic opcode as the raw `IRMemoryOrder` integer — `Acquire` is `1 : Int`, `Release` is `2 : Int`, `AcquireRelease` is `3 : Int`, and `SeqCst` is `4 : Int`. | boundary | [#the-atomic-memory-order-operand](../../../../design/ir-reference/resources-and-atomics.md#the-atomic-memory-order-operand) | [`atomic-memory-order-explicit-values.slang`](atomic-memory-order-explicit-values.slang) |
 | C85, C124: `WaveGetActiveMask()` does not reach `func %main` as the `waveGetActiveMask` opcode — lowering leaves `call %WaveGetActiveMask()` and each backend emits its own active-mask expression. | functional | [#wave-intrinsics](../../../../design/ir-reference/resources-and-atomics.md#wave-intrinsics) | [`wave-get-active-mask-call.slang`](wave-get-active-mask-call.slang) |
-| C145: Passing a `StructuredBuffer` to `__getRegisterIndex` is rejected with `E30019` because the query is declared only for textures and samplers. | boundary | [#resource-queries-and-modifiers](../../../../design/ir-reference/resources-and-atomics.md#resource-queries-and-modifiers) | [`binding-query-structured-buffer-rejected.slang`](binding-query-structured-buffer-rejected.slang) |
-| C146: `__getRegisterIndex(samp)` on `-target cuda` is rejected with `E81111` rather than returning a fallback value. | boundary | [#resource-queries-and-modifiers](../../../../design/ir-reference/resources-and-atomics.md#resource-queries-and-modifiers) | [`binding-query-cuda-unresolved-rejected.slang`](binding-query-cuda-unresolved-rejected.slang) |
-| C144: `ReportHit` in a `-target cuda` intersection shader is emitted as `optixReportIntersection(tHit, hitKind, a0..aN)` with the attribute struct flattened to scalar leaves. | functional | [#raytracing-payload](../../../../design/ir-reference/resources-and-atomics.md#raytracing-payload) | [`optix-report-intersection-cuda-emit.slang`](optix-report-intersection-cuda-emit.slang) |
-| C147: `NonUniformResourceIndex` on a non-arithmetic type (a `bool`) warns `E31200` and leaves no `nonUniformResourceIndex` opcode in `func %main`. | boundary | [#nonuniformresourceindex](../../../../design/ir-reference/resources-and-atomics.md#nonuniformresourceindex) | [`non-uniform-resource-index-deprecated-non-arithmetic.slang`](non-uniform-resource-index-deprecated-non-arithmetic.slang) |
 
 ## Untested claims
 
@@ -400,6 +393,7 @@ user-observable consequence, and are all classified in
 | `GroupMemoryBarrierWithGroupSync()` cannot be compiled for the WGSL or CPU kernel targets. | gpu-other | [#controlbarrier-vs-groupmemorybarrierwithgroupsync](../../../../design/ir-reference/resources-and-atomics.md#controlbarrier-vs-groupmemorybarrierwithgroupsync) | Both targets reject the intrinsic during capability checking, so the barrier fan-out test covers HLSL, GLSL, SPIR-V, Metal, and CUDA only; a WGSL/CPU claim would need the core module to gain those capability arms. |
 | C100, C106: `SPIRVLoadTexelPointerFromHeap` forms a texel pointer out of a heap descriptor, and SPIR-V legalization is the second producer of the heap opcodes, reached only from the combined-texture-sampler arm. | link-stage-only | [#descriptor-heaps](../../../../design/ir-reference/resources-and-atomics.md#descriptor-heaps) | `legalizeIRForSPIRV` runs from inside emit, after the last dump point, so neither is visible under `-dump-ir`; the capability-driven core-module producers are covered instead. |
 | C143: `AtomicOperation` and `BindingQuery` are the only Lua grouping parents on this page and have no `kIROp_` enumerator of their own, generating `kIROp_First…` / `kIROp_Last…` range bounds instead. | internal-source-fact | [#family-hierarchy](../../../../design/ir-reference/resources-and-atomics.md#family-hierarchy) | Range-bound enumerators exist only in the generated C++ header; no IR dump or emitted text names them. |
+| C135: `IROpInfo::fixedArgCount` is documented as the required-argument count but is computed as `#value.operands`, counting optional entries too. | internal-source-fact | [#fixedargcount-in-the-generated-op-info-table](../../../../design/ir-reference/resources-and-atomics.md#fixedargcount-in-the-generated-op-info-table) | The doc says the field is not read anywhere in the compiler, so no compile can observe the discrepancy; only a C++ unit test over the generated table could. |
 | C132: Entry-point provenance is an `EntryPointParamDecoration` attached to the `global_param` rather than a separate opcode, and the layout opcodes attach as children that backend emit walks to recover the binding. | out-of-bundle | [#globalparam-and-entrypointparamdecoration-cross-link](../../../../design/ir-reference/resources-and-atomics.md#globalparam-and-entrypointparamdecoration-cross-link) | The section cross-links to `structure.md` and `metadata.md`; the decoration and the `varLayout` / `EntryPointLayout` children are those bundles' catalog rows. |
 | C110: `imageGatherOffset`'s `offset` may be either a compile-time constant or a runtime value, and the backends distinguish the two cases. | out-of-bundle | [#imagegatheroffset](../../../../design/ir-reference/resources-and-atomics.md#imagegatheroffset) | The doc hands the distinction to `pipeline/06-emit.md`; the per-backend split between a constant and a runtime offset belongs to that bundle's emit coverage. |
 | C3, C109: `imageStore` can carry two aux-coord operands beyond the three the Lua declares, supplied by the Metal array-store intrinsic. | link-stage-only | [#imagestore-carries-undeclared-operands](../../../../design/ir-reference/resources-and-atomics.md#imagestore-carries-undeclared-operands) | The extra operand comes from `__metalImageStoreArray`, an underscore-prefixed core-module intrinsic reached only through Metal legalization; the opcode is not present at this bundle's `lower` stage. |
@@ -425,12 +419,7 @@ user-observable consequence, and are all classified in
 
 ## Doc gaps observed
 
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#sampling-and-combined-samplers](../../../../design/ir-reference/resources-and-atomics.md#sampling-and-combined-samplers) | undocumented-behavior | Eight sampling tests with `numthreads(1, 1, 1)` now fail with `E31211` (derivative group linear thread count) on SPIR-V compute; the section does not mention the constraint. | Note that implicit-derivative sampling in a compute entry point needs a group size whose linear thread count is a multiple of four. |
-| [#resource-queries-and-modifiers](../../../../design/ir-reference/resources-and-atomics.md#resource-queries-and-modifiers) | drift-from-source | Many `hlsl.meta.slang` line citations differ from the current tree (the deprecated `NonUniformResourceIndex` overload is cited at line 15067 but sits at 15183). | Re-derive the `__intrinsic_op` line numbers. |
-
-(Earlier gaps were fixed doc-side; see `docs/generated/design/_meta/doc-gap-state.json`.)
+(none) — no gaps remain open against this bundle's source document.
 
 Every gap previously listed here was fixed on the documentation side and
 recorded in `docs/generated/design/_meta/doc-gap-state.json`; the answers

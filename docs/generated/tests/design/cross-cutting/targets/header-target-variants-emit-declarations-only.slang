@@ -2,7 +2,7 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_section_digest=69b107f4782f9ecf7830ee47173687274ec18b773210afb33c78ee54075e5efa
+//META: doc_section_digest=09ecdf153c06b46e85b5bfd65a0136d6c1516c1e42e5e33b4b02ee440f2f963c
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#targets
 //META: purpose=The header enumerators of the C++ and CUDA target groups (`-target hpp`, `-target cuh`) route through the same emit backend as their source variants but write a declarations-only file with no kernel definition.
 //META: intent=boundary

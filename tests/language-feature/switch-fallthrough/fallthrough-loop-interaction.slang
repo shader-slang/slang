@@ -20,7 +20,7 @@
 // CHECK-HLSL: for(;;)
 // CHECK-HLSL: break
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case 1L:
+// CHECK-HLSL: case int(1):
 
 // CHECK:      73
 // CHECK-NEXT: 64

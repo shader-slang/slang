@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-c-cuda-legalization-lowering-phi-elimination
-//META: doc_section_digest=c5ba7e7159f13cfe3513cb6c3fd83b45567125805d4d70af544f0ece98ee1feb
+//META: doc_section_digest=60a878125219aee6cefce03caff6a6f1ca88b56b8f0f8f9f00a510f58c6ec5ad
 //META: purpose=Verifies legalizeArrayReturnType produces a FixedArray<T,16> * out-parameter for N=16 on CUDA emit (upper-edge array-size sweep).
 //META: intent=boundary
 //META: pipeline_stage=emit

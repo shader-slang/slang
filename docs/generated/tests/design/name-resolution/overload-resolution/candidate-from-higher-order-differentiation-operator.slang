@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#probe-phase-where-candidates-come-from
-//META: doc_section_digest=b2af3e2f54c7f6754ec3aa9bfc60fdd838fc76d81ba2211206a249dbafab3091
+//META: doc_section_digest=fd6b141e684f15a00cb062b04ca96b050f6b3c8c740707d6c23327611bd617b5
 //META: purpose=AddHigherOrderOverloadCandidates contributes candidates for operators such as __fwd_diff that wrap a callee, so the wrapped function resolves and is applied.
 //META: intent=functional
 //META: pipeline_stage=check

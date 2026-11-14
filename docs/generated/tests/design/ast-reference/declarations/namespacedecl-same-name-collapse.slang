@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#namespacedecl-moduledecl-filedecl
-//META: doc_section_digest=5c73eb281115d6eb7872ab686bf9bf11c3b781484b5a0da42d6602f1bdb3379c
+//META: doc_section_digest=0c426eaac3adce684d6e1bcd65a3863432d05ffa3258277a4308ff2a6c6f3c36
 //META: purpose=Multiple textual namespace declarations with the same name in one module are collapsed into one NamespaceDecl during parsing.
 //META: intent=functional
 //META: pipeline_stage=check

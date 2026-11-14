@@ -8,12 +8,24 @@
 namespace Slang
 {
 
-// Find an opaque handle type that cannot live in a function-local variable:
-// a type for which `isImageSamplerOrAccelerationStructureType` holds, since
-// SPIR-V forbids storing or loading those types
-// (VUID-StandaloneSpirv-OpTypeImage-06924). We also search the element/field
-// types of aggregates (arrays, structs, tuples), since storing an aggregate
-// that contains such a handle has the same problem. Returns the leaf handle type if found (for
+// Returns true if `type` is itself a leaf opaque "handle" type that SPIR-V
+// forbids from being stored to or loaded from
+// (VUID-StandaloneSpirv-OpTypeImage-06924): images/textures, samplers, sampled
+// images, subpass inputs (including GLSL input attachments), and acceleration
+// structures. These map to `OpTypeImage`/`OpTypeSampler`/`OpTypeSampledImage`/
+// `OpTypeAccelerationStructureKHR`, none of which may live in a function-local
+// variable.
+static bool isLeafUnstorableOpaqueHandleType(IRType* type)
+{
+    return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
+           as<IRSubpassInputType>(type) || type->getOp() == kIROp_GLSLInputAttachmentType ||
+           type->getOp() == kIROp_RaytracingAccelerationStructureType;
+}
+
+// Find an opaque handle type (see `isLeafUnstorableOpaqueHandleType`) that cannot
+// live in a function-local variable, recursing into the element/field types of
+// aggregates (arrays, structs, tuples) since storing an aggregate that contains
+// such a handle has the same problem. Returns the leaf handle type if found (for
 // diagnostics), or null otherwise. `visited` guards against cycles in
 // (potentially self-referential) aggregate types, mirroring the peer helper
 // `isOpaqueTypeImpl` in slang-legalize-types.cpp.
@@ -28,7 +40,7 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type, HashSet<IRType*>& vi
     if (!type)
         return nullptr;
 
-    if (isImageSamplerOrAccelerationStructureType(type))
+    if (isLeafUnstorableOpaqueHandleType(type))
         return type;
 
     // Only recurse once per aggregate type to avoid cycling on self-referential

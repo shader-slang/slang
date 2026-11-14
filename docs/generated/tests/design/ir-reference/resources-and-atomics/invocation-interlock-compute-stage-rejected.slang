@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#barriers-and-synchronization
-//META: doc_section_digest=8c466a442d244a131b8545faefbb2dad3bf762ee56c68f8afb7214ab1c19ad42
+//META: doc_section_digest=931865ab828ea4bf86b75e2e0a29cc458fac0ca8d3b216802e8173152dd6a088
 //META: purpose=The two interlock opcodes require a `fragment` entry point because the rasterizer ordering they request has no meaning in another stage, so `beginInvocationInterlock()` in a `compute` entry point is rejected with `E36107`.
 //META: intent=negative
 //META: pipeline_stage=check

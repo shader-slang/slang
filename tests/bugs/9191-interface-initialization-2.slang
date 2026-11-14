@@ -1,7 +1,7 @@
 // Additional test case for 9191-interface-initialization.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKWARN,exit-code=0): -target hlsl -entry computeMain -stage compute -std 2025
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKWARN,exit-code=0): -target spirv -entry computeMain -stage compute -std 2025
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKWARN): -target hlsl -entry computeMain -stage compute -std 2025
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKWARN): -target spirv -entry computeMain -stage compute -std 2025
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKERR): -target hlsl -entry computeMain -stage compute -std 2026
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKERR): -target spirv -entry computeMain -stage compute -std 2026
 

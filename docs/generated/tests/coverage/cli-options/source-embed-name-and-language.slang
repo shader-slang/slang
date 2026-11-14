@@ -27,7 +27,7 @@
 //TEST:SIMPLE(filecheck=DEFAULT):-target hlsl -entry main -stage compute -source-embed-style text
 //TEST:SIMPLE(filecheck=NAMED):-target hlsl -entry main -stage compute -source-embed-style text -source-embed-name myBlob
 //TEST:SIMPLE(filecheck=CLANG):-target hlsl -entry main -stage compute -source-embed-style text -source-embed-language c
-//TEST:SIMPLE(filecheck=BADLANG,exit-code=1):-target hlsl -entry main -stage compute -source-embed-style text -source-embed-language slang
+//TEST:SIMPLE(filecheck=BADLANG):-target hlsl -entry main -stage compute -source-embed-style text -source-embed-language slang
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

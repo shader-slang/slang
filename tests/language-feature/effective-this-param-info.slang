@@ -81,7 +81,6 @@ void computeMain()
 }
 
 // CHECK-LABEL: [nameHint("Counter.$init")]
-// CHECK-NEXT: [Artificial]
 // CHECK-NEXT: func {{.*}} : Func(%Counter, Attributed(Int, {{.*}}))
 // CHECK-LABEL: [nameHint("Counter.readByValue")]
 // CHECK-NEXT: func {{.*}} : Func(Int, %Counter)

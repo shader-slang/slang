@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#scope-bearing-ast-nodes
-//META: doc_section_digest=ba0fbb59f19c90964f30f63e36bd6d872a6caad870e1c39a6b2b4f2f5f9714ca
+//META: doc_section_digest=c25b4949da1f02764ce1c67f1094b0f0f36902472c4e7072dce4b3577317245e
 //META: purpose=`__target_switch` pushes and pops a ScopeDecl around each case group, so a local declared in one case is not visible from any other case of the same statement.
 //META: intent=negative
 //META: pipeline_stage=check

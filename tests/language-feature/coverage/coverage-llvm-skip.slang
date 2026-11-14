@@ -3,8 +3,8 @@
 // CPU targets do not have a verified lowering path for the synthesized
 // coverage resource + atomic sequence.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target host-callable -emit-cpu-via-llvm -entry main -stage compute -trace-function-coverage
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target host-callable -emit-cpu-via-llvm -entry main -stage compute -trace-branch-coverage
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target host-callable -emit-cpu-via-llvm -entry main -stage compute -trace-function-coverage
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target host-callable -emit-cpu-via-llvm -entry main -stage compute -trace-branch-coverage
 //CHECK: warning E45102
 
 [shader("compute")]

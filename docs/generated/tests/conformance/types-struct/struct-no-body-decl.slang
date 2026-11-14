@@ -29,11 +29,11 @@
 // second declaration) compiles. It is specifically the "... before the full definition" half of
 // the claim that the compiler rejects.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=GLSL,exit-code=-1):-target glsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=SPV,exit-code=-1):-target spirv-asm -entry main -stage compute
-//TEST:SIMPLE(filecheck=METAL,exit-code=-1):-target metal -entry main -stage compute
-//TEST:SIMPLE(filecheck=WGSL,exit-code=-1):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 
 // Forward declaration (no body)
 struct ForwardDeclared;

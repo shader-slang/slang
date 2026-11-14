@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
 
 // Verify exhaustive diagnostic matching does not require duplicate
 // annotations for the primary `span` row, while `note-span` rows still

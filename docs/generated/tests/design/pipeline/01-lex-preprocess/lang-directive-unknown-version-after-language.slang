@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-11T00:00:00+00:00
 //META: source_commit=48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#preprocessor-directives
-//META: doc_section_digest=a79d944b7d2a39d014afe31606a0e3f7d96f6912c534eadd8d9b1160507f3183
+//META: doc_section_digest=b8118c99e1f7a9dcb30eebf7d13f30e2f807dfde61a88dc27f936547536b52c3
 //META: purpose=An unrecognized identifier after an explicit `slang` language name is reported as E15207 unknown language version, not as E15208 unknown language, because the language is already settled.
 //META: intent=negative
 //META: pipeline_stage=preprocess

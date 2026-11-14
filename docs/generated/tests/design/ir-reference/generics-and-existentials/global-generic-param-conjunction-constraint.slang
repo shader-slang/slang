@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#generic-application
-//META: doc_section_digest=1b35acbd21812d559bc561b706440cf4fe3c630c3cac3ebd9b614ae7f2aa48b6
+//META: doc_section_digest=d49a080ef9b53be4d6c526a9c06cdc10eebed42c56ce72157faeb10bfc04648b
 //META: purpose=A conjunction constraint on a module-scope type_param emits one witness global_generic_param per half, so `T : IFoo & IBar` lowers to three module-scope parameters.
 //META: intent=boundary
 //META: pipeline_stage=lower

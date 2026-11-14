@@ -3,18 +3,20 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#definition-forms
-//META: doc_section_digest=222012023b43e7122e72f59e25f3a0031eadebb2990b9381de9fe214554d25cc
-//META: purpose=An extension atom records its version floor through inheritance, so asking for `SPV_KHR_cooperative_matrix` transitively raises the effective SPIR-V version to its `_spirv_1_6` floor.
+//META: doc_section_digest=2c0608f6d4897cdbfc247f90cd3fba9250321d1c82341829952363fd26bccf89
+//META: purpose=An extension atom records its version floor through inheritance, so asking for `SPV_KHR_cooperative_matrix` transitively asks for its `_spirv_1_6` floor and its inherited memory-model requirement.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that inheritance in a capability declaration is what
-// carries an extension's version floor, rather than the floor being
-// asserted at the use site. `SPV_KHR_cooperative_matrix` inherits a
-// SPIR-V 1.6 floor; the kernel itself uses nothing that needs it. The
-// CHECK asserts the emitted module header moved up to 1.6, which can
-// only come from folding in the inherited atom.
+// carries an extension's version floor and its companion
+// requirements, rather than each requirement being asserted at the
+// use site. `SPV_KHR_cooperative_matrix` inherits a SPIR-V 1.6 floor
+// and the Vulkan memory model; the kernel itself uses neither. The
+// CHECKs assert the emitted module header moved up to 1.6 and that
+// the memory-model capability was declared, both of which can only
+// come from folding in the inherited atoms.
 
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -capability SPV_KHR_cooperative_matrix -entry main -stage compute
 
@@ -27,4 +29,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf[tid.x] = 5;
 }
 
-// SPIRV: Version: 1.6
+// SPIRV-DAG: Version: 1.6
+// SPIRV-DAG: OpCapability VulkanMemoryModel

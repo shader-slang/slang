@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#hlsl-compatibility-declarations
-//META: doc_section_digest=47566cd8f7a7690b5bc248f56b6ae6ee7deb73f17385a110749298f08f34fd2a
+//META: doc_section_digest=2c1a661f3128523ca42f57d75ffd4649e625991cb2fdafb8ce1e9b1193d77d9d
 //META: purpose=`CBufferDecl` parses as `'cbuffer' IDENT ':' Register '{' StructMember* '}'` with a `register(...)` clause.
 //META: intent=functional
 //META: pipeline_stage=parse

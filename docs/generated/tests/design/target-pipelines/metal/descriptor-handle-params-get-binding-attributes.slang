@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#descriptorhandlet-parameter-binding-emission
-//META: doc_section_digest=c4bc4aa95a9f0c504acac5cbe36ac2ac9c85a1c9622ee31b77de701fc02e270c
+//META: doc_section_digest=159d74b6f024d007c931af7765e7aacc5da41ce801b0bc15fe83aa4c2d424647
 //META: purpose=`emitFuncParamLayoutImpl` unwraps `DescriptorHandle<T>` before the per-resource-kind test, so bindless buffer / texture / sampler parameters still receive `[[buffer(N)]]` / `[[texture(N)]]` / `[[sampler(N)]]`.
 //META: intent=functional
 //META: pipeline_stage=emit

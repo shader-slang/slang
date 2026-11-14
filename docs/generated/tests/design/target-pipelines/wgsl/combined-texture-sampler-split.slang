@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=9170fd752e08e7e2778f564ecb1cabc328722ba47d9d53a46dfb89d7feaa308a
+//META: doc_section_digest=d55555774e3671195c911b5700b7f3b76e600649eaa66a65a238dcf8a1620c86
 //META: purpose=lowerCombinedTextureSamplers splits Sampler2D into a separate texture and sampler pair on WGSL
 //META: intent=functional
 //META: pipeline_stage=ir-pass

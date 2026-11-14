@@ -5,7 +5,7 @@
 // be an unannotated diagnostic and cause failure. The span entry ("constexpr
 // is treated as const") is the second annotation here.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
 //CHECK: constexpr on variable declarations is not a supported Slang feature
 //CHECK: constexpr is treated as const

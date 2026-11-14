@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#the-atomic-memory-order-operand
-//META: doc_section_digest=adf1421d9e876005b9b4a50c4385745f838c4bface29d5d14e5bfd4987a276b7
+//META: doc_section_digest=05930fe2d0fb581dc7f1f5da2a6966c5942fddfa2e9dc69e40bf044d0e50b7a5
 //META: purpose=An explicit `MemoryOrder` argument reaches the atomic opcode as the raw `IRMemoryOrder` integer — `Acquire` is `1 : Int`, `Release` is `2 : Int`, `AcquireRelease` is `3 : Int`, and `SeqCst` is `4 : Int`.
 //META: intent=boundary
 //META: pipeline_stage=lower

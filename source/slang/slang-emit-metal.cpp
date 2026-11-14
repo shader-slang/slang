@@ -142,31 +142,6 @@ static IRType* unwrapDescriptorHandle(IRType* type)
     return type;
 }
 
-// Return whether `addr` is the address of (part of) an element of a read-only
-// `StructuredBuffer`. That buffer is emitted as a pointer to `const`, so the
-// address is one too.
-static bool isAddressIntoReadOnlyBuffer(IRInst* addr)
-{
-    for (;;)
-    {
-        switch (addr->getOp())
-        {
-        case kIROp_FieldAddress:
-        case kIROp_GetElementPtr:
-        case kIROp_GetOffsetPtr:
-            addr = addr->getOperand(0);
-            continue;
-        case kIROp_RWStructuredBufferGetElementPtr:
-            {
-                auto bufferType = unwrapDescriptorHandle(addr->getOperand(0)->getDataType());
-                return bufferType && bufferType->getOp() == kIROp_HLSLStructuredBufferType;
-            }
-        default:
-            return false;
-        }
-    }
-}
-
 void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -252,11 +227,6 @@ void MetalSourceEmitter::emitTempModifiers(IRInst* temp)
             .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
             .location = temp->sourceLoc});
     }
-
-    // A temporary that holds an address into a read-only buffer must point to
-    // `const`, as the buffer does, or Metal rejects its initialization.
-    if (isAddressIntoReadOnlyBuffer(temp))
-        m_writer->emit("const ");
 }
 
 void MetalSourceEmitter::emitParameterGroupImpl(
@@ -1484,11 +1454,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
-        // A read-only buffer is a `const device` pointer, so that Metal knows the
-        // shader never writes it (a vertex function that returns a value may not
-        // have writable buffers).
-        if (type->getOp() == kIROp_HLSLStructuredBufferType)
-            m_writer->emit("const ");
         emitType(structuredBufferType->getElementType());
         m_writer->emit(" device*");
         return;
@@ -1499,8 +1464,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         switch (type->getOp())
         {
         case kIROp_HLSLByteAddressBufferType:
-            m_writer->emit("const uint32_t device*");
-            break;
         case kIROp_HLSLRWByteAddressBufferType:
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
             m_writer->emit("uint32_t device*");

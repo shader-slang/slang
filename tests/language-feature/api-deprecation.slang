@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // This test verifies various things that can be marked as deprecated
 

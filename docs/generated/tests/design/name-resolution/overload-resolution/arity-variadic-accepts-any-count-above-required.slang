@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate
-//META: doc_section_digest=471a235af8be78d2eb5c62c0f69c7e4037797818d1630eb02a08fcdaae148425
+//META: doc_section_digest=8893ade9a7efa04929eeabd0929b6ce5ed75204189b492f7d284d2f366d938f2
 //META: purpose=An allowed count of -1 makes a variadic callable accept any argument count at or above required, so zero, one and many arguments all pass the arity step.
 //META: intent=boundary
 //META: pipeline_stage=check

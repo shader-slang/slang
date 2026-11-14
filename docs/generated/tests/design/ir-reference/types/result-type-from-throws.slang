@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
-//META: doc_section_digest=d954301fdc74111df1e5e54e77e9f4a6d231275aa7a1492da12b7560db422806
+//META: doc_section_digest=f6cc1906090c3a2ff4445cfbcbe2318b867549d8261d32762ca2f8abf427d1bf
 //META: purpose=A function declared with a throws clause has an IR result type of Result(valueType, errorType).
 //META: intent=functional
 //META: pipeline_stage=lower

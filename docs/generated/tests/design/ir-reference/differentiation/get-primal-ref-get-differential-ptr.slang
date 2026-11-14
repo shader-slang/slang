@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#differential-pair-projection
-//META: doc_section_digest=30a9aaa3217e1be659ec0b790da17d0c09653790c661efbf208569133ebceb1b
+//META: doc_section_digest=5f50033280aec505eacac53ad283962baab159487ef0677b633a1b40a4acdceb
 //META: purpose=The .p and .d getters of DifferentialPtrPair<T> lower to GetPrimalRef and GetDifferentialPtr, the pointer-flavoured projections.
 //META: intent=functional
 //META: pipeline_stage=lower

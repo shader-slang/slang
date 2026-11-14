@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizelogicalandor
-//META: doc_section_digest=e7e94a2aeb9019bee14cb6e84863d6584c1ac694c1d9873ef54bb71a3b4a1367
+//META: doc_section_digest=499ad51086032292ba8cad9d4b286986d3c90dcc6cc4265d96d1af27204d5afc
 //META: purpose=A vector-result And/Or is written as the HLSL 2021 intrinsic call `and(a, b)` / `or(a, b)` rather than the infix operator, because `&&` and `||` are scalar-only in HLSL.
 //META: intent=functional
 //META: pipeline_stage=emit

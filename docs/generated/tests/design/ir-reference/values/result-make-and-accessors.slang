@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#result--optional--conditional-helpers
-//META: doc_section_digest=b3ddfcf6633a61b27422d8bc64aaf60fdf964f353e9c9daf4a37f1c4514a9235
+//META: doc_section_digest=c6530a50486d7dbd37de911a5b051159a9daacde724b2a9b71968138031143b2
 //META: purpose=`Result<T, E>` helpers are observable through Slang's throwing-function surface: a `throws` function lowers `return x;` to `makeResultValue(x)` and `throw e;` to `makeResultError(e)`, while a `try` / `catch` site in the caller lowers to `isResultError`, `getResultValue`, and `getResultError` accessors.
 //META: intent=functional
 //META: pipeline_stage=lower

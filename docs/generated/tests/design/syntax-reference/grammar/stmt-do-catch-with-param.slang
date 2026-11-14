@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#statements
-//META: doc_section_digest=b9a1edc11e7f4ef12c141b50f73b3a36a9eda5811402d0c118a09dc03161e42b
+//META: doc_section_digest=11f48bb43fb7900ef7dd3c2f4785da1cab7aaae9b90d2da44ecf5e8cf8e950b1
 //META: purpose=`DoCatchStmt` parses as `'do' Stmt 'catch' '(' Param ')' Stmt` with an explicit catch parameter.
 //META: intent=functional
 //META: pipeline_stage=parse

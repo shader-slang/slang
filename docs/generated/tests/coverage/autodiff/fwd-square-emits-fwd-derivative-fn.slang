@@ -1,5 +1,5 @@
 //META: generated=true
-//META: model=claude-sonnet-5-5
+//META: model=claude-opus-4-8[1m]
 //META: generated_at=2026-06-11T12:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#forward-mode

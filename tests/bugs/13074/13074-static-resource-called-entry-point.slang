@@ -26,4 +26,4 @@ float4 main() : SV_Target
 // CHECK-LABEL: float4 callee_0(Texture2D<float4 > cachedTexture_0)
 // CHECK: return cachedTexture_0.Load
 // CHECK-LABEL: float4 main()
-// CHECK: return callee_0(textures_0[1L]);
+// CHECK: return callee_0(textures_0[int(1)]);

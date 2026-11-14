@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#how-target-choice-affects-ir
-//META: doc_section_digest=a06981cfad27799a980d12bc9debd43f1796df2e683f48b7ed9122101fbb44c3
+//META: doc_section_digest=1103b6c6793a74ba9a2a797712002157cc506284940af6ab698172cadfb6ec8a
 //META: purpose=A `__target_switch` whose only arm is `default:` provides a universal fallback; every target's `slang-ir-specialize-target-switch.cpp` lowering selects the default body.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

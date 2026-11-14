@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#synthesized-extensions-two-visibilities-not-one
-//META: doc_section_digest=8abd7f1109f9def2d37c1e3647eb1589eb4850f8ab3eddcf9d46bb2945ecffed
+//META: doc_section_digest=4435a8b6a0827b1e05fa959d983bff00e8290f17d59ed0a801cfdae989f175b2
 //META: purpose=A `private` `[Differentiable]` member's synthesized derivative is attached to an extension that is `internal` rather than `private`, so the program checks and the derivative is usable.
 //META: intent=functional
 //META: pipeline_stage=check

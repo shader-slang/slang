@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=76ee6e7723bb37a4f19d893a5f6a1b0f60d1fe8881e266ab68ab9b3946c62211
+//META: doc_section_digest=e9219cdb5c991479475f495fed529b3a717626417843075cd38373dfd41801fa
 //META: purpose=The NoneType of the `none` literal is accepted at an Optional-typed target without an explicit cast, whatever the optional's value type.
 //META: intent=functional
 //META: pipeline_stage=check

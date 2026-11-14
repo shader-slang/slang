@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#eliminatephis-with-default-options
-//META: doc_section_digest=113ec0f5fedb560261c41f0922f991b7f452eafb4a063ac8aa6fd35928b749f4
+//META: doc_section_digest=00630d7ff82aa522d00a339c906354e4fd298540af7004da0b72e30be204ab2f
 //META: purpose=eliminatePhis with default options replaces phi nodes with an explicit var and per-branch assignments
 //META: intent=functional
 //META: pipeline_stage=ir-pass

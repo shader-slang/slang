@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that use of empty statement after an `if` leads to a warning.
 

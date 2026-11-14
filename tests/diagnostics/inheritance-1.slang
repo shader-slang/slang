@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Tests that we will diagnose a warning on struct inheritance being unstable
 // before Slang 2026.

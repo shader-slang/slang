@@ -1,6 +1,6 @@
 // Exhaustive mode also asserts the plain `computeMain` does NOT warn.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
 //CHECK: constexpr on a function or other callable declaration is not a supported Slang feature and is ignored
 //CHECK: constexpr modifier is ignored here

@@ -1595,18 +1595,6 @@ struct DiffTransposePass
                 return TranspositionResult();
             }
 
-        case kIROp_GetElementPtr:
-        case kIROp_FieldAddress:
-            {
-                // An address computation carries no gradient itself; gradients flow through the
-                // loads, stores, and calls that use the address. Such an address survives address
-                // elimination when it is a reference argument, which address elimination keeps as
-                // an address, and forward-mode transcription gives it a differential counterpart
-                // even when the argument goes to a `no_diff` call that never uses one.
-                //
-                return TranspositionResult();
-            }
-
         default:
             SLANG_UNEXPECTED("Unhandled instruction");
         }

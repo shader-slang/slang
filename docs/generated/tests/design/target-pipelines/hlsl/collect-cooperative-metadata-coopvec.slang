@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#context-predicates-and-capability-gates
-//META: doc_section_digest=a446f5f1b00c98ec88710f2cd4e2ed7d7871afd918d7f976630ecc830d076868
+//META: doc_section_digest=2742dbf49b22ad8b1db112899ae1d588490d00cff38dbcbdefe57213a92dc387
 //META: purpose=collectCooperativeMetadata runs when target capabilities imply cooperative_matrix or cooperative_vector; a CoopVec compute kernel under -profile cs_6_9 emits HLSL that retains the cooperative-vector spelling and the byte-address buffer storage backing it.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

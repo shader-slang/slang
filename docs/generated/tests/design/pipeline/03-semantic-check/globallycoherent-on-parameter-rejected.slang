@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-11T00:00:00+00:00
 //META: source_commit=48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#modifier-validation
-//META: doc_section_digest=6d3d353f7acb30664cc90831179bf06d5f613a7e643d2f70a23548558a35ee35
+//META: doc_section_digest=cf9986ac73585feb8d7138003d7be69083848e024e0c79dad6db42132ddad3fe
 //META: purpose=globallycoherent on a function parameter is the concrete pair that reaches E31201, while the same modifier on a struct field is accepted without -allow-glsl.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#funcextensiondecl
-//META: doc_section_digest=ab70cb8cc77fd77f50a070aa2ea5840dfc4b047424408c5dbcc955bce0b712e5
+//META: doc_section_digest=23b3247cc6a5a19e7e7455ea0b4ffac555ac3ebd72721db7a1554013d44d65dd
 //META: purpose=A `__func_extension fwd_diff(f)(...)` attaches a custom forward derivative to an existing function without modifying its definition.
 //META: intent=functional
 //META: pipeline_stage=check

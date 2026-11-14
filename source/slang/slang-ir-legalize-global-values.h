@@ -21,9 +21,8 @@ struct GlobalInstInliningContextGeneric
     virtual bool shouldBeInlinedForTarget(IRInst* user) = 0;
     virtual IRInst* getOutsideASM(IRInst* beforeInst) = 0;
 
-    // Copy each global value that the target can't represent into every function, or global
-    // variable initializer, that uses it. Then remove the global, and the operands that were
-    // copied with it, once they are left without uses.
+    // Inline global values that can't represented by the target to their use sites.
+    // If this leaves any global unused, then remove it.
     void inlineGlobalValuesAndRemoveIfUnused(IRModule* module);
 
     // Opcodes that can exist in global scope, as long as the operands are.
@@ -55,9 +54,7 @@ struct GlobalInstInliningContextGeneric
 // `makeStruct`, so that a `static const` struct table can stay a global constant.
 //
 // For CUDA, a global constant whose type contains `half` is also inlined, because CUDA
-// emits a `half` literal as a constructor call, which is a dynamic initializer. Likewise, for
-// CUDA, a vector or matrix value computed by an operator (anything but `makeVector` or
-// `makeMatrix`) is inlined, because the CUDA prelude implements the operators as functions.
+// emits a `half` literal as a constructor call, which is a dynamic initializer.
 void inlineGlobalConstantsForLegalization(IRModule* module, CodeGenTarget target);
 
 

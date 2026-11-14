@@ -5,7 +5,7 @@
 // prefix/postfix/infix operator), and free operator functions at module and namespace scope (the
 // reachable spelling the error steers users toward).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // `operator()` is resolved by member lookup on the callee type, so a member declaration is valid.
 struct Callable

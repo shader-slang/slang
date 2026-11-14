@@ -63,7 +63,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // CPP: static const FixedArray<Record_0, 2>{{.*}}records_0 = { { { 1U, 2U }, { 3U, 4U } } };
 // CPP-NOT: Record{{.*}}init
 
-// HLSL: static const Record_0{{.*}}records_0[2L] = { { 1U, 2U }, { 3U, 4U } };
+// HLSL: static const Record_0{{.*}}records_0[int(2)] = { { 1U, 2U }, { 3U, 4U } };
 // HLSL-NOT: Record{{.*}}init
 
 // GLSL: const Record_0{{.*}}records_0[2] = Record_0[](Record_0(1U, 2U), Record_0(3U, 4U));

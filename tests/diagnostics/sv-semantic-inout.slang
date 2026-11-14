@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1): -target spirv -entry fsInoutInputOnly -stage fragment
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,exit-code=0): -target spirv -entry fsInoutBidirectional -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2): -target spirv -entry fsInoutBidirectional -stage fragment
 
 // Test inout parameter semantics validation.
 // Some semantics support both input and output (bidirectional), while others are input-only or output-only.

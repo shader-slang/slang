@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 // Here we test that diagnostics appear once per usage of each of the
 // deprecated declarations.

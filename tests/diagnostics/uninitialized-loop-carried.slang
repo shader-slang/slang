@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK,exit-code=0): -target cpp -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target cpp -entry computeMain -stage compute
 
 // Regression test for https://github.com/shader-slang/slang/issues/11778
 //

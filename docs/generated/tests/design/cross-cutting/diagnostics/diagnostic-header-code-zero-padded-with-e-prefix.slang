@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-sonnet-5-5
-//META: generated_at=2026-11-08T21:32:51Z
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-13T00:00:00+00:00
+//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#source-locations-and-message-rendering
-//META: doc_section_digest=b56b816820af1c15450b34e955f5435969bcf8f2936c6dbb068f8ab21ec3dca3
+//META: doc_section_digest=f952036c11ff9b8c1d73b32cb9eb2592525bdd2e44c5b243e4cfdec0a9352108
 //META: purpose=A rendered diagnostic header is `<severity>[E<5-digit id>]: <message>` with the id zero-padded, so entry 14 prints as error[E00014] rather than error[E14].
 //META: intent=boundary
 //META: pipeline_stage=check
@@ -17,7 +17,7 @@
 // rules out the unpadded spelling. It also pins the message so the row
 // is anchored to a specific entry rather than to any five-digit code.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target hlsl -entry main -stage compute -profile bogusProfileName
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -profile bogusProfileName
 
 RWStructuredBuffer<int> outBuf;
 

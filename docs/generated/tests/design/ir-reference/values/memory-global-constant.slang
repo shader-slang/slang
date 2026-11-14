@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#memory
-//META: doc_section_digest=f662fb7782cd3fc576fa13c3285e3f58c0e5cf06b8fc8ea778138d3616c5a4bf
+//META: doc_section_digest=b635be369d49eda13f4d8f18e7e6d308ac562fd62758b35e04990f1dd01ae3a4
 //META: purpose=A module-scope `static const T K = value;` declaration lowers to `globalConstant(<value>)` in the IR.
 //META: intent=functional
 //META: pipeline_stage=lower

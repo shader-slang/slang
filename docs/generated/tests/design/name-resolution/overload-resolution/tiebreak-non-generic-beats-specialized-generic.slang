@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-sonnet-5-5
-//META: generated_at=2026-11-08T21:35:39Z
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#tie-breaking-comparator
-//META: doc_section_digest=764e196b19a5dd0e0f2c516c498be250f0fdaba7e58c28f2ac820f88be1e5466
-//META: purpose=compareOverloadCandidateSpecificity ranks a candidate that is the inner declaration of a generic below one that is not, so a non-generic candidate beats a generic one of equal cost.
+//META: doc_section_digest=1d384c53a44075a9ff7b3de0f1907c30fb579e521154ac25ad145d433be8dd6a
+//META: purpose=compareOverloadCandidateSpecificity prefers the smaller getSpecializedParamCount, so a non-generic candidate beats a specialized generic one of equal cost.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies the specificity step. Both overloads accept an int with identity
-// cost, so cost cannot separate them; the generic candidate is the inner declaration of
-// a generic and the non-generic one is not. CHECK asserts the non-generic tag.
+// cost, so cost cannot separate them; the generic candidate carries a
+// specialized-parameter count of one against the non-generic candidate's zero.
+// CHECK asserts the non-generic tag.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=a15f36e90ce71c175813e4f9aaae1546ac333d5b71b1977e258855334d9377bf
+//META: doc_section_digest=1a006f5533aa420dc23fbb0ad582fabeafd0bcf79da9890e8a7b8254871f2401
 //META: purpose=collectCooperativeMetadata is gated on cooperative_matrix or cooperative_vector capability and does not fire for a plain WGSL compute kernel
 //META: intent=negative
 //META: pipeline_stage=ir-pass

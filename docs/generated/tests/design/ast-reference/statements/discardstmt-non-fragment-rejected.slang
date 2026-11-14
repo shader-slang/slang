@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#labelstmt-breakstmt-continuestmt-and-discardstmt
-//META: doc_section_digest=adfde865e3afc82ccfc5ca78a86a905bce73f1b1961ab0afdae17dd2375d854d
+//META: doc_section_digest=56973ad8752f95b6b4fe0b0a37cc16997d4bb7b6f6cfc8bddd18361e81252484
 //META: purpose=A DiscardStmt is a fragment-shader pixel-kill construct; using `discard` from a non-fragment entry point is rejected as an unavailable feature for that stage.
 //META: intent=negative
 //META: pipeline_stage=check

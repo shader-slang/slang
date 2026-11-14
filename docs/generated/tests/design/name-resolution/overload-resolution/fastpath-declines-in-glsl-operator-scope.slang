@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-17T06:27:35Z
 //META: source_commit=9f55ec61a25834c304d71fd1e9a58bf72b3864b3
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#the-builtin-operator-fast-path
-//META: doc_section_digest=9ff302fe090bb783b80fc43fa698c8bb501ddcb429e303b69ba88b9724eafaf1
+//META: doc_section_digest=16e17f0dd7f2f633f3f55fe47544e0f4c04b1b5b2ce0bf083439c29eeb4a3acc
 //META: purpose=In GLSL operator scope the fast path declines matrix operands, so mat * mat resolves through the glsl module's overload to an algebraic matrix product.
 //META: intent=boundary
 //META: pipeline_stage=check

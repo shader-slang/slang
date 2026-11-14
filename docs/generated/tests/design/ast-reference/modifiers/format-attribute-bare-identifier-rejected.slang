@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#nodes
-//META: doc_section_digest=29d86296deb73a57a4f207507e16ba645a6bf2e722162db8157e7554d2cf8004
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#capability--target-attributes
+//META: doc_section_digest=ce8106cbb762f8a84c2c1448718332b6001d57168b92318fbbf9d952624061de
 //META: purpose=The format attribute's argument is declared as a String, so a bare identifier such as [format(rgba32f)] is rejected with E33071 rather than being read as a format name.
 //META: intent=negative
 //META: pipeline_stage=check

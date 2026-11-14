@@ -748,16 +748,6 @@ void initCommandOptions(CommandOptions& options)
          "-skip-spirv-validation",
          nullptr,
          "Skips spirv validation."},
-        {OptionKind::ValidateWithDownstreamCompiler,
-         "-validate-with-downstream-compiler",
-         nullptr,
-         "After emitting code, compile or validate it with the downstream compiler that matches "
-         "the target: the SPIR-V validator for `spirv`, the Metal compiler for `metal`, DXC for "
-         "`hlsl` with shader model 6.0 or higher and FXC below that, glslang for `glsl`, Tint for "
-         "`wgsl`, NVRTC for `cuda`, and the C++ compiler for `cpp`. "
-         "The exit code is not 0 if the downstream tool is not available, cannot run, or reports "
-         "an error, or if the target has no downstream tool. "
-         "`-skip-spirv-validation` has priority over this option for SPIR-V targets."},
         {OptionKind::SourceEmbedStyle,
          "-source-embed-style",
          "-source-embed-style <source-embed-style>",
@@ -3480,7 +3470,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::SPIRVUnifiedDescriptorHeapStride:
         case OptionKind::DebugInfoIncludeSource:
         case OptionKind::SkipSPIRVValidation:
-        case OptionKind::ValidateWithDownstreamCompiler:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
         case OptionKind::TrackLiveness:

@@ -27,9 +27,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 //HLSL: _slang_coverage
 //HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(0\)}}
-//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*\[1L\]}}
-//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*\[2L\]}}
-//HLSL-NOT: InterlockedAdd{{.*_slang_coverage.*\[3L\]}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(1\)}}
+//HLSL-DAG: InterlockedAdd{{.*_slang_coverage.*int\(2\)}}
+//HLSL-NOT: InterlockedAdd{{.*_slang_coverage.*int\(3\)}}
 
 //GLSL: _slang_coverage
 //GLSL-DAG: atomicAdd{{.*_slang_coverage.*uint\(0\)}}

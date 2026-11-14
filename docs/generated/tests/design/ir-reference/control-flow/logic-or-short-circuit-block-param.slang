@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#block-and-param
-//META: doc_section_digest=2a352bcf0ce838b95cff334ee1235c003b2f526ca07b93710337b16c2a4872f8
+//META: doc_section_digest=2b345e8ce476ee0da24b2daa9c3e2bd0961bcb6de69a3908825bbe7092d800a6
 //META: purpose=Short-circuit || emits an ifElse whose short-circuit arm branches to the after-block carrying the literal true, and the after-block declares a param to receive it.
 //META: intent=functional
 //META: pipeline_stage=lower

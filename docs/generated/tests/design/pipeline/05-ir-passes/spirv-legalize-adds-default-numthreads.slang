@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
-//META: doc_section_digest=d08158ea09ba0a32a48d37035a53b103ee4e6cf5465c5f5427df02f5ade4cbbb
+//META: doc_section_digest=5ecc062dc93859b69b080811db13201d5e12052d67767a4d49a4d8787cb40272
 //META: purpose=The passes in between only read the numthreads decoration, with one exception: SPIR-V legalization adds a default NumThreadsDecoration of (1, 1, 1) to a compute entry point that has none.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

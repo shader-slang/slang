@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target cpp -entry computeMain -stage compute -validate-ir -disable-non-essential-validations -warnings-as-errors all
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -entry computeMain -stage compute -validate-ir -disable-non-essential-validations -warnings-as-errors all
 
 // Resource-global replacement creates the entry-point local after the pre-link module-wide
 // uninitialized-value check. Disabling non-essential validation must suppress both that check and

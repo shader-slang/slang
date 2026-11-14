@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#when-it-is-built
-//META: doc_section_digest=14acb6ce88acca39d38cb731d5aca5374cb8cdb115526a701acdd1c9362f92b7
+//META: doc_section_digest=d6045f4b781691bbbac81a8fd53eda7f9380160d802b50319cafbb501f353afc
 //META: purpose=When parameter binding fails with an error no layout IR module is built, so the dump contains no layout instructions after the pre-link block.
 //META: intent=negative
 //META: pipeline_stage=layout
@@ -15,7 +15,7 @@
 // still produced, and the CHECK-NOTs confirm no layout instruction or
 // layout decoration exists anywhere in the dump - construction never ran.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target metal -dump-ir -o - -entry main -stage miss
+//TEST:SIMPLE(filecheck=CHECK):-target metal -dump-ir -o - -entry main -stage miss
 
 struct Payload
 {

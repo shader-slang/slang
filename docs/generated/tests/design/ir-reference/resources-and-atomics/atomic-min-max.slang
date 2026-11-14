@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=05d2a0b4a3db43236d3559421222e61b18c415c1fc63143d73dee571f32aaba5
+//META: doc_section_digest=5818c272bb5b1e731fdf137e19f531519b21757eceadaae3e8b8a9739283af9c
 //META: purpose=`Atomic<T>::min(v)` and `::max(v)` lower to `atomicMin(%ptr, %val, %order)` and `atomicMax(%ptr, %val, %order)` respectively.
 //META: intent=functional
 //META: pipeline_stage=lower

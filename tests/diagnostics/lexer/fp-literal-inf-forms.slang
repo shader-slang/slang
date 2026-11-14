@@ -31,9 +31,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: outputBuffer{{.*}}[int(0)] = (1.0f / 0.0f);
-// CHECK: outputBuffer{{.*}}[1L] = (1.0f / 0.0f);
-// CHECK: outputBuffer{{.*}}[2L] = (1.0f / 0.0f);
-// CHECK: outputBuffer{{.*}}[3L] = 0.0f;
-// CHECK: outputBuffer{{.*}}[4L] = 0.0f;
-// CHECK: outputBuffer{{.*}}[5L] = 0.0f;
-// CHECK: outputBuffer{{.*}}[6L] = 0.0f;
+// CHECK: outputBuffer{{.*}}[int(1)] = (1.0f / 0.0f);
+// CHECK: outputBuffer{{.*}}[int(2)] = (1.0f / 0.0f);
+// CHECK: outputBuffer{{.*}}[int(3)] = 0.0f;
+// CHECK: outputBuffer{{.*}}[int(4)] = 0.0f;
+// CHECK: outputBuffer{{.*}}[int(5)] = 0.0f;
+// CHECK: outputBuffer{{.*}}[int(6)] = 0.0f;

@@ -617,19 +617,6 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 
-/// Get the address space of the storage that a by-reference parameter refers to.
-///
-/// A `groupshared` parameter refers to storage in the group-shared address space, and every other
-/// by-reference parameter refers to storage in the generic address space. The address space is
-/// derived from the declaration in the same way as the parameter-passing mode, and it is only
-/// meaningful for a parameter whose effective mode is a by-reference mode.
-///
-AddressSpace getReferenceParamAddressSpace(ParamDecl* paramDecl);
-
-/// Return whether `callableDecl` has a parameter whose effective mode is a by-reference mode.
-///
-bool hasReferenceParameter(CallableDecl* callableDecl);
-
 /// Finds the checked information for `declRef`'s effective `this` parameter.
 ///
 /// The declaration must have reached `DeclCheckState::SignatureChecked`. A declaration has a

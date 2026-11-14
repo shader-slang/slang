@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=4df83dc71e0587111a9da4d14a547f230fc7c2be546870abd078c2d1480d3144
+//META: doc_section_digest=646c4616c380e6a3797dd8913be0a1bc6b6c378869b500aed80575fdf0894184
 //META: purpose=Fires diagnostic E45100 (coverage-buffer-reserved-name) - `__slang_coverage` is reserved by `-trace-coverage`
 //META: intent=negative
 //META: pipeline_stage=ir-pass

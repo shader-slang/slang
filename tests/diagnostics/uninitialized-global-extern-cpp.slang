@@ -6,7 +6,7 @@
 // must NOT warn E41017. This test is exhaustive and carries no annotations: were the false positive
 // to reappear, the resulting E41017 would be an unannotated diagnostic and fail the test.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target cpp
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp
 
 [COM("007E2DAF-3A1F-4BC3-B08B-A9DB233D38CE")]
 interface IThing

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#builtinrequirementkey
-//META: doc_section_digest=2ceef85ef0f7e3e2032b23321c6a33649940568aac23a65e0680b6a547265147
+//META: doc_section_digest=fe739572a4e21ed7087cb15c7afcf55b26731bdf17dd5258d8624f0aebf3d9a1
 //META: purpose=The requirement role is promoted from DifferentialType to DifferentialWitness when the requirement being keyed is the associated conformance rather than the associated type, so the two get distinct keys.
 //META: intent=functional
 //META: pipeline_stage=lower

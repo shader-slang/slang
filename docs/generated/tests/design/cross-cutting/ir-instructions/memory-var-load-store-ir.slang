@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#memory-instructions
-//META: doc_section_digest=f9005d19ddbc4548f1db51bd12e064243f69089f5ee772db1c43b134661a06c0
+//META: doc_section_digest=88ac9c5bf3929b2eb7c6c8eba693545ca9ae827a013044241007c9ad7639db78
 //META: purpose=A local struct variable lowers to `var` and its field reads/writes lower to `store` / `load` / `get_field_addr` IR opcodes.
 //META: intent=functional
 //META: pipeline_stage=lower

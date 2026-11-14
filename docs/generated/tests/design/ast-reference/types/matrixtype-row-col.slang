@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#basicexpressiontype-vectorexpressiontype-matrixexpressiontype
-//META: doc_section_digest=a9e6231e60a10097307c960ed42577646899eb49854183d8f45eeb036c42700a
+//META: doc_section_digest=eb9e797ca9c3dbb949a62072e232852c0f820f49dd331388c5e7ffcde24a8c1c
 //META: purpose=A MatrixExpressionType carries an element type, a row count and a column count; a float2x3 value's six elements are reachable by [row][col] indexing.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generic-interface-requirements
-//META: doc_section_digest=098b79501b776b8d0f50cb7939761c1e503f5d48d2f51044f2065ab99b682db3
+//META: doc_section_digest=e0a5749b29e520ad49aa65105bc29051abf25351d8b6a63196e0e34d7a152ac7
 //META: purpose=Calling a generic interface method through a constrained type parameter lowers to `specialize(lookupWitness(table, key), methodArgs...)` rather than a flat witness lookup that drops the method's generic arguments.
 //META: intent=functional
 //META: pipeline_stage=lower

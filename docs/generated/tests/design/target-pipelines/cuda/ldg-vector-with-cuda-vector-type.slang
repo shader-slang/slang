@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda
-//META: doc_section_digest=176050d5aa6473a960364c4e8306dcb0207b369af4a0a0c828054dd949a1f62f
+//META: doc_section_digest=031d306ccbb9670357e2a8af6d7e786afcb208ea0c4a357ccf9a309fc8034205
 //META: purpose=A float4 immutable-buffer load maps directly to a single __ldg because float4 has a corresponding CUDA vector type.
 //META: intent=functional
 //META: pipeline_stage=emit

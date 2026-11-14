@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-unconditional-branches
-//META: doc_section_digest=d0eeb53252388d3a6e69f829f07385b975955f496c04529e2b4fcce99f38c4ae
+//META: doc_section_digest=4962589b5989729b48bd363a6bb21d740a9f4c8c1244aa21f8fb89e4dfab0256
 //META: purpose=unconditionalBranch carries argument operands beyond the target block; these become the values bound to the target's block params, the Slang-IR SSA phi handoff.
 //META: intent=functional
 //META: pipeline_stage=lower

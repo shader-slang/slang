@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-10T21:26:16+00:00
 //META: source_commit=1ca1aa50e5dbbd12ad65b64a60b3428f23c32d45
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#getstringhash
-//META: doc_section_digest=2e49a7038974c54373eb64a6a67281810cb65f3247508b881fd7e7f8fe060368
+//META: doc_section_digest=fafa30090d995addef159bd1bcc6fec7e9b68cdafe21f467253dcff09023bf48
 //META: purpose=A `getStringHash` argument that does not fold to a string literal is rejected with the documented "must be on a string literal" diagnostic (E41023).
 //META: intent=negative
 //META: pipeline_stage=ir-pass

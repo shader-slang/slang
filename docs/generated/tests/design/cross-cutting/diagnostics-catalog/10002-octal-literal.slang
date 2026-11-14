@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/compiler-core/slang-lexer-diagnostic-defs.h
-//META: doc_section_digest=375347e8628d63157286f9962c16e13a939a9b5f549f981f425c130ddf80c50f
+//META: doc_section_digest=daf1aec53ab33f862bcaafbe8b3a088da43c615a5ae0b538195fa6134d60888a
 //META: purpose=Fires diagnostic E10002 (octal-literal) from a minimum-reproduction input.
 //META: intent=negative
 //META: pipeline_stage=parse

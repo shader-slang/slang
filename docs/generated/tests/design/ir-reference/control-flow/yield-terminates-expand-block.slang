@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-returns-and-yields
-//META: doc_section_digest=19520b191e2b148481e6b700687fe1131b2a8c16bbfb46366168336ce634d33f
+//META: doc_section_digest=f192f41be797c74b1114b7ff57ec1c86180c872b87ad52a64a206e75eec3e27e
 //META: purpose=The single block inside an expand instruction is terminated by yield carrying that iteration's pattern value.
 //META: intent=functional
 //META: pipeline_stage=lower

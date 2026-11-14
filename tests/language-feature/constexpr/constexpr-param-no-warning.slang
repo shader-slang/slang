@@ -4,7 +4,7 @@
 // Exhaustive mode with zero annotations: any diagnostic (including E31227)
 // would cause this test to fail.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
 void foo(constexpr int offset) {}
 

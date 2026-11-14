@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#edge-cases-and-failure-modes
-//META: doc_section_digest=074addd0c2d66598101cf0dfc70be7e1bcffe641d2e7c455a491f14df2014a84
+//META: doc_section_digest=991fc4058be6fd34aec1a4296d60bb722bc2f19a97c9a91c4e3f65165643bfd2
 //META: purpose=Member lookup on the error type matches no arm of the type dispatch and returns empty silently, so a member access on an unresolved name does not cascade a second diagnostic.
 //META: intent=negative
 //META: pipeline_stage=check

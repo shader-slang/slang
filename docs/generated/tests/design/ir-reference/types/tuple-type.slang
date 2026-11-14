@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#tuples-packs-and-target-tuples
-//META: doc_section_digest=debbbb972e6800da97d7993e2f2fd56b9739048c25ff410d8e0d265743b807bc
+//META: doc_section_digest=340a6086a58d3b4b09f103090fa05f6f3ae19060b59ae154ea1dba8c258d6a25
 //META: purpose=A makeTuple call yields a value of IR type tuple_type(<T1>, <T2>, ...).
 //META: intent=functional
 //META: pipeline_stage=lower

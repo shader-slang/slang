@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#spir-v-direct
-//META: doc_section_digest=6795190d6e973dc49c27d2d64f289ffc9d0a4ee9074e6fe89cb121c00bd75475
+//META: doc_section_digest=b9622b13f522c0c7e4cadb4f7366a432ba9276aaf0eb9a1c678d12797589c381
 //META: purpose=The direct SPIR-V backend emits a complete SPIR-V module without going through GLSL, carrying `OpCapability Shader`, `OpEntryPoint GLCompute`, `OpExecutionMode ... LocalSize`, and `OpDecorate ... Binding`/`DescriptorSet` for a buffer resource.
 //META: intent=functional
 //META: pipeline_stage=emit

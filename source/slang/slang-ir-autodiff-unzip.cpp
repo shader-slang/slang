@@ -317,21 +317,11 @@ struct UnzippingContext
                 {
                     return clonedVar;
                 }
-                else if (
-                    paramDirection == ParameterDirectionInfo::BorrowInOut ||
-                    paramDirection.kind == ParameterDirectionInfo::Kind::Ref)
+                else if (paramDirection == ParameterDirectionInfo::BorrowInOut)
                 {
-                    // For inout and reference parameters, we need to store the original value into
-                    // the cloned var at the beginning of the function, and then load from the
-                    // cloned var at every use.
-                    //
-                    // TODO: A clone is wrong for a reference parameter, because the callee may
-                    // reach the same storage through another parameter, and a clone hides its
-                    // writes through one from its reads through the other. We do not reach this
-                    // with a reference parameter today, because a differentiable callee with one
-                    // is rejected during checking; supporting it needs the argument's address
-                    // passed through instead.
-                    //
+                    // For inout parameters, we need to store the original value into the cloned var
+                    // at the beginning of the function, and then load from the cloned var at every
+                    // use.
                     if (auto use = findUniqueStoredVal(var))
                         primalBuilder->emitStore(
                             clonedVar,

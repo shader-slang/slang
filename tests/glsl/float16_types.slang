@@ -74,9 +74,9 @@ void computeMain()
     // CHECK_SPV: OpTypeFloat 16
 
     // CHECK_HLSL: vector<half,4>
-    // CHECK_HLSL: matrix<half,4L,4L>
-    // CHECK_HLSL: matrix<half,3L,4L>
-    // CHECK_HLSL: matrix<half,2L,3L>
+    // CHECK_HLSL: matrix<half,int(4),int(4)>
+    // CHECK_HLSL: matrix<half,int(3),int(4)>
+    // CHECK_HLSL: matrix<half,int(2),int(3)>
 
     // CHECK_CUDA: __half4
     // CHECK_CUDA: makeMatrix<__half, 4, 4>

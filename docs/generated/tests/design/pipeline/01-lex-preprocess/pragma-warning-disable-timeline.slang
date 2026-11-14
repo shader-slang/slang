@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#pragma-warning-state-across-files
-//META: doc_section_digest=7cd0aa129784e726e7888eb0fd9d5a2e3f77d909331840c3287c13641c8d5c43
+//META: doc_section_digest=8d50eb65e40894cf0318aa4dcada1f78bcbcabc46b7e3a3d94a0319e9947491d
 //META: purpose=`#pragma warning(disable)` state is tracked on a source-location timeline: the same construct warns before the directive and is silent after it.
 //META: intent=functional
 //META: pipeline_stage=preprocess

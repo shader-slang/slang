@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#key--structkey
-//META: doc_section_digest=5b29b137b6d9c4b0dc69ab53f9cc5d592cf4a8960514db67698c83c00c81867d
+//META: doc_section_digest=d2ea86e1e20890cc6353bda3406625017f20105e88f02a8d8e91e8431b3fecb3
 //META: purpose=A struct does not own its keys: the key insts sit at module scope and the struct's field children merely point at them by operand.
 //META: intent=functional
 //META: pipeline_stage=lower

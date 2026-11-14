@@ -1,7 +1,7 @@
 // Test that `constexpr` emits a warning (unsupported feature) but compiles
 // correctly by falling back to `const` semantics. Regression test for #10940.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
 
 //CHECK: constexpr on variable declarations is not a supported Slang feature
 

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHK,exit-code=0): -lang glsl tests/diagnostics/uninitialized-globals.slang -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHK): -lang glsl tests/diagnostics/uninitialized-globals.slang -target spirv -entry computeMain
 
 // Using groupshared variables
 groupshared float4 gsUninitialized;

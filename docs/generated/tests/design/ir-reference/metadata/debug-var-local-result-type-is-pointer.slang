@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugvar
-//META: doc_section_digest=5e624fe4d59626301c0a26642fbfc7ef147f62f38d27132871b59bfd03634759
+//META: doc_section_digest=36d7febd0fe69b032d87ba181b780aaaa9c174da2ac29fb3b6a974c00865dc14
 //META: purpose=A DebugVar for an ordinary local omits the argument-index operand, and the variable's own type is the pointee of the instruction's pointer result type rather than an operand.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
@@ -11,8 +11,8 @@
 
 // Verifies the absent case of the optional operand together with the result
 // type rule. The local is an `int`, so its record must print with a `Ptr(Int)`
-// result type and exactly four operands (source, line, column, scope); pinning the
-// closing parenthesis after the scope rules out an argument index, and pinning the result type
+// result type and exactly three operands; pinning the closing parenthesis
+// after the column rules out an argument index, and pinning the result type
 // shows the variable's type is carried by the result rather than by an
 // operand.
 

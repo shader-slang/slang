@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK):
 
 // Test if the variable name is a part of the error message
 // when it is used inside of for-loop

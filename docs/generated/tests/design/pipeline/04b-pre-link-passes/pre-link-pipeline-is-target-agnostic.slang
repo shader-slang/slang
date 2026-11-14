@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#pre-link-mandatory-passes
-//META: doc_section_digest=cfba7e0229aa33754251e2f6ca4c48d43b4b19975b9fd796cd0d1148af7a941d
+//META: doc_section_digest=f3be9705adaba00c166c4c4eb1f2b3db4b7e22926b5ec3e600da34fe99b70618
 //META: purpose=The pre-link pipeline is target-agnostic, so the same source produces the same LOWER-TO-IR shape on every text-emit target.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

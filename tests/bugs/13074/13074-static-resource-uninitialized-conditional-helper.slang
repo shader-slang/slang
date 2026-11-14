@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -O0 -target cpp -entry computeMain -stage compute -validate-ir
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -target cpp -entry computeMain -stage compute -validate-ir
 
 // This test checks initialization through the call graph. The C++ target can represent local
 // resource storage, so the expected analysis diagnostic is not replaced by a target-legality

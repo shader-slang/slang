@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry
-//META: doc_section_digest=efe3a8c4431ab5a6b399324347401abcc5166c36a6b9143375ce7938cda0b03d
+//META: doc_section_digest=e214a09142215b02ab6420756675cda4aea3ee3bccc295e9aa6dbc0ccf6a4a23
 //META: purpose=The requirementKey operand of an interface_req_entry is the same key value that names the requirement on the witness_table_entry satisfying it.
 //META: intent=functional
 //META: pipeline_stage=lower

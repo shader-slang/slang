@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#collectoptixentrypointuniformparams
-//META: doc_section_digest=1f05f38c8eed97035a36748d72ce2614ccee318d957e417dd11d927a15b6e39d
+//META: doc_section_digest=8ed002654a8479208594bb58bcb3c6e4f9eb3e9ede038ad81c0477171ed8a3d5
 //META: purpose=collectOptiXEntryPointUniformParams replaces collectEntryPointUniformParams for raygeneration entry points so a CUDA raygeneration shader emits as an extern "C" __global__ void __raygen__<name> kernel through the OptiX SBT pathway.
 //META: intent=expansion
 //META: pipeline_stage=emit

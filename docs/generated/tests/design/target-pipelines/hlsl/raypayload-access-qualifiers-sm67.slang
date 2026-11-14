@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizeraypayloadaccessqualifiersforhlsl
-//META: doc_section_digest=fa93ab1a6089e95a7fd9ec37072323b57e52e9f3b3557418965c8650534d48be
+//META: doc_section_digest=684ef01d42bf0166bd93a05d657c09b3737cbd7bb9fbea4c5dc5d5f9d91f93ea
 //META: purpose=At a DX shader model 6.7 profile, every member of a `[raypayload]` struct is emitted with both a `read(...)` and a `write(...)` qualifier — the missing side is filled structurally — while a 6.6 profile emits no qualifiers at all.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

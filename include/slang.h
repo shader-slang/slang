@@ -1368,13 +1368,6 @@ typedef uint32_t SlangSizeT;
         // mode.
         HLSLMethodsMutatingByDefault = 164,
 
-        // `bool`: After the compiler emits code for a target, also compile or validate the emitted
-        // code with the downstream compiler or validator that matches the target (for example the
-        // Metal compiler for `metal`, or the SPIR-V validator for `spirv`). The compile fails if
-        // the downstream tool is not available, cannot run, or reports an error, and also if the
-        // target has no downstream tool.
-        ValidateWithDownstreamCompiler = 165,
-
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,

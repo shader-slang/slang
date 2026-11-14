@@ -25,7 +25,7 @@
 // The diagnostic renders against the synthetic "command line" source, so the
 // caret line quotes the whole argv; only the message and code are pinned.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=1):-target hlsl -entry main -stage compute -get-module-info no-such-module.slang-module
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -get-module-info no-such-module.slang-module
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

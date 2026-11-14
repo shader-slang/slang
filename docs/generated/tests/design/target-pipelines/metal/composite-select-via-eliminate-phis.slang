@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#eliminatephis-with-default-options
-//META: doc_section_digest=95d100050bc47f2bd5fba31843e81b751f46f7c3645b89b451d242d327b5a816
+//META: doc_section_digest=e0c92ad13ee96c904e5b118ad8e34d030d04052671354fe0520c1057981ecef2
 //META: purpose=A struct-valued conditional lowers to an if/else assigning a local of the struct type even though the HLSL-only `legalizeNonVectorCompositeSelect` pass does not run for Metal.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -1,4 +1,4 @@
 // output-no-entry-point.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-o something.dxbc -entry vsMain -stage vertex -entry fsMain -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-o something.dxbc -entry vsMain -stage vertex -entry fsMain -stage fragment
 //CHECK: the output path 'tests/diagnostics/command-line/something.dxbc' is not associated with any entry point

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#aggtypedecl-structdecl-classdecl-enumdecl
-//META: doc_section_digest=e899cc0803999820cd90ccc66d71078646ccd75a709e1801316ef7df32b9d638
+//META: doc_section_digest=ee81272d01f69d54c75b75fc6518d2ad8af9fdb4a6eed0176bdf0fe82ee19e5c
 //META: purpose=A StructDecl can nest another StructDecl as a member; the nested type is reachable through dotted member access.
 //META: intent=functional
 //META: pipeline_stage=check

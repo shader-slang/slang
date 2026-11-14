@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices
-//META: doc_section_digest=bdab7c96cac9a55381381f37622841c41f387f80bb1577daf4c1cc5d5aa46b5d
+//META: doc_section_digest=b6892a07f20e1bed38c81e547c6032137e43442412b027b4add1d9d062142325
 //META: purpose=wrapStructuredBuffersOfMatrices does NOT wrap a non-matrix element type; a StructuredBuffer<int> stays as RWStructuredBuffer<int>.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

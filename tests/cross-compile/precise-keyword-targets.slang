@@ -9,10 +9,10 @@
 //TEST:SIMPLE(filecheck=WGSL):  -target wgsl  -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=HLSL):  -target hlsl  -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSL):  -target glsl  -stage compute -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG,exit-code=0): -target cuda  -stage compute -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG,exit-code=0): -target cpp   -stage compute -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG,exit-code=0): -target metal -stage compute -entry computeMain
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG,exit-code=0): -target wgsl  -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG): -target cuda  -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG): -target cpp   -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG): -target wgsl  -stage compute -entry computeMain
 
 RWStructuredBuffer<float> gOut;
 

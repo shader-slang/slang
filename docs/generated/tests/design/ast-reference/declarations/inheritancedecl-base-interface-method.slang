@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#inheritancedecl
-//META: doc_section_digest=fb166f641a47111139b90d9bae931d7fe4a8eda48e9f02167ee1bcb0e48fb8ab
+//META: doc_section_digest=faee42cf53078ee6cd6b1f69e2f5e33966ac4159fe9a593a801ecde8862f2dc6
 //META: purpose=The witness recorded on an inheritance clause is what connects a requirement to the conformer's member at each dispatch site.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generics-and-existentials
-//META: doc_section_digest=00fef3057358760d4225321cd326293f0cb1ef37b4a7e3a927e9a7448fe83891
+//META: doc_section_digest=becaee0c42e1c1b7be4278315b96c53245e3eeb522315d56a2556cf99cbbc250
 //META: purpose=A GenericDecl lowers to an `IRGeneric` (function-shaped IR inst whose body computes a type-level value); specialization is NOT performed at lowering.
 //META: intent=functional
 //META: pipeline_stage=lower

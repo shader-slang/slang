@@ -2,7 +2,7 @@
 // lacking that capability is diagnosed as implicitly upgraded rather than compiling silently.
 
 // Direct parameter, SPIR-V.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1,exit-code=0):-stage fragment -entry fragmentMain -target spirv -profile spirv_1_6
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1):-stage fragment -entry fragmentMain -target spirv -profile spirv_1_6
 
 [shader("fragment")]
 float4 fragmentMain(float3 barycentrics : SV_Barycentrics) : SV_Target
@@ -15,7 +15,7 @@ float4 fragmentMain(float3 barycentrics : SV_Barycentrics) : SV_Target
 }
 
 // Struct field, SPIR-V.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,exit-code=0):-stage fragment -entry fragmentMainStruct -target spirv -profile spirv_1_6
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2):-stage fragment -entry fragmentMainStruct -target spirv -profile spirv_1_6
 
 struct PSInput
 {
@@ -33,7 +33,7 @@ float4 fragmentMainStruct(PSInput input) : SV_Target
 }
 
 // Nested struct field — exercises the recursive descent.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NESTED,exit-code=0):-stage fragment -entry fragmentMainNested -target spirv -profile spirv_1_6
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NESTED):-stage fragment -entry fragmentMainNested -target spirv -profile spirv_1_6
 
 struct Inner
 {
@@ -57,7 +57,7 @@ float4 fragmentMainNested(Outer input) : SV_Target
 }
 
 // Negative case: capability present in the profile, so no warning.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_HASCAP,exit-code=0):-stage fragment -entry fragmentMainWithCap -target spirv -profile spirv_1_6+spvFragmentBarycentricKHR
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_HASCAP):-stage fragment -entry fragmentMainWithCap -target spirv -profile spirv_1_6+spvFragmentBarycentricKHR
 
 [shader("fragment")]
 float4 fragmentMainWithCap(float3 barycentrics : SV_Barycentrics) : SV_Target
@@ -66,7 +66,7 @@ float4 fragmentMainWithCap(float3 barycentrics : SV_Barycentrics) : SV_Target
 }
 
 // HLSL path: the same requirement maps to sm_6_1 rather than the SPIR-V extension.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_HLSL,exit-code=0):-stage fragment -entry fragmentMainHlsl -target hlsl -profile sm_6_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_HLSL):-stage fragment -entry fragmentMainHlsl -target hlsl -profile sm_6_0
 
 [shader("fragment")]
 float4 fragmentMainHlsl(float3 barycentrics : SV_Barycentrics) : SV_Target

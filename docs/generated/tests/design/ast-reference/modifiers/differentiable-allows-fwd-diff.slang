@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#differentiable-attribute-family
-//META: doc_section_digest=26638fd86ec5c70772b8785345490b0ec9d7a8615adf9756f19b99197dda84c5
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#differentiability-attributes
+//META: doc_section_digest=6699d8238c4128825e36dbe2a01de6dafc1b30965367cc9fdfea25f482ef206a
 //META: purpose=A `[Differentiable]` function can be passed to `fwd_diff` and produces the correct derivative.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -1,6 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_G0,exit-code=1):-target spirv -g0 -debug-info-include-source -emit-spirv-directly
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_REV,exit-code=1):-target spirv -debug-info-include-source -g0 -emit-spirv-directly
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_ALONE,exit-code=1):-target spirv -debug-info-include-source -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_G0):-target spirv -g0 -debug-info-include-source -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_REV):-target spirv -debug-info-include-source -g0 -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_ALONE):-target spirv -debug-info-include-source -emit-spirv-directly
 
 // `-debug-info-include-source` requires debug information to embed the source into, so it
 // conflicts with `-g0` (no debug info). The post-parse validation is order-independent (it reads

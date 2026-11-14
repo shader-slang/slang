@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#other-control-flow-opcodes
-//META: doc_section_digest=2fbf434d88b8c04d432e174a859825b9963483ee0b5709efd8f95a6713e5d681
+//META: doc_section_digest=4caee0717f463f40ccf30a71a9f32b536d64d1e72bf9deeae1e1c1ad645c5ecf
 //META: purpose=A static_assert call lowers to the StaticAssert instruction carrying the condition value and the message string as its two operands.
 //META: intent=functional
 //META: pipeline_stage=lower

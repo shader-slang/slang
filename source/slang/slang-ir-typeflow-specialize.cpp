@@ -5524,11 +5524,7 @@ struct TypeFlowSpecializationContext
         //
         for (auto& kv : cloneEnv.mapOldValToNew)
         {
-            // The clone map also contains the module-level debug scopes copied with the
-            // function, along with their decorations (see cloneDebugScopesForFunc).
-            // Propagation info in this context exists only for instructions inside the base
-            // function.
-            if (getParentFunc(kv.first) != baseFunc)
+            if (isGlobalInst(kv.first))
                 continue;
 
             if (auto info = _tryGetInfo(InstWithContext(existentialSpecializedFunc, kv.first)))
@@ -6257,15 +6253,6 @@ struct TypeFlowSpecializationContext
                 paramTypes.growToCount(index + 1);
                 paramTypes[index] = nullptr;
             }
-
-            // A function type can carry a parameter's rate around its passing-mode type, as in
-            // `RateQualified(GroupShared, RefParam(T))` for a `groupshared` parameter. The
-            // parameter infos come from each callee's `getDataType()`, which has no rate, so we
-            // compare directions on the type inside the rate. The dispatch function's parameter
-            // type is built from those infos, so it does not carry the rate either.
-            //
-            if (auto rateQualifiedType = as<IRRateQualifiedType>(paramTypeUnionMask))
-                paramTypeUnionMask = rateQualifiedType->getValueType();
 
             {
                 // Then, update the existing type using structural union.

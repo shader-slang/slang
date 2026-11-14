@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#associated-type-bounds
-//META: doc_section_digest=0c68bfe17b84bd9c39a85e11be734dc556a406eabd46eed808e1ec3d8d61b661
+//META: doc_section_digest=e581ee12dbcf3d743086ff2ab64116df452d3fc89feb7dda14e837949d7cc5f6
 //META: purpose=A subtype bound on an associated type (`associatedtype Elem : IBase`) is relocated to interface level and lowers to a requirement entry whose requirement value is `witness_table_t(%IBase)`.
 //META: intent=boundary
 //META: pipeline_stage=lower

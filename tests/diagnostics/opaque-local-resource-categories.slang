@@ -1,7 +1,8 @@
-// `specializeResourceUsage` exposes the conditional resources returned by `selSampler` and
-// `selIfElse` in `main`. `specializeResourceSelections` then branches around their `Sample` calls,
-// so these cases must compile without opaque local storage. Neither pass can legalize the
-// `SubpassInput` result of `selSubpass`, which must still reach the opaque-storage diagnostic.
+// Issue #10526: the opaque-local-variable check fires for several categories of
+// opaque handle and for both the `?:` and `if`/`else` selection patterns, and it
+// recurses into struct fields. This complements the basic
+// `opaque-local-resource-select.slang` test (which covers a single `Texture1D`
+// via `?:`).
 
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry main -stage fragment
 
@@ -15,8 +16,10 @@ SamplerState selSampler(bool b)
 {
     return b ? s1 : s0;
 }
+//CHECK-DAG: opaque-typed value ('SamplerState') cannot be placed in a function-local variable
 
-// The texture is chosen by assignments in the two arms of an `if`/`else`.
+// Texture selected via `if`/`else` (a different post-phi-elimination IR shape
+// than `?:`).
 [noinline]
 Texture2D<float> selIfElse(bool b)
 {
@@ -27,6 +30,7 @@ Texture2D<float> selIfElse(bool b)
         r = t0;
     return r;
 }
+//CHECK-DAG: opaque-typed value ('Texture2D') cannot be placed in a function-local variable
 
 // SubpassInput selected via `?:` (Vulkan-only, fragment-stage opaque handle).
 [noinline]
@@ -34,11 +38,7 @@ SubpassInput<float4> selSubpass(bool b)
 {
     return b ? sp1 : sp0;
 }
-//CHECK-NOT: opaque-typed value ('SamplerState')
-//CHECK-NOT: opaque-typed value ('Texture2D')
-//CHECK: opaque-typed value ('SubpassInput') cannot be placed in a function-local variable
-//CHECK-NOT: opaque-typed value ('SamplerState')
-//CHECK-NOT: opaque-typed value ('Texture2D')
+//CHECK-DAG: opaque-typed value ('SubpassInput') cannot be placed in a function-local variable
 
 [shader("fragment")]
 float main(bool b) : SV_Target

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomiccompareexchange
-//META: doc_section_digest=e4eb208d1f9824d2e81cc5953a860caae9db983d08b74c7f4528a7adf051d211
+//META: doc_section_digest=56da737ad1c105ad7281a722161ff1e9d21baef2ae8c6e7634ade17f9c4abf58
 //META: purpose=`Atomic<T>::compareExchange(expected, desired)` lowers to `atomicCompareExchange(%ptr, %expected, %desired, ...)` — the CAS primitive returning the previous value, with the documented trailing memory-order operand(s) left unpinned.
 //META: intent=functional
 //META: pipeline_stage=lower
