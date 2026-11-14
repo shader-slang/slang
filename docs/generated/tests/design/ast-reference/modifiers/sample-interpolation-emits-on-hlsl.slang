@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#nodes
-//META: doc_section_digest=29d86296deb73a57a4f207507e16ba645a6bf2e722162db8157e7554d2cf8004
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#interpolation-modes
+//META: doc_section_digest=b00757f585ffb1d581749d3144f4d738cfa61d44114ac021c2e6dc15ad86eb5e
 //META: purpose=The `sample` interpolation modifier is preserved through emitted HLSL.
 //META: intent=functional
 //META: pipeline_stage=emit

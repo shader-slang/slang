@@ -27,7 +27,7 @@
 //TEST:SIMPLE(filecheck=DEFAULTFS):-target hlsl -entry main -stage compute -file-system default
 //TEST:SIMPLE(filecheck=LOADFILE):-target hlsl -entry main -stage compute -file-system load-file
 //TEST:SIMPLE(filecheck=OSFS):-target hlsl -entry main -stage compute -file-system os
-//TEST:SIMPLE(filecheck=BADVALUE,exit-code=1):-target hlsl -entry main -stage compute -file-system bogus
+//TEST:SIMPLE(filecheck=BADVALUE):-target hlsl -entry main -stage compute -file-system bogus
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-sonnet-5-5
-generated_at: 2026-11-08T21:30:10+00:00
-source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
-watched_paths_digest: 6b21dab41e1c131379fc0897c495695f0f771f15cef268021022d936d2b4cb67
+model: claude-sonnet-4-6
+generated_at: 2026-06-02T07:58:38+00:00
+source_commit: a01e79278cf0be9772deb8b2be52ee87687697a3
+watched_paths_digest: baa6fac8ba9ed5ca13a1a8e7c88d05af57311f436bd5f74976903baabe34556f
 source_doc: docs/language-reference/declarations.md
 source_doc_digest: 132f3f2073ca652a1ccb7c503f59b91bb65f4228adcc40915e269f77d6a985a1
 warning: "Auto-generated. May drift from source. Do not edit by hand."
@@ -207,4 +207,3 @@ not support non-const module-scope global instructions; those claims are covered
 | [#interfaces](../../../../language-reference/declarations.md#interfaces)               | drift-from-source     | The doc states "Functions, initializers, and subscripts declared inside an interface must not have bodies." The compiler actually accepts function bodies inside interfaces without error.                                                                                                                                   | Clarify whether interface method bodies are planned for a future version or intentionally accepted; update the doc to match actual compiler behavior.                                                                                                |
 | [#extensions](../../../../language-reference/declarations.md#extensions)               | missing-surface       | The doc states "extensions cannot apply to enumeration types or interfaces" but does not specify which diagnostic code is emitted when you try. A reader cannot write a negative test without knowing the expected error code.                                                                                               | Add the diagnostic code emitted when an extension is applied to an enum or interface to the doc.                                                                                                                                                     |
 | [#enumeration-types](../../../../language-reference/declarations.md#enumeration-types) | undocumented-behavior | The doc contains a Note: "The current Slang implementation has bugs that prevent explicit tag types from working correctly." No diagnostic code, no description of what goes wrong. The claim is partially blocked.                                                                                                          | Replace the Note with a specific known-bugs table or remove it and file a bug.                                                                                                                                                                       |
-| [#modules](../../../../language-reference/declarations.md#modules) | drift-from-source | `docs/language-reference/declarations.md` was removed from this repo (language reference moved to shader-slang/spec, #13439). The anchors and `source_doc_digest` in this bundle refer to the last in-tree version and cannot be re-verified locally. | Re-point `source_doc` at the spec repo copy, or retire the bundle. |

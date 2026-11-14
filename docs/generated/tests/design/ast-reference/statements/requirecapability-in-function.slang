@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#requirecapabilitystmt
-//META: doc_section_digest=0e475ed415a7b8317f2533d70e3c8adea676556ba4f72a3f5ab508aea132037d
+//META: doc_section_digest=12dedaf2aaf6752e756f7796eb2545e1de64f72f4e5259b97610f7ddfcf5586a
 //META: purpose=A RequireCapabilityStmt is a statement-level capability assertion (`__requireCapability(...)`) scoped to the enclosing function; the function compiles when the target capability set satisfies the listed atoms.
 //META: intent=functional
 //META: pipeline_stage=check

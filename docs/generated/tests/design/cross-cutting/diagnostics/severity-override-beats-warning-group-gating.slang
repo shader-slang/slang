@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-sonnet-5-5
-//META: generated_at=2026-11-08T21:32:51Z
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#severity-levels
-//META: doc_section_digest=3ea14a1946d125d6e51f1168520ddc4e04afd09127febe10b5079af9e30b1816
+//META: doc_section_digest=c2dc29952382274ed0bbb3fd75b8dda850859c3b85a57e5b07f0cbaf0a1abf4b
 //META: purpose=A per-id override takes precedence over warning-group gating, so `-W<id>` force-enables a single warning from a group that is off.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -O0 -target cpp -entry computeMain -stage compute -validate-ir -Wno-30051
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -O0 -target cpp -entry computeMain -stage compute -validate-ir -Wno-30051
 
 // The call below intentionally aliases an `__constref` parameter with an `out` parameter. We
 // suppress the unrelated aliasing warning so that exhaustive diagnostic matching isolates the

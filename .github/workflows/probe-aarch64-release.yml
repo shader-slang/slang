@@ -1,0 +1,26 @@
+name: Probe aarch64 release
+
+# DO NOT MERGE. This workflow belongs to a throwaway probe branch. It runs
+# only the windows-aarch64 release build, to test the new runner image.
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: probe-aarch64-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: aarch64
+      config: release
+      runs-on: '["windows-11-vs2026-arm"]'
+      build-llvm: true

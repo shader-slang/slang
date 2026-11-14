@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-sonnet-5-5
-generated_at: 2026-11-08T21:36:00+00:00
-source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
-watched_paths_digest: 97023cc589039ec4f3cca436023287c63ec6d72a7ade233738484e6b375008db
+model: claude-opus-5[1m]
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 61dc2589a4a9843f1bf8bb8e81ac88bf6ecf9b1390a4ae746c1d24e014d265cc
 source_doc: docs/generated/design/name-resolution/scopes.md
-source_doc_digest: 33d0841c80be7c99fb59fe4f80a833da93cad90347bc0322a54edc2483b48d1e
+source_doc_digest: 26fbbcec5abd0e13823ed646e5eacb4a2b29871658b606c7dad0d6050ae59cab
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -128,10 +128,6 @@ Internal-source facts (class layout and parser plumbing; no independent user-obs
 69. `addSiblingScopeForContainerDecl` allocates a fresh `Scope`, points it at the secondary `ContainerDecl`, and splices it into the destination scope's `nextSibling` list.
 70. `FuncConstraintDecl` also lands in an interface or generic scope as a requirement member, but it is synthesized during header checking and has no parser path or scope of its own.
 71. Pushing a `Scope` whose `containerDecl` is null is not supported; the bare-`Scope*` overload of `PushScope` exists only to restore a pre-built scope.
-72. Each `{ ... }` body of a reopened namespace gets its own `Scope` (recorded in `NamespaceDecl::lexicalScopes`), and `visitNamespaceDecl` attaches the other bodies' scopes as siblings, so code in one body reaches another body's members unqualified.
-73. For a qualified namespace name such as `namespace A.B`, the parser also pushes a scope for each earlier component, so the body sees members of `A` unqualified.
-74. `visitBlockStmt` sets `hiddenFromLookup` on each member of a `DeclGroup` as well as on each single `DeclStmt`, so an earlier declarator's initializer cannot see a later same-named declarator.
-75. Lookup stops climbing to the parent once a level has produced a result that is neither overloaded nor of an overloadable kind, so an inner variable shadows an outer function of the same name.
 
 ## Functional coverage
 
@@ -195,10 +191,6 @@ Internal-source facts (class layout and parser plumbing; no independent user-obs
 | C29, C48: Re-opening the same namespace name reuses the existing NamespaceDecl and links siblings; members from both declarations are reachable via the same qualified name. | functional | [#sibling-scopes](../../../../design/name-resolution/scopes.md#sibling-scopes)                                       | [`namespace-reopened-merges-members.slang`](namespace-reopened-merges-members.slang)                                       |
 | C25, C41: When a module is imported, the checker adds its scope as a sibling so names from it are reachable without explicit qualification; the core module's builtins (e.g. `sin`) are reachable through this mechanism. | functional | [#sibling-scopes](../../../../design/name-resolution/scopes.md#sibling-scopes)                                       | [`builtin-from-implicit-core-module.slang`](builtin-from-implicit-core-module.slang)                                       |
 | A `__constraint` written inside a `struct` is rejected on placement with `E30102`, separately from the `This`-subject rule. | negative | [#edge-cases-and-failure-modes](../../../../design/name-resolution/scopes.md#edge-cases-and-failure-modes) | [`constraint-decl-not-allowed-in-struct.slang`](constraint-decl-not-allowed-in-struct.slang) |
-| C72: Each body of a reopened namespace has its own Scope and the other bodies are wired in as siblings, so a later body reaches an earlier body's member unqualified. | functional | [#sibling-scopes](../../../../design/name-resolution/scopes.md#sibling-scopes) | [`namespace-reopened-body-sees-other-body-unqualified.slang`](namespace-reopened-body-sees-other-body-unqualified.slang) |
-| C73: A qualified namespace declaration `namespace A.B` pushes a scope for the earlier component, so its body reaches members of `A` unqualified. | functional | [#sibling-scopes](../../../../design/name-resolution/scopes.md#sibling-scopes) | [`namespace-qualified-decl-body-sees-parent-members.slang`](namespace-qualified-decl-body-sees-parent-members.slang) |
-| C74: Each declarator of a declaration group stays hidden from lookup until the checker walks past it, so an earlier declarator's initializer resolves the outer same-named local. | boundary | [#edge-cases-and-failure-modes](../../../../design/name-resolution/scopes.md#edge-cases-and-failure-modes) | [`block-decl-group-initializer-resolves-outer.slang`](block-decl-group-initializer-resolves-outer.slang) |
-| C75: Lookup stops at the first level with a non-overloadable hit, so an inner variable shadows an outer function of the same name. | boundary | [#scope-walking-order-during-lookup](../../../../design/name-resolution/scopes.md#scope-walking-order-during-lookup) | [`lookup-stops-at-non-overloadable-hit.slang`](lookup-stops-at-non-overloadable-hit.slang) |
 
 ## Untested claims
 

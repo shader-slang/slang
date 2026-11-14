@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#arrays
-//META: doc_section_digest=5c9b5155d865f422932e8a81448f6165059d67b7f88cef295a12330d13aef941
+//META: doc_section_digest=9dceac67990e87c52cd34a468863d86ce004f41ad1f40482a90f8aeac1862aaa
 //META: purpose=Expansion: Array composes with the narrow Int8 element type, surfacing Array(Int8, N : Int).
 //META: intent=expansion
 //META: pipeline_stage=lower

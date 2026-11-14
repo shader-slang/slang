@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#synthesized-derivative-witnesses
-//META: doc_section_digest=3f62027381c2407565e5f1b3ef3cfd6b38348501236004d7b78830aade4ef218
+//META: doc_section_digest=78050e8840112aefbd29c4d742e5c6beb9ffb31026048eaa31338aaf55782a36
 //META: purpose=FunctionCopy names an existing user function as the body of a synthesized derivative member, taking that function as its single operand.
 //META: intent=functional
 //META: pipeline_stage=lower

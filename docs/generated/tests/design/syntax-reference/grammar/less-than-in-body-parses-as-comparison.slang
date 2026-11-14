@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#-disambiguation
-//META: doc_section_digest=9af1f98685cb612077da94d031ef06cdcc2d4768b2522616e45c9ae531a49988
+//META: doc_section_digest=5bdf1269b8206a09e76ed3099e3be23084e5fadaadeeb860053823b4f5e48c23
 //META: purpose=`<` in a body context where the preceding expression does not resolve to a generic parses as the comparison operator.
 //META: intent=functional
 //META: pipeline_stage=parse

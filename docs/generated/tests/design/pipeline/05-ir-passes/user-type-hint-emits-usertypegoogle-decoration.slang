@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#layout-and-binding
-//META: doc_section_digest=0fba7fe66a94de18a3a43af71b0a2a503d43e1e15dfc035e524c23f3c2bdbd9f
+//META: doc_section_digest=e8a69f877014ca0f8bfc67db36bada005ec4a862dc57ca692609099e2ca800ab
 //META: purpose=The user-type-hint pass records each global param's original type name before type lowering erases it, and the SPIR-V backend turns that into an OpDecorateString UserTypeGOOGLE annotation under -fspv-reflect.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

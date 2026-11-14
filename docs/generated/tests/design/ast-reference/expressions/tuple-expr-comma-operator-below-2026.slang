@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#nodes
-//META: doc_section_digest=26c797434ab51700cf84e595593cca11917ffceaff2d95c7a0504524e997316e
+//META: doc_section_digest=0b0dfab9f13850a71e13b9ce6f8fb9a433ddb72267a526bf6454583638151a5b
 //META: purpose=Below language version 2026 a comma inside parentheses is still the comma operator rather than a tuple construction, so the parenthesized pair evaluates to its right-hand operand.
 //META: intent=boundary
 //META: pipeline_stage=parse

@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -std 2025 -target cpp -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -std legacy -target cpp -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2025 -target cpp -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std legacy -target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=NOWARNCHECK): -std 2025 -target cpp -entry computeMain -stage compute -Wno-31200
 
 // A four-component vector cannot be sensibly initialized from three components.

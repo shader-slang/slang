@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-29T07:48:53+00:00
 //META: source_commit=3bb522221d5db85fbdf8dcf441c05ffc3b801358
 //META: doc_ref=docs/generated/design/pipeline/overview.md#ast--ir-lowering
-//META: doc_section_digest=f6080f195ff136c94750bc26ce49f918dba5a42006e4c4170e4ad4820a141882
+//META: doc_section_digest=58d6fa34e989046b10c5c18ce14f1e0e4d1c1f389944592cfe513724b2c60cae
 //META: purpose=A for-loop statement in the AST becomes a back-edged block structure whose loop header, exit test, and body all reach the emitted target text.
 //META: intent=functional
 //META: pipeline_stage=lower

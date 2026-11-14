@@ -1,38 +1,11 @@
-// `specializeResourceUsage` exposes `returnHelper`'s conditional texture result at its call site,
-// even with `[noinline]`. `specializeResourceSelections` must then branch to fetch from `tex0` or
-// `tex1` and merge the float result, without storing a texture in a function-local variable.
+// Regression test for issue #10526: selecting a resource (texture/sampler/etc.)
+// through control flow forces it into a function-local variable, which Khronos
+// targets forbid (SPIR-V would emit an OpStore/OpLoad/OpPhi of an opaque handle,
+// producing Vulkan-invalid SPIR-V; GLSL likewise forbids opaque locals). Until
+// such selections can be legalized, the compiler must reject this rather than
+// emit invalid code.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -O0 -validate-ir -validate-ir-detailed
-//TEST:SIMPLE(filecheck=OPT):-target spirv-asm -validate-ir -validate-ir-detailed -O1
-// The unoptimized condition explicitly negates `useSecond`; SPIR-V optimization folds that
-// pair of operations into an equality test. Both forms must fetch from the corresponding binding.
-//CHECK: %[[INPUT:[^ ]+]] = OpLoad %int %useSecond{{( |$)}}
-//CHECK: %[[USE_SECOND:[^ ]+]] = OpINotEqual %bool %[[INPUT]] %int_0{{( |$)}}
-//CHECK: %[[USE_FIRST:[^ ]+]] = OpLogicalNot %bool %[[USE_SECOND]]{{( |$)}}
-//CHECK: OpSelectionMerge %[[MERGE:[^ ]+]] None
-//CHECK: OpBranchConditional %[[USE_FIRST]] %[[FIRST:[^ ]+]] %[[SECOND:[^ ]+]]{{( |$)}}
-//CHECK: %[[FIRST]] = OpLabel
-//CHECK: %[[TEX0:[^ ]+]] = OpLoad {{[^ ]+}} %tex0{{( |$)}}
-//CHECK: OpImageFetch {{[^ ]+}} %[[TEX0]]{{( |$)}}
-//CHECK: OpBranch %[[MERGE]]{{( |$)}}
-//CHECK: %[[SECOND]] = OpLabel
-//CHECK: %[[TEX1:[^ ]+]] = OpLoad {{[^ ]+}} %tex1{{( |$)}}
-//CHECK: OpImageFetch {{[^ ]+}} %[[TEX1]]{{( |$)}}
-//CHECK: OpBranch %[[MERGE]]{{( |$)}}
-//CHECK: %[[MERGE]] = OpLabel
-//OPT: %[[INPUT:[^ ]+]] = OpLoad %int %useSecond{{( |$)}}
-//OPT: %[[USE_FIRST:[^ ]+]] = OpIEqual %bool %[[INPUT]] %int_0{{( |$)}}
-//OPT: OpSelectionMerge %[[MERGE:[^ ]+]] None
-//OPT: OpBranchConditional %[[USE_FIRST]] %[[FIRST:[^ ]+]] %[[SECOND:[^ ]+]]{{( |$)}}
-//OPT: %[[FIRST]] = OpLabel
-//OPT: %[[TEX0:[^ ]+]] = OpLoad {{[^ ]+}} %tex0{{( |$)}}
-//OPT: OpImageFetch {{[^ ]+}} %[[TEX0]]{{( |$)}}
-//OPT: OpBranch %[[MERGE]]{{( |$)}}
-//OPT: %[[SECOND]] = OpLabel
-//OPT: %[[TEX1:[^ ]+]] = OpLoad {{[^ ]+}} %tex1{{( |$)}}
-//OPT: OpImageFetch {{[^ ]+}} %[[TEX1]]{{( |$)}}
-//OPT: OpBranch %[[MERGE]]{{( |$)}}
-//OPT: %[[MERGE]] = OpLabel
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
 Texture1D<float> tex0, tex1;
 
@@ -40,6 +13,8 @@ Texture1D<float> tex0, tex1;
 Texture1D<float> returnHelper(Texture1D<float> a, Texture1D<float> b, bool useSecond)
 {
     return useSecond ? b : a;
+//CHECK:             ^ opaque type in local variable is not supported for Khronos targets
+//CHECK:             ^ a resource or other opaque-typed value ('Texture1D') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function
 }
 
 [shader("fragment")]

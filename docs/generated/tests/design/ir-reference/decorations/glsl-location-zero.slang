@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout-and-binding
-//META: doc_section_digest=bb0b029cf149621f75e5779e2f3a19e923bd78331824b0f9ffa6d1080fe26c47
+//META: doc_section_digest=fefaa116238af2b286c6cb73dc3224a4704918ed8d0cdbaa5e118e7c7b474c44
 //META: purpose=Boundary - vk::location(0) at the lower edge produces glslLocation(0 : Int).
 //META: intent=boundary
 //META: pipeline_stage=lower

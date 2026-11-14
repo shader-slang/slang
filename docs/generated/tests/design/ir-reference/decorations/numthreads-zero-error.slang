@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#entry-point-and-stage
-//META: doc_section_digest=dba27f1411ac31618a8d7cd73ed506a70bd92102a42f2b59e56aa750058110fa
+//META: doc_section_digest=babb40e44ba0eb7addfafeddc37185c8c3bbed4c27b3b7fc8a2469d95b33aca1
 //META: purpose=Negative - [numthreads(0,1,1)] is rejected with E31102 "expected a positive integer", the lower-edge invalid input.
 //META: intent=negative
 //META: pipeline_stage=check

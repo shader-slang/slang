@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#container-level-cap
-//META: doc_section_digest=d83dae05e0e7481f6942efbbae41ad28781f57bf1ef326d5237d5732290704df
+//META: doc_section_digest=9489d5d7008e3b7339c769e32cc45730a497b35c5a531094faa03ce8571ca08f
 //META: purpose=A type's visibility is the minimum of its own declaration's visibility and its declaration-reference generic arguments, so a `public` generic specialized on an `internal` argument is itself less visible.
 //META: intent=negative
 //META: pipeline_stage=check

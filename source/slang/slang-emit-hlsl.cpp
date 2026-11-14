@@ -1760,92 +1760,50 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_IntLit:
-        {
-            // The `L` suffix types an `int` constant without a cast, as `U`, `LL` and `ULL` type
-            // the other integer constants that the base emitter writes. Two values keep another
-            // form. dxc types `0L` as `uint`, so zero stays the cast `int(0)`. `2147483648` does
-            // not fit in an `int`, so the minimum is written as an expression of in-range literals,
-            // as the base emitter writes the `int64_t` minimum.
-            IRConstant* constantInst = static_cast<IRConstant*>(inst);
-            auto basicType = as<IRBasicType>(constantInst->getDataType());
-            if (!basicType || basicType->getBaseType() != BaseType::Int)
-                break;
-            int32_t value = int32_t(constantInst->value.intVal);
-            if (value == 0)
-            {
-                m_writer->emit("int(0)");
-            }
-            else if (value == INT32_MIN)
-            {
-                m_writer->emit("(-2147483647L - 1L)");
-            }
-            else
-            {
-                m_writer->emit(value);
-                m_writer->emit("L");
-            }
-            return;
-        }
-
     case kIROp_FloatLit:
         {
-            // HLSL types an unsuffixed floating-point literal as `float`, and dxc deduces template
-            // arguments such as the `T` of `RWByteAddressBuffer.Store<T>` from the literal, so
-            // every constant carries the suffix of its type. The `h` suffix needs no 16-bit types:
-            // without them, `half` is a 32-bit type and `1.5h` is a 32-bit value. A NaN or infinity
-            // is a division by zero in literals of its type, which dxc and FXC fold to the
-            // constant. `BFloat16`, `FloatE4M3` and `FloatE5M2` have no HLSL scalar type, so their
-            // constants keep the unsuffixed and `float` spellings.
             IRConstant* constantInst = static_cast<IRConstant*>(inst);
-            const char* suffix = nullptr;
-            switch (constantInst->getDataType()->getOp())
-            {
-            case kIROp_HalfType:
-                suffix = "h";
-                break;
-            case kIROp_FloatType:
-                suffix = "f";
-                break;
-            case kIROp_DoubleType:
-                suffix = "L";
-                break;
-            default:
-                break;
-            }
-
-            const char* nonFiniteNumerator = nullptr;
-            switch (constantInst->getFloatKind())
+            IRConstant::FloatKind kind = constantInst->getFloatKind();
+            switch (kind)
             {
             case IRConstant::FloatKind::Nan:
-                nonFiniteNumerator = "0.0";
-                break;
+                {
+                    m_writer->emit("(0.0f / 0.0f)");
+                    return;
+                }
             case IRConstant::FloatKind::PositiveInfinity:
-                nonFiniteNumerator = "1.0";
-                break;
+                {
+                    m_writer->emit("(1.0f / 0.0f)");
+                    return;
+                }
             case IRConstant::FloatKind::NegativeInfinity:
-                nonFiniteNumerator = "-1.0";
-                break;
+                {
+                    m_writer->emit("(-1.0f / 0.0f)");
+                    return;
+                }
             default:
-                break;
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+                    // HLSL treats an unsuffixed floating-point literal as a 32-bit `float` by
+                    // default, and dxc deduces `float` from one for a template argument such as the
+                    // `T` of `RWByteAddressBuffer.Store<T>`. A finite `float` literal therefore
+                    // takes `f` and a finite `double` literal takes `L`. A `half` literal stays
+                    // bare, because the `h` suffix needs 16-bit types to be enabled; that and the
+                    // `float`-typed NaN/Inf spellings above are known remaining gaps.
+                    switch (constantInst->getDataType()->getOp())
+                    {
+                    case kIROp_FloatType:
+                        m_writer->emit("f");
+                        break;
+                    case kIROp_DoubleType:
+                        m_writer->emit("L");
+                        break;
+                    default:
+                        break;
+                    }
+                    return;
+                }
             }
-
-            if (nonFiniteNumerator)
-            {
-                const char* nonFiniteSuffix = suffix ? suffix : "f";
-                m_writer->emit("(");
-                m_writer->emit(nonFiniteNumerator);
-                m_writer->emit(nonFiniteSuffix);
-                m_writer->emit(" / 0.0");
-                m_writer->emit(nonFiniteSuffix);
-                m_writer->emit(")");
-                return;
-            }
-
-            m_writer->emit(constantInst->value.floatVal);
-            if (suffix)
-                m_writer->emit(suffix);
-            return;
         }
 
     default:
@@ -2435,8 +2393,19 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
                                                                     : nullptr;
         SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
 
-        auto [directionInfo, valueType] = splitParameterDirectionAndType(paramType);
-        SLANG_UNUSED(directionInfo);
+        auto valueType = paramType;
+        if (auto outType = as<IROutParamTypeBase>(valueType))
+        {
+            valueType = outType->getValueType();
+        }
+        else if (auto refType = as<IRRefParamType>(valueType))
+        {
+            valueType = refType->getValueType();
+        }
+        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
+        {
+            valueType = constRefType->getValueType();
+        }
 
         m_writer->emit(prefix);
         emitType(valueType, paramName);

@@ -7,12 +7,12 @@
 // export reads one stage's counts; its generic list specialization leaves other sections empty
 // so references to concrete shader types do not combine incompatible stage requirements.
 //EMPTY-COUNT-6: return int(0);
-//NONEMPTY-DAG: return 1L;
-//NONEMPTY-DAG: return 1L;
-//NONEMPTY-DAG: return 2L;
-//NONEMPTY-DAG: return 2L;
-//NONEMPTY-DAG: return 3L;
-//NONEMPTY-DAG: return 3L;
+//NONEMPTY-DAG: return int(1);
+//NONEMPTY-DAG: return int(1);
+//NONEMPTY-DAG: return int(2);
+//NONEMPTY-DAG: return int(2);
+//NONEMPTY-DAG: return int(3);
+//NONEMPTY-DAG: return int(3);
 import slang.raytracing.portable;
 
 struct TraceContext : rt::ITraceContext

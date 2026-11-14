@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#angle-bracket-annotations
-//META: doc_section_digest=2c5cb602908e3515d97a6034149f8485fbc80ce25286dbf4b9ffe1c1046a8600
+//META: doc_section_digest=c1b90aaeaf650f0c241c36ad809eff8ba3ee9d76205a8687880ba161c262b30c
 //META: purpose=Under `-enable-effect-annotations` the declarator-level `< ... >` clause is discarded entirely, so nothing written inside the angle brackets reaches the AST and the annotated declaration binds normally.
 //META: intent=functional
 //META: pipeline_stage=parse

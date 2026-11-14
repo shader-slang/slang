@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK):
 
 import glsl;
 //CHK: ^^^^ redundant import of the builtin `glsl` module

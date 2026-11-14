@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#storage-type-legalization-casts
-//META: doc_section_digest=96b87d6b5442ad6c1bef1c050044861920cb28d3ed66bb9755bd34d3a87bba7b
+//META: doc_section_digest=221b34de87a25c557e22e8683a229aec25e86798194a0bdcacb5ad27c36b69b1
 //META: purpose=A call to the core-module `asDynamicUniform<T>` emits a `TreatAsDynamicUniform` inst wrapping the marked value, and the uniformity pass consumes it before emit.
 //META: intent=functional
 //META: pipeline_stage=lower

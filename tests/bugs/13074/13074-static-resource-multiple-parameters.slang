@@ -8,9 +8,9 @@
 //CHECK-LABEL: float4 loadBoth_{{[0-9]+}}(
 //CHECK-SAME: Texture2D<float4 > [[FIRST:firstTexture_[0-9]+]],
 //CHECK-SAME: Texture2D<float4 > [[SECOND:secondTexture_[0-9]+]])
-//CHECK: return [[FIRST]].Load({{.*}}int(0){{.*}}) + [[SECOND]].Load({{.*}}1L
+//CHECK: return [[FIRST]].Load({{.*}}int(0){{.*}}) + [[SECOND]].Load({{.*}}int(1)
 //CHECK-LABEL: float4 main()
-//CHECK: return loadBoth_{{[0-9]+}}(textures_{{[0-9]+}}[int(0)], textures_{{[0-9]+}}[1L]);
+//CHECK: return loadBoth_{{[0-9]+}}(textures_{{[0-9]+}}[int(0)], textures_{{[0-9]+}}[int(1)]);
 
 Texture2D<float4> textures[2];
 

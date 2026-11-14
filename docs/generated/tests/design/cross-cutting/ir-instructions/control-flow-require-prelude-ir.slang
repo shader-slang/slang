@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#control-flow-instructions
-//META: doc_section_digest=84a56cdc54a61bf845ba17e0760f56fb7758a625c46a5925f23f07061273dd5f
+//META: doc_section_digest=c0238650e6ba499ae56294af00d41ede4ea9a7b4f8215393080c0974a1553619
 //META: purpose=`__requirePrelude` lowers to the `RequirePrelude` backend-hint opcode carrying the prelude text, which the emitter hoists ahead of the generated code.
 //META: intent=functional
 //META: pipeline_stage=lower

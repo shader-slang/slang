@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#work-graph-nodes
-//META: doc_section_digest=ba5cf53411be35c9a539664a4903ff408ae31f00dc971f0c8a66a83a4ff5743e
+//META: doc_section_digest=5226e00be7c0cb4031cddbe6e885685396e42c7841a4bb73bc9f271385a6ae1c
 //META: purpose=A [NodeID(name, arrayIndex)] attribute lowers to a nodeID decoration whose operands are the name string and the array index integer.
 //META: intent=functional
 //META: pipeline_stage=lower

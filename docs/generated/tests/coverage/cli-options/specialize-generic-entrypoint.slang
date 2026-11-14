@@ -22,7 +22,7 @@
 // generated `_0` suffix is part of it because Slang's name mangling is stable
 // for a single non-overloaded method here.
 
-//TEST:SIMPLE(filecheck=DEFAULT,exit-code=-1):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=DEFAULT):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPECIALIZED):-target hlsl -entry main -stage compute -specialize Impl
 
 interface IFoo

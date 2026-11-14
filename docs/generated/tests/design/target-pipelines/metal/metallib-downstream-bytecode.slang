@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#downstream-apple-metal-compiler
-//META: doc_section_digest=493f392639c5a17ee3f1baf8a77a2222a0f4ff648b2f59628575efc1dd1a87c3
+//META: doc_section_digest=a3046473c0484e96989947066db50f7473521aa41eb25ead13bba827af504a1c
 //META: purpose=`-target metallib` hands the emitted MSL to Apple's `metal` compiler (the `MetalC` pass-through) to produce a `.metallib` carrying the renamed entry point.
 //META: intent=expansion
 //META: pipeline_stage=runtime

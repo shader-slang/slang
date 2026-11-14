@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#two-stage-parsing
-//META: doc_section_digest=9e6cdcd331c77e6ace71db8f4327394855e85e18930b373da3d6bbea094c0c09
+//META: doc_section_digest=ddfe5f62e9b1084664029d4e0b1a2903b23b23769c16d58583a7289396a20747
 //META: purpose=A base that resolves to a non-generic function, to a type, or to an overload group with such a candidate commits to the generic reading of `<`, because such a name can never legally precede a comparison.
 //META: intent=negative
 //META: pipeline_stage=parse

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):-E
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-E
 //TEST:SIMPLE(filecheck=CHECK):-E
 
 //

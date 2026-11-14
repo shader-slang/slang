@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-unscoped-enum
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-unscoped-enum
 
 // With `-unscoped-enum`, every enum adds a `static const` alias for each case to the
 // enclosing scope, so a case conflicts with an earlier declaration of the same name

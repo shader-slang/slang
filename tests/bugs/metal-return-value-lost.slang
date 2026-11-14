@@ -67,7 +67,7 @@ void computeMain(uint tid : SV_GroupIndex)
 // HLSL: for(;;)
 // HLSL: [[RET]].data_0 = output_0.data_0;
 // HLSL: if(([[RET]].data_0[int(0)]) == 30.0f)
-// HLSL: passed_0 = ([[RET]].data_0[1L]) == 70.0f;
+// HLSL: passed_0 = ([[RET]].data_0[int(1)]) == 70.0f;
 
 // CUDA: Vec_0 [[RET:_S[0-9]+]];
 // CUDA: for(;;)

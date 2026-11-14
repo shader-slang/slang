@@ -7,7 +7,7 @@
 //TEST:SIMPLE(filecheck=NOCACHE): -target hlsl -entry main -stage compute -validate-ir
 
 //NOCACHE-NOT: cachedTextures
-//CHECK: Texture2D<float4 >   [[TEXTURES:textures_[0-9]+]][1L][1L]
+//CHECK: Texture2D<float4 >   [[TEXTURES:textures_[0-9]+]][int(1)][int(1)]
 //CHECK-LABEL: void main()
 //CHECK: [[TEXTURES]][int(0)][int(0)].Load
 

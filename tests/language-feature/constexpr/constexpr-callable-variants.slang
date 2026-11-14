@@ -1,7 +1,7 @@
 // non-exhaustive is required because each E31228 also emits a span row that no
 // CHECK matches.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
 
 //CHECK: constexpr on a function or other callable declaration is not a supported Slang feature and is ignored
 //CHECK: constexpr on a function or other callable declaration is not a supported Slang feature and is ignored

@@ -206,7 +206,6 @@ public:
     bool isSpecializationDisabled();
 
     bool shouldSkipSPIRVValidation();
-    bool shouldValidateWithDownstreamCompiler();
 
     SlangResult requireTranslationUnitSourceFiles();
 
@@ -260,7 +259,6 @@ protected:
     SlangResult emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outArtifact);
 
     SlangResult emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& outArtifact);
-    SlangResult validateEmittedSourceWithDownstream(CodeGenTarget sourceTarget);
 
     /* Determines a suitable filename to identify the input for a given entry point being compiled.
     If the end-to-end compile is a pass-through case, will attempt to find the (unique) source file

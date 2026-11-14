@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#declstmt-expressionstmt-and-emptystmt
-//META: doc_section_digest=003e69c99073f5634eddc84cdfb1b66685b97f4c42311978531b11906df8dbf4
+//META: doc_section_digest=f7bfa0974673101affd0c2c6bec598b82f456d7ca02af4b3bb7f94c38cd16f85
 //META: purpose=An ExpressionStmt holds an arbitrary `Expr` used for its side effects; the value of the expression is computed and discarded, and any side effects (function call, assignment) are observed.
 //META: intent=functional
 //META: pipeline_stage=check

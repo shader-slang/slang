@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage fragment -entry fragmentMain -Wno-119
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_DIAG,exit-code=0): -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_DIAG): -no-codegen
 
 //CHECK_GLSL: layout(location = 0)
 //CHECK_GLSL: out vec4 entryPointParam_fragmentMain_cd_out1_0;

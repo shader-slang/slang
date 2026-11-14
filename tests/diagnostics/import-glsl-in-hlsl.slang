@@ -1,7 +1,7 @@
 // `import glsl` does not change the source language, so using it from HLSL mixes the GLSL module's
 // declarations and operator rules with HLSL parsing and semantics.
 
-//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK,exit-code=0): -lang hlsl tests/diagnostics/import-glsl-in-hlsl.slang
+//DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/diagnostics/import-glsl-in-hlsl.slang
 
 import glsl;
 /*CHECK:

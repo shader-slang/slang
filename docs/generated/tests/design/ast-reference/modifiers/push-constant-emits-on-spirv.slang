@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#nodes
-//META: doc_section_digest=29d86296deb73a57a4f207507e16ba645a6bf2e722162db8157e7554d2cf8004
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#layout--binding-attributes
+//META: doc_section_digest=937b78c13b95575b061eb7026bb075b7caeed29a419f54d8aaffc825020fc09c
 //META: purpose=`[push_constant]` places the constant buffer in the SPIR-V PushConstant storage class instead of a descriptor binding.
 //META: intent=functional
 //META: pipeline_stage=layout

@@ -3,7 +3,7 @@
 //META: generated_at=2026-11-02T10:45:10+00:00
 //META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
 //META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=76ee6e7723bb37a4f19d893a5f6a1b0f60d1fe8881e266ab68ab9b3946c62211
+//META: doc_section_digest=e9219cdb5c991479475f495fed529b3a717626417843075cd38373dfd41801fa
 //META: purpose=A DescriptorHandleType `DescriptorHandle<T>` is a bindless handle that carries a heap index; the HLSL backend recovers the concrete resource by indexing the descriptor heap with it.
 //META: intent=functional
 //META: pipeline_stage=emit

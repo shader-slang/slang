@@ -4,7 +4,7 @@
 // in both import orders. This file imports the extern overload first; see
 // extern-overload-def-first.slang for the swapped order.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
 
 // No diagnostics are expected, and the check is exhaustive. Had the `extern float f(float)`
 // candidate been dropped, `f(1.5f)` would have no applicable overload (`float` to `int` is not an

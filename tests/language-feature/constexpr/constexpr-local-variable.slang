@@ -1,7 +1,7 @@
 // Test that `constexpr` on a local (non-static) variable emits the E31227
 // warning and compiles correctly by treating the variable as `const`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
 
 //CHECK: constexpr on variable declarations is not a supported Slang feature
 

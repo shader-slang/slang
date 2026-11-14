@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#interaction-with-extern-and-export
-//META: doc_section_digest=403fe2795d9f861f86a9b27c1535faca2b2c8fd96e1ba9fff4f9858b4f7b550f
+//META: doc_section_digest=a07dce2967fabea624992741eb466967b7e29d81570718107992df0067ad062b
 //META: purpose=The bare `export` keyword records linkage intent and does not raise a decl's visibility, so an `export`-marked struct is still only `internal` to the visibility checker.
 //META: intent=negative
 //META: pipeline_stage=check

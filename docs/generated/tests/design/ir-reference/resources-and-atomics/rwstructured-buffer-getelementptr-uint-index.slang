@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#rwstructuredbuffergetelementptr
-//META: doc_section_digest=c1926379566a798f6e26928651f281675df5e998bf0bf008f9481bf70aad885c
+//META: doc_section_digest=79a3f90a07e564c3a6781f28bec380af53c172ad701f8d621623d248c4edee79
 //META: purpose=`rwbuf[uint_idx] = v` (uint-typed index) still surfaces the documented `rwstructuredBufferGetElementPtr(%base, %index)` opcode shape; the operand type is uint rather than int.
 //META: intent=boundary
 //META: pipeline_stage=lower

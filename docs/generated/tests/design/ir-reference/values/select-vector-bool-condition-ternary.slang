@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#select
-//META: doc_section_digest=3b5109edc595d8e386591ea291155032aaed6d4073b37d2b31e86bba10c285b4
+//META: doc_section_digest=6a246596e363472d4dea3a9f4c80799257cdcad05d5bbe71a9d627181a6e8654
 //META: purpose=A ternary `?:` whose condition is a `vector<bool,N>` (not a `BasicExpressionType`) lowers to the branch-free `select` opcode rather than to `ifElse` plus a join-block param.
 //META: intent=functional
 //META: pipeline_stage=lower

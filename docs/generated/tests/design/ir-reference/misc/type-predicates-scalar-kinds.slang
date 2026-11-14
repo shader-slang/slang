@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#type-queries-and-predicates
-//META: doc_section_digest=a314589d5bf1e20e3602ad6d1cfc7cdbc66f447af11efa30fb64ff86fa52545e
+//META: doc_section_digest=cab621016e64a7e1c7e309a2dec68b9f941414337db801f7d55a994e5fdebe08
 //META: purpose=Each scalar type predicate (`IsInt`, `IsBool`, `IsFloat`, `IsHalf`, `IsCoopFloat`, `IsUnsignedInt`, `IsSignedInt`) folds to a boolean constant matching the queried scalar type.
 //META: intent=functional
 //META: pipeline_stage=lower

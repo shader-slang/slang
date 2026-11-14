@@ -3,7 +3,7 @@
 //META: generated_at=2026-09-11T00:00:00+00:00
 //META: source_commit=48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#edge-cases-and-failure-modes
-//META: doc_section_digest=6f56ac76aaddef7a4076217c6b9406ddfe1d14ddd4d122a991eba3c769b781e4
+//META: doc_section_digest=7b8fdedc5a4069b7a10da3f6dcaf8b3268c6f74fbb85dd4ea2edff960fab2b8b
 //META: purpose=A __constraint written inside a struct is rejected by the placement rule with E30102, which is separate from the This-subject rule that applies once the decl is somewhere it is allowed.
 //META: intent=negative
 //META: pipeline_stage=parse

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#wgslsourceemitter-policy-overrides-and-bool-conditioned-values
-//META: doc_section_digest=3eb656b9aedf4fda1a1310d903954e043c88751dba5159c8d5337e7ff6d4c613
+//META: doc_section_digest=4257ff9be02b99251d770da11abeb8bfa7d80ed5fd4d56efef79e6f40ff84e49
 //META: purpose=A component-wise vector<bool,3> to vector<int,3> cast emits a vector select because the same emitter arm tests the vector element type
 //META: intent=boundary
 //META: pipeline_stage=emit

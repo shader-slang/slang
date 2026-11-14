@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#sampling-and-combined-samplers
-//META: doc_section_digest=bbf71e9879e5ca6464e703729e122f9e3af7f79c62a7f182ca2c1576a2edbfe2
+//META: doc_section_digest=796a186ea07715a784b97724aaeb7a3b60b2a410eea1fc6f2ea9cc87d5100072
 //META: purpose=`TextureCube::Sample(samp, uv)` surfaces in `main` as a `call specialize(%Sample, ..., TextureShapeCubeDType, ...)` against the library helper.
 //META: intent=expansion
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@ uniform TextureCube<float4> tex;
 uniform SamplerState samp;
 uniform RWStructuredBuffer<float4> outbuf;
 
-[numthreads(4, 1, 1)]
+[numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
     float3 uv = float3(tid);

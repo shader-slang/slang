@@ -55,7 +55,7 @@ void callableVector(inout float4 data)
 // HLSL: void anyHitVector(inout [[vector]] [[anyHit:[A-Za-z0-9_]+]],
 // HLSL: [[anyHit]].[[vectorField]][int(0)] = {{.*}}barycentrics.x;
 // HLSL: AcceptHitAndEndSearch();
-// HLSL: [[anyHit]].[[vectorField]][2L] = 1.0f;
+// HLSL: [[anyHit]].[[vectorField]][int(2)] = 1.0f;
 // HLSL: void closestHitVector(inout [[vector]] [[closestHit:[A-Za-z0-9_]+]],
 // HLSL: [[closestHit]].[[vectorField]] = float4(
 // HLSL: struct [[scalar:RayPayload_t[A-Za-z0-9_]*]]
@@ -67,9 +67,9 @@ void callableVector(inout float4 data)
 // HLSL: [[miss]].[[vectorField]] = float4(
 // HLSL: struct [[array:RayPayload_t[A-Za-z0-9_]*]]
 // HLSL-NEXT: {
-// HLSL-NEXT: float [[arrayField:[A-Za-z0-9_]+]][4L];
+// HLSL-NEXT: float [[arrayField:[A-Za-z0-9_]+]][int(4)];
 // HLSL: void missArray(inout [[array]] [[missArray:[A-Za-z0-9_]+]])
-// HLSL: [[missArray]].[[arrayField]][2L] =
+// HLSL: [[missArray]].[[arrayField]][int(2)] =
 // HLSL: struct [[callable:ForceVarIntoStructTemporarily_t[A-Za-z0-9_]*]]
 // HLSL-NEXT: {
 // HLSL-NEXT: float4 [[callableField:[A-Za-z0-9_]+]];
@@ -86,7 +86,7 @@ void callableVector(inout float4 data)
 // PAQ-NEXT: float {{[A-Za-z0-9_]+}} : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
 // PAQ: struct [raypayload] RayPayload_t
 // PAQ-NEXT: {
-// PAQ-NEXT: float {{[A-Za-z0-9_]+}}[4L] : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
+// PAQ-NEXT: float {{[A-Za-z0-9_]+}}[int(4)] : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
 // PAQ: struct ForceVarIntoStructTemporarily_t
 // PAQ-NEXT: {
 // PAQ-NEXT: float4 {{[A-Za-z0-9_]+}};

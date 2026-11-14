@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=156280c3625197a4ed3b683ed5771a1ea94cd998308b23695241f7f96edbb6a7
+//META: doc_section_digest=9e56dc6fbb032bd27e7464356d0ae573f83ef6e509f182c79ec8316e29e88dc0
 //META: purpose=Boundary: integer remainder by 1 (`a % 1`) lowers to `irem(%a, 1 : Int)` — the smallest non-zero divisor edge for the documented `irem` opcode.
 //META: intent=boundary
 //META: pipeline_stage=lower

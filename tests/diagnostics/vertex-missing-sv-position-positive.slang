@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
 
 // Regression test for #8753 (positive cases).
 //

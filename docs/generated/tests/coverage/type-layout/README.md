@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-sonnet-5-5
-generated_at: 2026-11-08T21:31:40+00:00
-source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
-watched_paths_digest: a12181c14bc0eede92ff8982c3dd33d038893db036613e8749e827a62d66d14e
+model: claude-opus-5[1m]
+generated_at: 2026-08-05T00:00:00+00:00
+source_commit: 5634a0ea1b
+watched_paths_digest: 0a2aa024299dd826ce0f7a6153336a696d3348a0c9cb798df8e2fc61b3e42130
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 

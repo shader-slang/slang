@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#reshape-and-pack-helpers
-//META: doc_section_digest=8048372bf4934a77e6dd87e52389c17ae44933ad62e3f83a6f26004d30fcaf5d
+//META: doc_section_digest=eb3718cb6b99fd9929a50fd7f641f3667f267902766e80b2d955d2a9bb78d371
 //META: purpose=An `each` expression over a `Tuple<expand each T>` parameter is the surface that emits `getTupleElement(tuple, index)`; positional member access is not, because it rewrites to `swizzle`.
 //META: intent=functional
 //META: pipeline_stage=lower

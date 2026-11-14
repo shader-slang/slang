@@ -5,33 +5,33 @@
 // combined texture+sampler arrays into separate texture and sampler arrays for all sampler types.
 
 // Sampler2D arrays with both texture and sampler register attributes
-// CHECK-DAG: Texture2D<float4 > tex2D_texture_0[16L] : register(t0, space2);
-// CHECK-DAG: SamplerState tex2D_sampler_0[16L] : register(s0, space2);
+// CHECK-DAG: Texture2D<float4 > tex2D_texture_0[int(16)] : register(t0, space2);
+// CHECK-DAG: SamplerState tex2D_sampler_0[int(16)] : register(s0, space2);
 Sampler2D tex2D[16] : register(t0, space2) : register(s0, space2);
 
 // SamplerCube arrays
-// CHECK-DAG: TextureCube<float4 > texCube_texture_0[8L] : register(t5, space1);
-// CHECK-DAG: SamplerState texCube_sampler_0[8L] : register(s10, space1);
+// CHECK-DAG: TextureCube<float4 > texCube_texture_0[int(8)] : register(t5, space1);
+// CHECK-DAG: SamplerState texCube_sampler_0[int(8)] : register(s10, space1);
 SamplerCube texCube[8] : register(t5, space1) : register(s10, space1);
 
 // Sampler3D arrays with default space (space0)
-// CHECK-DAG: Texture3D<float4 > tex3D_texture_0[4L] : register(t20);
-// CHECK-DAG: SamplerState tex3D_sampler_0[4L] : register(s25);
+// CHECK-DAG: Texture3D<float4 > tex3D_texture_0[int(4)] : register(t20);
+// CHECK-DAG: SamplerState tex3D_sampler_0[int(4)] : register(s25);
 Sampler3D tex3D[4] : register(t20) : register(s25);
 
 // Sampler1D arrays
-// CHECK-DAG: Texture1D<float4 > tex1D_texture_0[2L] : register(t30, space3);
-// CHECK-DAG: SamplerState tex1D_sampler_0[2L] : register(s30, space3);
+// CHECK-DAG: Texture1D<float4 > tex1D_texture_0[int(2)] : register(t30, space3);
+// CHECK-DAG: SamplerState tex1D_sampler_0[int(2)] : register(s30, space3);
 Sampler1D tex1D[2] : register(t30, space3) : register(s30, space3);
 
 // Single element arrays
-// CHECK-DAG: Texture2D<float4 > singleTex_texture_0[1L] : register(t100, space5);
-// CHECK-DAG: SamplerState singleTex_sampler_0[1L] : register(s100, space5);
+// CHECK-DAG: Texture2D<float4 > singleTex_texture_0[int(1)] : register(t100, space5);
+// CHECK-DAG: SamplerState singleTex_sampler_0[int(1)] : register(s100, space5);
 Sampler2D singleTex[1] : register(t100, space5) : register(s100, space5);
 
 // Large array to test with bigger sizes
-// CHECK-DAG: Texture2D<float4 > largeTex_texture_0[64L] : register(t200, space10);
-// CHECK-DAG: SamplerState largeTex_sampler_0[64L] : register(s200, space10);
+// CHECK-DAG: Texture2D<float4 > largeTex_texture_0[int(64)] : register(t200, space10);
+// CHECK-DAG: SamplerState largeTex_sampler_0[int(64)] : register(s200, space10);
 Sampler2D largeTex[64] : register(t200, space10) : register(s200, space10);
 
 // Mix with non-array combined sampler to ensure regression doesn't affect single samplers
@@ -40,8 +40,8 @@ Sampler2D largeTex[64] : register(t200, space10) : register(s200, space10);
 Sampler2D singleSampler : register(t300) : register(s300);
 
 // Array with only texture register (to test partial register specification)
-// CHECK-DAG: Texture2D<float4 > partialTex_texture_0[2L] : register(t400);
-// CHECK-DAG: SamplerState partialTex_sampler_0[2L] : register(s0);
+// CHECK-DAG: Texture2D<float4 > partialTex_texture_0[int(2)] : register(t400);
+// CHECK-DAG: SamplerState partialTex_sampler_0[int(2)] : register(s0);
 Sampler2D partialTex[2] : register(t400);
 
 float4 fragMain() : SV_Target

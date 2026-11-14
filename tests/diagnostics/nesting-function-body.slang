@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Declarations inside function bodies should be validated against the
 // nesting rules (getParentContainerForNesting unwraps ScopeDecl to reach

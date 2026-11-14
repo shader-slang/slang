@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#interface-internals
-//META: doc_section_digest=631091a3c7dc1e04cb9f969f0a3d91e5c836e06ad2bccf61b2c314a8b98e5d36
+//META: doc_section_digest=ea89e6f41cb0b27896567604f40c35e8dfe6d5bce27e8dd06de9c29f73a18b9b
 //META: purpose=An interface with no members lowers to an interface opcode with an empty operand list, and a conformance to it to a witness_table with no entries.
 //META: intent=boundary
 //META: pipeline_stage=lower

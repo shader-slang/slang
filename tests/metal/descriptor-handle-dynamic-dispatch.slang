@@ -48,7 +48,7 @@ void computeMain()
 // Verify pack uses (ulong) cast, not as_type
 // CHECK: (ulong)(
 // Verify unpack uses pointer cast from ulong, not as_type
-// CHECK: (const float device*)(
+// CHECK: (float device*)(
 // Verify no as_type casts involving pointers appear
 // CHECK-NOT: as_type<uint2>({{.*}}device
-// CHECK-NOT: as_type<{{(const )?}}float device
+// CHECK-NOT: as_type<float device

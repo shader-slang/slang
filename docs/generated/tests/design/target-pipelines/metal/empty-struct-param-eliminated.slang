@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeemptytypes-runs-twice
-//META: doc_section_digest=e318940853ac78ef62659e69253b628edf2c968aefece2a4df458f7ec505f945
+//META: doc_section_digest=bd568eee7f59a08a202af69fe8bc4ae2c67b7d754ce073ef68c3852ae24fa87f
 //META: purpose=`legalizeEmptyTypes` removes an empty-struct parameter entirely, so the emitted Metal function takes only its non-empty arguments.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

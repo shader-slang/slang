@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#targetintrinsic--targetintrinsicdecoration
-//META: doc_section_digest=8dd417122cd239043d2836cf1b6aac681f429d0b8ccfe3bcea947642192414a7
+//META: doc_section_digest=bcecad90942aef58e93b23cf4b28f81f01866d858ac796d92eb622fc5b09a36c
 //META: purpose=Calling a core-module built-in pulls in its targetIntrinsic decoration, whose operands are a capability-set reference and the target-language spelling string.
 //META: intent=functional
 //META: pipeline_stage=lower

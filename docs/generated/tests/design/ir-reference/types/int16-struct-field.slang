@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#struct-and-class-containers
-//META: doc_section_digest=dc8bc7206795f1cd2c841b0040ce70b9d481e3dc01f19fe9b3fa8d38576f4ab3
+//META: doc_section_digest=35e316a9e45af6f156a356bfecea45802765e6938f01700b134ee12ff89ff959
 //META: purpose=Expansion: a struct field of Int16 lowers to a field(...) row whose type operand is Int16.
 //META: intent=expansion
 //META: pipeline_stage=lower

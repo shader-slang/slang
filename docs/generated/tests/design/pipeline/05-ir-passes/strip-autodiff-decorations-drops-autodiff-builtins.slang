@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#differentiation-autodiff
-//META: doc_section_digest=ec7ab587fbb04a8acbf7d0b2ad0771119e07b323b2a0efed00309cf96398b83b
+//META: doc_section_digest=cacccd6a57cbe2ad73776f1f2b2c77aba567defd4a6ab0580f1f60c7e9ad1561
 //META: purpose=On a module with no autodiff constructs the core-module autodiff builtins lose their keep-alive decorations and are dead-code-eliminated, so no differential-pair machinery reaches the emit.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

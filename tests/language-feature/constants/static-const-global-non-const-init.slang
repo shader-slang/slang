@@ -21,21 +21,3 @@ static const float baz = foo * 2.0f;
 static const int minVal = min(int(foo), 5);
 //CHECK:         ^^^^^^ static const global initializer must be a compile-time constant
 //CHECK:         ^^^^^^ initializer of static const global 'minVal' does not evaluate to a compile-time constant
-
-// A specialization constant in one element does not stop E31226 for a mutable global in
-// another element of the same initializer.
-[vk::constant_id(0)]
-const int specN = 4;
-// CHECK: error[E31226]
-static const int mixed[2] = { specN, int(foo) };
-//CHECK:         ^^^^^ static const global initializer must be a compile-time constant
-//CHECK:         ^^^^^ initializer of static const global 'mixed' does not evaluate to a compile-time constant
-
-// The exemption covers only specialization constants that are shader parameters. A
-// `groupshared` global that carries the attribute is still mutable workgroup storage.
-[vk::constant_id(1)]
-groupshared int sharedSpec;
-// CHECK: error[E31226]
-static const int fromShared[2] = { sharedSpec, 3 };
-//CHECK:         ^^^^^^^^^^ static const global initializer must be a compile-time constant
-//CHECK:         ^^^^^^^^^^ initializer of static const global 'fromShared' does not evaluate to a compile-time constant

@@ -3,7 +3,7 @@
 
 int check<let b : bool>(int x)
 {
-    // CHECK: int v{{.*}}[2L]
+    // CHECK: int v{{.*}}[int(2)]
     int v[((int)b) + 1];
     for (int i = 0; i < ((int)b) + 1; i++)
         v[i] = i;

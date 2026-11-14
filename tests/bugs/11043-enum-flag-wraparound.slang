@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -stage compute -entry main -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry main -target spirv
 
 [Flags]
 enum TestEnumS8 : int8_t

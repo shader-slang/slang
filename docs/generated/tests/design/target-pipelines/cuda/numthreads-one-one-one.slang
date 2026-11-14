@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-d-cuda-emit-and-downstream-tools
-//META: doc_section_digest=c7f78b94ff182ef2afbf1242196ba7074458230c6fbf27a693b3d1516c676759
+//META: doc_section_digest=9d22512c322523764ce371d9c4007f35d2bbc6c883c193616d4814d1ae0d08eb
 //META: purpose=Verifies the minimum-thread dispatch shape [numthreads(1,1,1)] still produces an extern "C" __global__ void main_0 entry point on CUDA emit.
 //META: intent=boundary
 //META: pipeline_stage=emit

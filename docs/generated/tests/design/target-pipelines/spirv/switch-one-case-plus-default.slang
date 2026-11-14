@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#opswitch-case-literals-follow-the-selector-width
-//META: doc_section_digest=df525a2f3d687cee2cf33a268d3a981ea063c2889013390817331349a04aea87
+//META: doc_section_digest=5f05fae71db3799a3e7d29911813239729e0a4f62dfaf364df2eaf00a962914b
 //META: purpose=A switch with exactly one case plus default still emits OpSwitch (lower edge of case count) with one labeled target and one default target.
 //META: intent=boundary
 //META: pipeline_stage=emit

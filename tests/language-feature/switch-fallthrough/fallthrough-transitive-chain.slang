@@ -26,11 +26,11 @@
 
 // CHECK-HLSL: case int(0):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case 1L:
+// CHECK-HLSL: case int(1):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case 2L:
+// CHECK-HLSL: case int(2):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case 3L:
+// CHECK-HLSL: case int(3):
 
 // tid=0: 131 = 0x83
 // tid=1: 122 = 0x7A

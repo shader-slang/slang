@@ -6,20 +6,20 @@
 // warning that is OFF by default and only fires under -Wpedantic.
 
 // Off by default (no -Wpedantic): the warning must NOT appear.
-//DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -target spirv
 
 // The groups are independent, so enabling the other groups must NOT turn this pedantic warning on.
-//DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -Wall -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -Wextra -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wall -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wextra -target spirv
 
 // With -Wpedantic: the warning appears.
-//DIAGNOSTIC_TEST:SIMPLE(diag=ON,exit-code=0): -Wpedantic -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wpedantic -target spirv
 
 // With -Wpedantic but an explicit per-id disable: suppressed again.
-//DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -Wpedantic -Wno-vertex-shader-missing-sv-position -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wpedantic -Wno-vertex-shader-missing-sv-position -target spirv
 
 // An explicit per-id enable turns this one warning on without -Wpedantic.
-//DIAGNOSTIC_TEST:SIMPLE(diag=ON,exit-code=0): -Wvertex-shader-missing-sv-position -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wvertex-shader-missing-sv-position -target spirv
 
 struct VSOutput
 {

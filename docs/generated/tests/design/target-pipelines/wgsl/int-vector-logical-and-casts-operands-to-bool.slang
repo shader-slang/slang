@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#legalizelogicalandor
-//META: doc_section_digest=0f95d85b7e4917c52c5df24093e28b4af12cd02e40737f7e612285fa2f66c08c
+//META: doc_section_digest=cf46eb658ec5a58fd8d24cfc9418d9bb7f6dc375544f571f3fc248ceee86422b
 //META: purpose=legalizeLogicalAndOr casts non-boolean vector operands of a logical And to vector<bool,N> and rebuilds the And
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

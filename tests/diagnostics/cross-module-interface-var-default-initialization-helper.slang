@@ -1,6 +1,6 @@
 // This is a cross-module test helper for cross-module-interface-var-default-initialization.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
 
 #language 2025
 

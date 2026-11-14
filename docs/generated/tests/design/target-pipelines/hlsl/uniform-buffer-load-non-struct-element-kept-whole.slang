@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
-//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
+//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizeuniformbufferload
-//META: doc_section_digest=8bed69f5bd70a6209e14bea9460226f079bd82d7e278f76a3260ec2979928264
+//META: doc_section_digest=dc3070f03fc598e804b6c9c24d32a71db38592bbe7839811f671886ce6a11da2
 //META: purpose=A constant buffer whose element type is not a struct keeps its whole-object load, so its uses read the cbuffer variable directly instead of a recombined brace-list.
 //META: intent=boundary
 //META: pipeline_stage=legalize

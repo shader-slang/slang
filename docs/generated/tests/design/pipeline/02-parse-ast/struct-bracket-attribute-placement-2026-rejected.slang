@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#modifier-parsing
-//META: doc_section_digest=70d77929d730a0398ad6cf62c037992abc0cd9b4600f071779b6380151df5290
+//META: doc_section_digest=70d14f0d0b9b4cd7db70e075594b53bdc6fa2b49b6e87e525073bfaf49b1a033
 //META: purpose=From language version 2026 on, a bracketed attribute list written after the `struct` keyword is rejected outright with E31205.
 //META: intent=negative
 //META: pipeline_stage=parse

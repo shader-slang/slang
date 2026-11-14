@@ -26,9 +26,9 @@ T myGenF<T : __BuiltinIntegerType>(inout T a, T b)
     }
 }
 // CHECK: result{{.*}}[int(0)] = 1
-// CHECK: result{{.*}}[1L] = 4
-// CHECK: result{{.*}}[2L] = 1
-// CHECK: result{{.*}}[3L] = 4
+// CHECK: result{{.*}}[int(1)] = 4
+// CHECK: result{{.*}}[int(2)] = 1
+// CHECK: result{{.*}}[int(3)] = 4
 [numthreads(1,1,1)]
 void main()
 {

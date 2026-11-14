@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#intval-family
-//META: doc_section_digest=5fed4ba267a444ba4547b1574c8db862932b61bd0c009914f7040a04720849a9
+//META: doc_section_digest=3b7a66f73a4b30e3c18815ae985a8f256039debd8a5caa97ed928ac84dcbb5bd
 //META: purpose=A countof applied to a type pack is a compile-time integer that folds to the number of elements the pack was bound to.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/types.md#differentiation-types
-//META: doc_section_digest=418e205c407dfedf73a453aa71e19d8c136a8759dd81549fefaf44a7781fd4e9
+//META: doc_section_digest=bbedc6a4ad0a74e9d5ddf0e304389aa525dce5b68ac8fffe41ddae96584d54a7
 //META: purpose=A [BackwardDerivative(fn)] primal function gets the FromLegacyBwdDiffFunc context opcode pair, which carries the user-written derivative function as a second operand.
 //META: intent=functional
 //META: pipeline_stage=lower-to-ir

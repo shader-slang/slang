@@ -9,7 +9,7 @@
 // CHECK: uint state_
 // CHECK: void main()
 // CHECK: output_{{[0-9]+}}[int(0)] = FieldMiss_read_
-// CHECK: output_{{[0-9]+}}[1L] = {{.*}}.state_{{[0-9]+}} + {{.*}}.state_
+// CHECK: output_{{[0-9]+}}[int(1)] = {{.*}}.state_{{[0-9]+}} + {{.*}}.state_
 
 import slang.raytracing.portable;
 

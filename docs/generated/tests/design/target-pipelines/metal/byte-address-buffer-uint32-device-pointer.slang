@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=c5af8ae560515f62aefb59225c78774ee7d8bd8656a9f3cf1b634fcb3e1f88e4
+//META: doc_section_digest=8c75e285954fdccd137cc39333dbb7fd00df278f649c17f835f709926aac9f94
 //META: purpose=A byte-address buffer is emitted as a `uint32_t device*` and a surviving load indexes it by word, as `as_type<T>(buf[(offset)>>2])`.
 //META: intent=expansion
 //META: pipeline_stage=emit

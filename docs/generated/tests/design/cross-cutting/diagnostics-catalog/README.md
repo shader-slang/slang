@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-sonnet-5-5
-generated_at: 2026-11-08T21:33:28+00:00
-source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
-watched_paths_digest: 13365b402eff3e0617f913160ab9e2d2f55225f0855940dd86d8e5c880b55ef9
+model: claude-opus-5[1m]
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 066feab8065801e4e72259431701afaabfae819e2f03a3d824d35d6e71c8d213
 source_doc: docs/generated/design/cross-cutting/diagnostics.md
-source_doc_digest: 33010d44dc29922ced67cff3335fb5fb7257f2f46a67aadd6174dc96d2d6e62c
+source_doc_digest: 36a849c720b2096b99269b3399cb0b5b1faf225f7fe4a666aac539d87e0844ca
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -513,22 +513,22 @@ Three independent symptoms:
    while the table above — written from a live extraction at the previous
    regeneration — says 801. The 106-entry difference means neither number can be
    trusted as the current catalog size.
-2. **Nineteen drifted entries (refreshed).** Lint reported 19 tests whose cited
-   entry had changed (10000-10005, 10010, 10012, 20001, 20002, 20005, 30509,
-   30516, 40011, 40015, 45100, 45102, 45104, 100001). The 2026-11-08 refresh
-   re-read each claim against the current snapshot entry (all still hold and
-   all tests pass) and re-stamped their `doc_section_digest`. Caveat: the
-   snapshot holds a single row for 20001, 20002 and 20005, taken from the JSON
-   catalog (`endOfFileInLiteral`, `newlineInLiteral`, `expectingADigit`), while
-   the tests for those codes exercise the parser's `slang-diagnostics.lua`
-   entries that share the id; their digests therefore track the JSON row.
+2. **Nineteen drifted entries.** Full-suite lint reports 19 tests whose cited
+   entry has changed since they were anchored to it: codes 10000, 10001, 10002,
+   10003, 10004, 10005, 10010, 10012, 20001, 20002, 20005, 30509, 30516, 40011,
+   40015, 45100, 45102, 45104, and 100001. Their `doc_section_digest` no longer
+   matches `_meta/regenerate.py catalog-digest <code>`.
 3. **Eight absent codes.** Tests cite 20020, 20104, 29117, 30059, 30069, 32001,
    38014 and 40018, none of which the snapshot contains, so lint cannot recompute
    a digest for them at all. All eight tests pass — the compiler does emit those
    codes — so the snapshot is behind the compiler, not the other way round.
 
-No extractor is committed alongside the snapshot, so items 1 and 3 still need a
-separate re-extraction task; the eight absent-code tests keep their old digests.
+This pass deliberately does **not** re-extract the snapshot or re-stamp the 19
+drifted digests. No extractor is committed alongside the snapshot, so
+re-extracting means first writing (and reviewing) the tool that produces it;
+re-stamping the digests from the current, stale snapshot would only hide the
+drift behind a fresh hash. Both belong to a separate task, tracked here so the
+next session does not mistake the warnings for noise.
 
 ## Codes dropped (could not reach from minimum input)
 

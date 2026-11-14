@@ -94,10 +94,10 @@ indexing, and the fact that `-target cuda` stops at CUDA C++ text.
 where CPU/Metal do Y". Verify by compiling the same source to the sibling target
 with a second directive and a distinct CHECK prefix.
 
-**Conditional gates.** `#conditional-gates`,
-`#conditional-gates`,
+**Conditional gates.** `#required-lowering-pass-set-flags`,
+`#option-set-toggles-and-emit-side-options`,
 `#context-predicates-and-capability-gates`, and
-`#conditional-gates` — a gate is testable when the doc names a
+`#cuda-specific-runtime-predicates` — a gate is testable when the doc names a
 source shape that trips it and an emit difference that follows.
 
 ### Not testable through `slangc -target cuda` (record under `## Untested claims`)

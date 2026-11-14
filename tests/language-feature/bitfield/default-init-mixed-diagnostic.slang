@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Regression for shader-slang/slang#11844: a struct that mixes bitfields with a
 // trailing normal field must NOT emit warning E41021 ("default initializer will

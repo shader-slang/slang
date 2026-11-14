@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#source-location-preservation
-//META: doc_section_digest=b376d677453ba50705d8234aa3572303b42f0c428f903a6b2d9d9b73a3df65a7
+//META: doc_section_digest=d51763c65e99c32e7704e3dec4e69c5776526cb88e95bd9188137ae60ad362b9
 //META: purpose=A pasted token is re-lexed from a fresh token-paste source view, and a diagnostic raised on it is reported against that view plus a note pointing back at the `##` that initiated the paste.
 //META: intent=functional
 //META: pipeline_stage=preprocess
@@ -17,7 +17,7 @@
 // synthetic "token paste" file rather than to any line of this file,
 // and the initiating-location walk must add the paste-location note.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cpp -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry main -stage compute
 
 #define CAT_(a, b) a##b
 #define CAT(a, b) CAT_(a, b)

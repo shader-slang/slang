@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#existential-construction
-//META: doc_section_digest=fc4731125d3e1fb116f0025ce0d4b2ecc5234e8d4fae162606e0795f4acc047e
+//META: doc_section_digest=20236b856e5e4e69c3ee4b9b04483298a998afa8edf2f30d24865d81a8fb23ad
 //META: purpose=A createExistentialObject whose interface has no conformance in the linkage stops code generation with E50100, "no type conformances found".
 //META: intent=negative
 //META: pipeline_stage=ir-pass

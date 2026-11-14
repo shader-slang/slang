@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#switchstmt-casestmt-defaultstmt
-//META: doc_section_digest=13efdda0ccc7720aa861efdef335d6633fc6c1f771e3f28b4047c028e42fa9a0
+//META: doc_section_digest=c46b8381a22ed9261bb077edf82624f0780a9341487b887a991950c813ffc188
 //META: purpose=A SwitchStmt dispatches on its condition value to the matching case section, and a `BreakStmt` inside it returns control to the statement after the switch.
 //META: intent=functional
 //META: pipeline_stage=check

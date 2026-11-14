@@ -13,12 +13,12 @@
 
 // CHECK-HLSL: case int(0):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case 1L:
-// CHECK-HLSL: case 2L:
+// CHECK-HLSL: case int(1):
+// CHECK-HLSL: case int(2):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case 3L:
+// CHECK-HLSL: case int(3):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case 4L:
+// CHECK-HLSL: case int(4):
 
 // CHECK:      64
 // CHECK-NEXT: 65

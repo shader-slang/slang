@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=568f76ee2394f54152926bb0c6b02911e89b9fe2666189b0e859fd9e3af15aa1
+//META: doc_section_digest=adb7772d22130e19606f914e1755ef4fc121330a80f3fed809d48cb7d085a379
 //META: purpose=Under slangc -minimum-slang-optimization the minimal-optimization arm runs applySparseConditionalConstantPropagation plus eliminateDeadCode in place of simplifyIR, cleaning up the dead branch a force-inlined call reveals so a static_assert in that branch does not falsely fire.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

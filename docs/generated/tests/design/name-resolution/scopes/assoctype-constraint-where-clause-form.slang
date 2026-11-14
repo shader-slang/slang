@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#implicit-scopes
-//META: doc_section_digest=19ad073ab979d4a331ac1f5fc84f58af039847fad8e90dbe9db085b55e74e2b0
+//META: doc_section_digest=ea81eee9c248c045a204cf03769d29438ea6b24a6cbd441a4c42b3efc37f9f53
 //META: purpose=The `associatedtype A where A : IBar` where-clause form places its GenericTypeConstraintDecl in the enclosing interface's scope like the inheritance-clause form, so generic code can call IBar's requirement on T.A.
 //META: intent=functional
 //META: pipeline_stage=check

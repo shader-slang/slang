@@ -7,19 +7,6 @@
 namespace Slang
 {
 
-// Return true if `user` is in code that runs: a function body, or the initializer of a global
-// variable, which runs when the variable is initialized (for kernel targets,
-// `moveGlobalVarInitializationToEntryPoints` later moves it into each entry point).
-static bool isUserInExecutableCode(IRInst* user)
-{
-    for (auto parent = user->getParent(); parent; parent = parent->getParent())
-    {
-        if (as<IRFunc>(parent) || as<IRGlobalVar>(parent))
-            return true;
-    }
-    return false;
-}
-
 void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRModule* module)
 {
     List<IRUse*> globalInstUsesToInline;
@@ -30,7 +17,7 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
         {
             for (auto use = globalInst->firstUse; use; use = use->nextUse)
             {
-                if (isUserInExecutableCode(use->getUser()))
+                if (getParentFunc(use->getUser()) != nullptr)
                     globalInstUsesToInline.add(use);
             }
         }
@@ -46,38 +33,20 @@ void GlobalInstInliningContextGeneric::inlineGlobalValuesAndRemoveIfUnused(IRMod
         auto val = maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
         if (val != use->get())
         {
-            // A global that is illegal for the target, such as a call, is removed below once
-            // every use has its own copy, together with the operands inlined with it.
+            // Since certain globals that appear in the IR are considered illegal for all targets,
+            // e.g. calls to functions, we delete the globals we've inlined.
+            // Note that the inlining is done such that none of the descendants of the global will
+            // have any uses either.
             globalInstsToConsiderDeleting.add(use->usedValue);
 
             builder.replaceOperand(use, val);
         }
     }
 
-    // Inlining clones a global value together with the operands it needs, so once its uses are
-    // replaced, operands that were inlined with it may be left without uses as well. Dead code
-    // elimination would keep such an operand when it is a call whose callee might have side
-    // effects, and the target would then evaluate it a second time, or reject it, as a global
-    // initializer. Each use already has its own copy, so we remove the original. Children of an
-    // inlined global are recorded as inlined too, but they go away with their parent, so only
-    // module-scope operands are queued. An operand can be queued more than once, so we skip one
-    // that is no longer in the module.
-    List<IRInst*> workList;
     for (auto globalInst : globalInstsToConsiderDeleting)
-        workList.add(globalInst);
-    while (workList.getCount())
     {
-        auto globalInst = workList.getLast();
-        workList.removeLast();
-        if (!globalInst->getParent() || globalInst->hasUses())
-            continue;
-        for (UInt i = 0; i < globalInst->getOperandCount(); i++)
-        {
-            auto operand = globalInst->getOperand(i);
-            if (as<IRModuleInst>(operand->getParent()) && shouldInlineInst(operand))
-                workList.add(operand);
-        }
-        globalInst->removeAndDeallocate();
+        if (!globalInst->hasUses())
+            globalInst->removeAndDeallocate();
     }
 }
 
@@ -286,15 +255,8 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
     // variable.
     bool targetCanEmitGlobalInitializerForHalf;
 
-    // True if the target can emit a global initializer that computes a vector or matrix
-    // value with an operator, such as `int2(10, 7) / int2(4, 2)`. CUDA cannot: its prelude
-    // implements the vector and matrix operators as `inline __device__` functions that are
-    // not `constexpr`, so NVRTC rejects them in the initializer of a `__device__` variable.
-    bool targetCanEmitGlobalInitializerForVectorOps;
-
     explicit GlobalInstLegalizationInliningContext(CodeGenTarget target)
         : targetCanEmitGlobalInitializerForHalf(target != CodeGenTarget::CUDASource)
-        , targetCanEmitGlobalInitializerForVectorOps(target != CodeGenTarget::CUDASource)
     {
     }
 
@@ -339,40 +301,7 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
         // which NVRTC rejects.
         if (as<IRCall>(inst))
             return false;
-        if (!isSimpleConstantType(inst->getDataType()))
-            return false;
-        if (!targetCanEmitGlobalInitializerForVectorOps && isVectorOrMatrixOperation(inst))
-            return false;
-        return true;
-    }
-
-    // Return true if `inst` computes a vector or matrix value with anything other than
-    // a constructor.
-    //
-    // Consider this example:
-    //
-    //     static const int2 arr[2] = { int2(10, 7) / int2(4, 2), int2(1, 1) };
-    //
-    // The module has `div(makeVector(10, 7), makeVector(4, 2))`. No IR pass folds a vector
-    // operation, so the `div` reaches the emitter. For CUDA it becomes a call to the
-    // prelude's `operator/`, which is a dynamic initializer. A `makeVector` or
-    // `makeMatrix` of legal operands stays legal, so a constant table still stays global.
-    // Because `shouldInlineInstImpl` inlines every user of an instruction that is not
-    // legal, the `makeArray` above is also inlined, and each function that uses `arr`
-    // builds it at run time.
-    static bool isVectorOrMatrixOperation(IRInst* inst)
-    {
-        auto type = inst->getDataType();
-        if (!as<IRVectorType>(type) && !as<IRMatrixType>(type))
-            return false;
-        switch (inst->getOp())
-        {
-        case kIROp_MakeVector:
-        case kIROp_MakeMatrix:
-            return false;
-        default:
-            return true;
-        }
+        return isSimpleConstantType(inst->getDataType());
     }
 
     bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override { return false; }
@@ -449,15 +378,6 @@ static IRInst* tryBuildMakeStructFromSynthesizedConstructorCall(
     HashSet<IRInst*> consumedParams;
     for (auto inst = block->getFirstOrdinaryInst(); inst; inst = inst->getNextInst())
     {
-        // Debug instructions and address calculations rooted at a debug variable do not
-        // contribute to the constructed value. Folding replaces only the call, so we skip
-        // them and the callee keeps its debug records. `getRootAddr` leaves non-address
-        // instructions unchanged, so one check covers both. For example, a DebugValue for
-        // `this.a` takes a FieldAddress rooted at the `this` DebugVar. A real store or load
-        // through such an address is not skipped, and the checks below reject it.
-        if (isDebugInfoInst(getRootAddr(inst)))
-            continue;
-
         switch (inst->getOp())
         {
         case kIROp_Var:

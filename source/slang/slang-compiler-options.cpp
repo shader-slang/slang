@@ -345,7 +345,6 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::DumpIntermediates:
         case CompilerOptionName::MinimumSlangOptimization:
         case CompilerOptionName::SkipSPIRVValidation:
-        case CompilerOptionName::ValidateWithDownstreamCompiler:
         case CompilerOptionName::ZeroInitialize:
         case CompilerOptionName::IgnoreCapabilities:
         case CompilerOptionName::RestrictiveCapabilityCheck:

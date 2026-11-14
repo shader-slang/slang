@@ -17,7 +17,7 @@ RWStructuredBuffer<half> outputBuffer;
 void computeMain()
 {
     MyStruct<half, 4, 5> s;
-    //CHECK-HLSL: half  data_0[8L]
+    //CHECK-HLSL: half  data_0[int(8)]
     //CHECK-CUDA: FixedArray<__half, 8> data_0
 
     for (int i = 0; i < s.B; i++)

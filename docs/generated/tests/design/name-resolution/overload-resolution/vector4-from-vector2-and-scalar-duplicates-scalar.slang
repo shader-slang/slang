@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#conversions-that-do-not-have-their-own-cost-level
-//META: doc_section_digest=9227aed1f78a83806e63a847830af51d590c31ca851486fe30369ae22b80c447
+//META: doc_section_digest=ecd3a6f3ea79e7ef3d125546849e46357976725d2a9d4de69b69741a1f69fac4
 //META: purpose=Under the default language version float4(f2, f) still resolves to the declared (vector<T,2>, T) initializer and duplicates the scalar into the last two components.
 //META: intent=functional
 //META: pipeline_stage=check

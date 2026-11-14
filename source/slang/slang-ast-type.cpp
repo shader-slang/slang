@@ -897,17 +897,8 @@ Val* BwdDiffFuncType::_resolveImplOverride()
             case ParamPassingMode::RefReadOnly:
             case ParamPassingMode::RefWriteOnly:
                 {
-                    // We pass a reference parameter through unchanged and treat its storage as
-                    // non-differentiable. That is not a correct derivative, but no function with a
-                    // reference parameter is ever differentiated; semantic checking only needs this
-                    // signature to resolve expressions like `bwd_diff(f)`.
-                    //
-                    // TODO: Differentiate the storage that a reference parameter refers to.
-                    //
-                    newParamTypes.add(getParamTypeWithModeWrapper(
-                        astBuilder,
-                        _getNoDiffType(astBuilder, paramInfo.type),
-                        paramInfo.mode));
+                    // Ref parameters not allowed in backward diff.
+                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
                     break;
                 }
             default:

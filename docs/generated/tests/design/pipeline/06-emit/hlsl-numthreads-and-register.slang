@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#hlsl
-//META: doc_section_digest=0f503d8fadb1b9f79b472a6c782b61c5b96a0d3696d6b02a5dcf39a0d338f3af
+//META: doc_section_digest=aa6de29bd5d66aaa6fc85d4bb699f7a68e29ec9dc1dc52c392fa478b055ef466
 //META: purpose=The HLSL backend emits HLSL source text with an HLSL-shaped entry point (`[numthreads(...)]`) and HLSL `register(uN)` / `register(tN)` resource annotations.
 //META: intent=functional
 //META: pipeline_stage=emit

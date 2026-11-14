@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#cuda
-//META: doc_section_digest=727deb3a627e0080c2b0beee98e62ea785941ba3a3f746a00146314b79eaeaee
+//META: doc_section_digest=60ceca3fd5918824f51c21f3f9055095f61caf2e936f991c9b98ae61545a3663
 //META: purpose=The CUDA backend emits CUDA source that includes `slang-cuda-prelude.h` and exposes the compute entry point as an `extern "C" __global__` kernel.
 //META: intent=functional
 //META: pipeline_stage=emit

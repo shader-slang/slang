@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK,exit-code=0): -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
 
 // Test must-init (definite assignment) warning 41035.
 // These cases involve variables that are conditionally initialized —

@@ -81,13 +81,13 @@ Slang maps interpolation modifiers to Metal's interpolation attributes:
 
 Resource types are translated with appropriate Metal qualifiers:
 
-| Slang Type            | Metal Translation        |
-| --------------------- | ------------------------ |
-| `Texture2D`           | `texture2d`              |
-| `RWTexture2D`         | `texture2d`              |
-| `ByteAddressBuffer`   | `const uint32_t device*` |
-| `StructuredBuffer<T>` | `const T device*`        |
-| `ConstantBuffer<T>`   | `constant* T`            |
+| Slang Type            | Metal Translation  |
+| --------------------- | ------------------ |
+| `Texture2D`           | `texture2d`        |
+| `RWTexture2D`         | `texture2d`        |
+| `ByteAddressBuffer`   | `uint32_t device*` |
+| `StructuredBuffer<T>` | `device* T`        |
+| `ConstantBuffer<T>`   | `constant* T`      |
 
 | Slang Type                        | Metal Translation                       |
 | --------------------------------- | --------------------------------------- |
@@ -105,9 +105,9 @@ Resource types are translated with appropriate Metal qualifiers:
 | `TextureCubeArray`                | `texturecube_array`                     |
 | `Buffer<T>`                       | `texture_buffer<T, access::read>`       |
 | `RWBuffer<T>`                     | `texture_buffer<T, access::read_write>` |
-| `ByteAddressBuffer`               | `const uint32_t device*`                |
+| `ByteAddressBuffer`               | `device* uint32_t`                      |
 | `RWByteAddressBuffer`             | `device* uint32_t`                      |
-| `StructuredBuffer<T>`             | `const T device*`                       |
+| `StructuredBuffer<T>`             | `device* T`                             |
 | `RWStructuredBuffer<T>`           | `device* T`                             |
 | `AppendStructuredBuffer<T>`       | `device* T`                             |
 | `ConsumeStructuredBuffer<T>`      | `device* T`                             |

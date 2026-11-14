@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=a686eed39925656955d4318509d87550eaf868b727c1a59e5c7d1736bd470024
+//META: doc_section_digest=702ad77281db592f882065e33506b581a86d6d52898e040f800018dc367fd9bf
 //META: purpose=slangc -trace-branch-coverage is the third option that sets reqSet.coverageTracing, and it places one counter in each arm of a branch so a two-arm if/else gets two distinct coverage slots.
 //META: intent=expansion
 //META: pipeline_stage=emit

@@ -9,7 +9,7 @@ struct G<let m : uint>
 }
 
 // CHECK: int f_0()
-// CHECK: return 3L
+// CHECK: return int(3)
 
 int f<let n : int>(G<n> v)
 {

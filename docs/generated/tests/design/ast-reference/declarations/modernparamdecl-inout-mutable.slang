@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=77300e5bb37435bb7b157816bcb412b5ea19e8971e767a3eb68e890fccdc3431
+//META: doc_section_digest=f9721d75e32e3ac81b4ecdd86415227aa444d40f535b1e70e943f2f43e1c5bc0
 //META: purpose=A ModernParamDecl marked `inout` is mutable and copies the callee's change back to the caller.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -45,8 +45,8 @@ void computeMain()
 
     // Every value folds at compile time, so the emitted code contains the
     // constants rather than any size computation.
-    //CHECK: outputBuffer{{.*}}[int(0)] = 16L;
-    //CHECK: outputBuffer{{.*}}[1L] = 4L;
-    //CHECK: outputBuffer{{.*}}[2L] = 8L;
-    //CHECK: outputBuffer{{.*}}[3L] = 4L;
+    //CHECK: outputBuffer{{.*}}[int(0)] = int(16);
+    //CHECK: outputBuffer{{.*}}[int(1)] = int(4);
+    //CHECK: outputBuffer{{.*}}[int(2)] = int(8);
+    //CHECK: outputBuffer{{.*}}[int(3)] = int(4);
 }

@@ -21,6 +21,6 @@ void main_cs(uint gi : SV_GroupIndex)
 // HLSL-NOT: for(
 // HLSL-NOT: if (
 // HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(0)];
-// HLSL: s_Stage_0[{{.*}}] = {{.*}}[1L];
-// HLSL: s_Stage_0[{{.*}}] = {{.*}}[2L];
-// HLSL: s_Stage_0[{{.*}}] = {{.*}}[3L];
+// HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(1)];
+// HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(2)];
+// HLSL: s_Stage_0[{{.*}}] = {{.*}}[int(3)];

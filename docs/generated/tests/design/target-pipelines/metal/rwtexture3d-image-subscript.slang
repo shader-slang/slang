@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeimagesubscript
-//META: doc_section_digest=aa9bf84d8620c8c7f7f71d4a17a788c4c9a4a1245f763e82fd6ffc0bd5f7726c
+//META: doc_section_digest=1947215d93f0e5f1e4204f6fdb27c6177329ff0d8cfba1886b1c651160781409
 //META: purpose=The image-subscript rewrite generalizes past 2-D: `RWTexture3D<T>` emits as `texture3d<T, access::read_write>` with `.write(...)` / `.read(...)` accesses.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

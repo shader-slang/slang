@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#failure-modes
-//META: doc_section_digest=35a0377e8327c387000594e690000a91232b821b59188e50e4c846f99b749334
+//META: doc_section_digest=917434add55b557b228b443846eefc5d6962c4a14daa202ebe626eecee22d1ca
 //META: purpose=The pointer-width suffix `z` types an integer literal as `intptr_t`, or `uintptr_t` when `u` is also present, and for a non-decimal literal it does so without consulting the magnitude, so `0xFFz` is `intptr_t`.
 //META: intent=functional
 //META: pipeline_stage=parse

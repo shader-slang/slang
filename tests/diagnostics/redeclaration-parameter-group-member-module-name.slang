@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // A declaration may have the module's name, so the module's own `module` declaration does not
 // keep a later declaration from being compared with a buffer member of that name

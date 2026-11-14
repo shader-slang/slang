@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#requirecapabilityattribute
-//META: doc_section_digest=822b852736570bef2ccdf33dca2fdfcb645a761ef3c85e33d183f5f82810a980
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#capability--target-attributes
+//META: doc_section_digest=ce8106cbb762f8a84c2c1448718332b6001d57168b92318fbbf9d952624061de
 //META: purpose=`[require(capability)]` makes a call from an entry point that lacks the capability a checking error.
 //META: intent=negative
 //META: pipeline_stage=check

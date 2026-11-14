@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#astbuilder
-//META: doc_section_digest=9487463b588fd4f4aea24e0b0545152b863344c40f968f8aaab8d2c6b857d237
+//META: doc_section_digest=5f5b5e8f87139078f77e11d9a55a538f0ac8c31ecac932c34151bdae3fa13e26
 //META: purpose=The ASTBuilder hash-conses types, so two structurally identical spellings denote one type and cannot be used to declare two distinct overloads.
 //META: intent=negative
 //META: pipeline_stage=parse

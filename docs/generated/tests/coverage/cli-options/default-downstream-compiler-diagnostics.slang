@@ -27,8 +27,8 @@
 // attach to the synthetic command-line source, so only code and message text are
 // pinned, not a caret column.
 
-//TEST:SIMPLE(filecheck=BADLANG,exit-code=1):-target hlsl -entry main -stage compute -default-downstream-compiler bogus-lang dxc
-//TEST:SIMPLE(filecheck=BADCOMPILER,exit-code=1):-target hlsl -entry main -stage compute -default-downstream-compiler hlsl bogus-compiler
+//TEST:SIMPLE(filecheck=BADLANG):-target hlsl -entry main -stage compute -default-downstream-compiler bogus-lang dxc
+//TEST:SIMPLE(filecheck=BADCOMPILER):-target hlsl -entry main -stage compute -default-downstream-compiler hlsl bogus-compiler
 //TEST:SIMPLE(filecheck=OK):-target hlsl -entry main -stage compute -default-downstream-compiler c gcc
 
 [shader("compute")]

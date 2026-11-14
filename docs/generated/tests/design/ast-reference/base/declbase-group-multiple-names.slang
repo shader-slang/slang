@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/base.md#declbase-modifiablesyntaxnode
-//META: doc_section_digest=969001d1349114a67182eac58e6a01de585cac3090a37aca3606728e5914f436
+//META: doc_section_digest=9683ae36f3d54e970d99e22024c0739ff2e17e32e3095366751562dd84c368d4
 //META: purpose=A DeclBase can represent a group of declarations, so one piece of syntax that declares several names produces several independently usable declarations.
 //META: intent=functional
 //META: pipeline_stage=check

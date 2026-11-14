@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#adjacent-targets
-//META: doc_section_digest=fb44610b2742bfe5f33ac0afcad6bc2224d477ca3be15015211f8fab8d3437c0
+//META: doc_section_digest=a0b226a1bd3f83df262292669b2807f32bbaddabb63ae2722080cf8e47f120dd
 //META: purpose=CUDA/OptiX supports the ray-object accessors in the intersection stage, so ObjectRayOrigin in an intersection entry point emits as optixGetObjectRayOrigin inside an __intersection__ kernel.
 //META: intent=functional
 //META: pipeline_stage=emit

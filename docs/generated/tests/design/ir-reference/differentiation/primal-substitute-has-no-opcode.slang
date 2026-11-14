@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#backwarddifferentiate
-//META: doc_section_digest=b166ba910ef2a99442f2c03d25cc7b3a091f3457459ecbd8e21af4813cf75b71
+//META: doc_section_digest=80c3b1c2caf73f8e0218460f597c7fde1afe54923e65ef808b09364a0f4982b9
 //META: purpose=[PrimalSubstitute] and [PrimalSubstituteOf] are AST-level attributes with no PrimalSubstitute opcode, so the substitute is resolved before lowering.
 //META: intent=functional
 //META: pipeline_stage=lower

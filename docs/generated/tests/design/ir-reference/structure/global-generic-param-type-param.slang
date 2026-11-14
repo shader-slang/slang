@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#global-state
-//META: doc_section_digest=b99cd634d7767c3e608ac1457ec02c747a3002b11e0c6ec01b999815f7b996c1
+//META: doc_section_digest=8c6eae7c2fbeb81e2aa53b0b571a66020f7197ad1677c38daf0d744e65bab956
 //META: purpose=A module-level type_param declaration lowers to global_generic_param, and its interface constraint lowers to a second global_generic_param holding the witness table.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -13,10 +13,8 @@
 // `global_generic_param` and that a constraint decl parented by it lowers to
 // the same opcode. The CHECK-DAGs require two module-scope insts: one typed
 // `Type` (the type parameter `T` itself) and one typed
-// `witness_table_t(%IFoo)` (the `T : IFoo` constraint), the witness inst that
-// lets a body call an interface method on `T` before `T` is bound. `T` is
-// deliberately not used in shader code: the compiler rejects that (E38207)
-// because a global generic parameter needs a concrete binding to be used.
+// `witness_table_t(%IFoo)` (the `T : IFoo` constraint), which is how a body can
+// dispatch `t.run(x)` before `T` is bound.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
@@ -27,10 +25,13 @@ interface IFoo { int run(int x); }
 
 type_param T : IFoo;
 
+int callRun(T t, int x) { return t.run(x); }
+
 [numthreads(1, 1, 1)]
 void main()
 {
-    buf[0] = seed;
+    T t = {};
+    buf[0] = callRun(t, seed);
 }
 
 // CHECK-DAG: let  %{{[0-9]+}}	: Type	= global_generic_param

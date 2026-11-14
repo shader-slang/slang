@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#entry-point-scoped-decorations
-//META: doc_section_digest=9a246dfae970afa6da375b8cf4f4bcd5af2b199ebb02c64ef046e546dbab9e53
+//META: doc_section_digest=8f5c4dfb266dce5d2655c05189800b6a5f09525dcebcbbaef4b83ef1e0ebd83f
 //META: purpose=The `spvShader64BitIndexingEXT` requirement of a callee is lifted onto the entry point as a shader-64-bit-indexing decoration, not left on the attributed function.
 //META: intent=functional
 //META: pipeline_stage=lower
