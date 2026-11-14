@@ -5096,8 +5096,9 @@ err(
     span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
 )
 
--- Note: compilationCeased is a fatal diagnostic that is locationless
-fatal(
+-- Module loading propagates failure through its return value. This locationless summary must
+-- not abort compilation: an exception-disabled build cannot unwind a fatal diagnostic.
+err(
     "compilation-ceased",
     40003,
     "compilation ceased",

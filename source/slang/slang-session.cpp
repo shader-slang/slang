@@ -1287,6 +1287,7 @@ void Linkage::loadParsedModule(
             // Remove from maps if there were errors during semantic checking
             mapPathToLoadedModule.remove(mostUniqueIdentity);
             mapNameToLoadedModules.remove(name);
+            return;
         }
         else
         {
@@ -2046,13 +2047,13 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
                 type,
                 /*isSpeculativeLoad*/ true);
 
-            // If the attempt to load the module from the given path
-            // was successful, we go ahead and use it, without trying
-            // out any other options.
-            //
-            if (module)
+            // A source file that fails to compile is a failed import, not a search miss. Return
+            // its failure as well as its success, so we do not try another spelling or a standard
+            // module and incorrectly report that the source file could not be opened.
+            // Binary loads remain speculative and may fall back to source.
+            if (module || type == ModuleBlobType::Source)
             {
-                if (type == ModuleBlobType::Source)
+                if (module && type == ModuleBlobType::Source)
                     module->setSourceDigest(computeSourceBlobDigest(fileContents));
                 return module;
             }
