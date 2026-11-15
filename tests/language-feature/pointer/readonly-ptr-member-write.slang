@@ -82,6 +82,28 @@ void readThroughReadPtr(Ptr<Item, Access.Read> p)
     readOnlyRef(p[0].count);
 }
 
+struct Base
+{
+    uint baseCount;
+}
+
+struct Derived : Base
+//CHECK:         ^^^^ support for inheritance is unstable
+{
+}
+
+// Member lookup reaches an inherited field through a cast to `Base`, which keeps the read-only
+// memory location of its operand.
+void readInheritedFieldThroughReadPtr(Ptr<Derived, Access.Read> p)
+{
+    readOnlyRef(p->baseCount);
+}
+
+void readInheritedFieldOfReadOnlyRef(__ref_readonly Derived d)
+{
+    readOnlyRef(d.baseCount);
+}
+
 void writeThroughReadWritePtr(Ptr<Item, Access.ReadWrite> p)
 {
     p->count = 1;

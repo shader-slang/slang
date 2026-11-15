@@ -3314,6 +3314,17 @@ public:
     /// to `operator*` that returns a `Ref`, and is not reported here.
     PtrType* getDereferencedPtrType(Expr* expr);
 
+    /// Return true if a call to the subscript `subscriptDeclRef` can be written even when its
+    /// base is not writable, because one of its `set` or `ref` accessors does not require
+    /// writable receiver storage (e.g. a `[nonmutating] ref` accessor that addresses memory
+    /// outside the receiver).
+    bool canWriteSubscriptWithoutWritableBase(DeclRef<SubscriptDecl> subscriptDeclRef);
+
+    /// Return the base of `expr`, as `container` in `container[i]`, when `expr` is a call to a
+    /// subscript that can be written only through a writable base, as a struct's `set` accessor
+    /// can, and null otherwise. Writing such a call writes its base.
+    Expr* getBaseWrittenBySubscriptCall(Expr* expr);
+
     /// Warn if `lvalueExpr`, which is about to be written, is a dereference of a pointer whose
     /// access qualifier is a generic parameter rather than a known value, or a member, element or
     /// swizzle of one (e.g. `p->count = 1` or `p[0].count = 1` with `p` of type

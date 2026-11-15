@@ -78,6 +78,45 @@ void writeInheritedFieldThroughGenericAccessPtr<Access access>(Ptr<Derived, acce
 */
 }
 
+// A `set` accessor modifies its receiver, so writing `p->container[0]` writes `p->container`.
+struct Container
+{
+    uint data[4];
+
+    __subscript(int i)->uint
+    {
+        get { return data[i]; }
+        set { data[i] = newValue; }
+    }
+}
+
+// A `[nonmutating] ref` accessor addresses memory outside its receiver.
+struct Handle
+{
+    uint64_t address;
+
+    __subscript(int i)->uint
+    {
+        [nonmutating]
+        ref { return Ptr<uint>(address)[i]; }
+    }
+}
+
+struct Holder
+{
+    Container container;
+    Handle handle;
+}
+
+void writeSubscriptOfFieldThroughGenericAccessPtr<Access access>(Ptr<Holder, access> p)
+{
+    outputBuffer[2] = p->container[0];
+    p->container[0] = 1;
+//CHECK:        ^ writing through a pointer whose access qualifier is not known
+//CHECK:        ^ the access qualifier of the pointer is a generic parameter
+    p->handle[0] = 1;
+}
+
 [numthreads(1, 1, 1)]
 void main()
 {

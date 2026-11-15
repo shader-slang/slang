@@ -1742,15 +1742,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             }
                             // Otherwise, an accessor that does not require writable receiver
                             // storage can produce an l-value regardless of the base.
-                            auto accessorDeclRef =
-                                m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
-                            auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
-                            if (thisParamInfo &&
-                                !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
-                            {
+                            if (canWriteSubscriptWithoutWritableBase(subscriptDeclRef))
                                 callExpr->type.isLeftValue = true;
-                                break;
-                            }
+                            break;
                         }
                     }
                 }

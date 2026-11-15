@@ -1024,6 +1024,11 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                         expr->type.isLeftValue = true;
                     }
 
+                    // A read-only memory location, such as the pointee of a
+                    // `Ptr<Derived, Access.Read>`, stays one when viewed as its base type, so
+                    // that an inherited field reached through it is read-only like a direct field.
+                    expr->type.isReadOnlyMemoryLocation = bb->type.isReadOnlyMemoryLocation;
+
                     bb = expr;
                 }
             }
@@ -3833,6 +3838,38 @@ PtrType* SemanticsVisitor::getDereferencedPtrType(Expr* expr)
     return nullptr;
 }
 
+bool SemanticsVisitor::canWriteSubscriptWithoutWritableBase(DeclRef<SubscriptDecl> subscriptDeclRef)
+{
+    for (auto accessorDecl : subscriptDeclRef.getDecl()->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (!as<SetterDecl>(accessorDecl) && !as<RefAccessorDecl>(accessorDecl))
+            continue;
+
+        auto accessorDeclRef = m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
+        auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+        if (thisParamInfo && !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+            return true;
+    }
+    return false;
+}
+
+Expr* SemanticsVisitor::getBaseWrittenBySubscriptCall(Expr* expr)
+{
+    auto invokeExpr = as<InvokeExpr>(expr);
+    if (!invokeExpr)
+        return nullptr;
+
+    auto calleeExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!calleeExpr)
+        return nullptr;
+
+    auto subscriptDeclRef = calleeExpr->declRef.as<SubscriptDecl>();
+    if (!subscriptDeclRef || canWriteSubscriptWithoutWritableBase(subscriptDeclRef))
+        return nullptr;
+
+    return GetBaseExpr(calleeExpr);
+}
+
 void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueExpr)
 {
     // A dereference of a pointer whose access qualifier is not a known constant is kept an
@@ -3840,7 +3877,9 @@ void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueE
     // subscript case of `CompleteOverloadCandidate`). We peel off the member, element, swizzle,
     // parentheses and base-type cast layers of the written expression to find the dereference,
     // so that we warn only when a write actually goes through such a pointer. The base-type
-    // cast is what member lookup inserts for an inherited field, as in `p->baseField`.
+    // cast is what member lookup inserts for an inherited field, as in `p->baseField`. A call to
+    // a subscript whose write modifies its receiver, as in `p->container[i]` with a `set`
+    // accessor, writes its base, so we continue from the base.
     for (Expr* e = lvalueExpr; e;)
     {
         if (auto memberExpr = as<MemberExpr>(e))
@@ -3855,16 +3894,19 @@ void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueE
             e = parenExpr->base;
         else if (auto castToSuperTypeExpr = as<CastToSuperTypeExpr>(e))
             e = castToSuperTypeExpr->valueArg;
-        else
+        else if (auto ptrType = getDereferencedPtrType(e))
         {
-            auto ptrType = getDereferencedPtrType(e);
-            if (ptrType && !ptrType->tryGetAccessQualifierValue().has_value())
+            if (!ptrType->tryGetAccessQualifierValue().has_value())
             {
                 getSink()->diagnose(
                     Diagnostics::WriteThroughPointerOfUnknownAccess{.expr = lvalueExpr});
             }
             return;
         }
+        else if (auto subscriptBase = getBaseWrittenBySubscriptCall(e))
+            e = subscriptBase;
+        else
+            return;
     }
 }
 
