@@ -89,6 +89,11 @@ Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink);
 /// Note: this currently does not include PtrTypeBase.
 Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
+/// Return true if `type` is a `Ptr` or `Ref` type whose access qualifier is a constant that is
+/// not one of the `Access` enumerators, as in `Ptr<T, (Access)3>`. A pointer whose access is a
+/// generic parameter is not a constant and is not reported.
+bool hasAccessQualifierOutsideAccessEnum(Type* type);
+
 /// True if `containerDecl` is `moduleDecl` itself or one of its own `__include`d
 /// `FileDecl` children — i.e. a scope that belongs on `moduleDecl`'s imported surface.
 /// Used by both the `import` re-export filter (`importModuleIntoScope`) and the

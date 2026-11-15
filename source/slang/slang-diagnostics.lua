@@ -3625,6 +3625,13 @@ err(
     span { loc = "typeExp:Expr", message = "pointer to a managed resource is invalid, use `NativeRef<T>` instead" }
 )
 
+err(
+    "invalid-access-qualifier",
+    30409,
+    "invalid access qualifier for a pointer or reference type",
+    span { loc = "typeExp:Expr", message = "the access qualifier must be 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'" }
+)
+
 -- Control flow (305xx)
 
 warning(

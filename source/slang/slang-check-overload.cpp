@@ -4262,7 +4262,21 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
         // applicable in the end.
         // We will report errors for this one candidate, then, to give
         // the user the most help we can.
-        return CompleteOverloadCandidate(context, *context.bestCandidate);
+        auto resultExpr = CompleteOverloadCandidate(context, *context.bestCandidate);
+
+        // The value category of a pointee is derived from the access qualifier by
+        // `QualType::applyAccessQualifier`, which only accepts the `Access` enumerators. A cast
+        // such as `Ptr<T, (Access)3>` can spell any other value, so we reject that type here,
+        // where it is formed, both as the type of a declaration and inside an expression.
+        if (auto typeType = as<TypeType>(resultExpr->type))
+        {
+            if (hasAccessQualifierOutsideAccessEnum(typeType->getType()))
+            {
+                getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.typeExp = genericAppExpr});
+                return CreateErrorExpr(genericAppExpr);
+            }
+        }
+        return resultExpr;
     }
     else
     {
