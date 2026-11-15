@@ -663,9 +663,9 @@ void test(Ptr<MyType, Access.Read> p)
 ```
 
 If the access mode of a pointer is a generic parameter, as in `Ptr<MyType, access>`, the compiler cannot
-tell whether the pointer is writable, so a write through `p->` or `p.` produces a warning, and a write
-through `*p` is an error. A future version of Slang will make all of these an error. Declare the pointer
-with `Access.ReadWrite` if the function writes through it.
+tell whether the pointer is writable, so a write through `p->`, `p.` or `p[i]` produces a warning, and a
+write through `*p` is an error. A future version of Slang will make all of these an error. Declare the
+pointer with `Access.ReadWrite` if the function writes through it.
 
 ### Limitations
 

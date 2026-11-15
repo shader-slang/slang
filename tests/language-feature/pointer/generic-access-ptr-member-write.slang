@@ -41,6 +41,11 @@ void writeThroughGenericAccessPtr<Access access>(Ptr<Item, access> p)
     InterlockedAdd(p->count, 1u);
 //CHECK:              ^^^^^ writing through a pointer whose access qualifier is not known
 //CHECK:              ^^^^^ the access qualifier of the pointer is a generic parameter
+    p[0].count = 1;
+/*CHECK:
+         ^^^^^ writing through a pointer whose access qualifier is not known
+         ^^^^^ the access qualifier of the pointer is a generic parameter
+*/
     p->reset();
 /*CHECK:
     ^ writing through a pointer whose access qualifier is not known

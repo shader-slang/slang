@@ -1695,21 +1695,20 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             // If the subscript decl has a setter,
                             // then the call is an l-value if base is l-value.
                             //
-                            // If Ptr<T, Access> we only need to check for ReadWrite
-                            // Access (if ReadWrite result is an LValue. By default a
-                            // Ptr<...> is Read-only (unresolved generic argument & Access::Read).
+                            // Subscripting a pointer dereferences it, so the value category
+                            // comes from the pointer's access qualifier, as it does for the
+                            // dereference built by `constructDerefExpr`. A pointer whose
+                            // access is not a known constant stays an l-value, and
+                            // `maybeWarnWriteThroughPointerOfUnknownAccess` warns on a write.
                             if (auto base = GetBaseExpr(baseExpr))
                             {
                                 if (auto ptrTypeBase = as<PtrTypeBase>(base->type))
                                 {
-                                    auto accessQualifier =
-                                        as<ConstantIntVal>(ptrTypeBase->getAccessQualifier());
-                                    if (!accessQualifier ||
-                                        AccessQualifier(accessQualifier->getValue()) ==
-                                            AccessQualifier::ReadWrite)
-                                    {
+                                    if (auto optAccessQualifier =
+                                            ptrTypeBase->tryGetAccessQualifierValue())
+                                        callExpr->type.applyAccessQualifier(*optAccessQualifier);
+                                    else
                                         callExpr->type.isLeftValue = true;
-                                    }
                                     break;
                                 }
 

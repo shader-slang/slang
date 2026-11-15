@@ -3280,9 +3280,17 @@ public:
     /// from `this`.
     void maybeDiagnoseConstVariableAssignment(Expr* expr);
 
-    /// Warn if `lvalueExpr`, which is about to be written, is a member or element of a
-    /// dereference of a pointer whose access qualifier is a generic parameter rather than a
-    /// known value (e.g. `p->count = 1` with `p` of type `Ptr<Item, access>`).
+    /// Return the type of the pointer that `expr` dereferences when `expr` is a pointer
+    /// dereference, and null otherwise. A pointer is dereferenced either by a `DerefExpr` (the
+    /// implicit dereference in `p->field` or `p.field`) or by a call to the `Ptr` subscript
+    /// (`p[i]`), which addresses the `i`-th value after the pointee. An explicit `*p` is a call
+    /// to `operator*` that returns a `Ref`, and is not reported here.
+    PtrType* getDereferencedPtrType(Expr* expr);
+
+    /// Warn if `lvalueExpr`, which is about to be written, is a dereference of a pointer whose
+    /// access qualifier is a generic parameter rather than a known value, or a member, element or
+    /// swizzle of one (e.g. `p->count = 1` or `p[0].count = 1` with `p` of type
+    /// `Ptr<Item, access>`).
     ///
     /// Such a write is accepted because the pointer might be writable, but the generic function
     /// would break if it were called with a read-only pointer. We warn at the write rather than

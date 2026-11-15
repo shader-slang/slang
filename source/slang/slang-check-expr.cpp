@@ -3802,12 +3802,29 @@ Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
     return expr;
 }
 
+PtrType* SemanticsVisitor::getDereferencedPtrType(Expr* expr)
+{
+    if (auto derefExpr = as<DerefExpr>(expr))
+        return as<PtrType>(derefExpr->base->type.type);
+
+    if (auto invokeExpr = as<InvokeExpr>(expr))
+    {
+        auto calleeExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+        if (!calleeExpr || !calleeExpr->declRef.as<SubscriptDecl>())
+            return nullptr;
+        if (auto baseExpr = GetBaseExpr(calleeExpr))
+            return as<PtrType>(baseExpr->type.type);
+    }
+    return nullptr;
+}
+
 void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueExpr)
 {
-    // `constructDerefExpr` keeps a dereference an l-value when the pointer's access qualifier
-    // is not a known constant, because the pointer might be writable. We peel off the member,
-    // element, swizzle and parentheses layers of the written expression to find that
-    // dereference, so that we warn only when a write actually goes through such a pointer.
+    // A dereference of a pointer whose access qualifier is not a known constant is kept an
+    // l-value, because the pointer might be writable (see `constructDerefExpr` and the `Ptr`
+    // subscript case of `CompleteOverloadCandidate`). We peel off the member, element, swizzle
+    // and parentheses layers of the written expression to find the dereference, so that we
+    // warn only when a write actually goes through such a pointer.
     for (Expr* e = lvalueExpr; e;)
     {
         if (auto memberExpr = as<MemberExpr>(e))
@@ -3820,9 +3837,9 @@ void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueE
             e = matrixSwizzleExpr->base;
         else if (auto parenExpr = as<ParenExpr>(e))
             e = parenExpr->base;
-        else if (auto derefExpr = as<DerefExpr>(e))
+        else
         {
-            auto ptrType = as<PtrType>(derefExpr->base->type.type);
+            auto ptrType = getDereferencedPtrType(e);
             if (ptrType && !ptrType->tryGetAccessQualifierValue().has_value())
             {
                 getSink()->diagnose(
@@ -3830,8 +3847,6 @@ void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueE
             }
             return;
         }
-        else
-            return;
     }
 }
 

@@ -79,6 +79,7 @@ void readThroughReadPtr(Ptr<Item, Access.Read> p)
     outputBuffer[0] = p->count;
     outputBuffer[1] = uint(p->value);
     readOnlyRef(p->count);
+    readOnlyRef(p[0].count);
 }
 
 void writeThroughReadWritePtr(Ptr<Item, Access.ReadWrite> p)
