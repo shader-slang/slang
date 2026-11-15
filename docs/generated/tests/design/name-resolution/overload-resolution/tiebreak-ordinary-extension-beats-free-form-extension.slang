@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#tie-breaking-comparator
-//META: doc_section_digest=1d384c53a44075a9ff7b3de0f1907c30fb579e521154ac25ad145d433be8dd6a
+//META: doc_section_digest=764e196b19a5dd0e0f2c516c498be250f0fdaba7e58c28f2ac820f88be1e5466
 //META: purpose=CompareLookupResultItems prefers an ordinary extension over a free-form extension whose target type is a constrained generic type parameter.
 //META: intent=functional
 //META: pipeline_stage=check

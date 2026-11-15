@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#switch-and-targetswitch
-//META: doc_section_digest=e7330a1330ebc11fe0bd87bcb458f4dfb290110bcd88d56b6f4a3f4d98791ce5
+//META: doc_section_digest=9ed6898dc4712155dd5c86ec8e6556e0db11da6e13cde8988194d8247ca4141f
 //META: purpose=A __target_switch lowers to targetSwitch(breakBlock, caseValue/caseBlock pairs...) whose case values are integer CapabilityName keys rather than runtime values.
 //META: intent=functional
 //META: pipeline_stage=lower

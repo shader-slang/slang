@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#transparent-members
-//META: doc_section_digest=3c2bf5c87121d9b38f4db23004a220e344b4a4d7037f34c06984152d5c067a8a
+//META: doc_section_digest=0241c2b2d6b5982b38fcab65827ac1661c13c0ef631b7184ea3b202026236a30
 //META: purpose=No parser keyword introduces a transparent modifier, so writing __transparent in front of a struct member is not recognised as a modifier and the declaration fails to parse.
 //META: intent=negative
 //META: pipeline_stage=parse

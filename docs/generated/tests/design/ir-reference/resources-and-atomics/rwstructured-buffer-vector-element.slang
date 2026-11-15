@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#rwstructuredbuffergetelementptr
-//META: doc_section_digest=79a3f90a07e564c3a6781f28bec380af53c172ad701f8d621623d248c4edee79
+//META: doc_section_digest=c1926379566a798f6e26928651f281675df5e998bf0bf008f9481bf70aad885c
 //META: purpose=`rwbuf[i] = vector_expr` for a vector element type also routes through `rwstructuredBufferGetElementPtr` to produce the lvalue, then stores the vector.
 //META: intent=functional
 //META: pipeline_stage=lower

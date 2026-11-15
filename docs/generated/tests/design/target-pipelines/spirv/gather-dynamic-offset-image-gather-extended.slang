@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#capabilities-and-extensions-decided-at-emit-time
-//META: doc_section_digest=3e45dcac84ce250c1ff549e4f6b6a3217763793be302a7a0949f0ec9245f3fec
+//META: doc_section_digest=42b60cbc03a13fbb7144f6605c9a5b8ebf0ab604187ecf3ce7e27dab3df6b393
 //META: purpose=A Gather with a runtime-computed offset falls through to the Offset image operand and requests OpCapability ImageGatherExtended.
 //META: intent=boundary
 //META: pipeline_stage=emit

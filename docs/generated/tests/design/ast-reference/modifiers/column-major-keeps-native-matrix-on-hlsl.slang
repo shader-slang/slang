@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#matrix-layout-modifiers
-//META: doc_section_digest=fe0e81537eb72b7c28145e1bc1dd83b677979f956278af7614c7e73e4b4bf96f
+//META: doc_section_digest=067e73d70aa04a99d59492486d8b06552dfb179696b3a89cb8bc60a05a2207a5
 //META: purpose=`column_major` on a constant-buffer matrix keeps the native matrix storage in emitted HLSL.
 //META: intent=functional
 //META: pipeline_stage=layout

@@ -27,7 +27,7 @@
 // (an exhaustive DIAGNOSTIC_TEST with no annotations passes iff zero diagnostics
 // are emitted), proving the guard does not fire for a symbolic T. A separate
 // code-generation check confirms the concrete float specialization still emits.
-//DIAGNOSTIC_TEST:SIMPLE(diag=GEN): -target cuda -entry eGenericFloat -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=GEN,exit-code=0): -target cuda -entry eGenericFloat -stage compute
 //TEST:SIMPLE(filecheck=GENERIC): -target cuda -entry eGenericFloat -stage compute
 
 Texture2D<half>        gHalf;

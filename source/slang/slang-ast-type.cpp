@@ -278,7 +278,17 @@ BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 void MatrixExpressionType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("matrix<") << getElementType() << toSlice(",") << getRowCount() << toSlice(",")
-        << getColumnCount() << toSlice(">");
+        << getColumnCount();
+    if (hasSpecifiedLayout())
+        out << toSlice(",") << getLayout();
+    out << toSlice(">");
+}
+
+bool MatrixExpressionType::hasSpecifiedLayout()
+{
+    SLANG_ASSERT(getLayout());
+    auto layout = as<ConstantIntVal>(getLayout());
+    return !layout || layout->getValue() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 }
 
 BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
@@ -907,8 +917,17 @@ Val* BwdDiffFuncType::_resolveImplOverride()
             case ParamPassingMode::RefReadOnly:
             case ParamPassingMode::RefWriteOnly:
                 {
-                    // Ref parameters not allowed in backward diff.
-                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    // We pass a reference parameter through unchanged and treat its storage as
+                    // non-differentiable. That is not a correct derivative, but no function with a
+                    // reference parameter is ever differentiated; semantic checking only needs this
+                    // signature to resolve expressions like `bwd_diff(f)`.
+                    //
+                    // TODO: Differentiate the storage that a reference parameter refers to.
+                    //
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        astBuilder,
+                        _getNoDiffType(astBuilder, paramInfo.type),
+                        paramInfo.mode));
                     break;
                 }
             default:

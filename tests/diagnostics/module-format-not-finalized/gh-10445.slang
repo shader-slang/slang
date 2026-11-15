@@ -9,11 +9,11 @@
 // definition crashes when compiling to a binary module.
 
 // Verify round-trip through binary module produces correct constants.
-// MODULE-CHECK: int(4)
-// MODULE-CHECK: int(4)
-// MODULE-CHECK: int(3)
-// MODULE-CHECK: int(5)
-// MODULE-CHECK: int(40)
+// MODULE-CHECK: = 4L
+// MODULE-CHECK: = 4L
+// MODULE-CHECK: = 3L
+// MODULE-CHECK: = 5L
+// MODULE-CHECK: = 40L
 
 RWStructuredBuffer<int> outputBuffer;
 

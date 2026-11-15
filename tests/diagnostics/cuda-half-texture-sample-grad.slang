@@ -18,7 +18,7 @@
 // A generic float SampleGrad wrapper must compile with no diagnostic at all (an
 // exhaustive DIAGNOSTIC_TEST with no annotations passes iff zero diagnostics are
 // emitted), so the guard does not fire for a symbolic T.
-//DIAGNOSTIC_TEST:SIMPLE(diag=GEN): -target cuda -entry eGenericFloat -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=GEN,exit-code=0): -target cuda -entry eGenericFloat -stage compute
 //TEST:SIMPLE(filecheck=GENERIC): -target cuda -entry eGenericFloat -stage compute
 
 Sampler2D<half>        gHalf;

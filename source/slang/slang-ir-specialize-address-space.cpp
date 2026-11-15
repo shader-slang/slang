@@ -138,11 +138,15 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         builder.setInsertBefore(func);
         auto specializedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, func));
 
-        // Update the parameter types with new address spaces in the specialized function.
+        // Update the parameter types with new address spaces in the specialized function. A
+        // `groupshared` parameter's full type wraps its pointer type in the group-shared rate, as
+        // in `RateQualified(GroupShared, RefParam(T))`, so we read and replace the data type
+        // inside the rate.
+        //
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
-            auto paramType = param->getFullType();
+            auto paramType = param->getDataType();
             auto ptrType = as<IRPtrTypeBase>(paramType);
             if (ptrType)
             {
@@ -153,7 +157,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     ptrType->getAccessQualifier(),
                     paramAddrSpace,
                     ptrType->getDataLayout());
-                param->setFullType(newParamType);
+                setDataType(param, newParamType);
                 mapInstToAddrSpace[param] = paramAddrSpace;
             }
             paramIndex++;

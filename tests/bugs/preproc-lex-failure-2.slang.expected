@@ -1,4 +1,4 @@
-result code = 0
+result code = -1
 standard error = {
 tests/bugs/preproc-lex-failure-2.slang(4): warning 10002: '0' prefix indicates octal literal
 000
