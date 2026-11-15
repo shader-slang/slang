@@ -650,6 +650,22 @@ declaring pointers to read-only and immutable values, and pointers to address sp
 `Device`. Pointers to immutable values can also be declared with type alias
 `ImmutablePtr<T, AddressSpace>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
+A value cannot be written through a pointer to a read-only or immutable value. This includes members
+reached with `->`, `.`, or `(*p).`, whether the write is an assignment, a compound assignment, or an
+argument for an `out`, `inout`, or `ref` parameter:
+
+```slang
+void test(Ptr<MyType, Access.Read> p)
+{
+    int x = p->a; // OK
+    p->a = 1;     // !! ERROR !!
+}
+```
+
+If the access mode of a pointer is a generic parameter, as in `Ptr<MyType, access>`, the compiler cannot
+tell whether the pointer is writable, so a write through it produces a warning. A future version of Slang
+will make this an error. Declare the pointer with `Access.ReadWrite` if the function writes through it.
+
 ### Limitations
 
 - Slang supports pointers to global and shared memory but not local memory. It is invalid to define a pointer to a local variable.

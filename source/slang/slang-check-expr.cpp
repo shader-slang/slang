@@ -712,7 +712,8 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         //
         // When the access is not a compile-time constant (e.g. `Ptr<T, access>` in a generic
         // function), we cannot tell whether the pointer is writable, and we keep the
-        // dereference an l-value.
+        // dereference an l-value. `maybeWarnWriteThroughPointerOfUnknownAccess` then warns when
+        // such a dereference is actually written.
         //
         if (auto optAccessQualifier = ptrType->tryGetAccessQualifierValue())
             derefExpr->type.applyAccessQualifier(*optAccessQualifier);
@@ -3801,6 +3802,39 @@ Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
     return expr;
 }
 
+void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueExpr)
+{
+    // `constructDerefExpr` keeps a dereference an l-value when the pointer's access qualifier
+    // is not a known constant, because the pointer might be writable. We peel off the member,
+    // element, swizzle and parentheses layers of the written expression to find that
+    // dereference, so that we warn only when a write actually goes through such a pointer.
+    for (Expr* e = lvalueExpr; e;)
+    {
+        if (auto memberExpr = as<MemberExpr>(e))
+            e = memberExpr->baseExpression;
+        else if (auto indexExpr = as<IndexExpr>(e))
+            e = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(e))
+            e = swizzleExpr->base;
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(e))
+            e = matrixSwizzleExpr->base;
+        else if (auto parenExpr = as<ParenExpr>(e))
+            e = parenExpr->base;
+        else if (auto derefExpr = as<DerefExpr>(e))
+        {
+            auto ptrType = as<PtrType>(derefExpr->base->type.type);
+            if (ptrType && !ptrType->tryGetAccessQualifierValue().has_value())
+            {
+                getSink()->diagnose(
+                    Diagnostics::WriteThroughPointerOfUnknownAccess{.expr = lvalueExpr});
+            }
+            return;
+        }
+        else
+            return;
+    }
+}
+
 void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 {
     // We will try to handle expressions of the form:
@@ -3886,6 +3920,8 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     }
     else
     {
+        maybeWarnWriteThroughPointerOfUnknownAccess(expr->left);
+
         if (auto var =
                 findGroupSharedVariablePartlyWrittenInDifferentiatedBody(expr->left, expr->left))
         {
@@ -4601,6 +4637,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
                                 maybeDiagnoseConstVariableAssignment(argExpr);
                             }
+                        }
+                        else if (!acceptsReadOnlyMemoryLocation)
+                        {
+                            // The argument is an l-value that the callee may write.
+                            maybeWarnWriteThroughPointerOfUnknownAccess(argExpr);
                         }
                     }
                     else

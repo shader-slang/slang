@@ -3280,6 +3280,15 @@ public:
     /// from `this`.
     void maybeDiagnoseConstVariableAssignment(Expr* expr);
 
+    /// Warn if `lvalueExpr`, which is about to be written, is a member or element of a
+    /// dereference of a pointer whose access qualifier is a generic parameter rather than a
+    /// known value (e.g. `p->count = 1` with `p` of type `Ptr<Item, access>`).
+    ///
+    /// Such a write is accepted because the pointer might be writable, but the generic function
+    /// would break if it were called with a read-only pointer. We warn at the write rather than
+    /// at the dereference so that reads through the same pointer stay quiet.
+    void maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueExpr);
+
     // Figure out what type an initializer/constructor declaration
     // is supposed to return. In most cases this is just the type
     // declaration that its declaration is nested inside.
