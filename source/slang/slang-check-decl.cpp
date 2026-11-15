@@ -5163,6 +5163,23 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     if (decl->initExpr)
         decl->initExpr = CheckTerm(decl->initExpr);
 
+    // The default of an `Access` parameter, as in `struct Box<let A : Access = (Access)3>`,
+    // stands in for every omitted argument, and the paths that fill it in do not see an explicit
+    // argument to check. We check it once here, as `TryCheckGenericOverloadCandidateTypes`
+    // checks an explicit argument, and replace an out-of-range default with an error so that
+    // those paths treat it like any other invalid default.
+    if (decl->initExpr && decl->type.type && isAccessEnumType(m_astBuilder, decl->type.type))
+    {
+        ConstantFoldingCircularityInfo circularityInfo(makeDeclRef(decl), nullptr);
+        auto defaultVal =
+            tryConstantFoldExpr(decl->initExpr, ConstantFoldingKind::CompileTime, &circularityInfo);
+        if (defaultVal && isAccessValueOutsideAccessEnum(defaultVal))
+        {
+            getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.expr = decl->initExpr});
+            decl->initExpr = CreateErrorExpr(decl->initExpr);
+        }
+    }
+
     if (decl->initExpr && getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
         checkForwardReferencesInGenericDecl(decl, decl->initExpr, nullptr);
 }

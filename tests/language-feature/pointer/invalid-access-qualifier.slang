@@ -16,6 +16,14 @@ struct Box<let A : Access>
 
 typealias PtrWith<let A : Access> = Ptr<Item, A>;
 
+// A default stands in for every omitted argument, so it is checked where it is declared.
+struct BoxWithDefault<let A : Access = (Access)3>
+//CHECK:                                       ^ invalid access qualifier
+//CHECK:                                       ^ an 'Access' value must be 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'
+{
+    Ptr<Item, A> p;
+}
+
 void takeAccess<let A : Access>()
 {
 }
@@ -41,6 +49,11 @@ void readThroughInvalidAccessAlias(PtrWith<(Access)3> p)
 //CHECK:                                           ^ an 'Access' value must be 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'
 {
     outputBuffer[2] = p->count;
+}
+
+void readThroughInvalidDefault(BoxWithDefault b)
+{
+    outputBuffer[4] = b.p->count;
 }
 
 [numthreads(1, 1, 1)]

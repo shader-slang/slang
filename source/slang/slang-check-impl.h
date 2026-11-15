@@ -89,6 +89,16 @@ Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink);
 /// Note: this currently does not include PtrTypeBase.
 Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
+/// Return true if `type` is the core module's `Access` enum, the type of the access parameter of
+/// `Ptr` and `Ref`.
+bool isAccessEnumType(ASTBuilder* astBuilder, Type* type);
+
+/// Return true if `val` is a constant access value that names none of the `Access`
+/// enumerators, as `(Access)3` does. The value category of a pointee is derived from an access
+/// qualifier by `QualType::applyAccessQualifier`, which only accepts the enumerators, so such a
+/// value must be rejected before it reaches a `Ptr` or `Ref` type.
+bool isAccessValueOutsideAccessEnum(Val* val);
+
 /// True if `containerDecl` is `moduleDecl` itself or one of its own `__include`d
 /// `FileDecl` children — i.e. a scope that belongs on `moduleDecl`'s imported surface.
 /// Used by both the `import` re-export filter (`importModuleIntoScope`) and the

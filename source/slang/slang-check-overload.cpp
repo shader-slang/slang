@@ -297,17 +297,14 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
-/// Return true if `arg`, the checked argument for a generic value parameter of type
-/// `paramType`, is a constant of the `Access` enum that is none of its enumerators, as the
-/// argument of `Ptr<T, (Access)3>` or of `Box<(Access)3>` is. The value category of a pointee is
-/// derived from an access qualifier by `QualType::applyAccessQualifier`, which only accepts the
-/// enumerators, so such an argument must not reach a `Ptr` or `Ref` type.
-static bool isAccessArgumentOutsideAccessEnum(ASTBuilder* astBuilder, Type* paramType, Val* arg)
+bool isAccessEnumType(ASTBuilder* astBuilder, Type* type)
 {
-    if (!paramType->equals(astBuilder->getMagicEnumType("AccessQualifier")))
-        return false;
+    return type->equals(astBuilder->getMagicEnumType("AccessQualifier"));
+}
 
-    auto optAccessQualifier = tryGetAccessQualifierValue(arg);
+bool isAccessValueOutsideAccessEnum(Val* val)
+{
+    auto optAccessQualifier = tryGetAccessQualifierValue(val);
     if (!optAccessQualifier)
         return false;
 
@@ -625,10 +622,8 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             // enumerators. We reject it here, where every explicit argument for an `Access`
             // parameter becomes a value, and use the error value below in its place.
             if (val && context.mode == OverloadResolveContext::Mode::ForReal &&
-                isAccessArgumentOutsideAccessEnum(
-                    m_astBuilder,
-                    getType(m_astBuilder, valParamRef),
-                    val))
+                isAccessEnumType(m_astBuilder, getType(m_astBuilder, valParamRef)) &&
+                isAccessValueOutsideAccessEnum(val))
             {
                 getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.expr = arg});
                 val = nullptr;
