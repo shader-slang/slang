@@ -1,6 +1,6 @@
 //TEST:EXECUTABLE:
 
-[RequirePrelude(cpp, "const int PRELUDE = 2; struct Foo{};")]
+[RequirePrelude(cpp, "const int PRELUDE = 2; " "struct Foo{};")]
 [RequirePrelude(glsl, "INVALID_PRELUDE")]
 __target_intrinsic(cpp, "Foo")
 struct Foo

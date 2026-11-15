@@ -5666,10 +5666,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getIntValue(builder->getUIntType(), operand.knownValue));
                     }
-                    else if (operand.token.getType() == TokenType::StringLiteral)
+                    else if (auto literal = operand.token.as<StringLiteralToken>())
                     {
-                        const auto v =
-                            getStringLiteralTokenValue(operand.token, context->getSink());
+                        const auto v = getStringLiteralTokenValue(literal, context->getSink());
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getStringValue(v.getUnownedSlice()));
                     }

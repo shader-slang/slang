@@ -307,6 +307,9 @@ List<SemanticToken> getSemanticTokens(
             }
             else if (auto targetCase = as<TargetCaseStmt>(node))
             {
+                // A default label has no capability identifier to highlight.
+                if (!targetCase->capabilityToken)
+                    return;
                 SemanticToken token = _createSemanticToken(
                     manager,
                     targetCase->capabilityToken.getLoc(),

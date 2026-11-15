@@ -1,0 +1,841 @@
+// GENERATED CODE; DO NOT EDIT
+//
+// input file: slang-raw-lexeme-types.h
+
+// BEGIN FIDDLE TEMPLATE OUTPUT:
+#ifdef FIDDLE_GENERATED_OUTPUT_ID
+
+#if FIDDLE_GENERATED_OUTPUT_ID == 0
+/// An atomic lexeme in the `Trivia` branch of the lexeme hierarchy.
+struct Trivia : Lexeme
+{
+    static constexpr LexemeKind kind = LexemeKind::Trivia;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Comment` branch of the lexeme hierarchy.
+struct CommentTrivia : Trivia
+{
+    static constexpr LexemeKind kind = LexemeKind::Comment;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Token` branch of the lexeme hierarchy.
+struct RawToken : Lexeme
+{
+    static constexpr LexemeKind kind = LexemeKind::Token;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Literal` branch of the lexeme hierarchy.
+struct RawLiteral : RawToken
+{
+    static constexpr LexemeKind kind = LexemeKind::Literal;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `NumericLiteral` branch of the lexeme hierarchy.
+struct RawNumericLiteral : RawLiteral
+{
+    static constexpr LexemeKind kind = LexemeKind::NumericLiteral;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Punctuation` branch of the lexeme hierarchy.
+struct RawPunctuation : RawToken
+{
+    static constexpr LexemeKind kind = LexemeKind::Punctuation;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `EndOfFile` branch of the lexeme hierarchy.
+struct RawEndOfFile : RawToken
+{
+    static constexpr LexemeKind kind = LexemeKind::EndOfFile;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Invalid` branch of the lexeme hierarchy.
+struct RawInvalid : RawToken
+{
+    static constexpr LexemeKind kind = LexemeKind::Invalid;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Identifier` branch of the lexeme hierarchy.
+struct RawIdentifier : RawToken
+{
+    static constexpr LexemeKind kind = LexemeKind::Identifier;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `IntegerLiteral` branch of the lexeme hierarchy.
+struct RawIntegerLiteral : RawNumericLiteral
+{
+    static constexpr LexemeKind kind = LexemeKind::IntegerLiteral;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `FloatingPointLiteral` branch of the lexeme hierarchy.
+struct RawFloatingPointLiteral : RawNumericLiteral
+{
+    static constexpr LexemeKind kind = LexemeKind::FloatingPointLiteral;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `StringLiteral` branch of the lexeme hierarchy.
+struct RawStringLiteral : RawLiteral
+{
+    static constexpr LexemeKind kind = LexemeKind::StringLiteral;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `CharLiteral` branch of the lexeme hierarchy.
+struct RawCharLiteral : RawLiteral
+{
+    static constexpr LexemeKind kind = LexemeKind::CharLiteral;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `WhiteSpace` branch of the lexeme hierarchy.
+struct WhiteSpaceTrivia : Trivia
+{
+    static constexpr LexemeKind kind = LexemeKind::WhiteSpace;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `NewLine` branch of the lexeme hierarchy.
+struct NewLineTrivia : Trivia
+{
+    static constexpr LexemeKind kind = LexemeKind::NewLine;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `LineComment` branch of the lexeme hierarchy.
+struct LineCommentTrivia : CommentTrivia
+{
+    static constexpr LexemeKind kind = LexemeKind::LineComment;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `BlockComment` branch of the lexeme hierarchy.
+struct BlockCommentTrivia : CommentTrivia
+{
+    static constexpr LexemeKind kind = LexemeKind::BlockComment;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Semicolon` branch of the lexeme hierarchy.
+struct RawSemicolon : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Semicolon;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Comma` branch of the lexeme hierarchy.
+struct RawComma : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Comma;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Dot` branch of the lexeme hierarchy.
+struct RawDot : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Dot;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `DotDot` branch of the lexeme hierarchy.
+struct RawDotDot : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::DotDot;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Ellipsis` branch of the lexeme hierarchy.
+struct RawEllipsis : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Ellipsis;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `LBrace` branch of the lexeme hierarchy.
+struct RawLBrace : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::LBrace;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `RBrace` branch of the lexeme hierarchy.
+struct RawRBrace : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::RBrace;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `LBracket` branch of the lexeme hierarchy.
+struct RawLBracket : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::LBracket;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `RBracket` branch of the lexeme hierarchy.
+struct RawRBracket : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::RBracket;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `LParent` branch of the lexeme hierarchy.
+struct RawLParent : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::LParent;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `RParent` branch of the lexeme hierarchy.
+struct RawRParent : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::RParent;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpAssign` branch of the lexeme hierarchy.
+struct RawOpAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpAdd` branch of the lexeme hierarchy.
+struct RawOpAdd : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpAdd;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpSub` branch of the lexeme hierarchy.
+struct RawOpSub : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpSub;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpMul` branch of the lexeme hierarchy.
+struct RawOpMul : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpMul;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpDiv` branch of the lexeme hierarchy.
+struct RawOpDiv : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpDiv;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpMod` branch of the lexeme hierarchy.
+struct RawOpMod : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpMod;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpNot` branch of the lexeme hierarchy.
+struct RawOpNot : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpNot;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpBitNot` branch of the lexeme hierarchy.
+struct RawOpBitNot : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpBitNot;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpLsh` branch of the lexeme hierarchy.
+struct RawOpLsh : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpLsh;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpRsh` branch of the lexeme hierarchy.
+struct RawOpRsh : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpRsh;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpEql` branch of the lexeme hierarchy.
+struct RawOpEql : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpEql;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpNeq` branch of the lexeme hierarchy.
+struct RawOpNeq : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpNeq;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpGreater` branch of the lexeme hierarchy.
+struct RawOpGreater : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpGreater;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpLess` branch of the lexeme hierarchy.
+struct RawOpLess : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpLess;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpGeq` branch of the lexeme hierarchy.
+struct RawOpGeq : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpGeq;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpLeq` branch of the lexeme hierarchy.
+struct RawOpLeq : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpLeq;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpAnd` branch of the lexeme hierarchy.
+struct RawOpAnd : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpAnd;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpOr` branch of the lexeme hierarchy.
+struct RawOpOr : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpOr;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpBitAnd` branch of the lexeme hierarchy.
+struct RawOpBitAnd : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpBitAnd;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpBitOr` branch of the lexeme hierarchy.
+struct RawOpBitOr : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpBitOr;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpBitXor` branch of the lexeme hierarchy.
+struct RawOpBitXor : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpBitXor;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpInc` branch of the lexeme hierarchy.
+struct RawOpInc : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpInc;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpDec` branch of the lexeme hierarchy.
+struct RawOpDec : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpDec;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpAddAssign` branch of the lexeme hierarchy.
+struct RawOpAddAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpAddAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpSubAssign` branch of the lexeme hierarchy.
+struct RawOpSubAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpSubAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpMulAssign` branch of the lexeme hierarchy.
+struct RawOpMulAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpMulAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpDivAssign` branch of the lexeme hierarchy.
+struct RawOpDivAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpDivAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpModAssign` branch of the lexeme hierarchy.
+struct RawOpModAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpModAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpShlAssign` branch of the lexeme hierarchy.
+struct RawOpShlAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpShlAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpShrAssign` branch of the lexeme hierarchy.
+struct RawOpShrAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpShrAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpAndAssign` branch of the lexeme hierarchy.
+struct RawOpAndAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpAndAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpOrAssign` branch of the lexeme hierarchy.
+struct RawOpOrAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpOrAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `OpXorAssign` branch of the lexeme hierarchy.
+struct RawOpXorAssign : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::OpXorAssign;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `QuestionMark` branch of the lexeme hierarchy.
+struct RawQuestionMark : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::QuestionMark;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Colon` branch of the lexeme hierarchy.
+struct RawColon : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Colon;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `RightArrow` branch of the lexeme hierarchy.
+struct RawRightArrow : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::RightArrow;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `DoubleRightArrow` branch of the lexeme hierarchy.
+struct RawDoubleRightArrow : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::DoubleRightArrow;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `At` branch of the lexeme hierarchy.
+struct RawAt : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::At;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Dollar` branch of the lexeme hierarchy.
+struct RawDollar : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Dollar;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `DollarDollar` branch of the lexeme hierarchy.
+struct RawDollarDollar : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::DollarDollar;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Pound` branch of the lexeme hierarchy.
+struct RawPound : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Pound;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `PoundPound` branch of the lexeme hierarchy.
+struct RawPoundPound : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::PoundPound;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `Scope` branch of the lexeme hierarchy.
+struct RawScope : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::Scope;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `CompletionRequest` branch of the lexeme hierarchy.
+struct RawCompletionRequest : RawPunctuation
+{
+    static constexpr LexemeKind kind = LexemeKind::CompletionRequest;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `EscapedNewLine` branch of the lexeme hierarchy.
+struct EscapedNewLineTrivia : Trivia
+{
+    static constexpr LexemeKind kind = LexemeKind::EscapedNewLine;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `AngleBracketHeaderName` branch of the lexeme hierarchy.
+struct RawAngleBracketHeaderName : RawToken
+{
+    static constexpr LexemeKind kind = LexemeKind::AngleBracketHeaderName;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+/// An atomic lexeme in the `EndOfDirective` branch of the lexeme hierarchy.
+struct RawEndOfDirective : RawToken
+{
+    static constexpr LexemeKind kind = LexemeKind::EndOfDirective;
+
+    static bool isKind(LexemeKind candidateKind)
+    {
+        return isLexemeKind(candidateKind, kind);
+    }
+};
+
+
+#endif
+
+#undef FIDDLE_GENERATED_OUTPUT_ID
+#endif
+// END FIDDLE TEMPLATE OUTPUT
+
+// END OF FIDDLE-GENERATED FILE

@@ -4,6 +4,7 @@
 
 #include "core/slang-array-view.h"
 #include "core/slang-basic.h"
+#include "slang-lexeme-defs.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
 
@@ -14,23 +15,6 @@ namespace Slang
 // flags; immutable objects carry spelling and are shared within a `TokenPool`.
 // The generated definitions describe both the atomic lexeme hierarchy and the
 // matching hierarchy of tokens with attached trivia.
-
-/// The unified kind space for atomic lexemes and tokens with trivia.
-enum class LexemeKind : uint8_t
-{
-    Unknown,
-#define SLANG_LEXEME_KIND(NAME, BASE, CONCRETE, DESCRIPTION) NAME,
-#include "slang-lexeme-defs.h"
-#undef SLANG_LEXEME_KIND
-    Count,
-};
-
-using TokenType = LexemeKind;
-char const* TokenTypeToString(TokenType type);
-
-/// Tests whether a concrete or abstract kind belongs to a conceptual base kind.
-bool isLexemeKind(LexemeKind kind, LexemeKind base);
-bool isConcreteLexemeKind(LexemeKind kind);
 
 using TokenFlags = uint8_t;
 
@@ -146,18 +130,7 @@ protected:
     TokenFlags m_flags = 0;
 };
 
-// Each wrapper inherits only the handle fields. We construct checked typed
-// values by copying the base handle, rather than downcasting a base C++ object.
-#define SLANG_RAW_LEXEME(KIND, NAME, BASE)               \
-    struct NAME : BASE                                   \
-    {                                                    \
-        static bool isKind(LexemeKind kind)              \
-        {                                                \
-            return isLexemeKind(kind, LexemeKind::KIND); \
-        }                                                \
-    };
-#include "slang-lexeme-defs.h"
-#undef SLANG_RAW_LEXEME
+#include "slang-raw-lexeme-types.h"
 
 /// Immutable token spelling and its ordered leading and trailing trivia.
 ///
@@ -231,26 +204,8 @@ struct Token
     TriviaList getLeadingTrivia() const;
     TriviaList getTrailingTrivia() const;
 
-    /// Replaces this non-empty token's kind through its pool.
-    ///
-    /// Requires a concrete token kind or `Unknown`. `Unknown` clears the handle;
-    /// EOF and `EndOfDirective` create zero-width tokens without trivia. Other kinds
-    /// preserve spellings and trivia and require the caller to justify that interpretation.
-    void setType(TokenType type);
-    /// Replaces both spellings of a non-empty token, preserving its kind and context.
-    ///
-    /// Discards attached trivia because changing spelling can invalidate its positions.
-    /// Clears any cached name; `getName()` returns null afterward.
-    /// Zero-width token kinds require empty replacement text.
-    void setContent(UnownedStringSlice content);
-    /// Replaces a non-empty token's spelling with a name, preserving kind and context.
-    ///
-    /// Requires a non-null name and discards attached trivia.
-    /// Zero-width token kinds require an empty name.
-    void setName(Name* name);
-    void setFlags(TokenFlags flags) { m_flags = flags; }
-    /// Relocates the raw token and discards trivia whose original positions would be lost.
-    void setLoc(SourceLoc loc);
+    /// Returns the same shared token with different preprocessing context flags.
+    Token withFlags(TokenFlags flags) const { return Token(m_object, m_loc, flags); }
 
     template<typename T>
     bool is() const
@@ -274,17 +229,7 @@ protected:
     TokenFlags m_flags = 0;
 };
 
-#define SLANG_TOKEN_WRAPPER(KIND, NAME, BASE)            \
-    struct NAME : BASE                                   \
-    {                                                    \
-        static bool isKind(LexemeKind kind)              \
-        {                                                \
-            return isLexemeKind(kind, LexemeKind::KIND); \
-        }                                                \
-        void setType(TokenType) = delete;                \
-    };
-#include "slang-lexeme-defs.h"
-#undef SLANG_TOKEN_WRAPPER
+#include "slang-token-types.h"
 
 /// A borrowed sequence of trivia with locations in one contiguous source view.
 ///
@@ -380,7 +325,7 @@ public:
         Name* name,
         SourceLoc loc = SourceLoc(),
         TokenFlags flags = 0);
-    Token createEndOfFile(SourceLoc loc = SourceLoc(), TokenFlags flags = 0);
+    EndOfFileToken createEndOfFile(SourceLoc loc = SourceLoc(), TokenFlags flags = 0);
 
     /// Creates the second `>` of a `>>` lexeme at its original byte location.
     ///
@@ -388,7 +333,7 @@ public:
     /// at its second `>`. The returned lexeme has spelling `>` and no occurrence flags,
     /// because no logical whitespace separates the two closer characters.
     /// An unknown input location remains unknown.
-    RawOpGreater createSecondGreaterToken(RawToken rightShift);
+    RawOpGreater createSecondGreaterToken(RawOpRsh rightShift);
 
     /// Copies a cluster into this pool while preserving its location and context.
     Token importToken(Token token);

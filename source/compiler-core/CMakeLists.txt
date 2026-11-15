@@ -22,29 +22,43 @@ if(NOT MSVC)
     )
 endif()
 
-# The lexer consumes a checked-in copy of its generated kind definitions because `slang-fiddle`
-# itself links `compiler-core`. These explicit maintenance targets run after fiddle is built;
-# making either target a prerequisite of `compiler-core` would introduce a dependency cycle.
-set(SLANG_LEXEME_DEFINITION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/slang-lexeme-defs.h")
+# We compile the checked-in kind and type definitions because `slang-fiddle` links
+# `compiler-core`. The maintenance targets run after `slang-fiddle` is built; making either
+# target a prerequisite of `compiler-core` would introduce a dependency cycle.
+set(
+    SLANG_LEXEME_DEFINITION_FILES
+    slang-lexeme-defs.h
+    slang-raw-lexeme-types.h
+    slang-token-types.h
+)
+list(
+    TRANSFORM SLANG_LEXEME_DEFINITION_FILES
+    PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/"
+    OUTPUT_VARIABLE SLANG_LEXEME_DEFINITION_HEADERS
+)
+list(
+    TRANSFORM SLANG_LEXEME_DEFINITION_HEADERS
+    APPEND ".fiddle"
+    OUTPUT_VARIABLE SLANG_LEXEME_DEFINITION_OUTPUTS
+)
 set(SLANG_LEXEME_DEFINITION_LUA "${CMAKE_CURRENT_SOURCE_DIR}/slang-lexeme-defs.lua")
-set(SLANG_LEXEME_DEFINITION_OUTPUT "${SLANG_LEXEME_DEFINITION_HEADER}.fiddle")
 
 add_custom_target(
     regenerate-lexeme-definitions
     COMMAND
         $<TARGET_FILE:slang-fiddle> -i "${CMAKE_CURRENT_SOURCE_DIR}/" -o
-        "${CMAKE_CURRENT_SOURCE_DIR}/" slang-lexeme-defs.h
+        "${CMAKE_CURRENT_SOURCE_DIR}/" ${SLANG_LEXEME_DEFINITION_FILES}
     DEPENDS
         slang-fiddle
-        ${SLANG_LEXEME_DEFINITION_HEADER}
+        ${SLANG_LEXEME_DEFINITION_HEADERS}
         ${SLANG_LEXEME_DEFINITION_LUA}
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     COMMENT "Regenerating the checked-in lexeme definitions"
     VERBATIM
 )
 
-# Fiddle can rewrite its input to update template markers. We give the check a build-only
-# input copy so checking a stale snapshot never edits the checkout being validated.
+# Fiddle can rewrite its input to update template markers. We give the check input copies
+# in the build directory so checking stale snapshots does not edit the checkout.
 set(SLANG_LEXEME_CHECK_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lexeme-definitions-check/$<CONFIG>")
 add_custom_target(
     check-lexeme-definitions
@@ -54,20 +68,28 @@ add_custom_target(
         "${SLANG_LEXEME_CHECK_DIRECTORY}/output"
     COMMAND
         ${CMAKE_COMMAND} -E copy_if_different
-        ${SLANG_LEXEME_DEFINITION_HEADER}
-        "${SLANG_LEXEME_CHECK_DIRECTORY}/input/slang-lexeme-defs.h"
+        ${SLANG_LEXEME_DEFINITION_HEADERS}
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/input/"
     COMMAND
         $<TARGET_FILE:slang-fiddle> -i "${SLANG_LEXEME_CHECK_DIRECTORY}/input/" -o
-        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/" slang-lexeme-defs.h
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/" ${SLANG_LEXEME_DEFINITION_FILES}
     COMMAND
         ${CMAKE_COMMAND} -E compare_files
-        ${SLANG_LEXEME_DEFINITION_OUTPUT}
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-lexeme-defs.h.fiddle"
         "${SLANG_LEXEME_CHECK_DIRECTORY}/output/slang-lexeme-defs.h.fiddle"
+    COMMAND
+        ${CMAKE_COMMAND} -E compare_files
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-raw-lexeme-types.h.fiddle"
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/slang-raw-lexeme-types.h.fiddle"
+    COMMAND
+        ${CMAKE_COMMAND} -E compare_files
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-token-types.h.fiddle"
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/slang-token-types.h.fiddle"
     DEPENDS
         slang-fiddle
-        ${SLANG_LEXEME_DEFINITION_HEADER}
+        ${SLANG_LEXEME_DEFINITION_HEADERS}
         ${SLANG_LEXEME_DEFINITION_LUA}
-        ${SLANG_LEXEME_DEFINITION_OUTPUT}
+        ${SLANG_LEXEME_DEFINITION_OUTPUTS}
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     COMMENT "Checking the checked-in lexeme definitions"
     VERBATIM

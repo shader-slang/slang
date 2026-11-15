@@ -8,7 +8,7 @@
 // Physical tokens retain their spelling and trivia throughout preprocessing.
 // `LexerInputStream` exposes line endings as separate, zero-width
 // `EndOfDirective` tokens so that directive handlers can stop before the next line.
-// Header operands use the lexer's contextual header-name mode; macro expansion
+// Header operands use the lexer's contextual angle-bracket header recognition; macro expansion
 // transforms the remaining token stream without changing physical trivia origins.
 
 #include "compiler-core/slang-lexer.h"
@@ -234,7 +234,7 @@ struct PretokenizedInputStream : InputStream
     // A pretokenized stream implements the key read/peek operations
     // by delegating to the underlying token reader.
 
-    virtual Token readToken() SLANG_OVERRIDE { return m_tokenReader.advanceToken(); }
+    virtual Token readToken() SLANG_OVERRIDE { return m_tokenReader.readToken(); }
 
     virtual Token peekToken() SLANG_OVERRIDE { return m_tokenReader.peekToken(); }
 
@@ -427,7 +427,7 @@ struct InputStreamStack
     SourceLoc peekLoc() { return peekToken().getLoc(); }
 
     /// Skip line delimiters to arrive at the next ordinary token.
-    void skipAllWhitespace()
+    void skipLineDelimiters()
     {
         for (;;)
         {
@@ -548,7 +548,7 @@ private:
         // The lexer groups trailing trivia through the first explicit newline.
         // We preserve the physical cluster and remember only that line delimiter
         // for the preprocessor's next read.
-        Token token = m_lexer.lexToken();
+        Token token = m_lexer.readToken();
         for (auto trivia : token.getTrailingTrivia())
         {
             if (trivia.getType() == TokenType::NewLine)
@@ -809,6 +809,9 @@ private:
 
     /// Get a reader for the tokens that make up the macro argument at the given `paramIndex`
     TokenReader _getArgTokens(Index paramIndex);
+
+    // Forms a borrowed argument slice with an explicit EOF at its delimiter.
+    TokenReader _getArgTokenRange(Index beginIndex, Index endIndex);
 
     /// Push a stream onto `m_currentOpStreams` that consists of a single token
     void _pushSingleTokenStream(
@@ -1552,7 +1555,7 @@ MacroInvocation::Arg ExpansionInputStream::_parseMacroArg(MacroInvocation* macro
     {
         arg.endTokenIndex = macroInvocation->m_argTokens.getCount();
 
-        m_inputStreams.skipAllWhitespace();
+        m_inputStreams.skipLineDelimiters();
         Token token = m_inputStreams.peekToken();
         macroInvocation->m_argTokens.add(token);
 
@@ -1829,7 +1832,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // at the underlying input stream to see if the next non-whitespace
                 // token after the lookahead is a `(`.
                 //
-                m_inputStreams.skipAllWhitespace();
+                m_inputStreams.skipLineDelimiters();
                 Token maybeLeftParen = m_inputStreams.peekToken();
                 if (maybeLeftParen.getType() != TokenType::LParent)
                 {
@@ -2057,7 +2060,7 @@ Token MacroInvocation::_readTokenImpl()
             // as well, otherwise the expanded code could be invalid.
             if (m_isStartOfLine)
             {
-                token.setFlags(token.getFlags() | TokenFlag::AtStartOfLine);
+                token = token.withFlags(token.getFlags() | TokenFlag::AtStartOfLine);
                 m_isStartOfLine = false;
             }
             return token;
@@ -2087,7 +2090,7 @@ Token MacroInvocation::_readTokenImpl()
             // as well, otherwise the expanded code could be invalid.
             if (m_isStartOfLine)
             {
-                token.setFlags(token.getFlags() | TokenFlag::AtStartOfLine);
+                token = token.withFlags(token.getFlags() | TokenFlag::AtStartOfLine);
                 m_isStartOfLine = false;
             }
             return token;
@@ -2255,7 +2258,7 @@ Token MacroInvocation::_readTokenImpl()
                     sourceView,
                     GetSink(m_preprocessor),
                     m_preprocessor->getNamePool());
-                auto lexedTokens = lexer.lexAllSemanticTokens();
+                auto lexedTokens = lexer.readAllTokens();
 
                 // The `lexedTokens` will always contain at least one token, representing an EOF for
                 // the end of the lexed token squence.
@@ -2387,6 +2390,23 @@ void MacroInvocation::_pushStreamForSourceLocBuiltin(TokenType tokenType, F cons
     _pushSingleTokenStream(tokenType, m_macroInvocationLoc, content.getUnownedSlice());
 }
 
+TokenReader MacroInvocation::_getArgTokenRange(Index beginIndex, Index endIndex)
+{
+    // Argument storage includes separating commas and the final ')'. A parameter
+    // expansion reads only its selected slice. We supply a distinct zero-width
+    // EOF at the delimiter so the reader never reinterprets that punctuation.
+    SLANG_RELEASE_ASSERT(beginIndex >= 0);
+    SLANG_RELEASE_ASSERT(beginIndex <= endIndex);
+    SLANG_RELEASE_ASSERT(endIndex <= m_argTokens.getCount());
+    auto buffer = m_argTokens.getBuffer();
+    auto begin = buffer ? buffer + beginIndex : nullptr;
+    auto end = buffer ? buffer + endIndex : nullptr;
+    auto endLoc =
+        endIndex < m_argTokens.getCount() ? m_argTokens[endIndex].getLoc() : m_macroInvocationLoc;
+    auto endOfFile = m_preprocessor->getSourceManager()->getTokenPool()->createEndOfFile(endLoc);
+    return TokenReader(begin, end, endOfFile.as<EndOfFileToken>());
+}
+
 TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
 {
     SLANG_ASSERT(paramIndex >= 0);
@@ -2396,7 +2416,6 @@ TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
     // depends on whether or not it is a variadic parameter.
     //
     auto& param = m_macro->params[paramIndex];
-    auto argTokens = m_argTokens.getBuffer();
     if (!param.isVariadic)
     {
         // The non-variadic case is, as expected, the simpler one.
@@ -2409,12 +2428,12 @@ TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
         // return an empty token range
         if (m_args.getCount() == 0 && m_macro->params.getCount() == 1)
         {
-            return TokenReader(argTokens, argTokens);
+            return _getArgTokenRange(0, 0);
         }
 
         SLANG_ASSERT(paramIndex < m_args.getCount());
         auto arg = m_args[paramIndex];
-        return TokenReader(argTokens + arg.beginTokenIndex, argTokens + arg.endTokenIndex);
+        return _getArgTokenRange(arg.beginTokenIndex, arg.endTokenIndex);
     }
     else
     {
@@ -2441,11 +2460,11 @@ TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
             if (lastArgIndex >= 0)
             {
                 auto arg = m_args[lastArgIndex];
-                return TokenReader(argTokens + arg.endTokenIndex, argTokens + arg.endTokenIndex);
+                return _getArgTokenRange(arg.endTokenIndex, arg.endTokenIndex);
             }
             else
             {
-                return TokenReader(argTokens, argTokens);
+                return _getArgTokenRange(0, 0);
             }
         }
 
@@ -2456,7 +2475,7 @@ TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
         //
         auto firstArg = m_args[firstArgIndex];
         auto lastArg = m_args[lastArgIndex];
-        return TokenReader(argTokens + firstArg.beginTokenIndex, argTokens + lastArg.endTokenIndex);
+        return _getArgTokenRange(firstArg.beginTokenIndex, lastArg.endTokenIndex);
     }
 }
 
@@ -2490,8 +2509,10 @@ void MacroInvocation::_initCurrentOpStream()
             // the chosen range, and push a matching input stream.
             //
             auto tokenBuffer = m_macro->tokens.begin();
-            auto tokenReader =
-                TokenReader(tokenBuffer + beginTokenIndex, tokenBuffer + endTokenIndex);
+            auto tokenReader = TokenReader(
+                tokenBuffer + beginTokenIndex,
+                tokenBuffer + endTokenIndex,
+                m_macro->tokens.end()->as<EndOfFileToken>());
             PretokenizedInputStream* stream =
                 new PretokenizedInputStream(m_preprocessor, tokenReader);
             m_currentOpStreams.push(stream);
@@ -2565,7 +2586,7 @@ void MacroInvocation::_initCurrentOpStream()
             builder.appendChar('"');
             for (bool first = true; !tokenReader.isAtEnd(); first = false)
             {
-                auto token = tokenReader.advanceToken();
+                auto token = tokenReader.readToken();
 
                 // Any whitespace between the tokens of argument must be collapsed into
                 // a single space character. Fortunately for us, the lexer has tracked
@@ -3645,24 +3666,24 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 {
     // Consider `#include<dir/file.h>`. The operand must be lexed as one header
     // name even without whitespace after `include`. Both input stream caches
-    // defer their next read, so we can select header mode before consuming the
+    // defer their next read, so we can select angle-bracket header recognition before consuming the
     // directive name and requesting its operand.
     auto lexer = getInputFile(context)->getLexer();
-    lexer->setHeaderNameMode(true);
+    lexer->setMode(LexerMode::ExpectingAngleBracketHeaderName);
     AdvanceRawToken(context);
     auto operandType = PeekTokenType(context);
-    lexer->setHeaderNameMode(false);
+    lexer->setMode(LexerMode::Normal);
 
     Token pathToken;
     IncludeSystem::Mode includeMode = IncludeSystem::Mode::Quote;
     String path;
-    if (operandType == TokenType::HeaderName)
+    if (operandType == TokenType::AngleBracketHeaderName)
     {
         // Physical angle-bracket operands preserve spaces and comment-like text
         // inside the header name instead of interpreting that text as trivia.
         Expect(
             context,
-            TokenType::HeaderName,
+            TokenType::AngleBracketHeaderName,
             PreprocessorExpectDiag::TokenInDirective,
             &pathToken);
         path = getFileNameTokenValue(pathToken);
@@ -3672,7 +3693,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     {
         // Macro expansion can supply a header as several ordinary tokens. We
         // combine their logical spellings and preserve separating whitespace.
-        // Physical operands already took the `HeaderName` case above.
+        // Physical operands already took the `AngleBracketHeaderName` case above.
         StringBuilder pathSB;
         Expect(context, TokenType::OpLess, PreprocessorExpectDiag::TokenInDirective, &pathToken);
         while (!IsEndOfLine(context))
@@ -4122,7 +4143,9 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             // The end of the current line/file ends the directive, and serves
             // as the end-of-file marker for the macro's definition as well.
             //
-            token.setType(TokenType::EndOfFile);
+            token = context->m_preprocessor->getSourceManager()->getTokenPool()->createEndOfFile(
+                token.getLoc(),
+                token.getFlags());
             macro->tokens.add(token);
             break;
         }
@@ -4282,7 +4305,9 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         break;
 
     case TokenType::StringLiteral:
-        file = getStringLiteralTokenValue(AdvanceToken(context), GetSink(context));
+        file = getStringLiteralTokenValue(
+            AdvanceToken(context).as<StringLiteralToken>(),
+            GetSink(context));
         break;
 
     case TokenType::IntegerLiteral:
@@ -5028,7 +5053,7 @@ static void DefineMacro(Preprocessor* preprocessor, String const& key, String co
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
     lexer.initialize(valueView, GetSink(preprocessor), preprocessor->getNamePool());
-    macro->tokens = lexer.lexAllSemanticTokens();
+    macro->tokens = lexer.readAllTokens();
 
     Dictionary<Name*, Index> mapParamNameToIndex;
     _parseMacroOps(preprocessor, macro, mapParamNameToIndex);

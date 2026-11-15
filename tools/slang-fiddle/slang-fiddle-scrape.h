@@ -23,19 +23,20 @@ class Node : public Val
 public:
 };
 
-// Grouping Tokens and Trivia
+// Fiddle shares token occurrences between its parser and syntax nodes. The mutable node adds
+// delimiter-skip information; `Token` represents the raw token and its attached trivia.
 
+/// A token occurrence with mutable bookkeeping shared by Fiddle's parser and syntax nodes.
 class TokenWithTriviaNode : public RefObject
 {
 public:
     TokenType getType() const { return token.getType(); }
 
-    List<Lexeme> leadingTrivia;
-    Lexeme token;
-    List<Lexeme> trailingTrivia;
+    Token token;
     Count skipCount = 0;
 };
 
+/// A shared handle to a token occurrence and Fiddle's delimiter-skip bookkeeping.
 struct TokenWithTrivia
 {
 public:
@@ -48,7 +49,7 @@ public:
 
     SourceLoc getLoc() const { return node->token.getLoc(); }
 
-    Lexeme const& getToken() const { return node->token; }
+    Token const& getToken() const { return node->token; }
 
     TokenType getType() const { return node ? node->getType() : TokenType::Unknown; }
 
@@ -59,7 +60,7 @@ public:
 
     Count getSkipCount() const { return node ? node->skipCount : 0; }
 
-    /// Consumes the first `>` of a `>>` lexeme, leaving its second closer as lookahead.
+    /// Consumes the first `>` of a `>>` token, leaving its second closer as lookahead.
     ///
     /// Requires a non-empty `OpRsh` value. Leading trivia is consumed with the first
     /// closer; trailing trivia remains with the second closer at its original locations.
@@ -68,12 +69,13 @@ public:
         SLANG_RELEASE_ASSERT(node);
         SLANG_RELEASE_ASSERT(node->token);
         auto token = node->token;
-        node->token = token.getPool()->createSecondGreaterToken(token.as<RawToken>());
-        node->leadingTrivia.clear();
+        auto pool = token.getPool();
+        auto secondCloser = pool->createSecondGreaterToken(token.getRawToken().as<RawOpRsh>());
+        node->token = pool->createToken(secondCloser, {}, token.getTrailingTrivia().getObjects());
     }
 
-    List<Lexeme> const& getLeadingTrivia() const { return node->leadingTrivia; }
-    List<Lexeme> const& getTrailingTrivia() const { return node->trailingTrivia; }
+    TriviaList getLeadingTrivia() const { return node->token.getLeadingTrivia(); }
+    TriviaList getTrailingTrivia() const { return node->token.getTrailingTrivia(); }
 
     operator TokenWithTriviaNode*() { return node; }
 

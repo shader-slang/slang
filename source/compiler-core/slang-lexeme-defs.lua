@@ -1,152 +1,210 @@
--- This hierarchy is the source of truth for lexeme kinds and their C++ value wrappers.
--- Abstract cases classify values but are never allocated as objects.
--- The checked-in fiddle output allows the lexer to bootstrap fiddle itself.
-local cases = {
-    { name = "Lexeme", abstract = true, description = "lexeme" },
-    { name = "Trivia", base = "Lexeme", abstract = true, description = "trivia" },
-    { name = "Comment", base = "Trivia", abstract = true, description = "comment" },
-    { name = "Token", base = "Lexeme", abstract = true, description = "token" },
-    { name = "Literal", base = "Token", abstract = true, description = "literal" },
-    { name = "NumericLiteral", base = "Literal", abstract = true, description = "numeric literal" },
-    { name = "Punctuation", base = "Token", abstract = true, description = "punctuation" },
-        { name = "EndOfFile", base = "Token", description = "end of file" },
-        { name = "Invalid", base = "Token", description = "invalid character" },
-        { name = "Identifier", base = "Token", description = "identifier" },
-        { name = "IntegerLiteral", base = "NumericLiteral", description = "integer literal" },
-        { name = "FloatingPointLiteral", base = "NumericLiteral", description = "floating-point literal" },
-        { name = "StringLiteral", base = "Literal", description = "string literal" },
-        { name = "CharLiteral", base = "Literal", description = "character literal" },
-        { name = "WhiteSpace", base = "Trivia", description = "whitespace" },
-        { name = "NewLine", base = "Trivia", description = "end of line" },
-        { name = "LineComment", base = "Comment", description = "line comment" },
-        { name = "BlockComment", base = "Comment", description = "block comment" },
-        { name = "Semicolon", base = "Punctuation", description = "';'" },
-        { name = "Comma", base = "Punctuation", description = "','" },
-        { name = "Dot", base = "Punctuation", description = "'.'" },
-        { name = "DotDot", base = "Punctuation", description = "'..'" },
-        { name = "Ellipsis", base = "Punctuation", description = "'...'" },
-        { name = "LBrace", base = "Punctuation", description = "'{'" },
-        { name = "RBrace", base = "Punctuation", description = "'}'" },
-        { name = "LBracket", base = "Punctuation", description = "'['" },
-        { name = "RBracket", base = "Punctuation", description = "']'" },
-        { name = "LParent", base = "Punctuation", description = "'('" },
-        { name = "RParent", base = "Punctuation", description = "')'" },
-        { name = "OpAssign", base = "Punctuation", description = "'='" },
-        { name = "OpAdd", base = "Punctuation", description = "'+'" },
-        { name = "OpSub", base = "Punctuation", description = "'-'" },
-        { name = "OpMul", base = "Punctuation", description = "'*'" },
-        { name = "OpDiv", base = "Punctuation", description = "'/'" },
-        { name = "OpMod", base = "Punctuation", description = "'%'" },
-        { name = "OpNot", base = "Punctuation", description = "'!'" },
-        { name = "OpBitNot", base = "Punctuation", description = "'~'" },
-        { name = "OpLsh", base = "Punctuation", description = "'<<'" },
-        { name = "OpRsh", base = "Punctuation", description = "'>>'" },
-        { name = "OpEql", base = "Punctuation", description = "'=='" },
-        { name = "OpNeq", base = "Punctuation", description = "'!='" },
-        { name = "OpGreater", base = "Punctuation", description = "'>'" },
-        { name = "OpLess", base = "Punctuation", description = "'<'" },
-        { name = "OpGeq", base = "Punctuation", description = "'>='" },
-        { name = "OpLeq", base = "Punctuation", description = "'<='" },
-        { name = "OpAnd", base = "Punctuation", description = "'&&'" },
-        { name = "OpOr", base = "Punctuation", description = "'||'" },
-        { name = "OpBitAnd", base = "Punctuation", description = "'&'" },
-        { name = "OpBitOr", base = "Punctuation", description = "'|'" },
-        { name = "OpBitXor", base = "Punctuation", description = "'^'" },
-        { name = "OpInc", base = "Punctuation", description = "'++'" },
-        { name = "OpDec", base = "Punctuation", description = "'--'" },
-        { name = "OpAddAssign", base = "Punctuation", description = "'+='" },
-        { name = "OpSubAssign", base = "Punctuation", description = "'-='" },
-        { name = "OpMulAssign", base = "Punctuation", description = "'*='" },
-        { name = "OpDivAssign", base = "Punctuation", description = "'/='" },
-        { name = "OpModAssign", base = "Punctuation", description = "'%='" },
-        { name = "OpShlAssign", base = "Punctuation", description = "'<<='" },
-        { name = "OpShrAssign", base = "Punctuation", description = "'>>='" },
-        { name = "OpAndAssign", base = "Punctuation", description = "'&='" },
-        { name = "OpOrAssign", base = "Punctuation", description = "'|='" },
-        { name = "OpXorAssign", base = "Punctuation", description = "'^='" },
-        { name = "QuestionMark", base = "Punctuation", description = "'?'" },
-        { name = "Colon", base = "Punctuation", description = "':'" },
-        { name = "RightArrow", base = "Punctuation", description = "'->'" },
-        { name = "DoubleRightArrow", base = "Punctuation", description = "'=>'" },
-        { name = "At", base = "Punctuation", description = "'@'" },
-        { name = "Dollar", base = "Punctuation", description = "'$'" },
-        { name = "DollarDollar", base = "Punctuation", description = "'$$'" },
-        { name = "Pound", base = "Punctuation", description = "'#'" },
-        { name = "PoundPound", base = "Punctuation", description = "'##'" },
-        { name = "Scope", base = "Punctuation", description = "'::'" },
-        { name = "CompletionRequest", base = "Punctuation", description = "'#?'" },
-    { name = "EscapedNewLine", base = "Trivia", description = "escaped end of line" },
-    { name = "HeaderName", base = "Token", description = "header name" },
-    { name = "EndOfDirective", base = "Token", description = "end of preprocessor directive" },
-}
+-- We define the conceptual lexeme hierarchy once, then use it to generate kind tags and
+-- the C++ types for atomic lexemes and tokens with trivia. A `LexemeClass` declaration
+-- names its parent directly; only an abstract class can have subclasses.
+-- The C++ declarations and functions are written in the headers that use these definitions.
 
--- We compute wrapper names from the conceptual hierarchy so raw tokens and
--- tokens with trivia share one kind space without sharing their C++ bases.
-local function generate()
-    local byName = {}
-    for _, case in ipairs(cases) do
-        assert(not byName[case.name], "duplicate lexeme kind: " .. case.name)
-        byName[case.name] = case
-    end
+-- The definition environment registers each assignment under its declared name.
+-- For example, `Literal` below is a class object whose parent is the `Token` class object.
+local function defineLexemeClasses(_ENV)
+    Lexeme = LexemeClass{"lexeme", abstract = true}
+    Trivia = LexemeClass{Lexeme, "trivia", abstract = true}
+    Comment = LexemeClass{Trivia, "comment", abstract = true}
+    Token = LexemeClass{Lexeme, "token", abstract = true}
+    Literal = LexemeClass{Token, "literal", abstract = true}
+    NumericLiteral = LexemeClass{Literal, "numeric literal", abstract = true}
+    Punctuation = LexemeClass{Token, "punctuation", abstract = true}
 
-    -- A concrete case must be a leaf, and every ancestry chain must terminate
-    -- at the abstract root. We reject invalid data before generating C++.
-    for _, case in ipairs(cases) do
-        local ancestors = {}
-        local current = case
-        while current.base do
-            assert(not ancestors[current.name], "cyclic lexeme ancestry: " .. case.name)
-            ancestors[current.name] = true
-            local parent = byName[current.base]
-            assert(parent, "unknown lexeme base: " .. current.base)
-            assert(parent.abstract, "concrete lexeme has a subtype: " .. parent.name)
-            current = parent
-        end
-        assert(current.name == "Lexeme", "lexeme has a different root: " .. case.name)
-        assert(current.abstract, "the lexeme root must be abstract")
-    end
+    EndOfFile = LexemeClass{Token, "end of file"}
+    Invalid = LexemeClass{Token, "invalid character"}
+    Identifier = LexemeClass{Token, "identifier"}
+    IntegerLiteral = LexemeClass{NumericLiteral, "integer literal"}
+    FloatingPointLiteral = LexemeClass{NumericLiteral, "floating-point literal"}
+    StringLiteral = LexemeClass{Literal, "string literal"}
+    CharLiteral = LexemeClass{Literal, "character literal"}
 
-    local function isTrivia(case)
-        if case.name == "Trivia" then return true end
-        if not case.base then return false end
-        return isTrivia(byName[case.base])
-    end
-    local function rawName(case)
-        if case.name == "Lexeme" or case.name == "Trivia" then return case.name end
-        if isTrivia(case) then return case.name .. "Trivia" end
-        return "Raw" .. case.name
-    end
-    local function tokenName(case)
-        if case.name == "Token" then return "Token" end
-        return case.name .. "Token"
-    end
-    local lines = {
-        "// Generated from slang-lexeme-defs.lua. Regenerate with regenerate-lexeme-definitions.",
-        "#ifdef SLANG_LEXEME_KIND",
-    }
-    for _, case in ipairs(cases) do
-        table.insert(lines, string.format('SLANG_LEXEME_KIND(%s, %s, %s, %q)',
-            case.name, case.base or case.name, case.abstract and "false" or "true",
-            case.description))
-    end
-    table.insert(lines, "#endif")
-    table.insert(lines, "#ifdef SLANG_RAW_LEXEME")
-    for _, case in ipairs(cases) do
-        if case.name ~= "Lexeme" then
-            table.insert(lines, string.format('SLANG_RAW_LEXEME(%s, %s, %s)',
-                case.name, rawName(case), rawName(byName[case.base])))
-        end
-    end
-    table.insert(lines, "#endif")
-    table.insert(lines, "#ifdef SLANG_TOKEN_WRAPPER")
-    for _, case in ipairs(cases) do
-        if case.name ~= "Lexeme" and case.name ~= "Token" and not isTrivia(case) then
-            table.insert(lines, string.format('SLANG_TOKEN_WRAPPER(%s, %s, %s)',
-                case.name, tokenName(case), tokenName(byName[case.base])))
-        end
-    end
-    table.insert(lines, "#endif")
-    return table.concat(lines, "\n") .. "\n"
+    WhiteSpace = LexemeClass{Trivia, "whitespace"}
+    NewLine = LexemeClass{Trivia, "end of line"}
+    LineComment = LexemeClass{Comment, "line comment"}
+    BlockComment = LexemeClass{Comment, "block comment"}
+
+    Semicolon = LexemeClass{Punctuation, "';'"}
+    Comma = LexemeClass{Punctuation, "','"}
+    Dot = LexemeClass{Punctuation, "'.'"}
+    DotDot = LexemeClass{Punctuation, "'..'"}
+    Ellipsis = LexemeClass{Punctuation, "'...'"}
+    LBrace = LexemeClass{Punctuation, "'{'"}
+    RBrace = LexemeClass{Punctuation, "'}'"}
+    LBracket = LexemeClass{Punctuation, "'['"}
+    RBracket = LexemeClass{Punctuation, "']'"}
+    LParent = LexemeClass{Punctuation, "'('"}
+    RParent = LexemeClass{Punctuation, "')'"}
+    OpAssign = LexemeClass{Punctuation, "'='"}
+    OpAdd = LexemeClass{Punctuation, "'+'"}
+    OpSub = LexemeClass{Punctuation, "'-'"}
+    OpMul = LexemeClass{Punctuation, "'*'"}
+    OpDiv = LexemeClass{Punctuation, "'/'"}
+    OpMod = LexemeClass{Punctuation, "'%'"}
+    OpNot = LexemeClass{Punctuation, "'!'"}
+    OpBitNot = LexemeClass{Punctuation, "'~'"}
+    OpLsh = LexemeClass{Punctuation, "'<<'"}
+    OpRsh = LexemeClass{Punctuation, "'>>'"}
+    OpEql = LexemeClass{Punctuation, "'=='"}
+    OpNeq = LexemeClass{Punctuation, "'!='"}
+    OpGreater = LexemeClass{Punctuation, "'>'"}
+    OpLess = LexemeClass{Punctuation, "'<'"}
+    OpGeq = LexemeClass{Punctuation, "'>='"}
+    OpLeq = LexemeClass{Punctuation, "'<='"}
+    OpAnd = LexemeClass{Punctuation, "'&&'"}
+    OpOr = LexemeClass{Punctuation, "'||'"}
+    OpBitAnd = LexemeClass{Punctuation, "'&'"}
+    OpBitOr = LexemeClass{Punctuation, "'|'"}
+    OpBitXor = LexemeClass{Punctuation, "'^'"}
+    OpInc = LexemeClass{Punctuation, "'++'"}
+    OpDec = LexemeClass{Punctuation, "'--'"}
+    OpAddAssign = LexemeClass{Punctuation, "'+='"}
+    OpSubAssign = LexemeClass{Punctuation, "'-='"}
+    OpMulAssign = LexemeClass{Punctuation, "'*='"}
+    OpDivAssign = LexemeClass{Punctuation, "'/='"}
+    OpModAssign = LexemeClass{Punctuation, "'%='"}
+    OpShlAssign = LexemeClass{Punctuation, "'<<='"}
+    OpShrAssign = LexemeClass{Punctuation, "'>>='"}
+    OpAndAssign = LexemeClass{Punctuation, "'&='"}
+    OpOrAssign = LexemeClass{Punctuation, "'|='"}
+    OpXorAssign = LexemeClass{Punctuation, "'^='"}
+    QuestionMark = LexemeClass{Punctuation, "'?'"}
+    Colon = LexemeClass{Punctuation, "':'"}
+    RightArrow = LexemeClass{Punctuation, "'->'"}
+    DoubleRightArrow = LexemeClass{Punctuation, "'=>'"}
+    At = LexemeClass{Punctuation, "'@'"}
+    Dollar = LexemeClass{Punctuation, "'$'"}
+    DollarDollar = LexemeClass{Punctuation, "'$$'"}
+    Pound = LexemeClass{Punctuation, "'#'"}
+    PoundPound = LexemeClass{Punctuation, "'##'"}
+    Scope = LexemeClass{Punctuation, "'::'"}
+    CompletionRequest = LexemeClass{Punctuation, "'#?'"}
+
+    EscapedNewLine = LexemeClass{Trivia, "escaped end of line"}
+    AngleBracketHeaderName = LexemeClass{Token, "angle-bracket-enclosed header name"}
+    EndOfDirective = LexemeClass{Token, "end of preprocessor directive"}
 end
 
-return { cases = cases, generate = generate }
+-- A class definition records its parent, diagnostic description, and abstractness.
+local LexemeClass = {}
+LexemeClass.__index = LexemeClass
+local specificationKeys = {[1] = true, [2] = true, abstract = true}
+
+-- Determine whether a class is `base` or a subclass of `base`.
+-- Every parent is registered before its subclasses, so following parents terminates.
+function LexemeClass:isSubclassOf(base)
+    local current = self
+    while current do
+        if current == base then return true end
+        current = current.base
+    end
+    return false
+end
+
+-- Construct a class from `{parent, description, abstract = true}`.
+-- The root omits the parent; omitting `abstract` makes a class concrete.
+local function createLexemeClass(specification)
+    local base = specification[1]
+    local description = specification[2]
+    if type(base) == "string" then
+        -- Only the root has a description in the first positional argument.
+        assert(description == nil, "a root class has only a description")
+        description = base
+        base = nil
+    else
+        assert(getmetatable(base) == LexemeClass, "a parent must be a declared lexeme class")
+    end
+
+    -- We reject misspelled options instead of quietly treating a class as concrete.
+    for key in pairs(specification) do
+        assert(specificationKeys[key], "unknown lexeme class option: " .. tostring(key))
+    end
+    assert(type(description) == "string", "a lexeme class needs a diagnostic description")
+    local isAbstract = specification.abstract
+    if isAbstract == nil then isAbstract = false end
+    assert(type(isAbstract) == "boolean", "abstract must be a boolean")
+
+    return setmetatable({
+        base = base,
+        description = description,
+        isAbstract = isAbstract,
+    }, LexemeClass)
+end
+
+local classes = {}
+local classesByName = {}
+
+-- Register a named class and validate its place in the hierarchy before exposing it.
+-- Requiring an already registered abstract parent prevents cycles and subclasses of
+-- concrete classes.
+local function registerLexemeClass(_, name, class)
+    assert(getmetatable(class) == LexemeClass, "a definition must use LexemeClass")
+    assert(not classesByName[name], "duplicate lexeme class: " .. name)
+    assert(not class.name, "a lexeme class cannot be registered under more than one name")
+    assert(name ~= "Unknown", "Unknown is reserved for empty values")
+    assert(name ~= "Count", "Count is reserved for the kind count")
+    if class.base then
+        assert(class.base.name, "a parent must be registered before its subclasses")
+        assert(class.base.isAbstract,
+            "a concrete class cannot have subclasses: " .. class.base.name)
+    else
+        assert(name == "Lexeme", "Lexeme must be the only root class")
+        assert(class.isAbstract, "Lexeme must be abstract")
+    end
+
+    class.name = name
+    classesByName[name] = class
+    table.insert(classes, class)
+end
+
+-- Resolve a parent name or the constructor while evaluating the declarations above.
+-- An unknown name is a definition error, rather than a second spelling for the root.
+local function findLexemeDefinition(_, name)
+    if name == "LexemeClass" then return createLexemeClass end
+    local class = classesByName[name]
+    assert(class, "unknown lexeme class: " .. name)
+    return class
+end
+
+-- We use a separate, empty environment so every assignment invokes registration,
+-- including an erroneous redefinition. Definitions do not add globals to Fiddle's Lua state.
+defineLexemeClasses(setmetatable({}, {
+    __index = findLexemeDefinition,
+    __newindex = registerLexemeClass,
+}))
+
+-- Derive C++ type names from the two branches. Atomic token types use `Raw`, whereas
+-- only the token branch has a second set of types for tokens with attached trivia.
+local root = classesByName.Lexeme
+local trivia = classesByName.Trivia
+local token = classesByName.Token
+assert(trivia.base == root, "Trivia must derive directly from Lexeme")
+assert(token.base == root, "Token must derive directly from Lexeme")
+local rawClasses = {}
+local tokenClasses = {}
+for _, class in ipairs(classes) do
+    if class == root then
+        class.rawTypeName = "Lexeme"
+    elseif class == trivia then
+        class.rawTypeName = "Trivia"
+    elseif class:isSubclassOf(trivia) then
+        class.rawTypeName = class.name .. "Trivia"
+    else
+        assert(class:isSubclassOf(token),
+            "a class must be either trivia or a token: " .. class.name)
+        class.rawTypeName = "Raw" .. class.name
+    end
+    if class ~= root then table.insert(rawClasses, class) end
+
+    if class == token then
+        class.tokenTypeName = "Token"
+    elseif class:isSubclassOf(token) then
+        class.tokenTypeName = class.name .. "Token"
+        table.insert(tokenClasses, class)
+    end
+end
+
+return {classes = classes, rawClasses = rawClasses, tokenClasses = tokenClasses}

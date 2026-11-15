@@ -480,7 +480,7 @@ void EnumNode::dump(int indent, StringBuilder& out)
         out << "class ";
     }
 
-    if (m_name.getType() != TokenType::Invalid)
+    if (m_name)
     {
         out << m_name.getContent();
     }

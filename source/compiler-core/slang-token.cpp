@@ -1,67 +1,12 @@
 // slang-token.cpp
 #include "slang-token.h"
 
+// Pools own the spelling of every atom and the ordered trivia attached to each
+// token. We intern atoms first, then use their stable pointers to intern tokens.
+// Foreign objects are copied into the receiving pool before either lookup stores
+// a pointer, so each returned value borrows from exactly one owner.
 namespace Slang
 {
-
-// Kind relationships come from the same table as the wrapper declarations.
-// We follow conceptual parents because abstract groups need not occupy adjacent
-// numeric ranges in the unified kind space.
-bool isLexemeKind(LexemeKind kind, LexemeKind base)
-{
-    if (kind == LexemeKind::Unknown)
-        return false;
-    if (kind >= LexemeKind::Count)
-        return false;
-    for (;;)
-    {
-        if (kind == base)
-            return true;
-        if (kind == LexemeKind::Lexeme)
-            return false;
-        switch (kind)
-        {
-#define SLANG_LEXEME_KIND(NAME, BASE, CONCRETE, DESCRIPTION) \
-    case LexemeKind::NAME:                                   \
-        kind = LexemeKind::BASE;                             \
-        break;
-#include "slang-lexeme-defs.h"
-#undef SLANG_LEXEME_KIND
-        default:
-            SLANG_UNREACHABLE("Invalid lexeme kind.");
-        }
-    }
-}
-
-bool isConcreteLexemeKind(LexemeKind kind)
-{
-    switch (kind)
-    {
-#define SLANG_LEXEME_KIND(NAME, BASE, CONCRETE, DESCRIPTION) \
-    case LexemeKind::NAME:                                   \
-        return CONCRETE;
-#include "slang-lexeme-defs.h"
-#undef SLANG_LEXEME_KIND
-    default:
-        return false;
-    }
-}
-
-char const* TokenTypeToString(TokenType type)
-{
-    switch (type)
-    {
-    case TokenType::Unknown:
-        return "<unknown>";
-#define SLANG_LEXEME_KIND(NAME, BASE, CONCRETE, DESCRIPTION) \
-    case TokenType::NAME:                                    \
-        return DESCRIPTION;
-#include "slang-lexeme-defs.h"
-#undef SLANG_LEXEME_KIND
-    default:
-        SLANG_UNREACHABLE("Invalid lexeme kind.");
-    }
-}
 
 // Storage for a pool's immutable objects, stable lookup keys, and retained names.
 struct TokenPool::Impl
@@ -290,12 +235,12 @@ Token TokenPool::createToken(TokenType kind, Name* name, SourceLoc loc, TokenFla
     return createToken(createLexeme(kind, content, content, loc, flags, name).as<RawToken>());
 }
 
-Token TokenPool::createEndOfFile(SourceLoc loc, TokenFlags flags)
+EndOfFileToken TokenPool::createEndOfFile(SourceLoc loc, TokenFlags flags)
 {
-    return createToken(TokenType::EndOfFile, UnownedStringSlice(), loc, flags);
+    return createToken(TokenType::EndOfFile, UnownedStringSlice(), loc, flags).as<EndOfFileToken>();
 }
 
-RawOpGreater TokenPool::createSecondGreaterToken(RawToken rightShift)
+RawOpGreater TokenPool::createSecondGreaterToken(RawOpRsh rightShift)
 {
     // For `G<G<int>> value;`, the inner argument consumes one closer and leaves the
     // second as lookahead. The lexer ends the `OpRsh` spelling at that second `>`,
@@ -361,63 +306,6 @@ Trivia TriviaList::operator[](Index index) const
     for (Index i = 0; i < index; ++i)
         ++iterator;
     return *iterator;
-}
-
-void Token::setType(TokenType type)
-{
-    // Retagging is used for parser-created interpretations and EOF boundaries.
-    // EOF is zero-width, so its replacement does not inherit the original text.
-    SLANG_RELEASE_ASSERT(m_object);
-    if (type == TokenType::Unknown)
-    {
-        *this = Token();
-        return;
-    }
-    SLANG_RELEASE_ASSERT(isLexemeKind(type, LexemeKind::Token));
-    SLANG_RELEASE_ASSERT(isConcreteLexemeKind(type));
-    if (isZeroWidthTokenKind(type))
-    {
-        *this = getPool()->createToken(type, UnownedStringSlice(), m_loc, m_flags);
-        return;
-    }
-    auto raw = getRawToken();
-    auto replacement = getPool()->createLexeme(
-        type,
-        raw.getSpelling(),
-        raw.getContent(),
-        m_loc,
-        m_flags,
-        raw.getName());
-    *this = getPool()->createToken(
-        replacement.as<RawToken>(),
-        getLeadingTrivia().getObjects(),
-        getTrailingTrivia().getObjects());
-}
-
-void Token::setContent(UnownedStringSlice content)
-{
-    // Changed spelling is synthetic. Existing adjacent trivia cannot retain
-    // physical locations after a length change, so this creates a bare token.
-    SLANG_RELEASE_ASSERT(m_object);
-    *this = getPool()->createToken(getType(), content, m_loc, m_flags);
-}
-
-void Token::setName(Name* name)
-{
-    SLANG_RELEASE_ASSERT(m_object);
-    *this = getPool()->createToken(getType(), name, m_loc, m_flags);
-}
-
-void Token::setLoc(SourceLoc loc)
-{
-    // Legacy consumers relocate macro tokens independently. Keeping old trivia
-    // would incorrectly imply adjacent bytes at the new location.
-    if (m_object)
-    {
-        if (loc != m_loc)
-            *this = getPool()->createToken(getRawToken());
-    }
-    m_loc = loc;
 }
 
 } // namespace Slang

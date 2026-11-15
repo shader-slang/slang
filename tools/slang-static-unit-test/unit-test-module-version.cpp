@@ -451,6 +451,39 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
     }
 }
 
+SLANG_UNIT_TEST(serializedModuleRejectsVersion42TokenLayout)
+{
+    // Version 42 encoded tokens without separate original spelling and trivia records.
+    // A field semantic ensures that this module contains a token in its serialized AST.
+    const char* source = R"(
+        module token_schema_version;
+        public struct Input
+        {
+            float4 color : COLOR;
+        }
+    )";
+    List<uint8_t> container;
+    SLANG_CHECK_ABORT(serializeModule(unitTestContext, "token_schema_version", source, container));
+    auto moduleVersion = getModuleVersion(container);
+    SLANG_CHECK_ABORT(moduleVersion);
+
+    // We change only the version of a current payload. Rejection must come from
+    // the compatibility gate, independently of how an old token record would decode.
+    *moduleVersion = 42;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(createSession(unitTestContext->slangGlobalSession, nullptr, false, session));
+    ComPtr<ISlangBlob> diagnostics;
+    auto loaded = slang_loadModuleFromIRBlob(
+        session,
+        "token_schema_version",
+        "token_schema_version.slang-module",
+        container.getBuffer(),
+        container.getCount(),
+        diagnostics.writeRef());
+    SLANG_CHECK(loaded == nullptr);
+    SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00130]")) >= 0);
+}
+
 SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
 {
     const char* source = R"(

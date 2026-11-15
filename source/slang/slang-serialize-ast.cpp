@@ -795,7 +795,7 @@ void ASTSerialReadContext::handleName(ASTSerializer const& serializer, Name*& va
 // into the receiving AST builder's pool. Locations remain occurrence data.
 struct SerializedLexeme
 {
-    TokenType kind = TokenType::Unknown;
+    LexemeKind kind = LexemeKind::Unknown;
     String spelling;
     String content;
     bool hasName = false;
@@ -806,7 +806,7 @@ struct FossilizedTypeTraits<SerializedLexeme>
 {
     struct FossilizedType
     {
-        Fossilized<TokenType> kind;
+        Fossilized<LexemeKind> kind;
         Fossilized<String> spelling;
         Fossilized<String> content;
         Fossilized<bool> hasName;
@@ -923,7 +923,7 @@ void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& v
     serialize(serializer, trailing);
 
     // Optional AST token fields retain their empty-value representation.
-    if (rawToken.kind == TokenType::Unknown)
+    if (rawToken.kind == LexemeKind::Unknown)
     {
         value = Token(nullptr, loc, flags);
         return;

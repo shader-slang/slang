@@ -2246,11 +2246,11 @@ public:
     // Adding an IR instruction requires a new writer version. Earlier modules can remain
     // supported when their AST and IR representations are compatible with the reader.
     //
-    // Adding or removing AST classes changes the sequential `ASTNodeType` values. We raise the
-    // minimum supported version when those values change so older modules are rejected before
-    // their node IDs can be decoded as different AST classes.
-    const static UInt k_minSupportedModuleVersion = 42;
-    const static UInt k_maxSupportedModuleVersion = 42;
+    // Changes to serialized AST classes or field layouts can make earlier modules incompatible.
+    // We raise the minimum supported version when `ASTNodeType` values or `Token` record layouts
+    // change so the loader rejects incompatible modules before decoding their AST data.
+    const static UInt k_minSupportedModuleVersion = 43;
+    const static UInt k_maxSupportedModuleVersion = 43;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

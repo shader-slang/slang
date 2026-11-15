@@ -287,19 +287,6 @@ public:
     }
 };
 
-/// Advances through BlockComment/LineComment, otherwise, "advanceIf 'type' is the next token"
-enum class AdvanceOptions : UInt
-{
-    None = 0 << 0,
-    SkipComments = 1 << 0,
-};
-
-template<AdvanceOptions L, AdvanceOptions R>
-constexpr bool ContainsOption()
-{
-    return (UInt)L & (UInt)R;
-}
-
 static bool isInternalDef(RefPtr<CapabilityDef> def)
 {
     return def->name.startsWith("_");
@@ -319,64 +306,66 @@ struct CapabilityDefParser
     List<RefPtr<CapabilityDef>> m_defs;
     CapabilitySharedContext& m_sharedContext;
 
-    LexemeReader m_tokenReader;
+    LexemeReader m_lexemeReader;
 
-    template<AdvanceOptions advanceOptions>
-    bool advanceIf(TokenType type)
+    /// Skips comments within a definition, leaving the next grammar token unconsumed.
+    void skipComments()
     {
-        auto peekToken = m_tokenReader.peekTokenType();
-        if constexpr (ContainsOption<advanceOptions, AdvanceOptions::SkipComments>())
-        {
-            while (peekToken == TokenType::BlockComment || peekToken == TokenType::LineComment)
-            {
-                m_tokenReader.advanceToken();
-                peekToken = m_tokenReader.peekTokenType();
-            }
-        }
-        if (peekToken == type)
-        {
-            m_tokenReader.advanceToken();
-            return true;
-        }
-        return false;
+        // Comments within a definition do not contribute documentation or grammar symbols.
+        // The top-level definition loop reads comments itself to collect documentation.
+        while (m_lexemeReader.peekLexeme().is<CommentTrivia>())
+            m_lexemeReader.readLexeme();
     }
 
-    template<AdvanceOptions advanceOptions>
-    SlangResult readToken(TokenType type, Lexeme& nextToken)
+    /// Skips comments and consumes a token of type `T`, or returns an empty `T`.
+    template<typename T>
+    T advanceIf()
     {
-        nextToken = m_tokenReader.advanceToken();
-        if constexpr (ContainsOption<advanceOptions, AdvanceOptions::SkipComments>())
-        {
-            while (nextToken.getType() == TokenType::BlockComment ||
-                   nextToken.getType() == TokenType::LineComment)
-                nextToken = m_tokenReader.advanceToken();
-        }
-        if (nextToken.getType() != type)
+        skipComments();
+        auto token = m_lexemeReader.peekLexeme().as<T>();
+        if (token)
+            m_lexemeReader.readLexeme();
+        return token;
+    }
+
+    /// Skips comments, consumes the next lexeme, and diagnoses a mismatch with type `T`.
+    ///
+    /// On success, `token` receives the checked raw token. On failure, `token` is empty.
+    template<typename T>
+    SlangResult readToken(T& token)
+    {
+        // A required read consumes one significant lexeme, then exposes a typed token only
+        // when its kind matches. Callers return on failure before using the empty result.
+        skipComments();
+        auto lexeme = m_lexemeReader.readLexeme();
+        token = lexeme.as<T>();
+        if (!token)
         {
             m_sink->diagnose(
-                nextToken.getLoc(),
+                lexeme.getLoc(),
                 Diagnostics::unexpectedTokenExpectedTokenType,
-                nextToken,
-                type);
+                lexeme,
+                T::kind);
             return SLANG_FAIL;
         }
         return SLANG_OK;
     }
 
-    template<AdvanceOptions advanceOptions>
-    SlangResult readToken(TokenType type)
+    template<typename T>
+    SlangResult readToken()
     {
-        Lexeme nextToken;
-        return readToken<advanceOptions>(type, nextToken);
+        T token;
+        return readToken(token);
     }
 
     SlangResult parseConjunction(CapabilityConjunctionExpr& expr)
     {
+        // We resolve each identifier in a `+`-separated conjunction as it is read.
+        // Definition order therefore determines which capability names are available.
         for (;;)
         {
-            Lexeme nameToken;
-            SLANG_RETURN_ON_FAIL(
-                readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, nameToken));
+            RawIdentifier nameToken;
+            SLANG_RETURN_ON_FAIL(readToken(nameToken));
             CapabilityDef* def = nullptr;
             if (m_mapNameToCapability.tryGetValue(nameToken.getContent(), def))
             {
@@ -387,7 +376,7 @@ struct CapabilityDefParser
                 m_sink->diagnose(nameToken.getLoc(), Diagnostics::undefinedIdentifier, nameToken);
                 return SLANG_FAIL;
             }
-            if (!(advanceIf<AdvanceOptions::SkipComments>(TokenType::OpAdd)))
+            if (!advanceIf<RawOpAdd>())
                 break;
         }
         return SLANG_OK;
@@ -395,13 +384,14 @@ struct CapabilityDefParser
 
     SlangResult parseExpr(CapabilityDisjunctionExpr& expr)
     {
+        // We parse each `|`-separated conjunction independently so `+` binds more tightly.
         for (;;)
         {
             CapabilityConjunctionExpr conjunction;
-            conjunction.sourceLoc = m_tokenReader.peekLoc();
+            conjunction.sourceLoc = m_lexemeReader.peekLoc();
             SLANG_RETURN_ON_FAIL(parseConjunction(conjunction));
             expr.conjunctions.add(conjunction);
-            if (!advanceIf<AdvanceOptions::SkipComments>(TokenType::OpBitOr))
+            if (!advanceIf<RawOpBitOr>())
                 break;
         }
         return SLANG_OK;
@@ -452,51 +442,64 @@ struct CapabilityDefParser
 
     SlangResult parseDefs()
     {
-        auto tokens = m_lexer->lexAllMarkupTokens();
-        m_tokenReader = LexemeReader(tokens);
+        // Documentation comments participate in the top-level scan, but whitespace and
+        // newline trivia do not. We retain comments and raw tokens in the reader's list;
+        // adjacency between documentation lines is checked with the source file's line map.
+        LexemeList lexemes;
+        for (;;)
+        {
+            auto lexeme = m_lexer->readLexeme();
+            if (lexeme.is<RawToken>())
+                lexemes.add(lexeme);
+            else if (lexeme.is<CommentTrivia>())
+                lexemes.add(lexeme);
+            if (lexeme.is<RawEndOfFile>())
+                break;
+        }
+        m_lexemeReader = LexemeReader(lexemes);
         AutoDocInfo successiveComments = AutoDocInfo();
         HumaneSourceLoc successiveCommentLine = {};
 
         for (;;)
         {
-            auto nextToken = m_tokenReader.advanceToken();
+            auto nextLexeme = m_lexemeReader.readLexeme();
 
             if (!isLineSuccessive(
                     successiveCommentLine,
-                    m_lexer->m_sourceView->getHumaneLoc(nextToken.getLoc())))
+                    m_lexer->m_sourceView->getHumaneLoc(nextLexeme.getLoc())))
                 successiveComments = AutoDocInfo();
 
             RefPtr<CapabilityDef> def = new CapabilityDef();
             def->sharedContext = &m_sharedContext;
             def->flavor = CapabilityFlavor::Normal;
-            if (nextToken.getContent() == "alias")
+            if (nextLexeme.getContent() == "alias")
             {
                 def->flavor = CapabilityFlavor::Alias;
             }
-            else if (nextToken.getContent() == "abstract")
+            else if (nextLexeme.getContent() == "abstract")
             {
                 def->flavor = CapabilityFlavor::Abstract;
             }
-            else if (nextToken.getContent() == "def")
+            else if (nextLexeme.getContent() == "def")
             {
                 def->flavor = CapabilityFlavor::Normal;
             }
-            else if (nextToken.getType() == TokenType::BlockComment)
+            else if (nextLexeme.is<BlockCommentTrivia>())
             {
                 // Do not auto-document
                 continue;
             }
-            else if (nextToken.getType() == TokenType::LineComment)
+            else if (nextLexeme.is<LineCommentTrivia>())
             {
                 // Auto-document if the preceeding token to an identifier is '///'
                 // complete rules described in `source\slang\slang-capabilities.capdef`
-                auto commentContent = nextToken.getContent();
+                auto commentContent = nextLexeme.getContent();
 
                 // remove "//"
                 commentContent = commentContent.subString(2, commentContent.getLength() - 2);
                 if (commentContent.startsWith("/"))
                 {
-                    auto commentLine = m_lexer->m_sourceView->getHumaneLoc(nextToken.getLoc());
+                    auto commentLine = m_lexer->m_sourceView->getHumaneLoc(nextLexeme.getLoc());
 
                     // Reset the `successiveCommentLine` to our newest commentLine
                     successiveCommentLine = commentLine;
@@ -521,7 +524,7 @@ struct CapabilityDefParser
                             successiveComments.headerGroup = getAutoDocHeaderGroupFromTag(
                                 m_sink,
                                 headerName,
-                                nextToken.getLoc());
+                                nextLexeme.getLoc());
                             continue;
                         }
                         // If we did not find a header this is a regular comment
@@ -532,65 +535,62 @@ struct CapabilityDefParser
                 }
                 continue;
             }
-            else if (nextToken.getType() == TokenType::EndOfFile)
+            else if (nextLexeme.is<RawEndOfFile>())
             {
                 break;
             }
             else
             {
-                m_sink->diagnose(nextToken.getLoc(), Diagnostics::unexpectedToken, nextToken);
+                m_sink->diagnose(nextLexeme.getLoc(), Diagnostics::unexpectedToken, nextLexeme);
                 return SLANG_FAIL;
             }
 
-            Lexeme nameToken;
-            SLANG_RETURN_ON_FAIL(
-                readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, nameToken));
+            RawIdentifier nameToken;
+            SLANG_RETURN_ON_FAIL(readToken(nameToken));
             def->name = nameToken.getContent();
 
             if (def->flavor == CapabilityFlavor::Normal)
             {
-                if (advanceIf<AdvanceOptions::SkipComments>(TokenType::Colon))
+                if (advanceIf<RawColon>())
                 {
                     SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
                 }
-                if (advanceIf<AdvanceOptions::SkipComments>(TokenType::OpAssign))
+                if (advanceIf<RawOpAssign>())
                 {
-                    Lexeme rankToken;
-                    SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(
-                        TokenType::IntegerLiteral,
-                        rankToken));
+                    RawIntegerLiteral rankToken;
+                    SLANG_RETURN_ON_FAIL(readToken(rankToken));
                     def->rank = stringToInt(rankToken.getContent());
                 }
                 def->docComment = successiveComments;
                 if (def->docComment.comment.getLength() == 0 && !isInternalDef(def))
                     m_sink->diagnose(
-                        nextToken.getLoc(),
+                        nextLexeme.getLoc(),
                         Diagnostics::requiresDocComment,
                         def->name);
             }
             else if (def->flavor == CapabilityFlavor::Alias)
             {
-                SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::OpAssign));
+                SLANG_RETURN_ON_FAIL(readToken<RawOpAssign>());
                 SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
                 def->docComment = successiveComments;
                 if (def->docComment.comment.getLength() == 0 && !isInternalDef(def))
                     m_sink->diagnose(
-                        nextToken.getLoc(),
+                        nextLexeme.getLoc(),
                         Diagnostics::requiresDocComment,
                         def->name);
             }
             else if (def->flavor == CapabilityFlavor::Abstract)
             {
-                if (advanceIf<AdvanceOptions::SkipComments>(TokenType::Colon))
+                if (advanceIf<RawColon>())
                 {
                     SLANG_RETURN_ON_FAIL(parseExpr(def->expr));
                 }
             }
-            SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::Semicolon));
+            SLANG_RETURN_ON_FAIL(readToken<RawSemicolon>());
             m_defs.add(def);
             if (!m_mapNameToCapability.addIfNotExists(def->name, m_defs.getLast()))
             {
-                m_sink->diagnose(nextToken.getLoc(), Diagnostics::redefinition, def->name);
+                m_sink->diagnose(nextLexeme.getLoc(), Diagnostics::redefinition, def->name);
                 return SLANG_FAIL;
             }
 

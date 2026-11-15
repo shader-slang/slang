@@ -492,7 +492,7 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
                     .location = caseStmt->capabilityToken.getLoc()});
             }
             else if (
-                caseStmt->capabilityToken.getContentLength() != 0 &&
+                caseStmt->capabilityToken &&
                 (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
             {
                 getSink()->diagnose(Diagnostics::InvalidTargetSwitchCase{

@@ -1326,7 +1326,7 @@ private:
         }
 
 
-        void emitTrivia(List<Lexeme> const& trivia)
+        void emitTrivia(TriviaList trivia)
         {
             for (auto trivium : trivia)
                 _builder.append(trivium.getContent());
@@ -1434,38 +1434,18 @@ bool AggTypeDecl::isSubTypeOf(char const* name)
     return false;
 }
 
-List<TokenWithTrivia> collectTokensWithTrivia(LexemeList const& lexemes)
+List<TokenWithTrivia> createParserTokens(TokenList const& tokens)
 {
-    LexemeReader reader(lexemes);
-
-    List<TokenWithTrivia> allTokensWithTrivia;
-    for (;;)
+    // We add shared bookkeeping nodes around the lexer's grouped tokens. The parser needs
+    // to replace lookahead when splitting `>>` and to annotate opening delimiters with skips.
+    List<TokenWithTrivia> parserTokens;
+    for (auto token : tokens.getTokens())
     {
-        RefPtr<TokenWithTriviaNode> currentTokenWithTriviaNode = new TokenWithTriviaNode();
-        TokenWithTrivia currentTokenWithTrivia = currentTokenWithTriviaNode;
-        allTokensWithTrivia.add(currentTokenWithTrivia);
-
-        while (reader.peekToken().is<Trivia>())
-        {
-            auto trivia = reader.advanceToken();
-            currentTokenWithTriviaNode->leadingTrivia.add(trivia);
-        }
-
-        auto token = reader.advanceToken();
-        currentTokenWithTriviaNode->token = token;
-
-        if (token.getType() == TokenType::EndOfFile)
-            return allTokensWithTrivia;
-
-        while (reader.peekToken().is<Trivia>())
-        {
-            auto trivia = reader.advanceToken();
-            currentTokenWithTriviaNode->trailingTrivia.add(trivia);
-
-            if (trivia.getType() == TokenType::NewLine)
-                break;
-        }
+        RefPtr<TokenWithTriviaNode> node = new TokenWithTriviaNode();
+        node->token = token;
+        parserTokens.add(TokenWithTrivia(node));
     }
+    return parserTokens;
 }
 
 void readTokenTree(List<TokenWithTrivia> const& tokens, Index& ioIndex);
@@ -1567,7 +1547,8 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
         if (cursor->getType() != TokenType::StringLiteral)
             continue;
 
-        auto includedFileName = getStringLiteralTokenValue(cursor->getToken(), nullptr);
+        auto literal = cursor->getToken().getRawToken().as<RawStringLiteral>();
+        auto includedFileName = getStringLiteralTokenValue(literal, nullptr);
         if (includedFileName == outputFileName)
             return true;
     }
@@ -1590,8 +1571,8 @@ RefPtr<SourceUnit> parseSourceUnit(
     DiagnosticSink lexerSink;
     lexer.initialize(inputSourceView, &lexerSink, namePool);
 
-    auto inputTokens = lexer.lexAllTokens();
-    auto tokensWithTrivia = collectTokensWithTrivia(inputTokens);
+    auto inputTokens = lexer.readAllTokens();
+    auto tokensWithTrivia = createParserTokens(inputTokens);
     matchBalancedTokens(tokensWithTrivia);
 
     Parser parser(*sink, tokensWithTrivia, logicalModule);

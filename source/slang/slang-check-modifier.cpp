@@ -1397,8 +1397,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
-            requirePreludeAttr->prelude =
-                getStringLiteralTokenValue(stringLitExpr->token, getSink());
+            requirePreludeAttr->prelude = stringLitExpr->value;
         }
         else
         {
