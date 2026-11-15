@@ -21851,7 +21851,7 @@ void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
     VarDeclBase* varDecl,
     HLSLRegisterSemantic* registerSemantic)
 {
-    auto registerName = registerSemantic->registerName.getContent();
+    auto registerName = registerSemantic->registerName.getLogicalSpelling();
     if (registerName.getLength() < 1)
     {
         getSink()->diagnose(Diagnostics::InvalidHlslRegisterName{

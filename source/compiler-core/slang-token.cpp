@@ -17,23 +17,23 @@ struct TokenPool::Impl
     struct LexemeKey
     {
         LexemeKind kind;
-        UnownedStringSlice spelling;
-        UnownedStringSlice content;
+        UnownedStringSlice physicalSpelling;
+        UnownedStringSlice logicalSpelling;
         Name* name;
 
         HashCode getHashCode() const
         {
-            auto hash = combineHash(Slang::getHashCode(kind), spelling.getHashCode());
-            hash = combineHash(hash, content.getHashCode());
+            auto hash = combineHash(Slang::getHashCode(kind), physicalSpelling.getHashCode());
+            hash = combineHash(hash, logicalSpelling.getHashCode());
             return combineHash(hash, Slang::getHashCode(name));
         }
         bool operator==(const LexemeKey& other) const
         {
             if (kind != other.kind)
                 return false;
-            if (spelling != other.spelling)
+            if (physicalSpelling != other.physicalSpelling)
                 return false;
-            if (content != other.content)
+            if (logicalSpelling != other.logicalSpelling)
                 return false;
             return name == other.name;
         }
@@ -98,45 +98,48 @@ static bool isZeroWidthTokenKind(TokenType kind)
 
 Lexeme TokenPool::createLexeme(
     LexemeKind kind,
-    UnownedStringSlice spelling,
-    UnownedStringSlice content,
+    UnownedStringSlice physicalSpelling,
+    UnownedStringSlice logicalSpelling,
     SourceLoc loc,
     TokenFlags flags,
     Name* name)
 {
     // Abstract kinds and the empty-value kind have no object representation.
-    // Identity depends on spelling and an optional interned name, while location
+    // Identity depends on both spellings and an optional interned name, while location
     // and preprocessing context belong to the occurrence returned below.
     SLANG_RELEASE_ASSERT(isConcreteLexemeKind(kind));
     // EOF and directive delimiters denote positions rather than source text.
-    // Enforcing their empty spelling here also covers replacement and import.
+    // Enforcing both empty spellings here also covers replacement and import.
     if (isZeroWidthTokenKind(kind))
     {
-        SLANG_RELEASE_ASSERT(spelling.getLength() == 0);
-        SLANG_RELEASE_ASSERT(content.getLength() == 0);
+        SLANG_RELEASE_ASSERT(physicalSpelling.getLength() == 0);
+        SLANG_RELEASE_ASSERT(logicalSpelling.getLength() == 0);
     }
     if (name)
-        SLANG_RELEASE_ASSERT(name->text.getUnownedSlice() == content);
-    Impl::LexemeKey key{kind, spelling, content, name};
+        SLANG_RELEASE_ASSERT(name->text.getUnownedSlice() == logicalSpelling);
+    Impl::LexemeKey key{kind, physicalSpelling, logicalSpelling, name};
     if (auto found = m_impl->lexemes.tryGetValue(key))
         return Lexeme(*found, loc, flags);
 
     // We share the two text views when no lexical scrubbing was necessary.
     // This avoids two copies for the common case without borrowing input storage.
-    const auto spellingCopy = UnownedStringSlice(
-        m_impl->arena.allocateString(spelling.begin(), spelling.getLength()),
-        spelling.getLength());
-    auto contentCopy = spellingCopy;
-    if (content != spelling)
+    const auto physicalSpellingCopy = UnownedStringSlice(
+        m_impl->arena.allocateString(physicalSpelling.begin(), physicalSpelling.getLength()),
+        physicalSpelling.getLength());
+    auto logicalSpellingCopy = physicalSpellingCopy;
+    if (logicalSpelling != physicalSpelling)
     {
-        contentCopy = UnownedStringSlice(
-            m_impl->arena.allocateString(content.begin(), content.getLength()),
-            content.getLength());
+        logicalSpellingCopy = UnownedStringSlice(
+            m_impl->arena.allocateString(logicalSpelling.begin(), logicalSpelling.getLength()),
+            logicalSpelling.getLength());
     }
 
     auto storage = m_impl->arena.allocateAligned(sizeof(LexemeObj), alignof(LexemeObj));
-    auto object = new (storage) LexemeObj(this, kind, spellingCopy, contentCopy, name);
-    m_impl->lexemes.add(Impl::LexemeKey{kind, spellingCopy, contentCopy, name}, object);
+    auto object =
+        new (storage) LexemeObj(this, kind, physicalSpellingCopy, logicalSpellingCopy, name);
+    m_impl->lexemes.add(
+        Impl::LexemeKey{kind, physicalSpellingCopy, logicalSpellingCopy, name},
+        object);
     if (name)
         m_impl->names.add(name);
     return Lexeme(object, loc, flags);
@@ -157,9 +160,9 @@ Token TokenPool::createToken(
     List<const LexemeObj*> importedTrailing;
     const auto leading = _importTrivia(leadingTrivia, importedLeading);
     const auto trailing = _importTrivia(trailingTrivia, importedTrailing);
-    Index leadingLength = 0;
+    Index leadingPhysicalLength = 0;
     for (auto object : leading)
-        leadingLength += object->getSpelling().getLength();
+        leadingPhysicalLength += object->getPhysicalSpelling().getLength();
 
     Impl::TokenKey key{rawObject, leading, trailing};
     if (auto found = m_impl->tokens.tryGetValue(key))
@@ -173,7 +176,8 @@ Token TokenPool::createToken(
         m_impl->arena.allocateAndCopyArray(trailing.getBuffer(), trailing.getCount()),
         trailing.getCount());
     auto storage = m_impl->arena.allocateAligned(sizeof(TokenObj), alignof(TokenObj));
-    auto object = new (storage) TokenObj(rawObject, leadingCopy, trailingCopy, leadingLength);
+    auto object =
+        new (storage) TokenObj(rawObject, leadingCopy, trailingCopy, leadingPhysicalLength);
     m_impl->tokens.add(Impl::TokenKey{rawObject, leadingCopy, trailingCopy}, object);
     return Token(object, rawToken.getLoc(), rawToken.getFlags());
 }
@@ -187,8 +191,8 @@ const LexemeObj* TokenPool::_importLexeme(const LexemeObj* object)
         return object;
     auto imported = createLexeme(
         object->getType(),
-        object->getSpelling(),
-        object->getContent(),
+        object->getPhysicalSpelling(),
+        object->getLogicalSpelling(),
         SourceLoc(),
         0,
         object->getName());
@@ -219,20 +223,20 @@ ConstArrayView<const LexemeObj*> TokenPool::_importTrivia(
 
 Token TokenPool::createToken(
     TokenType kind,
-    UnownedStringSlice content,
+    UnownedStringSlice spelling,
     SourceLoc loc,
     TokenFlags flags)
 {
     SLANG_RELEASE_ASSERT(isLexemeKind(kind, LexemeKind::Token));
-    return createToken(createLexeme(kind, content, content, loc, flags).as<RawToken>());
+    return createToken(createLexeme(kind, spelling, spelling, loc, flags).as<RawToken>());
 }
 
 Token TokenPool::createToken(TokenType kind, Name* name, SourceLoc loc, TokenFlags flags)
 {
     SLANG_RELEASE_ASSERT(name);
     SLANG_RELEASE_ASSERT(isLexemeKind(kind, LexemeKind::Token));
-    const auto content = name->text.getUnownedSlice();
-    return createToken(createLexeme(kind, content, content, loc, flags, name).as<RawToken>());
+    const auto spelling = name->text.getUnownedSlice();
+    return createToken(createLexeme(kind, spelling, spelling, loc, flags, name).as<RawToken>());
 }
 
 EndOfFileToken TokenPool::createEndOfFile(SourceLoc loc, TokenFlags flags)
@@ -242,19 +246,19 @@ EndOfFileToken TokenPool::createEndOfFile(SourceLoc loc, TokenFlags flags)
 
 RawOpGreater TokenPool::createSecondGreaterToken(RawOpRsh rightShift)
 {
-    // For `G<G<int>> value;`, the inner argument consumes one closer and leaves the
-    // second as lookahead. The lexer ends the `OpRsh` spelling at that second `>`,
-    // including any escaped newlines between the two characters. Its final byte
-    // therefore locates the second closer without assuming that the bytes are adjacent.
+    // While parsing the inner application in `G<G<int>> value;`, we consume the
+    // first closer and leave the second in lookahead. The physical spelling of
+    // `OpRsh` ends at that second `>`, even with escaped newlines between the two
+    // characters, so its final byte gives the second closer's location.
     SLANG_RELEASE_ASSERT(rightShift.getType() == TokenType::OpRsh);
-    SLANG_RELEASE_ASSERT(rightShift.getContent() == toSlice(">>"));
-    const auto spelling = rightShift.getSpelling();
-    SLANG_RELEASE_ASSERT(spelling.getLength() >= 2);
-    SLANG_RELEASE_ASSERT(spelling[spelling.getLength() - 1] == '>');
+    SLANG_RELEASE_ASSERT(rightShift.getLogicalSpelling() == toSlice(">>"));
+    const auto physicalSpelling = rightShift.getPhysicalSpelling();
+    SLANG_RELEASE_ASSERT(physicalSpelling.getLength() >= 2);
+    SLANG_RELEASE_ASSERT(physicalSpelling[physicalSpelling.getLength() - 1] == '>');
 
     auto secondLoc = rightShift.getLoc();
     if (secondLoc.isValid())
-        secondLoc = secondLoc + (spelling.getLength() - 1);
+        secondLoc = secondLoc + (physicalSpelling.getLength() - 1);
     const auto greater = toSlice(">");
     return createLexeme(TokenType::OpGreater, greater, greater, secondLoc).as<RawOpGreater>();
 }
@@ -271,35 +275,35 @@ Token TokenPool::importToken(Token token)
 
 TriviaList Token::getLeadingTrivia() const
 {
-    // Leading spelling precedes the raw token in a physical cluster. An absent
+    // In a physical token cluster, leading trivia precedes the raw token. An absent
     // debug location must stay unknown instead of wrapping around on subtraction.
     if (!m_object)
         return TriviaList();
     auto loc = m_loc;
     if (loc.isValid())
     {
-        SLANG_RELEASE_ASSERT(loc.getRaw() >= m_object->getLeadingTriviaLength());
-        loc = loc + -m_object->getLeadingTriviaLength();
+        SLANG_RELEASE_ASSERT(loc.getRaw() >= m_object->getLeadingTriviaPhysicalLength());
+        loc = loc + -m_object->getLeadingTriviaPhysicalLength();
     }
     return TriviaList(m_object->getLeadingTrivia(), loc);
 }
 
 TriviaList Token::getTrailingTrivia() const
 {
-    // We offset a known raw location by its spelling length. Synthetic or stripped
+    // We offset a known raw location by its physical spelling length. Synthetic or stripped
     // locations remain unknown even when the lexical data has non-empty spelling.
     if (!m_object)
         return TriviaList();
     auto loc = m_loc;
     if (loc.isValid())
-        loc = loc + getSpellingLength();
+        loc = loc + getPhysicalSpellingLength();
     return TriviaList(m_object->getTrailingTrivia(), loc);
 }
 
 Trivia TriviaList::operator[](Index index) const
 {
     // Trivia objects have no individual offsets, so indexed access uses the same
-    // spelling-length accumulation as sequential iteration.
+    // physical spelling-length accumulation as sequential iteration.
     SLANG_RELEASE_ASSERT(index >= 0);
     SLANG_RELEASE_ASSERT(index < m_objects.getCount());
     auto iterator = begin();

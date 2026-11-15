@@ -276,7 +276,7 @@ struct ASTDumpContext
         ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.getType()) << ", ";
         dump(token.getLoc());
         m_writer->emit(", ");
-        dump(token.getContent());
+        dump(token.getLogicalSpelling());
         m_writer->emit(" }");
     }
 

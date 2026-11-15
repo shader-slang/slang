@@ -67,14 +67,17 @@ SLANG_UNIT_TEST(lexemePoolSeparatesSpellingFromOccurrences)
     // context. Only the returned values differ; both refer to one immutable object.
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
-    const auto spelling = UnownedStringSlice("alpha\\\nbeta");
-    const auto content = UnownedStringSlice("alphabeta");
-    auto first =
-        pool.createLexeme(LexemeKind::Identifier, spelling, content, SourceLoc::fromRaw(100));
+    const auto physicalSpelling = UnownedStringSlice("alpha\\\nbeta");
+    const auto logicalSpelling = UnownedStringSlice("alphabeta");
+    auto first = pool.createLexeme(
+        LexemeKind::Identifier,
+        physicalSpelling,
+        logicalSpelling,
+        SourceLoc::fromRaw(100));
     auto second = pool.createLexeme(
         LexemeKind::Identifier,
-        spelling,
-        content,
+        physicalSpelling,
+        logicalSpelling,
         SourceLoc::fromRaw(200),
         TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace);
     SLANG_CHECK(first.getObject() == second.getObject());
@@ -85,11 +88,11 @@ SLANG_UNIT_TEST(lexemePoolSeparatesSpellingFromOccurrences)
 
     // Scrubbing does not erase the distinction between physical spellings. Keeping that
     // distinction lets a token stream reproduce the escaped newline exactly.
-    auto unspliced = pool.createLexeme(LexemeKind::Identifier, content, content);
+    auto unspliced = pool.createLexeme(LexemeKind::Identifier, logicalSpelling, logicalSpelling);
     SLANG_CHECK(first.getObject() != unspliced.getObject());
-    SLANG_CHECK(first.getContent() == unspliced.getContent());
-    SLANG_CHECK(first.getSpelling() == spelling);
-    SLANG_CHECK(unspliced.getSpelling() == content);
+    SLANG_CHECK(first.getLogicalSpelling() == unspliced.getLogicalSpelling());
+    SLANG_CHECK(first.getPhysicalSpelling() == physicalSpelling);
+    SLANG_CHECK(unspliced.getPhysicalSpelling() == logicalSpelling);
 }
 
 SLANG_UNIT_TEST(lexemePoolOwnsInputText)
@@ -104,8 +107,8 @@ SLANG_UNIT_TEST(lexemePoolOwnsInputText)
         UnownedStringSlice(spelling),
         UnownedStringSlice(spelling));
     spelling[0] = 'X';
-    SLANG_CHECK(lexeme.getSpelling() == UnownedStringSlice("item"));
-    SLANG_CHECK(lexeme.getContent() == UnownedStringSlice("item"));
+    SLANG_CHECK(lexeme.getPhysicalSpelling() == UnownedStringSlice("item"));
+    SLANG_CHECK(lexeme.getLogicalSpelling() == UnownedStringSlice("item"));
 
     auto repeated = pool.createLexeme(
         LexemeKind::Identifier,
@@ -211,10 +214,10 @@ SLANG_UNIT_TEST(tokenReplacementPreservesSharedObject)
     auto original = pool.createToken(TokenType::Identifier, UnownedStringSlice("before"));
     auto sharedOriginal = original;
     auto replaced = pool.createToken(TokenType::Identifier, UnownedStringSlice("after"));
-    SLANG_CHECK(original.getContent() == UnownedStringSlice("before"));
+    SLANG_CHECK(original.getLogicalSpelling() == UnownedStringSlice("before"));
     SLANG_CHECK(sharedOriginal.getObject() == original.getObject());
-    SLANG_CHECK(sharedOriginal.getContent() == UnownedStringSlice("before"));
-    SLANG_CHECK(replaced.getContent() == UnownedStringSlice("after"));
+    SLANG_CHECK(sharedOriginal.getLogicalSpelling() == UnownedStringSlice("before"));
+    SLANG_CHECK(replaced.getLogicalSpelling() == UnownedStringSlice("after"));
     SLANG_CHECK(original.getObject() != replaced.getObject());
 
     auto repeated = pool.createToken(TokenType::Identifier, UnownedStringSlice("after"));
@@ -242,13 +245,13 @@ SLANG_UNIT_TEST(tokenReaderTypedConditionalRead)
     SLANG_CHECK(reader.isAtCursor(start));
     auto identifier = reader.advanceIf<IdentifierToken>();
     SLANG_CHECK(bool(identifier));
-    SLANG_CHECK(identifier.getContent() == UnownedStringSlice("value"));
+    SLANG_CHECK(identifier.getLogicalSpelling() == UnownedStringSlice("value"));
     SLANG_CHECK(reader.peekTokenType() == TokenType::IntegerLiteral);
 
     // A conditional read can use an abstract token group, and a successful EOF read
     // remains distinguishable from the empty result of a mismatched read.
     auto literal = reader.advanceIf<LiteralToken>();
-    SLANG_CHECK(literal.getContent() == UnownedStringSlice("12"));
+    SLANG_CHECK(literal.getLogicalSpelling() == UnownedStringSlice("12"));
     SLANG_CHECK(bool(reader.advanceIf<EndOfFileToken>()));
     SLANG_CHECK(reader.isAtEnd());
     SLANG_CHECK(!reader.advanceIf<IdentifierToken>());
@@ -275,11 +278,11 @@ SLANG_UNIT_TEST(tokenSplitPreservesPhysicalOffsetsAndTrailingTrivia)
     auto original = pool.createToken(rightShift.as<RawToken>(), {}, makeConstArrayView(trailing));
     auto second = pool.createSecondGreaterToken(rightShift.as<RawOpRsh>());
     SLANG_CHECK(second.getType() == TokenType::OpGreater);
-    SLANG_CHECK(second.getSpelling() == UnownedStringSlice(">"));
-    SLANG_CHECK(second.getContent() == UnownedStringSlice(">"));
+    SLANG_CHECK(second.getPhysicalSpelling() == UnownedStringSlice(">"));
+    SLANG_CHECK(second.getLogicalSpelling() == UnownedStringSlice(">"));
     SLANG_CHECK(second.getLoc() == SourceLoc::fromRaw(103));
     SLANG_CHECK(second.getFlags() == 0);
-    SLANG_CHECK(rightShift.getContent() == UnownedStringSlice(">>"));
+    SLANG_CHECK(rightShift.getLogicalSpelling() == UnownedStringSlice(">>"));
 
     // Trivia following the original operator is still adjacent to the second half.
     // Reusing those objects must therefore preserve the comment's physical location.
@@ -311,7 +314,7 @@ SLANG_UNIT_TEST(tokenRefRetainsPoolAndName)
     }
     SLANG_CHECK_ABORT(!wasPoolDestroyed);
     SLANG_CHECK(bool(retained));
-    SLANG_CHECK(retained->getContent() == UnownedStringSlice("retained"));
+    SLANG_CHECK(retained->getLogicalSpelling() == UnownedStringSlice("retained"));
     SLANG_CHECK_ABORT(retained->getName() != nullptr);
     SLANG_CHECK(retained->getName()->text == "retained");
     retained = TokenRef<IdentifierToken>();
@@ -346,8 +349,9 @@ SLANG_UNIT_TEST(tokenPoolImportOwnsForeignTrivia)
         SLANG_CHECK_ABORT(imported.getLeadingTrivia().getCount() == 1);
         SLANG_CHECK(imported.getLeadingTrivia()[0].getPool() == &destination);
     }
-    SLANG_CHECK(imported.getContent() == UnownedStringSlice("42"));
-    SLANG_CHECK(imported.getLeadingTrivia()[0].getSpelling() == UnownedStringSlice("/*c*/"));
+    SLANG_CHECK(imported.getLogicalSpelling() == UnownedStringSlice("42"));
+    SLANG_CHECK(
+        imported.getLeadingTrivia()[0].getPhysicalSpelling() == UnownedStringSlice("/*c*/"));
     SLANG_CHECK(imported.getLeadingTrivia()[0].getLoc() == SourceLoc::fromRaw(15));
     SLANG_CHECK(imported.getFlags() == TokenFlag::AfterWhitespace);
 }
@@ -396,11 +400,14 @@ SLANG_UNIT_TEST(tokenListReplacementRetainsEveryPool)
         SLANG_CHECK_ABORT(!wasFirstPoolDestroyed);
         SLANG_CHECK_ABORT(!wasSecondPoolDestroyed);
         TokenReader reader(tokens);
-        SLANG_CHECK(reader.advanceIf<IdentifierToken>().getContent() == UnownedStringSlice("one"));
         SLANG_CHECK(
-            reader.advanceIf<IntegerLiteralToken>().getContent() == UnownedStringSlice("2"));
+            reader.advanceIf<IdentifierToken>().getLogicalSpelling() == UnownedStringSlice("one"));
         SLANG_CHECK(
-            reader.advanceIf<IdentifierToken>().getContent() == UnownedStringSlice("three"));
+            reader.advanceIf<IntegerLiteralToken>().getLogicalSpelling() ==
+            UnownedStringSlice("2"));
+        SLANG_CHECK(
+            reader.advanceIf<IdentifierToken>().getLogicalSpelling() ==
+            UnownedStringSlice("three"));
         SLANG_CHECK(reader.peekTokenType() == TokenType::EndOfFile);
     }
     SLANG_CHECK(wasFirstPoolDestroyed);
@@ -420,11 +427,11 @@ SLANG_UNIT_TEST(tokenListRetainsLexicalStorage)
 
     TokenReader reader(tokens);
     auto first = reader.advanceIf<IdentifierToken>();
-    SLANG_CHECK(first.getContent() == UnownedStringSlice("one"));
+    SLANG_CHECK(first.getLogicalSpelling() == UnownedStringSlice("one"));
     SLANG_CHECK_ABORT(first.getName() != nullptr);
     SLANG_CHECK(first.getName()->text == "one");
     SLANG_CHECK_ABORT(first.getTrailingTrivia().getCount() == 3);
-    SLANG_CHECK(first.getTrailingTrivia()[1].getSpelling() == UnownedStringSlice("//tail"));
+    SLANG_CHECK(first.getTrailingTrivia()[1].getPhysicalSpelling() == UnownedStringSlice("//tail"));
     SLANG_CHECK(reader.peekTokenType() == TokenType::EndOfFile);
 }
 
@@ -462,13 +469,13 @@ SLANG_UNIT_TEST(tokenTriviaPreservesUnknownSourceLocations)
     for (auto trivia : token.getLeadingTrivia())
     {
         SLANG_CHECK(!trivia.getLoc().isValid());
-        reconstructed << trivia.getSpelling();
+        reconstructed << trivia.getPhysicalSpelling();
     }
-    reconstructed << token.getSpelling();
+    reconstructed << token.getPhysicalSpelling();
     for (auto trivia : token.getTrailingTrivia())
     {
         SLANG_CHECK(!trivia.getLoc().isValid());
-        reconstructed << trivia.getSpelling();
+        reconstructed << trivia.getPhysicalSpelling();
     }
     SLANG_CHECK(reconstructed.getUnownedSlice() == UnownedStringSlice(" /*c*/42\n "));
 }
@@ -502,8 +509,8 @@ SLANG_UNIT_TEST(lexerAtomicLexemesReconstructInput)
         for (auto lexeme : lexemes)
         {
             SLANG_CHECK(lexeme.getLoc() == input.beginLoc + offset);
-            reconstructed << lexeme.getSpelling();
-            offset += lexeme.getSpellingLength();
+            reconstructed << lexeme.getPhysicalSpelling();
+            offset += lexeme.getPhysicalSpellingLength();
         }
         SLANG_CHECK(lexemes.end()->is<RawEndOfFile>());
         SLANG_CHECK(lexemes.end()->getLoc() == input.beginLoc + offset);
@@ -521,7 +528,7 @@ SLANG_UNIT_TEST(lexerFinalBackslashUsesBufferEnd)
     SLANG_CHECK(input.lexer.m_end == bytes + 1);
     auto backslash = input.lexer.readLexeme();
     SLANG_CHECK(backslash.is<RawInvalid>());
-    SLANG_CHECK(backslash.getSpelling() == UnownedStringSlice("\\"));
+    SLANG_CHECK(backslash.getPhysicalSpelling() == UnownedStringSlice("\\"));
     auto eof = input.lexer.readLexeme();
     SLANG_CHECK(eof.is<RawEndOfFile>());
     SLANG_CHECK(eof.getLoc() == input.beginLoc + 1);
@@ -538,11 +545,11 @@ SLANG_UNIT_TEST(lexerTerminalSpliceUsesCompleteNewline)
         LexemeTestInput input(UnownedStringSlice(bytes, size_t(4)));
         auto identifier = input.lexer.readLexeme();
         SLANG_CHECK(identifier.is<RawIdentifier>());
-        SLANG_CHECK(identifier.getSpelling() == UnownedStringSlice("a"));
+        SLANG_CHECK(identifier.getPhysicalSpelling() == UnownedStringSlice("a"));
         auto splice = input.lexer.readLexeme();
         SLANG_CHECK(splice.is<EscapedNewLineTrivia>());
-        SLANG_CHECK(splice.getSpelling() == UnownedStringSlice(bytes + 1, bytes + 4));
-        SLANG_CHECK(splice.getContent().getLength() == 0);
+        SLANG_CHECK(splice.getPhysicalSpelling() == UnownedStringSlice(bytes + 1, bytes + 4));
+        SLANG_CHECK(splice.getLogicalSpelling().getLength() == 0);
         auto eof = input.lexer.readLexeme();
         SLANG_CHECK(eof.is<RawEndOfFile>());
         SLANG_CHECK(eof.getLoc() == input.beginLoc + 4);
@@ -557,7 +564,7 @@ SLANG_UNIT_TEST(lexerTruncatedUtf8UsesBufferEnd)
     const char bytes[] = {char(0xE2), char(0x82), char(0xAC)};
     LexemeTestInput input(UnownedStringSlice(bytes, size_t(2)));
     auto invalidSequence = input.lexer.readLexeme();
-    SLANG_CHECK(invalidSequence.getSpelling() == UnownedStringSlice(bytes, size_t(2)));
+    SLANG_CHECK(invalidSequence.getPhysicalSpelling() == UnownedStringSlice(bytes, size_t(2)));
     SLANG_CHECK(input.sink.getErrorCount() == 1);
     auto eof = input.lexer.readLexeme();
     SLANG_CHECK(eof.is<RawEndOfFile>());
@@ -571,11 +578,11 @@ SLANG_UNIT_TEST(lexerInvalidUtf8PreservesFollowingAscii)
     const char bytes[] = {char(0xE2), char(0x82), 'b'};
     LexemeTestInput input(UnownedStringSlice(bytes, sizeof(bytes)));
     auto invalidSequence = input.lexer.readLexeme();
-    SLANG_CHECK(invalidSequence.getSpelling() == UnownedStringSlice(bytes, size_t(2)));
+    SLANG_CHECK(invalidSequence.getPhysicalSpelling() == UnownedStringSlice(bytes, size_t(2)));
     SLANG_CHECK(input.sink.getErrorCount() == 1);
     auto identifier = input.lexer.readLexeme();
     SLANG_CHECK(identifier.is<RawIdentifier>());
-    SLANG_CHECK(identifier.getContent() == UnownedStringSlice("b"));
+    SLANG_CHECK(identifier.getLogicalSpelling() == UnownedStringSlice("b"));
     SLANG_CHECK(identifier.getLoc() == input.beginLoc + 2);
     SLANG_CHECK(input.lexer.readLexeme().is<RawEndOfFile>());
     SLANG_CHECK(input.sink.getErrorCount() == 1);
@@ -591,18 +598,19 @@ SLANG_UNIT_TEST(lexerInvalidUnicodeCannotBecomeEndOfFile)
     LexemeTestInput input(UnownedStringSlice(bytes, sizeof(bytes)));
     auto invalidSequence = input.lexer.readLexeme();
     SLANG_CHECK(invalidSequence.is<WhiteSpaceTrivia>());
-    SLANG_CHECK(invalidSequence.getSpelling() == UnownedStringSlice(bytes, size_t(7)));
+    SLANG_CHECK(invalidSequence.getPhysicalSpelling() == UnownedStringSlice(bytes, size_t(7)));
     SLANG_CHECK(input.sink.getErrorCount() == 1);
     auto identifier = input.lexer.readLexeme();
     SLANG_CHECK(identifier.is<RawIdentifier>());
-    SLANG_CHECK(identifier.getContent() == UnownedStringSlice("x"));
+    SLANG_CHECK(identifier.getLogicalSpelling() == UnownedStringSlice("x"));
     auto eof = input.lexer.readLexeme();
     SLANG_CHECK(eof.is<RawEndOfFile>());
     SLANG_CHECK(eof.getLoc() == input.beginLoc + sizeof(bytes));
     SLANG_CHECK(input.sink.getErrorCount() == 1);
 
     StringBuilder reconstructed;
-    reconstructed << invalidSequence.getSpelling() << identifier.getSpelling() << eof.getSpelling();
+    reconstructed << invalidSequence.getPhysicalSpelling() << identifier.getPhysicalSpelling()
+                  << eof.getPhysicalSpelling();
     SLANG_CHECK(reconstructed.getUnownedSlice() == UnownedStringSlice(bytes, sizeof(bytes)));
 }
 
@@ -614,7 +622,7 @@ SLANG_UNIT_TEST(lexerAcceptsMaximumUnicodeScalar)
     LexemeTestInput input(UnownedStringSlice(bytes, sizeof(bytes)));
     auto identifier = input.lexer.readLexeme();
     SLANG_CHECK(identifier.is<RawIdentifier>());
-    SLANG_CHECK(identifier.getSpelling() == UnownedStringSlice(bytes, sizeof(bytes)));
+    SLANG_CHECK(identifier.getPhysicalSpelling() == UnownedStringSlice(bytes, sizeof(bytes)));
     SLANG_CHECK(input.lexer.readLexeme().is<RawEndOfFile>());
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
@@ -627,24 +635,24 @@ SLANG_UNIT_TEST(lexerRejectsUnicodeSurrogate)
     LexemeTestInput input(UnownedStringSlice(bytes, sizeof(bytes)));
     auto invalidSequence = input.lexer.readLexeme();
     SLANG_CHECK(invalidSequence.is<WhiteSpaceTrivia>());
-    SLANG_CHECK(invalidSequence.getSpelling() == UnownedStringSlice(bytes, size_t(3)));
+    SLANG_CHECK(invalidSequence.getPhysicalSpelling() == UnownedStringSlice(bytes, size_t(3)));
     SLANG_CHECK(input.sink.getErrorCount() == 1);
     auto identifier = input.lexer.readLexeme();
     SLANG_CHECK(identifier.is<RawIdentifier>());
-    SLANG_CHECK(identifier.getContent() == UnownedStringSlice("x"));
+    SLANG_CHECK(identifier.getLogicalSpelling() == UnownedStringSlice("x"));
     SLANG_CHECK(input.lexer.readLexeme().is<RawEndOfFile>());
     SLANG_CHECK(input.sink.getErrorCount() == 1);
 }
 
-SLANG_UNIT_TEST(lexerRetainsOriginalAndLogicalSpellings)
+SLANG_UNIT_TEST(lexerRetainsPhysicalAndLogicalSpellings)
 {
     // Identifier lookup uses the spelling after line splicing, while reconstruction
     // uses the original CRLF continuation. Neither operation may overwrite the other.
     LexemeTestInput input("alpha\\\r\nbeta");
     auto identifier = input.lexer.readLexeme();
     SLANG_CHECK(identifier.is<RawIdentifier>());
-    SLANG_CHECK(identifier.getSpelling() == UnownedStringSlice("alpha\\\r\nbeta"));
-    SLANG_CHECK(identifier.getContent() == UnownedStringSlice("alphabeta"));
+    SLANG_CHECK(identifier.getPhysicalSpelling() == UnownedStringSlice("alpha\\\r\nbeta"));
+    SLANG_CHECK(identifier.getLogicalSpelling() == UnownedStringSlice("alphabeta"));
     SLANG_CHECK(identifier.getName() == input.namePool.getName(String("alphabeta")));
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
@@ -659,7 +667,7 @@ SLANG_UNIT_TEST(lexerTokenTriviaPartitionsPhysicalInput)
     auto first = input.lexer.readToken();
     auto second = input.lexer.readToken();
     auto eof = input.lexer.readToken();
-    SLANG_CHECK(first.getContent() == UnownedStringSlice("first"));
+    SLANG_CHECK(first.getLogicalSpelling() == UnownedStringSlice("first"));
     SLANG_CHECK(first.getLoc() == input.beginLoc + 2);
     SLANG_CHECK(first.getLeadingTrivia().getCount() == 1);
     SLANG_CHECK_ABORT(first.getTrailingTrivia().getCount() == 4);
@@ -677,10 +685,10 @@ SLANG_UNIT_TEST(lexerTokenTriviaPartitionsPhysicalInput)
     for (auto token : {first, second, eof})
     {
         for (auto trivia : token.getLeadingTrivia())
-            reconstructed << trivia.getSpelling();
-        reconstructed << token.getSpelling();
+            reconstructed << trivia.getPhysicalSpelling();
+        reconstructed << token.getPhysicalSpelling();
         for (auto trivia : token.getTrailingTrivia())
-            reconstructed << trivia.getSpelling();
+            reconstructed << trivia.getPhysicalSpelling();
     }
     SLANG_CHECK(reconstructed.getUnownedSlice() == UnownedStringSlice(text));
     SLANG_CHECK(input.sink.getErrorCount() == 0);
@@ -698,7 +706,7 @@ SLANG_UNIT_TEST(lexerTriviaOnlyFileUsesEndOfFileToken)
     SLANG_CHECK(eof.getTrailingTrivia().getCount() == 0);
     StringBuilder reconstructed;
     for (auto trivia : eof.getLeadingTrivia())
-        reconstructed << trivia.getSpelling();
+        reconstructed << trivia.getPhysicalSpelling();
     SLANG_CHECK(reconstructed.getUnownedSlice() == UnownedStringSlice(text));
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
@@ -712,10 +720,12 @@ SLANG_UNIT_TEST(tokenReaderPreservesStoredEndOfFileTrivia)
     const auto storedEOF = *tokens.end();
     SLANG_CHECK_ABORT(storedEOF.is<EndOfFileToken>());
     SLANG_CHECK_ABORT(storedEOF.getLeadingTrivia().getCount() == 2);
-    SLANG_CHECK(storedEOF.getLeadingTrivia()[0].getSpelling() == UnownedStringSlice("\n"));
-    SLANG_CHECK(storedEOF.getLeadingTrivia()[1].getSpelling() == UnownedStringSlice("//last"));
+    SLANG_CHECK(storedEOF.getLeadingTrivia()[0].getPhysicalSpelling() == UnownedStringSlice("\n"));
+    SLANG_CHECK(
+        storedEOF.getLeadingTrivia()[1].getPhysicalSpelling() == UnownedStringSlice("//last"));
     TokenReader reader(tokens);
-    SLANG_CHECK(reader.advanceIf<IdentifierToken>().getContent() == UnownedStringSlice("a"));
+    SLANG_CHECK(
+        reader.advanceIf<IdentifierToken>().getLogicalSpelling() == UnownedStringSlice("a"));
 
     // Reading EOF repeatedly is stable: both the interned cluster and its occurrence
     // state remain the same, including the positions of its attached trivia.
@@ -739,7 +749,8 @@ SLANG_UNIT_TEST(tokenReaderBoundedRangeUsesExplicitEndOfFile)
     RefPtr<TokenPool> pool = new TokenPool();
     auto endpoint = pool->createEndOfFile(SourceLoc::fromRaw(150), TokenFlag::AfterWhitespace);
     TokenReader reader(tokens.begin(), tokens.begin() + 1, endpoint);
-    SLANG_CHECK(reader.advanceIf<IdentifierToken>().getContent() == UnownedStringSlice("one"));
+    SLANG_CHECK(
+        reader.advanceIf<IdentifierToken>().getLogicalSpelling() == UnownedStringSlice("one"));
     SLANG_CHECK(reader.isAtEnd());
     for (int read = 0; read < 3; ++read)
     {
@@ -791,8 +802,10 @@ SLANG_UNIT_TEST(tokenReaderRestoresPartiallyConsumedRightShift)
     SLANG_CHECK(restored.getLoc() == input.beginLoc + 3);
     SLANG_CHECK(restored.getFlags() == 0);
     SLANG_CHECK_ABORT(restored.getTrailingTrivia().getCount() == 3);
-    SLANG_CHECK(restored.getTrailingTrivia()[1].getSpelling() == UnownedStringSlice("//tail"));
-    SLANG_CHECK(reader.advanceIf<IdentifierToken>().getContent() == UnownedStringSlice("next"));
+    SLANG_CHECK(
+        restored.getTrailingTrivia()[1].getPhysicalSpelling() == UnownedStringSlice("//tail"));
+    SLANG_CHECK(
+        reader.advanceIf<IdentifierToken>().getLogicalSpelling() == UnownedStringSlice("next"));
 
     reader.setCursor(beforeSplit);
     SLANG_CHECK(reader.peekToken().getObject() == original.getObject());
@@ -838,13 +851,13 @@ SLANG_UNIT_TEST(lexerAngleBracketHeaderNameModePrecedesAdjacentOperand)
     // including characters that would otherwise start a C-style comment.
     LexemeTestInput input("#include<one/*name*/two.h>\nnext");
     SLANG_CHECK(input.lexer.readToken().is<PoundToken>());
-    SLANG_CHECK(input.lexer.readToken().getContent() == UnownedStringSlice("include"));
+    SLANG_CHECK(input.lexer.readToken().getLogicalSpelling() == UnownedStringSlice("include"));
     input.lexer.setMode(LexerMode::ExpectingAngleBracketHeaderName);
     auto header = input.lexer.readToken();
     SLANG_CHECK(header.is<AngleBracketHeaderNameToken>());
-    SLANG_CHECK(header.getSpelling() == UnownedStringSlice("<one/*name*/two.h>"));
+    SLANG_CHECK(header.getPhysicalSpelling() == UnownedStringSlice("<one/*name*/two.h>"));
     input.lexer.setMode(LexerMode::Normal);
-    SLANG_CHECK(input.lexer.readToken().getContent() == UnownedStringSlice("next"));
+    SLANG_CHECK(input.lexer.readToken().getLogicalSpelling() == UnownedStringSlice("next"));
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 

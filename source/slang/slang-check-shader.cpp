@@ -277,7 +277,7 @@ static void validateSystemValueSemanticForType(
     if (!semantic || !type)
         return;
 
-    auto semanticNameSlice = semantic->name.getContent();
+    auto semanticNameSlice = semantic->name.getLogicalSpelling();
 
     // Only validate SV_ semantics
     if (!semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
@@ -488,7 +488,7 @@ static void validateNoPerPrimitiveSemanticsInType(
         if (!semantic)
             continue;
 
-        auto name = semantic->name.getContent();
+        auto name = semantic->name.getLogicalSpelling();
         if (isPerPrimitiveMeshSemantic(name))
         {
             sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
@@ -558,10 +558,10 @@ static void validateSystemValueSemantic(
         {
             if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
             {
-                if (isPerPrimitiveMeshSemantic(semantic->name.getContent()))
+                if (isPerPrimitiveMeshSemantic(semantic->name.getLogicalSpelling()))
                 {
                     sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
-                        .semantic = String(semantic->name.getContent()),
+                        .semantic = String(semantic->name.getLogicalSpelling()),
                         .location = decl->loc});
                 }
             }
@@ -691,7 +691,7 @@ static void collectDepthOutputSemantics(
     // Record a depth semantic declared directly on this decl.
     if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
     {
-        if (isDepthOutputSemantic(semantic->name.getContent()))
+        if (isDepthOutputSemantic(semantic->name.getLogicalSpelling()))
             ioDepthSemantics.add(semantic);
     }
 }
@@ -1670,7 +1670,7 @@ static bool _declHasSemantic(Decl* decl, UnownedStringSlice baseName)
         return false;
     if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
     {
-        if (_semanticBaseName(semantic->name.getContent()).caseInsensitiveEquals(baseName))
+        if (_semanticBaseName(semantic->name.getLogicalSpelling()).caseInsensitiveEquals(baseName))
             return true;
     }
     return false;
@@ -2323,7 +2323,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             {
                 const auto& semanticToken = semantic->name;
 
-                String lowerName = String(semanticToken.getContent()).toLower();
+                String lowerName = String(semanticToken.getLogicalSpelling()).toLower();
 
                 if (lowerName == "sv_dispatchthreadid")
                 {
@@ -2460,8 +2460,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // parameters (in declaration order) then the return value, so the "second" is the
             // later contributor, not necessarily the lexically-later one.
             sink->diagnose(Diagnostics::MultipleDepthOutputSemantics{
-                .conflictingSemantic = String(depthOutputSemantics[1]->name.getContent()),
-                .earlierSemantic = String(depthOutputSemantics[0]->name.getContent()),
+                .conflictingSemantic = String(depthOutputSemantics[1]->name.getLogicalSpelling()),
+                .earlierSemantic = String(depthOutputSemantics[0]->name.getLogicalSpelling()),
                 .location = depthOutputSemantics[1]->loc});
         }
     }

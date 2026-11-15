@@ -47,11 +47,11 @@ Token getFieldSemanticToken(Module* module, const char* structName)
 /// Checks the spelling and context shared by both semantic-token occurrences.
 void checkSemanticToken(Token token)
 {
-    // The semantic has one logical identifier, but its spelling crosses a physical
+    // The semantic has one logical identifier, but its physical spelling crosses a
     // newline. The cached name must use the logical spelling after deserialization.
     SLANG_CHECK(token.is<IdentifierToken>());
-    SLANG_CHECK(token.getSpelling() == UnownedStringSlice("COLO\\\nR"));
-    SLANG_CHECK(token.getContent() == UnownedStringSlice("COLOR"));
+    SLANG_CHECK(token.getPhysicalSpelling() == UnownedStringSlice("COLO\\\nR"));
+    SLANG_CHECK(token.getLogicalSpelling() == UnownedStringSlice("COLOR"));
     SLANG_CHECK_ABORT(token.getName());
     SLANG_CHECK(token.getName()->text == "COLOR");
     SLANG_CHECK((token.getFlags() & TokenFlag::AtStartOfLine) != 0);
@@ -61,13 +61,14 @@ void checkSemanticToken(Token token)
     // line therefore leads the semantic; its trailing comment precedes the semicolon.
     SLANG_CHECK_ABORT(token.getLeadingTrivia().getCount() == 2);
     SLANG_CHECK(token.getLeadingTrivia()[0].is<LineCommentTrivia>());
-    SLANG_CHECK(token.getLeadingTrivia()[0].getSpelling() == UnownedStringSlice("// lead"));
+    SLANG_CHECK(token.getLeadingTrivia()[0].getPhysicalSpelling() == UnownedStringSlice("// lead"));
     SLANG_CHECK(token.getLeadingTrivia()[1].is<NewLineTrivia>());
-    SLANG_CHECK(token.getLeadingTrivia()[1].getSpelling() == UnownedStringSlice("\n"));
+    SLANG_CHECK(token.getLeadingTrivia()[1].getPhysicalSpelling() == UnownedStringSlice("\n"));
     SLANG_CHECK_ABORT(token.getTrailingTrivia().getCount() == 2);
-    SLANG_CHECK(token.getTrailingTrivia()[0].getSpelling() == UnownedStringSlice(" "));
+    SLANG_CHECK(token.getTrailingTrivia()[0].getPhysicalSpelling() == UnownedStringSlice(" "));
     SLANG_CHECK(token.getTrailingTrivia()[1].is<BlockCommentTrivia>());
-    SLANG_CHECK(token.getTrailingTrivia()[1].getSpelling() == UnownedStringSlice("/*tail*/"));
+    SLANG_CHECK(
+        token.getTrailingTrivia()[1].getPhysicalSpelling() == UnownedStringSlice("/*tail*/"));
 }
 
 /// Checks that a retained location resolves to the expected physical line and column.

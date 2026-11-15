@@ -1413,7 +1413,7 @@ static void reportIncludeFileForContentAssist(Preprocessor* preprocessor, Token 
         return;
     FileIncludeContentAssistInfo info;
     info.loc = token.getLoc();
-    info.length = (int)token.getContentLength();
+    info.length = (int)token.getLogicalSpellingLength();
     info.path = path;
     preprocessor->contentAssistInfo->fileIncludes.add(info);
 }
@@ -2213,7 +2213,7 @@ Token MacroInvocation::_readTokenImpl()
                 {
                     if (token.getType() != TokenType::EndOfFile)
                     {
-                        pastedContent << token.getContent();
+                        pastedContent << token.getLogicalSpelling();
                     }
                 }
                 else
@@ -2235,12 +2235,12 @@ Token MacroInvocation::_readTokenImpl()
                 m_macroOpIndex++;
                 _initCurrentOpStream();
 
-                // If the right operand yields at least one non-EOF token, then we need
-                // to append that content to our paste result.
+                // If the right operand yields at least one non-EOF token, we append
+                // that token's logical spelling to our paste result.
                 //
                 Token rightToken = m_currentOpStreams.readToken();
                 if (rightToken.getType() != TokenType::EndOfFile)
-                    pastedContent << rightToken.getContent();
+                    pastedContent << rightToken.getLogicalSpelling();
 
                 // Now we need to re-lex the token(s) that resulted from pasting, which requires
                 // us to create a fresh source file to represent the paste result.
@@ -2605,7 +2605,7 @@ void MacroInvocation::_initCurrentOpStream()
                 // literal value.
                 //
                 auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
-                handler->appendEscaped(token.getContent(), builder);
+                handler->appendEscaped(token.getLogicalSpelling(), builder);
             }
             builder.appendChar('"');
 
@@ -2717,7 +2717,7 @@ inline Token const& GetDirective(PreprocessorDirectiveContext* context)
 // Get the name of the directive being parsed.
 inline UnownedStringSlice GetDirectiveName(PreprocessorDirectiveContext* context)
 {
-    return context->m_directiveToken.getContent();
+    return context->m_directiveToken.getLogicalSpelling();
 }
 
 // Get the location of the directive being parsed.
@@ -2872,7 +2872,7 @@ static bool ExpectRaw(
                 sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorExpression{
                     .expectedToken = tokenStr,
                     .openingToken =
-                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                        openingToken ? openingToken->getLogicalSpelling() : UnownedStringSlice(),
                     .location = loc,
                     .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
@@ -2880,7 +2880,7 @@ static bool ExpectRaw(
                 sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
                     .expectedToken = tokenStr,
                     .openingToken =
-                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                        openingToken ? openingToken->getLogicalSpelling() : UnownedStringSlice(),
                     .location = loc,
                     .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
@@ -2928,7 +2928,7 @@ static bool Expect(
                 sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorExpression{
                     .expectedToken = tokenStr,
                     .openingToken =
-                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                        openingToken ? openingToken->getLogicalSpelling() : UnownedStringSlice(),
                     .location = loc,
                     .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
@@ -2936,7 +2936,7 @@ static bool Expect(
                 sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
                     .expectedToken = tokenStr,
                     .openingToken =
-                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                        openingToken ? openingToken->getLogicalSpelling() : UnownedStringSlice(),
                     .location = loc,
                     .openingLoc = openingToken ? openingToken->getLoc() : SourceLoc()});
                 break;
@@ -3086,11 +3086,11 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
         }
 
     case TokenType::IntegerLiteral:
-        return stringToInt(token.getContent());
+        return stringToInt(token.getLogicalSpelling());
 
     case TokenType::Identifier:
         {
-            if (token.getContent() == "defined")
+            if (token.getLogicalSpelling() == "defined")
             {
                 // handle `defined(someName)`
 
@@ -3129,7 +3129,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
 
                 return LookupMacro(context, name) != NULL;
             }
-            else if (token.getContent() == "__has_feature")
+            else if (token.getLogicalSpelling() == "__has_feature")
             {
                 // handle `defined(someName)`
 
@@ -3165,7 +3165,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
                     }
                 }
 
-                if (nameToken.getContent() == "hlsl_vk_buffer_pointer")
+                if (nameToken.getLogicalSpelling() == "hlsl_vk_buffer_pointer")
                 {
                     return 1;
                 }
@@ -3479,7 +3479,7 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
     {
         GetSink(context)->diagnose(Diagnostics::DirectiveAfterElse{
             .directive = GetDirectiveName(context),
-            .elseDirective = conditional->elseToken.getContent(),
+            .elseDirective = conditional->elseToken.getLogicalSpelling(),
             .location = GetDirectiveLoc(context),
             .elseLoc = conditional->elseToken.getLoc()});
         return;
@@ -3541,7 +3541,7 @@ static void HandleElifDirective(PreprocessorDirectiveContext* context)
     {
         GetSink(context)->diagnose(Diagnostics::DirectiveAfterElse{
             .directive = GetDirectiveName(context),
-            .elseDirective = conditional->elseToken.getContent(),
+            .elseDirective = conditional->elseToken.getLogicalSpelling(),
             .location = GetDirectiveLoc(context),
             .elseLoc = conditional->elseToken.getLoc()});
         return;
@@ -3703,7 +3703,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
             auto pathPart = AdvanceToken(context);
             if (pathPart.getFlags() & TokenFlag::AfterWhitespace)
                 pathSB.appendChar(' ');
-            pathSB << pathPart.getContent();
+            pathSB << pathPart.getLogicalSpelling();
         }
         if (!Expect(context, TokenType::OpGreater, PreprocessorExpectDiag::TokenInDirective))
             return;
@@ -3798,7 +3798,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     {
         // This file has already been included, we should diagnose an error and return.
         GetSink(context)->diagnose(Diagnostics::CyclicInclude{
-            .path = pathToken.getContent(),
+            .path = pathToken.getLogicalSpelling(),
             .location = pathToken.getLoc()});
         return;
     }
@@ -4200,7 +4200,7 @@ static String _readDirectiveMessage(PreprocessorDirectiveContext* context)
                 result.append(" ");
             }
         }
-        result.append(token.getContent());
+        result.append(token.getLogicalSpelling());
     }
 
     return result;
@@ -4272,7 +4272,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     switch (PeekTokenType(context))
     {
     case TokenType::IntegerLiteral:
-        line = stringToInt(AdvanceToken(context).getContent());
+        line = stringToInt(AdvanceToken(context).getLogicalSpelling());
         break;
 
     case TokenType::EndOfFile:
@@ -4282,7 +4282,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
 
     case TokenType::Identifier:
-        if (PeekToken(context).getContent() == "default")
+        if (PeekToken(context).getLogicalSpelling() == "default")
         {
             AdvanceToken(context);
             _handleDefaultLineDirective(context);
@@ -4313,7 +4313,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     case TokenType::IntegerLiteral:
         // Note(tfoley): GLSL allows the "source string" to be indicated by an integer
         // TODO(tfoley): Figure out a better way to handle this, if it matters
-        file = AdvanceToken(context).getContent();
+        file = AdvanceToken(context).getLogicalSpelling();
         break;
 
     default:
@@ -4380,13 +4380,13 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     if (tk.getType() == TokenType::Identifier)
     {
         // #pragma warning (push)
-        if (tk.getContent() == "push")
+        if (tk.getLogicalSpelling() == "push")
         {
             AdvanceToken(context);
             context->m_preprocessor->warningStateTracker->addPragmaPush(tk.getLoc());
         }
         // #pragma warning (pop)
-        else if (tk.getContent() == "pop")
+        else if (tk.getLogicalSpelling() == "pop")
         {
             AdvanceToken(context);
             context->m_preprocessor->warningStateTracker->addPragmaPop(
@@ -4424,23 +4424,23 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 id = AdvanceToken(context);
                 PragmaWarningSpecifier specifier;
                 SourceLoc nextLineEnd = {}; // Needed for suppress
-                if (id.getContent() == "default")
+                if (id.getLogicalSpelling() == "default")
                 {
                     specifier = PragmaWarningSpecifier::Default;
                 }
-                else if (id.getContent() == "disable")
+                else if (id.getLogicalSpelling() == "disable")
                 {
                     specifier = PragmaWarningSpecifier::Disable;
                 }
-                else if (id.getContent() == "error")
+                else if (id.getLogicalSpelling() == "error")
                 {
                     specifier = PragmaWarningSpecifier::Error;
                 }
-                else if (id.getContent() == "once")
+                else if (id.getLogicalSpelling() == "once")
                 {
                     specifier = PragmaWarningSpecifier::Once;
                 }
-                else if (id.getContent() == "suppress")
+                else if (id.getLogicalSpelling() == "suppress")
                 {
                     specifier = PragmaWarningSpecifier::Suppress;
                     // We need to start from `subDirectiveToken.getLoc()` because the next tokens
@@ -4457,7 +4457,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 else
                 {
                     GetSink(context)->diagnose(Diagnostics::PragmaWarningUnknownSpecifier{
-                        .specifier = id.getContent(),
+                        .specifier = id.getLogicalSpelling(),
                         .location = specifierLocation});
                     return finish();
                 }
@@ -4477,7 +4477,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                     if (warningNumberToken.getType() == TokenType::IntegerLiteral)
                     {
                         AdvanceToken(context);
-                        int warningNumber = stringToInt(warningNumberToken.getContent());
+                        int warningNumber = stringToInt(warningNumberToken.getLogicalSpelling());
                         context->m_preprocessor->warningStateTracker->addEntry(
                             idLocation,
                             nextLineEnd,
@@ -4505,7 +4505,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 else
                 {
                     GetSink(context)->diagnose(Diagnostics::UnexpectedToken{
-                        .tokenType = end.getContent(),
+                        .tokenType = end.getLogicalSpelling(),
                         .location = endLoc});
                     return finish();
                 }
@@ -4655,7 +4655,7 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     switch (PeekTokenType(context))
     {
     case TokenType::IntegerLiteral:
-        version = stringToInt(AdvanceToken(context).getContent());
+        version = stringToInt(AdvanceToken(context).getLogicalSpelling());
         break;
     default:
         GetSink(context)->diagnose(
@@ -4694,7 +4694,7 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
     {
         // start by parsing the language (optional)
         auto token = AdvanceToken(context);
-        if (token.getContent().caseInsensitiveEquals(toSlice("slang")))
+        if (token.getLogicalSpelling().caseInsensitiveEquals(toSlice("slang")))
         {
             token = AdvanceToken(context);
             languageSpecified = true;
@@ -4721,7 +4721,7 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
     {
         // Note: Returns SLANG_LANGUAGE_VERSION_UNKNOWN if the language version
         // is not found.
-        int version = TypeTextUtil::findLanguageVersion(versionToken.getContent());
+        int version = TypeTextUtil::findLanguageVersion(versionToken.getLogicalSpelling());
 
         if (isValidSlangLanguageVersion(version))
         {
@@ -4742,7 +4742,7 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
             {
                 // Language not specified, so we interpret the bad identifier token as a language
                 GetSink(context)->diagnose(Diagnostics::UnknownLanguage{
-                    .language = versionToken.getContent(),
+                    .language = versionToken.getLogicalSpelling(),
                     .location = GetDirectiveLoc(context)});
             }
             else if (
@@ -4753,7 +4753,7 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
                 // - integer literal (always interpreted as a version)
                 // - identifier token AND language was specified (interpret as a version)
                 GetSink(context)->diagnose(Diagnostics::UnknownLanguageVersion{
-                    .version = versionToken.getContent(),
+                    .version = versionToken.getLogicalSpelling(),
                     .location = GetDirectiveLoc(context)});
             }
             else
@@ -4928,7 +4928,7 @@ void Preprocessor::popInputFile()
          conditional = conditional->parent)
     {
         GetSink(this)->diagnose(Diagnostics::EndOfFileInPreprocessorConditional{
-            .directive = conditional->ifToken.getContent(),
+            .directive = conditional->ifToken.getLogicalSpelling(),
             .location = eofToken.getLoc(),
             .directiveLoc = conditional->ifToken.getLoc()});
     }
@@ -5149,7 +5149,7 @@ Result findMacroValue(
 
         if (!first && (token.getFlags() & TokenFlag::AfterWhitespace))
             value.append(" ");
-        value.append(token.getContent());
+        value.append(token.getLogicalSpelling());
     }
 
     delete invocation;

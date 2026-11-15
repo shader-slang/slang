@@ -269,7 +269,8 @@ struct Lexer
     /// not needed by the DiagnosticSink.
     static UnownedStringSlice sourceLocationLexer(const UnownedStringSlice& in);
 
-    /// Reads one atomic lexeme, including trivia, preserving its exact input spelling.
+    /// Reads one atomic lexeme, including trivia, preserving both its physical and logical
+    /// spellings.
     Lexeme readLexeme();
 
     /// Reads a token with leading and trailing trivia, returning a real EOF at end.
@@ -321,7 +322,7 @@ struct Lexer
 /// Decodes a string literal, including a C++ raw string.
 ///
 /// Requires a non-empty token. Escaped physical newlines have already been removed from its
-/// canonical text. An unterminated ordinary literal yields its decoded prefix; an incomplete
+/// logical spelling. An unterminated ordinary literal yields its decoded prefix; an incomplete
 /// raw-string delimiter yields an empty string. The lexer diagnoses missing delimiters, and
 /// this function diagnoses invalid escape sequences when `sink` is non-null.
 String getStringLiteralTokenValue(RawStringLiteral token, DiagnosticSink* sink);

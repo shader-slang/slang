@@ -67,7 +67,7 @@ void printDiagnosticArg(StringBuilder& sb, TokenType tokenType)
 
 void printDiagnosticArg(StringBuilder& sb, Token const& token)
 {
-    sb << token.getContent();
+    sb << token.getLogicalSpelling();
 }
 
 SourceLoc getDiagnosticPos(Token const& token)
@@ -77,7 +77,7 @@ SourceLoc getDiagnosticPos(Token const& token)
 
 void printDiagnosticArg(StringBuilder& sb, Lexeme const& lexeme)
 {
-    sb << lexeme.getContent();
+    sb << lexeme.getLogicalSpelling();
 }
 
 SourceLoc getDiagnosticPos(Lexeme const& lexeme)

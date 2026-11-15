@@ -120,7 +120,7 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
         auto identifier = token.as<IdentifierToken>();
         if (!identifier)
             continue;
-        if (identifier.getContent() != toSlice("spirv_asm"))
+        if (identifier.getLogicalSpelling() != toSlice("spirv_asm"))
             continue;
 
         TextRange range;

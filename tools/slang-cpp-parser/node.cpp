@@ -92,7 +92,7 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
         }
         else
         {
-            outName << node->m_name.getContent();
+            outName << node->m_name.getLogicalSpelling();
         }
     }
 }
@@ -317,9 +317,9 @@ void ScopeNode::addChild(Node* child)
 {
     addChildIgnoringName(child);
 
-    if (child->m_name.hasContent())
+    if (child->m_name.hasLogicalSpelling())
     {
-        m_childMap.add(child->m_name.getContent(), child);
+        m_childMap.add(child->m_name.getLogicalSpelling(), child);
     }
 }
 
@@ -356,9 +356,9 @@ void ScopeNode::dump(int indentCount, StringBuilder& out)
         }
     case Kind::Namespace:
         {
-            if (m_name.hasContent())
+            if (m_name.hasLogicalSpelling())
             {
-                out << "namespace " << m_name.getContent() << " {\n";
+                out << "namespace " << m_name.getLogicalSpelling() << " {\n";
             }
             else
             {
@@ -387,9 +387,9 @@ static bool _needsSpace(const Token& prevTok, const Token& tok)
     auto prevLoc = prevTok.getLoc();
     auto loc = tok.getLoc();
 
-    auto prevContent = prevTok.getContent();
+    auto prevLogicalSpelling = prevTok.getLogicalSpelling();
 
-    if (prevLoc + prevContent.getLength() == loc)
+    if (prevLoc + prevLogicalSpelling.getLength() == loc)
     {
         return false;
     }
@@ -402,7 +402,7 @@ static void _dumpTokens(const Token* toks, Index count, StringBuilder& out)
 {
     if (count > 0)
     {
-        out << toks[0].getContent();
+        out << toks[0].getLogicalSpelling();
 
         for (Index i = 1; i < count; ++i)
         {
@@ -414,7 +414,7 @@ static void _dumpTokens(const Token* toks, Index count, StringBuilder& out)
                 out << " ";
             }
 
-            out << token.getContent();
+            out << token.getLogicalSpelling();
         }
     }
 }
@@ -432,7 +432,7 @@ void EnumCaseNode::dump(int indent, StringBuilder& out)
         dumpMarkup(indent, out);
 
         _indent(indent, out);
-        out << m_name.getContent();
+        out << m_name.getLogicalSpelling();
 
         if (m_valueTokens.getCount())
         {
@@ -456,7 +456,7 @@ void TypeDefNode::dump(int indent, StringBuilder& out)
 
         out << "typedef ";
         _dumpTokens(m_targetTypeTokens, out);
-        out << " " << m_name.getContent() << ";\n";
+        out << " " << m_name.getLogicalSpelling() << ";\n";
     }
 }
 
@@ -482,7 +482,7 @@ void EnumNode::dump(int indent, StringBuilder& out)
 
     if (m_name)
     {
-        out << m_name.getContent();
+        out << m_name.getLogicalSpelling();
     }
 
     if (m_backingTokens.getCount() > 0)
@@ -527,7 +527,7 @@ void CallableNode::dump(int indent, StringBuilder& out)
     }
 
     out << m_returnType << " ";
-    out << m_name.getContent() << "(";
+    out << m_name.getLogicalSpelling() << "(";
 
     const Index count = m_params.getCount();
     for (Index i = 0; i < count; ++i)
@@ -541,7 +541,7 @@ void CallableNode::dump(int indent, StringBuilder& out)
         out << param.m_type;
         if (param.m_name.getType() == TokenType::Identifier)
         {
-            out << " " << param.m_name.getContent();
+            out << " " << param.m_name.getLogicalSpelling();
         }
     }
 
@@ -573,7 +573,7 @@ void FieldNode::dump(int indent, StringBuilder& out)
         out << "static ";
     }
 
-    out << m_fieldType << " " << m_name.getContent() << "\n";
+    out << m_fieldType << " " << m_name.getLogicalSpelling() << "\n";
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ClassLikeNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -597,10 +597,10 @@ void ClassLikeNode::calcDerivedDepthFirst(List<ClassLikeNode*>& outNodes)
 
 void ClassLikeNode::dumpDerived(int indentCount, StringBuilder& out)
 {
-    if (isClassLike() && isReflected() && m_name.hasContent())
+    if (isClassLike() && isReflected() && m_name.hasLogicalSpelling())
     {
         _indent(indentCount, out);
-        out << m_name.getContent() << "\n";
+        out << m_name.getLogicalSpelling() << "\n";
     }
 
     for (ClassLikeNode* derivedType : m_derivedTypes)
@@ -675,15 +675,15 @@ void ClassLikeNode::dump(int indentCount, StringBuilder& out)
     {
         out << " (";
     }
-    out << m_name.getContent();
+    out << m_name.getLogicalSpelling();
     if (!isReflected())
     {
         out << ") ";
     }
 
-    if (m_super.hasContent())
+    if (m_super.hasLogicalSpelling())
     {
-        out << " : " << m_super.getContent();
+        out << " : " << m_super.getLogicalSpelling();
     }
 
     out << " {\n";

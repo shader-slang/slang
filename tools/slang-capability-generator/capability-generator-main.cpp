@@ -367,7 +367,7 @@ struct CapabilityDefParser
             RawIdentifier nameToken;
             SLANG_RETURN_ON_FAIL(readToken(nameToken));
             CapabilityDef* def = nullptr;
-            if (m_mapNameToCapability.tryGetValue(nameToken.getContent(), def))
+            if (m_mapNameToCapability.tryGetValue(nameToken.getLogicalSpelling(), def))
             {
                 expr.atoms.add(def);
             }
@@ -472,15 +472,15 @@ struct CapabilityDefParser
             RefPtr<CapabilityDef> def = new CapabilityDef();
             def->sharedContext = &m_sharedContext;
             def->flavor = CapabilityFlavor::Normal;
-            if (nextLexeme.getContent() == "alias")
+            if (nextLexeme.getLogicalSpelling() == "alias")
             {
                 def->flavor = CapabilityFlavor::Alias;
             }
-            else if (nextLexeme.getContent() == "abstract")
+            else if (nextLexeme.getLogicalSpelling() == "abstract")
             {
                 def->flavor = CapabilityFlavor::Abstract;
             }
-            else if (nextLexeme.getContent() == "def")
+            else if (nextLexeme.getLogicalSpelling() == "def")
             {
                 def->flavor = CapabilityFlavor::Normal;
             }
@@ -493,7 +493,7 @@ struct CapabilityDefParser
             {
                 // Auto-document if the preceeding token to an identifier is '///'
                 // complete rules described in `source\slang\slang-capabilities.capdef`
-                auto commentContent = nextLexeme.getContent();
+                auto commentContent = nextLexeme.getLogicalSpelling();
 
                 // remove "//"
                 commentContent = commentContent.subString(2, commentContent.getLength() - 2);
@@ -547,7 +547,7 @@ struct CapabilityDefParser
 
             RawIdentifier nameToken;
             SLANG_RETURN_ON_FAIL(readToken(nameToken));
-            def->name = nameToken.getContent();
+            def->name = nameToken.getLogicalSpelling();
 
             if (def->flavor == CapabilityFlavor::Normal)
             {
@@ -559,7 +559,7 @@ struct CapabilityDefParser
                 {
                     RawIntegerLiteral rankToken;
                     SLANG_RETURN_ON_FAIL(readToken(rankToken));
-                    def->rank = stringToInt(rankToken.getContent());
+                    def->rank = stringToInt(rankToken.getLogicalSpelling());
                 }
                 def->docComment = successiveComments;
                 if (def->docComment.comment.getLength() == 0 && !isInternalDef(def))

@@ -12,7 +12,7 @@ namespace Slang
 {
 
 // Lexical values have two layers. Small handles carry a location and occurrence
-// flags; immutable objects carry spelling and are shared within a `TokenPool`.
+// flags; immutable objects carry both spellings and are shared within a `TokenPool`.
 // The generated definitions describe both the atomic lexeme hierarchy and the
 // matching hierarchy of tokens with attached trivia.
 
@@ -36,18 +36,20 @@ struct Trivia;
 struct Token;
 class TriviaList;
 
-/// Immutable spelling and kind shared by lexemes at different locations.
+/// Immutable physical and logical spellings and kind shared by lexemes at different locations.
 ///
-/// Objects are created only by their pool. Content is the logical spelling after
-/// escaped newlines have been removed; spelling preserves exact `SourceView` input
-/// for lexed objects. Synthesized objects use the spellings supplied by their factory.
-/// Neither form decodes escapes in a string or character literal.
+/// Objects are created only by their pool. Physical spelling preserves the exact
+/// bytes consumed from a `SourceView`, including escaped newlines. Logical spelling
+/// removes those escaped newlines; neither form decodes string or character escapes.
+/// Synthesized objects use the physical and logical spellings supplied by their factory.
 class LexemeObj
 {
 public:
     LexemeKind getType() const { return m_type; }
-    UnownedStringSlice getSpelling() const { return m_spelling; }
-    UnownedStringSlice getContent() const { return m_content; }
+    /// The exact byte sequence representing the lexeme, including escaped newlines.
+    UnownedStringSlice getPhysicalSpelling() const { return m_physicalSpelling; }
+    /// The lexeme's spelling after escaped newlines have been removed.
+    UnownedStringSlice getLogicalSpelling() const { return m_logicalSpelling; }
     Name* getName() const { return m_name; }
     TokenPool* getPool() const { return m_pool; }
 
@@ -59,24 +61,28 @@ private:
     LexemeObj(
         TokenPool* pool,
         LexemeKind type,
-        UnownedStringSlice spelling,
-        UnownedStringSlice content,
+        UnownedStringSlice physicalSpelling,
+        UnownedStringSlice logicalSpelling,
         Name* name)
-        : m_pool(pool), m_type(type), m_spelling(spelling), m_content(content), m_name(name)
+        : m_pool(pool)
+        , m_type(type)
+        , m_physicalSpelling(physicalSpelling)
+        , m_logicalSpelling(logicalSpelling)
+        , m_name(name)
     {
     }
 
     TokenPool* m_pool;
     LexemeKind m_type;
-    UnownedStringSlice m_spelling;
-    UnownedStringSlice m_content;
+    UnownedStringSlice m_physicalSpelling;
+    UnownedStringSlice m_logicalSpelling;
     Name* m_name;
 };
 
 /// One atomic token or trivia occurrence.
 ///
 /// A null object denotes an empty value, independently of its location or flags.
-/// The pool must outlive the handle. The pool owns the spelling, so retaining a
+/// The pool must outlive the handle. The pool owns both spellings, so retaining a
 /// handle does not require retaining the input text buffer.
 struct Lexeme
 {
@@ -93,17 +99,20 @@ struct Lexeme
     LexemeKind getType() const { return m_object ? m_object->getType() : LexemeKind::Unknown; }
     SourceLoc getLoc() const { return m_loc; }
     TokenFlags getFlags() const { return m_flags; }
-    UnownedStringSlice getSpelling() const
+    /// The physical spelling of this occurrence, or an empty slice for an empty value.
+    UnownedStringSlice getPhysicalSpelling() const
     {
-        return m_object ? m_object->getSpelling() : UnownedStringSlice();
+        return m_object ? m_object->getPhysicalSpelling() : UnownedStringSlice();
     }
-    UnownedStringSlice getContent() const
+    /// The logical spelling of this occurrence, or an empty slice for an empty value.
+    UnownedStringSlice getLogicalSpelling() const
     {
-        return m_object ? m_object->getContent() : UnownedStringSlice();
+        return m_object ? m_object->getLogicalSpelling() : UnownedStringSlice();
     }
-    Index getContentLength() const { return getContent().getLength(); }
-    Index getSpellingLength() const { return getSpelling().getLength(); }
-    bool hasContent() const { return getContentLength() != 0; }
+    Index getPhysicalSpellingLength() const { return getPhysicalSpelling().getLength(); }
+    Index getLogicalSpellingLength() const { return getLogicalSpelling().getLength(); }
+    /// Whether the logical spelling contains any bytes; EOF has no spelling bytes.
+    bool hasLogicalSpelling() const { return getLogicalSpellingLength() != 0; }
     Name* getName() const { return m_object ? m_object->getName() : nullptr; }
     Name* getNameOrNull() const { return getName(); }
 
@@ -132,7 +141,7 @@ protected:
 
 #include "slang-raw-lexeme-types.h"
 
-/// Immutable token spelling and its ordered leading and trailing trivia.
+/// An immutable raw token and its ordered leading and trailing trivia.
 ///
 /// Location and occurrence flags are excluded from interning identity. Every
 /// referenced lexeme object belongs to the same pool as this token object.
@@ -142,7 +151,8 @@ public:
     const LexemeObj* getRawToken() const { return m_rawToken; }
     ConstArrayView<const LexemeObj*> getLeadingTrivia() const { return m_leadingTrivia; }
     ConstArrayView<const LexemeObj*> getTrailingTrivia() const { return m_trailingTrivia; }
-    Index getLeadingTriviaLength() const { return m_leadingTriviaLength; }
+    /// The total physical spelling length, in bytes, of the leading trivia.
+    Index getLeadingTriviaPhysicalLength() const { return m_leadingTriviaPhysicalLength; }
     TokenPool* getPool() const { return m_rawToken->getPool(); }
 
 private:
@@ -154,25 +164,25 @@ private:
         const LexemeObj* rawToken,
         ConstArrayView<const LexemeObj*> leadingTrivia,
         ConstArrayView<const LexemeObj*> trailingTrivia,
-        Index leadingTriviaLength)
+        Index leadingTriviaPhysicalLength)
         : m_rawToken(rawToken)
         , m_leadingTrivia(leadingTrivia)
         , m_trailingTrivia(trailingTrivia)
-        , m_leadingTriviaLength(leadingTriviaLength)
+        , m_leadingTriviaPhysicalLength(leadingTriviaPhysicalLength)
     {
     }
 
     const LexemeObj* m_rawToken;
     ConstArrayView<const LexemeObj*> m_leadingTrivia;
     ConstArrayView<const LexemeObj*> m_trailingTrivia;
-    Index m_leadingTriviaLength;
+    Index m_leadingTriviaPhysicalLength;
 };
 
 /// A token occurrence with attached trivia.
 ///
 /// The location identifies the beginning of the raw token, excluding leading
-/// trivia. For a physically lexed cluster, trivia locations follow from spelling
-/// lengths. Preprocessing must keep a cluster contiguous in its source view or
+/// trivia. For a physically lexed cluster, trivia locations follow from physical
+/// spelling lengths. Preprocessing must keep a cluster contiguous in its source view or
 /// drop transferred trivia when replacing its location.
 /// A null object denotes an empty value; EOF always has a non-null object.
 struct Token
@@ -193,11 +203,16 @@ struct Token
     }
     SourceLoc getLoc() const { return m_loc; }
     TokenFlags getFlags() const { return m_flags; }
-    UnownedStringSlice getContent() const { return getRawToken().getContent(); }
-    UnownedStringSlice getSpelling() const { return getRawToken().getSpelling(); }
-    Index getContentLength() const { return getContent().getLength(); }
-    Index getSpellingLength() const { return getSpelling().getLength(); }
-    bool hasContent() const { return getContentLength() != 0; }
+    /// The raw token's physical spelling, excluding all attached trivia.
+    UnownedStringSlice getPhysicalSpelling() const { return getRawToken().getPhysicalSpelling(); }
+    /// The raw token's logical spelling, excluding all attached trivia.
+    UnownedStringSlice getLogicalSpelling() const { return getRawToken().getLogicalSpelling(); }
+    /// Compatibility alias for the raw token's logical spelling.
+    UnownedStringSlice getContent() const { return getLogicalSpelling(); }
+    Index getPhysicalSpellingLength() const { return getPhysicalSpelling().getLength(); }
+    Index getLogicalSpellingLength() const { return getLogicalSpelling().getLength(); }
+    /// Whether the logical spelling contains any bytes; EOF has no spelling bytes.
+    bool hasLogicalSpelling() const { return getLogicalSpellingLength() != 0; }
     Name* getName() const { return getRawToken().getName(); }
     Name* getNameOrNull() const { return getName(); }
     RawToken getRawToken() const;
@@ -233,7 +248,7 @@ protected:
 
 /// A borrowed sequence of trivia with locations in one contiguous source view.
 ///
-/// Attached trivia exposes kind, spelling, and position. Its occurrence flags are
+/// Attached trivia exposes kind, both spellings, and position. Its occurrence flags are
 /// zero; preprocessing context is retained on the containing token's raw occurrence.
 class TriviaList
 {
@@ -245,7 +260,7 @@ public:
         Iterator& operator++()
         {
             if (loc.isValid())
-                loc = loc + (*cursor)->getSpelling().getLength();
+                loc = loc + (*cursor)->getPhysicalSpelling().getLength();
             ++cursor;
             return *this;
         }
@@ -289,15 +304,15 @@ public:
 
     /// Interns a concrete atomic lexeme and returns its located occurrence.
     ///
-    /// Requires a concrete kind, and a name whose text equals `content` when supplied.
-    /// EOF and `EndOfDirective` require empty original and logical spellings.
-    /// For lexed objects, spelling preserves `SourceView` bytes and content is its
-    /// already-scrubbed logical spelling. Synthetic objects use the supplied forms.
+    /// Requires a concrete kind, and a name whose text equals `logicalSpelling` when supplied.
+    /// EOF and `EndOfDirective` require empty physical and logical spellings.
+    /// For lexed objects, `physicalSpelling` preserves the consumed `SourceView` bytes and
+    /// `logicalSpelling` removes escaped newlines. Synthetic objects use the supplied forms.
     /// Location and flags are retained only on the returned value.
     Lexeme createLexeme(
         LexemeKind kind,
-        UnownedStringSlice spelling,
-        UnownedStringSlice content,
+        UnownedStringSlice physicalSpelling,
+        UnownedStringSlice logicalSpelling,
         SourceLoc loc = SourceLoc(),
         TokenFlags flags = 0,
         Name* name = nullptr);
@@ -311,13 +326,13 @@ public:
         ConstArrayView<const LexemeObj*> leadingTrivia = {},
         ConstArrayView<const LexemeObj*> trailingTrivia = {});
 
-    /// Creates a token with no trivia and identical original and logical spelling.
+    /// Creates a token with no trivia and identical physical and logical spellings.
     ///
     /// Requires a concrete token kind. The text overload does not intern a `Name`;
     /// the name overload retains the supplied name and uses its text for both spellings.
     Token createToken(
         TokenType kind,
-        UnownedStringSlice content,
+        UnownedStringSlice spelling,
         SourceLoc loc = SourceLoc(),
         TokenFlags flags = 0);
     Token createToken(
@@ -329,8 +344,8 @@ public:
 
     /// Creates the second `>` of a `>>` lexeme at its original byte location.
     ///
-    /// Requires an `OpRsh` lexeme with logical spelling `>>` and original spelling ending
-    /// at its second `>`. The returned lexeme has spelling `>` and no occurrence flags,
+    /// Requires an `OpRsh` lexeme with logical spelling `>>` and physical spelling ending
+    /// at its second `>`. The returned lexeme has both spellings `>` and no occurrence flags,
     /// because no logical whitespace separates the two closer characters.
     /// An unknown input location remains unknown.
     RawOpGreater createSecondGreaterToken(RawOpRsh rightShift);
@@ -350,7 +365,7 @@ private:
     Impl* m_impl;
 };
 
-/// A typed token together with ownership of the pool backing its spelling.
+/// A typed token together with ownership of the pool backing both spellings.
 ///
 /// Retaining a pool keeps lexical data alive, but does not retain `SourceManager`
 /// records used to interpret its source location.

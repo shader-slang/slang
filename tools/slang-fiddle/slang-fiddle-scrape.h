@@ -53,9 +53,9 @@ public:
 
     TokenType getType() const { return node ? node->getType() : TokenType::Unknown; }
 
-    UnownedStringSlice getContent() const
+    UnownedStringSlice getLogicalSpelling() const
     {
-        return node ? node->token.getContent() : UnownedStringSlice();
+        return node ? node->token.getLogicalSpelling() : UnownedStringSlice();
     }
 
     Count getSkipCount() const { return node ? node->skipCount : 0; }

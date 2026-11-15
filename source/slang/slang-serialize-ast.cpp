@@ -790,14 +790,14 @@ void ASTSerialReadContext::handleName(ASTSerializer const& serializer, Name*& va
     value = _astBuilder->getNamePool()->getName(text);
 }
 
-// Tokens serialize lexical values rather than pool addresses. The raw spelling,
+// Tokens serialize lexical values rather than pool addresses. The physical spelling,
 // logical spelling, and trivia order are preserved; deserialization interns them
 // into the receiving AST builder's pool. Locations remain occurrence data.
 struct SerializedLexeme
 {
     LexemeKind kind = LexemeKind::Unknown;
-    String spelling;
-    String content;
+    String physicalSpelling;
+    String logicalSpelling;
     bool hasName = false;
 };
 
@@ -807,8 +807,8 @@ struct FossilizedTypeTraits<SerializedLexeme>
     struct FossilizedType
     {
         Fossilized<LexemeKind> kind;
-        Fossilized<String> spelling;
-        Fossilized<String> content;
+        Fossilized<String> physicalSpelling;
+        Fossilized<String> logicalSpelling;
         Fossilized<bool> hasName;
     };
 };
@@ -818,8 +818,8 @@ void serialize(S const& serializer, SerializedLexeme& value)
 {
     SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
     serialize(serializer, value.kind);
-    serialize(serializer, value.spelling);
-    serialize(serializer, value.content);
+    serialize(serializer, value.physicalSpelling);
+    serialize(serializer, value.logicalSpelling);
     serialize(serializer, value.hasName);
 }
 
@@ -850,15 +850,15 @@ static SerializedLexeme getSerializedLexeme(Lexeme lexeme)
         return SerializedLexeme();
     SerializedLexeme result;
     result.kind = lexeme.getType();
-    result.spelling = lexeme.getSpelling();
-    result.content = lexeme.getContent();
+    result.physicalSpelling = lexeme.getPhysicalSpelling();
+    result.logicalSpelling = lexeme.getLogicalSpelling();
     result.hasName = lexeme.getName() != nullptr;
     return result;
 }
 
 void ASTSerialWriteContext::handleToken(ASTSerializer const& serializer, Token& value)
 {
-    // Trivia byte offsets are recoverable from original spelling lengths, but
+    // Trivia byte offsets are recoverable from physical spelling lengths, but
     // the source-location writer also needs each trivia's line metadata. It
     // records only requested positions, so registering the raw token alone
     // would lose line starts for leading comments in a serialized module.
@@ -898,11 +898,11 @@ static Lexeme createDeserializedLexeme(
 {
     Name* name = nullptr;
     if (value.hasName)
-        name = astBuilder->getNamePool()->getName(value.content);
+        name = astBuilder->getNamePool()->getName(value.logicalSpelling);
     return astBuilder->getTokenPool()->createLexeme(
         value.kind,
-        value.spelling.getUnownedSlice(),
-        value.content.getUnownedSlice(),
+        value.physicalSpelling.getUnownedSlice(),
+        value.logicalSpelling.getUnownedSlice(),
         loc,
         flags,
         name);

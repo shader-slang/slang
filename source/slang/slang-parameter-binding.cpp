@@ -649,9 +649,9 @@ static LayoutSemanticInfo _extractLayoutSemanticInfo(
     }
 
     LayoutSemanticInfo info = extractHLSLLayoutSemanticInfo(
-        registerToken.getContent(),
+        registerToken.getLogicalSpelling(),
         registerToken.getLoc(),
-        spaceToken->getContent(),
+        spaceToken->getLogicalSpelling(),
         spaceToken->getLoc(),
         getSink(context));
 
@@ -670,8 +670,8 @@ static bool findLayoutArg(ModifiableSyntaxNode* syntax, UInt* outVal)
     {
         if (modifier)
         {
-            *outVal =
-                (UInt)strtoull(String(modifier->valToken.getContent()).getBuffer(), nullptr, 10);
+            *outVal = (UInt)
+                strtoull(String(modifier->valToken.getLogicalSpelling()).getBuffer(), nullptr, 10);
             return true;
         }
     }
@@ -1124,7 +1124,7 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
         UnownedStringSlice registerClassName;
         UnownedStringSlice registerIndexDigits;
         splitNameAndIndex(
-            registerModifier->registerName.getContent(),
+            registerModifier->registerName.getLogicalSpelling(),
             registerClassName,
             registerIndexDigits);
 
@@ -1959,7 +1959,7 @@ struct SimpleSemanticInfo
 
 SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
 {
-    auto composedName = semantic->name.getContent();
+    auto composedName = semantic->name.getLogicalSpelling();
 
     // look for a trailing sequence of decimal digits
     // at the end of the composed name

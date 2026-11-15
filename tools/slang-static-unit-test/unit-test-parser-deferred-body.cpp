@@ -73,7 +73,8 @@ SLANG_UNIT_TEST(parserDeferredBodyRetainsTerminatingEOF)
     SLANG_CHECK(capturedEOF.getLoc() == actualEOF.getLoc());
     SLANG_CHECK(capturedEOF.getFlags() == actualEOF.getFlags());
     SLANG_CHECK_ABORT(capturedEOF.getLeadingTrivia().getCount() == 2);
-    SLANG_CHECK(capturedEOF.getLeadingTrivia()[1].getSpelling() == UnownedStringSlice("//last"));
+    SLANG_CHECK(
+        capturedEOF.getLeadingTrivia()[1].getPhysicalSpelling() == UnownedStringSlice("//last"));
     SLANG_CHECK(
         capturedEOF.getLeadingTrivia()[1].getLoc() == actualEOF.getLeadingTrivia()[1].getLoc());
     SLANG_CHECK(!translationUnit->isChecked);

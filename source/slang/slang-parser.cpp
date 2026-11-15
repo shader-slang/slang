@@ -503,7 +503,7 @@ static bool IsClosingToken(TokenType tokenType)
 Token Parser::ReadToken(const char* expected)
 {
     if (tokenReader.peekTokenType() == TokenType::Identifier &&
-        tokenReader.peekToken().getContent() == expected)
+        tokenReader.peekToken().getLogicalSpelling() == expected)
     {
         isRecovering = false;
         return tokenReader.readToken();
@@ -522,7 +522,7 @@ Token Parser::ReadToken(const char* expected)
             // The token we expected?
             // Then exit recovery mode and pretend like all is well.
             if (tokenReader.peekTokenType() == TokenType::Identifier &&
-                tokenReader.peekToken().getContent() == expected)
+                tokenReader.peekToken().getLogicalSpelling() == expected)
             {
                 isRecovering = false;
                 return tokenReader.readToken();
@@ -763,7 +763,8 @@ bool Parser::LookAheadToken(const char* string, int offset)
     for (int ii = 0; ii < offset; ++ii)
         r.readToken();
 
-    return r.peekTokenType() == TokenType::Identifier && r.peekToken().getContent() == string;
+    return r.peekTokenType() == TokenType::Identifier &&
+           r.peekToken().getLogicalSpelling() == string;
 }
 
 bool Parser::LookAheadToken(TokenType type, int offset)
@@ -783,7 +784,7 @@ bool Parser::LookAheadToken(TokenType type)
 bool Parser::LookAheadToken(const char* string)
 {
     const auto& token = tokenReader.peekToken();
-    return token.getType() == TokenType::Identifier && token.getContent() == string;
+    return token.getType() == TokenType::Identifier && token.getLogicalSpelling() == string;
 }
 
 bool AdvanceIf(Parser* parser, TokenType tokenType, Token* outToken)
@@ -1047,7 +1048,7 @@ static Name* parseAttributeName(Parser* parser, Token& outOriginalLastToken)
     {
         scopedIdentifierBuilder.append('_');
     }
-    scopedIdentifierBuilder.append(firstIdentifier.getContent());
+    scopedIdentifierBuilder.append(firstIdentifier.getLogicalSpelling());
 
     while (parser->tokenReader.peekTokenType() == TokenType::Scope)
     {
@@ -1056,7 +1057,7 @@ static Name* parseAttributeName(Parser* parser, Token& outOriginalLastToken)
 
         const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
         outOriginalLastToken = nextIdentifier;
-        scopedIdentifierBuilder.append(nextIdentifier.getContent());
+        scopedIdentifierBuilder.append(nextIdentifier.getLogicalSpelling());
     }
 
     return parser->getNamePool()->getName(scopedIdentifierBuilder.getUnownedSlice());
@@ -1416,7 +1417,7 @@ static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* de
             while (advanceIf<DotToken>(parser))
             {
                 sb << "/";
-                sb << parser->ReadToken(TokenType::Identifier).getContent();
+                sb << parser->ReadToken(TokenType::Identifier).getLogicalSpelling();
             }
 
             moduleNameAndLoc.name = getName(parser, sb.produceString());
@@ -1485,7 +1486,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     if (parser->LookAheadToken(TokenType::Identifier))
     {
         auto nameToken = parser->ReadToken(TokenType::Identifier);
-        decl->nameAndLoc.name = parser->getNamePool()->getName(nameToken.getContent());
+        decl->nameAndLoc.name = parser->getNamePool()->getName(nameToken.getLogicalSpelling());
         decl->nameAndLoc.loc = nameToken.getLoc();
         if (moduleDecl)
             moduleDecl->nameAndLoc = decl->nameAndLoc;
@@ -1526,7 +1527,7 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
         nameToken = parser->ReadToken();
         // Operator names belong to the AST's name vocabulary. `?:` and `()`
         // each have one name even though the programmer writes two tokens.
-        auto operatorName = nameToken.getContent();
+        auto operatorName = nameToken.getLogicalSpelling();
         bool isValidOperator = true;
         switch (nameToken.getType())
         {
@@ -1580,7 +1581,7 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
             }; // fall-thru
         default:
             parser->sink->diagnose(Diagnostics::InvalidOperator{
-                .op = nameToken.getContent(),
+                .op = nameToken.getLogicalSpelling(),
                 .location = nameToken.getLoc()});
             isValidOperator = false;
             break;
@@ -1913,7 +1914,7 @@ static Decl* parseOptGenericDecl(Parser* parser, const ParseFunc& parseInner)
 
 static bool _isCountOfKeyword(Token const& token)
 {
-    return token.getType() == TokenType::Identifier && token.getContent() == "countof";
+    return token.getType() == TokenType::Identifier && token.getLogicalSpelling() == "countof";
 }
 
 // Pack-count constraints use the built-in `countof(...)` form. A plain
@@ -1935,7 +1936,7 @@ static bool _isGenericWhereClauseBoundary(Token const& token)
     {
         return true;
     }
-    return token.getType() == TokenType::Identifier && token.getContent() == "where";
+    return token.getType() == TokenType::Identifier && token.getLogicalSpelling() == "where";
 }
 
 static bool _isPackCountConstraintOperator(TokenType tokenType)
@@ -3612,10 +3613,10 @@ static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
     SLANG_ASSERT(isHLSLTraditionalIntegerTypeSpecifierStart(parser));
 
     const Token signToken = parser->ReadToken(TokenType::Identifier);
-    const bool isUnsigned = signToken.getContent() == "unsigned";
+    const bool isUnsigned = signToken.getLogicalSpelling() == "unsigned";
 
     StringBuilder typeNameBuilder;
-    typeNameBuilder << signToken.getContent();
+    typeNameBuilder << signToken.getLogicalSpelling();
 
     bool hasUnsupportedTypeNameSuffix = false;
     if (AdvanceIf(parser, "int"))
@@ -3627,16 +3628,16 @@ static Expr* parseHLSLTraditionalIntegerTypeSpecifier(Parser* parser)
         parser->LookAheadToken("long"))
     {
         const Token widthToken = parser->ReadToken(TokenType::Identifier);
-        typeNameBuilder << " " << widthToken.getContent();
+        typeNameBuilder << " " << widthToken.getLogicalSpelling();
         hasUnsupportedTypeNameSuffix = true;
 
-        if (widthToken.getContent() == "long" && AdvanceIf(parser, "long"))
+        if (widthToken.getLogicalSpelling() == "long" && AdvanceIf(parser, "long"))
             typeNameBuilder << " long";
 
         // C and C++ also allow a trailing `int` in spellings such as `unsigned short int`.
         // Consume it as part of the unsupported spelling so it does not produce an unrelated
         // follow-on error.
-        if (widthToken.getContent() != "char" && AdvanceIf(parser, "int"))
+        if (widthToken.getLogicalSpelling() != "char" && AdvanceIf(parser, "int"))
             typeNameBuilder << " int";
     }
 
@@ -4346,7 +4347,7 @@ static Decl* ParseBufferBlockDecl(
 
     // The parameter group type need to have its name generated.
     bufferDataTypeDecl->nameAndLoc.name =
-        generateName(parser, "ParameterGroup_" + String(reflectionNameToken.getContent()));
+        generateName(parser, "ParameterGroup_" + String(reflectionNameToken.getLogicalSpelling()));
 
 
     // TODO(tfoley): We end up constructing unchecked syntax here that
@@ -4433,8 +4434,9 @@ static Decl* ParseBufferBlockDecl(
         }
         else
         {
-            bufferVarDecl->nameAndLoc.name =
-                generateName(parser, "parameterGroup_" + String(reflectionNameToken.getContent()));
+            bufferVarDecl->nameAndLoc.name = generateName(
+                parser,
+                "parameterGroup_" + String(reflectionNameToken.getLogicalSpelling()));
         }
 
         // We also need to make the declaration "transparent" so that their
@@ -4952,12 +4954,12 @@ static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
     while (parser->LookAheadToken(TokenType::Identifier))
     {
         auto capNameToken = parser->ReadToken(TokenType::Identifier);
-        CapabilityName capName = findCapabilityName(capNameToken.getContent());
+        CapabilityName capName = findCapabilityName(capNameToken.getLogicalSpelling());
         if (capName != CapabilityName::Invalid)
             capNames.add(capName);
         else
             parser->sink->diagnose(Diagnostics::UnknownCapability{
-                .capability = capNameToken.getContent(),
+                .capability = capNameToken.getLogicalSpelling(),
                 .location = capNameToken.getLoc()});
         if (AdvanceIf(parser, "+") || AdvanceIf(parser, ","))
             continue;
@@ -6317,7 +6319,7 @@ static DeclBase* ParseDeclWithModifiers(
                     else
                     {
                         bool isGLSLBuiltinRedeclaration =
-                            parser->tokenReader.peekToken().getContent().startsWith("gl_");
+                            parser->tokenReader.peekToken().getLogicalSpelling().startsWith("gl_");
                         decl = ParseBufferBlockDecl(parser, "", nullptr);
                         if (isGLSLBuiltinRedeclaration)
                         {
@@ -6968,7 +6970,7 @@ static Decl* parseEnumDecl(Parser* parser)
             {
                 auto enumClassModifier = parser->astBuilder->create<EnumClassModifier>();
                 enumClassModifier->loc = classToken.getLoc();
-                enumClassModifier->keywordName = getName(parser, classToken.getContent());
+                enumClassModifier->keywordName = getName(parser, classToken.getLogicalSpelling());
                 addModifier(decl, enumClassModifier);
             }
 
@@ -7107,12 +7109,12 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
             {
                 TargetCaseStmt* targetCase = parser->astBuilder->create<TargetCaseStmt>();
                 auto cap = label.capabilityToken
-                               ? findCapabilityName(label.capabilityToken.getContent())
+                               ? findCapabilityName(label.capabilityToken.getLogicalSpelling())
                                : CapabilityName::Invalid;
                 if (label.capabilityToken && cap == CapabilityName::Invalid)
                 {
                     parser->sink->diagnose(Diagnostics::UnknownTargetName{
-                        .name = label.capabilityToken.getContent(),
+                        .name = label.capabilityToken.getLogicalSpelling(),
                         .location = label.loc});
                 }
                 targetCase->capability = (int32_t)cap;
@@ -7570,7 +7572,7 @@ bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     TokenReader tokenPreview = parser->tokenReader;
     for (;;)
     {
-        if (tokenPreview.peekToken().getContent() == token)
+        if (tokenPreview.peekToken().getLogicalSpelling() == token)
             return true;
         else if (auto syntaxDecl = tryLookUpSyntaxDecl(parser, tokenPreview.peekToken().getName()))
         {
@@ -8122,7 +8124,7 @@ RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
         if (capToken.getType() != TokenType::Identifier)
             break;
 
-        UnownedStringSlice capNameStr = capToken.getContent();
+        UnownedStringSlice capNameStr = capToken.getLogicalSpelling();
         CapabilityName capName = findCapabilityName(capNameStr);
         if (capName != CapabilityName::Invalid)
             statement->requiredCaps.add(capToken);
@@ -8325,8 +8327,8 @@ Precedence GetOpLevel(Parser* parser, const Token& token)
         return Precedence::Multiplicative;
     default:
         {
-            const auto content = token.getContent();
-            if (content == "is" || content == "as")
+            const auto logicalSpelling = token.getLogicalSpelling();
+            if (logicalSpelling == "is" || logicalSpelling == "as")
             {
                 return Precedence::RelationalComparison;
             }
@@ -8341,7 +8343,7 @@ static Expr* parseOperator(Parser* parser)
     // punctuation token is `?`. We choose that AST name without changing the token.
     auto opToken = parser->ReadToken();
     auto operatorName =
-        opToken.is<QuestionMarkToken>() ? UnownedStringSlice("?:") : opToken.getContent();
+        opToken.is<QuestionMarkToken>() ? UnownedStringSlice("?:") : opToken.getLogicalSpelling();
     auto opExpr = parser->astBuilder->create<VarExpr>();
     opExpr->name = getName(parser, operatorName);
     opExpr->scope = parser->currentScope;
@@ -8372,9 +8374,9 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
         // Special case the "is" and "as" operators.
         if (opToken.getType() == TokenType::Identifier)
         {
-            const auto content = opToken.getContent();
+            const auto logicalSpelling = opToken.getLogicalSpelling();
 
-            if (content == "is")
+            if (logicalSpelling == "is")
             {
                 auto isExpr = parser->astBuilder->create<IsTypeExpr>();
                 isExpr->value = expr;
@@ -8384,7 +8386,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
                 expr = isExpr;
                 continue;
             }
-            else if (content == "as")
+            else if (logicalSpelling == "as")
             {
                 auto asExpr = parser->astBuilder->create<AsTypeExpr>();
                 asExpr->value = expr;
@@ -8742,7 +8744,7 @@ static IntegerLiteralValue _fixIntegerLiteral(
         {
             // Output a warning that number has been altered
             sink->diagnose(Diagnostics::IntegerLiteralTruncated{
-                .literal = String(token->getContent()),
+                .literal = String(token->getLogicalSpelling()),
                 .type = String(BaseTypeInfo::asText(baseType)),
                 .truncatedValue = String(truncatedValue),
                 .location = token->getLoc()});
@@ -9255,7 +9257,7 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
         if (std::isfinite(value))
         {
             parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
-                .literal = String(token.getContent()),
+                .literal = String(token.getLogicalSpelling()),
                 .type = String(BaseTypeInfo::asText(suffixBaseType)),
                 .convertedValue = String(value),
                 .location = token.getLoc()});
@@ -9264,7 +9266,7 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
         {
             parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
                 .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                .literal = String(token.getContent()),
+                .literal = String(token.getLogicalSpelling()),
                 .convertedValue = String(value),
                 .location = token.getLoc()});
         }
@@ -9274,7 +9276,7 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
     if (precisionLost && !diagnosed)
     {
         parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
-            .literal = String(token.getContent()),
+            .literal = String(token.getLogicalSpelling()),
             .truncatedValue = StringUtil::makeMinimalHexFloat(value),
             .location = token.getLoc()});
         diagnosed = true;
@@ -9930,7 +9932,7 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
             // (shader-slang/slang#12108). Integer ids (`%6`) carry no name.
             SLANG_ASSERT(
                 !parser->options.isCoreModule || idToken.getType() != TokenType::Identifier ||
-                idToken.getContent().startsWith("__"));
+                idToken.getLogicalSpelling().startsWith("__"));
             return SPIRVAsmOperand{SPIRVAsmOperand::Id, idToken};
         }
     }
@@ -10003,7 +10005,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
         ret.opcode = *resultOrOpcode;
     }
 
-    const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
+    const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getLogicalSpelling());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
     ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
@@ -10012,7 +10014,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     if (!opInfo && resultOperand)
     {
         parser->diagnose(Diagnostics::UnrecognizedSpirvOpcode{
-            .opcode = ret.opcode.token.getContent(),
+            .opcode = ret.opcode.token.getLogicalSpelling(),
             .location = resultOperand->token.getLoc()});
         return std::nullopt;
     }
@@ -10022,7 +10024,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     if (resultOperand && opInfo && opInfo->resultIdIndex == -1)
     {
         parser->diagnose(Diagnostics::SpirvInstructionWithoutResultId{
-            .opcode = ret.opcode.token.getContent(),
+            .opcode = ret.opcode.token.getLogicalSpelling(),
             .location = resultOperand->token.getLoc()});
         return std::nullopt;
     }
@@ -10031,7 +10033,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     if (resultTypeOperand && opInfo && opInfo->resultTypeIndex == -1)
     {
         parser->diagnose(Diagnostics::SpirvInstructionWithoutResultTypeId{
-            .opcode = ret.opcode.token.getContent(),
+            .opcode = ret.opcode.token.getLogicalSpelling(),
             .location = resultTypeOperand->token.getLoc()});
     }
 
@@ -10068,13 +10070,13 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
             // assignment in the form of %something = ....
             //
             auto token = parser->tokenReader.peekToken();
-            if (token.getContent().startsWith("Op") ||
+            if (token.getLogicalSpelling().startsWith("Op") ||
                 token.getType() == TokenType::OpMod &&
                     (parser->LookAheadToken(TokenType::OpAssign, 2) ||
                      parser->LookAheadToken(TokenType::Colon, 2)))
             {
                 parser->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
-                    .opcode = ret.opcode.token.getContent(),
+                    .opcode = ret.opcode.token.getLogicalSpelling(),
                     .maxOperands = opInfo->maxOperandCount,
                     .location = parser->tokenReader.peekLoc()});
             }
@@ -10103,13 +10105,13 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
         if (ret.opcode.token.getType() == TokenType::IntegerLiteral)
         {
             Int intVal = -1;
-            StringUtil::parseInt(ret.opcode.token.getContent(), intVal);
+            StringUtil::parseInt(ret.opcode.token.getLogicalSpelling(), intVal);
             ret.opcode.knownValue = (SpvWord)intVal;
         }
         else
         {
             parser->diagnose(Diagnostics::UnrecognizedSpirvOpcode{
-                .opcode = ret.opcode.token.getContent(),
+                .opcode = ret.opcode.token.getLogicalSpelling(),
                 .location = ret.opcode.token.getLoc()});
             return std::nullopt;
         }
@@ -10572,18 +10574,18 @@ static IROp parseIROp(Parser* parser, Token& outToken)
     if (advanceIf<OpSubToken>(parser))
     {
         outToken = parser->ReadToken();
-        return IROp(-stringToInt(outToken.getContent()));
+        return IROp(-stringToInt(outToken.getLogicalSpelling()));
     }
     else if (parser->LookAheadToken(TokenType::IntegerLiteral))
     {
         outToken = parser->ReadToken();
-        return IROp(stringToInt(outToken.getContent()));
+        return IROp(stringToInt(outToken.getLogicalSpelling()));
     }
     else
     {
         outToken = parser->ReadToken(TokenType::Identifier);
         ;
-        auto op = findIROp(outToken.getContent());
+        auto op = findIROp(outToken.getLogicalSpelling());
 
         if (op == kIROp_Invalid)
         {
@@ -10719,7 +10721,7 @@ static SlangResult parseSemanticVersion(
     outToken = parser->ReadToken();
     parser->ReadToken(TokenType::RParent);
 
-    UnownedStringSlice content = outToken.getContent();
+    UnownedStringSlice content = outToken.getLogicalSpelling();
     // We allow specified as major.minor or as a string (in quotes)
     switch (outToken.getType())
     {
@@ -11055,7 +11057,7 @@ static NodeBase* parseBuiltinTypeModifier(Parser* parser, void* /*userData*/)
     BuiltinTypeModifier* modifier = parser->astBuilder->create<BuiltinTypeModifier>();
     parser->ReadToken(TokenType::LParent);
     modifier->tag =
-        BaseType(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        BaseType(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getLogicalSpelling()));
     parser->ReadToken(TokenType::RParent);
 
     return modifier;
@@ -11066,7 +11068,7 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     BuiltinRequirementModifier* modifier = parser->astBuilder->create<BuiltinRequirementModifier>();
     parser->ReadToken(TokenType::LParent);
     modifier->kind = BuiltinRequirementKind(
-        stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getLogicalSpelling()));
     parser->ReadToken(TokenType::RParent);
 
     return modifier;
@@ -11085,11 +11087,11 @@ static NodeBase* parseMagicTypeModifierImpl(
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
-    modifier->magicName = parser->ReadToken(TokenType::Identifier).getContent();
+    modifier->magicName = parser->ReadToken(TokenType::Identifier).getLogicalSpelling();
     if (advanceIf<CommaToken>(parser))
     {
-        modifier->tag =
-            uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        modifier->tag = uint32_t(
+            stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getLogicalSpelling()));
     }
 
     if (kind == MagicTypeModifierKind::Enum)
@@ -11126,8 +11128,8 @@ static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
     modifier->irOp = parseIROp(parser, modifier->opToken);
     while (advanceIf<CommaToken>(parser))
     {
-        auto operand =
-            uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        auto operand = uint32_t(
+            stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getLogicalSpelling()));
         modifier->irOperands.add(operand);
     }
     parser->ReadToken(TokenType::RParent);
@@ -11152,12 +11154,12 @@ static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userDat
         else
         {
             cost = ConversionCost(
-                stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+                stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getLogicalSpelling()));
         }
         if (advanceIf<CommaToken>(parser))
         {
             builtinKind = BuiltinConversionKind(
-                stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+                stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getLogicalSpelling()));
         }
         parser->ReadToken(TokenType::RParent);
     }

@@ -208,7 +208,7 @@ static void _outputPreprocessorTokens(const TokenList& toks, ISlangWriter* write
     StringBuilder buf;
     for (const auto& tok : toks)
     {
-        buf << tok.getContent();
+        buf << tok.getLogicalSpelling();
         // We'll separate tokens with space for now
         buf.appendChar(' ');
     }

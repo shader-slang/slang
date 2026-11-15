@@ -27,7 +27,7 @@ We call whitespace, line endings, and comments *trivia* because preprocessing an
 `RawToken` is the category of atomic lexemes that are tokens rather than trivia.
 
 For the first line of the example, atomic reading produces an identifier, a space, a block comment, and a newline.
-Each lexeme has its own kind and spelling.
+Each lexeme has its own kind and *physical spelling*: the exact input bytes the lexer consumed for that lexeme.
 A block comment remains one lexeme even when the comment contains several lines.
 
 `Lexer::readToken()` reads a raw token together with ordered leading and trailing trivia.
@@ -55,7 +55,7 @@ If the input contains only trivia, all of that trivia leads EOF.
 EOF therefore participates in the same grouping rule as every other token.
 
 Every input byte belongs to exactly one atomic lexeme and exactly one token cluster.
-Concatenating each cluster's leading spellings, raw-token spelling, and trailing spellings, including the EOF cluster, reproduces the input.
+Concatenating the physical spellings of each cluster's leading trivia, raw token, and trailing trivia, including the EOF cluster, reproduces the input.
 The input here is the text in a `SourceView`; `SourceFile` may already have decoded the file or removed a byte-order mark before lexing begins.
 
 `Lexer::readAllLexemes()` reads the complete atomic sequence, including EOF.
@@ -74,12 +74,17 @@ val\
 ue
 ```
 
-The lexer recognizes one identifier with logical spelling `value`.
+The lexer recognizes one identifier spelled `value` after line splicing.
 Identifier lookup needs that joined text, but reconstruction needs the backslash and newline as well.
-Each `LexemeObj` therefore stores both the original spelling returned by `getSpelling()` and the logical spelling returned by `getContent()`.
-For this identifier, the original spelling spans both physical lines and the logical spelling is `value`.
+Each `LexemeObj` therefore stores two spellings.
+For lexed objects, `getPhysicalSpelling()` returns the exact consumed input bytes, including backslash-newline sequences.
+`getLogicalSpelling()` returns the *logical spelling*, with line splices removed.
+For this identifier, the physical spelling spans both lines and the logical spelling is `value`.
 
-The lexer recognizes tokens through logical code-point reads while recording the consumed byte span for original spelling.
+`Lexeme` exposes both accessors, and `Token` exposes them for its raw token, excluding attached trivia.
+`Token::getContent()` is a compatibility alias for `getLogicalSpelling()`.
+
+The lexer recognizes tokens through logical code-point reads while recording the consumed byte span for physical spelling.
 Logical lookahead and consumption use the same line-splice removal and UTF-8 decoding procedure.
 Lookahead copies the bounded byte cursor and leaves the lexer's position and diagnostics unchanged.
 Recognition therefore tests the same characters that a later read consumes, without losing the input bytes skipped by line splicing.
@@ -96,7 +101,7 @@ value \
 ```
 
 The space has already ended the identifier, so the backslash/newline is a separate `EscapedNewLine` trivia lexeme.
-Its original spelling preserves the backslash and line ending, and its logical spelling is empty.
+Its physical spelling preserves the backslash and line ending, and its logical spelling is empty.
 The escape itself neither introduces logical whitespace nor ends a preprocessor directive.
 The space before the escape still separates `value` from `+`.
 
@@ -120,8 +125,8 @@ We keep those two kinds of information separate so that sharing spelling never m
 A `Lexeme` contains a pointer to an immutable `LexemeObj`, a `SourceLoc`, and occurrence flags.
 The object contains the concrete kind, both spellings, and an optional interned `Name*`.
 `TokenPool` owns and interns those objects.
-Within one pool, lexemes with the same concrete kind, original spelling, logical spelling, and optional `Name*` share an object, regardless of location or occurrence flags.
-Different original spellings remain distinct even when their logical spellings are equal, as with `value` and the escaped-newline identifier above.
+Within one pool, lexemes with the same concrete kind, physical spelling, logical spelling, and optional `Name*` share an object, regardless of location or occurrence flags.
+Different physical spellings remain distinct even when their logical spellings are equal, as with `value` and the escaped-newline identifier above.
 
 A `Token` follows the same division.
 Its immutable `TokenObj` refers to a raw-token object and ordered arrays of leading and trailing trivia objects.
@@ -134,9 +139,9 @@ For example, recognizing a function-like macro definition depends on whether whi
 Those flags belong to the occurrence rather than to an interned spelling.
 Attached trivia exposes its kind, spelling, and location with zero occurrence flags; the containing raw token carries the preprocessing context.
 
-The raw token's location and the original spelling lengths determine the locations of attached trivia.
-Leading trivia begins before the raw token by the total length of its leading spellings.
-Trailing trivia begins immediately after the raw spelling.
+The raw token's location and the physical spelling lengths determine the locations of attached trivia.
+Leading trivia begins before the raw token by the total byte length of its leading trivia's physical spellings.
+Trailing trivia begins immediately after the raw token's physical spelling.
 An unknown raw-token location produces unknown trivia locations rather than invented offsets.
 These calculations require a physically contiguous cluster; they do not establish the origin of text assembled by preprocessing.
 
@@ -264,7 +269,7 @@ Importing a token into another pool copies its referenced lexical state into the
 The imported token then depends on that pool for lexical storage, including every attached trivia object.
 Its location and flags remain occurrence information.
 
-AST serialization preserves the recognized lexical state: concrete kind, original and logical spellings, name presence, ordered trivia, location, and occurrence flags.
+AST serialization preserves the recognized lexical state: concrete kind, physical and logical spellings, name presence, ordered trivia, location, and occurrence flags.
 Deserialization constructs that state directly in the receiving builder's pool.
 For example, re-lexing the spelling `<dir/file.h>` in normal mode would produce ordinary tokens rather than the original header-name token.
 The serialized kind records the recognition decision, so loading a token does not require guessing a preprocessing context.

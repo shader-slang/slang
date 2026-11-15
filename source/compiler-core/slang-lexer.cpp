@@ -670,7 +670,7 @@ IntegerLiteralValue getIntegerLiteralValue(
 {
     uint64_t value = 0;
 
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
 
     char const* cursor = content.begin();
     char const* end = content.end();
@@ -1016,7 +1016,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     bool& outPrecisionLost,
     UnownedStringSlice& outErrorContent)
 {
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
     const char* cursor = content.begin();
     const char* end = content.end();
 
@@ -1535,7 +1535,7 @@ static IntegerLiteralValue _decodeStringEscape(
 IntegerLiteralValue getCharLiteralValue(RawCharLiteral token, DiagnosticSink* sink)
 {
     SLANG_RELEASE_ASSERT(token);
-    UnownedStringSlice content = token.getContent();
+    UnownedStringSlice content = token.getLogicalSpelling();
 
     // We require two quotes and at least one byte before decoding. The lexer can produce
     // an incomplete character literal after diagnosing a newline or EOF inside it.
@@ -1718,7 +1718,7 @@ static UnownedStringSlice getRawStringLiteralTokenValue(RawStringLiteral token)
     // escapes. An incomplete raw string is still a string token after lexer diagnostics,
     // so we verify both delimiters before forming the body slice.
     SLANG_RELEASE_ASSERT(token);
-    auto content = token.getContent();
+    auto content = token.getLogicalSpelling();
     SLANG_RELEASE_ASSERT(content.startsWith("R\""));
     auto delimiterBegin = content.begin() + 2;
     auto openingParenthesis = delimiterBegin;
@@ -1753,10 +1753,10 @@ String getStringLiteralTokenValue(RawStringLiteral token, DiagnosticSink* sink)
     // We remove raw-string delimiters without interpreting the body. Ordinary strings
     // instead decode each character or escape between their quotes.
     SLANG_RELEASE_ASSERT(token);
-    if (token.getContent().startsWith("R\""))
+    if (token.getLogicalSpelling().startsWith("R\""))
         return getRawStringLiteralTokenValue(token);
 
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
 
     char const* cursor = content.begin();
     char const* end = content.end();
@@ -1847,7 +1847,7 @@ String getStringLiteralTokenValue(RawStringLiteral token, DiagnosticSink* sink)
 
 String getFileNameTokenValue(Token const& token)
 {
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
 
     // A file name usually doesn't process escape sequences
     // (this is import on Windows, where `\\` is a valid
@@ -2448,7 +2448,7 @@ Lexeme Lexer::readLexeme()
 {
     // Recognition uses logical characters, but we retain the complete byte span
     // consumed from the `SourceView`. A splice at a lexeme boundary is its own
-    // trivia item; splices inside a token remain part of that token's spelling.
+    // trivia item; splices inside a token remain part of that token's physical spelling.
     const auto loc = _getSourceLoc(this);
     const auto textBegin = m_cursor;
     auto kind = TokenType::Unknown;
@@ -2483,12 +2483,12 @@ Lexeme Lexer::readLexeme()
 
     // We only allocate a temporary logical spelling when recognition crossed a
     // splice. The pool then stores a stable copy and interns the full lexical state.
-    const UnownedStringSlice spelling(textBegin, m_cursor);
-    auto content = spelling;
+    const UnownedStringSlice physicalSpelling(textBegin, m_cursor);
+    auto logicalSpelling = physicalSpelling;
     StringBuilder scrubbed;
     if (kind == TokenType::EscapedNewLine)
     {
-        content = UnownedStringSlice();
+        logicalSpelling = UnownedStringSlice();
     }
     else if (flags & TokenFlag::ScrubbingNeeded)
     {
@@ -2513,16 +2513,16 @@ Lexeme Lexer::readLexeme()
             }
             scrubbed.appendChar(*cursor++);
         }
-        content = scrubbed.getUnownedSlice();
+        logicalSpelling = scrubbed.getUnownedSlice();
     }
 
     Name* name = nullptr;
     if (m_namePool)
     {
         if (kind == TokenType::Identifier || kind == TokenType::CompletionRequest)
-            name = m_namePool->getName(content);
+            name = m_namePool->getName(logicalSpelling);
     }
-    return m_tokenPool->createLexeme(kind, spelling, content, loc, flags, name);
+    return m_tokenPool->createLexeme(kind, physicalSpelling, logicalSpelling, loc, flags, name);
 }
 
 Token Lexer::readToken()
@@ -2592,21 +2592,23 @@ LexemeList Lexer::readAllLexemes()
 
     lexer.initialize(sourceView, &sink, &namePool);
 
-    auto tok = lexer.readLexeme();
+    auto lexeme = lexer.readLexeme();
 
-    if (tok.getType() == TokenType::Invalid)
+    if (lexeme.getType() == TokenType::Invalid)
     {
         return UnownedStringSlice();
     }
 
-    const int offset = sourceView->getRange().getOffset(tok.getLoc());
+    const int offset = sourceView->getRange().getOffset(lexeme.getLoc());
 
     if (offset < 0 || offset >= in.getLength())
         return UnownedStringSlice();
-    if (Index(offset + tok.getSpellingLength()) > in.getLength())
+    if (Index(offset + lexeme.getPhysicalSpellingLength()) > in.getLength())
         return UnownedStringSlice();
 
-    return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.getSpellingLength());
+    return UnownedStringSlice(
+        in.begin() + offset,
+        in.begin() + offset + lexeme.getPhysicalSpellingLength());
 }
 
 SourceLoc Lexer::findNextLineEnd(SourceLoc from, UInt& lineCount) const

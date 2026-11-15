@@ -89,7 +89,7 @@ public:
     {
         if (peekType() == TokenType::Identifier)
         {
-            if (peek().getContent() == expected)
+            if (peek().getLogicalSpelling() == expected)
             {
                 return read();
             }
@@ -123,7 +123,7 @@ public:
     {
         if (peekType() == TokenType::Identifier)
         {
-            if (peek().getContent() == name)
+            if (peek().getLogicalSpelling() == name)
             {
                 read();
                 return true;
@@ -414,7 +414,7 @@ public:
                 _sink.diagnose(
                     peekLoc(),
                     fiddle::Diagnostics::expectedFiddleEllipsisInvocation,
-                    decl->nameToken.getContent());
+                    decl->nameToken.getLogicalSpelling());
             }
         }
 
@@ -590,9 +590,9 @@ public:
                 {
                     const auto b = read();
                     StringBuilder sb;
-                    sb << b.getContent();
+                    sb << b.getLogicalSpelling();
                     for (int i = 0; i < b.getSkipCount(); ++i)
-                        sb << read().getContent() << " ";
+                        sb << read().getLogicalSpelling() << " ";
                     modifiers.add(new TableModifier(std::move(sb)));
                 }
                 break;
@@ -800,9 +800,9 @@ public:
                     StringBuilder sb;
                     const auto f = expect(TokenType::Identifier);
                     const auto b = read();
-                    sb << f.getContent() << b.getContent();
+                    sb << f.getLogicalSpelling() << b.getLogicalSpelling();
                     for (int i = 0; i < b.getSkipCount(); ++i)
-                        sb << read().getContent() << " ";
+                        sb << read().getLogicalSpelling() << " ";
                     auto fiddleLuaCall = RefPtr(new FiddleLuaCallInvocation());
                     fiddleLuaCall->fiddleToken = fiddleToken;
                     fiddleLuaCall->parentDecl = _currentParentDecl;
@@ -860,7 +860,7 @@ public:
 
         if (auto physicalNamespace = as<PhysicalNamespaceDecl>(memberDecl))
         {
-            auto namespaceName = physicalNamespace->nameToken.getContent();
+            auto namespaceName = physicalNamespace->nameToken.getLogicalSpelling();
             auto logicalNamespace = findDecl<LogicalNamespace>(logicalParent, namespaceName);
             if (!logicalNamespace)
             {
@@ -952,7 +952,7 @@ public:
             // one that we want to pay attention to?
             //
             //
-            auto name = peek().getContent();
+            auto name = peek().getLogicalSpelling();
             if (name == "FIDDLE")
             {
                 // If the `FIDDLE` is the first token we are seeing, then we will
@@ -1102,7 +1102,7 @@ private:
     {
         if (auto nameExpr = as<NameExpr>(expr))
         {
-            return lookUp(nameExpr->nameToken.getContent());
+            return lookUp(nameExpr->nameToken.getLogicalSpelling());
         }
         else
         {
@@ -1119,7 +1119,7 @@ private:
             // TODO: accelerate lookup with a dictionary on the container...
             for (auto memberDecl : containerDecl->members)
             {
-                if (memberDecl->nameToken.getContent() == name)
+                if (memberDecl->nameToken.getLogicalSpelling() == name)
                 {
                     return new DirectDeclRef(memberDecl);
                 }
@@ -1267,7 +1267,7 @@ private:
                                 "kSyntaxClassInfo;" MACRO_LINE_ENDING);
 
                 _builder.append("public: static constexpr ASTNodeType kType = ASTNodeType::");
-                _builder.append(decl->nameToken.getContent());
+                _builder.append(decl->nameToken.getLogicalSpelling());
                 _builder.append(";" MACRO_LINE_ENDING);
 
                 if (decl->findModifier<AbstractModifier>())
@@ -1278,7 +1278,7 @@ private:
                 {
                     _builder.append("public: ");
                 }
-                _builder.append(decl->nameToken.getContent());
+                _builder.append(decl->nameToken.getLogicalSpelling());
                 _builder.append("() {}" MACRO_LINE_ENDING);
             }
             _builder.append("public:" MACRO_LINE_ENDING);
@@ -1290,7 +1290,7 @@ private:
     {
         if (auto declRef = as<DirectDeclRef>(expr))
         {
-            _builder.append(declRef->decl->nameToken.getContent());
+            _builder.append(declRef->decl->nameToken.getLogicalSpelling());
             _builder.append(" ");
             _builder.append(name);
         }
@@ -1329,7 +1329,7 @@ private:
         void emitTrivia(TriviaList trivia)
         {
             for (auto trivium : trivia)
-                _builder.append(trivium.getContent());
+                _builder.append(trivium.getLogicalSpelling());
         }
 
         void emitRawNode(RawNode* rawNode)
@@ -1337,7 +1337,7 @@ private:
             for (auto token : rawNode->tokens)
             {
                 emitTrivia(token.getLeadingTrivia());
-                _builder.append(token.getContent());
+                _builder.append(token.getLogicalSpelling());
                 emitTrivia(token.getTrailingTrivia());
             }
         }
@@ -1401,7 +1401,7 @@ Decl* findDecl_(ContainerDecl* outerDecl, UnownedStringSlice const& name)
 {
     for (auto memberDecl : outerDecl->members)
     {
-        if (memberDecl->nameToken.getContent() == name)
+        if (memberDecl->nameToken.getLogicalSpelling() == name)
             return memberDecl;
     }
     return nullptr;
@@ -1412,7 +1412,7 @@ bool AggTypeDecl::isSubTypeOf(char const* name)
     Decl* decl = this;
     while (decl)
     {
-        if (decl->nameToken.getContent() == UnownedTerminatedStringSlice(name))
+        if (decl->nameToken.getLogicalSpelling() == UnownedTerminatedStringSlice(name))
         {
             return true;
         }
@@ -1540,7 +1540,7 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
         }
         cursor++;
 
-        if (cursor->getContent() != "include")
+        if (cursor->getLogicalSpelling() != "include")
             continue;
         cursor++;
 
@@ -1651,7 +1651,7 @@ int _toStringVal(lua_State* L)
 
     if (auto decl = as<Decl>(val))
     {
-        push(L, decl->nameToken.getContent());
+        push(L, decl->nameToken.getLogicalSpelling());
         return 1;
     }
 
@@ -1719,7 +1719,7 @@ int _indexVal(lua_State* L)
     {
         for (auto m : containerDecl->members)
         {
-            if (m->nameToken.getContent() == UnownedTerminatedStringSlice(name))
+            if (m->nameToken.getLogicalSpelling() == UnownedTerminatedStringSlice(name))
             {
                 push(L, m);
                 return 1;
@@ -1807,8 +1807,8 @@ int _indexVal(lua_State* L)
             {
                 lua_pushlstring(
                     L,
-                    literalExpr->token.getContent().begin(),
-                    literalExpr->token.getContent().getLength());
+                    literalExpr->token.getLogicalSpelling().begin(),
+                    literalExpr->token.getLogicalSpelling().getLength());
                 return 1;
             }
             return 0;
@@ -1854,7 +1854,7 @@ void registerScrapedStuffWithScript(LogicalModule* logicalModule)
         if (!decl->nameToken)
             continue;
 
-        registerValWithScript(decl->nameToken.getContent(), decl);
+        registerValWithScript(decl->nameToken.getLogicalSpelling(), decl);
     }
 }
 

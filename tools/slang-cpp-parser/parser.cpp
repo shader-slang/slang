@@ -98,7 +98,7 @@ bool Parser::advanceIfToken(TokenType type, Token* outToken)
 bool Parser::advanceIfMarker(Token* outToken)
 {
     const Token peekToken = m_reader.peekToken();
-    if (peekToken.getType() == TokenType::Identifier && _isMarker(peekToken.getContent()))
+    if (peekToken.getType() == TokenType::Identifier && _isMarker(peekToken.getLogicalSpelling()))
     {
         m_reader.readToken();
         if (outToken)
@@ -115,7 +115,7 @@ bool Parser::advanceIfStyle(IdentifierStyle style, Token* outToken)
     if (m_reader.peekTokenType() == TokenType::Identifier)
     {
         IdentifierStyle readStyle =
-            m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+            m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getLogicalSpelling());
         if (readStyle == style)
         {
             Token token = m_reader.readToken();
@@ -164,23 +164,23 @@ SlangResult Parser::pushScope(ScopeNode* scopeNode)
         m_sourceOrigin->addNode(scopeNode);
     }
 
-    if (scopeNode->m_name.hasContent())
+    if (scopeNode->m_name.hasLogicalSpelling())
     {
         // For anonymous namespace, we should look if we already have one and just reopen that.
         // Doing so will mean will find anonymous namespace clashes
 
-        if (Node* foundNode = m_currentScope->findChild(scopeNode->m_name.getContent()))
+        if (Node* foundNode = m_currentScope->findChild(scopeNode->m_name.getLogicalSpelling()))
         {
             if (scopeNode->isClassLike())
             {
                 m_sink->diagnose(
                     m_reader.peekToken(),
                     CPPDiagnostics::typeAlreadyDeclared,
-                    scopeNode->m_name.getContent());
+                    scopeNode->m_name.getLogicalSpelling());
                 m_sink->diagnose(
                     foundNode->m_name,
                     CPPDiagnostics::seeDeclarationOf,
-                    scopeNode->m_name.getContent());
+                    scopeNode->m_name.getLogicalSpelling());
                 return SLANG_FAIL;
             }
 
@@ -192,7 +192,7 @@ SlangResult Parser::pushScope(ScopeNode* scopeNode)
                     m_sink->diagnose(
                         m_reader.peekToken(),
                         CPPDiagnostics::typeAlreadyDeclared,
-                        scopeNode->m_name.getContent());
+                        scopeNode->m_name.getLogicalSpelling());
                     return SLANG_FAIL;
                 }
 
@@ -325,7 +325,8 @@ SlangResult Parser::_parseEnum()
     Token nameToken;
     if (advanceIfToken(TokenType::Identifier, &nameToken))
     {
-        const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(nameToken.getContent());
+        const IdentifierStyle style =
+            m_nodeTree->m_identifierLookup->get(nameToken.getLogicalSpelling());
 
         if (style == IdentifierStyle::Class)
         {
@@ -341,7 +342,7 @@ SlangResult Parser::_parseEnum()
             m_sink->diagnose(
                 nameToken.getLoc(),
                 CPPDiagnostics::expectingIdentifier,
-                nameToken.getContent());
+                nameToken.getLogicalSpelling());
             return SLANG_FAIL;
         }
     }
@@ -383,7 +384,7 @@ SlangResult Parser::_parseEnum()
     {
         if (nameToken)
         {
-            Node* node = m_currentScope->findChild(nameToken.getContent());
+            Node* node = m_currentScope->findChild(nameToken.getLogicalSpelling());
             if (node)
             {
                 // Strictly speaking we should check the backing type etc, match, but for now ignore
@@ -396,7 +397,7 @@ SlangResult Parser::_parseEnum()
                 m_sink->diagnose(
                     nameToken.getLoc(),
                     CPPDiagnostics::typeAlreadyDeclared,
-                    nameToken.getContent());
+                    nameToken.getLogicalSpelling());
                 return SLANG_FAIL;
             }
             return popScope();
@@ -418,12 +419,12 @@ SlangResult Parser::_parseEnum()
         // We could also check if the name is a valid identifier for name, for now just assume.
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &caseNode->m_name));
 
-        if (node->findChild(caseNode->m_name.getContent()))
+        if (node->findChild(caseNode->m_name.getLogicalSpelling()))
         {
             m_sink->diagnose(
                 caseNode->m_name.getLoc(),
                 CPPDiagnostics::identifierAlreadyDefined,
-                caseNode->m_name.getContent());
+                caseNode->m_name.getLogicalSpelling());
             return SLANG_FAIL;
         }
 
@@ -863,7 +864,7 @@ UnownedStringSlice Parser::_concatTokens(const Token* toks, Index toksCount)
             buf << " ";
         }
 
-        buf << token.getContent();
+        buf << token.getLogicalSpelling();
 
         prevTokenType = token.getType();
     }
@@ -889,7 +890,7 @@ UnownedStringSlice Parser::_concatTokens(TokenReader::ParsingCursor start)
         {
             buf << " ";
         }
-        buf << token.getContent();
+        buf << token.getLogicalSpelling();
 
         prevTokenType = token.getType();
     }
@@ -909,7 +910,7 @@ SlangResult Parser::_maybeParseType(
         if (m_reader.peekTokenType() == TokenType::Identifier)
         {
             const IdentifierStyle style =
-                m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+                m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getLogicalSpelling());
 
             if (style == IdentifierStyle::TypeModifier ||
                 style == IdentifierStyle::IntegerModifier || style == IdentifierStyle::Class ||
@@ -932,7 +933,7 @@ SlangResult Parser::_maybeParseType(
             if (peekToken.getType() == TokenType::Identifier)
             {
                 const IdentifierStyle style =
-                    m_nodeTree->m_identifierLookup->get(peekToken.getContent());
+                    m_nodeTree->m_identifierLookup->get(peekToken.getLogicalSpelling());
                 if (style == IdentifierStyle::IntegerType)
                 {
                     m_reader.readToken();
@@ -948,7 +949,7 @@ SlangResult Parser::_maybeParseType(
             if (m_reader.peekTokenType() == TokenType::Identifier)
             {
                 const IdentifierStyle style =
-                    m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+                    m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getLogicalSpelling());
                 if (style == IdentifierStyle::Class || style == IdentifierStyle::Struct)
                 {
                     m_reader.readToken();
@@ -962,7 +963,7 @@ SlangResult Parser::_maybeParseType(
             }
 
             const IdentifierStyle style =
-                m_nodeTree->m_identifierLookup->get(identifierToken.getContent());
+                m_nodeTree->m_identifierLookup->get(identifierToken.getLogicalSpelling());
             if (hasFlag(style, IdentifierFlag::Keyword))
             {
                 return SLANG_FAIL;
@@ -1133,7 +1134,8 @@ SlangResult Parser::_parseSpecialMacro()
     }
 
     // Can do special handling here
-    const UnownedStringSlice suffix = name.getContent().tail(m_options->m_markPrefix.getLength());
+    const UnownedStringSlice suffix =
+        name.getLogicalSpelling().tail(m_options->m_markPrefix.getLength());
 
     if (suffix == "COM_INTERFACE")
     {
@@ -1147,7 +1149,7 @@ SlangResult Parser::_parseMarker()
 {
     SLANG_ASSERT(
         m_reader.peekTokenType() == TokenType::Identifier &&
-        _isMarker(m_reader.peekToken().getContent()) && m_currentScope->isClassLike());
+        _isMarker(m_reader.peekToken().getLogicalSpelling()) && m_currentScope->isClassLike());
 
     ClassLikeNode* node = as<ClassLikeNode>(m_currentScope);
 
@@ -1156,7 +1158,7 @@ SlangResult Parser::_parseMarker()
         m_sink->diagnose(
             m_reader.peekToken(),
             CPPDiagnostics::classMarkerAlreadyFound,
-            node->m_name.getContent());
+            node->m_name.getLogicalSpelling());
         m_sink->diagnose(node->m_marker, CPPDiagnostics::previousLocation);
         return SLANG_FAIL;
     }
@@ -1165,7 +1167,7 @@ SlangResult Parser::_parseMarker()
     node->m_marker = m_reader.readToken();
 
     // Looks like it's a marker
-    UnownedStringSlice slice(node->m_marker.getContent());
+    UnownedStringSlice slice(node->m_marker.getLogicalSpelling());
 
     // Strip the prefix and suffix
     slice = UnownedStringSlice(
@@ -1192,12 +1194,12 @@ SlangResult Parser::_parseMarker()
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeNameToken));
     SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
-    if (typeNameToken.getContent() != node->m_name.getContent())
+    if (typeNameToken.getLogicalSpelling() != node->m_name.getLogicalSpelling())
     {
         m_sink->diagnose(
             typeNameToken,
             CPPDiagnostics::typeNameDoesntMatch,
-            node->m_name.getContent());
+            node->m_name.getLogicalSpelling());
         return SLANG_FAIL;
     }
 
@@ -1484,12 +1486,12 @@ SlangResult Parser::_parseTypeDef()
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &nameToken));
     }
 
-    if (Node::lookupNameInScope(m_currentScope, nameToken.getContent()))
+    if (Node::lookupNameInScope(m_currentScope, nameToken.getLogicalSpelling()))
     {
         m_sink->diagnose(
             nameToken.getLoc(),
             CPPDiagnostics::identifierAlreadyDefined,
-            nameToken.getContent());
+            nameToken.getLogicalSpelling());
         return SLANG_FAIL;
     }
 
@@ -1513,7 +1515,7 @@ bool Parser::_isCtor()
     bool isCtor = false;
     // It's a constructor
     if (m_currentScope->isClassLike() && m_reader.peekTokenType() == TokenType::Identifier &&
-        m_reader.peekToken().getContent() == m_currentScope->m_name.getContent())
+        m_reader.peekToken().getLogicalSpelling() == m_currentScope->m_name.getLogicalSpelling())
     {
         // We need to check it's followed immediately by ( to be sure it's a ctor
 
@@ -1543,7 +1545,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     while (m_reader.peekTokenType() == TokenType::Identifier)
     {
         const IdentifierStyle style =
-            m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+            m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getLogicalSpelling());
 
         // Check for virtualness
         if (style == IdentifierStyle::Virtual)
@@ -1581,12 +1583,12 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             Token tok;
             SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &tok));
 
-            if (tok.getContent() != m_currentScope->m_name.getContent())
+            if (tok.getLogicalSpelling() != m_currentScope->m_name.getLogicalSpelling())
             {
                 m_sink->diagnose(
                     m_reader.peekLoc(),
                     CPPDiagnostics::destructorNameDoesntMatch,
-                    m_currentScope->m_name.getContent());
+                    m_currentScope->m_name.getLogicalSpelling());
                 return SLANG_FAIL;
             }
         }
@@ -1629,7 +1631,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     // Handles other scenarios, but here for catching operator overloading
     if (nameToken.getType() == TokenType::Identifier)
     {
-        const auto style = m_nodeTree->m_identifierLookup->get(nameToken.getContent());
+        const auto style = m_nodeTree->m_identifierLookup->get(nameToken.getLogicalSpelling());
         if (style != IdentifierStyle::None)
         {
             _consumeToSync();
@@ -1744,7 +1746,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
             {
                 Int value = -1;
                 if (SLANG_SUCCEEDED(
-                        StringUtil::parseInt(m_reader.peekToken().getContent(), value)) &&
+                        StringUtil::parseInt(m_reader.peekToken().getLogicalSpelling(), value)) &&
                     value == 0)
                 {
                     isPure = true;
@@ -1792,7 +1794,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
 
         callableNode->m_params.swapWith(params);
 
-        Node* nodeWithName = m_currentScope->findChild(nameToken.getContent());
+        Node* nodeWithName = m_currentScope->findChild(nameToken.getLogicalSpelling());
 
         if (nodeWithName)
         {
@@ -1925,7 +1927,7 @@ SlangResult Parser::_parsePreDeclare()
     // Get the typeSet
     Token typeSetToken;
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeSetToken));
-    TypeSet* typeSet = m_nodeTree->getOrAddTypeSet(typeSetToken.getContent());
+    TypeSet* typeSet = m_nodeTree->getOrAddTypeSet(typeSetToken.getLogicalSpelling());
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
 
@@ -1935,14 +1937,15 @@ SlangResult Parser::_parsePreDeclare()
         Token typeToken;
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeToken));
 
-        const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(typeToken.getContent());
+        const IdentifierStyle style =
+            m_nodeTree->m_identifierLookup->get(typeToken.getLogicalSpelling());
 
         if (style != IdentifierStyle::Struct && style != IdentifierStyle::Class)
         {
             m_sink->diagnose(
                 typeToken,
                 CPPDiagnostics::expectingTypeKeyword,
-                typeToken.getContent());
+                typeToken.getLogicalSpelling());
             return SLANG_FAIL;
         }
         nodeKind = _toNodeKind(style);
@@ -1999,7 +2002,7 @@ SlangResult Parser::_parseTypeSet()
     Token typeSetToken;
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeSetToken));
 
-    TypeSet* typeSet = m_nodeTree->getOrAddTypeSet(typeSetToken.getContent());
+    TypeSet* typeSet = m_nodeTree->getOrAddTypeSet(typeSetToken.getLogicalSpelling());
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
 
@@ -2010,7 +2013,7 @@ SlangResult Parser::_parseTypeSet()
     SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
     // Set the typename
-    typeSet->m_typeName = typeToken.getContent();
+    typeSet->m_typeName = typeToken.getLogicalSpelling();
 
     return SLANG_OK;
 }
@@ -2074,7 +2077,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
         case TokenType::Identifier:
             {
                 const IdentifierStyle style =
-                    m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
+                    m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getLogicalSpelling());
 
                 switch (style)
                 {
@@ -2164,10 +2167,11 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         }
                         else
                         {
-                            UnownedStringSlice content = m_reader.peekToken().getContent();
+                            UnownedStringSlice logicalSpelling =
+                                m_reader.peekToken().getLogicalSpelling();
 
                             // If it's a marker handle it
-                            if (_isMarker(content))
+                            if (_isMarker(logicalSpelling))
                             {
                                 if (!m_currentScope->isClassLike())
                                 {
@@ -2182,7 +2186,8 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                             }
 
                             if (m_options->m_markPrefix.getLength() > 0 &&
-                                content.startsWith(m_options->m_markPrefix.getUnownedSlice()))
+                                logicalSpelling.startsWith(
+                                    m_options->m_markPrefix.getUnownedSlice()))
                             {
                                 SLANG_RETURN_ON_FAIL(_parseSpecialMacro());
                                 break;

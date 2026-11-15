@@ -1174,7 +1174,7 @@ void DocMarkdownWriter::_appendExpr(StringBuilder& sb, Expr* expr)
     }
     else if (auto litExpr = as<LiteralExpr>(expr))
     {
-        sb << litExpr->token.getContent();
+        sb << litExpr->token.getLogicalSpelling();
     }
     else
     {

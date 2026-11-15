@@ -176,7 +176,7 @@ static Index _findLexemeIndex(SourceLoc loc, const Lexeme* lexemes, Index lexeme
     {
     case LexemeKind::BlockComment:
         {
-            UnownedStringSlice slice = lexeme.getContent();
+            UnownedStringSlice slice = lexeme.getLogicalSpelling();
             if (slice.getLength() >= 3 && (slice[2] == '!' || slice[2] == '*'))
             {
                 return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::BlockAfter
@@ -190,7 +190,7 @@ static Index _findLexemeIndex(SourceLoc loc, const Lexeme* lexemes, Index lexeme
         }
     case LexemeKind::LineComment:
         {
-            UnownedStringSlice slice = lexeme.getContent();
+            UnownedStringSlice slice = lexeme.getLogicalSpelling();
             if (slice.getLength() >= 3)
             {
                 if (slice[2] == '!')
@@ -274,7 +274,7 @@ SlangResult DocMarkupExtractor::_extractMarkup(
 
             const UnownedStringSlice startLine = sourceFile->getLineContainingOffset(offset);
 
-            UnownedStringSlice content = lexeme.getContent();
+            UnownedStringSlice content = lexeme.getLogicalSpelling();
 
             // Split into lines
             List<UnownedStringSlice> lines;
@@ -350,7 +350,7 @@ SlangResult DocMarkupExtractor::_extractMarkup(
             for (Index i = range.start; i < range.end; ++i)
             {
                 const auto& lexeme = info.lexemeList->getLexemes()[i];
-                UnownedStringSlice line = lexeme.getContent();
+                UnownedStringSlice line = lexeme.getLogicalSpelling();
                 line = removeStart(foundMarkup.type, line);
 
                 // If the first or last line are all white space, just ignore them
@@ -537,11 +537,11 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     if (flags & MarkupFlag::IsBlock)
     {
         // We accept a block comment when either end touches the requested line. The end
-        // location uses the original spelling length: escaped newlines are absent from the
-        // scrubbed text, but their bytes still separate the start and end in the input file.
-        const auto spellingLength = lexeme.getSpellingLength();
-        SLANG_RELEASE_ASSERT(spellingLength <= UINT32_MAX - uint32_t(offset));
-        const auto endOffset = uint32_t(offset) + uint32_t(spellingLength);
+        // location uses the physical spelling length: escaped newlines are absent from the
+        // logical spelling, but their bytes still separate the start and end in the input file.
+        const auto physicalLength = lexeme.getPhysicalSpellingLength();
+        SLANG_RELEASE_ASSERT(physicalLength <= UINT32_MAX - uint32_t(offset));
+        const auto endOffset = uint32_t(offset) + uint32_t(physicalLength);
         return sourceFile->isOffsetOnLine(offset, lineIndex) ||
                sourceFile->isOffsetOnLine(endOffset, lineIndex);
     }
@@ -771,7 +771,7 @@ static void _calcLineVisibility(
     {
         if (lexeme.getType() == LexemeKind::LineComment)
         {
-            UnownedStringSlice contents = lexeme.getContent();
+            UnownedStringSlice contents = lexeme.getLogicalSpelling();
 
             MarkupVisibility newVisibility = lastVisibility;
 

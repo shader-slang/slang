@@ -281,7 +281,7 @@ List<SemanticToken> getSemanticTokens(
                         manager,
                         attr->originalIdentifierToken.getLoc(),
                         nullptr);
-                    token.length = (int)attr->originalIdentifierToken.getContentLength();
+                    token.length = (int)attr->originalIdentifierToken.getLogicalSpellingLength();
                     token.type = SemanticTokenType::Type;
                     maybeInsertToken(token);
 
