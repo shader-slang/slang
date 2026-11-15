@@ -1102,6 +1102,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 return false;
             }
 
+            // A mutating method writes its `this` argument, as an `inout` argument would be
+            // written.
+            if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
+                maybeWarnWriteThroughPointerOfUnknownAccess(context.baseExpr);
+
             // The parameters of functions declared using traditional/legacy
             // syntax are currently exposed as mutable locals within the body
             // of the relevant function. As such, it is legal to call `[mutating]`
