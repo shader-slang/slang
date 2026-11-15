@@ -281,8 +281,8 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
         // reference, whereas the `QualType` constructor does not
         // perform such unwrapping.
         //
-        openRef->type = QualType(refType);
         openRef->type.type = refType->getValueType();
+        applyAccessQualifierOfPtrType(openRef->type, refType, expr);
 
         openRef->checked = true;
         openRef->loc = expr->loc;
@@ -715,21 +715,16 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         // dereference an l-value. `maybeWarnWriteThroughPointerOfUnknownAccess` then warns when
         // such a dereference is actually written.
         //
-        if (auto optAccessQualifier = ptrType->tryGetAccessQualifierValue())
-            derefExpr->type.applyAccessQualifier(*optAccessQualifier);
-        else
+        if (!applyAccessQualifierOfPtrType(derefExpr->type, ptrType, base))
             derefExpr->type.isLeftValue = true;
     }
-    else if (as<ExplicitRefType>(base->type))
+    else if (auto refType = as<ExplicitRefType>(base->type))
     {
-        // TODO(tfoley): The code here is exploiting the ability of the
-        // `QualType` constructor to compute the correct value category
-        // for a reference type, so that we don't have to repeat that logic
-        // here. That might not be the right place for that logic to live,
-        // however, and so the code here might need updating sooner or
-        // later.
+        // A reference whose access is not a compile-time constant is neither an l-value nor a
+        // read-only memory location, as in the `QualType(Type*)` constructor.
         //
-        QualType refQualType(base->type.type);
+        QualType refQualType;
+        applyAccessQualifierOfPtrType(refQualType, refType, base);
         derefExpr->type.isLeftValue = refQualType.isLeftValue;
         derefExpr->type.isReadOnlyMemoryLocation = refQualType.isReadOnlyMemoryLocation;
     }
@@ -748,6 +743,26 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     }
 
     return derefExpr;
+}
+
+bool SemanticsVisitor::applyAccessQualifierOfPtrType(
+    QualType& type,
+    PtrTypeBase* ptrType,
+    Expr* ptrExpr)
+{
+    auto optAccessQualifier = ptrType->tryGetAccessQualifierValue();
+    if (!optAccessQualifier)
+        return false;
+
+    if (!isAccessEnumerator(*optAccessQualifier))
+    {
+        getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.expr = ptrExpr});
+        type.isLeftValue = true;
+        return true;
+    }
+
+    type.applyAccessQualifier(*optAccessQualifier);
+    return true;
 }
 
 Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)

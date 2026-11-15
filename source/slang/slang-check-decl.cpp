@@ -5167,7 +5167,9 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     // stands in for every omitted argument, and the paths that fill it in do not see an explicit
     // argument to check. We check it once here, as `TryCheckGenericOverloadCandidateTypes`
     // checks an explicit argument, and replace an out-of-range default with an error so that
-    // those paths treat it like any other invalid default.
+    // those paths treat it like any other invalid default. A default computed from an earlier
+    // parameter, as in `let A : Access = (Access)N`, is not a constant here, and
+    // `applyAccessQualifierOfPtrType` reports it where the pointer is dereferenced.
     if (decl->initExpr && decl->type.type && isAccessEnumType(m_astBuilder, decl->type.type))
     {
         ConstantFoldingCircularityInfo circularityInfo(makeDeclRef(decl), nullptr);

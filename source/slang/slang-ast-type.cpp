@@ -1269,6 +1269,19 @@ std::optional<AccessQualifier> tryGetAccessQualifierValue(Val* val)
     return std::optional<AccessQualifier>();
 }
 
+bool isAccessEnumerator(AccessQualifier accessQualifier)
+{
+    switch (accessQualifier)
+    {
+    case AccessQualifier::ReadWrite:
+    case AccessQualifier::Read:
+    case AccessQualifier::Immutable:
+        return true;
+    default:
+        return false;
+    }
+}
+
 std::optional<AccessQualifier> PtrTypeBase::tryGetAccessQualifierValue()
 {
     auto accessQualifierArg = this->getAccessQualifier();

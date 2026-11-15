@@ -46,9 +46,13 @@ KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
 QualType::QualType(Type* type)
     : type(type), isLeftValue(false)
 {
+    // A reference whose access is a constant outside the `Access` enum gets no value category
+    // here, because there is no diagnostic sink to report it to. Such a reference is reported
+    // when it is opened or dereferenced, by `SemanticsVisitor::applyAccessQualifierOfPtrType`.
     if (auto refType = as<ExplicitRefType>(type))
     {
-        if (auto optAccessQualifier = refType->tryGetAccessQualifierValue())
+        if (auto optAccessQualifier = refType->tryGetAccessQualifierValue();
+            optAccessQualifier && isAccessEnumerator(*optAccessQualifier))
             applyAccessQualifier(*optAccessQualifier);
     }
 }

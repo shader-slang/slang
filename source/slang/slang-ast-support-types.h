@@ -678,7 +678,8 @@ FIDDLE() namespace Slang
         /// and `Immutable` yield a read-only memory location.
         ///
         /// A reference type and a pointer type map their access qualifier through this one
-        /// function, so that an access qualifier gives the same value category on both.
+        /// function, so that an access qualifier gives the same value category on both. The
+        /// access qualifier must be an `Access` enumerator (see `isAccessEnumerator`).
         void applyAccessQualifier(AccessQualifier accessQualifier);
 
 

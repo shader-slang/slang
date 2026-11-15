@@ -305,18 +305,7 @@ bool isAccessEnumType(ASTBuilder* astBuilder, Type* type)
 bool isAccessValueOutsideAccessEnum(Val* val)
 {
     auto optAccessQualifier = tryGetAccessQualifierValue(val);
-    if (!optAccessQualifier)
-        return false;
-
-    switch (*optAccessQualifier)
-    {
-    case AccessQualifier::ReadWrite:
-    case AccessQualifier::Read:
-    case AccessQualifier::Immutable:
-        return false;
-    default:
-        return true;
-    }
+    return optAccessQualifier && !isAccessEnumerator(*optAccessQualifier);
 }
 
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
@@ -1737,10 +1726,10 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             {
                                 if (auto ptrTypeBase = as<PtrTypeBase>(base->type))
                                 {
-                                    if (auto optAccessQualifier =
-                                            ptrTypeBase->tryGetAccessQualifierValue())
-                                        callExpr->type.applyAccessQualifier(*optAccessQualifier);
-                                    else
+                                    if (!applyAccessQualifierOfPtrType(
+                                            callExpr->type,
+                                            ptrTypeBase,
+                                            base))
                                         callExpr->type.isLeftValue = true;
                                     break;
                                 }

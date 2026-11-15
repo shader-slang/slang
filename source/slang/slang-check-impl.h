@@ -94,9 +94,8 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 bool isAccessEnumType(ASTBuilder* astBuilder, Type* type);
 
 /// Return true if `val` is a constant access value that names none of the `Access`
-/// enumerators, as `(Access)3` does. The value category of a pointee is derived from an access
-/// qualifier by `QualType::applyAccessQualifier`, which only accepts the enumerators, so such a
-/// value must be rejected before it reaches a `Ptr` or `Ref` type.
+/// enumerators, as `(Access)3` does. We reject such a value where it is written as a generic
+/// argument or default, so that the error points at it.
 bool isAccessValueOutsideAccessEnum(Val* val);
 
 /// True if `containerDecl` is `moduleDecl` itself or one of its own `__include`d
@@ -2055,6 +2054,24 @@ public:
 
     Expr* ConstructDerefExpr(Expr* base, SourceLoc loc);
     Expr* constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc);
+
+    /// Set the value category of `type`, which denotes the storage reached by dereferencing
+    /// `ptrExpr` of pointer or reference type `ptrType`, from the access qualifier of `ptrType`,
+    /// and return true. Return false and leave `type` unchanged when the access is not a
+    /// compile-time constant, as for `Ptr<T, access>` in a generic function; a pointer and a
+    /// reference treat such an access differently, so the caller decides.
+    ///
+    /// Substitution can produce an access constant that names no `Access` enumerator after every
+    /// generic argument has been checked. Consider:
+    ///
+    ///     struct Box<let N : int> { Ptr<Item, (Access)N> p; }
+    ///     void f(Box<3> b) { uint c = b.p->count; }
+    ///
+    /// The type of `b.p` is `Ptr<Item, (Access)3>`, yet no `Access` argument was written, so
+    /// `TryCheckGenericOverloadCandidateTypes` never saw the value. The dereference is the first
+    /// place that interprets it, so we report 30409 at `ptrExpr` here and make the storage an
+    /// l-value, which keeps the error from being followed by write errors.
+    bool applyAccessQualifierOfPtrType(QualType& type, PtrTypeBase* ptrType, Expr* ptrExpr);
 
     InvokeExpr* constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments);
 

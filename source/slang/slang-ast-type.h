@@ -883,6 +883,11 @@ class PtrTypeBase : public BuiltinType
 /// not (e.g. a generic parameter).
 std::optional<AccessQualifier> tryGetAccessQualifierValue(Val* val);
 
+/// Return true if `accessQualifier` is one of the enumerators of the core module's `Access` enum:
+/// `ReadWrite`, `Read` or `Immutable`. These are the only access values a `Ptr` or `Ref` is meant
+/// to carry; any other value comes from a cast such as `(Access)3`.
+bool isAccessEnumerator(AccessQualifier accessQualifier);
+
 FIDDLE()
 class NoneType : public BuiltinType
 {
