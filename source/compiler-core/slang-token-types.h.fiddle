@@ -6,741 +6,470 @@
 #ifdef FIDDLE_GENERATED_OUTPUT_ID
 
 #if FIDDLE_GENERATED_OUTPUT_ID == 0
-/// A token with attached trivia in the `Literal` branch of the lexeme hierarchy.
-struct LiteralToken : Token
-{
-    static constexpr LexemeKind kind = LexemeKind::Literal;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `NumericLiteral` branch of the lexeme hierarchy.
-struct NumericLiteralToken : LiteralToken
-{
-    static constexpr LexemeKind kind = LexemeKind::NumericLiteral;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Punctuation` branch of the lexeme hierarchy.
-struct PunctuationToken : Token
-{
-    static constexpr LexemeKind kind = LexemeKind::Punctuation;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `EndOfFile` branch of the lexeme hierarchy.
-struct EndOfFileToken : Token
-{
-    static constexpr LexemeKind kind = LexemeKind::EndOfFile;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Invalid` branch of the lexeme hierarchy.
-struct InvalidToken : Token
-{
-    static constexpr LexemeKind kind = LexemeKind::Invalid;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Identifier` branch of the lexeme hierarchy.
-struct IdentifierToken : Token
-{
-    static constexpr LexemeKind kind = LexemeKind::Identifier;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `IntegerLiteral` branch of the lexeme hierarchy.
-struct IntegerLiteralToken : NumericLiteralToken
-{
-    static constexpr LexemeKind kind = LexemeKind::IntegerLiteral;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `FloatingPointLiteral` branch of the lexeme hierarchy.
-struct FloatingPointLiteralToken : NumericLiteralToken
-{
-    static constexpr LexemeKind kind = LexemeKind::FloatingPointLiteral;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `StringLiteral` branch of the lexeme hierarchy.
-struct StringLiteralToken : LiteralToken
-{
-    static constexpr LexemeKind kind = LexemeKind::StringLiteral;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `CharLiteral` branch of the lexeme hierarchy.
-struct CharLiteralToken : LiteralToken
-{
-    static constexpr LexemeKind kind = LexemeKind::CharLiteral;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Semicolon` branch of the lexeme hierarchy.
-struct SemicolonToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Semicolon;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Comma` branch of the lexeme hierarchy.
-struct CommaToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Comma;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Dot` branch of the lexeme hierarchy.
-struct DotToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Dot;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `DotDot` branch of the lexeme hierarchy.
-struct DotDotToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::DotDot;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Ellipsis` branch of the lexeme hierarchy.
-struct EllipsisToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Ellipsis;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `LBrace` branch of the lexeme hierarchy.
-struct LBraceToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::LBrace;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `RBrace` branch of the lexeme hierarchy.
-struct RBraceToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::RBrace;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `LBracket` branch of the lexeme hierarchy.
-struct LBracketToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::LBracket;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `RBracket` branch of the lexeme hierarchy.
-struct RBracketToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::RBracket;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `LParent` branch of the lexeme hierarchy.
-struct LParentToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::LParent;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `RParent` branch of the lexeme hierarchy.
-struct RParentToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::RParent;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpAssign` branch of the lexeme hierarchy.
-struct OpAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpAdd` branch of the lexeme hierarchy.
-struct OpAddToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpAdd;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpSub` branch of the lexeme hierarchy.
-struct OpSubToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpSub;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpMul` branch of the lexeme hierarchy.
-struct OpMulToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpMul;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpDiv` branch of the lexeme hierarchy.
-struct OpDivToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpDiv;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpMod` branch of the lexeme hierarchy.
-struct OpModToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpMod;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpNot` branch of the lexeme hierarchy.
-struct OpNotToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpNot;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpBitNot` branch of the lexeme hierarchy.
-struct OpBitNotToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpBitNot;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpLsh` branch of the lexeme hierarchy.
-struct OpLshToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpLsh;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpRsh` branch of the lexeme hierarchy.
-struct OpRshToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpRsh;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpEql` branch of the lexeme hierarchy.
-struct OpEqlToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpEql;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpNeq` branch of the lexeme hierarchy.
-struct OpNeqToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpNeq;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpGreater` branch of the lexeme hierarchy.
-struct OpGreaterToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpGreater;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpLess` branch of the lexeme hierarchy.
-struct OpLessToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpLess;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpGeq` branch of the lexeme hierarchy.
-struct OpGeqToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpGeq;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpLeq` branch of the lexeme hierarchy.
-struct OpLeqToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpLeq;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpAnd` branch of the lexeme hierarchy.
-struct OpAndToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpAnd;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpOr` branch of the lexeme hierarchy.
-struct OpOrToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpOr;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpBitAnd` branch of the lexeme hierarchy.
-struct OpBitAndToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpBitAnd;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpBitOr` branch of the lexeme hierarchy.
-struct OpBitOrToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpBitOr;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpBitXor` branch of the lexeme hierarchy.
-struct OpBitXorToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpBitXor;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpInc` branch of the lexeme hierarchy.
-struct OpIncToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpInc;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpDec` branch of the lexeme hierarchy.
-struct OpDecToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpDec;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpAddAssign` branch of the lexeme hierarchy.
-struct OpAddAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpAddAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpSubAssign` branch of the lexeme hierarchy.
-struct OpSubAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpSubAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpMulAssign` branch of the lexeme hierarchy.
-struct OpMulAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpMulAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpDivAssign` branch of the lexeme hierarchy.
-struct OpDivAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpDivAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpModAssign` branch of the lexeme hierarchy.
-struct OpModAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpModAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpShlAssign` branch of the lexeme hierarchy.
-struct OpShlAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpShlAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpShrAssign` branch of the lexeme hierarchy.
-struct OpShrAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpShrAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpAndAssign` branch of the lexeme hierarchy.
-struct OpAndAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpAndAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpOrAssign` branch of the lexeme hierarchy.
-struct OpOrAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpOrAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `OpXorAssign` branch of the lexeme hierarchy.
-struct OpXorAssignToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::OpXorAssign;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `QuestionMark` branch of the lexeme hierarchy.
-struct QuestionMarkToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::QuestionMark;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Colon` branch of the lexeme hierarchy.
-struct ColonToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Colon;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `RightArrow` branch of the lexeme hierarchy.
-struct RightArrowToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::RightArrow;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `DoubleRightArrow` branch of the lexeme hierarchy.
-struct DoubleRightArrowToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::DoubleRightArrow;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `At` branch of the lexeme hierarchy.
-struct AtToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::At;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Dollar` branch of the lexeme hierarchy.
-struct DollarToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Dollar;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `DollarDollar` branch of the lexeme hierarchy.
-struct DollarDollarToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::DollarDollar;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Pound` branch of the lexeme hierarchy.
-struct PoundToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Pound;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `PoundPound` branch of the lexeme hierarchy.
-struct PoundPoundToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::PoundPound;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `Scope` branch of the lexeme hierarchy.
-struct ScopeToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::Scope;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `CompletionRequest` branch of the lexeme hierarchy.
-struct CompletionRequestToken : PunctuationToken
-{
-    static constexpr LexemeKind kind = LexemeKind::CompletionRequest;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
-};
-
-/// A token with attached trivia in the `AngleBracketHeaderName` branch of the lexeme hierarchy.
+/// A token with attached trivia in the `AngleBracketHeaderName` class.
 struct AngleBracketHeaderNameToken : Token
 {
-    static constexpr LexemeKind kind = LexemeKind::AngleBracketHeaderName;
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
+    static constexpr LexemeType type = LexemeTypes::AngleBracketHeaderName;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::AngleBracketHeaderName;
 };
 
-/// A token with attached trivia in the `EndOfDirective` branch of the lexeme hierarchy.
+/// A token with attached trivia in the `EndOfDirective` class.
 struct EndOfDirectiveToken : Token
 {
-    static constexpr LexemeKind kind = LexemeKind::EndOfDirective;
+    static constexpr LexemeType type = LexemeTypes::EndOfDirective;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::EndOfDirective;
+};
 
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
+/// A token with attached trivia in the `EndOfFile` class.
+struct EndOfFileToken : Token
+{
+    static constexpr LexemeType type = LexemeTypes::EndOfFile;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::EndOfFile;
+};
+
+/// A token with attached trivia in the `Identifier` class.
+struct IdentifierToken : Token
+{
+    static constexpr LexemeType type = LexemeTypes::Identifier;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Identifier;
+};
+
+/// A token with attached trivia in the `Invalid` class.
+struct InvalidToken : Token
+{
+    static constexpr LexemeType type = LexemeTypes::Invalid;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Invalid;
+};
+
+/// A token with attached trivia in the `Literal` class.
+struct LiteralToken : Token
+{
+    static constexpr LexemeType type = LexemeTypes::Literal;
+};
+
+/// A token with attached trivia in the `CharLiteral` class.
+struct CharLiteralToken : LiteralToken
+{
+    static constexpr LexemeType type = LexemeTypes::CharLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::CharLiteral;
+};
+
+/// A token with attached trivia in the `NumericLiteral` class.
+struct NumericLiteralToken : LiteralToken
+{
+    static constexpr LexemeType type = LexemeTypes::NumericLiteral;
+};
+
+/// A token with attached trivia in the `FloatingPointLiteral` class.
+struct FloatingPointLiteralToken : NumericLiteralToken
+{
+    static constexpr LexemeType type = LexemeTypes::FloatingPointLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::FloatingPointLiteral;
+};
+
+/// A token with attached trivia in the `IntegerLiteral` class.
+struct IntegerLiteralToken : NumericLiteralToken
+{
+    static constexpr LexemeType type = LexemeTypes::IntegerLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::IntegerLiteral;
+};
+
+/// A token with attached trivia in the `StringLiteral` class.
+struct StringLiteralToken : LiteralToken
+{
+    static constexpr LexemeType type = LexemeTypes::StringLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::StringLiteral;
+};
+
+/// A token with attached trivia in the `Punctuation` class.
+struct PunctuationToken : Token
+{
+    static constexpr LexemeType type = LexemeTypes::Punctuation;
+};
+
+/// A token with attached trivia in the `At` class.
+struct AtToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::At;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::At;
+};
+
+/// A token with attached trivia in the `Colon` class.
+struct ColonToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Colon;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Colon;
+};
+
+/// A token with attached trivia in the `Comma` class.
+struct CommaToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Comma;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Comma;
+};
+
+/// A token with attached trivia in the `CompletionRequest` class.
+struct CompletionRequestToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::CompletionRequest;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::CompletionRequest;
+};
+
+/// A token with attached trivia in the `Dollar` class.
+struct DollarToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Dollar;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Dollar;
+};
+
+/// A token with attached trivia in the `DollarDollar` class.
+struct DollarDollarToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::DollarDollar;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::DollarDollar;
+};
+
+/// A token with attached trivia in the `Dot` class.
+struct DotToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Dot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Dot;
+};
+
+/// A token with attached trivia in the `DotDot` class.
+struct DotDotToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::DotDot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::DotDot;
+};
+
+/// A token with attached trivia in the `DoubleRightArrow` class.
+struct DoubleRightArrowToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::DoubleRightArrow;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::DoubleRightArrow;
+};
+
+/// A token with attached trivia in the `Ellipsis` class.
+struct EllipsisToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Ellipsis;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Ellipsis;
+};
+
+/// A token with attached trivia in the `LBrace` class.
+struct LBraceToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::LBrace;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::LBrace;
+};
+
+/// A token with attached trivia in the `LBracket` class.
+struct LBracketToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::LBracket;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::LBracket;
+};
+
+/// A token with attached trivia in the `LParent` class.
+struct LParentToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::LParent;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::LParent;
+};
+
+/// A token with attached trivia in the `OpAdd` class.
+struct OpAddToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpAdd;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAdd;
+};
+
+/// A token with attached trivia in the `OpAddAssign` class.
+struct OpAddAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpAddAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAddAssign;
+};
+
+/// A token with attached trivia in the `OpAnd` class.
+struct OpAndToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpAnd;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAnd;
+};
+
+/// A token with attached trivia in the `OpAndAssign` class.
+struct OpAndAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpAndAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAndAssign;
+};
+
+/// A token with attached trivia in the `OpAssign` class.
+struct OpAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAssign;
+};
+
+/// A token with attached trivia in the `OpBitAnd` class.
+struct OpBitAndToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitAnd;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitAnd;
+};
+
+/// A token with attached trivia in the `OpBitNot` class.
+struct OpBitNotToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitNot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitNot;
+};
+
+/// A token with attached trivia in the `OpBitOr` class.
+struct OpBitOrToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitOr;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitOr;
+};
+
+/// A token with attached trivia in the `OpBitXor` class.
+struct OpBitXorToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitXor;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitXor;
+};
+
+/// A token with attached trivia in the `OpDec` class.
+struct OpDecToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpDec;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpDec;
+};
+
+/// A token with attached trivia in the `OpDiv` class.
+struct OpDivToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpDiv;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpDiv;
+};
+
+/// A token with attached trivia in the `OpDivAssign` class.
+struct OpDivAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpDivAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpDivAssign;
+};
+
+/// A token with attached trivia in the `OpEql` class.
+struct OpEqlToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpEql;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpEql;
+};
+
+/// A token with attached trivia in the `OpGeq` class.
+struct OpGeqToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpGeq;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpGeq;
+};
+
+/// A token with attached trivia in the `OpGreater` class.
+struct OpGreaterToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpGreater;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpGreater;
+};
+
+/// A token with attached trivia in the `OpInc` class.
+struct OpIncToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpInc;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpInc;
+};
+
+/// A token with attached trivia in the `OpLeq` class.
+struct OpLeqToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpLeq;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpLeq;
+};
+
+/// A token with attached trivia in the `OpLess` class.
+struct OpLessToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpLess;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpLess;
+};
+
+/// A token with attached trivia in the `OpLsh` class.
+struct OpLshToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpLsh;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpLsh;
+};
+
+/// A token with attached trivia in the `OpMod` class.
+struct OpModToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpMod;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpMod;
+};
+
+/// A token with attached trivia in the `OpModAssign` class.
+struct OpModAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpModAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpModAssign;
+};
+
+/// A token with attached trivia in the `OpMul` class.
+struct OpMulToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpMul;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpMul;
+};
+
+/// A token with attached trivia in the `OpMulAssign` class.
+struct OpMulAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpMulAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpMulAssign;
+};
+
+/// A token with attached trivia in the `OpNeq` class.
+struct OpNeqToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpNeq;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpNeq;
+};
+
+/// A token with attached trivia in the `OpNot` class.
+struct OpNotToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpNot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpNot;
+};
+
+/// A token with attached trivia in the `OpOr` class.
+struct OpOrToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpOr;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpOr;
+};
+
+/// A token with attached trivia in the `OpOrAssign` class.
+struct OpOrAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpOrAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpOrAssign;
+};
+
+/// A token with attached trivia in the `OpRsh` class.
+struct OpRshToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpRsh;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpRsh;
+};
+
+/// A token with attached trivia in the `OpShlAssign` class.
+struct OpShlAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpShlAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpShlAssign;
+};
+
+/// A token with attached trivia in the `OpShrAssign` class.
+struct OpShrAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpShrAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpShrAssign;
+};
+
+/// A token with attached trivia in the `OpSub` class.
+struct OpSubToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpSub;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpSub;
+};
+
+/// A token with attached trivia in the `OpSubAssign` class.
+struct OpSubAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpSubAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpSubAssign;
+};
+
+/// A token with attached trivia in the `OpXorAssign` class.
+struct OpXorAssignToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::OpXorAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpXorAssign;
+};
+
+/// A token with attached trivia in the `Pound` class.
+struct PoundToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Pound;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Pound;
+};
+
+/// A token with attached trivia in the `PoundPound` class.
+struct PoundPoundToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::PoundPound;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::PoundPound;
+};
+
+/// A token with attached trivia in the `QuestionMark` class.
+struct QuestionMarkToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::QuestionMark;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::QuestionMark;
+};
+
+/// A token with attached trivia in the `RBrace` class.
+struct RBraceToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::RBrace;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RBrace;
+};
+
+/// A token with attached trivia in the `RBracket` class.
+struct RBracketToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::RBracket;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RBracket;
+};
+
+/// A token with attached trivia in the `RParent` class.
+struct RParentToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::RParent;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RParent;
+};
+
+/// A token with attached trivia in the `RightArrow` class.
+struct RightArrowToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::RightArrow;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RightArrow;
+};
+
+/// A token with attached trivia in the `Scope` class.
+struct ScopeToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Scope;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Scope;
+};
+
+/// A token with attached trivia in the `Semicolon` class.
+struct SemicolonToken : PunctuationToken
+{
+    static constexpr LexemeType type = LexemeTypes::Semicolon;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Semicolon;
 };
 
 

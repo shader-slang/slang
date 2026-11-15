@@ -180,7 +180,7 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
     // this `break` is meant to break out of.
     //
     BreakableStmt* targetOuterStmt = nullptr;
-    if (stmt->targetLabel.getType() == TokenType::Identifier)
+    if (stmt->targetLabel.getTypeTag() == TokenType::Identifier)
     {
         // If this is a `break` statement that specifies
         // an explicit label, then we will search for

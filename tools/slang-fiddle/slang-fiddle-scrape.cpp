@@ -54,7 +54,7 @@ public:
 
     SourceLoc peekLoc() { return peek().getLoc(); }
 
-    TokenType peekType() { return peek().getType(); }
+    TokenType peekType() { return peek().getTypeTag(); }
 
     TokenWithTrivia read()
     {
@@ -1459,13 +1459,13 @@ void readBalancedToken(List<TokenWithTrivia> const& tokens, Index& ioIndex, Toke
     for (;;)
     {
         auto token = tokens[ioIndex];
-        if (token.getType() == closeType)
+        if (token.getTypeTag() == closeType)
         {
             ioIndex++;
             break;
         }
 
-        switch (token.getType())
+        switch (token.getTypeTag())
         {
         default:
             readTokenTree(tokens, ioIndex);
@@ -1484,7 +1484,7 @@ void readBalancedToken(List<TokenWithTrivia> const& tokens, Index& ioIndex, Toke
 
 void readTokenTree(List<TokenWithTrivia> const& tokens, Index& ioIndex)
 {
-    switch (tokens[ioIndex].getType())
+    switch (tokens[ioIndex].getTypeTag())
     {
     default:
         ioIndex++;
@@ -1507,7 +1507,7 @@ void matchBalancedTokens(List<TokenWithTrivia> tokens)
     for (;;)
     {
         auto& token = tokens[index];
-        switch (token.getType())
+        switch (token.getTypeTag())
         {
         case TokenType::EndOfFile:
             return;
@@ -1533,7 +1533,7 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
 
     while (cursor != end)
     {
-        if (cursor->getType() != TokenType::Pound)
+        if (cursor->getTypeTag() != TokenType::Pound)
         {
             cursor++;
             continue;
@@ -1544,7 +1544,7 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
             continue;
         cursor++;
 
-        if (cursor->getType() != TokenType::StringLiteral)
+        if (cursor->getTypeTag() != TokenType::StringLiteral)
             continue;
 
         auto literal = cursor->getToken().getRawToken().as<RawStringLiteral>();
@@ -1560,7 +1560,6 @@ RefPtr<SourceUnit> parseSourceUnit(
     LogicalModule* logicalModule,
     NamePool* namePool,
     DiagnosticSink* sink,
-    SourceManager* sourceManager,
     String outputFileName)
 {
     Lexer lexer;
@@ -1569,7 +1568,7 @@ RefPtr<SourceUnit> parseSourceUnit(
     // so that we can ignore any files we don't understand.
     //
     DiagnosticSink lexerSink;
-    lexer.initialize(inputSourceView, &lexerSink, namePool);
+    lexer.initialize(inputSourceView, &lexerSink, namePool, logicalModule->getTokenPool());
 
     auto inputTokens = lexer.readAllTokens();
     auto tokensWithTrivia = createParserTokens(inputTokens);

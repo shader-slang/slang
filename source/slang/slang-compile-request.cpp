@@ -520,6 +520,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
         auto preprocessed = preprocessSourceSegments(
             segments,
+            astBuilder->getTokenPool(),
             slangLanguageVersion,
             getSink(),
             &includeSystem,
@@ -649,6 +650,7 @@ List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* s
 
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
+    TokenPool* tokenPool,
     SlangLanguageVersion& ioLanguageVersion,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,
@@ -664,6 +666,7 @@ List<PreprocessedSegment> preprocessSourceSegments(
 
         seg.tokens = preprocessSource(
             segmentFile,
+            tokenPool,
             sink,
             includeSystem,
             preprocessorDefinitions,

@@ -6,623 +6,488 @@
 #ifdef FIDDLE_GENERATED_OUTPUT_ID
 
 #if FIDDLE_GENERATED_OUTPUT_ID == 0
-    Lexeme,
-    Trivia,
-    Comment,
-    Token,
-    Literal,
-    NumericLiteral,
-    Punctuation,
-    EndOfFile,
-    Invalid,
-    Identifier,
-    IntegerLiteral,
-    FloatingPointLiteral,
-    StringLiteral,
-    CharLiteral,
-    WhiteSpace,
-    NewLine,
-    LineComment,
-    BlockComment,
-    Semicolon,
-    Comma,
-    Dot,
-    DotDot,
-    Ellipsis,
-    LBrace,
-    RBrace,
-    LBracket,
-    RBracket,
-    LParent,
-    RParent,
-    OpAssign,
-    OpAdd,
-    OpSub,
-    OpMul,
-    OpDiv,
-    OpMod,
-    OpNot,
-    OpBitNot,
-    OpLsh,
-    OpRsh,
-    OpEql,
-    OpNeq,
-    OpGreater,
-    OpLess,
-    OpGeq,
-    OpLeq,
-    OpAnd,
-    OpOr,
-    OpBitAnd,
-    OpBitOr,
-    OpBitXor,
-    OpInc,
-    OpDec,
-    OpAddAssign,
-    OpSubAssign,
-    OpMulAssign,
-    OpDivAssign,
-    OpModAssign,
-    OpShlAssign,
-    OpShrAssign,
-    OpAndAssign,
-    OpOrAssign,
-    OpXorAssign,
-    QuestionMark,
-    Colon,
-    RightArrow,
-    DoubleRightArrow,
-    At,
-    Dollar,
-    DollarDollar,
-    Pound,
-    PoundPound,
-    Scope,
-    CompletionRequest,
-    EscapedNewLine,
+/// The tags of concrete lexeme types, in depth-first hierarchy order.
+enum class LexemeTypeTag : uint8_t
+{
     AngleBracketHeaderName,
     EndOfDirective,
+    EndOfFile,
+    Identifier,
+    Invalid,
+    CharLiteral,
+    FloatingPointLiteral,
+    IntegerLiteral,
+    StringLiteral,
+    At,
+    Colon,
+    Comma,
+    CompletionRequest,
+    Dollar,
+    DollarDollar,
+    Dot,
+    DotDot,
+    DoubleRightArrow,
+    Ellipsis,
+    LBrace,
+    LBracket,
+    LParent,
+    OpAdd,
+    OpAddAssign,
+    OpAnd,
+    OpAndAssign,
+    OpAssign,
+    OpBitAnd,
+    OpBitNot,
+    OpBitOr,
+    OpBitXor,
+    OpDec,
+    OpDiv,
+    OpDivAssign,
+    OpEql,
+    OpGeq,
+    OpGreater,
+    OpInc,
+    OpLeq,
+    OpLess,
+    OpLsh,
+    OpMod,
+    OpModAssign,
+    OpMul,
+    OpMulAssign,
+    OpNeq,
+    OpNot,
+    OpOr,
+    OpOrAssign,
+    OpRsh,
+    OpShlAssign,
+    OpShrAssign,
+    OpSub,
+    OpSubAssign,
+    OpXorAssign,
+    Pound,
+    PoundPound,
+    QuestionMark,
+    RBrace,
+    RBracket,
+    RParent,
+    RightArrow,
+    Scope,
+    Semicolon,
+    BlockComment,
+    LineComment,
+    EscapedNewLine,
+    NewLine,
+    WhiteSpace,
+    /// One past all valid tags; an empty lexical value returns this sentinel.
+    Count,
+};
 
-#endif
+/// Compatibility name for the tag of a token.
+using TokenType = LexemeTypeTag;
 
-#if FIDDLE_GENERATED_OUTPUT_ID == 1
-        case LexemeKind::Trivia:
-            kind = LexemeKind::Lexeme;
-            break;
-        case LexemeKind::Comment:
-            kind = LexemeKind::Trivia;
-            break;
-        case LexemeKind::Token:
-            kind = LexemeKind::Lexeme;
-            break;
-        case LexemeKind::Literal:
-            kind = LexemeKind::Token;
-            break;
-        case LexemeKind::NumericLiteral:
-            kind = LexemeKind::Literal;
-            break;
-        case LexemeKind::Punctuation:
-            kind = LexemeKind::Token;
-            break;
-        case LexemeKind::EndOfFile:
-            kind = LexemeKind::Token;
-            break;
-        case LexemeKind::Invalid:
-            kind = LexemeKind::Token;
-            break;
-        case LexemeKind::Identifier:
-            kind = LexemeKind::Token;
-            break;
-        case LexemeKind::IntegerLiteral:
-            kind = LexemeKind::NumericLiteral;
-            break;
-        case LexemeKind::FloatingPointLiteral:
-            kind = LexemeKind::NumericLiteral;
-            break;
-        case LexemeKind::StringLiteral:
-            kind = LexemeKind::Literal;
-            break;
-        case LexemeKind::CharLiteral:
-            kind = LexemeKind::Literal;
-            break;
-        case LexemeKind::WhiteSpace:
-            kind = LexemeKind::Trivia;
-            break;
-        case LexemeKind::NewLine:
-            kind = LexemeKind::Trivia;
-            break;
-        case LexemeKind::LineComment:
-            kind = LexemeKind::Comment;
-            break;
-        case LexemeKind::BlockComment:
-            kind = LexemeKind::Comment;
-            break;
-        case LexemeKind::Semicolon:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::Comma:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::Dot:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::DotDot:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::Ellipsis:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::LBrace:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::RBrace:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::LBracket:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::RBracket:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::LParent:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::RParent:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpAdd:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpSub:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpMul:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpDiv:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpMod:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpNot:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpBitNot:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpLsh:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpRsh:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpEql:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpNeq:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpGreater:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpLess:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpGeq:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpLeq:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpAnd:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpOr:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpBitAnd:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpBitOr:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpBitXor:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpInc:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpDec:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpAddAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpSubAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpMulAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpDivAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpModAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpShlAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpShrAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpAndAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpOrAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::OpXorAssign:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::QuestionMark:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::Colon:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::RightArrow:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::DoubleRightArrow:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::At:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::Dollar:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::DollarDollar:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::Pound:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::PoundPound:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::Scope:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::CompletionRequest:
-            kind = LexemeKind::Punctuation;
-            break;
-        case LexemeKind::EscapedNewLine:
-            kind = LexemeKind::Trivia;
-            break;
-        case LexemeKind::AngleBracketHeaderName:
-            kind = LexemeKind::Token;
-            break;
-        case LexemeKind::EndOfDirective:
-            kind = LexemeKind::Token;
-            break;
+namespace LexemeTypes
+{
+inline constexpr LexemeType Lexeme{
+    LexemeTypeTag::AngleBracketHeaderName,
+    LexemeTypeTag::Count,
+    "lexeme"};
+inline constexpr LexemeType Token{
+    LexemeTypeTag::AngleBracketHeaderName,
+    LexemeTypeTag::BlockComment,
+    "token"};
+inline constexpr LexemeType AngleBracketHeaderName{
+    LexemeTypeTag::AngleBracketHeaderName,
+    LexemeTypeTag::EndOfDirective,
+    "angle-bracket-enclosed header name"};
+inline constexpr LexemeType EndOfDirective{
+    LexemeTypeTag::EndOfDirective,
+    LexemeTypeTag::EndOfFile,
+    "end of preprocessor directive"};
+inline constexpr LexemeType EndOfFile{
+    LexemeTypeTag::EndOfFile,
+    LexemeTypeTag::Identifier,
+    "end of file"};
+inline constexpr LexemeType Identifier{
+    LexemeTypeTag::Identifier,
+    LexemeTypeTag::Invalid,
+    "identifier"};
+inline constexpr LexemeType Invalid{
+    LexemeTypeTag::Invalid,
+    LexemeTypeTag::CharLiteral,
+    "invalid character"};
+inline constexpr LexemeType Literal{
+    LexemeTypeTag::CharLiteral,
+    LexemeTypeTag::At,
+    "literal"};
+inline constexpr LexemeType CharLiteral{
+    LexemeTypeTag::CharLiteral,
+    LexemeTypeTag::FloatingPointLiteral,
+    "character literal"};
+inline constexpr LexemeType NumericLiteral{
+    LexemeTypeTag::FloatingPointLiteral,
+    LexemeTypeTag::StringLiteral,
+    "numeric literal"};
+inline constexpr LexemeType FloatingPointLiteral{
+    LexemeTypeTag::FloatingPointLiteral,
+    LexemeTypeTag::IntegerLiteral,
+    "floating-point literal"};
+inline constexpr LexemeType IntegerLiteral{
+    LexemeTypeTag::IntegerLiteral,
+    LexemeTypeTag::StringLiteral,
+    "integer literal"};
+inline constexpr LexemeType StringLiteral{
+    LexemeTypeTag::StringLiteral,
+    LexemeTypeTag::At,
+    "string literal"};
+inline constexpr LexemeType Punctuation{
+    LexemeTypeTag::At,
+    LexemeTypeTag::BlockComment,
+    "punctuation"};
+inline constexpr LexemeType At{
+    LexemeTypeTag::At,
+    LexemeTypeTag::Colon,
+    "'@'"};
+inline constexpr LexemeType Colon{
+    LexemeTypeTag::Colon,
+    LexemeTypeTag::Comma,
+    "':'"};
+inline constexpr LexemeType Comma{
+    LexemeTypeTag::Comma,
+    LexemeTypeTag::CompletionRequest,
+    "','"};
+inline constexpr LexemeType CompletionRequest{
+    LexemeTypeTag::CompletionRequest,
+    LexemeTypeTag::Dollar,
+    "'#?'"};
+inline constexpr LexemeType Dollar{
+    LexemeTypeTag::Dollar,
+    LexemeTypeTag::DollarDollar,
+    "'$'"};
+inline constexpr LexemeType DollarDollar{
+    LexemeTypeTag::DollarDollar,
+    LexemeTypeTag::Dot,
+    "'$$'"};
+inline constexpr LexemeType Dot{
+    LexemeTypeTag::Dot,
+    LexemeTypeTag::DotDot,
+    "'.'"};
+inline constexpr LexemeType DotDot{
+    LexemeTypeTag::DotDot,
+    LexemeTypeTag::DoubleRightArrow,
+    "'..'"};
+inline constexpr LexemeType DoubleRightArrow{
+    LexemeTypeTag::DoubleRightArrow,
+    LexemeTypeTag::Ellipsis,
+    "'=>'"};
+inline constexpr LexemeType Ellipsis{
+    LexemeTypeTag::Ellipsis,
+    LexemeTypeTag::LBrace,
+    "'...'"};
+inline constexpr LexemeType LBrace{
+    LexemeTypeTag::LBrace,
+    LexemeTypeTag::LBracket,
+    "'{'"};
+inline constexpr LexemeType LBracket{
+    LexemeTypeTag::LBracket,
+    LexemeTypeTag::LParent,
+    "'['"};
+inline constexpr LexemeType LParent{
+    LexemeTypeTag::LParent,
+    LexemeTypeTag::OpAdd,
+    "'('"};
+inline constexpr LexemeType OpAdd{
+    LexemeTypeTag::OpAdd,
+    LexemeTypeTag::OpAddAssign,
+    "'+'"};
+inline constexpr LexemeType OpAddAssign{
+    LexemeTypeTag::OpAddAssign,
+    LexemeTypeTag::OpAnd,
+    "'+='"};
+inline constexpr LexemeType OpAnd{
+    LexemeTypeTag::OpAnd,
+    LexemeTypeTag::OpAndAssign,
+    "'&&'"};
+inline constexpr LexemeType OpAndAssign{
+    LexemeTypeTag::OpAndAssign,
+    LexemeTypeTag::OpAssign,
+    "'&='"};
+inline constexpr LexemeType OpAssign{
+    LexemeTypeTag::OpAssign,
+    LexemeTypeTag::OpBitAnd,
+    "'='"};
+inline constexpr LexemeType OpBitAnd{
+    LexemeTypeTag::OpBitAnd,
+    LexemeTypeTag::OpBitNot,
+    "'&'"};
+inline constexpr LexemeType OpBitNot{
+    LexemeTypeTag::OpBitNot,
+    LexemeTypeTag::OpBitOr,
+    "'~'"};
+inline constexpr LexemeType OpBitOr{
+    LexemeTypeTag::OpBitOr,
+    LexemeTypeTag::OpBitXor,
+    "'|'"};
+inline constexpr LexemeType OpBitXor{
+    LexemeTypeTag::OpBitXor,
+    LexemeTypeTag::OpDec,
+    "'^'"};
+inline constexpr LexemeType OpDec{
+    LexemeTypeTag::OpDec,
+    LexemeTypeTag::OpDiv,
+    "'--'"};
+inline constexpr LexemeType OpDiv{
+    LexemeTypeTag::OpDiv,
+    LexemeTypeTag::OpDivAssign,
+    "'/'"};
+inline constexpr LexemeType OpDivAssign{
+    LexemeTypeTag::OpDivAssign,
+    LexemeTypeTag::OpEql,
+    "'/='"};
+inline constexpr LexemeType OpEql{
+    LexemeTypeTag::OpEql,
+    LexemeTypeTag::OpGeq,
+    "'=='"};
+inline constexpr LexemeType OpGeq{
+    LexemeTypeTag::OpGeq,
+    LexemeTypeTag::OpGreater,
+    "'>='"};
+inline constexpr LexemeType OpGreater{
+    LexemeTypeTag::OpGreater,
+    LexemeTypeTag::OpInc,
+    "'>'"};
+inline constexpr LexemeType OpInc{
+    LexemeTypeTag::OpInc,
+    LexemeTypeTag::OpLeq,
+    "'++'"};
+inline constexpr LexemeType OpLeq{
+    LexemeTypeTag::OpLeq,
+    LexemeTypeTag::OpLess,
+    "'<='"};
+inline constexpr LexemeType OpLess{
+    LexemeTypeTag::OpLess,
+    LexemeTypeTag::OpLsh,
+    "'<'"};
+inline constexpr LexemeType OpLsh{
+    LexemeTypeTag::OpLsh,
+    LexemeTypeTag::OpMod,
+    "'<<'"};
+inline constexpr LexemeType OpMod{
+    LexemeTypeTag::OpMod,
+    LexemeTypeTag::OpModAssign,
+    "'%'"};
+inline constexpr LexemeType OpModAssign{
+    LexemeTypeTag::OpModAssign,
+    LexemeTypeTag::OpMul,
+    "'%='"};
+inline constexpr LexemeType OpMul{
+    LexemeTypeTag::OpMul,
+    LexemeTypeTag::OpMulAssign,
+    "'*'"};
+inline constexpr LexemeType OpMulAssign{
+    LexemeTypeTag::OpMulAssign,
+    LexemeTypeTag::OpNeq,
+    "'*='"};
+inline constexpr LexemeType OpNeq{
+    LexemeTypeTag::OpNeq,
+    LexemeTypeTag::OpNot,
+    "'!='"};
+inline constexpr LexemeType OpNot{
+    LexemeTypeTag::OpNot,
+    LexemeTypeTag::OpOr,
+    "'!'"};
+inline constexpr LexemeType OpOr{
+    LexemeTypeTag::OpOr,
+    LexemeTypeTag::OpOrAssign,
+    "'||'"};
+inline constexpr LexemeType OpOrAssign{
+    LexemeTypeTag::OpOrAssign,
+    LexemeTypeTag::OpRsh,
+    "'|='"};
+inline constexpr LexemeType OpRsh{
+    LexemeTypeTag::OpRsh,
+    LexemeTypeTag::OpShlAssign,
+    "'>>'"};
+inline constexpr LexemeType OpShlAssign{
+    LexemeTypeTag::OpShlAssign,
+    LexemeTypeTag::OpShrAssign,
+    "'<<='"};
+inline constexpr LexemeType OpShrAssign{
+    LexemeTypeTag::OpShrAssign,
+    LexemeTypeTag::OpSub,
+    "'>>='"};
+inline constexpr LexemeType OpSub{
+    LexemeTypeTag::OpSub,
+    LexemeTypeTag::OpSubAssign,
+    "'-'"};
+inline constexpr LexemeType OpSubAssign{
+    LexemeTypeTag::OpSubAssign,
+    LexemeTypeTag::OpXorAssign,
+    "'-='"};
+inline constexpr LexemeType OpXorAssign{
+    LexemeTypeTag::OpXorAssign,
+    LexemeTypeTag::Pound,
+    "'^='"};
+inline constexpr LexemeType Pound{
+    LexemeTypeTag::Pound,
+    LexemeTypeTag::PoundPound,
+    "'#'"};
+inline constexpr LexemeType PoundPound{
+    LexemeTypeTag::PoundPound,
+    LexemeTypeTag::QuestionMark,
+    "'##'"};
+inline constexpr LexemeType QuestionMark{
+    LexemeTypeTag::QuestionMark,
+    LexemeTypeTag::RBrace,
+    "'?'"};
+inline constexpr LexemeType RBrace{
+    LexemeTypeTag::RBrace,
+    LexemeTypeTag::RBracket,
+    "'}'"};
+inline constexpr LexemeType RBracket{
+    LexemeTypeTag::RBracket,
+    LexemeTypeTag::RParent,
+    "']'"};
+inline constexpr LexemeType RParent{
+    LexemeTypeTag::RParent,
+    LexemeTypeTag::RightArrow,
+    "')'"};
+inline constexpr LexemeType RightArrow{
+    LexemeTypeTag::RightArrow,
+    LexemeTypeTag::Scope,
+    "'->'"};
+inline constexpr LexemeType Scope{
+    LexemeTypeTag::Scope,
+    LexemeTypeTag::Semicolon,
+    "'::'"};
+inline constexpr LexemeType Semicolon{
+    LexemeTypeTag::Semicolon,
+    LexemeTypeTag::BlockComment,
+    "';'"};
+inline constexpr LexemeType Trivia{
+    LexemeTypeTag::BlockComment,
+    LexemeTypeTag::Count,
+    "trivia"};
+inline constexpr LexemeType Comment{
+    LexemeTypeTag::BlockComment,
+    LexemeTypeTag::EscapedNewLine,
+    "comment"};
+inline constexpr LexemeType BlockComment{
+    LexemeTypeTag::BlockComment,
+    LexemeTypeTag::LineComment,
+    "block comment"};
+inline constexpr LexemeType LineComment{
+    LexemeTypeTag::LineComment,
+    LexemeTypeTag::EscapedNewLine,
+    "line comment"};
+inline constexpr LexemeType EscapedNewLine{
+    LexemeTypeTag::EscapedNewLine,
+    LexemeTypeTag::NewLine,
+    "escaped end of line"};
+inline constexpr LexemeType NewLine{
+    LexemeTypeTag::NewLine,
+    LexemeTypeTag::WhiteSpace,
+    "end of line"};
+inline constexpr LexemeType WhiteSpace{
+    LexemeTypeTag::WhiteSpace,
+    LexemeTypeTag::Count,
+    "whitespace"};
+} // namespace LexemeTypes
 
-#endif
+/// The concrete descriptors in tag order, shared by tag-to-description lookup.
+inline constexpr LexemeType kConcreteLexemeTypes[] = {
+    LexemeTypes::AngleBracketHeaderName,
+    LexemeTypes::EndOfDirective,
+    LexemeTypes::EndOfFile,
+    LexemeTypes::Identifier,
+    LexemeTypes::Invalid,
+    LexemeTypes::CharLiteral,
+    LexemeTypes::FloatingPointLiteral,
+    LexemeTypes::IntegerLiteral,
+    LexemeTypes::StringLiteral,
+    LexemeTypes::At,
+    LexemeTypes::Colon,
+    LexemeTypes::Comma,
+    LexemeTypes::CompletionRequest,
+    LexemeTypes::Dollar,
+    LexemeTypes::DollarDollar,
+    LexemeTypes::Dot,
+    LexemeTypes::DotDot,
+    LexemeTypes::DoubleRightArrow,
+    LexemeTypes::Ellipsis,
+    LexemeTypes::LBrace,
+    LexemeTypes::LBracket,
+    LexemeTypes::LParent,
+    LexemeTypes::OpAdd,
+    LexemeTypes::OpAddAssign,
+    LexemeTypes::OpAnd,
+    LexemeTypes::OpAndAssign,
+    LexemeTypes::OpAssign,
+    LexemeTypes::OpBitAnd,
+    LexemeTypes::OpBitNot,
+    LexemeTypes::OpBitOr,
+    LexemeTypes::OpBitXor,
+    LexemeTypes::OpDec,
+    LexemeTypes::OpDiv,
+    LexemeTypes::OpDivAssign,
+    LexemeTypes::OpEql,
+    LexemeTypes::OpGeq,
+    LexemeTypes::OpGreater,
+    LexemeTypes::OpInc,
+    LexemeTypes::OpLeq,
+    LexemeTypes::OpLess,
+    LexemeTypes::OpLsh,
+    LexemeTypes::OpMod,
+    LexemeTypes::OpModAssign,
+    LexemeTypes::OpMul,
+    LexemeTypes::OpMulAssign,
+    LexemeTypes::OpNeq,
+    LexemeTypes::OpNot,
+    LexemeTypes::OpOr,
+    LexemeTypes::OpOrAssign,
+    LexemeTypes::OpRsh,
+    LexemeTypes::OpShlAssign,
+    LexemeTypes::OpShrAssign,
+    LexemeTypes::OpSub,
+    LexemeTypes::OpSubAssign,
+    LexemeTypes::OpXorAssign,
+    LexemeTypes::Pound,
+    LexemeTypes::PoundPound,
+    LexemeTypes::QuestionMark,
+    LexemeTypes::RBrace,
+    LexemeTypes::RBracket,
+    LexemeTypes::RParent,
+    LexemeTypes::RightArrow,
+    LexemeTypes::Scope,
+    LexemeTypes::Semicolon,
+    LexemeTypes::BlockComment,
+    LexemeTypes::LineComment,
+    LexemeTypes::EscapedNewLine,
+    LexemeTypes::NewLine,
+    LexemeTypes::WhiteSpace,
+};
 
-#if FIDDLE_GENERATED_OUTPUT_ID == 2
-    case LexemeKind::Lexeme:
-        return false;
-    case LexemeKind::Trivia:
-        return false;
-    case LexemeKind::Comment:
-        return false;
-    case LexemeKind::Token:
-        return false;
-    case LexemeKind::Literal:
-        return false;
-    case LexemeKind::NumericLiteral:
-        return false;
-    case LexemeKind::Punctuation:
-        return false;
-    case LexemeKind::EndOfFile:
-        return true;
-    case LexemeKind::Invalid:
-        return true;
-    case LexemeKind::Identifier:
-        return true;
-    case LexemeKind::IntegerLiteral:
-        return true;
-    case LexemeKind::FloatingPointLiteral:
-        return true;
-    case LexemeKind::StringLiteral:
-        return true;
-    case LexemeKind::CharLiteral:
-        return true;
-    case LexemeKind::WhiteSpace:
-        return true;
-    case LexemeKind::NewLine:
-        return true;
-    case LexemeKind::LineComment:
-        return true;
-    case LexemeKind::BlockComment:
-        return true;
-    case LexemeKind::Semicolon:
-        return true;
-    case LexemeKind::Comma:
-        return true;
-    case LexemeKind::Dot:
-        return true;
-    case LexemeKind::DotDot:
-        return true;
-    case LexemeKind::Ellipsis:
-        return true;
-    case LexemeKind::LBrace:
-        return true;
-    case LexemeKind::RBrace:
-        return true;
-    case LexemeKind::LBracket:
-        return true;
-    case LexemeKind::RBracket:
-        return true;
-    case LexemeKind::LParent:
-        return true;
-    case LexemeKind::RParent:
-        return true;
-    case LexemeKind::OpAssign:
-        return true;
-    case LexemeKind::OpAdd:
-        return true;
-    case LexemeKind::OpSub:
-        return true;
-    case LexemeKind::OpMul:
-        return true;
-    case LexemeKind::OpDiv:
-        return true;
-    case LexemeKind::OpMod:
-        return true;
-    case LexemeKind::OpNot:
-        return true;
-    case LexemeKind::OpBitNot:
-        return true;
-    case LexemeKind::OpLsh:
-        return true;
-    case LexemeKind::OpRsh:
-        return true;
-    case LexemeKind::OpEql:
-        return true;
-    case LexemeKind::OpNeq:
-        return true;
-    case LexemeKind::OpGreater:
-        return true;
-    case LexemeKind::OpLess:
-        return true;
-    case LexemeKind::OpGeq:
-        return true;
-    case LexemeKind::OpLeq:
-        return true;
-    case LexemeKind::OpAnd:
-        return true;
-    case LexemeKind::OpOr:
-        return true;
-    case LexemeKind::OpBitAnd:
-        return true;
-    case LexemeKind::OpBitOr:
-        return true;
-    case LexemeKind::OpBitXor:
-        return true;
-    case LexemeKind::OpInc:
-        return true;
-    case LexemeKind::OpDec:
-        return true;
-    case LexemeKind::OpAddAssign:
-        return true;
-    case LexemeKind::OpSubAssign:
-        return true;
-    case LexemeKind::OpMulAssign:
-        return true;
-    case LexemeKind::OpDivAssign:
-        return true;
-    case LexemeKind::OpModAssign:
-        return true;
-    case LexemeKind::OpShlAssign:
-        return true;
-    case LexemeKind::OpShrAssign:
-        return true;
-    case LexemeKind::OpAndAssign:
-        return true;
-    case LexemeKind::OpOrAssign:
-        return true;
-    case LexemeKind::OpXorAssign:
-        return true;
-    case LexemeKind::QuestionMark:
-        return true;
-    case LexemeKind::Colon:
-        return true;
-    case LexemeKind::RightArrow:
-        return true;
-    case LexemeKind::DoubleRightArrow:
-        return true;
-    case LexemeKind::At:
-        return true;
-    case LexemeKind::Dollar:
-        return true;
-    case LexemeKind::DollarDollar:
-        return true;
-    case LexemeKind::Pound:
-        return true;
-    case LexemeKind::PoundPound:
-        return true;
-    case LexemeKind::Scope:
-        return true;
-    case LexemeKind::CompletionRequest:
-        return true;
-    case LexemeKind::EscapedNewLine:
-        return true;
-    case LexemeKind::AngleBracketHeaderName:
-        return true;
-    case LexemeKind::EndOfDirective:
-        return true;
+/// Whether `tag` identifies a concrete lexeme type.
+constexpr bool isValidLexemeTypeTag(LexemeTypeTag tag)
+{
+    return uint8_t(tag) < uint8_t(LexemeTypeTag::Count);
+}
 
-#endif
+/// Returns the descriptor for a concrete tag.
+///
+/// Requires a valid tag; `Count` is not a lexeme type.
+inline const LexemeType& getLexemeType(LexemeTypeTag tag)
+{
+    SLANG_RELEASE_ASSERT(isValidLexemeTypeTag(tag));
+    return kConcreteLexemeTypes[uint8_t(tag)];
+}
 
-#if FIDDLE_GENERATED_OUTPUT_ID == 3
-    case TokenType::Lexeme:
-        return "lexeme";
-    case TokenType::Trivia:
-        return "trivia";
-    case TokenType::Comment:
-        return "comment";
-    case TokenType::Token:
-        return "token";
-    case TokenType::Literal:
-        return "literal";
-    case TokenType::NumericLiteral:
-        return "numeric literal";
-    case TokenType::Punctuation:
-        return "punctuation";
-    case TokenType::EndOfFile:
-        return "end of file";
-    case TokenType::Invalid:
-        return "invalid character";
-    case TokenType::Identifier:
-        return "identifier";
-    case TokenType::IntegerLiteral:
-        return "integer literal";
-    case TokenType::FloatingPointLiteral:
-        return "floating-point literal";
-    case TokenType::StringLiteral:
-        return "string literal";
-    case TokenType::CharLiteral:
-        return "character literal";
-    case TokenType::WhiteSpace:
-        return "whitespace";
-    case TokenType::NewLine:
-        return "end of line";
-    case TokenType::LineComment:
-        return "line comment";
-    case TokenType::BlockComment:
-        return "block comment";
-    case TokenType::Semicolon:
-        return "';'";
-    case TokenType::Comma:
-        return "','";
-    case TokenType::Dot:
-        return "'.'";
-    case TokenType::DotDot:
-        return "'..'";
-    case TokenType::Ellipsis:
-        return "'...'";
-    case TokenType::LBrace:
-        return "'{'";
-    case TokenType::RBrace:
-        return "'}'";
-    case TokenType::LBracket:
-        return "'['";
-    case TokenType::RBracket:
-        return "']'";
-    case TokenType::LParent:
-        return "'('";
-    case TokenType::RParent:
-        return "')'";
-    case TokenType::OpAssign:
-        return "'='";
-    case TokenType::OpAdd:
-        return "'+'";
-    case TokenType::OpSub:
-        return "'-'";
-    case TokenType::OpMul:
-        return "'*'";
-    case TokenType::OpDiv:
-        return "'/'";
-    case TokenType::OpMod:
-        return "'%'";
-    case TokenType::OpNot:
-        return "'!'";
-    case TokenType::OpBitNot:
-        return "'~'";
-    case TokenType::OpLsh:
-        return "'<<'";
-    case TokenType::OpRsh:
-        return "'>>'";
-    case TokenType::OpEql:
-        return "'=='";
-    case TokenType::OpNeq:
-        return "'!='";
-    case TokenType::OpGreater:
-        return "'>'";
-    case TokenType::OpLess:
-        return "'<'";
-    case TokenType::OpGeq:
-        return "'>='";
-    case TokenType::OpLeq:
-        return "'<='";
-    case TokenType::OpAnd:
-        return "'&&'";
-    case TokenType::OpOr:
-        return "'||'";
-    case TokenType::OpBitAnd:
-        return "'&'";
-    case TokenType::OpBitOr:
-        return "'|'";
-    case TokenType::OpBitXor:
-        return "'^'";
-    case TokenType::OpInc:
-        return "'++'";
-    case TokenType::OpDec:
-        return "'--'";
-    case TokenType::OpAddAssign:
-        return "'+='";
-    case TokenType::OpSubAssign:
-        return "'-='";
-    case TokenType::OpMulAssign:
-        return "'*='";
-    case TokenType::OpDivAssign:
-        return "'/='";
-    case TokenType::OpModAssign:
-        return "'%='";
-    case TokenType::OpShlAssign:
-        return "'<<='";
-    case TokenType::OpShrAssign:
-        return "'>>='";
-    case TokenType::OpAndAssign:
-        return "'&='";
-    case TokenType::OpOrAssign:
-        return "'|='";
-    case TokenType::OpXorAssign:
-        return "'^='";
-    case TokenType::QuestionMark:
-        return "'?'";
-    case TokenType::Colon:
-        return "':'";
-    case TokenType::RightArrow:
-        return "'->'";
-    case TokenType::DoubleRightArrow:
-        return "'=>'";
-    case TokenType::At:
-        return "'@'";
-    case TokenType::Dollar:
-        return "'$'";
-    case TokenType::DollarDollar:
-        return "'$$'";
-    case TokenType::Pound:
-        return "'#'";
-    case TokenType::PoundPound:
-        return "'##'";
-    case TokenType::Scope:
-        return "'::'";
-    case TokenType::CompletionRequest:
-        return "'#?'";
-    case TokenType::EscapedNewLine:
-        return "escaped end of line";
-    case TokenType::AngleBracketHeaderName:
-        return "angle-bracket-enclosed header name";
-    case TokenType::EndOfDirective:
-        return "end of preprocessor directive";
+/// Returns a concrete tag's diagnostic description, or `<unknown>` for an empty value.
+inline const char* TokenTypeToString(TokenType tag)
+{
+    if (tag == LexemeTypeTag::Count)
+        return "<unknown>";
+    return getLexemeType(tag).description;
+}
 
 #endif
 

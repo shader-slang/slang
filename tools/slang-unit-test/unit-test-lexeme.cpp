@@ -21,6 +21,7 @@ struct LexemeTestInput
     SourceManager sourceManager;
     NamePool namePool;
     DiagnosticSink sink;
+    RefPtr<TokenPool> tokenPool = new TokenPool();
     Lexer lexer;
     SourceLoc beginLoc;
 
@@ -39,7 +40,7 @@ struct LexemeTestInput
         auto file = sourceManager.createSourceFileWithBlob(PathInfo::makeUnknown(), blob);
         auto view = sourceManager.createSourceView(file, nullptr, SourceLoc());
         beginLoc = view->getRange().begin;
-        lexer.initialize(view, &sink, &namePool);
+        lexer.initialize(view, &sink, &namePool, tokenPool);
     }
 };
 
@@ -70,12 +71,12 @@ SLANG_UNIT_TEST(lexemePoolSeparatesSpellingFromOccurrences)
     const auto physicalSpelling = UnownedStringSlice("alpha\\\nbeta");
     const auto logicalSpelling = UnownedStringSlice("alphabeta");
     auto first = pool.createLexeme(
-        LexemeKind::Identifier,
+        LexemeTypeTag::Identifier,
         physicalSpelling,
         logicalSpelling,
         SourceLoc::fromRaw(100));
     auto second = pool.createLexeme(
-        LexemeKind::Identifier,
+        LexemeTypeTag::Identifier,
         physicalSpelling,
         logicalSpelling,
         SourceLoc::fromRaw(200),
@@ -88,7 +89,7 @@ SLANG_UNIT_TEST(lexemePoolSeparatesSpellingFromOccurrences)
 
     // Scrubbing does not erase the distinction between physical spellings. Keeping that
     // distinction lets a token stream reproduce the escaped newline exactly.
-    auto unspliced = pool.createLexeme(LexemeKind::Identifier, logicalSpelling, logicalSpelling);
+    auto unspliced = pool.createLexeme(LexemeTypeTag::Identifier, logicalSpelling, logicalSpelling);
     SLANG_CHECK(first.getObject() != unspliced.getObject());
     SLANG_CHECK(first.getLogicalSpelling() == unspliced.getLogicalSpelling());
     SLANG_CHECK(first.getPhysicalSpelling() == physicalSpelling);
@@ -103,7 +104,7 @@ SLANG_UNIT_TEST(lexemePoolOwnsInputText)
     auto& pool = *poolOwner;
     char spelling[] = "item";
     auto lexeme = pool.createLexeme(
-        LexemeKind::Identifier,
+        LexemeTypeTag::Identifier,
         UnownedStringSlice(spelling),
         UnownedStringSlice(spelling));
     spelling[0] = 'X';
@@ -111,7 +112,7 @@ SLANG_UNIT_TEST(lexemePoolOwnsInputText)
     SLANG_CHECK(lexeme.getLogicalSpelling() == UnownedStringSlice("item"));
 
     auto repeated = pool.createLexeme(
-        LexemeKind::Identifier,
+        LexemeTypeTag::Identifier,
         UnownedStringSlice("item"),
         UnownedStringSlice("item"));
     SLANG_CHECK(lexeme.getObject() == repeated.getObject());
@@ -123,18 +124,22 @@ SLANG_UNIT_TEST(tokenPoolInternsOrderedTrivia)
     // its leading trivia. A second occurrence shares objects but retains its own context.
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
-    auto space =
-        pool.createLexeme(LexemeKind::WhiteSpace, UnownedStringSlice(" "), UnownedStringSlice(" "));
+    auto space = pool.createLexeme(
+        LexemeTypeTag::WhiteSpace,
+        UnownedStringSlice(" "),
+        UnownedStringSlice(" "));
     auto comment = pool.createLexeme(
-        LexemeKind::BlockComment,
+        LexemeTypeTag::BlockComment,
         UnownedStringSlice("/*c*/"),
         UnownedStringSlice("/*c*/"));
-    auto newline =
-        pool.createLexeme(LexemeKind::NewLine, UnownedStringSlice("\n"), UnownedStringSlice("\n"));
+    auto newline = pool.createLexeme(
+        LexemeTypeTag::NewLine,
+        UnownedStringSlice("\n"),
+        UnownedStringSlice("\n"));
     const LexemeObj* leading[] = {space.getObject(), comment.getObject()};
     const LexemeObj* trailing[] = {newline.getObject()};
     auto raw = pool.createLexeme(
-        LexemeKind::Identifier,
+        LexemeTypeTag::Identifier,
         UnownedStringSlice("x"),
         UnownedStringSlice("x"),
         SourceLoc::fromRaw(100));
@@ -143,7 +148,7 @@ SLANG_UNIT_TEST(tokenPoolInternsOrderedTrivia)
         makeConstArrayView(leading),
         makeConstArrayView(trailing));
     auto otherRaw = pool.createLexeme(
-        LexemeKind::Identifier,
+        LexemeTypeTag::Identifier,
         UnownedStringSlice("x"),
         UnownedStringSlice("x"),
         SourceLoc::fromRaw(200),
@@ -197,6 +202,8 @@ SLANG_UNIT_TEST(lexemeTypedValuesDistinguishEmptyFromEndOfFile)
     // extra payloads. Numeric literals belong to both numeric and literal groups.
     auto number = pool.createToken(TokenType::IntegerLiteral, UnownedStringSlice("12"));
     SLANG_CHECK(number.is<IntegerLiteralToken>());
+    SLANG_CHECK(number.isInstanceOf<LiteralToken>());
+    SLANG_CHECK(number.isInstanceOf(LexemeTypes::NumericLiteral));
     SLANG_CHECK(number.is<LiteralToken>());
     SLANG_CHECK(number.is<Token>());
     SLANG_CHECK(number.getRawToken().is<RawNumericLiteral>());
@@ -235,7 +242,7 @@ SLANG_UNIT_TEST(tokenReaderTypedConditionalRead)
     // returns the requested type and advances to the following token.
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
-    TokenList tokens;
+    TokenList tokens(poolOwner);
     tokens.add(pool.createToken(TokenType::Identifier, UnownedStringSlice("value")));
     tokens.add(pool.createToken(TokenType::IntegerLiteral, UnownedStringSlice("12")));
     tokens.add(pool.createEndOfFile());
@@ -265,19 +272,19 @@ SLANG_UNIT_TEST(tokenSplitPreservesPhysicalOffsetsAndTrailingTrivia)
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
     auto rightShift = pool.createLexeme(
-        LexemeKind::OpRsh,
+        LexemeTypeTag::OpRsh,
         UnownedStringSlice(">\\\n>"),
         UnownedStringSlice(">>"),
         SourceLoc::fromRaw(100),
         TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace);
     auto comment = pool.createLexeme(
-        LexemeKind::LineComment,
+        LexemeTypeTag::LineComment,
         UnownedStringSlice("//tail"),
         UnownedStringSlice("//tail"));
     const LexemeObj* trailing[] = {comment.getObject()};
     auto original = pool.createToken(rightShift.as<RawToken>(), {}, makeConstArrayView(trailing));
     auto second = pool.createSecondGreaterToken(rightShift.as<RawOpRsh>());
-    SLANG_CHECK(second.getType() == TokenType::OpGreater);
+    SLANG_CHECK(second.getTypeTag() == TokenType::OpGreater);
     SLANG_CHECK(second.getPhysicalSpelling() == UnownedStringSlice(">"));
     SLANG_CHECK(second.getLogicalSpelling() == UnownedStringSlice(">"));
     SLANG_CHECK(second.getLoc() == SourceLoc::fromRaw(103));
@@ -321,103 +328,35 @@ SLANG_UNIT_TEST(tokenRefRetainsPoolAndName)
     SLANG_CHECK(wasPoolDestroyed);
 }
 
-SLANG_UNIT_TEST(tokenPoolImportOwnsForeignTrivia)
+SLANG_UNIT_TEST(tokenListRetainsItsSelectedPool)
 {
-    // Imported clusters must depend only on the destination pool. We release every
-    // owner of the original cluster before reading the imported spelling and trivia.
-    RefPtr<TokenPool> destinationOwner = new TokenPool();
-    auto& destination = *destinationOwner;
-    Token imported;
+    // The sequence keeps its one selected pool alive after the allocating owner
+    // leaves scope. Replacing its values does not add or change pool ownership.
+    bool wasDestroyed = false;
+    TokenList tokens;
     {
-        RefPtr<TokenPool> originalOwner = new TokenPool();
-        auto& original = *originalOwner;
-        auto raw = original.createLexeme(
-            LexemeKind::IntegerLiteral,
-            UnownedStringSlice("42"),
-            UnownedStringSlice("42"),
-            SourceLoc::fromRaw(20),
-            TokenFlag::AfterWhitespace);
-        auto comment = original.createLexeme(
-            LexemeKind::BlockComment,
-            UnownedStringSlice("/*c*/"),
-            UnownedStringSlice("/*c*/"));
-        const LexemeObj* trivia[] = {comment.getObject()};
-        auto token = original.createToken(raw.as<RawToken>(), makeConstArrayView(trivia));
-        imported = destination.importToken(token);
-        SLANG_CHECK(imported.getObject() != token.getObject());
-        SLANG_CHECK(imported.getRawToken().getPool() == &destination);
-        SLANG_CHECK_ABORT(imported.getLeadingTrivia().getCount() == 1);
-        SLANG_CHECK(imported.getLeadingTrivia()[0].getPool() == &destination);
+        RefPtr<TokenPool> pool = new TokenPoolWithDestructionFlag(wasDestroyed);
+        tokens = TokenList(pool);
+        tokens.add(pool->createToken(TokenType::Identifier, UnownedStringSlice("one")));
+        tokens.add(pool->createEndOfFile());
+        SLANG_CHECK(tokens.getTokenPool() == pool.get());
     }
-    SLANG_CHECK(imported.getLogicalSpelling() == UnownedStringSlice("42"));
-    SLANG_CHECK(
-        imported.getLeadingTrivia()[0].getPhysicalSpelling() == UnownedStringSlice("/*c*/"));
-    SLANG_CHECK(imported.getLeadingTrivia()[0].getLoc() == SourceLoc::fromRaw(15));
-    SLANG_CHECK(imported.getFlags() == TokenFlag::AfterWhitespace);
-}
-
-SLANG_UNIT_TEST(tokenPoolEmptyImportPreservesOccurrenceState)
-{
-    // A null object makes the token empty, independently of location and context.
-    // Importing that value must preserve the independent occurrence fields as well.
-    RefPtr<TokenPool> pool = new TokenPool();
-    const auto loc = SourceLoc::fromRaw(150);
-    const TokenFlags flags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
-    Token empty(nullptr, loc, flags);
-    auto imported = pool->importToken(empty);
-    SLANG_CHECK(!imported);
-    SLANG_CHECK(imported.getObject() == nullptr);
-    SLANG_CHECK(imported.getLoc() == loc);
-    SLANG_CHECK(imported.getFlags() == flags);
-}
-
-SLANG_UNIT_TEST(tokenListReplacementRetainsEveryPool)
-{
-    // A list can alternate between pools, and the original owners can disappear
-    // before the list replaces itself. Destruction flags make lifetime failures
-    // observable before any test attempts to read the borrowed spelling.
-    bool wasFirstPoolDestroyed = false;
-    bool wasSecondPoolDestroyed = false;
+    SLANG_CHECK_ABORT(!wasDestroyed);
+    tokens.setTokens(tokens.getTokens());
     {
-        TokenList tokens;
-        {
-            RefPtr<TokenPool> first = new TokenPoolWithDestructionFlag(wasFirstPoolDestroyed);
-            RefPtr<TokenPool> second = new TokenPoolWithDestructionFlag(wasSecondPoolDestroyed);
-            List<Token> replacement;
-            replacement.add(first->createToken(TokenType::Identifier, UnownedStringSlice("one")));
-            replacement.add(
-                second->createToken(TokenType::IntegerLiteral, UnownedStringSlice("2")));
-            replacement.add(first->createToken(TokenType::Identifier, UnownedStringSlice("three")));
-            replacement.add(second->createEndOfFile());
-            tokens.setTokens(replacement);
-        }
-        SLANG_CHECK_ABORT(!wasFirstPoolDestroyed);
-        SLANG_CHECK_ABORT(!wasSecondPoolDestroyed);
-
-        // Self replacement aliases the list's own storage. Retaining replacement pools
-        // must precede releasing old values, even though no external owner remains.
-        tokens.setTokens(tokens.getTokens());
-        SLANG_CHECK_ABORT(!wasFirstPoolDestroyed);
-        SLANG_CHECK_ABORT(!wasSecondPoolDestroyed);
         TokenReader reader(tokens);
         SLANG_CHECK(
             reader.advanceIf<IdentifierToken>().getLogicalSpelling() == UnownedStringSlice("one"));
-        SLANG_CHECK(
-            reader.advanceIf<IntegerLiteralToken>().getLogicalSpelling() ==
-            UnownedStringSlice("2"));
-        SLANG_CHECK(
-            reader.advanceIf<IdentifierToken>().getLogicalSpelling() ==
-            UnownedStringSlice("three"));
-        SLANG_CHECK(reader.peekTokenType() == TokenType::EndOfFile);
+        SLANG_CHECK(reader.peekToken().getPool() == tokens.getTokenPool());
     }
-    SLANG_CHECK(wasFirstPoolDestroyed);
-    SLANG_CHECK(wasSecondPoolDestroyed);
+    tokens = TokenList();
+    SLANG_CHECK(wasDestroyed);
 }
 
 SLANG_UNIT_TEST(tokenListRetainsLexicalStorage)
 {
     // A saved token list can outlive the lexer, the name pool, and the `SourceManager`.
-    // Its pool references must preserve spelling and names without borrowing file bytes.
+    // Its selected pool must preserve spelling and names without borrowing file bytes.
     TokenList tokens;
     {
         LexemeTestInput input("one //tail\n");
@@ -435,6 +374,29 @@ SLANG_UNIT_TEST(tokenListRetainsLexicalStorage)
     SLANG_CHECK(reader.peekTokenType() == TokenType::EndOfFile);
 }
 
+SLANG_UNIT_TEST(tokenListAppendPreservesAliasedOccurrence)
+{
+    // Appending an occurrence already in the sequence must remain valid while the
+    // sequence grows and relocates its values. The pool and occurrence stay the same.
+    RefPtr<TokenPool> pool = new TokenPool();
+    TokenList tokens(pool);
+    auto first = pool->createToken(
+        TokenType::Identifier,
+        UnownedStringSlice("kept"),
+        SourceLoc::fromRaw(100),
+        TokenFlag::AfterWhitespace);
+    tokens.add(first);
+    for (Index i = 0; i < 128; ++i)
+        tokens.add(tokens.getTokens()[0]);
+    tokens.add(pool->createEndOfFile());
+    for (auto token : tokens)
+    {
+        SLANG_CHECK(token.getObject() == first.getObject());
+        SLANG_CHECK(token.getLoc() == first.getLoc());
+        SLANG_CHECK(token.getFlags() == first.getFlags());
+    }
+}
+
 SLANG_UNIT_TEST(tokenTriviaPreservesUnknownSourceLocations)
 {
     // A token reconstructed without debug locations can still have spelling and
@@ -442,17 +404,21 @@ SLANG_UNIT_TEST(tokenTriviaPreservesUnknownSourceLocations)
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
     auto raw = pool.createLexeme(
-        LexemeKind::IntegerLiteral,
+        LexemeTypeTag::IntegerLiteral,
         UnownedStringSlice("42"),
         UnownedStringSlice("42"));
-    auto space =
-        pool.createLexeme(LexemeKind::WhiteSpace, UnownedStringSlice(" "), UnownedStringSlice(" "));
+    auto space = pool.createLexeme(
+        LexemeTypeTag::WhiteSpace,
+        UnownedStringSlice(" "),
+        UnownedStringSlice(" "));
     auto comment = pool.createLexeme(
-        LexemeKind::BlockComment,
+        LexemeTypeTag::BlockComment,
         UnownedStringSlice("/*c*/"),
         UnownedStringSlice("/*c*/"));
-    auto newline =
-        pool.createLexeme(LexemeKind::NewLine, UnownedStringSlice("\n"), UnownedStringSlice("\n"));
+    auto newline = pool.createLexeme(
+        LexemeTypeTag::NewLine,
+        UnownedStringSlice("\n"),
+        UnownedStringSlice("\n"));
     const LexemeObj* leading[] = {space.getObject(), comment.getObject()};
     const LexemeObj* trailing[] = {newline.getObject(), space.getObject()};
     auto token = pool.createToken(
@@ -653,6 +619,7 @@ SLANG_UNIT_TEST(lexerRetainsPhysicalAndLogicalSpellings)
     SLANG_CHECK(identifier.is<RawIdentifier>());
     SLANG_CHECK(identifier.getPhysicalSpelling() == UnownedStringSlice("alpha\\\r\nbeta"));
     SLANG_CHECK(identifier.getLogicalSpelling() == UnownedStringSlice("alphabeta"));
+    SLANG_CHECK(identifier.getFlags() == (TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace));
     SLANG_CHECK(identifier.getName() == input.namePool.getName(String("alphabeta")));
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
@@ -924,4 +891,48 @@ SLANG_UNIT_TEST(lexerCharacterLiteralValuesRequireOneCompleteCharacter)
         SLANG_CHECK(getCharLiteralValue(token, &input.sink) == -1);
         SLANG_CHECK(input.sink.getErrorCount() > 0);
     }
+}
+
+SLANG_UNIT_TEST(lexemeTypeRangesClassifyConcreteTags)
+{
+    // Every concrete tag indexes one leaf descriptor. Abstract ranges must agree
+    // with the grammar categories independently of the numerical DFS ordering.
+    static_assert(sizeof(LexemeTypeTag) == 1);
+    for (unsigned i = 0; i < unsigned(LexemeTypeTag::Count); ++i)
+    {
+        auto tag = LexemeTypeTag(i);
+        const auto& leaf = getLexemeType(tag);
+        SLANG_CHECK(leaf.tagCount == 1);
+        SLANG_CHECK(leaf.firstTag == tag);
+        SLANG_CHECK(leaf.contains(tag));
+        SLANG_CHECK(!leaf.contains(leaf.getEndTag()));
+        SLANG_CHECK(
+            UnownedStringSlice(TokenTypeToString(tag)) == UnownedStringSlice(leaf.description));
+        SLANG_CHECK(Lexeme::type.contains(tag));
+        bool isTrivia = false;
+        switch (tag)
+        {
+        case LexemeTypeTag::WhiteSpace:
+        case LexemeTypeTag::NewLine:
+        case LexemeTypeTag::EscapedNewLine:
+        case LexemeTypeTag::LineComment:
+        case LexemeTypeTag::BlockComment:
+            isTrivia = true;
+            break;
+        default:
+            break;
+        }
+        SLANG_CHECK(Trivia::type.contains(tag) == isTrivia);
+        SLANG_CHECK(RawToken::type.contains(tag) == !isTrivia);
+        bool isNumeric =
+            tag == LexemeTypeTag::IntegerLiteral || tag == LexemeTypeTag::FloatingPointLiteral;
+        SLANG_CHECK(RawNumericLiteral::type.contains(tag) == isNumeric);
+    }
+    SLANG_CHECK(!Lexeme::type.contains(LexemeTypeTag::Count));
+    SLANG_CHECK(!Trivia::type.contains(LexemeTypeTag(255)));
+    SLANG_CHECK(!RawToken::type.contains(LexemeTypeTag::Count));
+    SLANG_CHECK(RawPunctuation::type.contains(RawOpAdd::tag));
+    SLANG_CHECK(!RawPunctuation::type.contains(RawIdentifier::tag));
+    SLANG_CHECK(RawLiteral::type.contains(RawStringLiteral::tag));
+    SLANG_CHECK(!RawLiteral::type.contains(RawIdentifier::tag));
 }

@@ -369,7 +369,7 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
 
             if (auto litExpr = as<LiteralExpr>(initExpr))
             {
-                if (litExpr->token.getType() != TokenType::Unknown)
+                if (litExpr->token)
                     sb << " = " << litExpr->token.getLogicalSpelling();
                 else if (auto intLit = as<IntegerLiteralExpr>(litExpr))
                     sb << " = " << intLit->value;

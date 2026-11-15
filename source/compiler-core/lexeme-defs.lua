@@ -1,10 +1,7 @@
--- We define the conceptual lexeme hierarchy once, then use it to generate kind tags and
--- the C++ types for atomic lexemes and tokens with trivia. A `LexemeClass` declaration
--- names its parent directly; only an abstract class can have subclasses.
--- The C++ declarations and functions are written in the headers that use these definitions.
+-- Lexeme declarations describe a tree; their textual order does not assign tags.
+-- We resolve the declarations first, then visit the tree depth first so every class
+-- occupies one contiguous range of concrete leaf tags.
 
--- The definition environment registers each assignment under its declared name.
--- For example, `Literal` below is a class object whose parent is the `Token` class object.
 local function defineLexemeClasses(_ENV)
     Lexeme = LexemeClass{"lexeme", abstract = true}
     Trivia = LexemeClass{Lexeme, "trivia", abstract = true}
@@ -88,13 +85,14 @@ local function defineLexemeClasses(_ENV)
     EndOfDirective = LexemeClass{Token, "end of preprocessor directive"}
 end
 
--- A class definition records its parent, diagnostic description, and abstractness.
+
+-- A reference can precede its definition. The environment returns the same class
+-- object for both, so children keep a valid parent reference when it is defined later.
 local LexemeClass = {}
 LexemeClass.__index = LexemeClass
+local classesByName = {}
 local specificationKeys = {[1] = true, [2] = true, abstract = true}
 
--- Determine whether a class is `base` or a subclass of `base`.
--- Every parent is registered before its subclasses, so following parents terminates.
 function LexemeClass:isSubclassOf(base)
     local current = self
     while current do
@@ -104,21 +102,17 @@ function LexemeClass:isSubclassOf(base)
     return false
 end
 
--- Construct a class from `{parent, description, abstract = true}`.
--- The root omits the parent; omitting `abstract` makes a class concrete.
+-- A constructor supplies the class's data; assignment supplies its name.
 local function createLexemeClass(specification)
     local base = specification[1]
     local description = specification[2]
     if type(base) == "string" then
-        -- Only the root has a description in the first positional argument.
         assert(description == nil, "a root class has only a description")
         description = base
         base = nil
     else
-        assert(getmetatable(base) == LexemeClass, "a parent must be a declared lexeme class")
+        assert(getmetatable(base) == LexemeClass, "a parent must be a lexeme class")
     end
-
-    -- We reject misspelled options instead of quietly treating a class as concrete.
     for key in pairs(specification) do
         assert(specificationKeys[key], "unknown lexeme class option: " .. tostring(key))
     end
@@ -126,7 +120,6 @@ local function createLexemeClass(specification)
     local isAbstract = specification.abstract
     if isAbstract == nil then isAbstract = false end
     assert(type(isAbstract) == "boolean", "abstract must be a boolean")
-
     return setmetatable({
         base = base,
         description = description,
@@ -134,77 +127,114 @@ local function createLexemeClass(specification)
     }, LexemeClass)
 end
 
-local classes = {}
-local classesByName = {}
-
--- Register a named class and validate its place in the hierarchy before exposing it.
--- Requiring an already registered abstract parent prevents cycles and subclasses of
--- concrete classes.
-local function registerLexemeClass(_, name, class)
-    assert(getmetatable(class) == LexemeClass, "a definition must use LexemeClass")
-    assert(not classesByName[name], "duplicate lexeme class: " .. name)
-    assert(not class.name, "a lexeme class cannot be registered under more than one name")
-    assert(name ~= "Unknown", "Unknown is reserved for empty values")
-    assert(name ~= "Count", "Count is reserved for the kind count")
-    if class.base then
-        assert(class.base.name, "a parent must be registered before its subclasses")
-        assert(class.base.isAbstract,
-            "a concrete class cannot have subclasses: " .. class.base.name)
-    else
-        assert(name == "Lexeme", "Lexeme must be the only root class")
-        assert(class.isAbstract, "Lexeme must be abstract")
-    end
-
-    class.name = name
-    classesByName[name] = class
-    table.insert(classes, class)
-end
-
--- Resolve a parent name or the constructor while evaluating the declarations above.
--- An unknown name is a definition error, rather than a second spelling for the root.
-local function findLexemeDefinition(_, name)
-    if name == "LexemeClass" then return createLexemeClass end
+local function getClass(name)
     local class = classesByName[name]
-    assert(class, "unknown lexeme class: " .. name)
+    if not class then
+        class = setmetatable({name = name, isDefined = false}, LexemeClass)
+        classesByName[name] = class
+    end
     return class
 end
 
--- We use a separate, empty environment so every assignment invokes registration,
--- including an erroneous redefinition. Definitions do not add globals to Fiddle's Lua state.
+-- We fill a forward reference rather than replace it. Reusing a named class as a
+-- definition would give it two identities, so aliases and duplicate names are errors.
+local function registerLexemeClass(_, name, definition)
+    assert(getmetatable(definition) == LexemeClass, "a definition must use LexemeClass")
+    assert(not definition.name, "a class cannot be defined under another class's name")
+    assert(name ~= "Count", "Count is reserved for the tag count")
+    assert(name ~= "LexemeClass", "LexemeClass is reserved for the constructor")
+    local class = getClass(name)
+    assert(not class.isDefined, "duplicate lexeme class: " .. name)
+    class.base = definition.base
+    class.description = definition.description
+    class.isAbstract = definition.isAbstract
+    class.isDefined = true
+end
+
+local function findLexemeDefinition(_, name)
+    if name == "LexemeClass" then return createLexemeClass end
+    return getClass(name)
+end
+
 defineLexemeClasses(setmetatable({}, {
     __index = findLexemeDefinition,
     __newindex = registerLexemeClass,
 }))
 
--- Derive C++ type names from the two branches. Atomic token types use `Raw`, whereas
--- only the token branch has a second set of types for tokens with attached trivia.
-local root = classesByName.Lexeme
-local trivia = classesByName.Trivia
-local token = classesByName.Token
-assert(trivia.base == root, "Trivia must derive directly from Lexeme")
-assert(token.base == root, "Token must derive directly from Lexeme")
-local rawClasses = {}
-local tokenClasses = {}
-for _, class in ipairs(classes) do
-    if class == root then
-        class.rawTypeName = "Lexeme"
-    elseif class == trivia then
-        class.rawTypeName = "Trivia"
-    elseif class:isSubclassOf(trivia) then
-        class.rawTypeName = class.name .. "Trivia"
-    else
-        assert(class:isSubclassOf(token),
-            "a class must be either trivia or a token: " .. class.name)
-        class.rawTypeName = "Raw" .. class.name
-    end
-    if class ~= root then table.insert(rawClasses, class) end
-
-    if class == token then
-        class.tokenTypeName = "Token"
-    elseif class:isSubclassOf(token) then
-        class.tokenTypeName = class.name .. "Token"
-        table.insert(tokenClasses, class)
+-- Names sort siblings independently of declaration order. We validate references
+-- before constructing child lists so an unresolved name cannot disappear from the tree.
+local declaredClasses = {}
+for name, class in pairs(classesByName) do
+    assert(class.isDefined, "undefined lexeme class: " .. name)
+    class.children = {}
+    table.insert(declaredClasses, class)
+end
+table.sort(declaredClasses, function(a, b) return a.name < b.name end)
+local root = assert(classesByName.Lexeme, "Lexeme must be declared")
+assert(root.base == nil, "Lexeme must be the root class")
+assert(root.isAbstract, "Lexeme must be abstract")
+for _, class in ipairs(declaredClasses) do
+    if class ~= root then
+        local base = assert(class.base, "only Lexeme can be a root class: " .. class.name)
+        assert(base.name and classesByName[base.name] == base,
+            "a parent must be a named lexeme class: " .. class.name)
+        assert(base.isAbstract, "a concrete class cannot have subclasses: " .. base.name)
+        table.insert(base.children, class)
     end
 end
 
-return {classes = classes, rawClasses = rawClasses, tokenClasses = tokenClasses}
+-- Visiting a class records its first leaf before its children and its end after
+-- them. A concrete class contributes itself; an abstract class concatenates the
+-- leaves of its children. No class may describe an empty set of concrete lexemes.
+local classes = {}
+local concreteClasses = {}
+local function visit(class)
+    assert(class.visitState == nil, "cycle in lexeme hierarchy: " .. class.name)
+    class.visitState = "visiting"
+    class.firstTag = #concreteClasses
+    class.leafClasses = {}
+    table.insert(classes, class)
+    if class.isAbstract then
+        for _, child in ipairs(class.children) do
+            visit(child)
+            for _, leaf in ipairs(child.leafClasses) do
+                table.insert(class.leafClasses, leaf)
+            end
+        end
+        assert(#class.leafClasses > 0, "abstract class has no concrete descendants: " .. class.name)
+    else
+        assert(#class.children == 0, "a concrete class cannot have subclasses: " .. class.name)
+        class.tag = #concreteClasses
+        table.insert(concreteClasses, class)
+        table.insert(class.leafClasses, class)
+    end
+    class.endTag = #concreteClasses
+    class.visitState = "visited"
+end
+visit(root)
+
+-- With one root and one parent per class, an unvisited component must contain a
+-- cycle. Visiting it reports the cycle rather than silently dropping its classes.
+for _, class in ipairs(declaredClasses) do
+    if class.visitState ~= "visited" then visit(class) end
+end
+
+local trivia = assert(classesByName.Trivia, "Trivia must be declared")
+local token = assert(classesByName.Token, "Token must be declared")
+assert(trivia.base == root, "Trivia must derive directly from Lexeme")
+assert(token.base == root, "Token must derive directly from Lexeme")
+for _, class in ipairs(classes) do
+    if class ~= root then
+        assert(class:isSubclassOf(trivia) or class:isSubclassOf(token),
+            "a lexeme class must derive from Trivia or Token: " .. class.name)
+    end
+end
+
+return {
+    classes = classes,
+    concreteClasses = concreteClasses,
+    classesByName = classesByName,
+    root = root,
+    trivia = trivia,
+    token = token,
+}

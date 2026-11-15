@@ -41,6 +41,9 @@ struct PreprocessorDesc
     /// Required: name pool to use when creating `Name`s from strings
     NamePool* namePool = nullptr;
 
+    /// Required: pool for all input, macro-expansion and output tokens.
+    TokenPool* tokenPool = nullptr;
+
     /// Required: file system to use when looking up files
     ISlangFileSystemExt* fileSystem = nullptr;
 
@@ -81,6 +84,7 @@ struct SourceLanguageDirective
 
 /// Preprocess `file` and return its tokens and first source-language directive, if any.
 ///
+/// All lexed, included and generated tokens use `desc.tokenPool`.
 /// Conflicting directives in the same source segment are diagnosed and do not replace the
 /// first selection. `outLanguageVersion` changes only when a valid Slang `#language` directive is
 /// present.
@@ -92,9 +96,11 @@ TokenList preprocessSource(
 
 /// Preprocess `file` using services and language-server state supplied by `linkage`.
 ///
-/// The output and conflict behavior match the `PreprocessorDesc` overload.
+/// All tokens use `tokenPool`. The output and conflict behavior match the `PreprocessorDesc`
+/// overload.
 TokenList preprocessSource(
     SourceFile* file,
+    TokenPool* tokenPool,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,
     Dictionary<String, String> const& defines,

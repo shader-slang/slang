@@ -15818,7 +15818,7 @@ Stmt* SemanticsVisitor::maybeParseStmt(Stmt* stmt, const SemanticsContext& conte
     {
         // Parse the statement now, and check it.
         SemanticsVisitor subVisitor(context);
-        TokenList tokenList;
+        TokenList tokenList(m_astBuilder->getTokenPool());
         tokenList.setTokens(unparsedStmt->tokens);
         unparsedStmt->tokens.clear();
         return parseUnparsedStmt(

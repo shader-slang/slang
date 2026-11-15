@@ -677,6 +677,7 @@ public:
         ISlangBlob* blobHoldingSerializedData)
         : _linkage(linkage)
         , _astBuilder(astBuilder)
+        , _tokenPool(astBuilder->getTokenPool())
         , _sink(sink)
         , _sourceLocReader(sourceLocReader)
         , _requestingSourceLoc(requestingSourceLoc)
@@ -712,6 +713,7 @@ public:
 private:
     Linkage* _linkage = nullptr;
     ASTBuilder* _astBuilder = nullptr;
+    TokenPool* _tokenPool = nullptr;
     DiagnosticSink* _sink = nullptr;
     RefPtr<SerialSourceLocReader> _sourceLocReader = nullptr;
     SourceLoc _requestingSourceLoc;
@@ -795,7 +797,7 @@ void ASTSerialReadContext::handleName(ASTSerializer const& serializer, Name*& va
 // into the receiving AST builder's pool. Locations remain occurrence data.
 struct SerializedLexeme
 {
-    LexemeKind kind = LexemeKind::Unknown;
+    LexemeTypeTag kind = LexemeTypeTag::Count;
     String physicalSpelling;
     String logicalSpelling;
     bool hasName = false;
@@ -806,7 +808,7 @@ struct FossilizedTypeTraits<SerializedLexeme>
 {
     struct FossilizedType
     {
-        Fossilized<LexemeKind> kind;
+        Fossilized<LexemeTypeTag> kind;
         Fossilized<String> physicalSpelling;
         Fossilized<String> logicalSpelling;
         Fossilized<bool> hasName;
@@ -849,7 +851,7 @@ static SerializedLexeme getSerializedLexeme(Lexeme lexeme)
     if (!lexeme)
         return SerializedLexeme();
     SerializedLexeme result;
-    result.kind = lexeme.getType();
+    result.kind = lexeme.getTypeTag();
     result.physicalSpelling = lexeme.getPhysicalSpelling();
     result.logicalSpelling = lexeme.getLogicalSpelling();
     result.hasName = lexeme.getName() != nullptr;
@@ -888,10 +890,11 @@ void ASTSerialWriteContext::handleToken(ASTSerializer const& serializer, Token& 
     serialize(serializer, trailing);
 }
 
-// Deserialization constructs semantic lexical objects directly. Re-lexing their
+// Deserialization constructs lexical objects directly. Re-lexing their
 // text would depend on a preprocessing mode that is not part of serialized ASTs.
 static Lexeme createDeserializedLexeme(
     ASTBuilder* astBuilder,
+    TokenPool* tokenPool,
     const SerializedLexeme& value,
     SourceLoc loc = SourceLoc(),
     TokenFlags flags = 0)
@@ -899,7 +902,7 @@ static Lexeme createDeserializedLexeme(
     Name* name = nullptr;
     if (value.hasName)
         name = astBuilder->getNamePool()->getName(value.logicalSpelling);
-    return astBuilder->getTokenPool()->createLexeme(
+    return tokenPool->createLexeme(
         value.kind,
         value.physicalSpelling.getUnownedSlice(),
         value.logicalSpelling.getUnownedSlice(),
@@ -923,7 +926,7 @@ void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& v
     serialize(serializer, trailing);
 
     // Optional AST token fields retain their empty-value representation.
-    if (rawToken.kind == LexemeKind::Unknown)
+    if (rawToken.kind == LexemeTypeTag::Count)
     {
         value = Token(nullptr, loc, flags);
         return;
@@ -932,14 +935,13 @@ void ASTSerialReadContext::handleToken(ASTSerializer const& serializer, Token& v
     List<const LexemeObj*> leadingObjects;
     List<const LexemeObj*> trailingObjects;
     for (const auto& trivia : leading)
-        leadingObjects.add(createDeserializedLexeme(_astBuilder, trivia).getObject());
+        leadingObjects.add(createDeserializedLexeme(_astBuilder, _tokenPool, trivia).getObject());
     for (const auto& trivia : trailing)
-        trailingObjects.add(createDeserializedLexeme(_astBuilder, trivia).getObject());
-    auto raw = createDeserializedLexeme(_astBuilder, rawToken, loc, flags).as<RawToken>();
-    value = _astBuilder->getTokenPool()->createToken(
-        raw,
-        leadingObjects.getArrayView(),
-        trailingObjects.getArrayView());
+        trailingObjects.add(createDeserializedLexeme(_astBuilder, _tokenPool, trivia).getObject());
+    auto raw =
+        createDeserializedLexeme(_astBuilder, _tokenPool, rawToken, loc, flags).as<RawToken>();
+    value =
+        _tokenPool->createToken(raw, leadingObjects.getArrayView(), trailingObjects.getArrayView());
 }
 
 //

@@ -132,6 +132,8 @@ SLANG_UNIT_TEST(tokenASTSerializationPreservesLexicalValues)
             auto first = getFieldSemanticToken(module, "First");
             auto second = getFieldSemanticToken(module, "Second");
             checkSemanticToken(first);
+            SLANG_CHECK(first.getPool() == module->getASTBuilder()->getTokenPool());
+            SLANG_CHECK(second.getPool() == first.getPool());
             SLANG_CHECK(first.getObject() == second.getObject());
             SLANG_CHECK(first.getLoc() != second.getLoc());
             expectedFlags = first.getFlags();
@@ -168,6 +170,8 @@ SLANG_UNIT_TEST(tokenASTSerializationPreservesLexicalValues)
             auto first = getFieldSemanticToken(module, "First");
             auto second = getFieldSemanticToken(module, "Second");
             checkSemanticToken(first);
+            SLANG_CHECK(first.getPool() == module->getASTBuilder()->getTokenPool());
+            SLANG_CHECK(second.getPool() == first.getPool());
             SLANG_CHECK(first.getObject() == second.getObject());
             SLANG_CHECK(first.getFlags() == expectedFlags);
             retainedToken = TokenRef(first.as<IdentifierToken>());

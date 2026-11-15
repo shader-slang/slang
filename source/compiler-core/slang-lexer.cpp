@@ -41,7 +41,8 @@ void Lexer::initialize(
     m_sourceView = sourceView;
     m_sink = sink;
     m_namePool = namePool;
-    m_tokenPool = tokenPool ? tokenPool : sourceView->getSourceManager()->getTokenPool();
+    SLANG_RELEASE_ASSERT(tokenPool);
+    m_tokenPool = tokenPool;
     m_mode = LexerMode::Normal;
 
     auto content = sourceView->getContent();
@@ -267,7 +268,7 @@ static int _advance(Lexer* lexer)
     int result = _readCodePoint(lexer, cursor, hasLineSplice, lexer->getDiagnosticSink());
     lexer->m_cursor = cursor.position;
     if (hasLineSplice)
-        lexer->m_tokenFlags |= TokenFlag::ScrubbingNeeded;
+        lexer->m_hasLineSpliceInCurrentLexeme = true;
     return result;
 }
 
@@ -1894,7 +1895,7 @@ static TokenType _readAngleBracketHeaderName(Lexer* lexer)
     }
 }
 
-static LexemeKind _readLexemeKind(Lexer* lexer)
+static LexemeTypeTag _readLexemeTypeTag(Lexer* lexer)
 {
     int nextCodePoint = _peek(lexer);
     if (lexer->m_mode == LexerMode::ExpectingAngleBracketHeaderName)
@@ -2449,9 +2450,10 @@ Lexeme Lexer::readLexeme()
     // Recognition uses logical characters, but we retain the complete byte span
     // consumed from the `SourceView`. A splice at a lexeme boundary is its own
     // trivia item; splices inside a token remain part of that token's physical spelling.
+    m_hasLineSpliceInCurrentLexeme = false;
     const auto loc = _getSourceLoc(this);
     const auto textBegin = m_cursor;
-    auto kind = TokenType::Unknown;
+    auto kind = TokenType::Count;
     if (_isAtStartOfEscapedNewLine(this))
     {
         _readRawByte(this);
@@ -2459,8 +2461,8 @@ Lexeme Lexer::readLexeme()
         _handleNewLineInner(this, newline);
         kind = TokenType::EscapedNewLine;
     }
-    if (kind == TokenType::Unknown)
-        kind = _readLexemeKind(this);
+    if (kind == TokenType::Count)
+        kind = _readLexemeTypeTag(this);
 
     const auto flags = m_tokenFlags;
     switch (kind)
@@ -2472,7 +2474,6 @@ Lexeme Lexer::readLexeme()
     case TokenType::BlockComment:
     case TokenType::LineComment:
         m_tokenFlags |= TokenFlag::AfterWhitespace;
-        m_tokenFlags &= ~TokenFlag::ScrubbingNeeded;
         break;
     case TokenType::EscapedNewLine:
         break;
@@ -2490,7 +2491,7 @@ Lexeme Lexer::readLexeme()
     {
         logicalSpelling = UnownedStringSlice();
     }
-    else if (flags & TokenFlag::ScrubbingNeeded)
+    else if (m_hasLineSpliceInCurrentLexeme)
     {
         for (auto cursor = textBegin; cursor < m_cursor;)
         {
@@ -2539,13 +2540,13 @@ Token Lexer::readToken()
     // We stop immediately after the first explicit newline. Embedded newlines
     // do not split a block comment, and escaped newlines do not end directives.
     List<const LexemeObj*> trailing;
-    if (rawToken.getType() != TokenType::EndOfFile)
+    if (rawToken.getTypeTag() != TokenType::EndOfFile)
     {
         while (_isAtStartOfTrivia(this))
         {
             auto trivia = readLexeme();
             trailing.add(trivia.getObject());
-            if (trivia.getType() == TokenType::NewLine)
+            if (trivia.getTypeTag() == TokenType::NewLine)
                 break;
         }
     }
@@ -2554,24 +2555,24 @@ Token Lexer::readToken()
 
 TokenList Lexer::readAllTokens()
 {
-    TokenList tokens;
+    TokenList tokens(m_tokenPool);
     for (;;)
     {
         auto token = readToken();
         tokens.add(token);
-        if (token.getType() == TokenType::EndOfFile)
+        if (token.getTypeTag() == TokenType::EndOfFile)
             return tokens;
     }
 }
 
 LexemeList Lexer::readAllLexemes()
 {
-    LexemeList lexemes;
+    LexemeList lexemes(m_tokenPool);
     for (;;)
     {
         auto lexeme = readLexeme();
         lexemes.add(lexeme);
-        if (lexeme.getType() == TokenType::EndOfFile)
+        if (lexeme.getTypeTag() == TokenType::EndOfFile)
             return lexemes;
     }
 }
@@ -2590,11 +2591,12 @@ LexemeList Lexer::readAllLexemes()
 
     NamePool namePool;
 
-    lexer.initialize(sourceView, &sink, &namePool);
+    RefPtr<TokenPool> tokenPool = new TokenPool();
+    lexer.initialize(sourceView, &sink, &namePool, tokenPool);
 
     auto lexeme = lexer.readLexeme();
 
-    if (lexeme.getType() == TokenType::Invalid)
+    if (lexeme.getTypeTag() == TokenType::Invalid)
     {
         return UnownedStringSlice();
     }

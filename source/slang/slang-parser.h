@@ -7,7 +7,9 @@
 
 namespace Slang
 {
-// Parse a source file into an existing translation unit
+/// Parses a source file into an existing translation unit.
+///
+/// Input tokens must be allocated in the destination `ASTBuilder`'s token pool.
 void parseSourceFile(
     ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit,
@@ -17,6 +19,9 @@ void parseSourceFile(
     Scope* outerScope,
     ContainerDecl* parentDecl);
 
+/// Parses an expression from the supplied token sequence.
+///
+/// Input tokens must be allocated in the destination `ASTBuilder`'s token pool.
 Expr* parseTermFromSourceFile(
     ASTBuilder* astBuilder,
     TokenSpan const& tokens,
@@ -27,6 +32,9 @@ Expr* parseTermFromSourceFile(
 
 struct SemanticsVisitor;
 
+/// Parses a deferred block body using its saved scopes.
+///
+/// Input tokens must be allocated in the destination `ASTBuilder`'s token pool.
 Stmt* parseUnparsedStmt(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,

@@ -1,24 +1,30 @@
 #ifndef SLANG_RAW_LEXEME_TYPES_H
 #define SLANG_RAW_LEXEME_TYPES_H
 
-// `slang-token.h` includes this fragment inside `namespace Slang`, after declaring `Lexeme`.
-// We generate the atomic value types in parent-before-child order from the conceptual
-// hierarchy. Each type uses `isKind` to recognize its branch without adding value storage.
-
+// `slang-token.h` includes this fragment inside `namespace Slang` after declaring `Lexeme`.
+// C++ naming belongs to this template: trivia gets a `Trivia` suffix, and atomic tokens
+// get a `Raw` prefix. The Lua schema supplies only the hierarchy and tag ranges.
 // clang-format off
 #if 0 // FIDDLE TEMPLATE:
-% for _, class in ipairs(require("source/compiler-core/slang-lexeme-defs.lua").rawClasses) do
-/// An atomic lexeme in the `$(class.name)` branch of the lexeme hierarchy.
-struct $(class.rawTypeName) : $(class.base.rawTypeName)
+% local lexeme_defs = require("lexeme-defs")
+% local function rawTypeName(class)
+%     if class == lexeme_defs.root then return "Lexeme" end
+%     if class == lexeme_defs.trivia then return "Trivia" end
+%     if class:isSubclassOf(lexeme_defs.trivia) then return class.name .. "Trivia" end
+%     return "Raw" .. class.name
+% end
+% for _, class in ipairs(lexeme_defs.classes) do
+%     if class ~= lexeme_defs.root then
+/// An atomic lexeme in the `$(class.name)` class.
+struct $(rawTypeName(class)) : $(rawTypeName(class.base))
 {
-    static constexpr LexemeKind kind = LexemeKind::$(class.name);
-
-    static bool isKind(LexemeKind candidateKind)
-    {
-        return isLexemeKind(candidateKind, kind);
-    }
+    static constexpr LexemeType type = LexemeTypes::$(class.name);
+%         if not class.isAbstract then
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::$(class.name);
+%         end
 };
 
+%     end
 % end
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0

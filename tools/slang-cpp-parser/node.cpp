@@ -539,7 +539,7 @@ void CallableNode::dump(int indent, StringBuilder& out)
 
         const auto& param = m_params[i];
         out << param.m_type;
-        if (param.m_name.getType() == TokenType::Identifier)
+        if (param.m_name.getTypeTag() == TokenType::Identifier)
         {
             out << " " << param.m_name.getLogicalSpelling();
         }

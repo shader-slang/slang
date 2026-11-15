@@ -1211,6 +1211,7 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
 
     auto tokens = preprocessSource(
         srcFile,
+        getASTBuilder()->getTokenPool(),
         &sink,
         nullptr,
         Dictionary<String, String>(),
@@ -2363,6 +2364,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
 
     auto preprocessed = preprocessSourceSegments(
         segments,
+        module->getASTBuilder()->getTokenPool(),
         slangLanguageVersion,
         sink,
         &includeSystem,

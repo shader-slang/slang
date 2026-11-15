@@ -102,8 +102,8 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
 {
     List<TextRange> resultRanges;
     // We exclude SPIR-V assembly bodies because clang-format does not parse their syntax.
-    // The lexer finds keywords and balanced braces without mistaking literal or comment text
-    // for the delimiters of a body.
+    // We find `spirv_asm` identifiers and balance the following brace tokens, so comment
+    // and literal contents cannot be mistaken for body delimiters.
     Lexer lexer;
     SourceManager manager;
     manager.initialize(nullptr, nullptr);
@@ -111,7 +111,8 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
     auto sourceView = manager.createSourceView(sourceFile, nullptr, SourceLoc());
     DiagnosticSink sink;
     NamePool namePool;
-    lexer.initialize(sourceView, &sink, &namePool);
+    RefPtr<TokenPool> tokenPool = new TokenPool();
+    lexer.initialize(sourceView, &sink, &namePool, tokenPool);
     for (;;)
     {
         auto token = lexer.readToken();

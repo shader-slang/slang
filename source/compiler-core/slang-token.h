@@ -8,6 +8,8 @@
 #include "slang-name.h"
 #include "slang-source-loc.h"
 
+#include <type_traits>
+
 namespace Slang
 {
 
@@ -25,7 +27,6 @@ struct TokenFlag
     {
         AtStartOfLine = 1 << 0,
         AfterWhitespace = 1 << 1,
-        ScrubbingNeeded = 1 << 2,
     };
 };
 
@@ -45,7 +46,7 @@ class TriviaList;
 class LexemeObj
 {
 public:
-    LexemeKind getType() const { return m_type; }
+    LexemeTypeTag getTypeTag() const { return m_typeTag; }
     /// The exact byte sequence representing the lexeme, including escaped newlines.
     UnownedStringSlice getPhysicalSpelling() const { return m_physicalSpelling; }
     /// The lexeme's spelling after escaped newlines have been removed.
@@ -60,12 +61,12 @@ private:
 
     LexemeObj(
         TokenPool* pool,
-        LexemeKind type,
+        LexemeTypeTag type,
         UnownedStringSlice physicalSpelling,
         UnownedStringSlice logicalSpelling,
         Name* name)
         : m_pool(pool)
-        , m_type(type)
+        , m_typeTag(type)
         , m_physicalSpelling(physicalSpelling)
         , m_logicalSpelling(logicalSpelling)
         , m_name(name)
@@ -73,7 +74,7 @@ private:
     }
 
     TokenPool* m_pool;
-    LexemeKind m_type;
+    LexemeTypeTag m_typeTag;
     UnownedStringSlice m_physicalSpelling;
     UnownedStringSlice m_logicalSpelling;
     Name* m_name;
@@ -86,7 +87,7 @@ private:
 /// handle does not require retaining the input text buffer.
 struct Lexeme
 {
-    static bool isKind(LexemeKind kind) { return isLexemeKind(kind, LexemeKind::Lexeme); }
+    static constexpr LexemeType type = LexemeTypes::Lexeme;
     Lexeme() = default;
     Lexeme(const LexemeObj* object, SourceLoc loc, TokenFlags flags = 0)
         : m_object(object), m_loc(loc), m_flags(flags)
@@ -96,7 +97,10 @@ struct Lexeme
     explicit operator bool() const { return m_object != nullptr; }
     const LexemeObj* getObject() const { return m_object; }
     TokenPool* getPool() const { return m_object ? m_object->getPool() : nullptr; }
-    LexemeKind getType() const { return m_object ? m_object->getType() : LexemeKind::Unknown; }
+    LexemeTypeTag getTypeTag() const
+    {
+        return m_object ? m_object->getTypeTag() : LexemeTypeTag::Count;
+    }
     SourceLoc getLoc() const { return m_loc; }
     TokenFlags getFlags() const { return m_flags; }
     /// The physical spelling of this occurrence, or an empty slice for an empty value.
@@ -116,17 +120,30 @@ struct Lexeme
     Name* getName() const { return m_object ? m_object->getName() : nullptr; }
     Name* getNameOrNull() const { return getName(); }
 
+    /// Whether this non-empty value's tag belongs to the requested type's range.
+    bool isInstanceOf(LexemeType targetType) const
+    {
+        return m_object && targetType.contains(getTypeTag());
+    }
+
+    template<typename T>
+    bool isInstanceOf() const
+    {
+        static_assert(std::is_base_of_v<Lexeme, T>, "The requested type must derive from Lexeme.");
+        return isInstanceOf(T::type);
+    }
+
     template<typename T>
     bool is() const
     {
-        return m_object && T::isKind(getType());
+        return isInstanceOf<T>();
     }
 
-    /// Returns a matching typed value, or an empty value without changing this handle.
+    /// Returns the checked value, or an empty value when the type does not match.
     template<typename T>
     T as() const
     {
-        if (!is<T>())
+        if (!isInstanceOf<T>())
             return T();
         T result;
         static_cast<Lexeme&>(result) = *this;
@@ -187,7 +204,7 @@ private:
 /// A null object denotes an empty value; EOF always has a non-null object.
 struct Token
 {
-    static bool isKind(LexemeKind kind) { return isLexemeKind(kind, LexemeKind::Token); }
+    static constexpr LexemeType type = LexemeTypes::Token;
     Token() = default;
     Token(const TokenObj* object, SourceLoc loc, TokenFlags flags = 0)
         : m_object(object), m_loc(loc), m_flags(flags)
@@ -197,9 +214,9 @@ struct Token
     explicit operator bool() const { return m_object != nullptr; }
     const TokenObj* getObject() const { return m_object; }
     TokenPool* getPool() const { return m_object ? m_object->getPool() : nullptr; }
-    TokenType getType() const
+    TokenType getTypeTag() const
     {
-        return m_object ? m_object->getRawToken()->getType() : TokenType::Unknown;
+        return m_object ? m_object->getRawToken()->getTypeTag() : TokenType::Count;
     }
     SourceLoc getLoc() const { return m_loc; }
     TokenFlags getFlags() const { return m_flags; }
@@ -222,16 +239,30 @@ struct Token
     /// Returns the same shared token with different preprocessing context flags.
     Token withFlags(TokenFlags flags) const { return Token(m_object, m_loc, flags); }
 
-    template<typename T>
-    bool is() const
+    /// Whether this non-empty value's tag belongs to the requested type's range.
+    bool isInstanceOf(LexemeType targetType) const
     {
-        return m_object && T::isKind(getType());
+        return m_object && targetType.contains(getTypeTag());
     }
 
     template<typename T>
+    bool isInstanceOf() const
+    {
+        static_assert(std::is_base_of_v<Token, T>, "The requested type must derive from Token.");
+        return isInstanceOf(T::type);
+    }
+
+    template<typename T>
+    bool is() const
+    {
+        return isInstanceOf<T>();
+    }
+
+    /// Returns the checked value, or an empty value when the type does not match.
+    template<typename T>
     T as() const
     {
-        if (!is<T>())
+        if (!isInstanceOf<T>())
             return T();
         T result;
         static_cast<Token&>(result) = *this;
@@ -289,8 +320,8 @@ private:
 
 /// Owns and interns immutable lexeme and token objects, their text, and trivia arrays.
 ///
-/// Interning is scoped to this pool. Creation copies all text and imports any
-/// supplied lexeme objects from another pool. `Name` references are retained.
+/// Creation copies spelling text and retains `Name` references. Every raw token
+/// and trivia object supplied to this pool must have been created by this pool.
 /// Handles remain borrowed; `TokenRef` provides ownership when needed.
 /// Owning handles require a pool allocated under `RefPtr` ownership.
 /// A pool is not safe for simultaneous mutation by multiple threads.
@@ -310,7 +341,7 @@ public:
     /// `logicalSpelling` removes escaped newlines. Synthetic objects use the supplied forms.
     /// Location and flags are retained only on the returned value.
     Lexeme createLexeme(
-        LexemeKind kind,
+        LexemeTypeTag kind,
         UnownedStringSlice physicalSpelling,
         UnownedStringSlice logicalSpelling,
         SourceLoc loc = SourceLoc(),
@@ -320,7 +351,7 @@ public:
     /// Forms a physical cluster whose trivia and raw token occupy adjacent source bytes.
     ///
     /// Requires a non-empty raw token and concrete trivia objects in both arrays.
-    /// Every supplied object is imported into this pool before interning.
+    /// All supplied objects must belong to this pool.
     Token createToken(
         RawToken rawToken,
         ConstArrayView<const LexemeObj*> leadingTrivia = {},
@@ -350,17 +381,7 @@ public:
     /// An unknown input location remains unknown.
     RawOpGreater createSecondGreaterToken(RawOpRsh rightShift);
 
-    /// Copies a cluster into this pool while preserving its location and context.
-    Token importToken(Token token);
-
 private:
-    /// Imports a lexeme's immutable state when it belongs to a different pool.
-    const LexemeObj* _importLexeme(const LexemeObj* object);
-    /// Returns same-pool trivia, using scratch storage only when importing is necessary.
-    ConstArrayView<const LexemeObj*> _importTrivia(
-        ConstArrayView<const LexemeObj*> objects,
-        List<const LexemeObj*>& imported);
-
     struct Impl;
     Impl* m_impl;
 };

@@ -5659,7 +5659,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
             case SPIRVAsmOperand::Literal:
                 {
-                    if (operand.token.getType() == TokenType::IntegerLiteral)
+                    if (operand.token.getTypeTag() == TokenType::IntegerLiteral)
                     {
                         // TODO: we should sign-extend these where appropriate,
                         // difficult because it requires information on usage...
@@ -13484,7 +13484,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 definition = targetMod->definitionString;
             }
-            else if (targetMod->definitionIdent.getType() == TokenType::Identifier)
+            else if (targetMod->definitionIdent.getTypeTag() == TokenType::Identifier)
             {
                 definition = targetMod->definitionIdent.getLogicalSpelling();
             }
@@ -13503,7 +13503,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             UnownedStringSlice targetName;
             auto& targetToken = targetMod->targetToken;
-            if (targetToken.getType() != TokenType::Unknown)
+            if (targetToken)
             {
                 targetName = targetToken.getLogicalSpelling();
             }
@@ -13654,7 +13654,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // If we find a catch-all case (marked as either *no* target
                 // token or an empty target name), then we should bail out.
                 //
-                if (targetMod->targetToken.getType() == TokenType::Unknown)
+                if (!targetMod->targetToken)
                     return;
                 else if (!targetMod->targetToken.hasLogicalSpelling())
                     return;

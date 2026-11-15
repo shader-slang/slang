@@ -345,7 +345,7 @@ struct CapabilityDefParser
                 lexeme.getLoc(),
                 Diagnostics::unexpectedTokenExpectedTokenType,
                 lexeme,
-                T::kind);
+                T::type.description);
             return SLANG_FAIL;
         }
         return SLANG_OK;
@@ -445,7 +445,7 @@ struct CapabilityDefParser
         // Documentation comments participate in the top-level scan, but whitespace and
         // newline trivia do not. We retain comments and raw tokens in the reader's list;
         // adjacency between documentation lines is checked with the source file's line map.
-        LexemeList lexemes;
+        LexemeList lexemes(m_lexer->getTokenPool());
         for (;;)
         {
             auto lexeme = m_lexer->readLexeme();
@@ -1365,7 +1365,8 @@ SlangResult parseDefFile(
     SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
     Lexer lexer;
     NamePool namePool;
-    lexer.initialize(sourceView, sink, &namePool);
+    RefPtr<TokenPool> tokenPool = new TokenPool();
+    lexer.initialize(sourceView, sink, &namePool, tokenPool);
 
     CapabilityDefParser parser(&lexer, sink, capabilitySharedContext);
 

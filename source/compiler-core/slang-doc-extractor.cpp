@@ -96,7 +96,7 @@ static LexemeList _readMarkupLexemes(Lexer& lexer)
 {
     // We retain comments as searchable entries alongside raw tokens. We omit other trivia so
     // comments on consecutive lines can occupy adjacent entries in the search sequence.
-    LexemeList lexemes;
+    LexemeList lexemes(lexer.getTokenPool());
     for (;;)
     {
         auto lexeme = lexer.readLexeme();
@@ -172,9 +172,9 @@ static Index _findLexemeIndex(SourceLoc loc, const Lexeme* lexemes, Index lexeme
 
 /* static */ DocMarkupExtractor::MarkupType DocMarkupExtractor::findMarkupType(const Lexeme& lexeme)
 {
-    switch (lexeme.getType())
+    switch (lexeme.getTypeTag())
     {
-    case LexemeKind::BlockComment:
+    case LexemeTypeTag::BlockComment:
         {
             UnownedStringSlice slice = lexeme.getLogicalSpelling();
             if (slice.getLength() >= 3 && (slice[2] == '!' || slice[2] == '*'))
@@ -188,7 +188,7 @@ static Index _findLexemeIndex(SourceLoc loc, const Lexeme* lexemes, Index lexeme
             }
             break;
         }
-    case LexemeKind::LineComment:
+    case LexemeTypeTag::LineComment:
         {
             UnownedStringSlice slice = lexeme.getLogicalSpelling();
             if (slice.getLength() >= 3)
@@ -406,26 +406,26 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     {
         const Lexeme& lexeme = lexemes.getLexemes()[i];
 
-        switch (lexeme.getType())
+        switch (lexeme.getTypeTag())
         {
-        case LexemeKind::LBrace:
-        case LexemeKind::LBracket:
-        case LexemeKind::LParent:
-        case LexemeKind::OpLess:
+        case LexemeTypeTag::LBrace:
+        case LexemeTypeTag::LBracket:
+        case LexemeTypeTag::LParent:
+        case LexemeTypeTag::OpLess:
             {
                 openCount += direction;
                 if (openCount < 0)
                     return -1;
                 break;
             }
-        case LexemeKind::RBracket:
+        case LexemeTypeTag::RBracket:
             {
                 openCount -= direction;
                 if (openCount < 0)
                     return -1;
                 break;
             }
-        case LexemeKind::OpGreater:
+        case LexemeTypeTag::OpGreater:
             {
                 if (location == Location::AfterGenericParam && openCount == 0)
                 {
@@ -438,7 +438,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
                 break;
             }
-        case LexemeKind::RParent:
+        case LexemeTypeTag::RParent:
             {
                 if (openCount == 0 && location == Location::AfterParam)
                 {
@@ -450,7 +450,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                     return -1;
                 break;
             }
-        case LexemeKind::RBrace:
+        case LexemeTypeTag::RBrace:
             {
                 // If we haven't hit a candidate yet before hitting } it's not going to work
                 if (location == Location::Before || location == Location::AfterEnumCase)
@@ -459,8 +459,8 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-        case LexemeKind::BlockComment:
-        case LexemeKind::LineComment:
+        case LexemeTypeTag::BlockComment:
+        case LexemeTypeTag::LineComment:
             {
                 if (openCount == 0)
                 {
@@ -484,7 +484,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-        case LexemeKind::Comma:
+        case LexemeTypeTag::Comma:
             {
                 if (openCount == 0)
                 {
@@ -502,7 +502,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
                 break;
             }
-        case LexemeKind::Semicolon:
+        case LexemeTypeTag::Semicolon:
             {
                 // If we haven't hit a candidate yet it's not going to work
                 if (location == Location::Before)
@@ -769,7 +769,7 @@ static void _calcLineVisibility(
 
     for (const auto& lexeme : lexemes)
     {
-        if (lexeme.getType() == LexemeKind::LineComment)
+        if (lexeme.getTypeTag() == LexemeTypeTag::LineComment)
         {
             UnownedStringSlice contents = lexeme.getLogicalSpelling();
 
@@ -946,7 +946,8 @@ SlangResult DocMarkupExtractor::extract(
 
                 // Run the lexer
                 Lexer lexer;
-                lexer.initialize(sourceView, sink, &namePool);
+                RefPtr<TokenPool> tokenPool = new TokenPool();
+                lexer.initialize(sourceView, sink, &namePool, tokenPool);
 
                 lexemes = _readMarkupLexemes(lexer);
 

@@ -10,66 +10,61 @@ struct NamePool;
 
 //
 
-/// An EOF-terminated lexical sequence that retains its referenced pools.
+/// An EOF-terminated sequence allocated in one explicitly selected token pool.
 ///
-/// `end()` points at the stored EOF, so ordinary iteration excludes that sentinel.
-/// The sequence must contain EOF before it is exposed to a reader. Mutation goes
-/// through `add()` or `setValues()` so borrowed values cannot bypass pool retention.
+/// The sequence retains that pool. `end()` points at the stored EOF, which ordinary
+/// iteration excludes. A default value is uninitialized storage; constructing a
+/// sequence with `add()` or `setValues()` requires selecting its pool first.
 template<typename T>
 struct LexicalList
 {
+    LexicalList() = default;
+    explicit LexicalList(TokenPool* pool)
+        : m_pool(pool)
+    {
+        SLANG_RELEASE_ASSERT(pool);
+    }
     const T* begin() const { return m_values.getBuffer(); }
     const T* end() const
     {
         SLANG_RELEASE_ASSERT(m_values.getCount());
-        SLANG_RELEASE_ASSERT(m_values.getLast().getType() == TokenType::EndOfFile);
+        SLANG_RELEASE_ASSERT(m_values.getLast().getTypeTag() == TokenType::EndOfFile);
         return m_values.getBuffer() + m_values.getCount() - 1;
     }
-
-    void add(const T& value)
+    void add(T value)
     {
-        // Sequences usually share one pool. We inspect other retained pools
-        // only when a macro expansion or imported token changes that pool.
-        auto pool = value.getPool();
-        if (pool)
-        {
-            if (m_pools.getCount() == 0 || m_pools.getLast().get() != pool)
-            {
-                bool isRetained = false;
-                for (const auto& retained : m_pools)
-                {
-                    if (retained.get() == pool)
-                        isRetained = true;
-                }
-                if (!isRetained)
-                    m_pools.add(pool);
-            }
-        }
+        _validateValue(value);
         m_values.add(value);
     }
-
-    const List<RefPtr<TokenPool>>& getPools() const { return m_pools; }
+    TokenPool* getTokenPool() const { return m_pool; }
     const List<T>& getValues() const { return m_values; }
 
-    /// Replaces the sequence and retains every pool referenced by its values.
+    /// Replaces the values with occurrences from this sequence's pool.
     void setValues(const List<T>& values)
     {
-        // We retain the replacement's pools before releasing the old list, since
-        // callers may pass values borrowing storage from one of those pools.
-        LexicalList replacement;
+        SLANG_RELEASE_ASSERT(m_pool);
         for (const auto& value : values)
-            replacement.add(value);
-        *this = _Move(replacement);
+            _validateValue(value);
+
+        // We copy before replacing because callers may pass this sequence's `getValues()`.
+        List<T> replacement(values);
+        m_values = _Move(replacement);
     }
 
 private:
+    void _validateValue(const T& value) const
+    {
+        SLANG_RELEASE_ASSERT(m_pool);
+        SLANG_RELEASE_ASSERT(value.getPool() == m_pool.get());
+    }
+    RefPtr<TokenPool> m_pool;
     List<T> m_values;
-    List<RefPtr<TokenPool>> m_pools;
 };
 
 /// An owning EOF-terminated sequence of tokens with attached trivia.
 struct TokenList : LexicalList<Token>
 {
+    using LexicalList<Token>::LexicalList;
     const List<Token>& getTokens() const { return getValues(); }
     void setTokens(const List<Token>& tokens) { setValues(tokens); }
 };
@@ -77,6 +72,7 @@ struct TokenList : LexicalList<Token>
 /// An owning EOF-terminated sequence of atomic raw tokens and trivia.
 struct LexemeList : LexicalList<Lexeme>
 {
+    using LexicalList<Lexeme>::LexicalList;
     const List<Lexeme>& getLexemes() const { return getValues(); }
     void setLexemes(const List<Lexeme>& lexemes) { setValues(lexemes); }
 };
@@ -161,7 +157,7 @@ struct TokenReader
         SLANG_RELEASE_ASSERT(m_nextToken);
         return m_nextToken;
     }
-    TokenType peekTokenType() const { return peekToken().getType(); }
+    TokenType peekTokenType() const { return peekToken().getTypeTag(); }
     SourceLoc peekLoc() const { return peekToken().getLoc(); }
     Token readToken();
 
@@ -214,7 +210,7 @@ struct LexemeReader
         SLANG_RELEASE_ASSERT(m_cursor);
         return *m_cursor;
     }
-    LexemeKind peekLexemeKind() const { return peekLexeme().getType(); }
+    LexemeTypeTag peekLexemeTypeTag() const { return peekLexeme().getTypeTag(); }
     SourceLoc peekLoc() const { return peekLexeme().getLoc(); }
     Lexeme readLexeme()
     {
@@ -249,15 +245,17 @@ struct Lexer
 {
     /// Initializes scanning over a source view using the supplied lexical pool.
     ///
-    /// When `tokenPool` is null, the source manager's pool owns the lexical data.
-    /// An explicitly supplied pool must remain alive while the lexer is used.
+    /// All returned values belong to `tokenPool`. The caller keeps that pool alive
+    /// while the lexer or any borrowed result is used.
     void initialize(
         SourceView* sourceView,
         DiagnosticSink* sink,
         NamePool* namePool,
-        TokenPool* tokenPool = nullptr);
+        TokenPool* tokenPool);
 
     ~Lexer();
+
+    TokenPool* getTokenPool() const { return m_tokenPool; }
 
     /// Runs the lexer to try and extract a single token, which is returned.
     /// This can be used by the DiagnosticSink to be able to display more appropriate
@@ -315,6 +313,11 @@ struct Lexer
 
     TokenPool* m_tokenPool = nullptr;
     LexerMode m_mode = LexerMode::Normal;
+
+    // Records whether a logical character read removed an escaped newline in the
+    // current lexeme. `readLexeme()` resets the flag before recognition and uses it
+    // to decide whether to build a logical spelling with those bytes removed.
+    bool m_hasLineSpliceInCurrentLexeme = false;
 };
 
 

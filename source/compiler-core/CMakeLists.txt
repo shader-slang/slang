@@ -41,7 +41,7 @@ list(
     APPEND ".fiddle"
     OUTPUT_VARIABLE SLANG_LEXEME_DEFINITION_OUTPUTS
 )
-set(SLANG_LEXEME_DEFINITION_LUA "${CMAKE_CURRENT_SOURCE_DIR}/slang-lexeme-defs.lua")
+set(SLANG_LEXEME_DEFINITION_LUA "${CMAKE_CURRENT_SOURCE_DIR}/lexeme-defs.lua")
 
 add_custom_target(
     regenerate-lexeme-definitions
@@ -69,6 +69,7 @@ add_custom_target(
     COMMAND
         ${CMAKE_COMMAND} -E copy_if_different
         ${SLANG_LEXEME_DEFINITION_HEADERS}
+        ${SLANG_LEXEME_DEFINITION_LUA}
         "${SLANG_LEXEME_CHECK_DIRECTORY}/input/"
     COMMAND
         $<TARGET_FILE:slang-fiddle> -i "${SLANG_LEXEME_CHECK_DIRECTORY}/input/" -o

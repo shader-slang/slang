@@ -216,24 +216,6 @@ public:
         , outerScope(outerScope)
         , options(inOptions)
     {
-        // AST nodes may keep token handles after the input list is destroyed. We retain
-        // every contributing pool, avoiding repeated requests for adjacent tokens in one pool.
-        TokenPool* previousPool = nullptr;
-        for (auto cursor = _tokens.begin();; ++cursor)
-        {
-            auto pool = cursor->getPool();
-            if (pool != previousPool)
-            {
-                if (pool)
-                    astBuilder->retainTokenPool(pool);
-                previousPool = pool;
-            }
-
-            // `TokenSpan::end()` points at the sentinel read by `TokenReader`, so its pool
-            // must remain valid for the parser and any AST nodes that preserve that token.
-            if (cursor == _tokens.end())
-                break;
-        }
     }
     Parser(const Parser& other) = default;
 
@@ -446,7 +428,7 @@ static TokenType SkipToMatchingToken(TokenReader* reader, TokenType tokenType);
 // the common case, or a matched pair of tokens for `()`, `[]`, and `{}`
 static TokenType SkipBalancedToken(TokenReader* reader)
 {
-    TokenType tokenType = reader->readToken().getType();
+    TokenType tokenType = reader->readToken().getTypeTag();
     switch (tokenType)
     {
     default:
@@ -784,7 +766,7 @@ bool Parser::LookAheadToken(TokenType type)
 bool Parser::LookAheadToken(const char* string)
 {
     const auto& token = tokenReader.peekToken();
-    return token.getType() == TokenType::Identifier && token.getLogicalSpelling() == string;
+    return token.getTypeTag() == TokenType::Identifier && token.getLogicalSpelling() == string;
 }
 
 bool AdvanceIf(Parser* parser, TokenType tokenType, Token* outToken)
@@ -863,7 +845,7 @@ static const MatchedTokenInfo kMatchedTokenInfos[] = {
     {TokenType::LParent, TokenType::RParent, kMatchedToken_BailAtCurlyBraceOrEOF},
     {TokenType::LBracket, TokenType::RBracket, kMatchedToken_BailAtCurlyBraceOrEOF},
     {TokenType::LBrace, TokenType::RBrace, kMatchedToken_BailAtEOF},
-    {TokenType::Unknown, TokenType::EndOfFile, kMatchedToken_BailAtEOF},
+    {TokenType::Count, TokenType::EndOfFile, kMatchedToken_BailAtEOF},
 };
 
 /// Expect to enter a matched region starting with `tokenType`
@@ -1382,7 +1364,7 @@ static Name* getName(Parser* parser, String const& text)
 
 static bool expect(Parser* parser, TokenType tokenType)
 {
-    return parser->ReadToken(tokenType).getType() == tokenType;
+    return parser->ReadToken(tokenType).getTypeTag() == tokenType;
 }
 
 static NameLoc expectIdentifier(Parser* parser)
@@ -1529,7 +1511,7 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
         // each have one name even though the programmer writes two tokens.
         auto operatorName = nameToken.getLogicalSpelling();
         bool isValidOperator = true;
-        switch (nameToken.getType())
+        switch (nameToken.getTypeTag())
         {
         case TokenType::OpAdd:
         case TokenType::OpSub:
@@ -1590,7 +1572,7 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
         if (outIsValidOperatorName)
             *outIsValidOperatorName = isValidOperator;
 
-        if (nameToken.getType() == TokenType::LParent)
+        if (nameToken.getTypeTag() == TokenType::LParent)
             return NameLoc(getName(parser, "()"), nameToken.getLoc());
 
         return NameLoc(getName(parser, operatorName), nameToken.getLoc());
@@ -1914,7 +1896,7 @@ static Decl* parseOptGenericDecl(Parser* parser, const ParseFunc& parseInner)
 
 static bool _isCountOfKeyword(Token const& token)
 {
-    return token.getType() == TokenType::Identifier && token.getLogicalSpelling() == "countof";
+    return token.getTypeTag() == TokenType::Identifier && token.getLogicalSpelling() == "countof";
 }
 
 // Pack-count constraints use the built-in `countof(...)` form. A plain
@@ -1931,12 +1913,12 @@ static bool _isCountOfCallStart(TokenReader reader)
 
 static bool _isGenericWhereClauseBoundary(Token const& token)
 {
-    if (token.getType() == TokenType::EndOfFile || token.getType() == TokenType::LBrace ||
-        token.getType() == TokenType::Semicolon)
+    if (token.getTypeTag() == TokenType::EndOfFile || token.getTypeTag() == TokenType::LBrace ||
+        token.getTypeTag() == TokenType::Semicolon)
     {
         return true;
     }
-    return token.getType() == TokenType::Identifier && token.getLogicalSpelling() == "where";
+    return token.getTypeTag() == TokenType::Identifier && token.getLogicalSpelling() == "where";
 }
 
 static bool _isPackCountConstraintOperator(TokenType tokenType)
@@ -1976,7 +1958,7 @@ static CountOfExpr* _parsePackCountConstraintCountOfExpr(Parser* parser, Token c
 static Token _readPackCountConstraintOperator(Parser* parser)
 {
     auto opToken = parser->tokenReader.peekToken();
-    if (_isPackCountConstraintOperator(opToken.getType()))
+    if (_isPackCountConstraintOperator(opToken.getTypeTag()))
     {
         parser->ReadToken();
     }
@@ -1985,7 +1967,7 @@ static Token _readPackCountConstraintOperator(Parser* parser)
         opToken = parser->ReadToken(TokenType::OpEql);
     }
 
-    if (opToken.getType() != TokenType::OpEql)
+    if (opToken.getTypeTag() != TokenType::OpEql)
     {
         parser->sink->diagnose(
             Diagnostics::VariadicPackCountConstraintRequiresEquality{.location = opToken.getLoc()});
@@ -2006,7 +1988,7 @@ static bool _hasCountOfOnRightOfPackCountComparison(Parser* parser)
         if (_isGenericWhereClauseBoundary(token))
             return false;
 
-        if (_isPackCountConstraintOperator(token.getType()))
+        if (_isPackCountConstraintOperator(token.getTypeTag()))
         {
             reader.readToken();
             return _isCountOfCallStart(reader);
@@ -2085,7 +2067,7 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         {
             parser->ParseExpression(Precedence::BitShift);
             auto opToken = parser->tokenReader.peekToken();
-            if (_isPackCountConstraintOperator(opToken.getType()))
+            if (_isPackCountConstraintOperator(opToken.getTypeTag()))
                 parser->ReadToken();
             else
                 parser->ReadToken(TokenType::OpEql);
@@ -2369,11 +2351,11 @@ static Stmt* parseOptBody(Parser* parser)
             tokens.add(token);
             return unparsedStmt;
         }
-        if (token.getType() == TokenType::LBrace)
+        if (token.getTypeTag() == TokenType::LBrace)
         {
             braceDepth++;
         }
-        else if (token.getType() == TokenType::RBrace)
+        else if (token.getTypeTag() == TokenType::RBrace)
         {
             braceDepth--;
         }
@@ -3932,7 +3914,7 @@ static DeclBase* ParseDeclaratorDecl(
     {
         if (typeSpec.decl)
         {
-            if (peekToken(parser).getType() == TokenType::EndOfFile ||
+            if (peekToken(parser).getTypeTag() == TokenType::EndOfFile ||
                 (peekToken(parser).getFlags() & TokenFlag::AtStartOfLine))
             {
                 // The token after the `}` is at the start of its
@@ -4252,9 +4234,9 @@ static Modifiers _parseOptSemantics(Parser* parser)
             for (;;)
             {
                 auto token = parser->tokenReader.peekToken();
-                if (token.getType() == TokenType::EndOfFile)
+                if (token.getTypeTag() == TokenType::EndOfFile)
                     break;
-                else if (token.getType() == TokenType::OpGreater)
+                else if (token.getTypeTag() == TokenType::OpGreater)
                     break;
                 else
                     parser->tokenReader.readToken();
@@ -4905,17 +4887,17 @@ static NodeBase* parseIgnoredBlockDecl(Parser* parser, void*)
     for (;;)
     {
         auto token = parser->ReadToken();
-        if (token.getType() == TokenType::RBrace)
+        if (token.getTypeTag() == TokenType::RBrace)
         {
             remaingingBraceToClose--;
             if (remaingingBraceToClose == 0)
                 break;
         }
-        else if (token.getType() == TokenType::LBrace)
+        else if (token.getTypeTag() == TokenType::LBrace)
         {
             remaingingBraceToClose++;
         }
-        else if (token.getType() == TokenType::EndOfFile)
+        else if (token.getTypeTag() == TokenType::EndOfFile)
         {
             break;
         }
@@ -5282,7 +5264,7 @@ static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
     else
     {
         parser->sink->diagnose(Diagnostics::UnexpectedToken{
-            .tokenType = TokenTypeToString(peekToken(parser).getType()),
+            .tokenType = TokenTypeToString(peekToken(parser).getTypeTag()),
             .location = parser->tokenReader.peekLoc()});
     }
 }
@@ -6363,7 +6345,7 @@ static DeclBase* ParseDeclWithModifiers(
             if (!parser->isRecovering)
             {
                 parser->sink->diagnose(Diagnostics::UnexpectedToken{
-                    .tokenType = TokenTypeToString(parser->tokenReader.peekToken().getType()),
+                    .tokenType = TokenTypeToString(parser->tokenReader.peekToken().getTypeTag()),
                     .location = loc});
             }
             SkipBalancedToken(&parser->tokenReader);
@@ -6839,7 +6821,8 @@ Decl* Parser::ParseStruct(StructDecl* decl)
                 if (!LookAheadToken(TokenType::Semicolon))
                 {
                     this->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                        .actualToken = TokenTypeToString(this->tokenReader.peekToken().getType()),
+                        .actualToken =
+                            TokenTypeToString(this->tokenReader.peekToken().getTypeTag()),
                         .expectedToken = "';'",
                         .location = this->tokenReader.peekToken().getLoc()});
                 }
@@ -7068,7 +7051,7 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
         if (caseLabels.getCount() == 0)
         {
             parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                .actualToken = TokenTypeToString(parser->tokenReader.peekToken().getType()),
+                .actualToken = TokenTypeToString(parser->tokenReader.peekToken().getTypeTag()),
                 .expectedToken = "'case' or 'default'",
                 .location = parser->tokenReader.peekLoc()});
             parser->isRecovering = true;
@@ -8121,7 +8104,7 @@ RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
     while (true)
     {
         Token capToken = ReadToken(TokenType::Identifier);
-        if (capToken.getType() != TokenType::Identifier)
+        if (capToken.getTypeTag() != TokenType::Identifier)
             break;
 
         UnownedStringSlice capNameStr = capToken.getLogicalSpelling();
@@ -8271,7 +8254,7 @@ Associativity GetAssociativityFromLevel(Precedence level)
 
 Precedence GetOpLevel(Parser* parser, const Token& token)
 {
-    switch (token.getType())
+    switch (token.getTypeTag())
     {
     case TokenType::QuestionMark:
         return Precedence::TernaryConditional;
@@ -8372,7 +8355,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
             break;
 
         // Special case the "is" and "as" operators.
-        if (opToken.getType() == TokenType::Identifier)
+        if (opToken.getTypeTag() == TokenType::Identifier)
         {
             const auto logicalSpelling = opToken.getLogicalSpelling();
 
@@ -8402,7 +8385,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
 
         // Special case the `?:` operator since it is the
         // one non-binary case we need to deal with.
-        if (opToken.getType() == TokenType::QuestionMark)
+        if (opToken.getTypeTag() == TokenType::QuestionMark)
         {
             SelectExpr* select = parser->astBuilder->create<SelectExpr>();
             select->loc = op->loc;
@@ -8432,7 +8415,7 @@ static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Preceden
             right = parseInfixExprWithPrecedence(parser, right, nextOpPrec);
         }
 
-        if (opToken.getType() == TokenType::OpAssign)
+        if (opToken.getTypeTag() == TokenType::OpAssign)
         {
             AssignExpr* assignExpr = parser->astBuilder->create<AssignExpr>();
             assignExpr->loc = op->loc;
@@ -9550,7 +9533,7 @@ static Expr* parseAtomicExpr(Parser* parser)
             auto nameToken = peekToken(parser);
             auto nameAndLoc = NameLoc(nameToken);
             varExpr->name = nameAndLoc.name;
-            if (nameToken.getType() == TokenType::CompletionRequest)
+            if (nameToken.getTypeTag() == TokenType::CompletionRequest)
             {
                 parser->hasSeenCompletionToken = true;
             }
@@ -9931,7 +9914,7 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
             // registers must be `__`-prefixed to read as compiler-internal
             // (shader-slang/slang#12108). Integer ids (`%6`) carry no name.
             SLANG_ASSERT(
-                !parser->options.isCoreModule || idToken.getType() != TokenType::Identifier ||
+                !parser->options.isCoreModule || idToken.getTypeTag() != TokenType::Identifier ||
                 idToken.getLogicalSpelling().startsWith("__"));
             return SPIRVAsmOperand{SPIRVAsmOperand::Id, idToken};
         }
@@ -10071,7 +10054,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
             //
             auto token = parser->tokenReader.peekToken();
             if (token.getLogicalSpelling().startsWith("Op") ||
-                token.getType() == TokenType::OpMod &&
+                token.getTypeTag() == TokenType::OpMod &&
                     (parser->LookAheadToken(TokenType::OpAssign, 2) ||
                      parser->LookAheadToken(TokenType::Colon, 2)))
             {
@@ -10102,7 +10085,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
         ret.opcode.knownValue == (SpvWord)SpvOpMax)
     {
-        if (ret.opcode.token.getType() == TokenType::IntegerLiteral)
+        if (ret.opcode.token.getTypeTag() == TokenType::IntegerLiteral)
         {
             Int intVal = -1;
             StringUtil::parseInt(ret.opcode.token.getLogicalSpelling(), intVal);
@@ -10723,7 +10706,7 @@ static SlangResult parseSemanticVersion(
 
     UnownedStringSlice content = outToken.getLogicalSpelling();
     // We allow specified as major.minor or as a string (in quotes)
-    switch (outToken.getType())
+    switch (outToken.getTypeTag())
     {
     case TokenType::FloatingPointLiteral:
         {

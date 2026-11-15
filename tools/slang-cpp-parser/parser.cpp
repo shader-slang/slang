@@ -98,7 +98,8 @@ bool Parser::advanceIfToken(TokenType type, Token* outToken)
 bool Parser::advanceIfMarker(Token* outToken)
 {
     const Token peekToken = m_reader.peekToken();
-    if (peekToken.getType() == TokenType::Identifier && _isMarker(peekToken.getLogicalSpelling()))
+    if (peekToken.getTypeTag() == TokenType::Identifier &&
+        _isMarker(peekToken.getLogicalSpelling()))
     {
         m_reader.readToken();
         if (outToken)
@@ -272,7 +273,7 @@ SlangResult Parser::consumeToClosingBrace(const Token* inOpenBraceToken)
     {
         openToken = m_reader.readToken();
     }
-    SLANG_ASSERT(openToken.getType() == TokenType::LBrace);
+    SLANG_ASSERT(openToken.getTypeTag() == TokenType::LBrace);
 
     while (true)
     {
@@ -853,20 +854,20 @@ UnownedStringSlice Parser::_concatTokens(const Token* toks, Index toksCount)
 {
     StringBuilder buf;
 
-    TokenType prevTokenType = TokenType::Unknown;
+    TokenType prevTokenType = TokenType::Count;
     for (Index i = 0; i < toksCount; ++i)
     {
         const auto token = toks[i];
 
         // Check if we need a space between tokens
-        if (_tokenConcatNeedsSpace(prevTokenType, token.getType()))
+        if (_tokenConcatNeedsSpace(prevTokenType, token.getTypeTag()))
         {
             buf << " ";
         }
 
         buf << token.getLogicalSpelling();
 
-        prevTokenType = token.getType();
+        prevTokenType = token.getTypeTag();
     }
 
     StringSlicePool* typePool = m_nodeTree->m_typePool;
@@ -879,20 +880,20 @@ UnownedStringSlice Parser::_concatTokens(TokenReader::ParsingCursor start)
 
     m_reader.setCursor(start);
 
-    TokenType prevTokenType = TokenType::Unknown;
+    TokenType prevTokenType = TokenType::Count;
 
     StringBuilder buf;
     while (!m_reader.isAtCursor(endCursor))
     {
         const Token token = m_reader.readToken();
         // Check if we need a space between tokens
-        if (_tokenConcatNeedsSpace(prevTokenType, token.getType()))
+        if (_tokenConcatNeedsSpace(prevTokenType, token.getTypeTag()))
         {
             buf << " ";
         }
         buf << token.getLogicalSpelling();
 
-        prevTokenType = token.getType();
+        prevTokenType = token.getTypeTag();
     }
 
     StringSlicePool* typePool = m_nodeTree->m_typePool;
@@ -930,7 +931,7 @@ SlangResult Parser::_maybeParseType(
         {
             // Consume the integer typename (if there is one)
             const Token peekToken = m_reader.peekToken();
-            if (peekToken.getType() == TokenType::Identifier)
+            if (peekToken.getTypeTag() == TokenType::Identifier)
             {
                 const IdentifierStyle style =
                     m_nodeTree->m_identifierLookup->get(peekToken.getLogicalSpelling());
@@ -1061,7 +1062,7 @@ SlangResult Parser::_maybeParseType(
 
 SlangResult Parser::_maybeParseType(List<Token>& outToks, Token& outName)
 {
-    // Set to unknown
+    // We start without a name because the declarator may be unnamed.
     outName = Token();
 
     auto startCursor = m_reader.getCursor();
@@ -1272,7 +1273,7 @@ static TokenType _getBalancedClose(TokenType tokenType)
     case TokenType::LBracket:
         return TokenType::RBracket;
     default:
-        return TokenType::Unknown;
+        return TokenType::Count;
     }
 }
 
@@ -1481,7 +1482,7 @@ SlangResult Parser::_parseTypeDef()
     SLANG_RETURN_ON_FAIL(_maybeParseType(toks, nameToken));
 
     // Followed by the name
-    if (nameToken.getType() != TokenType::Identifier)
+    if (nameToken.getTypeTag() != TokenType::Identifier)
     {
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &nameToken));
     }
@@ -1629,7 +1630,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     }
 
     // Handles other scenarios, but here for catching operator overloading
-    if (nameToken.getType() == TokenType::Identifier)
+    if (nameToken.getTypeTag() == TokenType::Identifier)
     {
         const auto style = m_nodeTree->m_identifierLookup->get(nameToken.getLogicalSpelling());
         if (style != IdentifierStyle::None)
@@ -1669,7 +1670,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
                     return res;
                 }
 
-                if (paramName.getType() != TokenType::Identifier)
+                if (paramName.getTypeTag() != TokenType::Identifier)
                 {
                     if (m_reader.peekTokenType() == TokenType::Identifier)
                     {
@@ -1822,7 +1823,7 @@ SlangResult Parser::_maybeParseContained(Node** outNode)
     else
     {
         // Looks like variable
-        if (!m_currentScope->canContainFields() || nameToken.getType() != TokenType::Identifier)
+        if (!m_currentScope->canContainFields() || nameToken.getTypeTag() != TokenType::Identifier)
         {
             _consumeToSync();
             return SLANG_OK;
@@ -2045,7 +2046,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
         m_currentScope->m_reflectionOverride = ReflectionType::Reflected;
     }
 
-    lexer.initialize(sourceView, m_sink, m_nodeTree->m_namePool);
+    lexer.initialize(sourceView, m_sink, m_nodeTree->m_namePool, m_nodeTree->getTokenPool());
     m_tokenList = lexer.readAllTokens();
     // See if there were any errors
     if (m_sink->getErrorCount())
@@ -2245,7 +2246,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                     for (;;)
                     {
                         auto t = m_reader.peekToken();
-                        if (t.getType() == TokenType::EndOfFile ||
+                        if (t.getTypeTag() == TokenType::EndOfFile ||
                             (t.getFlags() & TokenFlag::AtStartOfLine))
                         {
                             break;

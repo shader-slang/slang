@@ -3,126 +3,110 @@
 
 #include "core/slang-basic.h"
 
-// Lexemes and tokens with attached trivia share the conceptual hierarchy declared in
-// `slang-lexeme-defs.lua`. We generate the kind tags and queries together so the C++ type
-// wrappers can use the same ancestry relation as the object factory.
-// The checked-in outputs allow `compiler-core` to build before `slang-fiddle`.
 namespace Slang
 {
 
-/// The concrete lexeme kinds and abstract groups in the conceptual lexeme hierarchy.
-enum class LexemeKind : uint8_t
-{
-    /// The absence of a lexeme, returned by an empty value.
-    Unknown,
+enum class LexemeTypeTag : uint8_t;
 
+/// A lexeme class described by its nonempty range of concrete leaf tags.
+///
+/// The range is half-open: `firstTag` belongs to the class and `getEndTag()` does not.
+/// The description is suitable for diagnostics about either a leaf or an abstract class.
+struct LexemeType
+{
+    constexpr LexemeType(LexemeTypeTag firstTag, LexemeTypeTag endTag, const char* description)
+        : firstTag(firstTag)
+        , tagCount(uint8_t(uint8_t(endTag) - uint8_t(firstTag)))
+        , description(description)
+    {
+        SLANG_RELEASE_ASSERT(uint8_t(firstTag) < uint8_t(endTag));
+    }
+
+    /// Whether `tag` belongs to this class.
+    constexpr bool contains(LexemeTypeTag tag) const
+    {
+        // Unsigned subtraction makes tags below `firstTag` wrap above the range width.
+        return uint8_t(uint8_t(tag) - uint8_t(firstTag)) < tagCount;
+    }
+
+    constexpr LexemeTypeTag getEndTag() const
+    {
+        return LexemeTypeTag(uint8_t(firstTag) + tagCount);
+    }
+
+    LexemeTypeTag firstTag;
+    uint8_t tagCount;
+    const char* description;
+};
+
+// We assign tags only to leaves. A depth-first traversal groups each class's leaves
+// together, so class membership requires one subtraction and one comparison.
+// Checked-in output lets `compiler-core` build before the Fiddle generator itself.
 // clang-format off
 #if 0 // FIDDLE TEMPLATE:
-% for _, class in ipairs(require("source/compiler-core/slang-lexeme-defs.lua").classes) do
+% local lexeme_defs = require("lexeme-defs")
+% assert(#lexeme_defs.concreteClasses < 256, "LexemeTypeTag needs room for Count in uint8_t")
+% local function tagName(tag)
+%     if tag == #lexeme_defs.concreteClasses then return "Count" end
+%     return lexeme_defs.concreteClasses[tag + 1].name
+% end
+/// The tags of concrete lexeme types, in depth-first hierarchy order.
+enum class LexemeTypeTag : uint8_t
+{
+% for _, class in ipairs(lexeme_defs.concreteClasses) do
     $(class.name),
 % end
+    /// One past all valid tags; an empty lexical value returns this sentinel.
+    Count,
+};
+
+/// Compatibility name for the tag of a token.
+using TokenType = LexemeTypeTag;
+
+namespace LexemeTypes
+{
+% for _, class in ipairs(lexeme_defs.classes) do
+inline constexpr LexemeType $(class.name){
+    LexemeTypeTag::$(tagName(class.firstTag)),
+    LexemeTypeTag::$(tagName(class.endTag)),
+    $(string.format("%q", class.description))};
+% end
+} // namespace LexemeTypes
+
+/// The concrete descriptors in tag order, shared by tag-to-description lookup.
+inline constexpr LexemeType kConcreteLexemeTypes[] = {
+% for _, class in ipairs(lexeme_defs.concreteClasses) do
+    LexemeTypes::$(class.name),
+% end
+};
+
+/// Whether `tag` identifies a concrete lexeme type.
+constexpr bool isValidLexemeTypeTag(LexemeTypeTag tag)
+{
+    return uint8_t(tag) < uint8_t(LexemeTypeTag::Count);
+}
+
+/// Returns the descriptor for a concrete tag.
+///
+/// Requires a valid tag; `Count` is not a lexeme type.
+inline const LexemeType& getLexemeType(LexemeTypeTag tag)
+{
+    SLANG_RELEASE_ASSERT(isValidLexemeTypeTag(tag));
+    return kConcreteLexemeTypes[uint8_t(tag)];
+}
+
+/// Returns a concrete tag's diagnostic description, or `<unknown>` for an empty value.
+inline const char* TokenTypeToString(TokenType tag)
+{
+    if (tag == LexemeTypeTag::Count)
+        return "<unknown>";
+    return getLexemeType(tag).description;
+}
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
 #include "slang-lexeme-defs.h.fiddle"
 #endif // FIDDLE END
-    // clang-format on
-
-    /// One past the last declared kind.
-    Count,
-};
-
-/// The kind of a token, in the common lexeme kind space.
-using TokenType = LexemeKind;
-
-/// Whether `kind` denotes `base` or one of its subtypes.
-///
-/// `Unknown` and values outside the kind space do not belong to any lexeme class.
-inline bool isLexemeKind(LexemeKind kind, LexemeKind base)
-{
-    if (kind == LexemeKind::Unknown)
-        return false;
-    if (kind >= LexemeKind::Count)
-        return false;
-
-    // We test each ancestor before moving to its parent. Reaching the root without
-    // finding `base` proves that `kind` does not belong to the requested branch.
-    for (;;)
-    {
-        if (kind == base)
-            return true;
-        if (kind == LexemeKind::Lexeme)
-            return false;
-        switch (kind)
-        {
-            // clang-format off
-#if 0 // FIDDLE TEMPLATE:
-% for _, class in ipairs(require("source/compiler-core/slang-lexeme-defs.lua").classes) do
-%     if class.base then
-        case LexemeKind::$(class.name):
-            kind = LexemeKind::$(class.base.name);
-            break;
-%     end
-% end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 1
-#include "slang-lexeme-defs.h.fiddle"
-#endif // FIDDLE END
-       // clang-format on
-        default:
-            SLANG_UNREACHABLE("Invalid lexeme kind.");
-        }
-    }
-}
-
-/// Whether `kind` identifies a concrete lexeme that the factory can allocate.
-inline bool isConcreteLexemeKind(LexemeKind kind)
-{
-    switch (kind)
-    {
-        // clang-format off
-#if 0 // FIDDLE TEMPLATE:
-% for _, class in ipairs(require("source/compiler-core/slang-lexeme-defs.lua").classes) do
-    case LexemeKind::$(class.name):
-%     if class.isAbstract then
-        return false;
-%     else
-        return true;
-%     end
-% end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 2
-#include "slang-lexeme-defs.h.fiddle"
-#endif // FIDDLE END
-       // clang-format on
-    default:
-        return false;
-    }
-}
-
-/// The diagnostic description of a lexeme kind, or `<unknown>` for `Unknown`.
-///
-/// Requires `type` to be a declared kind or `Unknown`.
-inline char const* TokenTypeToString(TokenType type)
-{
-    switch (type)
-    {
-    case TokenType::Unknown:
-        return "<unknown>";
-        // clang-format off
-#if 0 // FIDDLE TEMPLATE:
-% for _, class in ipairs(require("source/compiler-core/slang-lexeme-defs.lua").classes) do
-    case TokenType::$(class.name):
-        return $(string.format("%q", class.description));
-% end
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 3
-#include "slang-lexeme-defs.h.fiddle"
-#endif // FIDDLE END
-       // clang-format on
-    default:
-        SLANG_UNREACHABLE("Invalid lexeme kind.");
-    }
-}
+// clang-format on
 
 } // namespace Slang
 

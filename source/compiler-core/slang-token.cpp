@@ -3,8 +3,8 @@
 
 // Pools own the spelling of every atom and the ordered trivia attached to each
 // token. We intern atoms first, then use their stable pointers to intern tokens.
-// Foreign objects are copied into the receiving pool before either lookup stores
-// a pointer, so each returned value borrows from exactly one owner.
+// Every object in a token belongs to the selected pool, so retaining that one
+// pool keeps the raw token, its trivia, and both spellings alive.
 namespace Slang
 {
 
@@ -16,7 +16,7 @@ struct TokenPool::Impl
     /// The location-independent lexical state used to intern an atomic object.
     struct LexemeKey
     {
-        LexemeKind kind;
+        LexemeTypeTag kind;
         UnownedStringSlice physicalSpelling;
         UnownedStringSlice logicalSpelling;
         Name* name;
@@ -97,7 +97,7 @@ static bool isZeroWidthTokenKind(TokenType kind)
 }
 
 Lexeme TokenPool::createLexeme(
-    LexemeKind kind,
+    LexemeTypeTag kind,
     UnownedStringSlice physicalSpelling,
     UnownedStringSlice logicalSpelling,
     SourceLoc loc,
@@ -107,7 +107,7 @@ Lexeme TokenPool::createLexeme(
     // Abstract kinds and the empty-value kind have no object representation.
     // Identity depends on both spellings and an optional interned name, while location
     // and preprocessing context belong to the occurrence returned below.
-    SLANG_RELEASE_ASSERT(isConcreteLexemeKind(kind));
+    SLANG_RELEASE_ASSERT(isValidLexemeTypeTag(kind));
     // EOF and directive delimiters denote positions rather than source text.
     // Enforcing both empty spellings here also covers replacement and import.
     if (isZeroWidthTokenKind(kind))
@@ -150,19 +150,27 @@ Token TokenPool::createToken(
     ConstArrayView<const LexemeObj*> leadingTrivia,
     ConstArrayView<const LexemeObj*> trailingTrivia)
 {
-    // A cluster stores only object pointers. We import foreign objects before
-    // interning so its lifetime depends on exactly one pool.
+    // A token combines objects already allocated in this pool. This makes its
+    // lifetime the lifetime of one pool, with no imports or additional owners.
     SLANG_RELEASE_ASSERT(rawToken);
-    SLANG_RELEASE_ASSERT(isLexemeKind(rawToken.getType(), LexemeKind::Token));
-    SLANG_RELEASE_ASSERT(isConcreteLexemeKind(rawToken.getType()));
-    const auto rawObject = _importLexeme(rawToken.getObject());
-    List<const LexemeObj*> importedLeading;
-    List<const LexemeObj*> importedTrailing;
-    const auto leading = _importTrivia(leadingTrivia, importedLeading);
-    const auto trailing = _importTrivia(trailingTrivia, importedTrailing);
+    SLANG_RELEASE_ASSERT(rawToken.getPool() == this);
+    const auto rawObject = rawToken.getObject();
     Index leadingPhysicalLength = 0;
-    for (auto object : leading)
-        leadingPhysicalLength += object->getPhysicalSpelling().getLength();
+    for (auto trivia : leadingTrivia)
+    {
+        SLANG_RELEASE_ASSERT(trivia);
+        SLANG_RELEASE_ASSERT(trivia->getPool() == this);
+        SLANG_RELEASE_ASSERT(LexemeTypes::Trivia.contains(trivia->getTypeTag()));
+        leadingPhysicalLength += trivia->getPhysicalSpelling().getLength();
+    }
+    for (auto trivia : trailingTrivia)
+    {
+        SLANG_RELEASE_ASSERT(trivia);
+        SLANG_RELEASE_ASSERT(trivia->getPool() == this);
+        SLANG_RELEASE_ASSERT(LexemeTypes::Trivia.contains(trivia->getTypeTag()));
+    }
+    const auto leading = leadingTrivia;
+    const auto trailing = trailingTrivia;
 
     Impl::TokenKey key{rawObject, leading, trailing};
     if (auto found = m_impl->tokens.tryGetValue(key))
@@ -182,59 +190,20 @@ Token TokenPool::createToken(
     return Token(object, rawToken.getLoc(), rawToken.getFlags());
 }
 
-const LexemeObj* TokenPool::_importLexeme(const LexemeObj* object)
-{
-    // A foreign pool may be released independently. We reuse same-pool objects
-    // and copy foreign lexical state before retaining any of its pointers.
-    SLANG_RELEASE_ASSERT(object);
-    if (object->getPool() == this)
-        return object;
-    auto imported = createLexeme(
-        object->getType(),
-        object->getPhysicalSpelling(),
-        object->getLogicalSpelling(),
-        SourceLoc(),
-        0,
-        object->getName());
-    return imported.getObject();
-}
-
-ConstArrayView<const LexemeObj*> TokenPool::_importTrivia(
-    ConstArrayView<const LexemeObj*> objects,
-    List<const LexemeObj*>& imported)
-{
-    // Most clusters already belong to one pool and can reuse their views without
-    // allocating temporary arrays. A foreign object requires importing the whole
-    // list so the resulting view has one owner and remains in its original order.
-    bool needsImport = false;
-    for (auto object : objects)
-    {
-        SLANG_RELEASE_ASSERT(object);
-        SLANG_RELEASE_ASSERT(isLexemeKind(object->getType(), LexemeKind::Trivia));
-        if (object->getPool() != this)
-            needsImport = true;
-    }
-    if (!needsImport)
-        return objects;
-    for (auto object : objects)
-        imported.add(_importLexeme(object));
-    return imported.getArrayView();
-}
-
 Token TokenPool::createToken(
     TokenType kind,
     UnownedStringSlice spelling,
     SourceLoc loc,
     TokenFlags flags)
 {
-    SLANG_RELEASE_ASSERT(isLexemeKind(kind, LexemeKind::Token));
+    SLANG_RELEASE_ASSERT(LexemeTypes::Token.contains(kind));
     return createToken(createLexeme(kind, spelling, spelling, loc, flags).as<RawToken>());
 }
 
 Token TokenPool::createToken(TokenType kind, Name* name, SourceLoc loc, TokenFlags flags)
 {
     SLANG_RELEASE_ASSERT(name);
-    SLANG_RELEASE_ASSERT(isLexemeKind(kind, LexemeKind::Token));
+    SLANG_RELEASE_ASSERT(LexemeTypes::Token.contains(kind));
     const auto spelling = name->text.getUnownedSlice();
     return createToken(createLexeme(kind, spelling, spelling, loc, flags, name).as<RawToken>());
 }
@@ -250,7 +219,7 @@ RawOpGreater TokenPool::createSecondGreaterToken(RawOpRsh rightShift)
     // first closer and leave the second in lookahead. The physical spelling of
     // `OpRsh` ends at that second `>`, even with escaped newlines between the two
     // characters, so its final byte gives the second closer's location.
-    SLANG_RELEASE_ASSERT(rightShift.getType() == TokenType::OpRsh);
+    SLANG_RELEASE_ASSERT(rightShift.getTypeTag() == TokenType::OpRsh);
     SLANG_RELEASE_ASSERT(rightShift.getLogicalSpelling() == toSlice(">>"));
     const auto physicalSpelling = rightShift.getPhysicalSpelling();
     SLANG_RELEASE_ASSERT(physicalSpelling.getLength() >= 2);
@@ -261,16 +230,6 @@ RawOpGreater TokenPool::createSecondGreaterToken(RawOpRsh rightShift)
         secondLoc = secondLoc + (physicalSpelling.getLength() - 1);
     const auto greater = toSlice(">");
     return createLexeme(TokenType::OpGreater, greater, greater, secondLoc).as<RawOpGreater>();
-}
-
-Token TokenPool::importToken(Token token)
-{
-    if (!token)
-        return token;
-    return createToken(
-        token.getRawToken(),
-        token.getLeadingTrivia().getObjects(),
-        token.getTrailingTrivia().getObjects());
 }
 
 TriviaList Token::getLeadingTrivia() const

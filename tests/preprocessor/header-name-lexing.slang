@@ -16,6 +16,10 @@
 #define QUOTED_HEADER "header-name/regular.slang.h"
 #include QUOTED_HEADER
 
+// A macro argument can use `<` as an operator while another argument supplies the path.
+#define SELECT_HEADER(condition, header) header
+#include SELECT_HEADER(1 < 2, "header-name/regular.slang.h")
+
 #if HEADER_NAME_REGULAR != 17
 #error The regular header was not included.
 #endif

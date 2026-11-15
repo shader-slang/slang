@@ -30,7 +30,7 @@ public:
 class TokenWithTriviaNode : public RefObject
 {
 public:
-    TokenType getType() const { return token.getType(); }
+    TokenType getTypeTag() const { return token.getTypeTag(); }
 
     Token token;
     Count skipCount = 0;
@@ -51,7 +51,7 @@ public:
 
     Token const& getToken() const { return node->token; }
 
-    TokenType getType() const { return node ? node->getType() : TokenType::Unknown; }
+    TokenType getTypeTag() const { return node ? node->getTypeTag() : TokenType::Count; }
 
     UnownedStringSlice getLogicalSpelling() const
     {
@@ -181,6 +181,11 @@ class LogicalNamespaceBase : public LogicalContainerDecl
 class LogicalModule : public LogicalNamespaceBase
 {
 public:
+    /// The pool for all files parsed into this module.
+    TokenPool* getTokenPool() const { return m_tokenPool; }
+
+private:
+    RefPtr<TokenPool> m_tokenPool = new TokenPool();
 };
 
 class LogicalNamespace : public LogicalNamespaceBase
@@ -364,12 +369,16 @@ T* findDecl(ContainerDecl* outerDecl, UnownedStringSlice const& name)
 }
 
 
+/// Parses one file's syntax and registers its declarations in `logicalModule`.
+///
+/// The returned tree borrows lexical storage from `logicalModule`'s pool, so the caller
+/// keeps that module alive while using the tree. Resolving the tree's source locations
+/// also requires the manager that owns `inputSourceView` to remain alive.
 RefPtr<SourceUnit> parseSourceUnit(
     SourceView* inputSourceView,
     LogicalModule* logicalModule,
     NamePool* namePool,
     DiagnosticSink* sink,
-    SourceManager* sourceManager,
     String outputFileName);
 
 bool hasAnyFiddleInvocations(SourceUnit* sourceUnit);

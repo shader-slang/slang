@@ -1,6 +1,6 @@
-// Deferred function bodies retain the tokens captured by declaration parsing.
-// These tests inspect that intermediate AST before semantic checking replaces
-// an `UnparsedStmt` with a parsed body.
+// Parser-created AST nodes retain tokens from their input. These tests inspect
+// an expression returned after its temporary input is released, and deferred
+// function bodies before semantic checking replaces an `UnparsedStmt` with a parsed body.
 
 #include "slang-com-ptr.h"
 #include "slang/slang-ast-builder.h"
@@ -11,6 +11,29 @@
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
+
+SLANG_UNIT_TEST(parserTermStringUsesBuilderTokenPool)
+{
+    slang::SessionDesc sessionDesc = {};
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        unitTestContext->slangGlobalSession->createSession(sessionDesc, session.writeRef())));
+    auto linkage = static_cast<Linkage*>(session.get());
+    auto astBuilder = linkage->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
+    // `parseTermString` releases its temporary source manager before returning.
+    // The returned expression's token must use the builder's pool, so its spelling
+    // remains available for the same lifetime as the expression.
+    auto scope = astBuilder->create<Scope>();
+    auto expression = linkage->parseTermString("123", scope);
+    auto literal = as<IntegerLiteralExpr>(expression);
+    SLANG_CHECK_ABORT(literal);
+    SLANG_CHECK(literal->token.getPool() == astBuilder->getTokenPool());
+    SLANG_CHECK(literal->token.is<IntegerLiteralToken>());
+    SLANG_CHECK(literal->token.getPhysicalSpelling() == UnownedStringSlice("123"));
+    SLANG_CHECK(literal->token.getLogicalSpelling() == UnownedStringSlice("123"));
+}
 
 SLANG_UNIT_TEST(parserDeferredBodyRetainsTerminatingEOF)
 {
@@ -44,7 +67,7 @@ SLANG_UNIT_TEST(parserDeferredBodyRetainsTerminatingEOF)
         source);
     auto view = sourceManager->createSourceView(file, nullptr, SourceLoc());
     Lexer lexer;
-    lexer.initialize(view, &sink, linkage->getNamePool());
+    lexer.initialize(view, &sink, linkage->getNamePool(), astBuilder->getTokenPool());
     auto tokens = lexer.readAllTokens();
     auto actualEOF = *tokens.end();
     SLANG_CHECK_ABORT(actualEOF.getLeadingTrivia().getCount() == 2);

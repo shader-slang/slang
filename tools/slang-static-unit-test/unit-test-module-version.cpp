@@ -451,9 +451,9 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
     }
 }
 
-SLANG_UNIT_TEST(serializedModuleRejectsVersion42TokenLayout)
+SLANG_UNIT_TEST(serializedModuleRejectsVersion43LexemeTags)
 {
-    // Version 42 encoded tokens without separate original spelling and trivia records.
+    // Version 43 assigned tags to abstract classes as well as concrete lexeme types.
     // A field semantic ensures that this module contains a token in its serialized AST.
     const char* source = R"(
         module token_schema_version;
@@ -469,7 +469,7 @@ SLANG_UNIT_TEST(serializedModuleRejectsVersion42TokenLayout)
 
     // We change only the version of a current payload. Rejection must come from
     // the compatibility gate, independently of how an old token record would decode.
-    *moduleVersion = 42;
+    *moduleVersion = 43;
     ComPtr<slang::ISession> session;
     SLANG_CHECK_ABORT(createSession(unitTestContext->slangGlobalSession, nullptr, false, session));
     ComPtr<ISlangBlob> diagnostics;

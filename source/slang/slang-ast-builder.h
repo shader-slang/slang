@@ -299,15 +299,11 @@ public:
 
     NamePool* getNamePool() { return getSharedASTBuilder()->getNamePool(); }
 
-    /// Returns the pool for tokens created by this builder.
+    /// Returns the lexical pool owned by this builder.
     ///
-    /// The builder owns the pool, so its tokens remain valid until the builder is destroyed.
+    /// Lexing, preprocessing, parsing, synthesis and deserialization for this AST use this
+    /// same pool. Its tokens remain valid until the builder is destroyed.
     TokenPool* getTokenPool();
-
-    /// Keeps `tokenPool` alive for tokens stored in this builder's AST nodes.
-    ///
-    /// Requires a non-null pool. Repeated calls for the same pool retain it only once.
-    void retainTokenPool(TokenPool* tokenPool);
 
     template<typename T, typename... TArgs>
     SLANG_FORCE_INLINE T* getOrCreate(TArgs... args)
@@ -1005,11 +1001,8 @@ protected:
     /// Cache for CapabilitySet::freeze() to avoid recreating identical CapabilitySetVal objects
     Dictionary<CapabilitySet, CapabilitySetVal*> m_capabilitySetCache;
 
-    /// Pool for tokens created while checking, parsing, or loading this builder's AST nodes.
+    /// The pool for lexemes and tokens allocated while constructing this builder's AST.
     RefPtr<TokenPool> m_tokenPool;
-
-    /// Pools that own tokens copied from lexer or preprocessor output into the AST.
-    List<RefPtr<TokenPool>> m_retainedTokenPools;
 
     MemoryArena m_arena;
 };
