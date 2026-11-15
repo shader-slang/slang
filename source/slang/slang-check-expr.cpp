@@ -3822,9 +3822,10 @@ void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueE
 {
     // A dereference of a pointer whose access qualifier is not a known constant is kept an
     // l-value, because the pointer might be writable (see `constructDerefExpr` and the `Ptr`
-    // subscript case of `CompleteOverloadCandidate`). We peel off the member, element, swizzle
-    // and parentheses layers of the written expression to find the dereference, so that we
-    // warn only when a write actually goes through such a pointer.
+    // subscript case of `CompleteOverloadCandidate`). We peel off the member, element, swizzle,
+    // parentheses and base-type cast layers of the written expression to find the dereference,
+    // so that we warn only when a write actually goes through such a pointer. The base-type
+    // cast is what member lookup inserts for an inherited field, as in `p->baseField`.
     for (Expr* e = lvalueExpr; e;)
     {
         if (auto memberExpr = as<MemberExpr>(e))
@@ -3837,6 +3838,8 @@ void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueE
             e = matrixSwizzleExpr->base;
         else if (auto parenExpr = as<ParenExpr>(e))
             e = parenExpr->base;
+        else if (auto castToSuperTypeExpr = as<CastToSuperTypeExpr>(e))
+            e = castToSuperTypeExpr->valueArg;
         else
         {
             auto ptrType = getDereferencedPtrType(e);
@@ -4580,6 +4583,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 // Replace the expression. This should make this situation
                                 // easier to detect.
                                 invoke->arguments[pp] = lValueImplicitCast;
+
+                                // The converted value is written back to the operand of the
+                                // cast after the call, so the operand is what gets written.
+                                maybeWarnWriteThroughPointerOfUnknownAccess(
+                                    implicitCastExpr->arguments[0]);
                             }
                             else if (!as<ErrorType>(argExpr->type))
                             {

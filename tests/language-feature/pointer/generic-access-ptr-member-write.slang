@@ -6,6 +6,7 @@
 struct Item
 {
     uint count;
+    int signedCount;
 
     [mutating]
     void reset()
@@ -50,6 +51,30 @@ void writeThroughGenericAccessPtr<Access access>(Ptr<Item, access> p)
 /*CHECK:
     ^ writing through a pointer whose access qualifier is not known
     ^ the access qualifier of the pointer is a generic parameter
+*/
+    // The `int` field is converted for the `inout uint` parameter and written back after the call.
+    bump(p->signedCount);
+//CHECK:    ^^^^^^^^^^^ writing through a pointer whose access qualifier is not known
+//CHECK:    ^^^^^^^^^^^ the access qualifier of the pointer is a generic parameter
+}
+
+struct Base
+{
+    uint baseCount;
+}
+
+struct Derived : Base
+//CHECK:         ^^^^ support for inheritance is unstable
+{
+}
+
+// Member lookup reaches an inherited field through a cast of the dereference to `Base`.
+void writeInheritedFieldThroughGenericAccessPtr<Access access>(Ptr<Derived, access> p)
+{
+    p->baseCount = 1;
+/*CHECK:
+       ^^^^^^^^^ writing through a pointer whose access qualifier is not known
+       ^^^^^^^^^ the access qualifier of the pointer is a generic parameter
 */
 }
 
