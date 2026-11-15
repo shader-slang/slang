@@ -297,6 +297,31 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
+/// Return true if `arg`, the checked argument for a generic value parameter of type
+/// `paramType`, is a constant of the `Access` enum that is none of its enumerators, as the
+/// argument of `Ptr<T, (Access)3>` or of `Box<(Access)3>` is. The value category of a pointee is
+/// derived from an access qualifier by `QualType::applyAccessQualifier`, which only accepts the
+/// enumerators, so such an argument must not reach a `Ptr` or `Ref` type.
+static bool isAccessArgumentOutsideAccessEnum(ASTBuilder* astBuilder, Type* paramType, Val* arg)
+{
+    if (!paramType->equals(astBuilder->getMagicEnumType("AccessQualifier")))
+        return false;
+
+    auto optAccessQualifier = tryGetAccessQualifierValue(arg);
+    if (!optAccessQualifier)
+        return false;
+
+    switch (*optAccessQualifier)
+    {
+    case AccessQualifier::ReadWrite:
+    case AccessQualifier::Read:
+    case AccessQualifier::Immutable:
+        return false;
+    default:
+        return true;
+    }
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
@@ -594,6 +619,19 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     getType(m_astBuilder, valParamRef),
                     argFoldingKind,
                     context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
+            }
+
+            // A cast such as `(Access)3` can spell an `Access` value that is none of its
+            // enumerators. We reject it here, where every explicit argument for an `Access`
+            // parameter becomes a value, and use the error value below in its place.
+            if (val && context.mode == OverloadResolveContext::Mode::ForReal &&
+                isAccessArgumentOutsideAccessEnum(
+                    m_astBuilder,
+                    getType(m_astBuilder, valParamRef),
+                    val))
+            {
+                getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.expr = arg});
+                val = nullptr;
             }
 
             // If any of the above checking steps fail and we don't
@@ -4262,21 +4300,7 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
         // applicable in the end.
         // We will report errors for this one candidate, then, to give
         // the user the most help we can.
-        auto resultExpr = CompleteOverloadCandidate(context, *context.bestCandidate);
-
-        // The value category of a pointee is derived from the access qualifier by
-        // `QualType::applyAccessQualifier`, which only accepts the `Access` enumerators. A cast
-        // such as `Ptr<T, (Access)3>` can spell any other value, so we reject that type here,
-        // where it is formed, both as the type of a declaration and inside an expression.
-        if (auto typeType = as<TypeType>(resultExpr->type))
-        {
-            if (hasAccessQualifierOutsideAccessEnum(typeType->getType()))
-            {
-                getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.typeExp = genericAppExpr});
-                return CreateErrorExpr(genericAppExpr);
-            }
-        }
-        return resultExpr;
+        return CompleteOverloadCandidate(context, *context.bestCandidate);
     }
     else
     {

@@ -879,6 +879,10 @@ class PtrTypeBase : public BuiltinType
     std::optional<AccessQualifier> tryGetAccessQualifierValue();
 };
 
+/// Return the access qualifier that `val` names when it is a constant, and nothing when it is
+/// not (e.g. a generic parameter).
+std::optional<AccessQualifier> tryGetAccessQualifierValue(Val* val);
+
 FIDDLE()
 class NoneType : public BuiltinType
 {

@@ -3628,8 +3628,8 @@ err(
 err(
     "invalid-access-qualifier",
     30409,
-    "invalid access qualifier for a pointer or reference type",
-    span { loc = "typeExp:Expr", message = "the access qualifier must be 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'" }
+    "invalid access qualifier",
+    span { loc = "expr:Expr", message = "an 'Access' value must be 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'" }
 )
 
 -- Control flow (305xx)

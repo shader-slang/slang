@@ -271,26 +271,6 @@ bool isManagedType(Type* type)
     return false;
 }
 
-bool hasAccessQualifierOutsideAccessEnum(Type* type)
-{
-    if (!as<PtrType>(type) && !as<ExplicitRefType>(type))
-        return false;
-
-    auto optAccessQualifier = as<PtrTypeBase>(type)->tryGetAccessQualifierValue();
-    if (!optAccessQualifier)
-        return false;
-
-    switch (*optAccessQualifier)
-    {
-    case AccessQualifier::ReadWrite:
-    case AccessQualifier::Read:
-    case AccessQualifier::Immutable:
-        return false;
-    default:
-        return true;
-    }
-}
-
 bool SemanticsVisitor::CoerceToProperTypeImpl(
     TypeExp const& typeExp,
     Type** outProperType,
