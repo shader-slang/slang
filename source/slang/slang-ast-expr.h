@@ -1110,6 +1110,8 @@ class SPIRVAsmExpr : public Expr
     FIDDLE(...)
 public:
     FIDDLE() List<SPIRVAsmInst> insts;
+    // Records whether the internal __assumeValidResourceOperands qualifier is present.
+    FIDDLE() bool assumeValidResourceOperands = false;
 };
 
 } // namespace Slang

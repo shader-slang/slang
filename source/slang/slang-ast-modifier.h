@@ -191,6 +191,13 @@ class ToBeSynthesizedModifier : public Modifier
     FIDDLE(...)
 };
 
+/// Marks a compiler-generated entity with no directly corresponding user-written declaration.
+FIDDLE()
+class ArtificialModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // Marks that the definition of a decl is synthesized.
 FIDDLE()
 class SynthesizedModifier : public Modifier

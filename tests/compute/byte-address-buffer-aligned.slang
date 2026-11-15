@@ -41,9 +41,9 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK2: buffer0_0.Store(32U,float4((buffer0_0).Load<float >(8U), (buffer0_0).Load<float >(12U), (buffer0_0).Load<float >(16U), (buffer0_0).Load<float >(20U)));
     // CHECK2: float4 [[WIDE:[A-Za-z0-9_]+]] = (buffer0_0).Load<float4 >(32U);
     // CHECK2: buffer0_0.Store(8U,[[WIDE]][int(0)]);
-    // CHECK2: buffer0_0.Store(12U,[[WIDE]][int(1)]);
-    // CHECK2: buffer0_0.Store(16U,[[WIDE]][int(2)]);
-    // CHECK2: buffer0_0.Store(20U,[[WIDE]][int(3)]);
+    // CHECK2: buffer0_0.Store(12U,[[WIDE]][1L]);
+    // CHECK2: buffer0_0.Store(16U,[[WIDE]][2L]);
+    // CHECK2: buffer0_0.Store(20U,[[WIDE]][3L]);
     // CHECK2: float [[W12:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(12U);
     // CHECK2: float [[W16:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(16U);
     // CHECK2: float [[W20:[A-Za-z0-9_]+]] = (buffer0_0).Load<float >(20U);

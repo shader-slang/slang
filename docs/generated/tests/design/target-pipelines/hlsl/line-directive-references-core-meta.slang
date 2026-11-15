@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-sonnet-5-5
 //META: generated_at=2026-11-02T10:45:10+00:00
-//META: source_commit=6815ed82d5e8c95b0e1258ca2eba0ca9c7825d86
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools
-//META: doc_section_digest=c7c97cf6f5a8dc2bac27a37c7292d84bc70e3e1764ddec58018711cf9fd606ce
+//META: doc_section_digest=affc65088b4faddcbee9b222f5a894089c99cb8eee13a5f0c0bac210c0fd5c78
 //META: purpose=The SourceWriter emits #line directives that reference the HLSL meta-module when emitted code originates from there.
 //META: intent=functional
 //META: pipeline_stage=emit

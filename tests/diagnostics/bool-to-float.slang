@@ -2,7 +2,7 @@
 
 // Diagnostic messages related to converting bool to float
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 struct Test
 {

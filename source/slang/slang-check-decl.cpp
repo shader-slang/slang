@@ -3349,6 +3349,7 @@ ConstructorDecl* SemanticsDeclVisitorBase::createCtor(
 {
     auto ctor = m_astBuilder->create<ConstructorDecl>();
     addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
+    addModifier(ctor, m_astBuilder->create<ArtificialModifier>());
     auto ctorName = getName("$init");
     ctor->ownedScope = m_astBuilder->create<Scope>();
     ctor->ownedScope->containerDecl = ctor;
@@ -3667,34 +3668,136 @@ static Decl* findLegacyBwdDiffFunc(SemanticsVisitor* visitor, ExtensionDecl* ext
 
 void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
-/// Returns true if `expr` is a runtime value that cannot be a compile-time constant.
+/// Returns true if every value of `type` is an opaque resource or sampler handle: a texture or
+/// other `ResourceType`, a sampler, a structured buffer, a byte-address buffer, or a non-empty
+/// struct or array made only of those. For example, `Texture2D`, `SamplerState[2]` and
+/// `struct S { Texture2D t; SamplerState s; }` qualify, but `float` and
+/// `struct S { Texture2D t; float scale; }` do not. A shader parameter of such a type is bound
+/// once for the whole dispatch, so its value does not change while the shader runs.
+///
+/// Constant-buffer and parameter-block types are deliberately excluded. They are handles too,
+/// but the data read through them is ordinary uniform data rather than another handle. A cbuffer
+/// member such as `Value` in `cbuffer CB { float Value; }` is read through such a handle, and
+/// that read must stay a runtime value.
+///
+/// `activeTypes` holds the struct types currently being visited. A struct that contains itself
+/// by value, such as `struct R { Texture2D t; R r; }`, is invalid and is diagnosed elsewhere,
+/// so it does not qualify here.
+static bool _isResourceHandleOnlyType(
+    ASTBuilder* astBuilder,
+    Type* type,
+    HashSet<Type*>& activeTypes)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    if (as<ResourceType>(type) || as<SamplerStateType>(type) ||
+        as<HLSLStructuredBufferTypeBase>(type) || as<UntypedBufferResourceType>(type))
+        return true;
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return _isResourceHandleOnlyType(astBuilder, arrayType->getElementType(), activeTypes);
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
+        {
+            // Fields inherited from a base struct are not returned by `getFields`, so a
+            // struct with a base struct does not qualify.
+            if (findBaseStructType(astBuilder, structDeclRef))
+                return false;
+            // If this struct is already being visited, it contains itself by value.
+            if (activeTypes.contains(type))
+                return false;
+            activeTypes.add(type);
+
+            // Builtin scalar types such as `float` are structs with no fields in the core
+            // module, so a struct must have at least one field to qualify.
+            bool hasField = false;
+            bool allFieldsQualify = true;
+            for (auto fieldDeclRef :
+                 getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+            {
+                hasField = true;
+                if (!_isResourceHandleOnlyType(
+                        astBuilder,
+                        getType(astBuilder, fieldDeclRef),
+                        activeTypes))
+                {
+                    allFieldsQualify = false;
+                    break;
+                }
+            }
+            activeTypes.remove(type);
+            return hasField && allFieldsQualify;
+        }
+    }
+    return false;
+}
+
+/// Returns true if `expr` is a runtime value that cannot be a compile-time or
+/// specialization-time constant.
 /// This is called only after constant folding has already failed (`varDecl->val` is null),
 /// so any surviving function call is known to be non-const-evaluable — if it were a
 /// constant-foldable intrinsic applied to constant arguments, folding would have succeeded.
 /// Used to distinguish "folding failed because of a runtime reference or call" from
 /// "folding failed because the folder doesn't handle this form" (e.g. unsupported literal type).
-static bool _initExprIsRuntimeValue(Expr* expr)
+///
+/// A resource or sampler handle read from a global shader parameter is not a runtime value,
+/// because the handle is bound once for the whole dispatch. For example, `tex` and `pb.tex` are
+/// both accepted in:
+///
+///     Texture2D tex;
+///     ParameterBlock<Params> pb;
+///     static const Texture2D aliasTex = tex;
+///     static const Texture2D aliasPbTex = pb.tex;
+///
+/// Reading data through a handle is still a runtime value. `tex[uint2(0, 0)]` reads a texel,
+/// and `Value` in `cbuffer CB { float Value; }` is a `float` read through a buffer handle. The
+/// type of such an expression is not made only of handles, so the exemption does not apply to it.
+static bool _initExprIsRuntimeValue(ASTBuilder* astBuilder, Expr* expr)
 {
     if (!expr)
         return false;
     if (as<ErrorType>(expr->type.type))
         return false;
+    HashSet<Type*> activeTypes;
+    if (_isResourceHandleOnlyType(astBuilder, expr->type.type, activeTypes))
+    {
+        // Look through the accesses that only select a handle out of a larger parameter,
+        // such as `pb.tex`, to find the variable the handle is read from.
+        Expr* root = expr;
+        for (;;)
+        {
+            if (auto memberExpr = as<MemberExpr>(root))
+                root = memberExpr->baseExpression;
+            else if (auto derefExpr = as<DerefExpr>(root))
+                root = derefExpr->base;
+            else if (auto parenExpr = as<ParenExpr>(root))
+                root = parenExpr->base;
+            else
+                break;
+        }
+        if (auto rootDeclRef = as<DeclRefExpr>(root))
+        {
+            auto rootVar = as<VarDeclBase>(rootDeclRef->declRef.getDecl());
+            if (rootVar && isGlobalShaderParameter(rootVar))
+                return false;
+        }
+    }
     if (auto memberExpr = as<MemberExpr>(expr))
-        return _initExprIsRuntimeValue(memberExpr->baseExpression);
+        return _initExprIsRuntimeValue(astBuilder, memberExpr->baseExpression);
     if (auto derefExpr = as<DerefExpr>(expr))
-        return _initExprIsRuntimeValue(derefExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, derefExpr->base);
     if (auto builtinCastExpr = as<BuiltinCastExpr>(expr))
-        return _initExprIsRuntimeValue(builtinCastExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, builtinCastExpr->base);
     if (auto swizzleExpr = as<SwizzleExpr>(expr))
-        return _initExprIsRuntimeValue(swizzleExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, swizzleExpr->base);
     if (auto matSwizzleExpr = as<MatrixSwizzleExpr>(expr))
-        return _initExprIsRuntimeValue(matSwizzleExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, matSwizzleExpr->base);
     if (auto indexExpr = as<IndexExpr>(expr))
     {
-        if (_initExprIsRuntimeValue(indexExpr->baseExpression))
+        if (_initExprIsRuntimeValue(astBuilder, indexExpr->baseExpression))
             return true;
         for (auto idx : indexExpr->indexExprs)
-            if (_initExprIsRuntimeValue(idx))
+            if (_initExprIsRuntimeValue(astBuilder, idx))
                 return true;
         return false;
     }
@@ -3704,6 +3807,13 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         {
             // References to static const globals are fine — compile-time constants.
             if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+                return false;
+            // Slang treats a specialization constant as a constant expression: it can size an
+            // array or set `numthreads`, and a `const` integer one folds to a `DeclRefIntVal`.
+            // A `uniform` or cbuffer value is not one, so it falls through to the case below.
+            // A `groupshared` global that carries the attribute is workgroup storage, not a
+            // shader parameter, so it does not qualify.
+            if (isGlobalShaderParameter(varDecl) && isSpecializationConstant(varDecl))
                 return false;
             // Any other global variable (including plain `static float foo`) is mutable.
             if (isGlobalDecl(varDecl))
@@ -3716,7 +3826,7 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         // A builtin-operator fast-path node is a pure builtin operation: it is a runtime
         // value only when one of its operands is.
         for (auto arg : builtinOpExpr->arguments)
-            if (_initExprIsRuntimeValue(arg))
+            if (_initExprIsRuntimeValue(astBuilder, arg))
                 return true;
         return false;
     }
@@ -3756,7 +3866,7 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         {
             // Pure callable: runtime only when an argument is runtime.
             for (auto arg : invokeExpr->arguments)
-                if (_initExprIsRuntimeValue(arg))
+                if (_initExprIsRuntimeValue(astBuilder, arg))
                     return true;
             return false;
         }
@@ -3764,11 +3874,11 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         return true;
     }
     if (auto parenExpr = as<ParenExpr>(expr))
-        return _initExprIsRuntimeValue(parenExpr->base);
+        return _initExprIsRuntimeValue(astBuilder, parenExpr->base);
     if (auto initListExpr = as<InitializerListExpr>(expr))
     {
         for (auto arg : initListExpr->args)
-            if (_initExprIsRuntimeValue(arg))
+            if (_initExprIsRuntimeValue(astBuilder, arg))
                 return true;
         return false;
     }
@@ -3833,7 +3943,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // handle (e.g. unsupported literal types).
             if (isStaticConst && isGlobalDecl(varDecl) && !varDecl->val &&
                 getSink()->getErrorCount() == errorCountBeforeInitCheck &&
-                _initExprIsRuntimeValue(initExpr))
+                _initExprIsRuntimeValue(getASTBuilder(), initExpr))
             {
                 getSink()->diagnose(Diagnostics::StaticConstGlobalNonConstantInit{.decl = varDecl});
             }
@@ -5793,6 +5903,17 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto satisfyingParamInfo = getParamInfo(m_astBuilder, satisfyingParam);
             if (!_doParamInfosMatch(satisfyingParamInfo, requiredParamInfo))
                 return false;
+
+            // Beyond matching modes exactly, two by-reference parameters match only if they refer
+            // to storage in the same address space. `groupshared` is currently the only way to
+            // spell an address space for a by-reference parameter, so this requires either both
+            // parameters or neither to be `groupshared`. When they differ, the requirement can
+            // still be satisfied by a synthesized wrapper whose call to the method type-checks.
+            //
+            if (isByReferenceParamPassingMode(requiredParamInfo.mode) &&
+                getReferenceParamAddressSpace(requiredParam.getDecl()) !=
+                    getReferenceParamAddressSpace(satisfyingParam.getDecl()))
+                return false;
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -7729,6 +7850,18 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         if (paramInfo.mode == ParamPassingMode::BorrowIn)
             paramType.isLeftValue = false;
 
+        // The synthesized declaration's passing mode is copied above, but a `groupshared`
+        // parameter also requires its argument to be thread-group-shared memory. The wrapper
+        // forwards its own parameter as that argument, so the parameter keeps `groupshared`;
+        // otherwise the forwarded argument would be rejected as not naming shared memory.
+        //
+        if (auto groupShared = paramDeclRef.getDecl()->findModifier<HLSLGroupSharedModifier>())
+        {
+            auto clonedModifier = m_astBuilder->create<HLSLGroupSharedModifier>();
+            clonedModifier->keywordName = groupShared->keywordName;
+            addModifier(synParamDecl, clonedModifier);
+        }
+
         // Create an expression that references the parameter for use in arguments.
         auto synArg = m_astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(synParamDecl);
@@ -7793,6 +7926,7 @@ CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitnessIn
     CallableDecl* synFuncDecl = as<CallableDecl>(
         m_astBuilder->createByNodeType(requiredMemberDeclRef.getDecl()->astNodeType));
     SLANG_ASSERT(synFuncDecl);
+    addModifier(synFuncDecl, m_astBuilder->create<ArtificialModifier>());
 
     synFuncDecl->ownedScope = m_astBuilder->create<Scope>();
     synFuncDecl->ownedScope->containerDecl = synFuncDecl;
@@ -8814,6 +8948,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         //
         auto synAccessorDecl = (AccessorDecl*)m_astBuilder->createByNodeType(
             requiredAccessorDeclRef.getDecl()->astNodeType);
+        addModifier(synAccessorDecl, m_astBuilder->create<ArtificialModifier>());
         synAccessorDecl->ownedScope = m_astBuilder->create<Scope>();
         synAccessorDecl->ownedScope->containerDecl = synAccessorDecl;
         synAccessorDecl->ownedScope->parent = getScope(context->parentDecl);
@@ -15211,6 +15346,33 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
+    // A `groupshared` parameter names thread-group-shared memory that other invocations can access
+    // during the call, so it must be a reference to that memory. A written `in`, `out`, `inout`, or
+    // `__borrow` (or its alias `__constref`) gives the parameter a mode that is not a reference,
+    // and we point the error at that keyword, since it is the one to remove.
+    //
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        auto mode = getExplicitlyDeclaredParamPassingMode(paramDecl);
+        if (!isByReferenceParamPassingMode(mode))
+        {
+            Modifier* modeModifier = nullptr;
+            for (auto modifier : paramDecl->modifiers)
+            {
+                if (as<InModifier>(modifier) || as<OutModifier>(modifier) ||
+                    as<BorrowModifier>(modifier) || as<HLSLPayloadModifier>(modifier))
+                {
+                    modeModifier = modifier;
+                    break;
+                }
+            }
+            SLANG_ASSERT(modeModifier);
+            getSink()->diagnose(Diagnostics::GroupsharedParameterMustBeReference{
+                .mode = mode,
+                .modifier = modeModifier});
+        }
+    }
+
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
     {
@@ -16138,6 +16300,32 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableSignature(CallableDe
             auto paramDecl = paramDeclRef.getDecl();
             if (!paramDecl->type.type)
                 continue;
+            // A by-reference parameter names storage that the caller, and possibly other
+            // invocations, may also access, and a derivative may access it a different number of
+            // times and in a different order than the function does. We do not support one here
+            // at all, so no derivative signature is ever built for the function.
+            //
+            // TODO: Once supported, a reference parameter should be treated as `no_diff`. We do not
+            // check for `no_diff` on one now, since every one is rejected.
+            //
+            if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            {
+                // A `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute declares this
+                // function as the derivative of another one rather than requesting a derivative of
+                // this one, so it gets its own wording.
+                //
+                auto attribute = decl->findModifier<DifferentiableAttribute>();
+                if (as<DerivativeOfAttribute>(attribute))
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfUserDefinedDerivative{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+                else
+                    getSink()->diagnose(Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                        .func = decl,
+                        .param = paramDecl,
+                        .attributeLocation = attribute->loc});
+            }
             if (!isTypeDifferentiable(paramDecl->type.type))
             {
                 if (!paramDecl->hasModifier<NoDiffModifier>())
@@ -16250,6 +16438,12 @@ void SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements(Callabl
             }
         }
     }
+
+    // A function with a reference parameter cannot be differentiated, so it gets no derivative
+    // signature and no conformance to the derivative interfaces.
+    //
+    if (hasReferenceParameter(decl))
+        return;
 
     if (as<FunctionDeclBase>(decl))
     {
@@ -17490,6 +17684,28 @@ void SemanticsDeclBasesVisitor::_funcExtensionApply(
     }
 }
 
+// Report each reference parameter of `primalFuncDecl` as a reason that it cannot be
+// differentiated, with a note at `derivativeLoc`, where a user-defined derivative names it as its
+// primal. A primal with a differentiability attribute has already been reported at that
+// attribute by `checkDifferentiableCallableSignature`, so we report nothing for it.
+//
+static void diagnoseReferenceParametersOfPrimal(
+    DiagnosticSink* sink,
+    CallableDecl* primalFuncDecl,
+    SourceLoc derivativeLoc)
+{
+    if (primalFuncDecl->findModifier<DifferentiableAttribute>())
+        return;
+    for (auto paramDecl : primalFuncDecl->getParameters())
+    {
+        if (isByReferenceParamPassingMode(getParamPassingMode(paramDecl)))
+            sink->diagnose(Diagnostics::ReferenceParameterOfDifferentiableFunction{
+                .func = primalFuncDecl,
+                .param = paramDecl,
+                .derivativeOfLocation = derivativeLoc});
+    }
+}
+
 static void _moveModifiersToFunc(Decl* src, Decl* dst)
 {
     Modifier** link = &src->modifiers.first;
@@ -17663,8 +17879,26 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     // conformance or synthesized members that depend on the invalid signature.
     extensionDecl->addMember(innerFunc);
 
-    // Dispatch to the appropriate helper based on the higher-order expression type.
-    if (isForwardDiff)
+    // We dispatch to the helper for the kind of higher-order expression, unless the function has a
+    // reference parameter. A function with a reference parameter cannot be differentiated, so an
+    // extension that gives it a derivative is an error, as a `[BackwardDerivativeOf]` attribute
+    // would be. We report it here unless the function's own `[Differentiable]` attribute already
+    // did.
+    //
+    auto primalFuncDecl = as<CallableDecl>(baseFuncDeclRef.getDecl());
+    SLANG_ASSERT(primalFuncDecl);
+    if (hasReferenceParameter(primalFuncDecl))
+    {
+        diagnoseReferenceParametersOfPrimal(getSink(), primalFuncDecl, diffExpr->baseFunction->loc);
+
+        // We leave the extension holding only the user's function, without a conformance or
+        // synthesized members, so the function gets no derivative. The helpers would build those
+        // from a derivative signature that cannot represent the derivative of a reference
+        // parameter, and for `bwd_diff` and `__apply` the `BwdCallableFuncType` they use gives the
+        // parameter an error type, which is an internal compiler error in lowering.
+        //
+    }
+    else if (isForwardDiff)
         _funcExtensionForwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
     else if (isBackwardDiff)
         _funcExtensionBackwardDiff(extensionDecl, innerFunc, baseFuncAsType, visibility);
@@ -20880,6 +21114,20 @@ void checkDerivativeOfAttributeImpl(
         return;
     }
 
+    // A primal with a reference parameter cannot be differentiated. If the primal has its own
+    // `[Differentiable]` attribute, `checkDifferentiableCallableSignature` has already reported
+    // that; otherwise this attribute is the only thing trying to give it a derivative, so we
+    // report the error here. Either way, `checkDerivativeAttribute` skips matching the derivative
+    // against the primal, so no derivative is attached.
+    //
+    if constexpr (!std::is_same_v<TDerivativeAttr, PrimalSubstituteAttribute>)
+    {
+        diagnoseReferenceParametersOfPrimal(
+            visitor->getSink(),
+            primalFuncDecl,
+            higherOrderFuncExpr->loc);
+    }
+
     if (auto existingModifier = _findModifier<TDerivativeAttr>(primalFuncDecl))
     {
         // The primal function already has a `[*Derivative]` attribute, this is invalid.
@@ -21154,6 +21402,12 @@ static void checkDerivativeAttribute(
 {
     SLANG_RELEASE_ASSERT(attr->funcExpr && !attr->funcExpr->type.type);
 
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check the derivative against.
+    //
+    if (hasReferenceParameter(primalDeclRef.getDecl()))
+        return;
+
     ArgsWithDirectionInfo imaginaryArguments =
         getImaginaryArgsToForwardDerivative(visitor, primalDeclRef, attr->loc);
     checkDerivativeAttributeImpl(
@@ -21184,6 +21438,12 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // A primal with a reference parameter cannot be differentiated, so it has no derivative
+    // signature to check its derivative against.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(
@@ -21224,6 +21484,12 @@ static void checkDerivativeAttribute(
     if (!attr->funcExpr)
         return;
     if (attr->funcExpr->type.type)
+        return;
+
+    // As for a forward derivative, a primal with a reference parameter has no backward derivative
+    // signature to check its derivative against.
+    //
+    if (hasReferenceParameter(funcDecl))
         return;
 
     auto primalDeclRef = createDefaultSubstitutionsIfNeeded(

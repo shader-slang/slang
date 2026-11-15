@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#tie-breaking-comparator
-//META: doc_section_digest=1d384c53a44075a9ff7b3de0f1907c30fb579e521154ac25ad145d433be8dd6a
+//META: doc_section_digest=764e196b19a5dd0e0f2c516c498be250f0fdaba7e58c28f2ac820f88be1e5466
 //META: purpose=getScopeRank prefers the declaration at the shorter scope distance from the call site when both non-generic candidates are otherwise equal.
 //META: intent=functional
 //META: pipeline_stage=check

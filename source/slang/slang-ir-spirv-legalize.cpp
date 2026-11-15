@@ -7,6 +7,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-eliminate-undefined-opaque-handles.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-inline.h"
@@ -3454,6 +3455,10 @@ void legalizeIRForSPIRV(
 
     // Run DCE to clean up any values that became unused after removing unreachable code
     eliminateDeadCode(module);
+
+    // An undefined opaque handle that is still present would be emitted as an `OpUndef` that
+    // Vulkan forbids (VUID-StandaloneSpirv-OpUndef-12464), so we report it instead.
+    diagnoseUndefinedOpaqueHandles(module, codeGenContext->getSink());
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
 

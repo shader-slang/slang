@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#layout-and-binding
-//META: doc_section_digest=e8a69f877014ca0f8bfc67db36bada005ec4a862dc57ca692609099e2ca800ab
+//META: doc_section_digest=0fba7fe66a94de18a3a43af71b0a2a503d43e1e15dfc035e524c23f3c2bdbd9f
 //META: purpose=The layout pass adds resource binding decorations; the SPIR-V emit carries explicit `Binding N` / `DescriptorSet 0` decorations for each declared resource.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
