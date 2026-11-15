@@ -673,6 +673,14 @@ FIDDLE() namespace Slang
             isLeftValue = isLVal;
         }
 
+        /// Set the value category of an expression that denotes the pointee of a pointer or
+        /// reference with the given access qualifier: `ReadWrite` yields an l-value, while `Read`
+        /// and `Immutable` yield a read-only memory location.
+        ///
+        /// A reference type and a pointer type map their access qualifier through this one
+        /// function, so that an access qualifier gives the same value category on both.
+        void applyAccessQualifier(AccessQualifier accessQualifier);
+
 
         Type* Ptr() { return type; }
 

@@ -703,13 +703,21 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     derefExpr->type = QualType(elementType);
     derefExpr->checked = true;
 
-    if (as<PtrType>(base->type))
+    if (auto ptrType = as<PtrType>(base->type))
     {
-        // TODO(tfoley): It is not clear why this is being unconditionally
-        // set to `true` when the `Ptr` types in the core module has an
-        // `AccessQualifier` parameter that can be used to form a read-only pointer.
+        // The pointee of a `Ptr<T, Access.Read>` or `Ptr<T, Access.Immutable>` can be read but
+        // not written through the pointer, so the dereference is a read-only memory location
+        // rather than an l-value. Any member reached through it, as in `p->field`, inherits
+        // that status from this expression.
         //
-        derefExpr->type.isLeftValue = true;
+        // When the access is not a compile-time constant (e.g. `Ptr<T, access>` in a generic
+        // function), we cannot tell whether the pointer is writable, and we keep the
+        // dereference an l-value.
+        //
+        if (auto optAccessQualifier = ptrType->tryGetAccessQualifierValue())
+            derefExpr->type.applyAccessQualifier(*optAccessQualifier);
+        else
+            derefExpr->type.isLeftValue = true;
     }
     else if (as<ExplicitRefType>(base->type))
     {

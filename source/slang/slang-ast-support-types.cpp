@@ -49,25 +49,27 @@ QualType::QualType(Type* type)
     if (auto refType = as<ExplicitRefType>(type))
     {
         if (auto optAccessQualifier = refType->tryGetAccessQualifierValue())
-        {
-            auto accessQualifier = *optAccessQualifier;
-            switch (accessQualifier)
-            {
-            case AccessQualifier::ReadWrite:
-                isLeftValue = true;
-                break;
+            applyAccessQualifier(*optAccessQualifier);
+    }
+}
 
-            case AccessQualifier::Read:
-            case AccessQualifier::Immutable:
-                isLeftValue = false;
-                isReadOnlyMemoryLocation = true;
-                break;
+void QualType::applyAccessQualifier(AccessQualifier accessQualifier)
+{
+    switch (accessQualifier)
+    {
+    case AccessQualifier::ReadWrite:
+        isLeftValue = true;
+        break;
 
-            default:
-                SLANG_UNEXPECTED("unhandled access qualifier");
-                break;
-            }
-        }
+    case AccessQualifier::Read:
+    case AccessQualifier::Immutable:
+        isLeftValue = false;
+        isReadOnlyMemoryLocation = true;
+        break;
+
+    default:
+        SLANG_UNEXPECTED("unhandled access qualifier");
+        break;
     }
 }
 
