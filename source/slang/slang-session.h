@@ -488,6 +488,18 @@ private:
     // Any modules currently being imported will be listed here
     ModuleBeingImportedRAII* m_modulesBeingImported = nullptr;
 
+public:
+    /// Drops the record of in-progress module imports. Recovery code at an API boundary calls
+    /// this when an aborted compilation skipped the stack-allocated `ModuleBeingImportedRAII`
+    /// destructors: the longjmp out of an in-progress import leaves the list head pointing into
+    /// abandoned stack frames, so it must be cleared before the boundary returns.
+    ///
+    /// Valid to call from a recovery branch because a module import only ever runs inside a
+    /// module-load boundary: at the point the innermost recovery branch runs, every entry in this
+    /// list belongs to a frame the jump abandoned.
+    void resetModulesBeingImported() { m_modulesBeingImported = nullptr; }
+
+private:
     /// Is the given module in the middle of being imported?
     bool isBeingImported(Module* module);
 

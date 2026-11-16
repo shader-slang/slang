@@ -1937,7 +1937,9 @@ SlangResult EndToEndCompileRequest::compile()
 {
     // `res` is assigned between the SLANG_EXCEPTION_TRY_RECOVERY setjmp and the longjmp that an
     // AbortCompilation can make in a no-exceptions build, so it is indeterminate once the jump
-    // lands; the recovery branch overwrites it, but only a `volatile` local carries a guarantee.
+    // lands. The recovery branch overwrites it on the reported-nothing path; on the path where a
+    // diagnostic already exists it deliberately keeps the pre-set failure result — and reading
+    // that back is exactly what only a `volatile` local guarantees.
 #if SLANG_HAS_EXCEPTIONS
     SlangResult res = SLANG_FAIL;
 #else
@@ -2018,11 +2020,15 @@ SlangResult EndToEndCompileRequest::compile()
         // reported as an internal error.
         if (getSink()->getErrorCount() == 0)
         {
+            // No exception object exists in this configuration, so the type name the exceptions
+            // arm derives with typeid() is replaced by the signal's own name.
             getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = "AbortCompilation",
                 .exceptionMessage = getLastSignalMessage()});
             res = SLANG_E_ABORT;
         }
+        // The jump abandoned any in-progress imports along with their RAII bookkeeping.
+        getLinkage()->resetModulesBeingImported();
     }
 #endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();

@@ -5,6 +5,7 @@
 #include "core/slang-blob.h"
 #include "core/slang-lz4-compression-system.h"
 #include "core/slang-shared-library.h"
+#include "core/slang-signal.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
@@ -353,6 +354,8 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 #else
     SLANG_EXCEPTION_ABORT_RECOVERY
     {
+        // The jump abandoned any in-progress imports along with their RAII bookkeeping.
+        resetModulesBeingImported();
         outputAbortCompilationDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
@@ -479,6 +482,8 @@ slang::IModule* Linkage::loadModuleFromBlob(
 #else
     SLANG_EXCEPTION_ABORT_RECOVERY
     {
+        // The jump abandoned any in-progress imports along with their RAII bookkeeping.
+        resetModulesBeingImported();
         outputAbortCompilationDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
@@ -1271,7 +1276,7 @@ void Linkage::loadParsedModule(
 
     int errorCountBefore = sink->getErrorCount();
     int errorCountAfter;
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         compileRequest->checkAllTranslationUnits();
     }
@@ -1281,6 +1286,16 @@ void Linkage::loadParsedModule(
         mapPathToLoadedModule.remove(mostUniqueIdentity);
         mapNameToLoadedModules.remove(name);
         throw;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        // This mirrors the catch arm above: the module was registered before checking so a
+        // recursive import could find it, so a failed check must take it back out before the
+        // abort continues to the enclosing boundary.
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(name);
+        reraiseAbortCompilation();
     }
 #endif
     errorCountAfter = sink->getErrorCount();
@@ -1432,7 +1447,7 @@ RefPtr<Module> Linkage::loadSerializedModule(
 
     mapPathToLoadedModule.add(mostUniqueIdentity, module);
     mapNameToLoadedModules.add(moduleName, module);
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         if (SLANG_FAILED(loadSerializedModuleContents(
                 module,
@@ -1456,6 +1471,15 @@ RefPtr<Module> Linkage::loadSerializedModule(
         mapPathToLoadedModule.remove(mostUniqueIdentity);
         mapNameToLoadedModules.remove(moduleName);
         throw;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        // Mirrors the catch arm above: undo the registration done before loading, then let the
+        // abort continue to the enclosing boundary.
+        mapPathToLoadedModule.remove(mostUniqueIdentity);
+        mapNameToLoadedModules.remove(moduleName);
+        reraiseAbortCompilation();
     }
 #endif
 }

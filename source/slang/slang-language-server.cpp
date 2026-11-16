@@ -3055,9 +3055,10 @@ SlangResult LanguageServer::runCommand(Command& call)
     catch (...)
     {
         // If we encountered an internal compiler error, don't crash the language server; instead
-        // return a null response. This recovery only applies with exceptions enabled; under
-        // SLANG_DISABLE_EXCEPTIONS an internal abort routes through handleSignal(AbortCompilation)
-        // → exit(-1) and terminates the process before reaching here.
+        // return a null response. Under SLANG_DISABLE_EXCEPTIONS an AbortCompilation is recovered
+        // only at API boundaries that install SLANG_EXCEPTION_TRY_RECOVERY (this compile path and
+        // session loadModule among them); internal-error-class signals and aborts raised outside
+        // those boundaries still terminate the process before reaching here.
         return m_connection->sendNullResult(call.id);
     }
 #endif
