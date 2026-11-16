@@ -64,6 +64,8 @@ namespace Slang
 /// that hoisted-variable legalization avoids. A default-constructed scalar, vector,
 /// matrix or pointer lowers to at most a handful of cheap constants, so those types
 /// are safe to materialize when a register temp needs a definition on every path.
+/// Anything else (aggregates, opaque handles, anything exotic) falls back to leaving
+/// the temp unwritten, which is the status-quo behavior for undefined reads.
 static bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
 {
     for (;;)
@@ -75,15 +77,15 @@ static bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
         else
             break;
     }
-    switch (type->getOp())
-    {
-    case kIROp_StructType:
-    case kIROp_ArrayType:
-    case kIROp_UnsizedArrayType:
-        return false;
-    default:
+    if (as<IRBasicType>(type))
         return true;
-    }
+    if (as<IRVectorType>(type))
+        return true;
+    if (as<IRMatrixType>(type))
+        return true;
+    if (as<IRPtrTypeBase>(type))
+        return true;
+    return false;
 }
 
 struct PhiEliminationContext
