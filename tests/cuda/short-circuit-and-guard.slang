@@ -1,6 +1,9 @@
 // CUDA short-circuit `&&` must keep a buffer load in its right operand inside
-// the emitted expression, where nvcc evaluates it only when the left operand
-// does not short-circuit (the `i < n && a[i]` guarded-access idiom).
+// the emitted expression (the `i < n && a[i]` guarded-access idiom). Issue
+// #14494's SASS measurements are what make that shape matter downstream —
+// nvcc evaluates an in-expression operand only when the left one does not
+// short-circuit; this test pins the emitted-source shape itself: the load
+// text must appear inside the `if` line, not as a preceding statement.
 
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target cuda
 
@@ -22,6 +25,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     {
         output[tid.x] = 0;
     }
-    //CHECK: &&
     //CHECK-NOT: bool _S
+    //CHECK: if({{.*}}&&{{.*}}slang_ldg_0
 }

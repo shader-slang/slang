@@ -23,6 +23,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     {
         output[tid.x] = 0;
     }
-    //CHECK: ||
     //CHECK-NOT: bool _S
+    //CHECK: if({{.*}}||
 }

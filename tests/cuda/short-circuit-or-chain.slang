@@ -1,8 +1,9 @@
 // CUDA short-circuit `||` chains must emit as source-level `||` expressions,
-// not as one `bool` temporary per link of the chain. A materialized boolean
-// temporary forces nvcc into `selp`/select chains instead of the
-// compare-and-branch it generates for hand-written `||` — the subject of
-// shader-slang/slang#14494.
+// not as one `bool` temporary per link of the chain. Issue #14494's SASS
+// measurements show a materialized boolean temporary is what drives nvcc
+// into `selp`/select chains instead of the compare-and-branch it generates
+// for hand-written `||`; this test pins the emitted-source shape that
+// avoids the temporaries.
 
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target cuda
 
@@ -30,6 +31,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         return;
     }
     output[tid.x] = 1;
-    //CHECK: ||
     //CHECK-NOT: bool _S
+    //CHECK: if({{.*}}||
 }
