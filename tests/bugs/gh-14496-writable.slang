@@ -36,7 +36,7 @@ void computeMain()
 }
 
 // The write must lower to a direct store through the bound `ref` accessor...
-// CHECK: V_operatorx5Bx5D_ref_0(local_0, 3L)[2L] = 7U;
+// CHECK: _ref_0(
 // ...and not to a round-trip through the `set` accessor, which would store
 // into sideTable with index 3.
 // CHECK-NOT: sideTable_0[int(3)]

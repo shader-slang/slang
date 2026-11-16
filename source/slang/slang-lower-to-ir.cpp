@@ -1230,11 +1230,11 @@ LoweredValInfo extractField(
                 // layout). Consider `Ptr<Holder, Access.Read> p`: the address
                 // of `p->v` must stay read-only, so that later decisions about
                 // writable storage see the same qualifications the pointer
-                // type carries. Before this, `maybePropagateAddressSpace`
-                // (inside `emitFieldAddress`) preserved those qualifications
-                // only when the base's address space differed from Generic, so
-                // a read-only pointer in the default address space lost its
-                // qualifier on this explicitly-typed path.
+                // type carries. On its own, `maybePropagateAddressSpace`
+                // (inside `emitFieldAddress`) preserves those qualifications
+                // only when the base's address space differs from Generic,
+                // so a read-only pointer in the default address space would
+                // lose its qualifier on this explicitly-typed path.
                 //
                 // The same derivation exists at the other sites that rebuild
                 // a pointer type from a base pointer —
@@ -4411,8 +4411,7 @@ static LoweredValInfo _emitCallToAccessor(
     // the base is proven read-only there is no sound call to make, so we
     // diagnose and skip the call, substituting an undefined value of the
     // requested type to keep the (already failing) compilation on the rails.
-    if (base.flavor != LoweredValInfo::Flavor::None &&
-        doesAccessorRequireWritableThis(context->astBuilder, accessorDeclRef) &&
+    if (doesAccessorRequireWritableThis(context->astBuilder, accessorDeclRef) &&
         isDefinitelyReadOnlyStorage(base))
     {
         SourceLoc loc;
