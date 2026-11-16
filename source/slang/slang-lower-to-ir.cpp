@@ -1074,6 +1074,17 @@ static LoweredValInfo _emitCallToAccessor(
     UInt argCount,
     IRInst* const* args);
 
+static bool canBindAccessorToBase(
+    IRGenContext* context,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    LoweredValInfo const& base);
+
+static bool doesAccessorRequireWritableThis(
+    ASTBuilder* astBuilder,
+    DeclRef<AccessorDecl> accessorDeclRef);
+
+static bool isDefinitelyReadOnlyStorage(LoweredValInfo const& val);
+
 static LoweredValInfo _emitCallToAccessor(
     IRGenContext* context,
     IRType* type,
@@ -1208,20 +1219,32 @@ LoweredValInfo extractField(
             // representing the field address.
             IRInst* irBasePtr = base.val;
             IRType* fieldPtrType = builder->getPtrType(fieldType);
-            if (auto basePtrType = as<IRPtrTypeBase>(unwrapAttributedType(irBasePtr->getDataType())))
+            if (auto basePtrType =
+                    as<IRPtrTypeBase>(unwrapAttributedType(irBasePtr->getDataType())))
             {
                 // A field of a qualified pointer is only as addressable as its
                 // base: when the base pointer carries a non-default access
                 // qualifier, address space, or data layout, the field address
-                // inherits them instead of defaulting to read-write. Consider
-                // `Ptr<Holder, Access.Read> p`: the address of `p->v` must stay
-                // read-only, so that later decisions about writable storage see
-                // the same qualifications the pointer type carries. Unqualified
-                // bases keep the plain pointer type, so ordinary writable
-                // addresses lower exactly as before.
-                // `IRBuilder::emitFieldAddress(IRInst*, IRInst*)` derives its
-                // result type the same way; this keeps the explicitly-typed path
-                // consistent with it.
+                // inherits them instead of falling back to the defaults
+                // (read-write access, Generic address space, default buffer
+                // layout). Consider `Ptr<Holder, Access.Read> p`: the address
+                // of `p->v` must stay read-only, so that later decisions about
+                // writable storage see the same qualifications the pointer
+                // type carries. Before this, `maybePropagateAddressSpace`
+                // (inside `emitFieldAddress`) preserved those qualifications
+                // only when the base's address space differed from Generic, so
+                // a read-only pointer in the default address space lost its
+                // qualifier on this explicitly-typed path.
+                //
+                // The same derivation exists at the other sites that rebuild
+                // a pointer type from a base pointer —
+                // `IRBuilder::emitFieldAddress(IRInst*, IRInst*)` (which
+                // derives the same qualifications, though it always emits the
+                // fully-qualified form where this path keeps the plain form
+                // for unqualified bases), `maybePropagateAddressSpace`, and
+                // `IRBuilder::getPtrType(valueType, oldPtrType)` — each with
+                // subtly different conditions. Unqualified bases take the
+                // plain pointer type here and lower exactly as before.
                 if (basePtrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
                     basePtrType->hasAddressSpace() || basePtrType->getDataLayout())
                 {
@@ -4374,6 +4397,38 @@ static LoweredValInfo _emitCallToAccessor(
     UInt argCount,
     IRInst* const* args)
 {
+    // An accessor whose effective `this` parameter requires writable storage
+    // must only be invoked on a base that can provide it, since the accessor
+    // body may write through its receiver. This is the single enforcement
+    // point for every accessor binding that has no better option:
+    // `tryGetAddress` pre-checks the `ref` case it can route to a `set`
+    // round-trip, and every other caller — reads via `materialize`, the
+    // `set` and `ref` fallbacks in `assign`, getter-only storage references —
+    // funnels through here. The check fires only on bases whose pointer type
+    // proves read-only (or immutable) storage: refusing on a merely-unknown
+    // base shape would diagnose legitimate programs, and the `set` round-trip
+    // in `assign` covers exactly the shapes where a fallback exists. When
+    // the base is proven read-only there is no sound call to make, so we
+    // diagnose and skip the call, substituting an undefined value of the
+    // requested type to keep the (already failing) compilation on the rails.
+    if (base.flavor != LoweredValInfo::Flavor::None &&
+        doesAccessorRequireWritableThis(context->astBuilder, accessorDeclRef) &&
+        isDefinitelyReadOnlyStorage(base))
+    {
+        SourceLoc loc;
+        for (auto locInfo = context->irBuilder->getSourceLocInfo(); locInfo;
+             locInfo = locInfo->next)
+        {
+            if (locInfo->sourceLoc.getRaw() != 0)
+            {
+                loc = locInfo->sourceLoc;
+                break;
+            }
+        }
+        context->getSink()->diagnose(Diagnostics::AccessorRequiresWritableBase{.location = loc});
+        return LoweredValInfo::simple(context->irBuilder->emitDefaultConstruct(type));
+    }
+
     FuncDeclBaseTypeInfo info;
     _lowerFuncDeclBaseTypeInfo(context, accessorDeclRef, info);
 
@@ -9837,22 +9892,38 @@ static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo 
 }
 
 /// Returns whether the effective `this` parameter of `accessorDeclRef` passes
-/// writable storage to the accessor, e.g. because it is declared `[mutating]`.
+/// writable storage to the accessor, e.g. because it is declared `[mutating]`
+/// (or is a setter, whose receiver defaults to writable).
 ///
 /// An accessor that receives writable storage must only be invoked on a base
 /// that can provide it, since the accessor may write through its receiver.
-static bool doesAccessorRequireWritableThis(ASTBuilder* astBuilder, DeclRef<RefAccessorDecl> accessorDeclRef)
+/// A signature-checked accessor always has an effective `this` parameter, so
+/// `findEffectiveThisParamInfo` returns none only on error-recovery paths
+/// that are already diagnosed; there we report no requirement, which keeps
+/// the pre-existing behavior for code that will not compile anyway.
+static bool doesAccessorRequireWritableThis(
+    ASTBuilder* astBuilder,
+    DeclRef<AccessorDecl> accessorDeclRef)
 {
     auto thisParamInfo = findEffectiveThisParamInfo(astBuilder, DeclRef<Decl>(accessorDeclRef));
     return thisParamInfo.has_value() &&
            doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode);
 }
 
-/// Returns whether `val` names a memory location that can be written through:
-/// an address whose pointer type carries the read-write access qualifier.
+/// Returns whether `val` names memory that a `[mutating]` accessor can use as
+/// its receiver: an address whose pointer type carries an access qualifier
+/// that permits stores. `ReadWrite` and `WriteOnly` both qualify — a
+/// write-only receiver can back a mutating accessor because the accessor
+/// only needs to store through it, and routing its write to the `set`
+/// round-trip instead would load write-only memory through the getter.
 ///
-/// Any other flavor either holds a value (no storage to write) or defers an
-/// accessor choice, so it cannot directly provide writable storage.
+/// The flavor check is deliberately conservative: any other flavor either
+/// holds a value (no storage) or defers an accessor choice, so it cannot
+/// directly provide writable storage even when a swizzle or cast of it could
+/// eventually collapse into an address. Refusing the `ref` binding then
+/// routes the write through the `set` accessor round-trip, which is correct
+/// whenever a `set` accessor exists (and `_emitCallToAccessor` diagnoses the
+/// write when it, too, would need a mutable receiver).
 static bool canProvideWritableStorage(LoweredValInfo const& val)
 {
     if (val.flavor != LoweredValInfo::Flavor::Ptr)
@@ -9860,7 +9931,40 @@ static bool canProvideWritableStorage(LoweredValInfo const& val)
     auto ptrType = as<IRPtrTypeBase>(unwrapAttributedType(val.val->getDataType()));
     if (!ptrType)
         return false;
-    return ptrType->getAccessQualifier() == AccessQualifier::ReadWrite;
+    auto access = ptrType->getAccessQualifier();
+    return access == AccessQualifier::ReadWrite || access == AccessQualifier::WriteOnly;
+}
+
+/// Returns whether lowering may bind `accessorDeclRef` to `base` as its
+/// receiver: an accessor whose effective `this` parameter requires writable
+/// storage may only be bound to a base that can provide it, since the
+/// accessor body may write through its receiver.
+static bool canBindAccessorToBase(
+    IRGenContext* context,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    LoweredValInfo const& base)
+{
+    if (!doesAccessorRequireWritableThis(context->astBuilder, accessorDeclRef))
+        return true;
+    return canProvideWritableStorage(base);
+}
+
+/// Returns whether `val` is known to name storage that does not permit
+/// writes: an address whose pointer type carries a read-only access
+/// qualifier. Bases of other lowering shapes are not proven writable
+/// either, but binding them is the pre-existing behavior, so the diagnostic
+/// in `_emitCallToAccessor` fires only on this positive read-only test —
+/// unlike `canProvideWritableStorage`, which is deliberately conservative
+/// because its refusal has a sound fallback (the `set` round-trip).
+static bool isDefinitelyReadOnlyStorage(LoweredValInfo const& val)
+{
+    if (val.flavor != LoweredValInfo::Flavor::Ptr)
+        return false;
+    auto ptrType = as<IRPtrTypeBase>(unwrapAttributedType(val.val->getDataType()));
+    if (!ptrType)
+        return false;
+    auto access = ptrType->getAccessQualifier();
+    return access == AccessQualifier::Read || access == AccessQualifier::Immutable;
 }
 
 LoweredValInfo tryGetAddress(
@@ -9916,11 +10020,17 @@ LoweredValInfo tryGetAddress(
                 // would pass the read-only base as its writable `this` and
                 // store through the returned pointer into read-only memory.
                 // When the `ref` accessor needs writable storage that the
-                // base cannot provide, we leave the value unbound so that
-                // `assign` performs the get/modify/set round-trip through
-                // the `set` accessor instead.
-                if (doesAccessorRequireWritableThis(context->astBuilder, refAccessor) &&
-                    !canProvideWritableStorage(subscriptInfo->base))
+                // base cannot provide, we return the value unchanged (still
+                // a `BoundStorage`), leaving the `ref` accessor unbound, so
+                // that `assign` performs the get/modify/set round-trip
+                // through the `set` accessor instead. This is the one binding
+                // site that has a sound fallback; every other accessor
+                // binding is guarded in `_emitCallToAccessor`, which
+                // diagnoses when no `set` round-trip can save it. Aggressive
+                // address-takers that are not assignments (e.g. `getAddress`
+                // for `__ref` parameters) diagnose the unbound value instead
+                // of silently binding a mutating `ref`.
+                if (!canBindAccessorToBase(context, refAccessor, subscriptInfo->base))
                 {
                     return val;
                 }

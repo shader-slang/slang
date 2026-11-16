@@ -4426,6 +4426,13 @@ standalone_note(
     span { loc = "location" }
 )
 
+err(
+    "accessor-requires-writable-base",
+    40027,
+    "cannot invoke this subscript's accessor: it requires a mutable receiver, but the base does not provide writable storage",
+    span { loc = "location", message = "the accessor's receiver may write through the base, and the base's storage does not permit writes" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,
