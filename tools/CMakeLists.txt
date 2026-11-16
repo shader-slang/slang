@@ -280,7 +280,7 @@ if(SLANG_ENABLE_GFX)
 endif()
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # ---- spvdb integration for SPVDB_DEBUGGER tests -------------------------
-    # spvdb (vendored at tests/spvdb) is a SPIR-V interpreter and source-level
+    # spvdb (vendored at source/tools/spvdb) is a SPIR-V interpreter and source-level
     # debugger. Build libspvdb here and link it into slang-test so that
     # .slang test files under tests/debuginfo can drive the debugger
     # in-process and validate its output with FileCheck.
@@ -297,7 +297,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         set(SPVDB_PARENT_PROVIDES_STB_IMAGE TRUE)
     endif()
     add_subdirectory(
-        "${slang_SOURCE_DIR}/tests/spvdb"
+        "${slang_SOURCE_DIR}/source/tools/spvdb"
         "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
         EXCLUDE_FROM_ALL
     )

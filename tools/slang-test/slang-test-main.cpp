@@ -5553,7 +5553,7 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
 //   //TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
 //
 // The args are forwarded to slangc (after -target spirv -g2 -o <stem>.spv).
-// libspvdb is vendored at tests/spvdb and is always linked in when slang-test
+// libspvdb is vendored at source/tools/spvdb and is always linked in when slang-test
 // is built (see the SLANG_ENABLE_SPVDB block in tools/CMakeLists.txt).
 // ---------------------------------------------------------------------------
 

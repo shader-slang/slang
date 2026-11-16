@@ -17,7 +17,7 @@ endif()
 
 # ---- Third-party dependencies -----------------------------------------------
 #
-# spvdb is vendored inside the Slang repository at tests/spvdb, two levels
+# spvdb is vendored inside the Slang repository at source/tools/spvdb, three levels
 # below the repository root. All of spvdb's own third-party dependencies
 # (SPIRV-Headers, stb, nlohmann_json, Catch2, replxx) live as submodules
 # under <slang root>/external instead of being duplicated in a nested
@@ -33,10 +33,10 @@ endif()
 
 include(FetchContent)
 
-# tests/spvdb/CMakeLists.txt -> tests/spvdb -> tests -> <slang root>/external
+# source/tools/spvdb -> source/tools -> source -> <slang root>, then /external
 get_filename_component(
     SPVDB_SLANG_EXTERNAL_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../external"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../external"
     ABSOLUTE
 )
 if(NOT IS_DIRECTORY "${SPVDB_SLANG_EXTERNAL_DIR}")
