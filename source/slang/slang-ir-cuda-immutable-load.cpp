@@ -94,12 +94,23 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     {
         auto func = builder.createFunc();
         builder.addNameHintDecoration(func, toSlice("slang_ldg"));
+        // The function only reads the immutable location its pointer argument
+        // points to (the caller has checked `isPointerToImmutableLocation`),
+        // so mark it free of side effects, and its pointer parameter as one
+        // through which no side effect can take place. Without the
+        // decorations every call to it is conservatively treated as
+        // side-effecting, which stops the emitter from folding a single-use
+        // `__ldg` call into its use site — the load then has to materialize
+        // as a `slang_ldg_N(...)` statement instead of appearing inside the
+        // expression that uses it.
+        builder.addDecoration(func, kIROp_NoSideEffectDecoration);
         builder.setInsertInto(func);
         auto block = builder.emitBlock();
         auto ptrType = builder.getPtrType(valueType);
         builder.setInsertInto(block);
         outParam = builder.emitParam(ptrType);
         builder.addNameHintDecoration(outParam, toSlice("ptr"));
+        builder.addDecoration(outParam, kIROp_IgnoreSideEffectsDecoration);
         func->setFullType(builder.getFuncType(ptrType, valueType));
         return func;
     }
