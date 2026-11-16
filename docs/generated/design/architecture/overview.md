@@ -190,7 +190,7 @@ implements the pattern on `LLVMDownstreamCompiler`.
 
 The `FIDDLE(...)` macro in AST and IR headers expands to code generated
 under `build/source/slang/fiddle/`; IR opcodes come from
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) and
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua) and
 diagnostics from
 [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
 plus the tables under
@@ -245,7 +245,7 @@ Front-end work is separated from back-end work: parsing and reusable
 module checking are largely target-independent, but entry-point
 validation compares capability requirements and profile stages against
 every `TargetRequest` in
-[slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp);
+[slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp);
 code generation happens in the back end.
 
 ## Where the public API lives

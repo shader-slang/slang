@@ -2,8 +2,8 @@
 #include "slang-reflection-json.h"
 
 #include "core/slang-blob.h"
-#include "slang-ast-support-types.h"
 #include "slang.h"
+#include "slang/ast/slang-ast-support-types.h"
 
 
 template<typename T>

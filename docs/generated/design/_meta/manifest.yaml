@@ -85,17 +85,17 @@ documents:
       - source/slang/slang-compile-request.h
       - source/slang/slang-code-gen.cpp
       - source/slang/slang-emit.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/slang-check.cpp
-      - source/slang/slang-parser.cpp
-      - source/slang/slang-preprocessor.cpp
+      - source/slang/parser/slang-parser.cpp
+      - source/slang/preprocessor/slang-preprocessor.cpp
       - source/compiler-core/slang-lexer.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/core/slang-type-text-util.cpp
       - source/slang/slang-compiler-options.h
-      - source/slang/slang-emit-hlsl.cpp
-      - source/slang/slang-ir-pytorch-cpp-binding.cpp
+      - source/slang/emission/slang-emit-hlsl.cpp
+      - source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp
     depends_on:
       - architecture/overview.md
     size_cap_bytes: 24576
@@ -110,14 +110,14 @@ documents:
       - source/compiler-core/slang-token-defs.h
       - source/compiler-core/slang-source-loc.h
       - source/compiler-core/slang-source-loc.cpp
-      - source/slang/slang-preprocessor.h
-      - source/slang/slang-preprocessor.cpp
+      - source/slang/preprocessor/slang-preprocessor.h
+      - source/slang/preprocessor/slang-preprocessor.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/compiler-core/slang-lexer-diagnostic-defs.h
       - source/core/slang-char-encode.cpp
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.cpp
     depends_on:
       - pipeline/overview.md
     size_cap_bytes: 32768
@@ -125,21 +125,21 @@ documents:
   pipeline/02-parse-ast.md:
     prompt: prompts/pipeline-02-parse-ast.md
     watched_paths:
-      - source/slang/slang-parser.h
-      - source/slang/slang-parser.cpp
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-base.cpp
-      - source/slang/slang-ast-decl.h
-      - source/slang/slang-ast-expr.h
-      - source/slang/slang-ast-stmt.h
-      - source/slang/slang-ast-type.h
-      - source/slang/slang-ast-modifier.h
-      - source/slang/slang-ast-builder.h
-      - source/slang/slang-ast-builder.cpp
+      - source/slang/parser/slang-parser.h
+      - source/slang/parser/slang-parser.cpp
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/ast/slang-ast-base.cpp
+      - source/slang/ast/slang-ast-decl.h
+      - source/slang/ast/slang-ast-expr.h
+      - source/slang/ast/slang-ast-stmt.h
+      - source/slang/ast/slang-ast-type.h
+      - source/slang/ast/slang-ast-modifier.h
+      - source/slang/ast/slang-ast-builder.h
+      - source/slang/ast/slang-ast-builder.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/compiler-core/slang-lexer.cpp
-      - source/slang/slang-check-modifier.cpp
+      - source/slang/semantic-checking/slang-check-modifier.cpp
       - source/slang/slang-diagnostics.lua
     depends_on:
       - pipeline/01-lex-preprocess.md
@@ -148,19 +148,19 @@ documents:
   pipeline/03-semantic-check.md:
     prompt: prompts/pipeline-03-semantic-check.md
     watched_paths:
-      - source/slang/slang-check.h
+      - source/slang/semantic-checking/slang-check.h
       - source/slang/slang-check.cpp
-      - source/slang/slang-check-impl.h
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-check-expr.cpp
-      - source/slang/slang-check-stmt.cpp
-      - source/slang/slang-check-type.cpp
-      - source/slang/slang-check-overload.cpp
-      - source/slang/slang-check-conformance.cpp
-      - source/slang/slang-check-conversion.cpp
-      - source/slang/slang-check-inheritance.cpp
-      - source/slang/slang-check-modifier.cpp
-      - source/slang/slang-check-shader.cpp
+      - source/slang/semantic-checking/slang-check-impl.h
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
+      - source/slang/semantic-checking/slang-check-stmt.cpp
+      - source/slang/semantic-checking/slang-check-type.cpp
+      - source/slang/semantic-checking/slang-check-overload.cpp
+      - source/slang/semantic-checking/slang-check-conformance.cpp
+      - source/slang/semantic-checking/slang-check-conversion.cpp
+      - source/slang/semantic-checking/slang-check-inheritance.cpp
+      - source/slang/semantic-checking/slang-check-modifier.cpp
+      - source/slang/semantic-checking/slang-check-shader.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/slang-diagnostics.lua
@@ -172,18 +172,18 @@ documents:
   pipeline/04-ast-to-ir.md:
     prompt: prompts/pipeline-04-ast-to-ir.md
     watched_paths:
-      - source/slang/slang-lower-to-ir.h
-      - source/slang/slang-lower-to-ir.cpp
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir-insts.lua
+      - source/slang/lower-to-ir/slang-lower-to-ir.h
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir-insts.lua
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-ast-val.h
-      - source/slang/slang-check-decl.cpp
+      - source/slang/ast/slang-ast-val.h
+      - source/slang/semantic-checking/slang-check-decl.cpp
       - source/slang/slang-options.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.cpp
       - source/slang/slang-session.cpp
       - source/standard-modules/experimental/workgraph.slang
       # The page documents the setIRModule hand-off that ends AST lowering.
@@ -196,10 +196,10 @@ documents:
   pipeline/04b-pre-link-passes.md:
     prompt: prompts/pipeline-04b-pre-link-passes.md
     watched_paths:
-      - source/slang/slang-lower-to-ir.cpp
-      - source/slang/slang-lower-to-ir.h
-      - source/slang/slang-ir-link.cpp
-      - source/slang/slang-ir-link.h
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.h
+      - source/slang/ir-passes/slang-ir-link.cpp
+      - source/slang/ir-passes/slang-ir-link.h
       - source/slang/slang-compiler-options.h
       - source/slang/slang-compile-request.cpp
       - source/slang/slang-session.cpp
@@ -208,14 +208,14 @@ documents:
       - source/slang/slang-compile-request.h
       - source/slang/slang-diagnostics.lua
       - source/slang/slang-emit.cpp
-      - source/slang/slang-ir-check-specialize-generic-with-existential.cpp
-      - source/slang/slang-ir-constexpr.cpp
-      - source/slang/slang-ir-operator-shift-overflow.cpp
-      - source/slang/slang-ir-sccp.cpp
-      - source/slang/slang-ir-typeflow-specialize.cpp
-      - source/slang/slang-ir.cpp
+      - source/slang/ir-passes/slang-ir-check-specialize-generic-with-existential.cpp
+      - source/slang/ir-passes/slang-ir-constexpr.cpp
+      - source/slang/ir-passes/slang-ir-operator-shift-overflow.cpp
+      - source/slang/ir-passes/slang-ir-sccp.cpp
+      - source/slang/ir-passes/slang-ir-typeflow-specialize.cpp
+      - source/slang/ir/slang-ir.cpp
       - source/slang/slang-options.cpp
-      - source/slang/slang-pass-wrapper.cpp
+      - source/slang/ir-passes/slang-pass-wrapper.cpp
       - source/standard-modules/experimental/workgraph.slang
     depends_on:
       - pipeline/03-semantic-check.md
@@ -227,18 +227,18 @@ documents:
   pipeline/04c-layout-ir.md:
     prompt: prompts/pipeline-04c-layout-ir.md
     watched_paths:
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/slang-target-program.h
-      - source/slang/slang-parameter-binding.cpp
+      - source/slang/layout-and-binding/slang-parameter-binding.cpp
       - source/slang/slang-compiler-options.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-check-shader.cpp
+      - source/slang/semantic-checking/slang-check-shader.cpp
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir.cpp
       - source/slang/slang-options.cpp
-      - source/slang/slang-type-layout.cpp
+      - source/slang/layout-and-binding/slang-type-layout.cpp
     depends_on:
       - pipeline/04-ast-to-ir.md
       - pipeline/04b-pre-link-passes.md
@@ -253,49 +253,49 @@ documents:
     # that glob: the pre-link passes are driven from slang-lower-to-ir.cpp and
     # legalizeIRForSPIRV is called from slang-emit-spirv.cpp.
     watched_paths:
-      - source/slang/slang-ir-*.h
-      - source/slang/slang-ir-*.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/**/slang-ir-*.h
+      - source/slang/**/slang-ir-*.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-spirv.cpp
+      - source/slang/emission/slang-emit-spirv.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-ir-addr-inst-elimination.cpp
-      - source/slang/slang-ir-any-value-inference.h
-      - source/slang/slang-ir-any-value-marshalling.cpp
-      - source/slang/slang-ir-autodiff-fwd.cpp
-      - source/slang/slang-ir-autodiff-primal-hoist.cpp
-      - source/slang/slang-ir-autodiff-rev.cpp
-      - source/slang/slang-ir-autodiff-unzip.cpp
-      - source/slang/slang-ir-bit-field-accessors.cpp
-      - source/slang/slang-ir-call-graph.h
-      - source/slang/slang-ir-coverage-instrument.h
-      - source/slang/slang-ir-defer-buffer-load.cpp
-      - source/slang/slang-ir-defer-buffer-load.h
-      - source/slang/slang-ir-defunctionalization.cpp
-      - source/slang/slang-ir-explicit-global-init.h
-      - source/slang/slang-ir-extract-value-from-type.h
-      - source/slang/slang-ir-fuse-satcoop.cpp
-      - source/slang/slang-ir-glsl-legalize.cpp
-      - source/slang/slang-ir-legalize-global-values.h
-      - source/slang/slang-ir-loop-inversion.cpp
-      - source/slang/slang-ir-lower-bit-cast.cpp
-      - source/slang/slang-ir-lower-copy-logical.cpp
-      - source/slang/slang-ir-lower-cuda-builtin-types.cpp
-      - source/slang/slang-ir-marshal-native-call.h
-      - source/slang/slang-ir-propagate-func-properties.cpp
-      - source/slang/slang-ir-pytorch-cpp-binding.cpp
-      - source/slang/slang-ir-reachability.h
-      - source/slang/slang-ir-resolve-varying-input-ref.cpp
-      - source/slang/slang-ir-restructure-scoping.h
-      - source/slang/slang-ir-restructure.h
-      - source/slang/slang-ir-spirv-legalize.cpp
-      - source/slang/slang-ir-synthesize-active-mask.h
-      - source/slang/slang-ir-typeflow-specialize.h
-      - source/slang/slang-ir-uniformity.cpp
-      - source/slang/slang-ir-user-type-hint.cpp
-      - source/slang/slang-ir-validate.cpp
-      - source/slang/slang-ir-validate.h
+      - source/slang/ir-passes/slang-ir-addr-inst-elimination.cpp
+      - source/slang/ir-passes/slang-ir-any-value-inference.h
+      - source/slang/ir-passes/slang-ir-any-value-marshalling.cpp
+      - source/slang/ir-passes/slang-ir-autodiff-fwd.cpp
+      - source/slang/ir-passes/slang-ir-autodiff-primal-hoist.cpp
+      - source/slang/ir-passes/slang-ir-autodiff-rev.cpp
+      - source/slang/ir-passes/slang-ir-autodiff-unzip.cpp
+      - source/slang/ir-passes/slang-ir-bit-field-accessors.cpp
+      - source/slang/ir-passes/slang-ir-call-graph.h
+      - source/slang/ir-passes/slang-ir-coverage-instrument.h
+      - source/slang/ir-passes/slang-ir-defer-buffer-load.cpp
+      - source/slang/ir-passes/slang-ir-defer-buffer-load.h
+      - source/slang/ir-passes/slang-ir-defunctionalization.cpp
+      - source/slang/ir-passes/slang-ir-explicit-global-init.h
+      - source/slang/ir-passes/slang-ir-extract-value-from-type.h
+      - source/slang/ir-passes/slang-ir-fuse-satcoop.cpp
+      - source/slang/ir-passes/slang-ir-glsl-legalize.cpp
+      - source/slang/ir-passes/slang-ir-legalize-global-values.h
+      - source/slang/ir-passes/slang-ir-loop-inversion.cpp
+      - source/slang/ir-passes/slang-ir-lower-bit-cast.cpp
+      - source/slang/ir-passes/slang-ir-lower-copy-logical.cpp
+      - source/slang/ir-passes/slang-ir-lower-cuda-builtin-types.cpp
+      - source/slang/ir-passes/slang-ir-marshal-native-call.h
+      - source/slang/ir-passes/slang-ir-propagate-func-properties.cpp
+      - source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp
+      - source/slang/ir-passes/slang-ir-reachability.h
+      - source/slang/ir-passes/slang-ir-resolve-varying-input-ref.cpp
+      - source/slang/ir-passes/slang-ir-restructure-scoping.h
+      - source/slang/ir-passes/slang-ir-restructure.h
+      - source/slang/ir-passes/slang-ir-spirv-legalize.cpp
+      - source/slang/ir-passes/slang-ir-synthesize-active-mask.h
+      - source/slang/ir-passes/slang-ir-typeflow-specialize.h
+      - source/slang/ir-passes/slang-ir-uniformity.cpp
+      - source/slang/ir-passes/slang-ir-user-type-hint.cpp
+      - source/slang/ir/slang-ir-validate.cpp
+      - source/slang/ir/slang-ir-validate.h
     depends_on:
       - pipeline/04-ast-to-ir.md
     size_cap_bytes: 81920
@@ -309,22 +309,22 @@ documents:
       - source/slang/slang-code-gen.cpp
       - source/slang/slang-global-session.cpp
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-*.h
-      - source/slang/slang-emit-*.cpp
+      - source/slang/**/slang-emit-*.h
+      - source/slang/**/slang-emit-*.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - prelude/slang-hlsl-prelude.h
       - source/core/slang-test-tool-util.cpp
       - source/core/slang-type-text-util.cpp
-      - source/slang/slang-emit-c-like.cpp
-      - source/slang/slang-emit-cpp.cpp
-      - source/slang/slang-emit-cuda.cpp
-      - source/slang/slang-emit-hlsl.cpp
-      - source/slang/slang-emit-metal.cpp
-      - source/slang/slang-emit-source-writer.cpp
-      - source/slang/slang-emit-vm.cpp
-      - source/slang/slang-emit-wgsl.cpp
-      - source/slang/slang-ir-explicit-global-context.cpp
+      - source/slang/emission/slang-emit-c-like.cpp
+      - source/slang/emission/slang-emit-cpp.cpp
+      - source/slang/emission/slang-emit-cuda.cpp
+      - source/slang/emission/slang-emit-hlsl.cpp
+      - source/slang/emission/slang-emit-metal.cpp
+      - source/slang/emission/slang-emit-source-writer.cpp
+      - source/slang/emission/slang-emit-vm.cpp
+      - source/slang/emission/slang-emit-wgsl.cpp
+      - source/slang/ir-passes/slang-ir-explicit-global-context.cpp
       - source/slangc/main.cpp
     depends_on:
       - pipeline/05-ir-passes.md
@@ -344,26 +344,26 @@ documents:
       - source/slang/hlsl.meta.slang
       - source/compiler-core/slang-lexer-diagnostic-defs.h
       - source/compiler-core/slang-source-loc.h
-      - source/slang/slang-parser.cpp
-      - source/slang/slang-preprocessor.cpp
+      - source/slang/parser/slang-parser.cpp
+      - source/slang/preprocessor/slang-preprocessor.cpp
       # The prompt requires documenting how `<...>` is lexed after #include,
       # but that retokenization lives in HandleIncludeDirective, not the lexer.
-      - source/slang/slang-preprocessor.cpp
+      - source/slang/preprocessor/slang-preprocessor.cpp
     depends_on: []
     size_cap_bytes: 24576
 
   syntax-reference/keywords-and-builtins.md:
     prompt: prompts/syntax-keywords-and-builtins.md
     watched_paths:
-      - source/slang/slang-parser.cpp
-      - source/slang/slang-syntax.cpp
-      - source/slang/slang-syntax.h
+      - source/slang/parser/slang-parser.cpp
+      - source/slang/ast/slang-syntax.cpp
+      - source/slang/ast/slang-syntax.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/glsl.meta.slang
       - source/slang/diff.meta.slang
-      - source/slang/slang-ast-builder.h
-      - source/slang/slang-ir-legalize-varying-params.cpp
+      - source/slang/ast/slang-ast-builder.h
+      - source/slang/ir-passes/slang-ir-legalize-varying-params.cpp
     depends_on:
       - syntax-reference/tokens.md
     size_cap_bytes: 32768
@@ -371,14 +371,14 @@ documents:
   syntax-reference/grammar.md:
     prompt: prompts/syntax-grammar.md
     watched_paths:
-      - source/slang/slang-parser.h
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.h
+      - source/slang/parser/slang-parser.cpp
       - source/compiler-core/slang-lexer.cpp
-      - source/slang/slang-ast-expr.h
+      - source/slang/ast/slang-ast-expr.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-check-stmt.cpp
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/semantic-checking/slang-check-stmt.cpp
       - source/slang/slang-diagnostics.lua
       - source/slang/slang-options.cpp
     depends_on:
@@ -429,10 +429,10 @@ documents:
   cross-cutting/ir-instructions.md:
     prompt: prompts/cross-cutting-ir-instructions.md
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
     depends_on:
@@ -442,8 +442,8 @@ documents:
   cross-cutting/targets.md:
     prompt: prompts/cross-cutting-targets.md
     watched_paths:
-      - source/slang/slang-emit-*.h
-      - source/slang/slang-emit-*.cpp
+      - source/slang/**/slang-emit-*.h
+      - source/slang/**/slang-emit-*.cpp
       - source/slang/slang-capability.h
       - source/slang/slang-capability.cpp
       - source/slang/slang-capabilities.capdef
@@ -489,7 +489,7 @@ documents:
   ast-reference/index.md:
     prompt: prompts/ast-reference-index.md
     watched_paths:
-      - source/slang/slang-ast-base.h
+      - source/slang/ast/slang-ast-base.h
       - docs/generated/design/ast-reference/*.md
     depends_on:
       - ast-reference/base.md
@@ -504,9 +504,9 @@ documents:
   ast-reference/base.md:
     prompt: prompts/ast-reference-base.md
     watched_paths:
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-forward-declarations.h
-      - source/slang/slang-ast-support-types.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/ast/slang-ast-forward-declarations.h
+      - source/slang/ast/slang-ast-support-types.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
     depends_on:
@@ -516,13 +516,13 @@ documents:
   ast-reference/declarations.md:
     prompt: prompts/ast-reference-declarations.md
     watched_paths:
-      - source/slang/slang-ast-decl.h
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-parser.cpp
+      - source/slang/ast/slang-ast-decl.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/parser/slang-parser.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-check-shader.cpp
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/semantic-checking/slang-check-shader.cpp
       - source/slang/slang-diagnostics.lua
     depends_on:
       - ast-reference/base.md
@@ -532,14 +532,14 @@ documents:
   ast-reference/expressions.md:
     prompt: prompts/ast-reference-expressions.md
     watched_paths:
-      - source/slang/slang-ast-expr.h
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-parser.cpp
+      - source/slang/ast/slang-ast-expr.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/parser/slang-parser.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/compiler-core/slang-lexer.cpp
-      - source/slang/slang-check-conversion.cpp
-      - source/slang/slang-check-expr.cpp
+      - source/slang/semantic-checking/slang-check-conversion.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
       - source/slang/slang-diagnostics.lua
     depends_on:
       - ast-reference/base.md
@@ -549,15 +549,15 @@ documents:
   ast-reference/statements.md:
     prompt: prompts/ast-reference-statements.md
     watched_paths:
-      - source/slang/slang-ast-stmt.h
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-parser.cpp
+      - source/slang/ast/slang-ast-stmt.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/parser/slang-parser.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-check-stmt.cpp
+      - source/slang/semantic-checking/slang-check-stmt.cpp
       - source/slang/slang-diagnostics.lua
       - source/slang/slang-options.cpp
-      - source/slang/slang-parser.h
+      - source/slang/parser/slang-parser.h
     depends_on:
       - ast-reference/base.md
       - syntax-reference/grammar.md
@@ -566,18 +566,18 @@ documents:
   ast-reference/types.md:
     prompt: prompts/ast-reference-types.md
     watched_paths:
-      - source/slang/slang-ast-type.h
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-val.h
+      - source/slang/ast/slang-ast-type.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/ast/slang-ast-val.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-ast-print.cpp
-      - source/slang/slang-ast-type.cpp
-      - source/slang/slang-check-overload.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/ast/slang-ast-print.cpp
+      - source/slang/ast/slang-ast-type.cpp
+      - source/slang/semantic-checking/slang-check-overload.cpp
+      - source/slang/parser/slang-parser.cpp
       # The family contract requires citing the parser entry point that builds
       # each type node, so parser churn has to mark this page stale.
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.cpp
     depends_on:
       - ast-reference/base.md
       - ast-reference/values.md
@@ -591,15 +591,15 @@ documents:
     # and 8 in workgraph.slang. Without these, adding or renaming an attribute
     # leaves the page silently wrong.
     watched_paths:
-      - source/slang/slang-ast-modifier.h
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-parser.cpp
+      - source/slang/ast/slang-ast-modifier.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/parser/slang-parser.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/diff.meta.slang
       - source/standard-modules/experimental/workgraph.slang
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-check-modifier.cpp
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/semantic-checking/slang-check-modifier.cpp
       - source/slang/slang-diagnostics.lua
     depends_on:
       - ast-reference/base.md
@@ -609,17 +609,17 @@ documents:
   ast-reference/values.md:
     prompt: prompts/ast-reference-values.md
     watched_paths:
-      - source/slang/slang-ast-val.h
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-val.cpp
-      - source/slang/slang-ast-builder.cpp
+      - source/slang/ast/slang-ast-val.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/ast/slang-ast-val.cpp
+      - source/slang/ast/slang-ast-builder.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.cpp
       # The witness `Val`s are declared in the header above but constructed in
       # the conformance and inheritance checkers, which the page cites.
-      - source/slang/slang-check-conformance.cpp
-      - source/slang/slang-check-inheritance.cpp
+      - source/slang/semantic-checking/slang-check-conformance.cpp
+      - source/slang/semantic-checking/slang-check-inheritance.cpp
     depends_on:
       - ast-reference/base.md
     size_cap_bytes: 49152
@@ -629,8 +629,8 @@ documents:
   name-resolution/index.md:
     prompt: prompts/name-resolution-index.md
     watched_paths:
-      - source/slang/slang-lookup.h
-      - source/slang/slang-ast-support-types.h
+      - source/slang/semantic-checking/slang-lookup.h
+      - source/slang/ast/slang-ast-support-types.h
       - docs/generated/design/name-resolution/*.md
     depends_on:
       - name-resolution/scopes.md
@@ -642,15 +642,15 @@ documents:
   name-resolution/scopes.md:
     prompt: prompts/name-resolution-scopes.md
     watched_paths:
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-decl.h
-      - source/slang/slang-ast-stmt.h
-      - source/slang/slang-parser.cpp
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-check-stmt.cpp
-      - source/slang/slang-check-expr.cpp
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/ast/slang-ast-decl.h
+      - source/slang/ast/slang-ast-stmt.h
+      - source/slang/parser/slang-parser.cpp
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/semantic-checking/slang-check-stmt.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
       - source/slang/slang-session.cpp
-      - source/slang/slang-lookup.cpp
+      - source/slang/semantic-checking/slang-lookup.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/slang-options.cpp
@@ -663,20 +663,20 @@ documents:
   name-resolution/lookup.md:
     prompt: prompts/name-resolution-lookup.md
     watched_paths:
-      - source/slang/slang-lookup.h
-      - source/slang/slang-lookup.cpp
-      - source/slang/slang-ast-support-types.h
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-decl.h
-      - source/slang/slang-ast-decl.cpp
-      - source/slang/slang-ast-modifier.h
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-check-inheritance.cpp
-      - source/slang/slang-check-stmt.cpp
-      - source/slang/slang-check-impl.h
-      - source/slang/slang-check-expr.cpp
-      - source/slang/slang-check-overload.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/semantic-checking/slang-lookup.h
+      - source/slang/semantic-checking/slang-lookup.cpp
+      - source/slang/ast/slang-ast-support-types.h
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/ast/slang-ast-decl.h
+      - source/slang/ast/slang-ast-decl.cpp
+      - source/slang/ast/slang-ast-modifier.h
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/semantic-checking/slang-check-inheritance.cpp
+      - source/slang/semantic-checking/slang-check-stmt.cpp
+      - source/slang/semantic-checking/slang-check-impl.h
+      - source/slang/semantic-checking/slang-check-expr.cpp
+      - source/slang/semantic-checking/slang-check-overload.cpp
+      - source/slang/parser/slang-parser.cpp
       - source/slang/slang-diagnostics.lua
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
@@ -689,24 +689,24 @@ documents:
   name-resolution/visibility.md:
     prompt: prompts/name-resolution-visibility.md
     watched_paths:
-      - source/slang/slang-ast-modifier.h
-      - source/slang/slang-ast-decl.h
-      - source/slang/slang-ast-support-types.h
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-check-modifier.cpp
-      - source/slang/slang-check-expr.cpp
-      - source/slang/slang-check-impl.h
-      - source/slang/slang-check-overload.cpp
-      - source/slang/slang-check-shader.cpp
-      - source/slang/slang-lookup.cpp
+      - source/slang/ast/slang-ast-modifier.h
+      - source/slang/ast/slang-ast-decl.h
+      - source/slang/ast/slang-ast-support-types.h
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/semantic-checking/slang-check-modifier.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
+      - source/slang/semantic-checking/slang-check-impl.h
+      - source/slang/semantic-checking/slang-check-overload.cpp
+      - source/slang/semantic-checking/slang-check-shader.cpp
+      - source/slang/semantic-checking/slang-lookup.cpp
       - source/slang/slang-diagnostics.lua
       - include/slang.h
       - source/slang/slang-compile-request.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-ast-decl.cpp
-      - source/slang/slang-check-stmt.cpp
+      - source/slang/ast/slang-ast-decl.cpp
+      - source/slang/semantic-checking/slang-check-stmt.cpp
     depends_on:
       - ast-reference/modifiers.md
       - ast-reference/declarations.md
@@ -716,22 +716,22 @@ documents:
   name-resolution/overload-resolution.md:
     prompt: prompts/name-resolution-overload-resolution.md
     watched_paths:
-      - source/slang/slang-check-overload.cpp
-      - source/slang/slang-check-impl.h
-      - source/slang/slang-check-conversion.cpp
+      - source/slang/semantic-checking/slang-check-overload.cpp
+      - source/slang/semantic-checking/slang-check-impl.h
+      - source/slang/semantic-checking/slang-check-conversion.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - include/slang.h
-      - source/slang/slang-check-constraint.cpp
-      - source/slang/slang-check-expr.cpp
+      - source/slang/semantic-checking/slang-check-constraint.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
       # Added to unblock the deferred finding about the constructor and bool
       # initializer cost claims, which the page may not cite while unwatched.
       - source/slang/core.meta.slang
       # The builtin-operator fast path and resolveOverloadedLookup, both central
       # to this page, live here rather than in slang-check-overload.cpp.
-      - source/slang/slang-check-expr.cpp
-      - source/slang/slang-ast-support-types.h
-      - source/slang/slang-ast-expr.h
+      - source/slang/semantic-checking/slang-check-expr.cpp
+      - source/slang/ast/slang-ast-support-types.h
+      - source/slang/ast/slang-ast-expr.h
     depends_on:
       - name-resolution/lookup.md
       - name-resolution/visibility.md
@@ -750,11 +750,11 @@ documents:
     # on the `visit*` population it counts, and on the core-module files that
     # declare the `__intrinsic_op` origins it describes.
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h.lua
-      - source/slang/slang-lower-to-ir.cpp
-      - source/slang/slang-ast-expr.h
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h.lua
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
+      - source/slang/ast/slang-ast-expr.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/diff.meta.slang
@@ -775,21 +775,21 @@ documents:
   ir-reference/types.md:
     prompt: prompts/ir-reference-types.md
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - include/slang.h
       - source/slang-core-module/slang-embedded-core-module-source.cpp
-      - source/slang/slang-ast-type.h
+      - source/slang/ast/slang-ast-type.h
       - source/slang/slang-capabilities.capdef
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-ir-autodiff-fwd.cpp
-      - source/slang/slang-ir-lower-error-handling.cpp
-      - source/slang/slang-ir-translate.cpp
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/ir-passes/slang-ir-autodiff-fwd.cpp
+      - source/slang/ir-passes/slang-ir-lower-error-handling.cpp
+      - source/slang/ir-passes/slang-ir-translate.cpp
       - source/slang/slang-session.cpp
       - source/standard-modules/experimental/workgraph.slang
     depends_on:
@@ -801,20 +801,20 @@ documents:
   ir-reference/values.md:
     prompt: prompts/ir-reference-values.md
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-ast-val.cpp
-      - source/slang/slang-check-conversion.cpp
-      - source/slang/slang-check-expr.cpp
-      - source/slang/slang-ir-legalize-empty-array.cpp
-      - source/slang/slang-ir-peephole.cpp
-      - source/slang/slang-ir-sccp.cpp
-      - source/slang/slang-ir-ssa.cpp
+      - source/slang/ast/slang-ast-val.cpp
+      - source/slang/semantic-checking/slang-check-conversion.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
+      - source/slang/ir-passes/slang-ir-legalize-empty-array.cpp
+      - source/slang/ir-passes/slang-ir-peephole.cpp
+      - source/slang/ir-passes/slang-ir-sccp.cpp
+      - source/slang/ir-passes/slang-ir-ssa.cpp
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -828,17 +828,17 @@ documents:
   ir-reference/control-flow.md:
     prompt: prompts/ir-reference-control-flow.md
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/core.meta.slang
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-emit-glsl.cpp
-      - source/slang/slang-emit-spirv.cpp
-      - source/slang/slang-ir-sccp.cpp
-      - source/slang/slang-ir-util.cpp
+      - source/slang/emission/slang-emit-glsl.cpp
+      - source/slang/emission/slang-emit-spirv.cpp
+      - source/slang/ir-passes/slang-ir-sccp.cpp
+      - source/slang/ir/slang-ir-util.cpp
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -848,11 +848,11 @@ documents:
   ir-reference/structure.md:
     prompt: prompts/ir-reference-structure.md
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/core.meta.slang
     depends_on:
       - cross-cutting/ir-instructions.md
@@ -866,24 +866,24 @@ documents:
     # declarations in the core module rather than from a lowering visitor, so
     # meta-source churn has to mark the page stale.
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
-      - source/slang/slang-ir.h.lua
-      - source/slang/slang-ir-util.h
-      - source/slang/slang-ir-specialize.h
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir.h.lua
+      - source/slang/ir/slang-ir-util.h
+      - source/slang/ir-passes/slang-ir-specialize.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/diff.meta.slang
-      - source/slang/slang-ir-typeflow-specialize.cpp
-      - source/slang/slang-ir-typeflow-set.cpp
-      - source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp
-      - source/slang/slang-ir-specialize.cpp
+      - source/slang/ir-passes/slang-ir-typeflow-specialize.cpp
+      - source/slang/ir-passes/slang-ir-typeflow-set.cpp
+      - source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp
+      - source/slang/ir-passes/slang-ir-specialize.cpp
       - source/slang/slang-diagnostics.lua
       - source/slang/slang-options.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.cpp
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -895,11 +895,11 @@ documents:
   ir-reference/resources-and-atomics.md:
     prompt: prompts/ir-reference-resources-and-atomics.md
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
     depends_on:
@@ -915,21 +915,21 @@ documents:
     # AST lowering, and the page is now required to name that producing pass, so
     # the autodiff sources are load-bearing for its correctness.
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
-      - source/slang/slang-ir-autodiff*.h
-      - source/slang/slang-ir-autodiff*.cpp
-      - source/slang/slang-ir-translate.cpp
-      - source/slang/slang-ir-dce.cpp
-      - source/slang/slang-check-decl.cpp
-      - source/slang/slang-emit-c-like.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
+      - source/slang/ir-passes/slang-ir-autodiff*.h
+      - source/slang/ir-passes/slang-ir-autodiff*.cpp
+      - source/slang/ir-passes/slang-ir-translate.cpp
+      - source/slang/ir-passes/slang-ir-dce.cpp
+      - source/slang/semantic-checking/slang-check-decl.cpp
+      - source/slang/emission/slang-emit-c-like.cpp
       - source/slang/core.meta.slang
       - source/slang/diff.meta.slang
-      - source/slang/slang-check-expr.cpp
-      - source/slang/slang-ir-check-differentiability.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
+      - source/slang/ir-passes/slang-ir-check-differentiability.cpp
       - source/slang/slang-diagnostics.lua
     depends_on:
       - cross-cutting/ir-instructions.md
@@ -941,18 +941,18 @@ documents:
   ir-reference/decorations.md:
     prompt: prompts/ir-reference-decorations.md
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir-insts-info.cpp
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir-insts-info.cpp
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-ir-collect-global-uniforms.cpp
-      - source/slang/slang-ir-entry-point-uniforms.cpp
-      - source/slang/slang-ir-glsl-legalize.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/ir-passes/slang-ir-collect-global-uniforms.cpp
+      - source/slang/ir-passes/slang-ir-entry-point-uniforms.cpp
+      - source/slang/ir-passes/slang-ir-glsl-legalize.cpp
+      - source/slang/parser/slang-parser.cpp
       - source/slang/slang-profile.h
     depends_on:
       - cross-cutting/ir-instructions.md
@@ -966,18 +966,18 @@ documents:
     # type-function operands plus `__truncate` are consumed in the SPIR-V
     # emitter; both are cited by the page but neither is an slang-ir-* file.
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir-insts-info.cpp
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir-insts-info.cpp
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-spirv.cpp
+      - source/slang/emission/slang-emit-spirv.cpp
       - source/slang/core.meta.slang
       - source/slang/slang-compiler-tu.cpp
       - include/slang.h
-      - source/slang/slang-ir-specialize-function-call.cpp
+      - source/slang/ir-passes/slang-ir-specialize-function-call.cpp
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -989,33 +989,33 @@ documents:
     # includes the work-graph and core-module intrinsics whose only declaration
     # is in meta-source rather than in a lowering visitor.
     watched_paths:
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-lower-to-ir.cpp
-      - source/slang/slang-ir.h.lua
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
+      - source/slang/ir/slang-ir.h.lua
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/diff.meta.slang
       - source/standard-modules/experimental/workgraph.slang
-      - source/slang/slang-emit-hlsl.cpp
-      - source/slang/slang-emit-hlsl-prelude.cpp
-      - source/slang/slang-emit-torch.cpp
-      - source/slang/slang-check-expr.cpp
+      - source/slang/emission/slang-emit-hlsl.cpp
+      - source/slang/emission/slang-emit-hlsl-prelude.cpp
+      - source/slang/emission/slang-emit-torch.cpp
+      - source/slang/semantic-checking/slang-check-expr.cpp
       - source/slang/slang-emit.cpp
-      - source/slang/slang-ir-hlsl-legalize.cpp
-      - source/slang/slang-ir-string-hash.cpp
-      - source/slang/slang-ir-uniformity.cpp
+      - source/slang/ir-passes/slang-ir-hlsl-legalize.cpp
+      - source/slang/ir-passes/slang-ir-string-hash.cpp
+      - source/slang/ir-passes/slang-ir-uniformity.cpp
       # The producer census now names these passes per opcode. This is the
       # narrow, cited subset of slang-ir-*.cpp -- see the note above on why the
       # whole glob is deliberately not watched.
-      - source/slang/slang-ir-peephole.cpp
-      - source/slang/slang-ir-pytorch-cpp-binding.cpp
-      - source/slang/slang-ir-lower-buffer-element-type.cpp
-      - source/slang/slang-ir-liveness.cpp
-      - source/slang/slang-ir-eliminate-phis.cpp
-      - source/slang/slang-ir-translate.cpp
+      - source/slang/ir-passes/slang-ir-peephole.cpp
+      - source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp
+      - source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp
+      - source/slang/ir-passes/slang-ir-liveness.cpp
+      - source/slang/ir-passes/slang-ir-eliminate-phis.cpp
+      - source/slang/ir-passes/slang-ir-translate.cpp
       - source/slang/slang-type-system-shared.h
     depends_on:
       - cross-cutting/ir-instructions.md
@@ -1049,11 +1049,11 @@ documents:
     prompt: prompts/target-pipelines-spirv.md
     watched_paths:
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-spirv.cpp
-      - source/slang/slang-ir-spirv-legalize.cpp
-      - source/slang/slang-ir-spirv-snippet.cpp
-      - source/slang/slang-ir-glsl-legalize.cpp
-      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/emission/slang-emit-spirv.cpp
+      - source/slang/ir-passes/slang-ir-spirv-legalize.cpp
+      - source/slang/emission/slang-ir-spirv-snippet.cpp
+      - source/slang/ir-passes/slang-ir-glsl-legalize.cpp
+      - source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp
       - source/slang/slang-target-program.h
       - source/slang/slang-compiler-options.h
       - source/slang/slang-code-gen.h
@@ -1061,9 +1061,9 @@ documents:
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-ir-check-recursion.cpp
-      - source/slang/slang-ir-eliminate-multilevel-break.cpp
-      - source/slang/slang-parameter-binding.cpp
+      - source/slang/ir-passes/slang-ir-check-recursion.cpp
+      - source/slang/ir-passes/slang-ir-eliminate-multilevel-break.cpp
+      - source/slang/layout-and-binding/slang-parameter-binding.cpp
     depends_on:
       - pipeline/04-ast-to-ir.md
       - pipeline/05-ir-passes.md
@@ -1076,23 +1076,23 @@ documents:
     prompt: prompts/target-pipelines-hlsl.md
     watched_paths:
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-hlsl.cpp
-      - source/slang/slang-emit-hlsl-prelude.cpp
-      - source/slang/slang-emit-c-like.cpp
-      - source/slang/slang-ir-hlsl-legalize.cpp
-      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/emission/slang-emit-hlsl.cpp
+      - source/slang/emission/slang-emit-hlsl-prelude.cpp
+      - source/slang/emission/slang-emit-c-like.cpp
+      - source/slang/ir-passes/slang-ir-hlsl-legalize.cpp
+      - source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp
       - source/slang/slang-target-program.h
       - source/slang/slang-compiler-options.h
       - source/slang/slang-code-gen.cpp
-      - source/slang/slang-ir-variable-scope-correction.cpp
+      - source/slang/ir-passes/slang-ir-variable-scope-correction.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/slang-capabilities.capdef
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-emit-spirv.cpp
-      - source/slang/slang-ir-legalize-uniform-buffer-load.cpp
-      - source/slang/slang-ir-lower-buffer-element-type.cpp
-      - source/slang/slang-ir-user-type-hint.cpp
+      - source/slang/emission/slang-emit-spirv.cpp
+      - source/slang/ir-passes/slang-ir-legalize-uniform-buffer-load.cpp
+      - source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp
+      - source/slang/ir-passes/slang-ir-user-type-hint.cpp
       - source/slang/slang-options.cpp
     depends_on:
       - pipeline/04-ast-to-ir.md
@@ -1106,25 +1106,25 @@ documents:
     prompt: prompts/target-pipelines-metal.md
     watched_paths:
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-metal.cpp
-      - source/slang/slang-emit-metal-prelude.cpp
-      - source/slang/slang-emit-c-like.cpp
-      - source/slang/slang-ir-metal-legalize.cpp
-      - source/slang/slang-ir-legalize-varying-params.cpp
-      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/emission/slang-emit-metal.cpp
+      - source/slang/emission/slang-emit-metal-prelude.cpp
+      - source/slang/emission/slang-emit-c-like.cpp
+      - source/slang/ir-passes/slang-ir-metal-legalize.cpp
+      - source/slang/ir-passes/slang-ir-legalize-varying-params.cpp
+      - source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp
       - source/slang/slang-target-program.h
       - source/slang/slang-compiler-options.h
       - source/slang/slang-code-gen.cpp
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-type-layout.cpp
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/layout-and-binding/slang-type-layout.cpp
       - source/compiler-core/slang-metal-compiler.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/slang-capabilities.capdef
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-ir-lower-buffer-element-type.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp
+      - source/slang/parser/slang-parser.cpp
     depends_on:
       - pipeline/04-ast-to-ir.md
       - pipeline/05-ir-passes.md
@@ -1137,23 +1137,23 @@ documents:
     prompt: prompts/target-pipelines-wgsl.md
     watched_paths:
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-wgsl.cpp
-      - source/slang/slang-emit-c-like.cpp
-      - source/slang/slang-ir-wgsl-legalize.cpp
-      - source/slang/slang-ir-legalize-varying-params.cpp
-      - source/slang/slang-ir-legalize-binary-operator.cpp
+      - source/slang/emission/slang-emit-wgsl.cpp
+      - source/slang/emission/slang-emit-c-like.cpp
+      - source/slang/ir-passes/slang-ir-wgsl-legalize.cpp
+      - source/slang/ir-passes/slang-ir-legalize-varying-params.cpp
+      - source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp
       - source/slang/slang-target-program.h
       - source/slang/slang-compiler-options.h
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
       - source/slang/slang-capabilities.capdef
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-ir-lower-append-consume-structured-buffer.cpp
-      - source/slang/slang-ir-lower-buffer-element-type.cpp
+      - source/slang/ir-passes/slang-ir-lower-append-consume-structured-buffer.cpp
+      - source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp
       # The default PhiEliminationOptions in slang-ir-eliminate-phis.h are what
       # this page's phi-elimination claim rests on.
       - source/slang/slang-code-gen.cpp
-      - source/slang/slang-ir-eliminate-phis.h
+      - source/slang/ir-passes/slang-ir-eliminate-phis.h
     depends_on:
       - pipeline/04-ast-to-ir.md
       - pipeline/05-ir-passes.md
@@ -1166,13 +1166,13 @@ documents:
     prompt: prompts/target-pipelines-cuda.md
     watched_paths:
       - source/slang/slang-emit.cpp
-      - source/slang/slang-emit-cuda.cpp
-      - source/slang/slang-emit-cpp.cpp
-      - source/slang/slang-emit-c-like.cpp
-      - source/slang/slang-ir-cuda-immutable-load.cpp
-      - source/slang/slang-ir-legalize-varying-params.cpp
-      - source/slang/slang-ir-optix-entry-point-uniforms.cpp
-      - source/slang/slang-ir-pytorch-cpp-binding.cpp
+      - source/slang/emission/slang-emit-cuda.cpp
+      - source/slang/emission/slang-emit-cpp.cpp
+      - source/slang/emission/slang-emit-c-like.cpp
+      - source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp
+      - source/slang/ir-passes/slang-ir-legalize-varying-params.cpp
+      - source/slang/ir-passes/slang-ir-optix-entry-point-uniforms.cpp
+      - source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp
       - source/slang/slang-target-program.h
       - source/slang/slang-compiler-options.h
       - source/slang/core.meta.slang
@@ -1180,10 +1180,10 @@ documents:
       - source/core/slang-type-text-util.cpp
       - source/slang/slang-code-gen.cpp
       - source/slang/slang-diagnostics.lua
-      - source/slang/slang-ir-coverage-instrument.cpp
-      - source/slang/slang-lower-to-ir.cpp
+      - source/slang/ir-passes/slang-ir-coverage-instrument.cpp
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
       - source/slang/slang-options.cpp
-      - source/slang/slang-parser.cpp
+      - source/slang/parser/slang-parser.cpp
       # isCpuLikeTarget in slang-artifact-desc-util.cpp decides three CUDA pass
       # gates, and getting it wrong produced this page's critical finding.
       - source/slang/slang-code-gen.cpp
@@ -1207,24 +1207,24 @@ documents:
       - docs/generated/design/cross-cutting/*.md
       - docs/generated/design/name-resolution/*.md
       - docs/generated/design/ir-reference/*.md
-      - source/slang/slang-ir.h
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-lower-to-ir.cpp
-      - source/slang/slang-ast-base.h
-      - source/slang/slang-ast-decl.h
-      - source/slang/slang-ast-expr.h
-      - source/slang/slang-ast-type.h
-      - source/slang/slang-ast-modifier.h
-      - source/slang/slang-ast-support-types.h
-      - source/slang/slang-syntax.h
-      - source/slang/slang-syntax.cpp
+      - source/slang/ir/slang-ir.h
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/lower-to-ir/slang-lower-to-ir.cpp
+      - source/slang/ast/slang-ast-base.h
+      - source/slang/ast/slang-ast-decl.h
+      - source/slang/ast/slang-ast-expr.h
+      - source/slang/ast/slang-ast-type.h
+      - source/slang/ast/slang-ast-modifier.h
+      - source/slang/ast/slang-ast-support-types.h
+      - source/slang/ast/slang-syntax.h
+      - source/slang/ast/slang-syntax.cpp
       - source/slang/slang-capability.h
       - source/slang/slang-profile.h
-      - source/slang/slang-lookup.h
-      - source/slang/slang-check-overload.cpp
-      - source/slang/slang-check-impl.h
-      - source/slang/slang-check-conversion.cpp
-      - source/slang/slang-ir.cpp
+      - source/slang/semantic-checking/slang-lookup.h
+      - source/slang/semantic-checking/slang-check-overload.cpp
+      - source/slang/semantic-checking/slang-check-impl.h
+      - source/slang/semantic-checking/slang-check-conversion.cpp
+      - source/slang/ir/slang-ir.cpp
       # The glossary's structural entries (session, linkage, translation unit,
       # entry point, required lowering pass set, fossil format) are defined in
       # these headers. All six were unwatched, which is why three of those
@@ -1235,7 +1235,7 @@ documents:
       - source/slang/slang-translation-unit.h
       - source/slang/slang-compile-request.h
       - source/slang/slang-code-gen.h
-      - source/slang/slang-fossil.h
+      - source/slang/serialization/slang-fossil.h
       - source/compiler-core/slang-token.h
       - source/compiler-core/slang-token-defs.h
       - source/compiler-core/slang-source-loc.h
@@ -1251,37 +1251,37 @@ documents:
   cross-cutting/serialization.md:
     prompt: prompts/cross-cutting-serialization.md
     watched_paths:
-      - source/slang/slang-serialize.h
-      - source/slang/slang-serialize.cpp
-      - source/slang/slang-serialize-ir.h
-      - source/slang/slang-serialize-ir.cpp
-      - source/slang/slang-serialize-ast.h
-      - source/slang/slang-serialize-ast.cpp
-      - source/slang/slang-serialize-container.h
-      - source/slang/slang-serialize-container.cpp
-      - source/slang/slang-serialize-fossil.h
-      - source/slang/slang-serialize-fossil.cpp
+      - source/slang/serialization/slang-serialize.h
+      - source/slang/serialization/slang-serialize.cpp
+      - source/slang/serialization/slang-serialize-ir.h
+      - source/slang/serialization/slang-serialize-ir.cpp
+      - source/slang/serialization/slang-serialize-ast.h
+      - source/slang/serialization/slang-serialize-ast.cpp
+      - source/slang/serialization/slang-serialize-container.h
+      - source/slang/serialization/slang-serialize-container.cpp
+      - source/slang/serialization/slang-serialize-fossil.h
+      - source/slang/serialization/slang-serialize-fossil.cpp
       - source/core/slang-riff.h
       - source/core/slang-riff.cpp
-      - source/slang/slang-serialize-ir-types.h
-      - source/slang/slang-serialize-ir-types.cpp
-      - source/slang/slang-serialize-source-loc.h
-      - source/slang/slang-serialize-source-loc.cpp
-      - source/slang/slang-serialize-types.h
-      - source/slang/slang-serialize-types.cpp
+      - source/slang/serialization/slang-serialize-ir-types.h
+      - source/slang/serialization/slang-serialize-ir-types.cpp
+      - source/slang/serialization/slang-serialize-source-loc.h
+      - source/slang/serialization/slang-serialize-source-loc.cpp
+      - source/slang/serialization/slang-serialize-types.h
+      - source/slang/serialization/slang-serialize-types.cpp
       - source/slang/core.meta.slang
       - source/slang/hlsl.meta.slang
-      - source/slang/slang-ir-insts-stable-names.lua
-      - source/slang/slang-ir-insts.h
-      - source/slang/slang-ir-insts.lua
-      - source/slang/slang-ir.cpp
-      - source/slang/slang-ir.h
+      - source/slang/ir/slang-ir-insts-stable-names.lua
+      - source/slang/ir/slang-ir-insts.h
+      - source/slang/ir/slang-ir-insts.lua
+      - source/slang/ir/slang-ir.cpp
+      - source/slang/ir/slang-ir.h
       - source/slang/slang-options.cpp
       # The stable-name table is what makes serialized IR survive opcode
       # renumbering, so the page treats it as part of the format contract.
-      - source/slang/slang-ir-insts-stable-names.h
-      - source/slang/slang-ir-insts-stable-names.cpp
-      - source/slang/slang-ir-insts-stable-names.lua
+      - source/slang/ir/slang-ir-insts-stable-names.h
+      - source/slang/ir/slang-ir-insts-stable-names.cpp
+      - source/slang/ir/slang-ir-insts-stable-names.lua
     depends_on:
       - architecture/overview.md
     size_cap_bytes: 32768

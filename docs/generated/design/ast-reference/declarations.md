@@ -14,17 +14,17 @@ Slang AST, written for a contributor reading or writing front-end code
 who needs to know what fields a particular declaration carries and
 which parser function emits it. The abstract roots `DeclBase` and
 `Decl` are declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h) and
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h) and
 documented in [base.md](base.md); this page covers their concrete
 descendants, which are declared in
-[slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h).
+[slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h).
 
 ## Source
 
 All declarations in this page are declared in
-[slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h). The parser
+[slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h). The parser
 functions that produce them live in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp); the
 top-level dispatch is `ParseDecl` and the syntax-decl table is the
 `SyntaxParseInfo` array `g_parseSyntaxEntries` (see
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md)).
@@ -188,7 +188,7 @@ A pseudo-member of an aggregate decl that records one entry in the type's `: Bas
 
 ### SyntaxDecl and the syntax-as-declaration model
 
-`SyntaxDecl` is the AST representation of a keyword binding. `populateBaseLanguageModule` in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) walks the `g_parseSyntaxEntries` table at startup and creates one `SyntaxDecl` per entry, so the parser maps an identifier to an AST node class (`syntaxClass`) and callback (`parseCallback`) through ordinary name lookup. The `syntax` keyword (`parseSyntaxDecl`) lets core-module source such as [core.meta.slang](../../../../source/slang/core.meta.slang) add further bindings; see [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). `attribute_syntax` produces an `AttributeDecl` and binds a spelling to an AST attribute class the compiler already knows (`parseAttributeSyntaxDecl` resolves it with `ASTBuilder::findSyntaxClass`), so a user module can add a new spelling but not a new attribute. Valid placements come from `AttributeTargetModifier`s on the declaration, which `parseAttributeTargetModifier` in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) builds from `__attributeTarget(...)`; the use-site check is in [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) (line 1527), see [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md). All 128 `attribute_syntax` declarations ship with the compiler: 110 in `core.meta.slang`, 8 in `diff.meta.slang`, 8 in [workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang), and 2 in `hlsl.meta.slang`.
+`SyntaxDecl` is the AST representation of a keyword binding. `populateBaseLanguageModule` in [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) walks the `g_parseSyntaxEntries` table at startup and creates one `SyntaxDecl` per entry, so the parser maps an identifier to an AST node class (`syntaxClass`) and callback (`parseCallback`) through ordinary name lookup. The `syntax` keyword (`parseSyntaxDecl`) lets core-module source such as [core.meta.slang](../../../../source/slang/core.meta.slang) add further bindings; see [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). `attribute_syntax` produces an `AttributeDecl` and binds a spelling to an AST attribute class the compiler already knows (`parseAttributeSyntaxDecl` resolves it with `ASTBuilder::findSyntaxClass`), so a user module can add a new spelling but not a new attribute. Valid placements come from `AttributeTargetModifier`s on the declaration, which `parseAttributeTargetModifier` in [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) builds from `__attributeTarget(...)`; the use-site check is in [slang-check-modifier.cpp](../../../../source/slang/semantic-checking/slang-check-modifier.cpp) (line 1527), see [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md). All 128 `attribute_syntax` declarations ship with the compiler: 110 in `core.meta.slang`, 8 in `diff.meta.slang`, 8 in [workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang), and 2 in `hlsl.meta.slang`.
 
 ### NamespaceDecl, ModuleDecl, FileDecl
 
@@ -208,15 +208,15 @@ A `semantic` declaration introduces a name usable in the `: Name` position of a 
 
 ### RequirementDecl-style nodes inside InterfaceDecl
 
-Interface requirements are not a separate `Decl` class; a requirement is whatever `Decl` was written in the interface body (a `FuncDecl`, `PropertyDecl`, `AssocTypeDecl`, ...). The checker distinguishes them with `isInterfaceRequirement(Decl*)` in [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) rather than by class. The one requirement with a class of its own is `FuncConstraintDecl`, because the checker, not the user, writes it.
+Interface requirements are not a separate `Decl` class; a requirement is whatever `Decl` was written in the interface body (a `FuncDecl`, `PropertyDecl`, `AssocTypeDecl`, ...). The checker distinguishes them with `isInterfaceRequirement(Decl*)` in [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h) rather than by class. The one requirement with a class of its own is `FuncConstraintDecl`, because the checker, not the user, writes it.
 
 ### AssocTypeDecl
 
-An `AssocTypeDecl` is the `associatedtype T` declaration inside an interface body. It derives from `AggTypeDecl` and adds no fields. `parseAssocType` in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) creates it and passes any constraint clause to `parseOptionalGenericConstraints`; directly inside an `InterfaceDecl` the constraint is redirected to that interface as a sibling, so `: IBar` and `where A : IBar` produce identical ASTs.
+An `AssocTypeDecl` is the `associatedtype T` declaration inside an interface body. It derives from `AggTypeDecl` and adds no fields. `parseAssocType` in [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) creates it and passes any constraint clause to `parseOptionalGenericConstraints`; directly inside an `InterfaceDecl` the constraint is redirected to that interface as a sibling, so `: IBar` and `where A : IBar` produce identical ASTs.
 
 ### GenericTypeConstraintDecl as an interface requirement
 
-`maybeParseGenericConstraints` in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) maps each `where` term to one of five classes: `T : IBar` and `T == U` to `GenericTypeConstraintDecl` (the `==` form sets `isEqualityConstraint`), `nonempty(Pack)` to `NonEmptyPackConstraintDecl`, `countof(Pack) == N` to `GenericVariadicPackCountConstraintDecl`, `__hasDiffTypeInfo(T)` to `HasDiffTypeInfoConstraintDecl`, and `To(From)` to `TypeCoercionConstraintDecl` (`toType` before the parentheses, `fromType` inside). Inside an interface body a `GenericTypeConstraintDecl` is also a constraint requirement, written as `__constraint <type> : <type>;` (`parseInterfaceConstraintDecl`) or as a bound on an associated type. The associated-type forms are redirected to the enclosing `InterfaceDecl` via `constraintTarget`, so all three produce the same sibling representation. `isConstraintDecl` in [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) covers all five classes, while `isGenericConstraintParameterDecl` is the narrower test for constraints that occupy a hidden generic-argument slot.
+`maybeParseGenericConstraints` in [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) maps each `where` term to one of five classes: `T : IBar` and `T == U` to `GenericTypeConstraintDecl` (the `==` form sets `isEqualityConstraint`), `nonempty(Pack)` to `NonEmptyPackConstraintDecl`, `countof(Pack) == N` to `GenericVariadicPackCountConstraintDecl`, `__hasDiffTypeInfo(T)` to `HasDiffTypeInfoConstraintDecl`, and `To(From)` to `TypeCoercionConstraintDecl` (`toType` before the parentheses, `fromType` inside). Inside an interface body a `GenericTypeConstraintDecl` is also a constraint requirement, written as `__constraint <type> : <type>;` (`parseInterfaceConstraintDecl`) or as a bound on an associated type. The associated-type forms are redirected to the enclosing `InterfaceDecl` via `constraintTarget`, so all three produce the same sibling representation. `isConstraintDecl` in [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h) covers all five classes, while `isGenericConstraintParameterDecl` is the narrower test for constraints that occupy a hidden generic-argument slot.
 
 ### FuncConstraintDecl
 
@@ -224,7 +224,7 @@ A `FuncConstraintDecl` is a `GenericTypeConstraintDecl` that no parser productio
 
 ### GlobalGenericParamDecl and GlobalGenericValueParamDecl
 
-`type_param T;` and `__generic_value_param N : int;` are module-scope declarations, not members of a `GenericDecl`; `parseGlobalGenericTypeParamDecl` and `parseGlobalGenericValueParamDecl` produce them. Each becomes a specialization parameter of the enclosing module (flavor `GenericType` or `GenericValue`) in `Module::_collectShaderParams` ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)). The binding arrives from outside the module; see [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md) for how it is validated.
+`type_param T;` and `__generic_value_param N : int;` are module-scope declarations, not members of a `GenericDecl`; `parseGlobalGenericTypeParamDecl` and `parseGlobalGenericValueParamDecl` produce them. Each becomes a specialization parameter of the enclosing module (flavor `GenericType` or `GenericValue`) in `Module::_collectShaderParams` ([slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp)). The binding arrives from outside the module; see [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md) for how it is validated.
 
 ### GLSLInterfaceBlockDecl
 
@@ -236,7 +236,7 @@ For HLSL source with `EnableExtendedHLSLBackwardsCompatibility`, `createUniformP
 
 ### UnresolvedDecl
 
-`UnresolvedDecl` is declared in [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) with no state, and the only other mention under `source/` is the `printDiagnosticArg(StringBuilder&, ASTNodeType)` switch. Nothing constructs one, so its role cannot be established and its `Summary` is `(unclear)`.
+`UnresolvedDecl` is declared in [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h) with no state, and the only other mention under `source/` is the `printDiagnosticArg(StringBuilder&, ASTNodeType)` switch. Nothing constructs one, so its role cannot be established and its `Summary` is `(unclear)`.
 
 ## See also
 
