@@ -2844,8 +2844,9 @@ Result linkAndOptimizeIR(
     // Rebuild short-circuit `&&`/`||` expressions from their diamond form while
     // the block-parameter (phi) form still exists; `eliminatePhis` below would
     // otherwise turn the merge parameters into `bool` temporaries that the
-    // downstream C++ compiler cannot turn back into branches. No-op for
-    // targets whose emitted language does not short-circuit.
+    // downstream C++ compiler cannot turn back into branches. Runs only on
+    // CUDA and CPU/C++-source targets, whose emitters the pass's fold-veto
+    // mirrors cover.
     SLANG_PASS(reconstructShortCircuit, targetRequest);
 
     // As a late step, we need to take the SSA-form IR and move things *out*

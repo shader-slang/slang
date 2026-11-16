@@ -254,6 +254,10 @@ struct ReconstructShortCircuitContext : public InstPassBase
         {
         case kIROp_Load:
         case kIROp_CUDALDG:
+        // Unreachable today (nothing produces it since the autodiff
+        // refactor), but memory-observing like any load: if a producer ever
+        // returns, the fold-guarantee checks are the safe default.
+        case kIROp_LoadReverseGradient:
         case kIROp_StructuredBufferLoad:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_ByteAddressBufferLoad:
@@ -288,6 +292,23 @@ struct ReconstructShortCircuitContext : public InstPassBase
     static bool isDebugInst(IRInst* inst)
     {
         return as<IRDebugLine>(inst) || as<IRDebugVar>(inst) || as<IRDebugScope>(inst);
+    }
+
+    // Returns whether `inst` reads memory (unless the read is a call to a
+    // `[__readNone]` callee, which provably reads nothing) or transitively
+    // uses an instruction already known to be on the fold path — the
+    // instructions whose text must stay inside the emitted `&&`/`||`
+    // operand for the rewrite to preserve their conditional evaluation.
+    bool isOnFoldPath(IRInst* inst, const HashSet<IRInst*>& foldPathInsts)
+    {
+        if (isMemoryReadingInst(inst) && !isReadNoneCall(inst))
+            return true;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (foldPathInsts.contains(inst->getOperand(i)))
+                return true;
+        }
+        return false;
     }
 
     // Check one instruction that is part of the value produced by the
@@ -424,13 +445,8 @@ struct ReconstructShortCircuitContext : public InstPassBase
                 // chain root must fold into its own use site: the emitter
                 // prints a non-folding instruction as a statement in the
                 // block before the `if`, and anything folded into that
-                // statement is then evaluated unconditionally. A call to a
-                // `[__readNone]` callee provably reads nothing, so it joins
-                // the fold path only through its operands.
-                bool onFoldPath = isMemoryReadingInst(inst) && !isReadNoneCall(inst);
-                for (UInt i = 0; i < inst->getOperandCount() && !onFoldPath; i++)
-                    onFoldPath = foldPathInsts.contains(inst->getOperand(i));
-                if (onFoldPath)
+                // statement is then evaluated unconditionally.
+                if (isOnFoldPath(inst, foldPathInsts))
                 {
                     if (isNeverFoldedOnCLikeTargets(inst))
                         return false;
@@ -557,6 +573,8 @@ struct ReconstructShortCircuitContext : public InstPassBase
         if (!isSimpleBranchTo(elseBlock, afterBlock, elseVal))
             return false;
 
+        // Always overwritten below; the shape check above returns for any
+        // arm pair other than the two canonical forms.
         IROp logicOp = kIROp_Nop;
         IRBlock* valueArm = nullptr;
         IRBlock* constArm = nullptr;
@@ -610,7 +628,9 @@ struct ReconstructShortCircuitContext : public InstPassBase
 
         // The parameter carries the user-visible name of the result (for
         // example `passed` in `bool passed = a && b;`); keep it on the
-        // reconstructed operation.
+        // reconstructed operation. When `emitOr`/`emitAnd` constant-folds,
+        // `logicInst` may be a pre-existing shared instruction, and the
+        // transferred name hint is cosmetic there.
         param->transferDecorationsTo(logicInst);
         param->replaceUsesWith(logicInst);
         param->removeAndDeallocate();

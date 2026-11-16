@@ -6,7 +6,6 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target cuda
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
 RWStructuredBuffer<uint> output;
 
 StructuredBuffer<float3> itemMin;
@@ -32,5 +31,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     {
         output[tid.x] = 0;
     }
+    //CHECK: if(
     //CHECK-NOT: &&
 }
