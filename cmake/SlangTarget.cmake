@@ -669,6 +669,12 @@ function(slang_add_target dir type)
             endif()
             set(export_args)
         endif()
+        # The component options in ARGN apply to the binaries only. The public
+        # headers are part of the public API, so they stay in the default
+        # component even when the library itself is in an EXCLUDE_FROM_ALL
+        # component. Consider a build with SLANG_EMBED_CORE_MODULE=OFF: there
+        # slang-compiler is installed only by the "generators" component, but a
+        # default install still has to provide slang.h.
         install(
             TARGETS ${target} ${export_args}
             ARCHIVE DESTINATION ${archive_subdir}
@@ -678,7 +684,6 @@ function(slang_add_target dir type)
             RUNTIME DESTINATION ${runtime_subdir}
             ${ARGN}
             PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            ${ARGN}
         )
     endmacro()
 
