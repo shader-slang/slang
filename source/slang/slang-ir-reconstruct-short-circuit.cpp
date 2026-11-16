@@ -178,6 +178,11 @@ struct ReconstructShortCircuitContext : public InstPassBase
         // need the fold guarantee. A call is memory-reading unless its callee
         // is marked `[__readNone]`; we conservatively treat every pure call
         // as memory-reading.
+        // The descriptor-heap ops below must stay in sync with the
+        // FoldPolicy::Never bail in canHoistArmInst: this list routes them
+        // into the fold-guarantee checks, and that bail keeps them out of a
+        // reconstructed `||` entirely. kIROp_SPIRVLoadDescriptorFromHeap is
+        // not in the C-family Never table, so it takes the check path.
         switch (inst->getOp())
         {
         case kIROp_Load:
@@ -218,6 +223,21 @@ struct ReconstructShortCircuitContext : public InstPassBase
         // arm keeps its shape, which only forgoes this optimization.
         if (as<IRDebugLine>(inst) || as<IRDebugVar>(inst) || as<IRDebugScope>(inst))
             return false;
+
+        // Descriptor-heap loads are pure, so the side-effect check below does
+        // not reject them, but the C-family emitter classifies them as
+        // FoldPolicy::Never (slang-emit-c-like.cpp): their result cannot be
+        // emitted as a sub-expression of the reconstructed `||`. Keeping the
+        // diamond for them mirrors that classification instead of relying on
+        // the lowering paths that produce them not reaching C-family targets.
+        switch (inst->getOp())
+        {
+        case kIROp_LoadResourceDescriptorFromHeap:
+        case kIROp_LoadSamplerDescriptorFromHeap:
+            return false;
+        default:
+            break;
+        }
 
         if (inst->mightHaveSideEffects(SideEffectAnalysisOptions::None, &sideEffectCache))
             return false;
