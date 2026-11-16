@@ -223,11 +223,13 @@ public in int2 gl_FragSizeEXT : SV_FragSize;
 public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 
-// Override operator* behavior to compute algebric product of matrices and vectors.
+// GLSL's `*` and `*=` on matrices and vectors compute the algebraic product. Each overload
+// below forwards to `mul` with its operands swapped, so its target set mirrors that of the
+// `mul` overload it calls; whether `double` can be emitted on a target is not modelled here (#10232).
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let C : int, let R : int>(matrix<T, C, L> m1, matrix<T, R, C> m2)
 {
     return mul(m2, m1);
@@ -235,7 +237,7 @@ public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let 
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(vector<T, C> v, matrix<T, R, C> m)
 {
     return mul(m, v);
@@ -243,7 +245,7 @@ public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(matrix<T, R, C> m, vector<T, R> v)
 {
     return mul(v, m);
@@ -251,7 +253,7 @@ public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public matrix<float, N, N> operator*=<let N:int>(inout matrix<float, N, N> m1, matrix<float, N, N> m2)
 {
     m1 = mul(m2, m1);
@@ -260,7 +262,7 @@ public matrix<float, N, N> operator*=<let N:int>(inout matrix<float, N, N> m1, m
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public matrix<half, N, N> operator*=<let N:int>(inout matrix<half, N, N> m1, matrix<half, N, N> m2)
 {
     m1 = mul(m2, m1);
@@ -269,7 +271,7 @@ public matrix<half, N, N> operator*=<let N:int>(inout matrix<half, N, N> m1, mat
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public matrix<double, N, N> operator*=<let N:int>(inout matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
     m1 = mul(m2, m1);
@@ -278,7 +280,7 @@ public matrix<double, N, N> operator*=<let N:int>(inout matrix<double, N, N> m1,
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 public vector<T, C> operator*=<T:__BuiltinFloatingPointType, let C : int>(inout vector<T, C> v, matrix<T, C, C> m)
 {
     v = mul(m, v);
@@ -5063,7 +5065,7 @@ public property int gl_InstanceCustomIndexEXT
 
 public property int gl_GeometryIndexEXT
 {
-    [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+    [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
     {
         setupExtForRayTracingBuiltIn();
@@ -5459,7 +5461,6 @@ public bool rayQueryProceedEXT(inout rayQueryEXT q)
 
 __glsl_extension(GL_EXT_ray_query)
 [require(glsl_spirv, rayquery)]
-[mutating]
 [ForceInline]
 public void rayQueryTerminateEXT(inout rayQueryEXT q)
 {
@@ -6125,7 +6126,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
-public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
+public void hitObjectRecordEmptyNV(inout hitObjectNV hitObject)
 {
     hitObject = HitObject::MakeNop();
 }
@@ -8766,292 +8767,119 @@ public vector<T,N> subgroupShuffleDown(vector<T,N> value, uint delta)
 // GL_KHR_shader_subgroup_clustered
 
 __generic<T : __BuiltinArithmeticType>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredAdd(T value, uint clusterSize)
+public T subgroupClusteredAdd(T value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredSum(value, clusterSize);
 }
 
 __generic<T : __BuiltinArithmeticType>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredMul(T value, uint clusterSize)
+public T subgroupClusteredMul(T value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredMul($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredProduct(value, clusterSize);
 }
 
 __generic<T : __BuiltinArithmeticType>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredMin(T value, uint clusterSize)
+public T subgroupClusteredMin(T value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredMin($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredMin(value, clusterSize);
 }
 
 __generic<T : __BuiltinArithmeticType>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredMax(T value, uint clusterSize)
+public T subgroupClusteredMax(T value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredMax($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredMax(value, clusterSize);
 }
 
 __generic<T : __BuiltinLogicalType>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredAnd(T value, uint clusterSize)
+public T subgroupClusteredAnd(T value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$T result Subgroup ClusteredReduce $value $clusterSize};
-    }
+    return WaveClusteredBitAnd(value, clusterSize);
 }
 
 __generic<T : __BuiltinLogicalType>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredOr(T value, uint clusterSize)
+public T subgroupClusteredOr(T value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredOr($0, $1)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$T result Subgroup ClusteredReduce $value $clusterSize};
-    }
+    return WaveClusteredBitOr(value, clusterSize);
 }
 
 
 
 __generic<T : __BuiltinLogicalType>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public T subgroupClusteredXor(T value, uint clusterSize)
+public T subgroupClusteredXor(T value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredXor($0, $1)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$T result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$T result Subgroup ClusteredReduce $value $clusterSize};
-    }
+    return WaveClusteredBitXor(value, clusterSize);
 }
 
 
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredAdd(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredAdd(vector<T,N> value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredAdd($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;
-            OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredSum(value, clusterSize);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredMul(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredMul(vector<T,N> value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredMul($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredProduct(value, clusterSize);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredMin(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredMin(vector<T,N> value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredMin($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredMin(value, clusterSize);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredMax(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredMax(vector<T,N> value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredMax($0, $1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;  OpGroupNonUniformUMax $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else return value;
-    }
+    return WaveClusteredMax(value, clusterSize);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredAnd(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredAnd(vector<T,N> value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredAnd($0, $1)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-    }
+    return WaveClusteredBitAnd(value, clusterSize);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredOr(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredOr(vector<T,N> value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredOr($0, $1)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-    }
+    return WaveClusteredBitOr(value, clusterSize);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
-__spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_clustered)
 [ForceInline]
 [require(glsl_spirv, subgroup_clustered)]
-public vector<T,N> subgroupClusteredXor(vector<T,N> value, uint clusterSize)
+public vector<T,N> subgroupClusteredXor(vector<T,N> value, constexpr uint clusterSize)
 {
-    shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupClusteredXor($0, $1)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
-    }
+    return WaveClusteredBitXor(value, clusterSize);
 }
 
 // GL_KHR_shader_subgroup_quad

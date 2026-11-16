@@ -5,8 +5,8 @@
 # Unlike the sibling coverage examples, missing Vulkan does NOT skip
 # the whole example — the CPU path (and Metal on Apple platforms)
 # stays available; the Vulkan path is compiled in only when a loader
-# is found. Like the siblings, this uses raw Vulkan rather than
-# slang-rhi until slang-rhi PR #739 lands (see shader-coverage-common/vk_compute_demo.h).
+# is found. This intentionally keeps native binding recipes for applications
+# that do not use slang-rhi. The image-pipeline and BVH examples show RHI binding.
 
 set(_sources main.cpp)
 set(_defines "")
@@ -16,7 +16,7 @@ set(_libs slang core)
 # bundled Vulkan-Headers target guarantees headers even when
 # find_library locates a bare loader; when the SDK's Vulkan::Vulkan
 # target is found instead, the SDK's own headers take precedence over
-# the bundled ones (the same pattern as the sibling coverage examples).
+# the bundled ones.
 find_package(Vulkan QUIET)
 if(TARGET Vulkan::Vulkan)
     set(_vulkan_loader Vulkan::Vulkan)
@@ -112,6 +112,5 @@ endif()
 target_compile_features(shader-coverage-backends PRIVATE cxx_std_17)
 set_target_properties(shader-coverage-backends PROPERTIES FOLDER examples)
 
-# Attach to the all-examples meta target explicitly (raw
-# add_executable, same as the sibling coverage demos).
+# Attach this native add_executable target to the examples build.
 add_dependencies(all-examples shader-coverage-backends)

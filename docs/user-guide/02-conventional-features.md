@@ -443,8 +443,10 @@ Swizzles can reorder elements (`v.yx`) or include duplicate elements (`v.yyy`).
 > Unlike GLSL, Slang only supports `xyzw` and `rgba` as swizzle elements, and not the seldom-used `stpq`.
 
 Matrix values also support HLSL-style matrix swizzles such as `m._m00_m01` and
-`m._41_32`. Matrix swizzle l-values may be assigned, and constant-indexed
-subscripts of matrix swizzles may be used where an l-value is required.
+`m._41_32`. A matrix swizzle without duplicate elements is an l-value when the
+matrix itself is an l-value: it may be assigned, and its constant-indexed
+subscripts may be used where an l-value is required. As with vector swizzles,
+a swizzle of a `let` or `const` matrix cannot be assigned.
 
 Statements
 ----------
@@ -525,9 +527,57 @@ Function parameters may be marked with a _direction_ qualifier:
 * `out` indicates an output parameter
 * `inout` or `in out` indicates an input/output parameter
 
+An `out` or `inout` parameter has exclusive access to its argument for the duration of the call.
+An `inout` parameter is an _exclusive mutable borrow_ of its argument.
+An `out` parameter receives uninitialized storage, to which the function writes a value; when the function returns, ownership of that value moves out of the function to the caller.
+While the call is in progress, nothing else should read or write the argument's memory, whether through another parameter, a global variable, or another invocation.
+
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
+> Slang does not check that a program gives an `out` or `inout` parameter exclusive access to its argument; if other code accesses the argument's memory during the call, the program has undefined behavior.
+
+#### Borrow and Reference Parameters ####
+
+Slang has additional parameter modifiers for borrows and references:
+
+* `__borrow` (also spelled `__constref`) indicates an _immutable borrow_: the function may read the argument but not modify it, and nothing should modify the argument while the call is in progress
+* `__ref` indicates a _reference_: the parameter does not have exclusive access to its argument, so other code may read or write the argument's memory while the call is in progress, and the function reads and writes that memory directly
+
+> #### Note ####
+> These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.
+> As with `out` and `inout`, Slang does not check that a program respects the access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior.
+
+A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we expect user code to use.
+Its argument must be a `groupshared` variable, a part of one, or another `groupshared` parameter, and the function accesses that memory while other invocations in the thread group can access it too.
+A `const groupshared` parameter is a read-only reference.
+A `groupshared` parameter cannot also be marked `in`, `out`, `inout`, or `__borrow`.
+
+```hlsl
+groupshared float tile[64];
+
+void fill(groupshared float values[64], uint i)
+{
+    values[i] = float(i);
+}
+
+float neighbor(const groupshared float values[64], uint i)
+{
+    return values[(i + 1) % 64];
+}
+
+[numthreads(64, 1, 1)]
+void computeMain(uint i : SV_GroupIndex)
+{
+    fill(tile, i);
+    GroupMemoryBarrierWithGroupSync();
+    float n = neighbor(tile, i);
+    // ...
+}
+```
+
+HLSL does not allow a function with a `groupshared` parameter to be `export` (see [HLSL proposal 0043](https://github.com/microsoft/hlsl-specs/blob/main/proposals/0043-groupshared-arguments.md)), and neither does Slang when targeting HLSL.
+If such a function must be `export`, have it access a global `groupshared` variable directly instead of taking the memory as a parameter.
 
 Preprocessor
 ------------
@@ -600,6 +650,30 @@ A global-scope `static const` variable defines a compile-time constant for use i
 
 A non-`const` global-scope `static` variable is conceptually similar to a global variable in C/C++, with the key difference that it has distinct storage per *thread* rather than being truly global.
 Each logical thread of shader execution initiated by the GPU will be allocated fresh storage for these `static` variables, and values written to those variables will be lost when a shader thread terminates.
+
+#### Resource-Valued Static Variables
+
+A mutable file- or namespace-scope `static` variable may hold one non-combined texture or typed-buffer resource, one sampler state, one structured buffer other than an append or consume buffer, or one byte-address buffer.
+A fixed-size homogeneous array of any of these resource types is also supported.
+
+The variable stores a resource binding separately for each shader invocation.
+Assigning the variable changes which bound resource later operations use during that invocation; it does not rebind the shader parameter that supplied the value or copy the resource's contents.
+An operation through the variable accesses the selected resource normally.
+
+Slang must be able to represent the variable as per-invocation state in the entry point and every helper function that uses it.
+The declaration therefore cannot use `groupshared` or a memory-access qualifier such as `globallycoherent`.
+Slang also reports an error when the program requires persistent or externally visible storage, observes the storage identity through an address, or accesses the variable from a function that cannot receive the per-invocation state.
+Some targets cannot represent resource-valued local variables or function parameters.
+Slang accepts those targets only when it can eliminate the unsupported forms during compilation.
+
+The supported forms do not include explicit parameter groups such as `ConstantBuffer<T>` and `ParameterBlock<T>`, unbounded arrays, structs containing resources, combined texture-sampler types, append and consume buffers, acceleration structures, or `__DynamicResource`.
+When code assigns individual elements of a resource array, Slang must be able to prove that no read can occur before a whole-array assignment; otherwise it reports that complete initialization has not been established.
+
+An initializer for a supported resource-valued `static` variable must be safe to evaluate at the start of each entry point.
+Slang must prove that the initializer and every function it can call return normally for all possible inputs.
+The current analysis cannot establish that proof across a loop or recursive call cycle that remains after optimization, even when the programmer knows that it terminates.
+Slang also reports an error when the initializer may have externally observable side effects or may read preexisting mutable storage, resource contents, or non-resource data from an explicit parameter group.
+When Slang cannot prove the initializer safe to move, initialize the variable explicitly in an entry point instead.
 
 > #### Note ####
 > Some target platforms do not support `static` global variables in all use cases.

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv-asm
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv-asm
 //TEST_INPUT:ubuffer(data=[0], stride=4):out
 
 // Test that DerivativeGroupQuadsKHR execution mode validates workgroup size
@@ -14,6 +14,7 @@ Texture2D g_textures[];
 SamplerState g_samplers[];
 
 [shader("compute")]
+[DerivativeGroupQuad]
 [numthreads(1, 1, 1)]  // Invalid: should be multiples of 2 for derivative group quads
 void main() {
     float4 texture_color = g_textures[0].Sample(

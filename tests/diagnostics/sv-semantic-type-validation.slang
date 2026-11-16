@@ -31,7 +31,7 @@ float4 vsWrongVectorSize(uint2 vertexId : SV_VertexID) : SV_Position
 }
 
 // Test 2: float2 is an accepted type for SV_Position output (HLSL allows fewer components)
-// CHECK2-NOT: error 30701
+// CHECK2-NOT: E30701
 float2 vsPositionFloat2(uint vertexId : SV_VertexID) : SV_Position
 {
     return float2(float(vertexId), 0);
@@ -47,21 +47,21 @@ float4 vsConditionalWrongType(Conditional<uint2, true> vertexId : SV_VertexID) :
 }
 
 // Test 4: Conditional<uint, true> unwraps to uint, which is correct for SV_VertexID (input)
-// CHECK4-NOT: error 30701
+// CHECK4-NOT: E30701
 float4 vsConditionalCorrectType(Conditional<uint, true> vertexId : SV_VertexID) : SV_Position
 {
     return float4(0, 0, 0, 1);
 }
 
 // Test 5: Conditional<float2, true> unwraps to float2, which is now accepted for SV_Position
-// CHECK5-NOT: error 30701
+// CHECK5-NOT: E30701
 Conditional<float2, true> vsConditionalOutputFloat2(uint vertexId : SV_VertexID) : SV_Position
 {
     return float2(0, 0);
 }
 
 // Test 6: Conditional<float4, true> unwraps to float4, which is correct for SV_Position (output)
-// CHECK6-NOT: error 30701
+// CHECK6-NOT: E30701
 Conditional<float4, true> vsConditionalOutputCorrectType(uint vertexId : SV_VertexID) : SV_Position
 {
     return float4(0, 0, 0, 1);
@@ -84,14 +84,14 @@ float vsPositionScalar(uint vertexId : SV_VertexID) : SV_Position
 }
 
 // Test 9: float3 is an accepted type for SV_Position
-// CHECK9-NOT: error 30701
+// CHECK9-NOT: E30701
 float3 vsPositionFloat3(uint vertexId : SV_VertexID) : SV_Position
 {
     return float3(float(vertexId), 0, 0);
 }
 
 // Test 10: float2 for SV_Position works for HLSL target too
-// CHECK10-NOT: error 30701
+// CHECK10-NOT: E30701
 // (uses vsPositionFloat2 entry point from Test 2, targeting HLSL)
 
 // Test 11: bool is rejected for SV_ViewID (uint semantic) — cross-category coercion (issue #6428)

@@ -93,8 +93,19 @@ SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE(intptr_t)
 #undef SLANG_NUMERICS_SIGNED_INTEGER_CONFORMANCE
 
 #define SLANG_NUMERICS_INTEGER_CONFORMANCE(TYPE)                                      \
-    public extension TYPE : ITotallyOrdered                                     \
-    {}                                                                           \
+    public extension TYPE : ITotallyOrdered, INumericExtrema                     \
+    {                                                                            \
+        [__unsafeForceInlineEarly]                                               \
+        This minimum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMinimum(this, other);                       \
+        }                                                                        \
+        [__unsafeForceInlineEarly]                                               \
+        This maximum(This other)                                                 \
+        {                                                                        \
+            return __numericsBuiltinMaximum(this, other);                       \
+        }                                                                        \
+    }                                                                            \
                                                                                  \
     public extension TYPE : IScalarIntegerType                                  \
     {                                                                            \
@@ -323,7 +334,7 @@ public extension<T : __BuiltinArithmeticType & IScalarNumeric, let N : int>
 }
 
 public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
-    vector<T, N> : IIntegerType
+    vector<T, N> : IIntegerType, INumericExtrema
 {
     typealias ShiftAmount = vector<int, N>;
 
@@ -349,6 +360,10 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     This minus(This other) { return this.sub(other); }
     [__unsafeForceInlineEarly]
     This multipliedBy(This other) { return this.mul(other); }
+    [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
     [__unsafeForceInlineEarly]
     This quotientWhenDividedBy(This divisor)
     {
@@ -377,6 +392,30 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     {
         return __numericsBuiltinShiftRight(this, amount);
     }
+}
+
+// Integer matrices used by `IFloatingPointWithIntegerPart` expose their logical shape without
+// requiring the arithmetic and bitwise operations of `IIntegerType`.
+public extension<let R : int, let C : int, let L : MatrixLayoutMode>
+    matrix<int, R, C, L> : INumericShapedType
+{
+    typealias Scalar = int;
+    typealias Mask = matrix<bool, R, C, L>;
+
+    [__unsafeForceInlineEarly]
+    static This fromScalar(Scalar value) { return This(value); }
+}
+
+public extension<
+    T : __BuiltinIntegerType & IScalarIntegerType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode> matrix<T, R, C, L> : INumericExtrema
+{
+    [__unsafeForceInlineEarly]
+    This minimum(This other) { return __numericsBuiltinMinimum(this, other); }
+    [__unsafeForceInlineEarly]
+    This maximum(This other) { return __numericsBuiltinMaximum(this, other); }
 }
 
 public extension<

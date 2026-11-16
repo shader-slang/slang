@@ -11,6 +11,7 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK-DAG: optixGetObjectRayDirection()
 //CHECK-DAG: optixGetObjectRayOrigin()
 //CHECK-DAG: optixGetPrimitiveIndex()
+//CHECK-DAG: optixGetSbtGASIndex()
 //CHECK-DAG: optixGetRayFlags()
 //CHECK-DAG: optixGetRayTmin()
 //CHECK-DAG: optixGetWorldRayDirection()
@@ -45,6 +46,7 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK_PTX-DAG: _optix_get_object_ray_direction_x
 //CHECK_PTX-DAG: _optix_get_object_ray_origin_x
 //CHECK_PTX-DAG: _optix_read_primitive_idx
+//CHECK_PTX-DAG: _optix_read_sbt_gas_idx
 //CHECK_PTX-DAG: _optix_get_ray_flags
 //CHECK_PTX-DAG: _optix_get_ray_tmin
 //CHECK_PTX-DAG: _optix_get_world_ray_direction_x
@@ -75,6 +77,7 @@ struct IntrinsicData
     uint instanceIndex;
     uint instanceID;
     uint primitiveIndex;
+    uint geometryIndex;
     float3 objectRayDirection;
     float3 objectRayOrigin;
     float3 worldRayDirection;
@@ -134,6 +137,7 @@ void closestHitShader(
     payload.data.instanceIndex = InstanceIndex();
     payload.data.instanceID = InstanceID();
     payload.data.primitiveIndex = PrimitiveIndex();
+    payload.data.geometryIndex = GeometryIndex();
     // Note: ObjectRayDirection/ObjectRayOrigin are NOT available in closesthit on CUDA/OptiX
     // They are only available in anyhit and intersection shaders per OptiX documentation.
     // See issue #9258 for details.

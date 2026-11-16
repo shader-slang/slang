@@ -19,6 +19,18 @@ struct MyType : IDifferentiable
      ^^^^^^^^ cannot use '[constref]' on a differentiable member method of a differentiable type.
 */
 
+    // Conflicting receiver modes do not suppress the diagnostic for `[constref]` on a
+    // differentiable method.
+    [Differentiable]
+    [mutating]
+    [constref] float computeWithOverlappingAttributes(float x) { return 0; }
+/*CHECK:
+     ^^^^^^^^ duplicate modifier
+     ^^^^^^^^ modifier 'constref' is redundant or conflicting with existing modifier 'mutating'
+     ^^^^^^^^ '[constref]' on differentiable member method
+     ^^^^^^^^ cannot use '[constref]' on a differentiable member method of a differentiable type.
+*/
+
     // OK
     [Differentiable]
     float compute1(float x) { return 0; }

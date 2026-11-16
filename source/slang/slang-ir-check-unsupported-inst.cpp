@@ -8,24 +8,12 @@
 namespace Slang
 {
 
-// Returns true if `type` is itself a leaf opaque "handle" type that SPIR-V
-// forbids from being stored to or loaded from
-// (VUID-StandaloneSpirv-OpTypeImage-06924): images/textures, samplers, sampled
-// images, subpass inputs (including GLSL input attachments), and acceleration
-// structures. These map to `OpTypeImage`/`OpTypeSampler`/`OpTypeSampledImage`/
-// `OpTypeAccelerationStructureKHR`, none of which may live in a function-local
-// variable.
-static bool isLeafUnstorableOpaqueHandleType(IRType* type)
-{
-    return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
-           as<IRSubpassInputType>(type) || type->getOp() == kIROp_GLSLInputAttachmentType ||
-           type->getOp() == kIROp_RaytracingAccelerationStructureType;
-}
-
-// Find an opaque handle type (see `isLeafUnstorableOpaqueHandleType`) that cannot
-// live in a function-local variable, recursing into the element/field types of
-// aggregates (arrays, structs, tuples) since storing an aggregate that contains
-// such a handle has the same problem. Returns the leaf handle type if found (for
+// Find an opaque handle type that cannot live in a function-local variable:
+// a type for which `isImageSamplerOrAccelerationStructureType` holds, since
+// SPIR-V forbids storing or loading those types
+// (VUID-StandaloneSpirv-OpTypeImage-06924). We also search the element/field
+// types of aggregates (arrays, structs, tuples), since storing an aggregate
+// that contains such a handle has the same problem. Returns the leaf handle type if found (for
 // diagnostics), or null otherwise. `visited` guards against cycles in
 // (potentially self-referential) aggregate types, mirroring the peer helper
 // `isOpaqueTypeImpl` in slang-legalize-types.cpp.
@@ -40,7 +28,7 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type, HashSet<IRType*>& vi
     if (!type)
         return nullptr;
 
-    if (isLeafUnstorableOpaqueHandleType(type))
+    if (isImageSamplerOrAccelerationStructureType(type))
         return type;
 
     // Only recurse once per aggregate type to avoid cycling on self-referential
@@ -79,6 +67,144 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type)
 {
     HashSet<IRType*> visited;
     return findUnstorableOpaqueHandleType(type, visited);
+}
+
+/// Return the innermost element type stored by a local variable after removing attributed wrappers
+/// and homogeneous arrays.
+//
+// We do not inspect record fields because type legalization has already separated resources from
+// programmer-declared aggregates before this check runs. Metal's `introduceExplicitGlobalContext`
+// pass also creates a compiler-owned `KernelContext` local whose resource fields are valid in that
+// record.
+static IRType* getInnermostHomogeneousArrayElementType(IRType* type)
+{
+    type = as<IRType>(unwrapAttributedType(type));
+    SLANG_RELEASE_ASSERT(type);
+    while (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        type = as<IRType>(unwrapAttributedType(arrayType->getElementType()));
+        SLANG_RELEASE_ASSERT(type);
+    }
+    return type;
+}
+
+/// Find a resource type supported by per-invocation replacement that DXBC or DXIL cannot represent
+/// in mutable local storage.
+//
+// We descend through array layers because the downstream D3D compilers reject the local when its
+// innermost element has an affected resource type. We then reuse the replacement predicate to
+// recognize the resource categories supported by per-invocation replacement.
+static IRType* findD3DUnsupportedLocalStorageType(IRType* type)
+{
+    type = getInnermostHomogeneousArrayElementType(type);
+    if (isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(type))
+        return type;
+    return nullptr;
+}
+
+/// Find a texture, image, or sampler type that Metal cannot place in mutable local storage.
+//
+// Metal rejects a texture, image, or sampler stored directly in `thread` storage. Structured and
+// byte-address buffers are represented by pointers and are not subject to this restriction. Metal
+// permits a fixed-size array with a texture, image, or sampler as its immediate element. The
+// `transformParamsToConstRef` pass
+// uses this allowed form when a caller cannot supply an immutable address for a by-value array
+// argument. It copies the argument into a local array and passes that array to the callee. An
+// unsized array has no fixed amount of local storage. The current Metal storage contract permits
+// exactly one fixed-size array layer and rejects nested arrays. For unsized and nested arrays, we
+// inspect the innermost element. A texture, image, or sampler element makes the storage invalid. We
+// remove attributed-type wrappers because they do not change the storage representation.
+//
+// TODO: Compile generated nested-array locals with metallib, and permit that form if the backend
+// accepts its emitted representation.
+static IRType* findMetalUnsupportedLocalStorageType(IRType* type)
+{
+    auto storageType = as<IRType>(unwrapAttributedType(type));
+    SLANG_RELEASE_ASSERT(storageType);
+    if (auto arrayType = as<IRArrayType>(storageType))
+    {
+        auto elementType = as<IRType>(unwrapAttributedType(arrayType->getElementType()));
+        SLANG_RELEASE_ASSERT(elementType);
+        if (as<IRResourceTypeBase>(elementType) || as<IRSamplerStateTypeBase>(elementType))
+            return nullptr;
+    }
+
+    type = getInnermostHomogeneousArrayElementType(storageType);
+    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+        return type;
+    return nullptr;
+}
+
+static void checkUnsupportedResourceLocals(
+    IRFunc* func,
+    TargetRequest* target,
+    bool shouldUseD3DStorageRules,
+    DiagnosticSink* sink)
+{
+    // The caller selects compiled D3D or Metal output. We use D3D storage rules when
+    // `shouldUseD3DStorageRules` is true, and Metal storage rules otherwise.
+    // We check each local variable against those rules. Resource specialization can leave a
+    // resource as an SSA value, but phi elimination and parameter
+    // lowering can create mutable storage for that value. We diagnose the storage, not the SSA
+    // value, because the target may support passing the value without supporting a mutable local.
+    // Several generated locals can refer to the same source declaration, so we report one error
+    // per source location in this function.
+    HashSet<SourceLoc::RawValue> diagnosedLocations;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() != kIROp_Var)
+                continue;
+
+            auto pointerType = as<IRPtrTypeBase>(unwrapAttributedType(inst->getDataType()));
+            SLANG_RELEASE_ASSERT(pointerType);
+            auto valueType = pointerType->getValueType();
+            SLANG_RELEASE_ASSERT(valueType);
+            auto unsupportedType = shouldUseD3DStorageRules
+                                       ? findD3DUnsupportedLocalStorageType(valueType)
+                                       : findMetalUnsupportedLocalStorageType(valueType);
+            if (!unsupportedType)
+                continue;
+
+            // A generated local may have no source location. We use its first use's location
+            // when possible so that the diagnostic points to relevant user code. Without a
+            // location, we still report the error; a missing location must not permit invalid IR.
+            auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+            if (loc.isValid())
+            {
+                if (!diagnosedLocations.add(loc.getRaw()))
+                    continue;
+            }
+            sink->diagnose(Diagnostics::OpaqueLocalStorageNotSupportedForTarget{
+                .type = unsupportedType,
+                .target = target->getTarget(),
+                .location = loc});
+        }
+    }
+}
+
+void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    // We validate resource locals for compiled D3D and Metal output after the passes that can
+    // introduce local storage. This check is required even in minimum-optimization mode: skipping
+    // an optimization does not make unsupported storage representable. HLSL source output is
+    // excluded because its emitter can preserve the local for a downstream compiler to check.
+    const bool shouldUseD3DStorageRules =
+        isD3DTarget(target) && target->getTarget() != CodeGenTarget::HLSL;
+    if (!shouldUseD3DStorageRules && !isMetalTarget(target))
+        return;
+
+    // We visit ordinary functions and functions returned by generics, matching the function
+    // bodies that the general unsupported-instruction check examines at this compilation stage.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (auto generic = as<IRGeneric>(globalInst))
+            func = as<IRFunc>(findGenericReturnVal(generic));
+        if (func)
+            checkUnsupportedResourceLocals(func, target, shouldUseD3DStorageRules, sink);
+    }
 }
 
 // True if `target` is a C++/CUDA *kernel* output target. The `String` type is
@@ -176,16 +302,18 @@ static bool instReferencesStringType(IRInst* inst)
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
-    // Khronos targets (SPIR-V and GLSL) and WGSL cannot place an
-    // image/sampler/subpass/acceleration-structure handle in a function-local
-    // variable: SPIR-V forbids OpStore/OpLoad (and OpPhi) of such a handle, GLSL
-    // likewise forbids opaque-typed locals, and WGSL requires handle-address-space
-    // variables (textures/samplers) to be module-scope. A local variable of one
-    // of those types reaching here is invalid output we cannot legalize yet
-    // (issue #10526, typically from selecting or returning a resource through
-    // control flow); reject it with a diagnostic rather than emitting invalid code.
-    const bool rejectOpaqueLocals = isKhronosTarget(target) || isWGPUTarget(target);
+    // We perform four independent checks. We diagnose unsupported function-typed values,
+    // `GetArrayLength`, Khronos/WGSL opaque local storage and default construction, and `String`
+    // values on kernel C++ or CUDA targets. We establish the target rules first, then scan the
+    // function parameters and instructions once.
 
+    // Resource specialization and SSA simplification run before this check. A resource value may
+    // remain as an SSA instruction, which needs no local storage, or phi elimination may place it
+    // in an `IRVar`. SPIR-V, GLSL, and WGSL cannot represent particular resource types in that
+    // local storage. The D3D and Metal storage checks are separate so that their diagnostics also
+    // run in minimum-optimization mode, which skips this general check.
+    const bool shouldUseKhronosOrWGSLOpaqueDiagnostic =
+        isKhronosTarget(target) || isWGPUTarget(target);
     // The `String` type has no runtime representation in kernel C++/CUDA output;
     // a use there (e.g. `let s : String = "1"; s.getLength();`) would otherwise
     // emit uncompilable code referencing an undefined `String`/method instead of
@@ -229,24 +357,27 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                     Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
                 break;
             case kIROp_Var:
-                if (rejectOpaqueLocals)
+                if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
                 {
-                    auto valueType = as<IRVar>(inst)->getDataType()->getValueType();
-                    if (auto handleType = findUnstorableOpaqueHandleType(valueType))
+                    auto pointerType = as<IRPtrTypeBase>(unwrapAttributedType(inst->getDataType()));
+                    SLANG_RELEASE_ASSERT(pointerType);
+                    auto valueType = pointerType->getValueType();
+                    SLANG_RELEASE_ASSERT(valueType);
+                    if (auto opaqueType = findUnstorableOpaqueHandleType(valueType))
                     {
-                        // The variable is usually synthesized (e.g. by phi
-                        // elimination) and has no source location of its own, so
-                        // fall back to the location of a use.
+                        // A synthesized variable, such as one created by phi elimination, may have
+                        // no source location. In that case we report the first operation that uses
+                        // the storage so that the diagnostic still identifies relevant user code.
                         auto loc =
                             inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
                         sink->diagnose(Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnKhronos{
-                            .type = handleType,
+                            .type = opaqueType,
                             .location = loc});
                     }
                 }
                 break;
             case kIROp_DefaultConstruct:
-                if (rejectOpaqueLocals)
+                if (shouldUseKhronosOrWGSLOpaqueDiagnostic)
                 {
                     // There is no default/zero value for an opaque handle (an
                     // image/sampler/subpass/acceleration-structure has no bit
@@ -283,8 +414,162 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
+// Return why MSL cannot express the floating-point atomic load, exchange, compare-exchange, min
+// or max `atomic`, or nullptr if it can. Other atomic operations, and atomics whose value is not
+// floating-point, also return nullptr. MSL has `atomic_float` load, exchange and compare-exchange
+// on device memory only (MSL 4.1 spec, section 6.16.4), no floating-point atomic min or max, and
+// integer-only texture atomics (section 6.13). For example, `Atomic<float>.load` through a device
+// pointer fits, but the same load on a `groupshared Atomic<float>` does not. Device memory means
+// the `Global` and `UserPointer` address spaces, which the Metal emitter prints as `device`.
+static const char* getUnsupportedMetalFloatAtomicReason(IRAtomicOperation* atomic)
+{
+    switch (atomic->getOp())
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        break;
+    default:
+        return nullptr;
+    }
+    auto valueType = atomic->getDataType();
+    if (!isFloatingType(valueType))
+        return nullptr;
+    if (atomic->getOp() == kIROp_AtomicMin || atomic->getOp() == kIROp_AtomicMax)
+        return "floating point atomic min or max";
+    if (valueType->getOp() != kIROp_FloatType)
+        return "floating point atomic operation on a type other than 32-bit float";
+    if (getAtomicImageSubscript(atomic))
+        return "floating point atomic operation on a texture";
+    auto destPtrType = cast<IRPtrTypeBase>(atomic->getPtr()->getDataType());
+    switch (destPtrType->getAddressSpace())
+    {
+    case AddressSpace::Global:
+    case AddressSpace::UserPointer:
+        return nullptr;
+    default:
+        return "floating point atomic operation outside device memory";
+    }
+}
+
+// Diagnose an atomic operation on the texture element `subscript` that MSL cannot express. The
+// MSL texture atomic members operate on one scalar texel, so a texture with a vector element type
+// has none. An array texture takes its array index from the last component of the coordinate, so
+// that coordinate must be a vector. Both diagnostics point at `subscript`, the texture access in
+// the user's code.
+static void checkUnsupportedMetalTextureAtomic(IRImageSubscript* subscript, DiagnosticSink* sink)
+{
+    auto resourceType = getImageSubscriptResourceType(subscript);
+    if (auto textureType = as<IRTextureType>(resourceType))
+    {
+        if (as<IRVectorType>(textureType->getElementType()))
+        {
+            sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "atomic operation on non-scalar texture",
+                .location = subscript->sourceLoc});
+        }
+    }
+    if (resourceType && getIntVal(resourceType->getIsArrayInst()) != 0 &&
+        !as<IRVectorType>(subscript->getCoord()->getDataType()))
+    {
+        sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "invalid image coordinate for atomic operation",
+            .location = subscript->sourceLoc});
+    }
+}
+
+// Diagnose a cooperative matrix type that the Metal emitter cannot express. The emitter writes a
+// cooperative matrix as a `simdgroup_matrix`, which it supports only as an 8x8 matrix of `half` or
+// `float` with subgroup scope.
+static void checkUnsupportedMetalCoopMatrixType(IRCoopMatrixType* coopType, DiagnosticSink* sink)
+{
+    auto rows = getIntVal(coopType->getRowCount());
+    auto cols = getIntVal(coopType->getColumnCount());
+    if (rows != 8 || cols != 8)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support 8x8 dimensions",
+            .location = coopType->sourceLoc});
+    }
+    auto scope = getIntVal(coopType->getScope());
+    if (scope != (IRIntegerValue)MemoryScope::Subgroup)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices (simdgroup_matrix) only support Subgroup scope",
+            .location = coopType->sourceLoc});
+    }
+    auto elementType = coopType->getElementType();
+    if (elementType->getOp() != kIROp_HalfType && elementType->getOp() != kIROp_FloatType)
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "Metal cooperative matrices only support half and float element types",
+            .location = coopType->sourceLoc});
+    }
+}
+
+// Diagnose a cooperative matrix multiply-add that requests saturating accumulation, which the
+// Metal emitter's `simdgroup_multiply_accumulate` cannot express.
+static void checkUnsupportedMetalCoopMatMulAdd(IRCoopMatMulAdd* mulAdd, DiagnosticSink* sink)
+{
+    auto saturatingLit = as<IRBoolLit>(mulAdd->getSaturatingAccumulation());
+    if (saturatingLit && saturatingLit->getValue())
+    {
+        sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "saturating accumulation for Metal cooperative matrices (simdgroup_matrix)",
+            .location = mulAdd->sourceLoc});
+    }
+}
+
+// Diagnose the instructions in `module` that the Metal emitter cannot express: unsupported atomic
+// operations, cooperative matrix types, and saturating cooperative matrix multiply-adds. We visit
+// only top-level functions because those are the bodies that the Metal emitter emits: a generic
+// that remains at this point is not emitted, and its body can still hold pointers whose address
+// space was never specialized. Cooperative matrix types are hoisted, deduplicated global
+// instructions, so each one is checked once.
+static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto coopType = as<IRCoopMatrixType>(globalInst))
+        {
+            checkUnsupportedMetalCoopMatrixType(coopType, sink);
+            continue;
+        }
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (auto mulAdd = as<IRCoopMatMulAdd>(inst))
+                {
+                    checkUnsupportedMetalCoopMatMulAdd(mulAdd, sink);
+                    continue;
+                }
+                auto atomic = as<IRAtomicOperation>(inst);
+                if (!atomic)
+                    continue;
+                if (auto reason = getUnsupportedMetalFloatAtomicReason(atomic))
+                {
+                    sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                        .operation = reason,
+                        .location = atomic->sourceLoc});
+                }
+                if (auto subscript = getAtomicImageSubscript(atomic))
+                    checkUnsupportedMetalTextureAtomic(subscript, sink);
+            }
+        }
+    }
+}
+
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
+    if (isMetalTarget(target))
+        checkUnsupportedMetalInsts(module, sink);
+
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
     const bool supportsMultisampledTexture = !isCUDATarget(target);

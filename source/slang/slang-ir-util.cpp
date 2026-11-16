@@ -52,6 +52,144 @@ bool isEmptyType(IRType* type)
     return isStructEmpty(type, isEmptyType);
 }
 
+bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
+{
+    // Some static type queries take a runtime value and inspect only its static type. Others
+    // compare types directly or query their layout. We enumerate both forms so that value-use
+    // analyses can ignore their operands while conservatively treating every unlisted instruction
+    // as a value use.
+    switch (inst->getOp())
+    {
+    case kIROp_IsBool:
+    case kIROp_IsInt:
+    case kIROp_IsUnsignedInt:
+    case kIROp_IsSignedInt:
+    case kIROp_IsHalf:
+    case kIROp_IsFloat:
+    case kIROp_IsCoopFloat:
+    case kIROp_IsVector:
+    case kIROp_IsBindlessTextureNVEncodable:
+    case kIROp_GetNaturalStride:
+    case kIROp_GetNaturalAlignment:
+    case kIROp_TypeEquals:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isSingleResourceValueType(IRInst* type)
+{
+    // We first remove attributed and rate wrappers. We then accept exactly the four IR type
+    // families that represent one texture or typed-buffer, sampler, structured-buffer, or
+    // byte-address-buffer value. Pass-specific restrictions on individual members of those
+    // families belong in the caller.
+    type = unwrapAttributedType(type);
+    if (!type)
+        return false;
+    if (as<IRResourceTypeBase>(type))
+        return true;
+    if (as<IRSamplerStateTypeBase>(type))
+        return true;
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
+        return true;
+    return as<IRByteAddressBufferTypeBase>(type) != nullptr;
+}
+
+bool isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(IRInst* type)
+{
+    // Semantic checking admits language types in
+    // `_isResourceTypeSupportedForPerInvocationReplacement` in `slang-check-decl.cpp`. This
+    // predicate recognizes IR types that the replacement pass can carry. Every admitted language
+    // type must lower to a type that satisfies this check after the target's selected resource-
+    // and empty-type legalization passes. Recognizing an IR type here does not make its
+    // corresponding language type legal in a mutable global declaration.
+    //
+    // We strip attributed and rate wrappers at every level because either wrapper may surround an
+    // array or its element. `IRArrayType` identifies a fixed-size array; we reject
+    // `IRUnsizedArrayType` without asking a separate recursive type query to infer that fact.
+    for (;;)
+    {
+        type = unwrapAttributedType(type);
+        if (!type || as<IRUnsizedArrayType>(type))
+            return false;
+
+        if (auto arrayType = as<IRArrayType>(type))
+        {
+            type = arrayType->getOperand(0);
+            continue;
+        }
+
+        break;
+    }
+
+    // The replacement pass creates one local for the whole value in each affected function. A
+    // non-entry-point function with runtime access also receives one generated parameter. We
+    // therefore require a type with one target-independent value. We reject aggregate and
+    // container forms, combined texture-samplers, and append or consume buffers because some
+    // target pipelines split them into several values.
+    if (!isSingleResourceValueType(type))
+        return false;
+
+    if (auto resourceType = as<IRResourceTypeBase>(type))
+        return !resourceType->isCombined();
+
+    switch (type->getOp())
+    {
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+        return false;
+    default:
+        return true;
+    }
+}
+
+IRType* getGlobalVarValueType(IRGlobalVar* globalVar)
+{
+    // IR transformations may retain attributes by wrapping the pointer type of a global variable.
+    // After removing those wrappers, the linked representation must contain a concrete pointer and
+    // pointee type. We retain wrappers on the pointee because they remain part of the stored value.
+    auto pointerType = as<IRPtrTypeBase>(unwrapAttributedType(globalVar->IRInst::getDataType()));
+    SLANG_RELEASE_ASSERT(pointerType);
+    auto valueType = as<IRType>(pointerType->getOperand(0));
+    SLANG_RELEASE_ASSERT(valueType);
+    return valueType;
+}
+
+bool isResourceGlobalCandidateForPerInvocationReplacement(IRGlobalVar* globalVar)
+{
+    // AST-to-IR lowering marks file- or namespace-scope mutable `static` variables and mutable
+    // uniform-parameter shadows synthesized for `-Gec`. The marker records those declaration
+    // categories but does not determine their storage rate. We therefore also require the absence
+    // of an explicit rate. For example, `groupshared` storage is shared among threads, and
+    // `actual-global` storage persists across entry-point invocations.
+    if (globalVar->getRate() ||
+        !globalVar->findDecoration<IRFileOrNamespaceScopeMutableVarDecoration>())
+        return false;
+
+    return isResourceValueOrArrayTypeSupportedForPerInvocationReplacement(
+        getGlobalVarValueType(globalVar));
+}
+
+bool isShaderOrCudaKernelEntryPoint(IRFunc* func)
+{
+    return func->findDecoration<IREntryPointDecoration>() != nullptr ||
+           func->findDecoration<IRCudaKernelDecoration>() != nullptr;
+}
+
+bool hasGenericAssemblyImplementation(IRFunc* func)
+{
+    // `IRGenericAsm` is a block terminator whose text supplies emitted target code instead of
+    // ordinary instructions in that block. Translation-unit lowering has already removed
+    // error-handling and `defer` terminators, so no other terminator represents generic assembly.
+    for (auto block : func->getBlocks())
+    {
+        if (as<IRGenericAsm>(block->getTerminator()))
+            return true;
+    }
+    return false;
+}
+
 bool isPointerOfType(IRInst* type, IROp opCode)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -82,6 +220,72 @@ bool isAddressInst(IRInst* inst)
     default:
         return false;
     }
+}
+
+bool doesUserResultTransferStorageAccessFromUse(IRUse* use)
+{
+    // We ask whether a later access through the user's result can transfer to or from storage
+    // supplied by this exact operand use. Every supported transfer operation takes that storage in
+    // operand zero; another operand may instead supply an index, a type, or a stored value.
+    auto user = use->getUser();
+    if (user->getOperandCount() == 0 || user->getOperandUse(0) != use)
+        return false;
+
+    // An address projection derives its result from the storage named by operand zero.
+    if (isAddressInst(user))
+        return true;
+
+    switch (user->getOp())
+    {
+    case kIROp_GetAddress:
+    case kIROp_AssumeAddress:
+        // These operations expose the address represented by operand zero.
+        return true;
+    case kIROp_BitCast:
+    case kIROp_Reinterpret:
+    case kIROp_PtrCast:
+    case kIROp_OutImplicitCast:
+    case kIROp_InOutImplicitCast:
+        // Only the pointer-to-pointer form can transfer access to operand-zero storage. An `inout`
+        // cast transfers reads into its temporary and writes back; an `out` cast transfers only
+        // writes back. This direction-independent predicate accepts either relation. Type
+        // attributes do not change the pointer relation, so we remove them before testing it.
+        return as<IRPtrTypeBase>(unwrapAttributedType(use->get()->getDataType())) != nullptr &&
+               as<IRPtrTypeBase>(unwrapAttributedType(user->getDataType())) != nullptr;
+    default:
+        return false;
+    }
+}
+
+IRInst* findCallArgumentParameterType(IRCall* call, IRUse* argumentUse)
+{
+    // We match the exact operand use rather than its value, because one value may be passed to
+    // multiple parameters with different direction contracts. Operand zero is the callee, and the
+    // remaining operands correspond positionally to the function-type parameters.
+    if (argumentUse == call->getCalleeUse())
+        return nullptr;
+
+    Index argumentIndex = -1;
+    for (UInt i = 0; i < call->getArgCount(); ++i)
+    {
+        if (call->getOperandUse(i + 1) == argumentUse)
+        {
+            argumentIndex = Index(i);
+            break;
+        }
+    }
+    if (argumentIndex < 0)
+        return nullptr;
+
+    // The callee's data type is the signature at this call site. It already contains generic
+    // substitutions and also covers indirect function-valued callees.
+    auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
+    if (!funcType || UInt(argumentIndex) >= funcType->getParamCount())
+        return nullptr;
+    // `IRFuncType::getParamType` assumes that every parameter operand derives from `IRType`.
+    // Generic functions can instead use a type parameter directly as a parameter type. We only
+    // need to inspect direction wrappers, so we retain the more general `IRInst*` representation.
+    return unwrapAttributedType(funcType->getOperand(UInt(argumentIndex) + 1));
 }
 
 IRType* getVectorElementType(IRType* type)
@@ -251,12 +455,14 @@ std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRTyp
         return {
             ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut),
             as<IRBorrowInOutParamType>(paramType)->getValueType()};
-    else if (as<IRRefParamType>(paramType))
-        return {
-            ParameterDirectionInfo(
-                ParameterDirectionInfo::Kind::Ref,
-                as<IRRefParamType>(paramType)->getAddressSpace()),
-            as<IRRefParamType>(paramType)->getValueType()};
+    else if (auto refParamType = as<IRRefParamType>(paramType))
+    {
+        ParameterDirectionInfo info(
+            ParameterDirectionInfo::Kind::Ref,
+            refParamType->getAddressSpace());
+        info.accessQualifier = refParamType->getAccessQualifier();
+        return {info, refParamType->getValueType()};
+    }
     else if (as<IRBorrowInParamType>(paramType))
         return {
             ParameterDirectionInfo(
@@ -281,7 +487,7 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
     case ParameterDirectionInfo::Kind::BorrowIn:
         return builder->getBorrowInParamType(type, info.addressSpace);
     case ParameterDirectionInfo::Kind::Ref:
-        return builder->getRefParamType(type, info.addressSpace);
+        return builder->getRefParamType(type, info.accessQualifier, info.addressSpace);
     default:
         SLANG_UNEXPECTED("Unhandled parameter info in fromDirectionAndType");
     }
@@ -1120,6 +1326,19 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return root;
 }
 
+IRImageSubscript* getAtomicImageSubscript(IRAtomicOperation* atomic)
+{
+    return as<IRImageSubscript>(getRootAddr(atomic->getPtr()));
+}
+
+IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript)
+{
+    auto imageType = subscript->getImage()->getDataType();
+    if (auto ptrType = as<IRPtrTypeBase>(imageType))
+        imageType = ptrType->getValueType();
+    return as<IRResourceTypeBase>(imageType);
+}
+
 
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
@@ -1415,14 +1634,86 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+// Returns true if the memory at `root` cannot be changed while `func` runs, either by a callee
+// of `func` that is not given a pointer to it or by another invocation. That is the case for a
+// local `var` of `func`, and for an `out`, `inout` or `__borrow` parameter, whose passing mode
+// gives `func` exclusive or immutable access to its argument for the duration of the call.
+static bool isCallerExclusiveRoot(IRGlobalValueWithCode* func, IRInst* root)
+{
+    // A local `var` of `func` is only reachable from `func` itself, unless a pointer to it is
+    // passed on (the caller checks the call's arguments for that separately).
+    //
+    if (as<IRVar>(root))
+        return isChildInstOf(root, func);
+
+    if (auto param = as<IRParam>(root))
+    {
+        // A parameter of any other block is a phi: it can carry any address that flows into
+        // the block, so it gives no guarantee.
+        //
+        if (param->getParent() != func->getFirstBlock())
+            return false;
+
+        auto type = param->getDataType();
+        if (!type)
+            return false;
+
+        // A function parameter is exclusive when its passing mode gives `func` exclusive or
+        // immutable access to the memory for the duration of the call: `out`, `inout` and
+        // `__borrow`.
+        //
+        switch (type->getOp())
+        {
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_BorrowInParamType:
+            return true;
+        }
+
+        // A `__ref` parameter or a plain pointer parameter carries no such guarantee: the
+        // memory behind it may be groupshared or device memory that other threads write.
+        //
+    }
+
+    // Everything else is not exclusive either: global variables, pointers loaded from memory
+    // (such as the kernel context on Metal, which holds pointers to the groupshared variables)
+    // and buffer element pointers.
+    //
+    return false;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
     IRInst* addr,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
+    // A texel holds scalar or vector data, never a resource handle, on every target, so an
+    // instruction that touches only texel memory cannot change a location that holds resources.
+    // `simplifyForEmit` relies on this to re-load a texture-array element next to each of its
+    // uses: on Metal, the `ImageStore` and the fences around it all name `getElement(load(arr),
+    // i)`, and without this rule the emitter would copy the whole array of handles into a local.
+    auto addrDataType = as<IRPtrTypeBase>(addr->getDataType());
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (addrDataType && atomic && getAtomicImageSubscript(atomic))
+    {
+        if (isResourceType(addrDataType->getValueType()))
+            return false;
+    }
+
     switch (inst->getOp())
     {
+    case kIROp_ImageStore:
+    case kIROp_MetalTextureFence:
+        {
+            if (addrDataType && isResourceType(addrDataType->getValueType()))
+                return false;
+
+            // Any other address may be texel memory reached through an `ImageSubscript`.
+            if (inst->mightHaveSideEffects())
+                return true;
+        }
+        break;
     case kIROp_Store:
         // If the target of the store inst may overlap addr, return true.
         if (canAddressesPotentiallyAlias(func, as<IRStore>(inst)->getPtr(), addr))
@@ -1437,20 +1728,25 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
-            // If addr is a global variable, calling a function may change its value.
-            // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            // A call can change the value at `addr` even when no argument points to it, unless
+            // `addr` is rooted at memory that `func` has exclusive access to.
+            //
+            // That covers global variables, and also memory reached through a pointer, such
+            // as a pointer parameter or a pointer loaded from a struct. Such memory may be
+            // groupshared or device memory that other threads write, and a barrier call
+            // orders the access against those writes. On Metal, for example, groupshared
+            // variables are reached through a pointer in the kernel context, so the root of
+            // their address is a load or a parameter in `func`, not a global.
+            //
+            if (!isCallerExclusiveRoot(func, getRootAddr(addr)))
             {
+                // Only a callee that is side-effect free and does not read from memory is
+                // safe here: it cannot change `addr`, and it does not order anything. Any other
+                // callee, or an unknown one, may change `addr`.
+                //
                 auto callee = call->getCallee();
-                if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
-                {
-                    // An exception is if the callee is side-effect free and is not reading from
-                    // memory.
-                }
-                else
-                {
+                if (!callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                     return true;
-                }
             }
 
             // If any pointer typed argument of the call inst may overlap addr, return true.
@@ -1505,6 +1801,12 @@ bool canInstHaveSideEffectAtAddress(
                 return true;
             }
         }
+        break;
+    case kIROp_RequireTargetExtension:
+        // A target-extension requirement is consumed only when code is emitted and neither reads
+        // nor writes memory, so loads and stores can be forwarded across it. It still reports a
+        // side effect through `mightHaveSideEffects`, which is what keeps the otherwise unused
+        // requirement alive through DCE.
         break;
     default:
         // Default behavior is that any insts that have side effect may affect `addr`.
@@ -1607,6 +1909,17 @@ void removeLinkageDecorations(IRInst* inst)
     }
     for (auto decoration : toRemove)
         decoration->removeAndDeallocate();
+}
+
+bool hasInterpolationMode(IRInst* inst, IRInterpolationMode mode)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        auto interpolationModeDecor = as<IRInterpolationModeDecoration>(decoration);
+        if (interpolationModeDecor && interpolationModeDecor->getMode() == mode)
+            return true;
+    }
+    return false;
 }
 
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
@@ -2630,6 +2943,21 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+DerivativeGroupMode inferDerivativeGroupMode(IRFunc* entryPoint)
+{
+    if (auto decoration = entryPoint->findDecoration<IRDerivativeGroupDecoration>())
+        return decoration->getMode();
+
+    if (auto numThreads = entryPoint->findDecoration<IRNumThreadsDecoration>())
+    {
+        // Y selects the default grouping; the full thread-group shape is validated separately.
+        // Only inspect a literal Y; a specialization constant's default can be overridden.
+        if (auto y = numThreads->getY())
+            return y->getValue() == 1 ? DerivativeGroupMode::Linear : DerivativeGroupMode::Quad;
+    }
+    return DerivativeGroupMode::Quad;
+}
+
 /// Gets a literal thread count, unwrapping a specialization constant's default when needed.
 static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
 {
@@ -3287,6 +3615,85 @@ IRInst* peelAddressForwardingOps(IRInst* addr)
     }
 }
 
+bool isArtificialInst(IRInst* inst)
+{
+    // Module-scope lowering has no current function to query.
+    if (!inst)
+        return false;
+
+    return inst->findDecoration<IRArtificialDecoration>() != nullptr;
+}
+
+bool isDebugInfoInst(IRInst* inst)
+{
+    // Debug instructions describe source locations, variables, and scopes rather than executing at
+    // runtime. This classification lets an analysis ignore them when they do not affect the
+    // question it answers. An optimization must still preserve required debug information.
+    switch (inst->getOp())
+    {
+    case kIROp_DebugValue:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugLocationDecoration:
+    case kIROp_DebugFuncDecoration:
+    case kIROp_DebugSource:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
+    case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool doesOpReadResourceContents(IROp op)
+{
+    // These dedicated operations produce results that depend on resource contents. A resource
+    // method represented as an `IRCall` is classified through its callee instead. Operations that
+    // only query resource dimensions or other metadata do not read the contents.
+    switch (op)
+    {
+    case kIROp_ImageGatherOffset:
+    case kIROp_ImageLoad:
+    case kIROp_Sample:
+    case kIROp_SampleGrad:
+    case kIROp_StructuredBufferLoad:
+    case kIROp_ByteAddressBufferLoad:
+    case kIROp_StructuredBufferLoadStatus:
+    case kIROp_RWStructuredBufferLoad:
+    case kIROp_RWStructuredBufferLoadStatus:
+    case kIROp_StructuredBufferConsume:
+    case kIROp_SubpassLoad:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool doesOpProduceResourceContentAddress(IROp op)
+{
+    // These operations create an address whose storage belongs to a resource. Analyses should
+    // classify them as resource-content roots before applying the general rule that follows operand
+    // zero through other address projections and pointer casts.
+    switch (op)
+    {
+    case kIROp_GetStructuredBufferPtr:
+    case kIROp_GetUntypedBufferPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_ImageSubscript:
+    case kIROp_ImageTexelPointer:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
 // forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
 static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
@@ -3694,6 +4101,32 @@ bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool ha
     if (!handleType)
         return false;
     return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
+}
+
+bool isImageSamplerOrAccelerationStructureType(IRType* type)
+{
+    // Every type in the `ResourceTypeBase` family is a texture or storage image, which maps to
+    // `OpTypeImage`, or to `OpTypeSampledImage` when it is combined with a sampler.
+    if (as<IRResourceTypeBase>(type))
+        return true;
+
+    // A sampler, including a comparison sampler, maps to `OpTypeSampler`.
+    if (as<IRSamplerStateTypeBase>(type))
+        return true;
+
+    // A subpass input maps to an `OpTypeImage` whose dimension is `SubpassData`.
+    if (as<IRSubpassInputType>(type))
+        return true;
+
+    // A GLSL input attachment is the GLSL spelling of a subpass input.
+    if (as<IRGLSLInputAttachmentType>(type))
+        return true;
+
+    // An acceleration structure maps to `OpTypeAccelerationStructureKHR`.
+    if (as<IRRaytracingAccelerationStructureType>(type))
+        return true;
+
+    return false;
 }
 
 } // namespace Slang

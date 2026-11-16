@@ -57,25 +57,38 @@ CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
 
 void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 {
+    if (auto declGroup = as<DeclGroup>(stmt->decl))
+    {
+        // The members of a group reach their declaration points in order, so
+        // that a later initializer can refer to an earlier member, as in
+        // `int a = 1, b = a;`.
+        for (auto decl : declGroup->decls)
+            checkDeclAtDeclarationPoint(decl);
+        return;
+    }
+
+    auto decl = as<Decl>(stmt->decl);
+    SLANG_RELEASE_ASSERT(decl);
+    checkDeclAtDeclarationPoint(decl);
+}
+
+void SemanticsStmtVisitor::checkDeclAtDeclarationPoint(Decl* decl)
+{
     // When we encounter a declaration during statement checking,
-    // we expect that it hasn't been checked yet (because otherwise
-    // it would be referenced before its declaration point), but
-    // we will bottleneck through the `ensureDecl()` path anyway,
-    // to unify with the rest of semantic checking.
+    // it may already be partly checked, for example by a parser-time
+    // lookup that decides what `a <` means, so we bottleneck through
+    // the `ensureDecl()` path to unify with the rest of semantic checking.
     //
     // TODO: This logic might not suffice for something like a
     // local `struct` declaration, where it would have members
     // that need to be recursively checked.
     //
-    ensureDeclBase(stmt->decl, DeclCheckState::DefinitionChecked, this);
-    if (auto decl = as<Decl>(stmt->decl))
+    ensureDecl(decl, DeclCheckState::DefinitionChecked, this);
+    decl->hiddenFromLookup = false;
+    if (auto varDecl = as<VarDeclBase>(decl))
     {
-        decl->hiddenFromLookup = false;
-        if (auto varDecl = as<VarDeclBase>(decl))
-        {
-            if (varDecl->initExpr)
-                varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
-        }
+        if (varDecl->initExpr)
+            varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
     }
 }
 
@@ -98,33 +111,25 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
                 ensureAllDeclsRec(genericDecl, DeclCheckState::DefinitionChecked);
         }
 
-        // Consider this code:
-        // ```
-        // {
-        //       int a = 5 + b; // should error.
-        //       int b = 3;
-        // }
-        //
-        // ```
-        // In order to detect the error trying to use `b` before it's declared within
-        // a block, our lookup logic contains a condition that ignores a decl if its
-        // `hiddenFromLookup` field is set to `true`.
-        // See _lookUpDirectAndTransparentMembers().
-        // This field will be set to false when we reach the decl through the DeclStmt.
-        //
-        if (auto seqStmt = as<SeqStmt>(stmt->body))
+        // We hide every local owned by this scope until its declaration is checked.
+        // In HLSL, that includes `for` initializers nested under other statements, such as
+        // `int x = i; for (int i = 0; i < 2; ++i) {}`. Looking only at the block's immediate
+        // declaration statements would let the earlier read bind to the later loop variable.
+        // `checkDeclAtDeclarationPoint` reveals each variable after checking its initializer;
+        // `_lookUpDirectAndTransparentMembers` skips variables still hidden from lookup.
+        for (auto decl : stmt->scopeDecl->getDirectMemberDecls())
         {
-            for (auto subStmt : seqStmt->stmts)
-            {
-                if (auto declStmt = as<DeclStmt>(subStmt))
-                {
-                    if (auto decl = as<Decl>(declStmt->decl))
-                        decl->hiddenFromLookup = true;
-                }
-            }
+            if (isLocalVar(decl))
+                decl->hiddenFromLookup = true;
         }
     }
     checkStmt(stmt->body);
+
+    // A `cbuffer` in a block adds a transparent variable to the block's scope, which does not go
+    // through `_dispatchDeclCheckingVisitor`, so we compare the members that lookup finds through
+    // it here, once the block's declarations are checked.
+    if (stmt->scopeDecl)
+        checkForRedeclarationOfTransparentMembers(stmt->scopeDecl);
 }
 
 void SemanticsStmtVisitor::visitSeqStmt(SeqStmt* stmt)

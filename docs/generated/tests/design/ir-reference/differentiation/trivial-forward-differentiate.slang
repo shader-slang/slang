@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#forward-mode
-//META: doc_section_digest=ff7339aef6c3ffedb9466f9df10a8adb3a5ae02fe094735a717bd998cd8bc62a
+//META: doc_section_digest=328436a3e1ac7ba4a32f6c5a0c5421e03200780194110def75518088f8387192
 //META: purpose=A [TreatAsDifferentiable] function gets a synthesized fwd_diff member built from TrivialForwardDifferentiate instead of ForwardDifferentiate.
 //META: intent=functional
 //META: pipeline_stage=lower

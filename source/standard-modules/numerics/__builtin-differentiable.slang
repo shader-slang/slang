@@ -46,8 +46,9 @@ public matrix<TDestination, R, C, L> __differentiableNumericsConstructMatrixFrom
     return matrix<TDestination, R, C, L>(__realCast<TDestination>(value));
 }
 
-// Matrix conformances apply these scalar and vector adapters component-wise so that they preserve
-// the matrix layout parameter in their result type.
+// Most matrix conformances apply these scalar and vector adapters component-wise so that they
+// preserve the matrix layout parameter in their result type. Extrema have explicit shaped matrix
+// adapters below so generic matrix calls retain the core target-specific lowering.
 #define SLANG_NUMERICS_DIFFERENTIABLE_UNARY_ADAPTER(NAME, BUILTIN)                    \
     [__readNone] [Differentiable] [__unsafeForceInlineEarly]                    \
     public T NAME<T : __BuiltinFloatingPointType>(T value)                      \
@@ -111,6 +112,30 @@ SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsPow, pow)
 SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER(__differentiableNumericsRemainder, fmod)
 
 #undef SLANG_NUMERICS_DIFFERENTIABLE_BINARY_ADAPTER
+
+[__readNone]
+[Differentiable]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __differentiableNumericsMaximum<
+    T : __BuiltinFloatingPointType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
+{
+    return ::max(left, right);
+}
+
+[__readNone]
+[Differentiable]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __differentiableNumericsMinimum<
+    T : __BuiltinFloatingPointType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> left, matrix<T, R, C, L> right)
+{
+    return ::min(left, right);
+}
 
 [__readNone]
 [Differentiable]

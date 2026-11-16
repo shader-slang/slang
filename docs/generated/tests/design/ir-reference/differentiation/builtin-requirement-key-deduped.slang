@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#builtinrequirementkey
-//META: doc_section_digest=fe739572a4e21ed7087cb15c7afcf55b26731bdf17dd5258d8624f0aebf3d9a1
+//META: doc_section_digest=2ceef85ef0f7e3e2032b23321c6a33649940568aac23a65e0680b6a547265147
 //META: purpose=builtinRequirementKey is hoistable and deduplicated by construction from its kind operand, so one logical built-in requirement is a single key inst with no linkage decoration.
 //META: intent=functional
 //META: pipeline_stage=lower

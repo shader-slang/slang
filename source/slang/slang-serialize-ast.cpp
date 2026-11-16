@@ -413,6 +413,7 @@ struct ContainerDeclDirectMemberDeclsInfo
 %   "BuiltinRequirementKind",
 %   "BuiltinOperationKind",
 %   "ImageFormat",
+%   "ParamPassingMode",
 %   "PreferRecomputeAttribute::SideEffectBehavior",
 %   "TreatAsDifferentiableExpr::Flavor",
 %   "LogicOperatorShortCircuitExpr::Flavor",
@@ -491,6 +492,7 @@ SLANG_DECLARE_FOSSILIZED_AS($T, FossilUInt);
 %
 %astStructTypes = {
 %   Slang.QualType,
+%   Slang.ParamInfo,
 %   Slang.SPIRVAsmOperand,
 %   Slang.DeclAssociation,
 %   Slang.NameLoc,

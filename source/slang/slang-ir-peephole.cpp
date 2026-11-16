@@ -32,6 +32,20 @@ struct PeepholeContext : InstPassBase
             inst->removeAndDeallocate();
     }
 
+    /// Return the texture type of a combined texture-sampler of type `combinedType`, that is the
+    /// same texture type with its combined flag cleared. It is the type that `__getTexture()`
+    /// returns.
+    IRType* getTextureTypeOfCombined(IRBuilder& builder, IRTextureTypeBase* combinedType)
+    {
+        List<IRInst*> operands;
+        for (UInt i = 0; i < combinedType->getOperandCount(); i++)
+            operands.add(combinedType->getOperand(i));
+        auto isCombined = combinedType->getIsCombinedInst();
+        operands[kCoreModule_TextureIsCombinedParameterIndex] =
+            builder.getIntValue(isCombined->getDataType(), 0);
+        return builder.getType(combinedType->getOp(), operands.getCount(), operands.getBuffer());
+    }
+
     bool tryFoldElementExtractFromUpdateInst(IRInst* inst)
     {
         bool isAccessChainEqual = false;
@@ -911,9 +925,16 @@ struct PeepholeContext : InstPassBase
                 for (UInt i = 0; i < opCount; i++)
                 {
                     auto element = inst->getOperand(0)->getOperand(i);
+                    // An operand can be a vector or a Metal packed vector. Both have an element
+                    // count, and the packed vector is converted to a vector by the `MakeVector`.
+                    IRInst* elementCount = nullptr;
                     if (auto elementVecType = as<IRVectorType>(element->getDataType()))
+                        elementCount = elementVecType->getElementCount();
+                    else if (auto packedType = as<IRMetalPackedVectorType>(element->getDataType()))
+                        elementCount = packedType->getElementCount();
+                    if (elementCount)
                     {
-                        auto vecSize = as<IRIntLit>(elementVecType->getElementCount());
+                        auto vecSize = as<IRIntLit>(elementCount);
                         if (!vecSize)
                             break;
                         if (index->getValue() >= startIndex &&
@@ -1322,6 +1343,85 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_CombinedTextureSamplerGetTexture:
+        case kIROp_CombinedTextureSamplerGetSampler:
+            if (auto combined = as<IRMakeCombinedTextureSampler>(inst->getOperand(0)))
+            {
+                // `getTexture(makeCombinedTextureSampler(t, s))` is `t`, and `getSampler` of it is
+                // `s`. The sampler can be extracted as a `SamplerState` or as a
+                // `SamplerComparisonState`, and only `s` of the matching type can stand in for it.
+                auto part = inst->getOp() == kIROp_CombinedTextureSamplerGetTexture
+                                ? combined->getTexture()
+                                : combined->getSampler();
+                if (part->getFullType() == inst->getFullType())
+                {
+                    inst->replaceUsesWith(part);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                    break;
+                }
+
+                // An uninitialized combined texture-sampler is rewritten below to hold an
+                // uninitialized `SamplerState`. A `SamplerComparisonState` view of that sampler is
+                // also uninitialized, so it gets an uninitialized value of its own type.
+                if (!as<IRLoadFromUninitializedMemory>(part))
+                    break;
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                inst->replaceUsesWith(builder.emitLoadFromUninitializedMemory(inst->getFullType()));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            else if (as<IRPoison>(inst->getOperand(0)))
+            {
+                // The texture or sampler of a poison value is poison, as is a load through a
+                // poison pointer.
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                inst->replaceUsesWith(builder.getPoison(inst->getFullType()));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_LoadFromUninitializedMemory:
+            {
+                // A never-written combined texture-sampler holds a never-written texture and a
+                // never-written sampler. We expand it into `makeCombinedTextureSampler` of those
+                // two values, so that the folds above extract them like the parts of any other
+                // combined value, and every extraction of the texture sees the same texture.
+                //
+                // Only direct SPIR-V emission constructs a combined value from its parts. Other
+                // targets either lower a combined value to a structure, in
+                // `lowerCombinedTextureSamplers`, or keep it as one opaque value, and they have no
+                // lowering for `makeCombinedTextureSampler`. Extractions from the structure of an
+                // uninitialized value already see one texture.
+                if (!targetProgram)
+                    break;
+                if (!targetProgram->shouldEmitSPIRVDirectly())
+                    break;
+                auto combinedType = as<IRTextureTypeBase>(inst->getDataType());
+                if (!combinedType)
+                    break;
+                if (!combinedType->isCombined())
+                    break;
+                if (!inst->hasUses())
+                    break;
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto texture = builder.emitLoadFromUninitializedMemory(
+                    getTextureTypeOfCombined(builder, combinedType));
+                auto sampler = builder.emitLoadFromUninitializedMemory(
+                    builder.getType(kIROp_SamplerStateType));
+                inst->replaceUsesWith(
+                    builder.emitMakeCombinedTextureSampler(inst->getFullType(), texture, sampler));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_OptionalHasValue:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
@@ -1531,6 +1631,29 @@ struct PeepholeContext : InstPassBase
                                 }
                             }
                         }
+                        else if (auto toArr = as<IRArrayType>(toType))
+                        {
+                            auto fromCountLit = as<IRIntLit>(fromArr->getElementCount());
+                            auto toCountLit = as<IRIntLit>(toArr->getElementCount());
+                            if (as<IRArrayType>(fromArr) && fromCountLit && toCountLit &&
+                                fromCountLit->getValue() == toCountLit->getValue())
+                            {
+                                List<IRInst*> elems;
+                                auto count = (UInt)toCountLit->getValue();
+                                elems.setCount((Index)count);
+                                for (UInt i = 0; i < count; ++i)
+                                {
+                                    elems[(Index)i] = builder.emitCast(
+                                        toArr->getElementType(),
+                                        builder.emitElementExtract(val, i));
+                                }
+                                auto newInst =
+                                    builder.emitMakeArray(toType, count, elems.getBuffer());
+                                inst->replaceUsesWith(newInst);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
+                        }
                     }
                 }
             }
@@ -1554,7 +1677,10 @@ struct PeepholeContext : InstPassBase
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
                     UInt index = 0;
-                    auto newInst = builder.emitSwizzle(resultType, inst->getOperand(0), 1, &index);
+                    // `resultType` is null on this path (the result is a scalar, not a
+                    // vector), so use the inst's actual data type for the swizzle.
+                    auto newInst =
+                        builder.emitSwizzle(inst->getDataType(), inst->getOperand(0), 1, &index);
                     inst->replaceUsesWith(newInst);
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1660,6 +1786,12 @@ struct PeepholeContext : InstPassBase
                     SLANG_ASSERT(terminator->getArgCount() > paramIndex);
                     auto arg = terminator->getArg(paramIndex);
                     if (as<IRUndefined>(arg))
+                        continue;
+                    // A back edge that passes the param its own value (a loop that never
+                    // writes it) adds no new value. Taken as the value, it would make the
+                    // param replace its uses with itself and report a change on every
+                    // iteration, so the pass would never reach a fixed point.
+                    if (arg == inst)
                         continue;
                     if (argValue == nullptr)
                         argValue = arg;
@@ -1883,12 +2015,17 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsVector:
         case kIROp_IsBindlessTextureNVEncodable:
             {
-                auto type = inst->getOperand(0)->getDataType();
-                if (auto vectorType = as<IRVectorType>(type))
-                    type = vectorType->getElementType();
-                if (auto matType = as<IRMatrixType>(type))
-                    type = matType->getElementType();
-                if (isConcreteType(type))
+                // `IsVector` classifies the operand type itself: only a builtin `vector<E, N>` is a
+                // vector, so a scalar or a matrix folds to false. The other predicates look through
+                // one vector or matrix layer and classify the element type. Every predicate waits
+                // until the element type is concrete, which keeps a still-generic `T` from folding.
+                auto operandType = inst->getOperand(0)->getDataType();
+                auto elementType = operandType;
+                if (auto vectorType = as<IRVectorType>(elementType))
+                    elementType = vectorType->getElementType();
+                if (auto matType = as<IRMatrixType>(elementType))
+                    elementType = matType->getElementType();
+                if (isConcreteType(elementType))
                 {
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
@@ -1898,28 +2035,28 @@ struct PeepholeContext : InstPassBase
                     switch (inst->getOp())
                     {
                     case kIROp_IsInt:
-                        result = isIntegralType(type);
+                        result = isIntegralType(elementType);
                         break;
                     case kIROp_IsBool:
-                        result = type->getOp() == kIROp_BoolType;
+                        result = elementType->getOp() == kIROp_BoolType;
                         break;
                     case kIROp_IsFloat:
-                        result = isFloatingType(type);
+                        result = isFloatingType(elementType);
                         break;
                     case kIROp_IsHalf:
-                        result = type->getOp() == kIROp_HalfType;
+                        result = elementType->getOp() == kIROp_HalfType;
                         break;
                     case kIROp_IsUnsignedInt:
-                        result = isIntegralType(type) && !getIntTypeSigned(type);
+                        result = isIntegralType(elementType) && !getIntTypeSigned(elementType);
                         break;
                     case kIROp_IsSignedInt:
-                        result = isIntegralType(type) && getIntTypeSigned(type);
+                        result = isIntegralType(elementType) && getIntTypeSigned(elementType);
                         break;
                     case kIROp_IsVector:
-                        result = as<IRVectorType>(type);
+                        result = as<IRVectorType>(operandType) != nullptr;
                         break;
                     case kIROp_IsBindlessTextureNVEncodable:
-                        result = isBindlessTextureNVEncodableResourceType(type);
+                        result = isBindlessTextureNVEncodableResourceType(elementType);
                         break;
                     }
                     inst->replaceUsesWith(builder.getBoolValue(result));

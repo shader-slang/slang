@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#failure-modes
-//META: doc_section_digest=f6d63bedcd6d31bb43fb73300201d5b6af73fbcaf7464a55660a5559a1828ae0
+//META: doc_section_digest=7e4fe030e4c8d273dce73bfc62475650108e02955445a796df82003091653dfa
 //META: purpose=Negative probe of decode-time integer errors: a literal too large for any integer type is reported by the integer value-extraction helper (E10012).
 //META: intent=negative
 //META: pipeline_stage=lex

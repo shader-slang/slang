@@ -103,6 +103,22 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{matrix.build-slang-llvm}}
+          use-cached-llvm: false
+
+      # Setup provides the native tools and MSVC environment before a cache miss.
+      # Release downloads or builds LLVM without publishing; the population
+      # workflow owns GCS uploads.
+      - name: Setup LLVM from GCS
+        if: matrix.build-slang-llvm == true
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: ${{matrix.os}}
+          compiler: ${{matrix.compiler}}
+          platform: ${{matrix.platform}}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+          build-if-missing: "true"
+          upload-if-missing: "false"
+          github-token: ${{ github.token }}
 
       - name: Build slang generators
         run: |

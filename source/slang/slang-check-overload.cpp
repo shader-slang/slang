@@ -24,7 +24,7 @@ bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* p
 }
 
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
-    FilteredMemberRefList<ParamDecl> params)
+    List<DeclRef<ParamDecl>> const& params)
 {
     ParamCounts counts = {0, 0};
     for (auto param : params)
@@ -151,8 +151,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        paramCounts =
-            CountParameters(getParameters(m_astBuilder, candidate.item.declRef.as<CallableDecl>()));
+        paramCounts = CountParameters(getParametersForCallableSignature(
+            m_astBuilder,
+            candidate.item.declRef.as<CallableDecl>()));
         break;
 
     case OverloadCandidate::Flavor::Generic:
@@ -764,7 +765,9 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     {
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::Out:
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         isLVal = true;
         break;
     }
@@ -798,7 +801,7 @@ static QualType getParamQualType(Type* paramType)
             isLVal = true;
         if (as<OutParamType>(paramDirType))
             isLVal = true;
-        if (as<RefParamType>(paramDirType))
+        if (as<RefParamTypeBase>(paramDirType))
             isLVal = true;
     }
     return QualType(unwrapModifiedType(valueType), isLVal);
@@ -811,11 +814,15 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     Index argCount = context.getArgCount();
 
     List<QualType> paramTypes;
+    List<DeclRef<ParamDecl>> paramDecls;
     switch (candidate.flavor)
     {
     case OverloadCandidate::Flavor::Func:
-        for (auto param : getParameters(m_astBuilder, candidate.item.declRef.as<CallableDecl>()))
+        for (auto param : getParametersForCallableSignature(
+                 m_astBuilder,
+                 candidate.item.declRef.as<CallableDecl>()))
         {
+            paramDecls.add(param);
             paramTypes.add(getParamQualType(m_astBuilder, param));
         }
         break;
@@ -924,9 +931,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     String name;
                     if (candidate.flavor == OverloadCandidate::Flavor::Func)
                     {
-                        auto decl = getParameters(
-                            m_astBuilder,
-                            candidate.item.declRef.as<CallableDecl>())[paramIndex];
+                        auto decl = paramDecls[paramIndex];
                         name = getText(decl.getName());
                     }
                     else
@@ -1013,21 +1018,6 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     return true;
 }
 
-bool isEffectivelyMutating(CallableDecl* decl)
-{
-    if (decl->hasModifier<MutatingAttribute>())
-        return true;
-    if (decl->hasModifier<RefAttribute>())
-        return true;
-    if (decl->hasModifier<NonmutatingAttribute>())
-        return false;
-
-    if (as<SetterDecl>(decl))
-        return true;
-
-    return false;
-}
-
 ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
 {
     auto expr = inExpr;
@@ -1047,13 +1037,11 @@ ParamDecl* SemanticsVisitor::isReferenceIntoFunctionInputParameter(Expr* inExpr)
                     return nullptr;
                 }
 
-                if (paramDeclRef.getDecl()->findModifier<OutModifier>() ||
-                    paramDeclRef.getDecl()->findModifier<RefModifier>())
+                if (doesParamPassingModeIndicateWritableStorage(
+                        getParamPassingMode(paramDeclRef.getDecl())))
                 {
-                    // Function parameters marked with `out`, `inout`,
-                    // `in out` or `ref` are all mutable in a way where
-                    // the result of mutations will be visible to the
-                    // caller.
+                    // Writable-storage modes are mutable in a way where the result of mutations
+                    // will be visible to the caller.
                     //
                     return nullptr;
                 }
@@ -1096,11 +1084,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
     // done in other places.
     //
     // For now we will only use this step to check the
-    // mutability of the `this` parameter where necessary.
+    // mutability of the effective `this` parameter where necessary.
     //
-    if (!isEffectivelyStatic(funcDeclRef.getDecl()))
+    if (auto thisParamInfo = findEffectiveThisParamInfo(funcDeclRef))
     {
-        if (isEffectivelyMutating(funcDeclRef.getDecl()))
+        if (doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
         {
             if (context.baseExpr && !context.baseExpr->type.isLeftValue)
             {
@@ -1681,6 +1669,13 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
                 callExpr->originalFunctionExpr = callExpr->functionExpr;
                 callExpr->functionExpr = baseExpr;
+
+                // `ConstructLookupResultExpr` can diagnose an invalid member reference (e.g. a
+                // non-static member named from a static function) after overload selection,
+                // which leaves a valid candidate result type but a callee with `ErrorType`.
+                if (IsErrorExpr(baseExpr))
+                    return CreateErrorExpr(callExpr);
+
                 callExpr->type = QualType(candidate.resultType);
 
                 // A call may yield an l-value, and we should take a look at the candidate to be
@@ -1719,10 +1714,13 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                                     break;
                                 }
                             }
-                            // Otherwise, if the accessor is [nonmutating], we can
-                            // also consider the result of the subscript call as l-value
-                            // regardless of the base.
-                            if (accessorDecl->findModifier<NonmutatingAttribute>())
+                            // Otherwise, an accessor that does not require writable receiver
+                            // storage can produce an l-value regardless of the base.
+                            auto accessorDeclRef =
+                                m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
+                            auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+                            if (thisParamInfo &&
+                                !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
                             {
                                 callExpr->type.isLeftValue = true;
                                 break;
@@ -1989,13 +1987,32 @@ int SemanticsVisitor::CompareLookupResultItems(
     // If both left and right are extern, then they are equal.
     // If only one of them is extern, then the other one is preferred.
     // If neither is extern, then we continue with the rest of the checks.
-    if (leftIsExtern)
+    //
+    // The preference only applies when the two candidates are one function (an `extern`
+    // declaration and its definition). Two functions with different signatures are distinct
+    // overloads, and `extern` must not make one of them win.
+    bool isSameFunction = true;
+    if (leftIsExtern != rigthIsExtern)
     {
-        return (rigthIsExtern ? 0 : 1);
+        auto leftFunc = as<FuncDecl>(left.declRef.getDecl());
+        auto rightFunc = as<FuncDecl>(right.declRef.getDecl());
+        if (leftFunc && rightFunc)
+        {
+            isSameFunction = doFunctionSignaturesMatch(
+                left.declRef.as<FuncDecl>(),
+                right.declRef.as<FuncDecl>());
+        }
     }
-    if (rigthIsExtern)
+    if (isSameFunction)
     {
-        return (leftIsExtern ? -1 : 0);
+        if (leftIsExtern)
+        {
+            return (rigthIsExtern ? 0 : 1);
+        }
+        if (rigthIsExtern)
+        {
+            return -1;
+        }
     }
 
     // If one of the candidates is a free-form extension, it is always worse than
@@ -2943,7 +2960,7 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             // Most callers let this routine compute parameter types from the
             // generic's inner callable. A caller that already computed them can
             // pass the list to avoid repeating that work.
-            auto params = getParameters(m_astBuilder, funcDeclRef).toArray();
+            auto params = getParametersForCallableSignature(m_astBuilder, funcDeclRef);
             for (auto param : params)
             {
                 paramTypes.add(getParamQualType(m_astBuilder, param));
@@ -3466,6 +3483,93 @@ String SemanticsVisitor::getCallSignatureString(OverloadResolveContext& context)
     return argsListBuilder.produceString();
 }
 
+// Returns the binary operator that the compound assignment operator `name` is written in terms
+// of (`-` for `-=`), or an empty slice when `name` is not a compound assignment operator.
+static UnownedStringSlice getBinaryOperatorOfCompoundAssignment(UnownedStringSlice name)
+{
+    static const char* const kCompoundAssignmentOperators[][2] = {
+        {"+=", "+"},
+        {"-=", "-"},
+        {"*=", "*"},
+        {"/=", "/"},
+        {"%=", "%"},
+        {"&=", "&"},
+        {"|=", "|"},
+        {"^=", "^"},
+        {"<<=", "<<"},
+        {">>=", ">>"},
+    };
+    for (const auto& entry : kCompoundAssignmentOperators)
+    {
+        if (name == UnownedStringSlice(entry[0]))
+            return UnownedStringSlice(entry[1]);
+    }
+    return UnownedStringSlice();
+}
+
+bool SemanticsVisitor::findBinaryOperatorForCompoundAssignment(
+    InvokeExpr* expr,
+    UnownedStringSlice& outCompoundOp,
+    UnownedStringSlice& outBinaryOp)
+{
+    // The parser builds `x op= y` as an `InfixExpr` that calls the operator by name.
+    if (!as<InfixExpr>(expr) || expr->arguments.getCount() != 2)
+        return false;
+    auto opExpr = as<VarExpr>(expr->originalFunctionExpr);
+    if (!opExpr || !opExpr->name)
+        return false;
+    UnownedStringSlice compoundOp = opExpr->name->text.getUnownedSlice();
+    UnownedStringSlice binaryOp = getBinaryOperatorOfCompoundAssignment(compoundOp);
+    if (binaryOp.getLength() == 0)
+        return false;
+
+    Expr* left = expr->arguments[0];
+    Expr* right = expr->arguments[1];
+    if (!left || !right || IsErrorExpr(left) || IsErrorExpr(right) || !left->type.type ||
+        !right->type.type)
+        return false;
+
+    // `x = x op y` needs `x` to be assignable; when it is not, that is the problem to fix.
+    if (!left->type.isLeftValue)
+        return false;
+
+    // Build `x op y` from the checked operands, looking `op` up in the scope where `x op= y`
+    // was written, so it sees the same declarations that `x = x op y` would see there.
+    auto binaryOpExpr = m_astBuilder->create<VarExpr>();
+    binaryOpExpr->name = getName(binaryOp);
+    binaryOpExpr->scope = opExpr->scope ? opExpr->scope : m_outerScope;
+    binaryOpExpr->loc = expr->loc;
+
+    auto binaryExpr = m_astBuilder->create<InfixExpr>();
+    binaryExpr->loc = expr->loc;
+    binaryExpr->functionExpr = binaryOpExpr;
+    binaryExpr->originalFunctionExpr = binaryOpExpr;
+    binaryExpr->arguments.add(left);
+    binaryExpr->arguments.add(right);
+
+    // Check it against a temporary sink: it is only a probe, and any error (no applicable
+    // overload, an ambiguous call, an argument that an `out` or `inout` parameter cannot take)
+    // means no note.
+    DiagnosticSink tempSink(getSourceManager(), nullptr);
+    SemanticsVisitor subVisitor(withSink(&tempSink));
+    binaryExpr->functionExpr = subVisitor.CheckTerm(binaryOpExpr);
+    if (tempSink.getErrorCount() != 0 || IsErrorExpr(binaryExpr->functionExpr))
+        return false;
+    Expr* resolved = subVisitor.CheckInvokeExprWithCheckedOperands(binaryExpr);
+    if (tempSink.getErrorCount() != 0 || !resolved || IsErrorExpr(resolved) || !resolved->type.type)
+        return false;
+
+    // Only suggest `x = x op y` when `x op y` has the type of `x`: that is the operator a
+    // user-written `operator op=` would wrap, and it rules out suggesting a rewrite that
+    // compiles only through an implicit (possibly truncating) conversion.
+    if (!resolved->type.type->equals(left->type.type))
+        return false;
+
+    outCompoundOp = compoundOp;
+    outBinaryOp = binaryOp;
+    return true;
+}
+
 Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 {
     OverloadResolveContext context;
@@ -3629,6 +3733,16 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 getSink()->diagnose(
                     Diagnostics::NoApplicableWithArgs{.args = argsList, .expr = expr});
+            }
+
+            UnownedStringSlice compoundOp;
+            UnownedStringSlice binaryOp;
+            if (findBinaryOperatorForCompoundAssignment(expr, compoundOp, binaryOp))
+            {
+                getSink()->diagnose(Diagnostics::CompoundAssignmentBinaryOperatorApplies{
+                    .binaryOp = binaryOp,
+                    .compoundOp = compoundOp,
+                    .location = expr->loc});
             }
 
             // For each candidate, show its signature and, when we recorded one,
@@ -3881,9 +3995,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         }
         else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
         {
-            for (auto param : callableDeclRef.getDecl()->getParameters())
+            for (auto paramDeclRef :
+                 getParametersForCallableSignature(m_astBuilder, callableDeclRef))
             {
-                paramDirections.add(getParamPassingMode(param));
+                paramDirections.add(getParamPassingMode(paramDeclRef.getDecl()));
             }
         }
         for (Index i = 0; i < expr->arguments.getCount(); i++)
@@ -3895,7 +4010,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 {
                 case ParamPassingMode::Out:
                 case ParamPassingMode::BorrowInOut:
-                case ParamPassingMode::Ref:
+                case ParamPassingMode::RefReadWrite:
+                case ParamPassingMode::RefReadOnly:
+                case ParamPassingMode::RefWriteOnly:
                 case ParamPassingMode::BorrowIn:
                     break;
                 default:
@@ -3905,7 +4022,26 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
                 arg = extractExistentialExpr->originalExpr;
         }
-        return CompleteOverloadCandidate(context, *context.bestCandidate);
+        // A single candidate that does not fit the arguments reports its own errors: for
+        // `S3 *= float` the closest candidate is the builtin `vector<float,1> *= float`, and the
+        // error is a type mismatch. Probe the binary operator before completing the candidate
+        // coerces the operands, and add the note after its errors. (A candidate that fails only
+        // on visibility is left alone: the operator exists there.)
+        UnownedStringSlice compoundOp;
+        UnownedStringSlice binaryOp;
+        bool addCompoundAssignmentNote =
+            context.bestCandidate->status < OverloadCandidate::Status::VisibilityChecked &&
+            findBinaryOperatorForCompoundAssignment(expr, compoundOp, binaryOp);
+        SourceLoc noteLoc = expr->loc;
+        Expr* result = CompleteOverloadCandidate(context, *context.bestCandidate);
+        if (addCompoundAssignmentNote)
+        {
+            getSink()->diagnose(Diagnostics::CompoundAssignmentBinaryOperatorApplies{
+                .binaryOp = binaryOp,
+                .compoundOp = compoundOp,
+                .location = noteLoc});
+        }
+        return result;
     }
 
     // If absolutely no viable candidates were extracted from the overloaded expression,

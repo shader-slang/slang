@@ -369,6 +369,11 @@ public:
         // negative).
         if (UIndex(size) > UIndex(m_capacity))
         {
+            // `m_count <= m_capacity < size` keeps the loop below inside both buffers. In release
+            // builds the assert also gives GCC 14+ that bound; without it, inlining several `add`
+            // calls (see #13770, tools/slang-unit-test/unit-test-string.cpp) produces a false
+            // -Wstringop-overflow on the move loop.
+            SLANG_ASSERT(m_count <= m_capacity);
             T* newBuffer = _allocate(size);
             if (m_capacity)
             {
@@ -417,6 +422,11 @@ public:
 
     void setCount(Index count)
     {
+        // A negative count is never valid. In release builds this also tells the compiler that
+        // `reserve` cannot be asked for a size in [2^63, 2^64) after the unsigned comparison
+        // there, which GCC otherwise reports as -Werror=alloc-size-larger-than when it inlines
+        // `makeRepeated` into a caller with an unconstrained count.
+        SLANG_ASSERT(count >= 0);
         reserve(count);
         m_count = count;
     }

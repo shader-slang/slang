@@ -7,6 +7,7 @@
 #include "replay-shared.h"
 #include "replay-stream.h"
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -403,10 +404,13 @@ public:
     /// Allocates replay-owned arena storage from the module that owns the replay context.
     SLANG_API void* allocateReplayArena(size_t sizeInBytes, size_t alignment);
 
-    /// Lock the context for thread-safe access.
-    /// Returns an RAII lock guard.
-    SLANG_API std::unique_lock<std::recursive_mutex> lock()
+    /// Lock the context if the record layer is active.
+    /// Returns an RAII guard that does not own the mutex when idle.
+    SLANG_API std::unique_lock<std::recursive_mutex> lockIfActive()
     {
+        ensureInitialized();
+        if (!isActive())
+            return std::unique_lock<std::recursive_mutex>(m_mutex, std::defer_lock);
         return std::unique_lock<std::recursive_mutex>(m_mutex);
     }
 
@@ -602,8 +606,19 @@ public:
     /// destructor can't safely call queryInterface — ref count is already 0).
     inline void unregisterProxy(ISlangUnknown* proxyIdentity)
     {
+        // Locks even when idle: a proxy can be released after the layer is disabled.
+        std::lock_guard<std::recursive_mutex> guard(m_mutex);
         unregisterProxyImpl(proxyIdentity);
     }
+
+    /// A replayed user release() of `proxy`; see unnotePlaybackOrphanedProxyImpl.
+    inline void unnotePlaybackOrphanedProxy(ISlangUnknown* proxy)
+    {
+        unnotePlaybackOrphanedProxyImpl(proxy);
+    }
+
+    /// A replayed user addRef() of `proxy`; see playbackUserAddRefImpl.
+    inline void playbackUserAddRef(ISlangUnknown* proxy) { playbackUserAddRefImpl(proxy); }
 
     /// Registers `obj` in the handle registry and returns its handle, for tests.
     ///
@@ -781,6 +796,20 @@ private:
     /// destroyed the proxy first (issue #11936).
     SLANG_API void notePlaybackOrphanedProxy(ISlangUnknown* proxy);
 
+    /// A replayed user release() of `proxy` gives up one reference the user owned. If
+    /// `proxy` has outstanding orphaned references, that reference is one of them, because
+    /// on playback the creation reference stands in for the one the recorded user owned.
+    /// One note is therefore dropped, so releaseOrphanedPlaybackProxies() does not release
+    /// that reference a second time. A replayed user addRef() adds a reference of the same
+    /// kind and adds a note (see playbackUserAddRef), so only a release that is not matched
+    /// by an earlier user addRef consumes the creation reference.
+    SLANG_API void unnotePlaybackOrphanedProxyImpl(ISlangUnknown* proxy);
+
+    /// A replayed user addRef() of `proxy`. If `proxy` has outstanding orphaned references,
+    /// the new user reference counts as one more, so that a later replayed release balances
+    /// it instead of the creation reference.
+    SLANG_API void playbackUserAddRefImpl(ISlangUnknown* proxy);
+
     /// Release the still-live orphaned playback proxies recorded by
     /// notePlaybackOrphanedProxy. Proxies whose recorded release stream already
     /// balanced their creation reference destroyed themselves during replay and
@@ -823,7 +852,7 @@ private:
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
     size_t m_replayArenaAllocationSize = 0;
-    Mode m_mode;
+    std::atomic<Mode> m_mode;
     List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
 
     // Handle tracking: maps objects to handles and back
@@ -851,8 +880,7 @@ private:
     // TTY logging
     bool m_ttyLogging = false; ///< Whether to log calls to stderr
 
-    // Deferred initialization (to avoid global init order issues with CharEncoding)
-    bool m_initialized = false; ///< True after ensureInitialized() has run
+    std::once_flag m_initFlag;
 
     // Map from function signature to handler
     Dictionary<String, PlaybackHandler> m_handlers;

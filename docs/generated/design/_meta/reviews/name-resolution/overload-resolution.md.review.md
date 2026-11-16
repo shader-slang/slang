@@ -1,52 +1,49 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:07:52+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:44:10Z
 target_doc: name-resolution/overload-resolution.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 5debe898d1297b2ebbe9b28df8c551241cfd6ebfb27572d37a7e416953c10a81
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: ed4c628981e69f8de0d5fb8f66d904cf847d3ad3d10c67e7ad56242aa4190b49
+source_commit: c63c2fbd5115a98b2b2469f43618671653d40bf1
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
-  completeness: pass
-  style_consistency: partial
-  source_alignment: fail
-  front_matter_validity: fail
-finding_count: 7
+  completeness: partial
+  style_consistency: pass
+  source_alignment: partial
+  front_matter_validity: pass
+finding_count: 5
 severity_breakdown:
-  critical: 0
-  major: 6
-  minor: 1
+  critical: 1
+  major: 2
+  minor: 2
   nit: 0
 ---
 
 # Review report for name-resolution/overload-resolution.md
 
 ## Summary
-The required sections, links, diagnostic names, and line-number citations are present and current, but seven source-alignment issues remain. Most importantly, the target front matter records a digest that differs from the digest for the resolved watched files, while the candidate-source and partial-generic sections make several claims the recorded source does not support.
+
+The document covers the required sections and accurately describes most of the resolution pipeline, but needs correction before acceptance. Most importantly, its l-value surcharge example misstates how ordinary call arguments are ranked. It also describes removed breadcrumb symbols and omits consequential lookup-comparator rules.
 
 ## Items checked
-- Read the target, `_review.md`, `_common.md`, the per-document prompt, all six resolved watched files, and all five dependency documents.
-- Confirmed the recorded target commit equals current `HEAD`, verified that the watched source files have no working-tree diff, and checked every line-number citation against that source.
-- Spot-checked more than 10 factual areas: candidate flavors/statuses/flags, both pipeline orders, generic diagnostics, constraint solving, conversion-cost values, comparator stages, candidate insertion, partial application, builtin rewrites, visibility, and ambiguity reporting.
-- Resolved all relative links and peer-document references; `regenerate.py lint name-resolution/overload-resolution.md` completed without an error.
-- Recomputed the watched-path digest and compared it with both the target front matter and the freshness ledger.
+
+- Verified against the **current working tree**; `git diff` confirmed that `source/` matches the document’s source commit. Confirmed HEAD matches the supplied report commit.
+- Read the review prompt, common generation contract, document-specific prompt, and resolved manifest entry.
+- Checked all 189 line-number citation occurrences, including repeated citations and prose-only references.
+- Spot-checked more than 20 behavioral claims: candidate enums, probe/finalize sequencing, arity, fixity, coercion, mutability, constraints, visibility, candidate retention, inference-failure diagnostics, partial application, comparator ordering, legacy fallback, operator eligibility, GLSL gates, conversion caching, and diagnostic deduplication.
+- Checked every conversion-cost constant and numeric value against `slang-ast-support-types.h`.
+- Resolved all 134 Markdown link occurrences, checked peer-page manifest membership and referenced heading anchors, and consulted dependency passages only for cross-reference checks.
+- Verified required front-matter fields, section coverage, Mermaid conventions, Liquid safety, and the 73,117-byte document against its 90,112-byte cap.
+- No files were written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | Intro, lines 17-19 | The introduction says builtin operators on numeric scalars, vectors, and matrices are rewritten and “never enter overload resolution at all.” The fast path explicitly returns null for several such cases, including GLSL-scope matrix operators/vector equality and mixed-type integer shifts, which then resume normal overload resolution. | `source/slang/slang-check-expr.cpp:4784-4797` and `source/slang/slang-check-expr.cpp:4818-4827`. | Qualify the bypass as applying only to operators and operand shapes accepted by `convertToBuiltinArithmeticOp`, and mention that declined cases use the general path. |
-| F-002 | major | `### Probe phase: where candidates come from`, lines 389-398 | Two candidate-source bullets name the wrong behavior. `AddDeclRefOverloadCandidates` accepts one `LookupResultItem` and dispatches aliases, callables, aggregate types, generics, typedefs, generic type parameters, and function-valued parameters; `AddOverloadCandidates` is what iterates a `LookupResult`. Also, the cited `AddFuncOverloadCandidate(FuncType*)` does not retain an expression, while `AddFuncExprOverloadCandidate` is the helper that stores `exprVal` for an actual function-valued expression. | `source/slang/slang-check-overload.cpp:3098-3164`, `source/slang/slang-check-overload.cpp:3166-3180`, and `source/slang/slang-check-overload.cpp:2612-2638`. | Describe `AddOverloadCandidates` as the result iterator, describe `AddDeclRefOverloadCandidates` as the per-item dispatcher, and cite `AddFuncExprOverloadCandidate` for function-valued expressions. |
-| F-003 | minor | `## Conversion costs`, row for `kConversionCost_RankPromotion` | The table calls this a “rank-preserving numeric promotion,” but the cost represents a lossless promotion to a higher conversion rank within the same conversion kind. | `source/slang/slang-ast-support-types.h:121-124` describes the same-kind lossless category; the cost is consumed as a promotion in `source/slang/slang-check-conversion.cpp:2175-2184`. | Change the meaning to “lossless same-kind rank promotion” or equivalent wording that does not say the rank is preserved. |
-| F-004 | major | `## Partial generic application`, lines 738-743 | The page says an explicit type ascription or a later `GenericAppExpr<...>` can close a `PartiallyAppliedGenericExpr`. In the watched semantic sources, the only resolution path consumes the partial as the callee of a later invocation and infers the remaining arguments from that call; no ascription or second generic-application path is present. | `source/slang/slang-check-overload.cpp:3228-3238` is the only semantic consumer that resumes inference; `source/slang/slang-check-expr.cpp:2345-2348` merely unwraps its base for `GetBaseExpr`. | State the source-backed invocation path only, or add and cite the actual watched implementation if another context can complete a partial generic. |
-| F-005 | major | `## Edge cases and failure modes`, lines 995-1000 | The claimed tie between a first-class function value and a declared callable, supposedly decided because the declaration is closer in scope, is unsupported. A true expression candidate created by `AddFuncExprOverloadCandidate` has no `LookupResultItem`, while the cited lookup and scope comparators operate on candidate decl-refs; the source does not establish the stated outcome. | `source/slang/slang-check-overload.cpp:2625-2638`, `source/slang/slang-check-overload.cpp:1915-1927`, and `source/slang/slang-check-overload.cpp:2428-2436`. | Remove this edge case unless a reachable producer path and test demonstrate the comparison; otherwise document the actual invariant that prevents such unlike candidates from reaching these decl-ref comparators. |
-| F-006 | major | Front matter, line 6 | `watched_paths_digest` is stale. The target records `5debe898…`, but the six files currently resolved by `regenerate.py show` hash to `e6978577…` at the same recorded `source_commit`; the freshness ledger already records the latter value. | `docs/generated/design/name-resolution/overload-resolution.md:6`; `docs/generated/design/_meta/freshness.json:183-187`; `python3 docs/generated/design/_meta/regenerate.py digest name-resolution/overload-resolution.md` returns `e6978577d22d792c1785a623b7574c2f07b5cffd5b1b24e80e17716562f17bec`. | Regenerate the target under the current manifest so its front matter records the resolved watched-set digest, then review that regenerated target. |
-| F-007 | major | `## Conversion costs`, lines 570-588 and 608-615 | The page makes detailed behavioral claims about constructors and `bool` initializers in `core.meta.slang`, but that file is not in this document’s resolved watched paths and its filename is not linked. This violates the family scope rule and means changes to the cited declarations cannot stale this page. | The resolved list from `regenerate.py show` omits `source/slang/core.meta.slang`; the scope rule is `docs/generated/design/_meta/prompts/_common.md:185-188`, and source-file links are required at lines 43-45. | Add `source/slang/core.meta.slang` to `watched_paths` and link the cited declarations, or remove the source-specific constructor/initializer assertions. |
-
-## No-issues notes
-- Every explicit line/range citation points at the named symbol or behavior at the recorded commit.
-- The probe Mermaid flow matches `TryCheckOverloadCandidate`, and the finalize section correctly places the class/`new` check first.
-- The complete conversion-cost constant list matches declaration order and numeric values.
-- Ambiguous, no-applicable, visibility, argument-mismatch, and focused generic-inference diagnostics match `slang-diagnostics.lua`.
+| F-001 | critical | `## Conversion costs`, line 594 | The `kConversionCost_LValueCast` row says the surcharge applies “whenever the source is an l-value,” and that `f(v)` with an ordinary `float` parameter pays it. Overload probing constructs the source qualification from the **parameter’s** l-value requirement, so that example does not acquire the surcharge merely because `v` is a variable. The surcharge also belongs to the initializer-conversion branch, rather than every conversion path. | `source/slang/slang-check-overload.cpp:897` constructs `QualType(arg.type, paramType.isLeftValue)` and passes it to `canCoerce` at line 914. `source/slang/slang-check-conversion.cpp:3017-3024` conditionally adds the surcharge within the selected-initializer branch; earlier paths, such as matrix-layout conversion at line 2370, return independently. | Describe the surcharge as conditional on the `QualType` reaching that initializer-conversion branch. Remove the ordinary `f(v)` versus `f(1)` example and the claim that this surcharge explains ordinary exact-match preference. |
+| F-002 | major | `### The general path`, lines 1085–1091 | The receiver explanation cites nonexistent `Breadcrumb::Kind::This` and `ThisParameterMode` symbols. It also incorrectly says explicit member lookup for call/subscript operators necessarily creates such a breadcrumb. The current representation distinguishes implicit `ThisExpr` and `ThisType` breadcrumbs; explicit operator lookup retains the supplied receiver expression. | `source/slang/slang-ast-support-types.h:1388-1426` declares `ThisExpr`, `ThisType`, and the scope invariant. Neither obsolete symbol occurs in `source/slang`. `source/slang/slang-lookup.cpp:1067` begins member lookup with no breadcrumb, while `source/slang/slang-check-expr.cpp:5394-5399` passes the existing callee expression as the member base. | Replace this paragraph’s breadcrumb claim with the explicit receiver flow through `createLookupResultExpr` and `context.baseExpr`. For implicit receiver lookup, reference `ThisExpr`/`ThisType` and link to `lookup.md`; remove `ThisParameterMode` and its listed values. |
+| F-003 | major | `### Tie-breaking comparator`, step 3, lines 710–731 | The required tie-breaking account substantially abbreviates `CompareLookupResultItems`, omitting rules that can determine the winner: non-generic versus generic extensions, derived aggregate members, subscript accessor supersets, and explicit versus synthesized declarations. Its stated non-extension preference also omits the synthesized-default-constructor exception. | `source/slang/slang-check-overload.cpp:2024-2053` contains the constructor exception and generic-extension comparison; lines 2081–2095 compare aggregate ancestry; lines 2100–2137 compare subscript accessor sets; lines 2143–2149 prefer declarations that are not effectively synthesized. | Extend step 3 with these rules in source order. Explicitly qualify the non-extension preference with the synthesized-default-constructor exception. Keep the additions within the existing comparator section. |
+| F-004 | minor | `## Conversion costs`, lines 599–601 | The citation locating `canConvertImplicitly` at line `3328` points into cast-expression construction, 136 lines before the named function. Other citations in the document already use the correct location. | `source/slang/slang-check-conversion.cpp:3328` is `castExpr->functionExpr = typeExpr;`; `canConvertImplicitly` is defined at lines 3464–3470. | Change this citation from `3328` to `3464-3470`. |
+| F-005 | minor | Source citations at lines 355, 789, 826, 990, and 996 | The page cites five source files absent from its watched paths: `slang-diagnostics.lua`, `slang-check-modifier.cpp`, `slang-lookup.cpp`, `slang-check-decl.cpp`, and `slang-compile-request.cpp`. The family contract requires expanding watched paths when such citations are necessary, with a corresponding note in the page. | `docs/generated/design/_meta/manifest.yaml:716-734` lists the watched paths and excludes these files. `docs/generated/design/_meta/prompts/_common.md`, “Name-resolution family contract,” explicitly requires expanding the manifest for citations outside those paths. | Add these five `source/slang/` paths to this document’s manifest entry and briefly note the expansion in `## Source`, or remove the direct implementation claims and defer to appropriate peer pages. |

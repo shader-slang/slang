@@ -93,3 +93,8 @@ Slang language version 202c brings these changes on top of Slang 2026:
   [#12045](https://github.com/shader-slang/slang/issues/12045) for details.
 - Compile-time for (`$for`) has been removed from the language. Use `[ForceUnroll] for` instead. See GitHub issue
   [#13065](https://github.com/shader-slang/slang/issues/13065) for details.
+- A non-void function must `return` a value or `throw` on every path that reaches the end of its body. Failure
+  to do so is diagnosed as an error in Slang 202c. Earlier versions report a warning, and an error only for
+  targets that require a return value (SPIR-V, GLSL and WGSL). To migrate, add an explicit `return` at the end
+  of the function where required. See GitHub issue
+  [#12264](https://github.com/shader-slang/slang/issues/12264) for details.

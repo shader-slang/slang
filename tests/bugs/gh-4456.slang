@@ -31,13 +31,13 @@ RayDesc MakeRayDesc()
 }
 void doInitialize(out RayQuery<RAY_FLAG_FORCE_OPAQUE> query, RayDesc ray)
 {
-    query.TraceRayInline(AccelerationStructure,RAY_FLAG_FORCE_NON_OPAQUE,0xFF,ray);
+    query.TraceRayInline(AccelerationStructure,RAY_FLAG_NONE,0xFF,ray);
 }
 
 [domain("tri")] PSSceneIn main(
     const float3 bary : SV_DomainLocation,
     const OutputPatch<HSPerVertexData, 3> patch,
-    const HSPerPatchData perPatchData) 
+    const HSPerPatchData perPatchData)
 {
     PSSceneIn v;
     v.pos = patch[0].v.pos * bary.x + patch[1].v.pos * bary.y + patch[2].v.pos * bary.z + perPatchData.edges[1];

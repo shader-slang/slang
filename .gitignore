@@ -168,3 +168,6 @@ replay-capture
 
 # Scaler autoscaler build output (built from source; see extras/scaler/README.md)
 /extras/scaler/scaler-linux
+
+# Checkout of shader-slang/spec used by the generated-tests lint (CI)
+/spec-checkout/

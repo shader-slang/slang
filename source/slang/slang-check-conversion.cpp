@@ -1724,6 +1724,30 @@ bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl
     return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
 }
 
+static bool isMatrixLayoutConversion(Type* toType, Type* fromType)
+{
+    if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
+    {
+        auto toMatrixType = as<MatrixExpressionType>(toType);
+        return toMatrixType &&
+               fromMatrixType->getElementType()->equals(toMatrixType->getElementType()) &&
+               fromMatrixType->getRowCount()->equals(toMatrixType->getRowCount()) &&
+               fromMatrixType->getColumnCount()->equals(toMatrixType->getColumnCount());
+    }
+    if (auto fromArrayType = as<ArrayExpressionType>(fromType))
+    {
+        auto toArrayType = as<ArrayExpressionType>(toType);
+        if (!toArrayType || !as<ConstantIntVal>(fromArrayType->getElementCount()) ||
+            fromArrayType->isUnsized() ||
+            !fromArrayType->getElementCount()->equals(toArrayType->getElementCount()))
+            return false;
+        return isMatrixLayoutConversion(
+            toArrayType->getElementType(),
+            fromArrayType->getElementType());
+    }
+    return false;
+}
+
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -1917,6 +1941,28 @@ bool SemanticsVisitor::_coerce(
                     if (outCost)
                         *outCost = kConversionCost_SizedArrayToUnsizedArray;
                     return true;
+                }
+
+                if (toArrayType->isUnsized())
+                {
+                    auto sizedToType = m_astBuilder->getArrayType(
+                        toArrayType->getElementType(),
+                        fromArrayType->getElementCount());
+                    if (isMatrixLayoutConversion(sizedToType, fromType))
+                    {
+                        if (outToExpr)
+                        {
+                            auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                            castExpr->type = sizedToType;
+                            castExpr->loc = fromExpr->loc;
+                            castExpr->base = fromExpr;
+                            *outToExpr = castExpr;
+                        }
+                        if (outCost)
+                            *outCost = kConversionCost_MatrixLayout +
+                                       kConversionCost_SizedArrayToUnsizedArray;
+                        return true;
+                    }
                 }
             }
         }
@@ -2130,6 +2176,10 @@ bool SemanticsVisitor::_coerce(
                 auto innerVarDecl = getASTBuilder()->create<VarDecl>();
                 innerVarDecl->nameAndLoc.name = getName("__optInner");
                 innerVarDecl->type.type = fromInner;
+                // The placeholder is complete and has no parent scope. We mark it as checked,
+                // as `moveTemp` does for its temporaries, because the declaration checks that a
+                // later `ensureDecl` would run on it need a parent scope.
+                innerVarDecl->checkState = DeclCheckState::DefinitionChecked;
 
                 auto innerVarExpr = getASTBuilder()->create<VarExpr>();
                 innerVarExpr->type = QualType(fromInner);
@@ -2313,29 +2363,21 @@ bool SemanticsVisitor::_coerce(
     }
 
     // matrix types with different layouts are convertible
-    if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
+    if (isMatrixLayoutConversion(toType, fromType))
     {
-        if (auto toMatrixType = as<MatrixExpressionType>(toType))
+        if (outCost)
         {
-            if (fromMatrixType->getElementType()->equals(toMatrixType->getElementType()) &&
-                fromMatrixType->getRowCount()->equals(toMatrixType->getRowCount()) &&
-                fromMatrixType->getColumnCount()->equals(toMatrixType->getColumnCount()))
-            {
-                if (outCost)
-                {
-                    *outCost = kConversionCost_MatrixLayout;
-                }
-                if (outToExpr)
-                {
-                    auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
-                    castExpr->type = toType;
-                    castExpr->loc = fromExpr->loc;
-                    castExpr->base = fromExpr;
-                    *outToExpr = castExpr;
-                }
-                return true;
-            }
+            *outCost = kConversionCost_MatrixLayout;
         }
+        if (outToExpr)
+        {
+            auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+            castExpr->type = toType;
+            castExpr->loc = fromExpr->loc;
+            castExpr->base = fromExpr;
+            *outToExpr = castExpr;
+        }
+        return true;
     }
 
     // We allow a value of a `struct` type to be coerced to a function

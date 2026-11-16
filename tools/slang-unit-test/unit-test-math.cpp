@@ -346,3 +346,118 @@ SLANG_UNIT_TEST(mathFloatE5M2SaturatesAtMax)
     SLANG_CHECK((e & 0x7F) == 0x7C);
     SLANG_CHECK(Math::IsInf(FloatE5M2ToFloat(e)));
 }
+
+// Compute the exact dyadic value from the format definition, independently of the
+// production Float32 bit shifts. Every finite FP8 value is exactly representable here.
+static float getFiniteFloat8Value(unsigned int code, unsigned int fractionBits, int bias)
+{
+    unsigned int fractionCount = 1u << fractionBits;
+    unsigned int exponent = code / fractionCount;
+    unsigned int fraction = code % fractionCount;
+    return exponent == 0
+               ? ldexpf(float(fraction), 1 - bias - int(fractionBits))
+               : ldexpf(float(fractionCount + fraction), int(exponent) - bias - int(fractionBits));
+}
+
+// Check every encoding, then every finite value and rounding boundary with its two
+// neighboring Float32 inputs. Enumerating distances makes the oracle independent of
+// the production rounding algorithm, including subnormal-to-normal carries.
+static void checkFloat8FiniteConversions(
+    unsigned int fractionBits,
+    int bias,
+    unsigned int maxFinite,
+    unsigned int (*narrow)(float),
+    float (*widen)(unsigned int))
+{
+    for (unsigned int sign = 0; sign < 2; sign++)
+    {
+        for (unsigned int code = 0; code < 128; code++)
+        {
+            unsigned int encoded = code | (sign << 7);
+            float actual = widen(encoded);
+            if (code <= maxFinite)
+            {
+                unsigned int expectedBits =
+                    FloatAsInt(getFiniteFloat8Value(code, fractionBits, bias)) | (sign << 31);
+                SLANG_CHECK(unsigned(FloatAsInt(actual)) == expectedBits);
+                SLANG_CHECK(narrow(IntAsFloat(expectedBits)) == encoded);
+            }
+            else
+            {
+                // Keep the existing special-value signs and payload mapping exact.
+                unsigned int expectedBits =
+                    fractionBits == 3 ? 0x7FC00000 : 0x7F800000 | ((code & 3) << 21);
+                SLANG_CHECK(unsigned(FloatAsInt(actual)) == (expectedBits | (sign << 31)));
+            }
+        }
+        for (unsigned int code = 0; code <= maxFinite; code++)
+        {
+            float value = getFiniteFloat8Value(code, fractionBits, bias);
+            for (unsigned int boundary = 0; boundary < 2; boundary++)
+            {
+                if (boundary && code == maxFinite)
+                    continue;
+                float center =
+                    boundary ? (value + getFiniteFloat8Value(code + 1, fractionBits, bias)) / 2
+                             : value;
+                for (int neighbor = -1; neighbor <= 1; neighbor++)
+                {
+                    if (center == 0 && neighbor < 0)
+                        continue;
+                    unsigned int inputBits = unsigned(FloatAsInt(center)) + neighbor;
+                    float input = IntAsFloat(inputBits);
+                    if (input > getFiniteFloat8Value(maxFinite, fractionBits, bias))
+                        continue;
+                    unsigned int nearest = 0;
+                    double distance = input;
+                    for (unsigned int candidate = 1; candidate <= maxFinite; candidate++)
+                    {
+                        double candidateDistance = fabs(
+                            double(input) - getFiniteFloat8Value(candidate, fractionBits, bias));
+                        if (candidateDistance < distance ||
+                            (candidateDistance == distance && (candidate & 1) == 0))
+                        {
+                            nearest = candidate;
+                            distance = candidateDistance;
+                        }
+                    }
+                    SLANG_CHECK(
+                        narrow(IntAsFloat(inputBits | (sign << 31))) == (nearest | (sign << 7)));
+                }
+            }
+        }
+    }
+}
+
+SLANG_UNIT_TEST(mathFloatE4M3FiniteConversions)
+{
+    checkFloat8FiniteConversions(3, 7, 126, FloatToFloatE4M3, FloatE4M3ToFloat);
+}
+
+SLANG_UNIT_TEST(mathFloatE5M2FiniteConversions)
+{
+    checkFloat8FiniteConversions(2, 15, 123, FloatToFloatE5M2, FloatE5M2ToFloat);
+}
+
+SLANG_UNIT_TEST(mathFloat8OverflowPolicy)
+{
+    for (unsigned int sign = 0; sign < 2; sign++)
+    {
+        // E4M3 rejects even the immediate Float32 neighbor above its finite maximum.
+        for (unsigned int bits : {0x43E00001u, 0x7F7FFFFFu, 0x7F800000u, 0x7F800001u, 0x7FC12345u})
+        {
+            SLANG_CHECK(FloatToFloatE4M3(IntAsFloat(bits | (sign << 31))) == (0x7Fu | (sign << 7)));
+        }
+        // E5M2 rounds to infinity at 61440, halfway from 57344 to the next exponent.
+        SLANG_CHECK(
+            FloatToFloatE5M2(IntAsFloat(0x47700000u - 1 | (sign << 31))) == (0x7Bu | (sign << 7)));
+        for (unsigned int bits : {0x47700000u, 0x47700001u, 0x7F7FFFFFu, 0x7F800000u})
+        {
+            SLANG_CHECK(FloatToFloatE5M2(IntAsFloat(bits | (sign << 31))) == (0x7Cu | (sign << 7)));
+        }
+        for (unsigned int bits : {0x7F800001u, 0x7FC12345u})
+        {
+            SLANG_CHECK(FloatToFloatE5M2(IntAsFloat(bits | (sign << 31))) == (0x7Du | (sign << 7)));
+        }
+    }
+}

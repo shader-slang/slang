@@ -735,6 +735,19 @@ local insts = {
 				},
 			},
 			{
+				TraceProgramDescriptor = {
+					-- An opaque structural ray-tracing program descriptor. Its operands retain the
+					-- schema type argument and conformance witness without exposing any
+					-- target-specific resource representation in source or IR.
+					struct_name = "TraceProgramDescriptorType",
+					operands = {
+						{ "schema", "IRType" },
+						{ "schemaWitness" },
+					},
+					hoistable = true,
+				},
+			},
+			{
 				struct = {
 					-- A user-defined structure declaration at the IR level.
 					-- Unlike in the AST where there is a distinction between
@@ -1384,6 +1397,9 @@ local insts = {
 	{ metalSetPrimitive = { operands = { { "index" }, { "elementValue" } } } },
 	{ metalSetIndices = { operands = { { "index" }, { "elementValue" } } } },
 	{ MetalCastToDepthTexture = { operands = { { "texture" } } } },
+	-- Order this thread's accesses to an `access::read_write` texture across this point
+	-- (MSL `texture.fence()`); `insertMetalTextureFences` puts one before and after each write.
+	{ metalTextureFence = { operands = { { "texture" } } } },
 	-- Construct a vector from a scalar
 	-- %dst = MakeVectorFromScalar %T %N %val
 	-- where
@@ -1668,6 +1684,31 @@ local insts = {
 	-- mirroring the read side (`emitOptiXAttributeFetch`). The CUDA emitter renders this as a
 	-- single `optixReportIntersection(tHit, hitKind, a0..aN)`.
 	{ reportOptiXIntersection = { min_operands = 2 } },
+	{
+		metalTraceRay = {
+			-- The two internal Metal trace functions lower to this instruction through
+			-- ordinary __intrinsic_op calls. No time operand means no motion; a present
+			-- time, including zero, means motion. The descriptor type retains the schema
+			-- and its witness, including the selected motion model, while the payload
+			-- pointer retains its concrete type. Later Metal lowering consumes this
+			-- operation before native entry-point legalization and emission.
+			operands = {
+				{ "accelerationStructure" },
+				{ "descriptor" },
+				{ "rayFlags" },
+				{ "instanceMask" },
+				{ "sbtOffset" },
+				{ "sbtStride" },
+				{ "missIndex" },
+				{ "rayOrigin" },
+				{ "rayTMin" },
+				{ "rayDirection" },
+				{ "rayTMax" },
+				{ "payload" },
+				{ "time", optional = true },
+			},
+		},
+	},
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{
@@ -1774,6 +1815,11 @@ local insts = {
 				},
 			},
 			{ branch = { struct_name = "BranchDecoration" } },
+			-- Marks a `SPIRVAsm` block whose whole execution, including output writes, has undefined
+			-- behavior when any opaque resource value operand is undefined, including either part of a
+			-- combined texture/sampler. Type functions such as `__imageType(x)` do not count as value
+			-- operands. This internal decoration has no operands.
+			{ assumeValidResourceOperands = { struct_name = "AssumeValidResourceOperandsDecoration" } },
 			{
 				flatten = {
 					struct_name = "FlattenDecoration",
@@ -1887,6 +1933,20 @@ local insts = {
 			-- to it.
 			{ vulkanHitObjectAttributes = { struct_name = "VulkanHitObjectAttributesDecoration" } },
 			{ GlobalVariableShadowingGlobalParameterDecoration = { min_operands = 2 } },
+			-- Lowering adds this marker when the AST declaration is either a file- or namespace-scope
+			-- mutable `static` variable or a mutable uniform-parameter shadow. The marker records
+			-- membership in that combined category, not which kind the declaration has or what storage
+			-- rate it uses. Static data members also use `IRGlobalVar`, but are outside the category.
+			{ fileOrNamespaceScopeMutableVar = { struct_name = "FileOrNamespaceScopeMutableVarDecoration" } },
+			-- The pre-link module-wide uninitialized-global check found a possible write and
+			-- therefore could not prove that every read is uninitialized. We preserve that result
+			-- because entry-point linking may remove the writer before a later analysis revisits the
+			-- global.
+			{
+				uninitializedGlobalCheckFoundPossibleWrite = {
+					struct_name = "UninitializedGlobalCheckFoundPossibleWriteDecoration",
+				},
+			},
 			{
 				requireSPIRVVersion = {
 					struct_name = "RequireSPIRVVersionDecoration",
@@ -1952,6 +2012,7 @@ local insts = {
 			{
 				patchConstantFunc = { struct_name = "PatchConstantFuncDecoration", operands = { { "func", "IRInst" } } },
 			},
+			{ glslPatch = { struct_name = "GLSLPatchDecoration" } },
 			{
 				maxTessFactor = {
 					struct_name = "MaxTessFactorDecoration",
@@ -2372,11 +2433,11 @@ local insts = {
 			},
 			{ noRefInline = { struct_name = "NoRefInlineDecoration" } },
 			{
-				DerivativeGroupQuad = {
-					struct_name = "DerivativeGroupQuadDecoration",
+				DerivativeGroupDecoration = {
+					{ DerivativeGroupQuad = { struct_name = "DerivativeGroupQuadDecoration" } },
+					{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 				},
 			},
-			{ DerivativeGroupLinear = { struct_name = "DerivativeGroupLinearDecoration" } },
 			{
 				MaximallyReconverges = {
 					struct_name = "MaximallyReconvergesDecoration",
@@ -2473,6 +2534,12 @@ local insts = {
 				constructor = {
 					struct_name = "ConstructorDecoration",
 					min_operands = 1,
+				},
+			},
+			{
+				Artificial = {
+					-- Marks a compiler-generated entity with no corresponding user-written declaration.
+					struct_name = "ArtificialDecoration",
 				},
 			},
 			{ method = { struct_name = "MethodDecoration" } },
@@ -2665,9 +2732,9 @@ local insts = {
 			},
 			{
 				DebugLocation = {
-					-- Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+					-- Source, line, column, and an optional declaration scope for variables/parameters.
 					struct_name = "DebugLocationDecoration",
-					operands = { { "source" }, { "line" }, { "col" } },
+					operands = { { "source" }, { "line" }, { "col" }, { "scope", optional = true } },
 				},
 			},
 			{
@@ -2999,7 +3066,11 @@ local insts = {
 			min_operands = 5,
 		},
 	},
-	{ DebugVar = { operands = { { "name" }, { "type" }, { "scope" }, { "location" } } } },
+	{
+		DebugVar = {
+			min_operands = 5,
+		},
+	},
 	{
 		DebugValue = {
 			min_operands = 2,
@@ -3008,7 +3079,13 @@ local insts = {
 	{ DebugInlinedAt = { min_operands = 5 } },
 	{
 		DebugFunction = {
+			-- Operands are the name, line, column, source, function type, and optional lexical parent scope.
 			min_operands = 5,
+		},
+	},
+	{
+		DebugLexicalBlock = {
+			operands = { { "source" }, { "line" }, { "col" }, { "parentScope" } },
 		},
 	},
 	{ DebugInlinedVariable = { min_operands = 2 } },

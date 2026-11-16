@@ -65,6 +65,7 @@ using namespace Slang;
 
 // Constants for slang-test specific options
 static const char* kPreserveEmbeddedSourceOption = "-preserve-embedded-source";
+static const char* kValidateWithDownstreamCompilerOption = "-validate-with-downstream-compiler";
 
 // Options for a particular test
 struct TestOptions
@@ -669,7 +670,9 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
-        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST
+        // Skip any extra slashes and spaces to handle malformed directives like ///TEST or // TEST.
+        // render-test's `ShaderInputLayoutParser::parse` uses the same prefix rule for
+        // `TEST_INPUT:` lines.
         while (*cursor == '/')
         {
             cursor++;
@@ -1699,6 +1702,118 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
             SLANG_ASSERT(!"Unknown type");
             return 0;
         }
+    }
+}
+
+/// Returns the compile target that the arguments of a test select with `-target`, or
+/// `SLANG_TARGET_UNKNOWN` if there is none.
+static SlangCompileTarget _findTargetInArgs(const List<String>& args)
+{
+    const Index targetIndex = args.indexOf("-target");
+    if (targetIndex == Index(-1) || targetIndex + 1 >= args.getCount())
+        return SLANG_TARGET_UNKNOWN;
+    return TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
+}
+
+/// Returns true if the shader model that the arguments of a test select is 6.0 or higher.
+///
+/// The test names the shader model in `-profile` (for example `sm_6_0` or `cs_6_6`) or in
+/// `-capability` (for example `sm_6_6`). Without any of them, an HLSL target uses the shader
+/// model 5.1, as `slangc` does. A ray tracing `-stage` raises the shader model to 6.3, as
+/// `getEffectiveProfile` does. A stage that only a `[shader(...)]` attribute names is not seen
+/// here.
+static bool _usesShaderModel6OrHigher(const List<String>& args)
+{
+    const Index stageIndex = args.indexOf("-stage");
+    if (stageIndex != Index(-1) && stageIndex + 1 < args.getCount())
+    {
+        for (const char* stage :
+             {"raygeneration", "intersection", "closesthit", "anyhit", "miss", "callable"})
+        {
+            if (args[stageIndex + 1] == stage)
+                return true;
+        }
+    }
+    for (Index i = 0; i + 1 < args.getCount(); i++)
+    {
+        if (args[i] != "-profile" && args[i] != "-capability")
+            continue;
+        const UnownedStringSlice value = args[i + 1].getUnownedSlice();
+        for (const char* model : {"_6_", "_7_", "_8_", "_9_"})
+        {
+            if (value.indexOf(UnownedStringSlice(model)) != Index(-1))
+                return true;
+        }
+    }
+    return false;
+}
+
+/// Returns the flag of the downstream tool that `slangc -validate-with-downstream-compiler` uses
+/// to validate the output of the test with the given arguments, or 0 if the option needs no tool
+/// that `slang-test` can check.
+///
+/// `_getPassThroughFlagsForTarget` cannot be used for this, because it returns 0 for the text
+/// targets: a test with `-target metal` does not need a downstream compiler to run, but its
+/// validation does. A binary target such as `metallib` is not in this mapping, because `slangc`
+/// already runs its downstream compiler on it. A target with no downstream tool is not in this
+/// mapping either: `slangc` reports an error for it, and that error is a real test failure.
+static PassThroughFlags _getValidationPassThroughFlags(const List<String>& args)
+{
+    switch (_findTargetInArgs(args))
+    {
+    case SLANG_SPIRV:
+    case SLANG_SPIRV_ASM:
+    case SLANG_GLSL:
+        return PassThroughFlag::Glslang;
+    case SLANG_HLSL:
+        return _usesShaderModel6OrHigher(args) ? PassThroughFlag::Dxc : PassThroughFlag::Fxc;
+    case SLANG_METAL:
+        return PassThroughFlag::Metal;
+    case SLANG_WGSL:
+        return PassThroughFlag::Tint;
+    case SLANG_CUDA_SOURCE:
+        return PassThroughFlag::NVRTC;
+    case SLANG_CPP_SOURCE:
+    case SLANG_HOST_CPP_SOURCE:
+        return PassThroughFlag::Generic_C_CPP;
+    default:
+        return 0;
+    }
+}
+
+/// Prints a warning for each target whose `-validate-with-downstream-compiler` validation `SIMPLE`
+/// tests skip, because the machine does not have the downstream tool.
+///
+/// `runSimpleTest` removes the option from the `slangc` command line in this case. Without the
+/// warning, a run on a machine without the tool (for example, the Metal compiler on Linux) would
+/// not tell that these checks did not happen.
+static void _reportDisabledDownstreamValidation(TestContext* context)
+{
+    struct ValidationTool
+    {
+        const char* targetName;
+        PassThroughFlags flag;
+        const char* toolName;
+    };
+    static const ValidationTool tools[] = {
+        {"spirv", PassThroughFlag::Glslang, "SPIR-V validator (slang-glslang)"},
+        {"glsl", PassThroughFlag::Glslang, "glslang"},
+        {"hlsl (shader model 6 and higher)", PassThroughFlag::Dxc, "DXC"},
+        {"hlsl (shader model 5.1 and lower)", PassThroughFlag::Fxc, "FXC"},
+        {"metal", PassThroughFlag::Metal, "Metal compiler"},
+        {"wgsl", PassThroughFlag::Tint, "Tint"},
+        {"cuda", PassThroughFlag::NVRTC, "NVRTC"},
+        {"cpp", PassThroughFlag::Generic_C_CPP, "C++ compiler"},
+    };
+    for (const auto& tool : tools)
+    {
+        if (context->availableBackendFlags & tool.flag)
+            continue;
+        StdWriters::getOut().print(
+            "warning: %s not found; %s is removed from SIMPLE tests with -target %s\n",
+            tool.toolName,
+            kValidateWithDownstreamCompilerOption,
+            tool.targetName);
     }
 }
 
@@ -2818,6 +2933,132 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return SLANG_OK;
     };
 
+    String testFileContent;
+
+    if (SLANG_FAILED(File::readAllText(input.filePath, testFileContent)))
+    {
+        return TestResult::Fail;
+    }
+
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(testFileContent.getUnownedSlice(), lines);
+
+    // A `//CONFIG_REPLY:<section>=<json>` or `//CONFIG:<key>=<json>` directive holds a JSON value.
+    // It is parsed into the connection's container right before use, because the container is
+    // reset whenever a message is read.
+    auto parseConfigValue = [&](UnownedStringSlice text, JSONValue& outValue) -> SlangResult
+    {
+        return JSONRPCUtil::parseJSON(
+            text.trim(),
+            connection->getContainer(),
+            connection->getSink(),
+            outValue);
+    };
+
+    auto reportDirectiveError = [&](UnownedStringSlice line, const char* problem)
+    {
+        StringBuilder lineText;
+        lineText << line;
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError,
+            "Invalid LANG_SERVER directive in '%s': %s: %s",
+            input.filePath.getBuffer(),
+            problem,
+            lineText.getBuffer());
+        return TestResult::Fail;
+    };
+
+    Dictionary<String, UnownedStringSlice> configReplies;
+    for (auto line : lines)
+    {
+        line = line.trimStart();
+        if (!line.startsWith("//"))
+            continue;
+        line = line.tail(2).trimStart();
+        if (!line.startsWith("CONFIG_REPLY:"))
+            continue;
+        if (!input.testOptions->commandOptions.containsKey("config-pull"))
+            return reportDirectiveError(line, "CONFIG_REPLY requires the config-pull option");
+        auto reply = line.tail(UnownedStringSlice("CONFIG_REPLY:").getLength());
+        Index eqIndex = reply.indexOf('=');
+        if (eqIndex < 0)
+            return reportDirectiveError(line, "expected <section>=<json>");
+        String section = reply.head(eqIndex).trim();
+        if (configReplies.containsKey(section))
+            return reportDirectiveError(line, "duplicate section");
+        configReplies[section] = reply.tail(eqIndex + 1);
+    }
+
+    List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
+    bool diagnosticsReceived = false;
+    // Every LANG_SERVER test shares one language server process, so a call the server sends must
+    // be read before the test ends or the next test reads it in place of its own response. A
+    // configuration message makes the server send zero or more refresh requests, depending on the
+    // setting and whether it changed. We set this flag whenever one is sent, and `waitForResponse`
+    // clears it, because the server sends those requests before it answers any later request.
+    bool mayHaveUnreadServerCalls = false;
+    // Record a `textDocument/publishDiagnostics` notification, or skip any other server-to-client
+    // call. The server never blocks on a reply to the calls it sends, so skipping is safe.
+    auto handleServerCall = [&](const JSONRPCCall& call) -> SlangResult
+    {
+        if (call.method != "textDocument/publishDiagnostics")
+            return SLANG_OK;
+        diagnosticsReceived = true;
+        LanguageServerProtocol::PublishDiagnosticsParams arg;
+        SLANG_RETURN_ON_FAIL(connection->getMessage(&arg));
+        diagnostics.add(arg);
+        return SLANG_OK;
+    };
+
+    // The harness answers the server's `workspace/configuration` request with one value per
+    // requested section, taken from `//CONFIG_REPLY:` lines, and JSON null for every other section.
+    // LSP requires null for a setting the client cannot provide, so this is the reply an editor
+    // without Slang-specific defaults (such as Zed) sends. Other server calls that arrive first are
+    // handled as `handleServerCall` does, and a request among them, such as
+    // `client/registerCapability`, is answered with a null result.
+    auto answerConfigRequest = [&]() -> SlangResult
+    {
+        for (;;)
+        {
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&call));
+            if (call.method != LanguageServerProtocol::ConfigurationParams::methodName)
+            {
+                SLANG_RETURN_ON_FAIL(handleServerCall(call));
+                if (call.id.isValid())
+                    SLANG_RETURN_ON_FAIL(connection->sendNullResult(call.id));
+                continue;
+            }
+
+            LanguageServerProtocol::ConfigurationParams configParams;
+            SLANG_RETURN_ON_FAIL(
+                connection->toNativeArgsOrSendError(call.params, &configParams, call.id));
+            List<JSONValue> values;
+            for (auto& item : configParams.items)
+            {
+                JSONValue value = JSONValue::makeNull();
+                UnownedStringSlice replyText;
+                if (configReplies.tryGetValue(item.section, replyText))
+                    SLANG_RETURN_ON_FAIL(parseConfigValue(replyText, value));
+                values.add(value);
+            }
+            JSONResultResponse response;
+            response.id = call.id;
+            response.result =
+                connection->getContainer()->createArray(values.getBuffer(), values.getCount());
+            mayHaveUnreadServerCalls = true;
+            return connection->sendRPC(&response);
+        }
+    };
+
+    if (input.testOptions->commandOptions.containsKey("config-pull"))
+    {
+        if (SLANG_FAILED(connection->sendCall(UnownedStringSlice("initialized"))) ||
+            SLANG_FAILED(answerConfigRequest()))
+            return TestResult::Fail;
+    }
+
     if (input.testOptions->commandOptions.containsKey("additional-search-path-order"))
     {
         // Configured search paths intentionally precede auto-discovered workspace paths. Exercise
@@ -2832,13 +3073,6 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     }
 
     // Send open document call.
-    String testFileContent;
-
-    if (SLANG_FAILED(File::readAllText(input.filePath, testFileContent)))
-    {
-        return TestResult::Fail;
-    }
-
     LanguageServerProtocol::DidOpenTextDocumentParams openDocParams;
     openDocParams.textDocument.version = 0;
     openDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
@@ -2847,32 +3081,50 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         LanguageServerProtocol::DidOpenTextDocumentParams::methodName,
         &openDocParams,
         JSONValue::makeInt(1));
-    List<LanguageServerProtocol::PublishDiagnosticsParams> diagnostics;
-    bool diagnosticsReceived = false;
-    auto waitForNonDiagnosticResponse = [&]() -> SlangResult
+    auto waitForResponse = [&]() -> SlangResult
     {
-        repeat:
-            if (SLANG_FAILED(connection->waitForResult(-1)))
-                return SLANG_FAIL;
-            if (connection->getMessageType() == JSONRPCMessageType::Call)
+        for (;;)
+        {
+            SLANG_RETURN_ON_FAIL(connection->waitForResult(-1));
+            if (connection->getMessageType() != JSONRPCMessageType::Call)
             {
-                JSONRPCCall call;
-                connection->getRPC(&call);
-                if (call.method == "textDocument/publishDiagnostics")
-                {
-                    diagnosticsReceived = true;
-                    LanguageServerProtocol::PublishDiagnosticsParams arg;
-                    if (SLANG_FAILED(connection->getMessage(&arg)))
-                        return SLANG_FAIL;
-                    diagnostics.add(arg);
-                    goto repeat;
-                }
+                mayHaveUnreadServerCalls = false;
+                return SLANG_OK;
             }
-            return SLANG_OK;
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(connection->getRPC(&call));
+            SLANG_RETURN_ON_FAIL(handleServerCall(call));
+        }
     };
 
-    List<UnownedStringSlice> lines;
-    StringUtil::calcLines(testFileContent.getUnownedSlice(), lines);
+    // Send a `//CONFIG:<key>=<json>` directive as a `workspace/didChangeConfiguration`
+    // notification. Any refresh requests it causes are read by the next `waitForResponse`. The
+    // server keeps formatting, inlay-hint, commit-character and trace options across `initialize`,
+    // so a test that changes one of them sets it back to its default before the test ends.
+    auto sendConfigNotification = [&](UnownedStringSlice directive) -> SlangResult
+    {
+        Index eqIndex = directive.indexOf('=');
+        if (eqIndex < 0)
+        {
+            reportDirectiveError(directive, "expected CONFIG:<key>=<json>");
+            return SLANG_FAIL;
+        }
+        JSONValue value;
+        SLANG_RETURN_ON_FAIL(parseConfigValue(directive.tail(eqIndex + 1), value));
+        auto container = connection->getContainer();
+        JSONValue settingsValue = container->createObject(nullptr, 0);
+        container->setKeyValue(
+            settingsValue,
+            container->getKey(directive.head(eqIndex).trim()),
+            value);
+
+        LanguageServerProtocol::DidChangeConfigurationParams configParams;
+        configParams.settings = settingsValue;
+        mayHaveUnreadServerCalls = true;
+        return connection->sendCall(
+            LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+            &configParams);
+    };
 
     StringBuilder actualOutputSB;
     auto parseLocation = [&](UnownedStringSlice text, Index startPos, Int& linePos, Int& colPos)
@@ -2883,6 +3135,13 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         return startPos;
     };
     int callId = 2;
+    // Items of the most recent COMPLETE (empty if it returned null or nothing), and the item picked
+    // by SAVE_COMPLETION_ITEM, so that a later RESOLVE_SAVED_ITEM can resolve an item that belongs
+    // to an earlier completion request. SAVE_COMPLETION_ITEM fails the test if the most recent
+    // COMPLETE has no item with that label, and RESOLVE_SAVED_ITEM fails it if no item was saved.
+    List<LanguageServerProtocol::CompletionItem> lastCompletionItems;
+    LanguageServerProtocol::CompletionItem savedCompletionItem;
+    bool hasSavedCompletionItem = false;
     for (auto line : lines)
     {
         line = line.trimStart();
@@ -2899,6 +3158,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             params.position.line = int(linePos - 1);
             params.position.character = int(colPos - 1);
             params.textDocument.uri = openDocParams.textDocument.uri;
+            lastCompletionItems.clear();
             if (SLANG_FAILED(connection->sendCall(
                     LanguageServerProtocol::CompletionParams::methodName,
                     &params,
@@ -2906,7 +3166,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             List<LanguageServerProtocol::CompletionItem> completionItems;
@@ -2916,6 +3176,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             }
             else if (SLANG_SUCCEEDED(connection->getMessage(&completionItems)))
             {
+                lastCompletionItems = completionItems;
                 for (auto item : completionItems)
                 {
                     actualOutputSB << item.label << ": " << item.kind << " " << item.detail << " ";
@@ -2932,6 +3193,52 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 }
             }
         }
+        else if (line.startsWith("SAVE_COMPLETION_ITEM:"))
+        {
+            auto label = line.tail(UnownedStringSlice("SAVE_COMPLETION_ITEM:").getLength()).trim();
+            bool found = false;
+            for (auto item : lastCompletionItems)
+            {
+                if (item.label.getUnownedSlice() == label)
+                {
+                    savedCompletionItem = item;
+                    hasSavedCompletionItem = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return TestResult::Fail;
+        }
+        else if (line.startsWith("RESOLVE_SAVED_ITEM:"))
+        {
+            // This resolves the item saved by SAVE_COMPLETION_ITEM, which may come from an earlier
+            // completion request than the most recent one. The directive is matched with its
+            // trailing colon like the other directives, so that it cannot collide with a
+            // directive that merely shares a prefix; it takes no argument.
+            if (!hasSavedCompletionItem)
+                return TestResult::Fail;
+            if (SLANG_FAILED(connection->sendCall(
+                    UnownedStringSlice("completionItem/resolve"),
+                    &savedCompletionItem,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\n";
+            LanguageServerProtocol::CompletionItem resolved;
+            if (receivedNullResult(connection))
+            {
+                actualOutputSB << "null\n";
+            }
+            else if (SLANG_SUCCEEDED(connection->getMessage(&resolved)))
+            {
+                actualOutputSB << "label: " << resolved.label << "\n";
+                actualOutputSB << "detail: " << resolved.detail << "\n";
+            }
+        }
         else if (line.startsWith("DISABLE_WORKSPACE_SEARCH"))
         {
             if (SLANG_FAILED(sendConfig(
@@ -2939,6 +3246,81 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                     JSONValue::makeBool(false))))
                 return TestResult::Fail;
             actualOutputSB << "--------\nsearchInAllWorkspaceDirectories: false\n";
+        }
+        else if (line.startsWith("CONFIG:"))
+        {
+            auto arg = line.tail(UnownedStringSlice("CONFIG:").getLength());
+            if (SLANG_FAILED(sendConfigNotification(arg)))
+                return TestResult::Fail;
+            actualOutputSB << "--------\nconfig: " << arg.trim() << "\n";
+        }
+        else if (line.trim() == "CONFIG_REPULL")
+        {
+            if (!input.testOptions->commandOptions.containsKey("config-pull"))
+                return reportDirectiveError(line, "CONFIG_REPULL requires the config-pull option");
+            // A `settings: null` notification asks the server to pull every setting again.
+            LanguageServerProtocol::DidChangeConfigurationParams configParams;
+            configParams.settings = JSONValue::makeNull();
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DidChangeConfigurationParams::methodName,
+                    &configParams)) ||
+                SLANG_FAILED(answerConfigRequest()))
+                return TestResult::Fail;
+            mayHaveUnreadServerCalls = true;
+            actualOutputSB << "--------\nconfig: re-pulled\n";
+        }
+        else if (line.startsWith("ON_TYPE_FORMAT:"))
+        {
+            // Only whether on-type formatting is enabled is reported: a disabled server answers
+            // null, and an enabled one answers a list of edits, which is empty when clang-format
+            // is unavailable.
+            auto arg = line.tail(UnownedStringSlice("ON_TYPE_FORMAT:").getLength());
+            Int linePos, colPos;
+            parseLocation(arg, 0, linePos, colPos);
+
+            LanguageServerProtocol::DocumentOnTypeFormattingParams params;
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            params.position.line = int(linePos - 1);
+            params.position.character = int(colPos - 1);
+            params.ch = "}";
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::DocumentOnTypeFormattingParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\non-type formatting: "
+                           << (receivedNullResult(connection) ? "disabled" : "enabled") << "\n";
+        }
+        else if (line.trim() == "INLAY")
+        {
+            LanguageServerProtocol::InlayHintParams params;
+            params.textDocument.uri = openDocParams.textDocument.uri;
+            params.range.start.line = 0;
+            params.range.start.character = 0;
+            params.range.end.line = int(lines.getCount());
+            params.range.end.character = 0;
+            if (SLANG_FAILED(connection->sendCall(
+                    LanguageServerProtocol::InlayHintParams::methodName,
+                    &params,
+                    JSONValue::makeInt(callId++))))
+            {
+                return TestResult::Fail;
+            }
+            if (SLANG_FAILED(waitForResponse()))
+                return TestResult::Fail;
+            actualOutputSB << "--------\ninlay hints:\n";
+            List<LanguageServerProtocol::InlayHint> hints;
+            if (!receivedNullResult(connection) && SLANG_FAILED(connection->getMessage(&hints)))
+                return TestResult::Fail;
+            for (auto& hint : hints)
+            {
+                actualOutputSB << hint.position.line << "," << hint.position.character << " "
+                               << hint.label << "\n";
+            }
         }
         else if (line.startsWith("SIGNATURE:"))
         {
@@ -2957,7 +3339,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             LanguageServerProtocol::SignatureHelp sigInfo;
@@ -3003,7 +3385,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             LanguageServerProtocol::Hover hover;
@@ -3038,7 +3420,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             {
                 return TestResult::Fail;
             }
-            if (SLANG_FAILED(waitForNonDiagnosticResponse()))
+            if (SLANG_FAILED(waitForResponse()))
                 return TestResult::Fail;
             actualOutputSB << "--------\n";
             LanguageServerProtocol::TextEditCompletionItem resolved;
@@ -3060,7 +3442,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
         {
             if (!diagnosticsReceived)
             {
-                waitForNonDiagnosticResponse();
+                waitForResponse();
             }
             actualOutputSB << "--------\n";
             for (auto item : diagnostics)
@@ -3075,6 +3457,21 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
             }
         }
     }
+    // A configuration message sent after the last request may have left server calls unread (see
+    // `mayHaveUnreadServerCalls`). A document symbol request has no side effects, and the server
+    // answers it only after handling every message sent before it.
+    if (mayHaveUnreadServerCalls)
+    {
+        LanguageServerProtocol::DocumentSymbolParams params;
+        params.textDocument.uri = openDocParams.textDocument.uri;
+        if (SLANG_FAILED(connection->sendCall(
+                LanguageServerProtocol::DocumentSymbolParams::methodName,
+                &params,
+                JSONValue::makeInt(callId++))) ||
+            SLANG_FAILED(waitForResponse()))
+            return TestResult::Fail;
+    }
+
     LanguageServerProtocol::DidCloseTextDocumentParams closeDocParams;
     closeDocParams.textDocument.uri = URI::fromLocalFilePath(fullPath.getUnownedSlice()).uri;
     connection->sendCall(
@@ -3155,6 +3552,80 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
+/// Checks the exit code of the tool under test for a FileCheck test or a diagnostic test.
+///
+/// A FileCheck test or a diagnostic test only looks at the text of the output, so it does not
+/// notice when the tool fails, or when it does not fail. The expected exit code is 0 for a
+/// FileCheck test and -1 (a failed compilation) for a diagnostic test (`diag=`), because a
+/// diagnostic test usually checks an error. A test that expects another value says so with
+/// `exit-code=N`, for example a diagnostic test that has only warnings uses `exit-code=0`. N must
+/// be 0 (success), -1 (the compilation failed because of errors in the input) or 1 (the command
+/// line was invalid, or the tool failed to run), as in the exit codes that `slangc -help` lists.
+/// The test fails for another value. The exit code -2 is never an expected result, because it
+/// reports an internal compiler error, which is a bug in the compiler.
+/// Tests that compare with an `.expected` file do not need this check, because the result code is
+/// a part of the text they compare.
+///
+/// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
+/// exit code is not the expected one, after it reports the mismatch.
+static bool _checkExpectedExitCode(
+    TestContext* context,
+    const TestInput& input,
+    int resultCode,
+    bool& outMismatch)
+{
+    outMismatch = false;
+
+    String diagPrefix;
+    String fileCheckPrefix;
+    const bool isDiagTest = input.testOptions->getDiagTestPrefix(diagPrefix);
+    if (!isDiagTest && !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+        return true;
+
+    auto reporter = context->getTestReporter();
+
+    int expectedExitCode = isDiagTest ? -1 : 0;
+    String exitCodeOption;
+    if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
+    {
+        Int parsedExitCode = 0;
+        if (SLANG_FAILED(StringUtil::parseInt(exitCodeOption.getUnownedSlice(), parsedExitCode)))
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "the value of `exit-code` must be -1, 0 or 1");
+            return false;
+        }
+        if (parsedExitCode == int(ToolReturnCode::InternalCompilerError))
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "`exit-code=-2` is not allowed, because -2 reports an internal compiler error. "
+                "A test must never expect an internal compiler error. Fix the compiler bug "
+                "instead");
+            return false;
+        }
+        if (parsedExitCode < -1 || parsedExitCode > 1)
+        {
+            reporter->message(
+                TestMessageType::TestFailure,
+                "the value of `exit-code` must be -1, 0 or 1");
+            return false;
+        }
+        expectedExitCode = int(parsedExitCode);
+    }
+
+    if (resultCode != expectedExitCode)
+    {
+        StringBuilder message;
+        message << "expected exit code " << expectedExitCode << ", but the exit code is "
+                << resultCode;
+        reporter->message(TestMessageType::TestFailure, message.getBuffer());
+        outMismatch = true;
+    }
+    return true;
+}
+
 TestResult runSimpleTest(TestContext* context, TestInput& input)
 {
     // need to execute the stand-alone Slang compiler on the file, and compare its output to what we
@@ -3177,10 +3648,21 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         cmdLine.addArg("-enable-machine-readable-diagnostics");
     }
 
+    // `slangc` reports an error if `-validate-with-downstream-compiler` is given and the downstream
+    // tool for the target is missing. A test cannot know which tools the machine has, so we remove
+    // the option here when the tool is missing. Only `SIMPLE` tests do this; the test runners that
+    // pass the option to `slangc` otherwise get the error.
+    const PassThroughFlags validationFlags =
+        _getValidationPassThroughFlags(input.testOptions->args);
+    const bool removeValidationOption =
+        (validationFlags & context->availableBackendFlags) == 0 && validationFlags != 0;
+
     for (auto arg : input.testOptions->args)
     {
         // Filter out slang-test specific options that shouldn't be passed to slangc
         if (arg == kPreserveEmbeddedSourceOption)
+            continue;
+        if (removeValidationOption && arg == kValidateWithDownstreamCompilerOption)
             continue;
         cmdLine.addArg(arg);
     }
@@ -3203,16 +3685,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     }
 
     // See what kind of target it is
-    SlangCompileTarget target = SLANG_TARGET_UNKNOWN;
-    {
-        const auto& args = input.testOptions->args;
-        const Index targetIndex = args.indexOf("-target");
-        if (targetIndex != Index(-1) && targetIndex + 1 < args.getCount())
-        {
-            target =
-                TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
-        }
-    }
+    const SlangCompileTarget target = _findTargetInArgs(input.testOptions->args);
 
     // If it's executable we run it and use it's output
     if (target == SLANG_HOST_EXECUTABLE)
@@ -3231,11 +3704,15 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -3346,11 +3823,15 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -3589,7 +4070,11 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
         }
     }
 
-    return _validateOutput(context, input, actualOutput);
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+        return TestResult::Fail;
+
+    return _validateOutput(context, input, actualOutput, exitCodeMismatch);
 }
 
 static String _calcSummary(IArtifactDiagnostics* inDiagnostics)
@@ -6106,6 +6591,77 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     return false;
 }
 
+// Returns true when `_validateOutput` would compare the output of a test line with a `.expected`
+// file. A line with `filecheck=` or `diag=` checks its output with FileCheck or with the
+// diagnostic annotations, and a disabled line does not run, so none of them reads the file.
+static bool _readsExpectedFile(const TestOptions& options)
+{
+    String prefix;
+    return options.isEnabled && !options.getFileCheckPrefix(prefix) &&
+           !options.getDiagTestPrefix(prefix);
+}
+
+// Returns true when a test line has both `filecheck=` and `diag=`.
+//
+// `_validateOutput` runs only the `diag=` check for such a line, so the `CHECK` lines of
+// `filecheck=` are never run. Consider a preprocessor test:
+//
+//     //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,diag=diag):-E
+//
+// The `diag=` check looks only at the diagnostics in the standard error. The text that `-E` writes
+// to the standard output is never checked, and a wrong `CHECK` line stays unnoticed. We report the
+// line as an error. A test that needs both checks uses one test line for each of them.
+static bool _hasBothFileCheckAndDiag(const TestOptions& options)
+{
+    String prefix;
+    return options.getFileCheckPrefix(prefix) && options.getDiagTestPrefix(prefix);
+}
+
+// Returns the path of the `.expected` file that belongs to the test line `subTestIndex` of
+// `filePath`, when that line has `filecheck=` or `diag=` and so never reads the file.
+// Returns an empty string when there is no such file.
+//
+// Consider a file with two test lines:
+//
+//     //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//
+// Output of line 1 is checked with the annotations, and `foo.slang.1.expected` is never read. The
+// file is dead, and it can show an old output format that misleads people.
+//
+// For line 0 the stem is `filePath` itself, so `foo.slang.expected` is also the shared file that
+// `_readTestFile` falls back to for any other line that has no file of its own. We do not report
+// the file when such a line exists, because the file is in use.
+static String _findUnusedExpectedFile(
+    const String& filePath,
+    Index subTestIndex,
+    const FileTestList& testList)
+{
+    // A disabled line may be enabled again later, and then it reads the file.
+    const TestOptions& options = testList.tests[subTestIndex].options;
+    if (!options.isEnabled || _readsExpectedFile(options))
+        return String();
+
+    StringBuilder stem;
+    stem << filePath;
+    if (subTestIndex != 0)
+        stem << "." << subTestIndex;
+    String expectedPath = stem.produceString() + ".expected";
+    if (!File::exists(expectedPath))
+        return String();
+
+    if (subTestIndex == 0)
+    {
+        for (Index i = 1; i < testList.tests.getCount(); i++)
+        {
+            if (_readsExpectedFile(testList.tests[i].options) &&
+                !File::exists(filePath + "." + String(i) + ".expected"))
+                return String();
+        }
+    }
+    return expectedPath;
+}
+
 // Insert a subtest index into a test name, after the file path but before any suffix.
 // e.g., "foo.slang (vk)" with index 0 -> "foo.slang.0 (vk)"
 static String insertSubtestIndex(const String& testName, int index)
@@ -6387,11 +6943,37 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
             TestResult testResult = TestResult::Fail;
 
+            // A `.expected` file that the test line never reads is an error, so that
+            // such files do not stay in the repository.
+            const String unusedExpectedFile =
+                testDetails.options.isSynthesized
+                    ? String()
+                    : _findUnusedExpectedFile(filePath, subTestIndex, testList);
+
             // If this test can be ignored
             if (_canIgnore(context, testDetails))
             {
                 testResult = TestResult::Ignored;
                 context->getTestReporter()->addResult(testResult);
+            }
+            else if (_hasBothFileCheckAndDiag(testDetails.options))
+            {
+                context->getTestReporter()->message(
+                    TestMessageType::TestFailure,
+                    "'filecheck=' and 'diag=' cannot be used on the same test line, because only "
+                    "the 'diag=' check runs. Use one test line for each of them.\n");
+                context->getTestReporter()->addResult(TestResult::Fail);
+                context->reportTestFailure();
+            }
+            else if (unusedExpectedFile.getLength())
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::TestFailure,
+                    "'%s' is never read, because this test line uses 'filecheck=' or 'diag='. "
+                    "Remove the file, or remove 'filecheck=' or 'diag=' from the test line.\n",
+                    unusedExpectedFile.getBuffer());
+                context->getTestReporter()->addResult(TestResult::Fail);
+                context->reportTestFailure();
             }
             else
             {
@@ -7131,6 +7713,8 @@ SlangResult innerMain(int argc, char** argv)
     // sm_6_6.
     _disableD3D12Backend(&context);
 #endif
+
+    _reportDisabledDownstreamValidation(&context);
 
     // If -only-api-detection mode, run API detection and exit
     if (options.apiDetectionOnly)

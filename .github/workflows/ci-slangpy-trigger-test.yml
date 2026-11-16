@@ -160,12 +160,24 @@ jobs:
               target_url: 'https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml'
             });
 
+      # Generate a token restricted to the downstream repository. The App key stays
+      # in this trusted metadata-only job; no PR code runs here.
+      - name: Create SlangPy dispatch token
+        id: dispatch-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        with:
+          client-id: ${{ secrets.SLANG_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SLANG_CI_APP_PRIVATE_KEY }}
+          owner: shader-slang
+          repositories: slangpy
+          permission-contents: write
+
       - name: Trigger SlangPy CI
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           PR_TITLE: ${{ steps.pr_auto.outputs.title || steps.pr_manual.outputs.title || steps.pr_mq.outputs.title }}
         with:
-          github-token: ${{ secrets.SLANGPY_DISPATCH_TOKEN }}
+          github-token: ${{ steps.dispatch-token.outputs.token }}
           script: |
             await github.rest.repos.createDispatchEvent({
               owner: 'shader-slang',
@@ -196,10 +208,10 @@ jobs:
   mark-slangpy-tests-skipped:
     needs: [filter]
     runs-on: ubuntu-latest
-    if: needs.filter.outputs.should-run == 'false'
 
     steps:
       - name: Post skipped status
+        if: needs.filter.outputs.should-run == 'false'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}

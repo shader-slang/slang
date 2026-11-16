@@ -1,4 +1,4 @@
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK,exit-code=1):
 
 // A function whose result type has no HostVM layout is unrepresentable even when the
 // returned value is a string literal: the literal follows the constant path and never
@@ -7,7 +7,6 @@
 
 String main()
 {
-    //CHECK: result code = 1
     //CHECK-DAG: error[E52014]
     //CHECK-DAG: 'string' has no HostVM layout
     //CHECK-NOT: error[E99999]

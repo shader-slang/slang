@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T09:20:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-03T08:33:38Z
 target_doc: ir-reference/structure.md
 review_report: ../../reviews/ir-reference/structure.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 5
+  fixed: 4
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,19 +18,13 @@ actions:
 
 ## Summary
 
-All five minor findings were verified against the source at the
-recorded commit and fixed; none was rejected, deferred, or escalated.
-Four fixes are single-cell corrections in the opcode tables and the
-witness-table prose; the fifth merges the audience sentence into the
-opening paragraph as the common contract requires. The nine
-generic/existential rows this page owns were left untouched.
+All four findings were verified against the current source and fixed in the document. Four findings were fixed; none were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed. `source/slang/slang-lower-to-ir.cpp:11927-11938` shows `visitVarDecl` sending only true globals to `lowerGlobalVarDecl` and function-statics to `lowerFunctionStaticVarDecl`, which at `:11825-11834` delegates a `const` to `lowerFunctionStaticConstVarDecl`. | `### Global state`: `global_var` origin now cites `lowerFunctionStaticVarDecl` for mutable function-statics; `globalConstant` origin gained function-`static` `const` via `lowerFunctionStaticConstVarDecl`. |
-| F-002 | fixed | Confirmed. `source/slang/slang-ast-decl.h:575` declares `GlobalGenericParamDecl : public AggTypeDecl`, but line 583 declares `GlobalGenericValueParamDecl : public VarDeclBase`. | `global_generic_param` row: split the shared derivation claim into the two correct base classes. |
-| F-003 | fixed | Confirmed. `docs/generated/design/_meta/prompts/ir-reference-structure.md:38` requires lambda lowering in this cell, and `source/slang/slang-check-expr.cpp:7933-7939` creates the lambda's `FuncDecl` and stores it on the lambda struct. | `func` row: added the synthesized `FuncDecl` that checking stores on a lambda to the AST-origin cell. |
-| F-004 | fixed | Confirmed. `source/slang/slang-lower-to-ir.cpp:12086-12108` counts one entry per `AccessorDecl` of a property or subscript and `continue`s past `InterfaceDefaultImplDecl`, so "one entry per direct interface member" overcounts and undercounts. | `witness_table_entry` / `interface_req_entry` prose: reworded to one entry per requirement-bearing member, with accessors contributing their own entries and default-impl decls skipped. |
-| F-005 | fixed | Confirmed. `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first body paragraph to state both coverage and intended reader; the page split them across two paragraphs. | Introduction: merged the audience sentence into the opening paragraph. |
+| F-001 | fixed | `source/slang/slang-lower-to-ir.cpp:1849-1855` keys by declaration with a `getMangledName` linkage name; same spelling does not imply same key. | `### key / StructKey`: unification is by same declaration's mangled name; same-spelling declarations stay distinct. |
+| F-002 | fixed | Producers confirmed at `slang-lower-to-ir.cpp` lines 15548, 10922, 12204, 12215, 2433, 11006, 12530, 12675, 12704, 14047. | Replaced all `(synthesized)` cells with named producers; added lowering functions for `param`, `field`, `SymbolAlias`. |
+| F-003 | fixed | 19 of 23 tabulated wrappers are hand-written, per the Source section. | Added a dagger marker on 19 wrapper cells plus a legend stating the count under `## Opcodes`. |
+| F-004 | fixed | `slang-lower-to-ir.cpp:1432-1458` and `slang-ir-link.cpp:2552-2574` show import/export decorations sit on individual symbols. | `### module / ModuleInst`: decorations described as on contained symbols; serialization kept separate. |

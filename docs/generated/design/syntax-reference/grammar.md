@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: d62ed3d2d5e78332b69f58ddf07b9770380e9c7a11a3789d113d04ab3161c0de
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T12:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 84e367782040254240d2878794cbff2815f0a6ccd2df6af1a236785a547a7918
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -174,12 +174,12 @@ TypedefDecl     ::= 'typedef' Type Declarator ';'             -- parseTypeDef
                                                               -- declarator, so trailing array suffixes and
                                                               -- the prefix-'*' / parenthesized forms are
                                                               -- folded onto the alias type (see Declarator)
-TypeAliasDecl   ::= 'typealias' IDENT ('<' GenericParams '>')? WhereClause? '=' Type ';'
+TypeAliasDecl   ::= 'typealias' IDENT GenericParamList? WhereClause? '=' Type ';'
                                                               -- parseTypeAliasDecl
 
-StructDecl      ::= 'struct' Attribute* IDENT? GenericParams? Inheritance?
+StructDecl      ::= 'struct' Attribute* IDENT? GenericParamList? Inheritance?
                     WhereClause? StructBody                   -- Parser::ParseStruct
-                  | 'struct' Attribute* IDENT? GenericParams? Inheritance? '=' Type ';'
+                  | 'struct' Attribute* IDENT? GenericParamList? Inheritance? '=' Type ';'
                                                               -- link-time symbol alias (aliasedType);
                                                               --   NOT a 'typealias' (see below)
                   | 'struct' Attribute* IDENT? ';'            -- bodyless declaration (hasBody = false);
@@ -192,18 +192,18 @@ StructMember    ::= ModifierList? (VarDecl | FuncDecl | TypedefDecl | TypeAliasD
                                   | ConstructorDecl | SubscriptDecl | PropertyDecl
                                   | AssocTypeDecl)
 
-EnumDecl        ::= 'enum' 'class'? IDENT? GenericParams? Inheritance? WhereClause?
+EnumDecl        ::= 'enum' 'class'? IDENT? GenericParamList? Inheritance? WhereClause?
                     '{' (EnumCase (',' EnumCase)* ','?)? '}'  -- parseEnumDecl; body may be empty
 EnumCase        ::= IDENT ('=' ArgExpr)?                       -- parseEnumCaseDecl; the tag uses
                                                               --   ArgExpr so ',' stays a separator
 
-InterfaceDecl   ::= 'interface' IDENT GenericParams? Inheritance? WhereClause?
+InterfaceDecl   ::= 'interface' IDENT GenericParamList? Inheritance? WhereClause?
                     '{' InterfaceMember* '}'                  -- parseInterfaceDecl
 InterfaceMember ::= ModifierList? (FuncDecl | AssocTypeDecl | PropertyDecl
                                   | SubscriptDecl | ConstructorDecl
                                   | InterfaceConstraintDecl)
 
-ExtensionDecl   ::= ('extension' | '__extension') ('<' GenericParams '>')? Type
+ExtensionDecl   ::= ('extension' | '__extension') GenericParamList? Type
                     Inheritance? WhereClause? '{' StructMember* '}'  -- parseExtensionDecl
 
 AssocTypeDecl   ::= 'associatedtype' IDENT (':' TypeList)? WhereClause? ';'
@@ -218,7 +218,7 @@ InterfaceConstraintDecl
                                                               -- ':' a subtype constraint
 
 Inheritance     ::= ':' TypeList                              -- parseOptionalInheritanceClause
-TypeList        ::= Type (',' Type)*
+TypeList        ::= Type (',' Type)*                          -- parseOptionalInheritanceClause
 ```
 
 `struct`, `class`, and `enum` are the three declaration keywords that
@@ -228,21 +228,24 @@ parser recognizes them by identifier lookahead and calls
 directly (see [keywords-and-builtins.md](keywords-and-builtins.md)).
 That is why the name is optional above — an anonymous one gets a
 generated name — and why the declaration can be followed by a
-declarator, as in `struct Foo { int x; } foo;`.
+declarator, as in `struct Foo { int x; } foo;`. In an HLSL source file
+`class` takes the struct path instead: the type-specifier parser calls
+`Parser::ParseStruct` with an `HLSLClassDecl`, so there it accepts the
+`StructDecl` shapes rather than the narrower `ClassDecl` one.
 
 Two of the `StructDecl` alternatives are easy to misread as their C or
 `typealias` counterparts, and neither behaves that way.
 
 The `'=' Type` form sets `aliasedType`
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-6424) and is a **link-time symbol alias**, not a type alias. Its
+6766) and is a **link-time symbol alias**, not a type alias. Its
 intended spelling carries `export`, as in
 `export struct Foo : IFoo = Bar;`, and lowering turns it into an
 `IRSymbolAlias`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 12714). The name is therefore resolved when modules are linked,
+lines 12519-12530). The name is therefore resolved when modules are linked,
 not while the declaring module is checked — which is why
-`isConcreteFieldOwningAggregate` (line 6663 in the same file) treats an
+`isConcreteFieldOwningAggregate` (line 6107 in the same file) treats an
 `aliasedType` struct exactly like a bodyless `extern struct X;` and
 refuses to build a field-wise `IRMakeStruct` for it: the fields "only
 materialize during linking". Compile `struct Alias = Base;` on its own,
@@ -261,7 +264,7 @@ every other flavor of declaration falls through to
 "we do not allow duplicate declarations with the same name", reporting
 `Redeclaration` (E30200) plus `SeePreviousDeclarationOf`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 13823-13847). A `struct Fwd;` followed by
+lines 14893-14913). A `struct Fwd;` followed by
 `struct Fwd { int v; }` is thus two conflicting declarations rather
 than a declaration completed by its definition, and a subsequent use of
 the name is additionally ambiguous between them.
@@ -294,18 +297,23 @@ generic parameter's `where` / `<T : I>` bound).
 ### Function-style declarations
 
 ```
-FuncDecl        ::= 'func' IDENT GenericParams? '(' ParamList? ')' ('throws' Type)? ('->' Type)?
-                    WhereClause? FuncBody                      -- parseFuncDecl
-                  | Type IDENT GenericParams? '(' ParamList? ')' ('throws' Type)?
+FuncDecl        ::= 'func' IDENT GenericParamList? '(' ParamList? ')' 'const'? ('throws' Type)?
+                    ('->' Type)? WhereClause? FuncBody         -- parseFuncDecl
+                  | Type IDENT GenericParamList? '(' ParamList? ')' 'const'? ('throws' Type)?
                     WhereClause? FuncBody                      -- C-style header (context-sensitive)
                                                               -- the leading Type is the return type;
                                                               -- type-vs-name disambiguation is heuristic;
                                                               -- see ../pipeline/02-parse-ast.md
                                                               -- (parseTraditionalFuncDecl)
+                                                              -- the optional 'const' after the
+                                                              --   parameter list is the C++-style
+                                                              --   receiver qualifier, kept as a
+                                                              --   CppStyleTrailingReceiverParam-
+                                                              --   ConstModifier
 
-ConstructorDecl ::= '__init' GenericParams? '(' ParamList? ')'
+ConstructorDecl ::= '__init' GenericParamList? '(' ParamList? ')'
                     WhereClause? FuncBody                      -- parseConstructorDecl
-SubscriptDecl   ::= '__subscript' GenericParams? '(' ParamList? ')' '->' Type
+SubscriptDecl   ::= '__subscript' GenericParamList? '(' ParamList? ')' '->' Type
                     WhereClause? AccessorBlock                 -- parseSubscriptDecl
                                                               -- routed through parseOptGenericDecl, so it
                                                               -- accepts inline generic params and a 'where'
@@ -315,7 +323,7 @@ PropertyDecl    ::= 'property' IDENT ':' Type AccessorBlock    -- parsePropertyD
                   | 'property' Type Declarator AccessorBlock   -- traditional C form
 
 FuncExtensionDecl
-                ::= '__func_extension' GenericParams? KeywordExprHead
+                ::= '__func_extension' GenericParamList? KeywordExprHead
                     '(' ParamList? ')' ('throws' Type)? ('->' Type)?
                     WhereClause? FuncBody                      -- parseFuncExtensionDecl
                                                               -- KeywordExprHead is a higher-order
@@ -334,7 +342,8 @@ Param           ::= ModifierList? Type IDENT ('=' ArgExpr)?    -- traditional, t
                   | ModifierList? IDENT (':' Type)? ('=' ArgExpr)? -- modern, name-first
                                                               --   (parseModernParamDecl, chosen when
                                                               --   _peekModernStyleVarDecl succeeds; the
-                                                              --   ':' Type is optional)
+                                                              --   ':' Type is optional at parse time,
+                                                              --   see the note below)
 
 WhereClause     ::= ('where' WhereTerm)+                       -- maybeParseGenericConstraints
 WhereTerm       ::= 'optional'? Type ':' Type (',' Type)*      -- conformance constraint(s)
@@ -362,10 +371,28 @@ AccessorName    ::= 'get' | 'set' | 'ref'        -- parseAccessorDecl; any other
                                                   -- accessor name is diagnosed (Unexpected)
 ```
 
+A modern parameter written without `':' Type` parses, but the checker
+accepts it only when an initializer supplies the type
+(`deriveVarTypeFromInitExpr`): `func f(x) {...}` is rejected with
+`ParamWithoutTypeMustHaveInitializer` (E30621), whereas
+`func f(x = 1) {...}` takes its type from the default value
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 15084-15094).
+
 A `__func_extension` names the higher-order form it is defining and
 then gives that form's signature. Its parameters go through
 `parseModernParamList`, so either parameter spelling is accepted, and
-the body is an ordinary `FuncBody`:
+the body is an ordinary `FuncBody`. User code must be compiled with
+`-experimental-feature` (declared in
+[slang-options.cpp](../../../../source/slang/slang-options.cpp), line
+1282); without it `visitFuncExtensionDecl` reports
+`FuncExtensionRequiresExperimentalFeature` (warning 30131) and stops
+processing the declaration, while declarations from the core module are
+exempt
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 17462-17471). A head other than `fwd_diff`, `bwd_diff`, or
+`__apply` is diagnosed as `FuncExtensionUnsupportedOperator` or
+`FuncExtensionUnsupportedTarget`.
 
 ```
 float cube(float x) { return x * x * x; }
@@ -384,15 +411,19 @@ VarDecl         ::= 'var' IDENT (':' Type)? ('=' ArgExpr)? ';' -- parseVarDecl
                   | Type VarDeclarator (',' VarDeclarator)* ';' -- C-style; context-sensitive
 LetDecl         ::= 'let' IDENT (':' Type)? ('=' ArgExpr)? ';'  -- parseLetDecl; '=' is parser-optional
 VarDeclarator   ::= Declarator Initializer?                    -- parseInitDeclarator
-ArraySuffix     ::= '[' Expr? ']' ArraySuffix?
+ArraySuffix     ::= '[' Expr? ']' ArraySuffix?                 -- parseDirectAbstractDeclarator
 Initializer     ::= '=' ArgExpr                                -- parseInitDeclarator (braced = InitListExpr)
 
-Declarator      ::= '*'? (DeclaratorName | '(' Declarator ')') ArraySuffix?
-                                                              -- parseDeclarator / UnwrapDeclarator
+Declarator      ::= '*' Declarator                             -- parseDeclarator (recursive pointer prefix)
+                  | (DeclaratorName | '(' Declarator ')') ArraySuffix?
+                                                              -- parseDirectAbstractDeclarator / UnwrapDeclarator
 DeclaratorName  ::= IDENT | 'operator' OperatorName            -- ParseDeclName; the 'operator'
                                                               --   form is legal only for a function
-OperatorName    ::= Operator | ',' | '=' | '(' ')' | '?' ':'   -- one operator token, or one of
-                                                              --   these three multi-token spellings
+OperatorName    ::= OperatorToken | ',' | '=' | '(' ')' | '?' ':' -- ParseDeclName switch; multi-token
+                                                              --   spellings: '(' ')' and '?' ':'
+OperatorToken   ::= '+' | '-' | '*' | '/' | '%' | '!' | '~' | '<<' | '>>' | '==' | '!='
+                  | '>' | '<' | '>=' | '<=' | '&&' | '||' | '^' | '&' | '|' | '++' | '--'
+                  | '+=' | '-=' | '*=' | '/=' | '%=' | '<<=' | '>>=' | '|=' | '&=' | '^='
 ```
 
 `Declarator` is the shared C-style name-plus-suffix grammar
@@ -418,7 +449,7 @@ declarator is followed by a parameter list or a generic `<`).
 ```
 CBufferDecl     ::= 'cbuffer' IDENT (':' Register)? '{' StructMember* '}'  -- parseHLSLCBufferDecl
 TBufferDecl     ::= 'tbuffer' IDENT (':' Register)? '{' StructMember* '}'  -- parseHLSLTBufferDecl
-Register        ::= 'register' '(' RegToken ')'
+Register        ::= 'register' '(' IDENT ('.' IDENT)? (',' IDENT)? ')'  -- ParseSemantic / parseHLSLRegisterSemantic
 ```
 
 ### User-defined syntax
@@ -430,10 +461,12 @@ SyntaxDecl          ::= 'syntax' IDENT (':' IDENT)? ('=' IDENT)? ';'
                                                               --   the '=' clause an existing keyword
                                                               --   to alias (its parse callback is
                                                               --   reused). One is intended, but the parser accepts neither (TODO)
-AttributeSyntaxDecl ::= 'attribute_syntax' '[' IDENT AttributeParams? ']' ':' IDENT ';'
+AttributeSyntaxDecl ::= 'attribute_syntax' '[' IDENT AttributeParams? ']' (':' IDENT)? ';'
                                                               -- parseAttributeSyntaxDecl; the ':'
                                                               --   clause names the AttributeDecl's
-                                                              --   syntax class -- there is no '='
+                                                              --   syntax class (intended to be
+                                                              --   required, but a missing clause is
+                                                              --   only a TODO) -- there is no '='
                                                               --   alias form for attributes
 AttributeParams     ::= '(' AttributeParam (',' AttributeParam)* ')'
 AttributeParam      ::= IDENT (':' Type)? ('=' ArgExpr)?      -- parseAttributeParamDecl
@@ -510,7 +543,9 @@ DoWhileStmt     ::= 'do' Stmt 'while' '(' Expr ')' ';'         -- ParseDoStateme
 DoCatchStmt     ::= 'do' Stmt ('catch' ('(' Param ')')? Stmt)+ -- ParseDoCatchStatement; chained catches nest
 
 SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- ParseSwitchStmt
-SwitchCase      ::= ('case' Expr ':' | 'default' ':') Stmt*    -- ParseCaseStmt / ParseDefaultStmt
+SwitchCase      ::= (CaseStmt | DefaultStmt) Stmt*
+CaseStmt        ::= 'case' Expr ':'                            -- ParseCaseStmt
+DefaultStmt     ::= 'default' ':'                              -- ParseDefaultStmt
 
 BreakStmt       ::= 'break' IDENT? ';'                          -- ParseBreakStatement
 ContinueStmt    ::= 'continue' ';'                             -- ParseContinueStatement
@@ -531,7 +566,9 @@ CompileTimeForStmt
                                                               --   parseCompileTimeForStmt the rest;
                                                               --   'Range' is a required literal keyword
                                                               --   here, and one argument means
-                                                              --   Range(end)
+                                                              --   Range(end); deprecated from
+                                                              --   language version 2025 and removed
+                                                              --   in 202c (see the note below)
 RequireCapabilityStmt
                 ::= '__requireCapability' '(' CapabilityName (',' CapabilityName)* ')' ';'
                                                               -- ParseRequireCapabilityStatement
@@ -540,6 +577,17 @@ DeclStmt        ::= Decl
 ExprStmt        ::= Expr ';'                                    -- ParseExpressionStatement
 EmptyStmt       ::= ';'
 ```
+
+`CompileTimeForStmt` is the legacy `$for` loop. `parseCompileTimeForStmt`
+reports `CompileTimeForIsDeprecated` (E30525) from language version 2025
+and `CompileTimeForIsRemoved` (E30526) from 202c; both name
+`[ForceUnroll] for` as the replacement. The loop variable is declared
+without a type; the checker gives it type `int` with a `const` modifier,
+and both `Range` arguments must be integer constants
+(`checkExpressionAndExpectIntegerConstant` with link-time folding), with
+an omitted first argument defaulting to 0
+([slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp)
+lines 361-390).
 
 The statement dispatcher also recognizes a set of compiler-internal
 statement keywords, all matched by direct identifier lookahead in
@@ -617,14 +665,14 @@ ShiftExpr       ::= AddExpr (('<<' | '>>') AddExpr)*           -- parseInfixExpr
 AddExpr         ::= MulExpr (('+' | '-') MulExpr)*            -- parseInfixExprWithPrecedence
 MulExpr         ::= UnaryExpr (('*' | '/' | '%') UnaryExpr)*  -- parseInfixExprWithPrecedence
 UnaryExpr       ::= UnaryOp UnaryExpr | PostfixExpr            -- parsePrefixExpr
-UnaryOp         ::= '+' | '-' | '!' | '~' | '++' | '--' | '*' | '&'
+UnaryOp         ::= '+' | '-' | '!' | '~' | '++' | '--' | '*' | '&'  -- parsePrefixExpr
 PostfixExpr     ::= AtomExpr PostfixSuffix*                    -- parsePostfixExpr
 PostfixSuffix   ::= '(' ArgList? ')'                           -- call
                   | '[' ArgList? ']'                            -- subscript; zero or more operands
                   | ('.' | '->') DeclaratorName                 -- MemberExpr / DerefMemberExpr
                   | '::' NameOrSubscript                        -- StaticMemberExpr
                   | '++' | '--'                                 -- postfix inc/dec
-                  | GenericSpecialization                       -- '<' Type/Expr (',' Type/Expr)* '>'  context-sensitive
+                  | GenericArgs                                  -- parseGenericApp; context-sensitive
 AtomExpr        ::= Literal                                    -- parseAtomicExpr (keyword syntax-decl dispatch)
                   | QualifiedName
                   | '(' Expr ')'                                -- parenthesized (ParenExpr)
@@ -669,19 +717,26 @@ AssignOp        ::= '=' | '+=' | '-=' | '*=' | '/=' | '%='
                   | '<<=' | '>>=' | '&=' | '|=' | '^='
 ```
 
-The value a `LambdaExpr` produces is consumed through the `IFunc`
-interface declared in
-[core.meta.slang](../../../../source/slang/core.meta.slang), whose
-requirement is `TR operator()(expand each TP p)`. The runnable
+A `LambdaExpr` is recognized in `parseAtomicExpr` when a parenthesized
+group is followed directly by `=>`. The value it produces is consumed
+through the `IFunc` interface declared in
+[core.meta.slang](../../../../source/slang/core.meta.slang) (line 2101),
+whose requirement is `TR operator()(expand each TP p)`. The runnable
 shape of the production is therefore a lambda passed to (or stored in)
-an `IFunc`-constrained binding, which is what supplies the call
-syntax:
+an `IFunc`-typed binding, which is what supplies the call syntax; a
+directly invoked lambda is not that shape:
 
 ```
 float apply(IFunc<float, float> f, float x) { return f(x); }
 
-// apply((float v) => v * 2.0, 3.0) is 6.0
+float twice(float x)
+{
+    return apply((float v) => v * 2.0, x);   // twice(3.0) is 6.0
+}
 ```
+
+The same pattern is exercised by
+`tests/language-feature/lambda/lambda-0.slang`.
 
 ### Literal forms vs. token kinds
 
@@ -723,25 +778,28 @@ is in the "generic-followers" set (`::`, `.`, `(`, `)`, `[`, `]`, `:`,
 `,`, `?`, `;`, `==`, `!=`, `>`, `>>`, end-of-file) treat the `<` as a
 generic application, otherwise back out and parse as a comparison.
 
-In body-parse mode (function bodies) a semantic visitor is available,
-and it becomes the primary signal: `tryParseGenericApp` checks the base
-expression with `CheckTerm` and skips the speculative parse entirely.
-A base that resolves to a `GenericDecl` is a generic application; so is
-one that resolves to a function or a type even when it is *not* generic,
-because a function or type name can never legally precede `<`, and
-committing to the generic reading produces a better diagnostic.
-Anything else is treated as a comparison.
+In body-parse mode (function bodies) a semantic visitor is available
+and `tryParseGenericApp` checks the base expression with `CheckTerm`
+first. A base that resolves to a `GenericDecl` commits to a generic
+application; so does one that resolves to a function or a type even
+when it is *not* generic, because a function or type name can never
+legally precede `<`, and committing produces a better diagnostic. A
+base known to be a value or other non-generic returns the comparison
+base. If the shape is not recognized (for example a `LetExpr` such as
+`h.o.get<4>()`), the kind stays `Unknown` and the parser falls through
+to the speculative parse and follower-token test above, even with a
+semantic visitor.
 
 Inside a generic argument list the ladder itself changes: while
 `genericDepth` is non-zero, `GetOpLevel` returns `Precedence::Invalid`
 for `>`, `>=`, and `>>`, so those tokens cannot be consumed as
 operators and are available to close the argument list
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
-7817-7831). `<`, `<=`, and the rest keep their normal precedence.
+8193-8206). `<`, `<=`, and the rest keep their normal precedence.
 
 The asymmetry is absolute, and parentheses do not rescue it.
 `genericDepth` is incremented only on entering a generic argument list
-and decremented on leaving it (lines 1750/1780, 2895/2914, 6158/6162);
+and decremented on leaving it (lines 1819/1849, 3023/3042, 6498/6502);
 nothing resets it for a nested parenthesized subexpression. So `>`,
 `>=`, and `>>` are unavailable as operators *anywhere* inside an open
 generic argument list, `A<(x > y)>` included — the inner `>` still
@@ -752,7 +810,7 @@ the spelling that does what it looks like.
 ## Modifiers
 
 ```
-ModifierList    ::= (Modifier | Attribute)+
+ModifierList    ::= (Modifier | Attribute)+                   -- ParseModifiers
 Modifier        ::= BareModifierKeyword                       -- takes no further tokens
                   | TailModifierKeyword ModifierTail?         -- tail required for most, optional
                                                               --   for four; see note
@@ -768,7 +826,8 @@ BareModifierKeyword
                   | 'dyn' | 'highp' | 'lowp' | 'mediump'
                   | 'volatile' | 'coherent' | 'restrict' | 'readonly' | 'writeonly'
                   | 'shared' | 'hitAttributeEXT'
-                  | '__ref' | '__constref' | '__builtin' | '__global' | '__exported'
+                  | '__ref' | '__ref_readonly' | '__ref_writeonly' | '__borrow'
+                  | '__constref' | '__builtin' | '__global' | '__exported'
                   | '__prefix' | '__postfix'
 TailModifierKeyword
                 ::= 'layout' | '__attributeTarget'            -- tail required
@@ -779,8 +838,8 @@ TailModifierKeyword
                   | '__intrinsic_op' | '__target_intrinsic'   -- tail optional
                   | '__specialized_for_target' | '__implicit_conversion'
 
-ModifierTail    ::= '(' ModifierArgs ')'                      -- per-modifier token shape, not a
-                                                              --   general ArgList; see note
+ModifierTail    ::= '(' ... ')'                               -- per-modifier token shape (deliberately
+                                                              --   abbreviated, not a non-terminal); see note
 ```
 
 The split follows `g_parseSyntaxEntries[]`: a modifier registered
@@ -810,7 +869,7 @@ Attribute       ::= '[' AttributeBody (','? AttributeBody)* ']'   -- ParseSquare
 AttributeBody   ::= AttributeName ('(' ArgList? ')')?
 AttributeName   ::= '::'? IDENT ('::' IDENT)*                  -- parseAttributeName
 
-ArgList         ::= ArgExpr (',' ArgExpr)*
+ArgList         ::= ArgExpr (',' ArgExpr)*                     -- ParseSquareBracketAttributes (ParseArgExpr loop)
 ```
 
 The bracket form `[name(args)]` is identical to a modifier in the
@@ -818,9 +877,11 @@ AST representation — `ParseSquareBracketAttributes` constructs
 `UncheckedAttribute` nodes that flow through the same `Modifier` chain
 as keyword modifiers (see
 [../ast-reference/modifiers.md](../ast-reference/modifiers.md)).
-The attribute name resolves through the same syntax-decl lookup
-the parser uses for keyword modifiers, with `attribute_syntax`
-declarations supplying the mapping from name to attribute class.
+Parsing performs no lookup: the `UncheckedAttribute` records the
+normalized name, arguments, and scope, and semantic checking later
+resolves the `AttributeDecl` (`lookUpAttributeDecl`,
+`LookupMask::Attribute`; slang-check-modifier.cpp). `attribute_syntax`
+declarations supply the mapping from name to attribute class.
 Inside a single bracket, multiple attributes may appear; the separating
 comma is optional, so `[a b]` and `[a, b]` parse the same way.
 
@@ -834,9 +895,10 @@ single-identifier lookup, regardless of how the attribute was spelled.
 ## Generics and where-clauses
 
 ```
-GenericDecl     ::= '__generic' '<' GenericParams '>' Decl     -- parseGenericDecl
+GenericDecl     ::= '__generic' GenericParamList Decl     -- parseGenericDecl
                                                               --   ALSO inline form on FuncDecl, StructDecl,
                                                               --   InterfaceDecl, ExtensionDecl, TypeAliasDecl
+GenericParamList ::= '<' GenericParams '>'                    -- ParseGenericDeclImpl (reads '<' and '>')
 GenericParams   ::= GenericParam (',' GenericParam)*           -- ParseGenericDeclImpl
 GenericParam    ::= 'typename'? IDENT (':' Type)? ('=' Type)?  -- type parameter, with an optional
                                                               --   constraint and default argument
@@ -876,10 +938,10 @@ creating an ordinary `GenericTypeParamDecl` and then a
 func-type-constraint and add it" — but that constraint is never given a
 `sub` or `sup` and is never `AddMember`ed to the generic
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
-1662-1671). What survives is therefore an unconstrained type parameter
+1731-1740). What survives is therefore an unconstrained type parameter
 with a dangling constraint node. The consequences follow from that: an
 optional `: Type` is handled by the shared tail below (lines
-1718-1734), which builds a normal subtype constraint and so demands an
+1789-1803), which builds a normal subtype constraint and so demands an
 interface, rejecting a function type such as `functype(int) -> int` as
 a constraint; and because nothing records that the parameter is
 callable, invoking it in the body does not resolve. Treat the
@@ -890,19 +952,30 @@ Each `where` keyword introduces exactly one `WhereTerm`
 (`maybeParseGenericConstraints` loops over `while (AdvanceIf("where"))`);
 to state several constraints, repeat the keyword. A leading
 `optional` modifier (parsed as `OptionalConstraintModifier`) is
-accepted on every term except `__hasDiffTypeInfo`. The
+consumed on every term, but only the conformance and equality terms
+keep it meaningfully: `optional __hasDiffTypeInfo(...)` is diagnosed by
+the parser (`OptionalHasDiffTypeInfoConstraintIsInvalid`, E30315), and
+`optional nonempty(...)` and `optional countof(...)` parse and are then
+rejected by the checker (`OptionalNonEmptyPackConstraintIsInvalid`,
+E30415, and `OptionalVariadicPackCountConstraintIsInvalid`, E30434). The
 `countof(Pack) == IntExpr` form is *oriented*: the reversed spelling
 `N == countof(Pack)` is recognized only to emit
-`VariadicPackCountConstraintRequiresCountofOnLeft`, which asks for the
-constraint to be rewritten with `countof` on the left, and the rest of
-that `where` clause is then skipped. `nonempty(Pack)` and
+`VariadicPackCountConstraintRequiresCountofOnLeft` (E30437, "`countof(...)`
+pack-count constraint must be written with `countof(...)` on the left
+side"), which asks for the constraint to be rewritten as
+`countof(Pack) == IntExpr`, and the rest of that `where` clause is then
+skipped. A comparison other than `==` after `countof(Pack)` is consumed
+and reported as `VariadicPackCountConstraintRequiresEquality` (E30436). `nonempty(Pack)` and
 `countof(Pack) == IntExpr` are pack-shape constraints on a variadic
 `each` parameter; `__hasDiffTypeInfo(Type)` is a compiler-internal
 differentiability constraint.
 
 An `optional` conformance constraint is one the argument type does not
 have to satisfy, so anything the constraint provides has to be guarded
-by an `is` test before it is used:
+by an `is` test before it is used; using it unguarded is diagnosed by
+the checker as `RequiredConstraintIsNotChecked` (E30403, "the constraint
+providing '...' is optional and must be checked with an 'is' statement
+before usage"):
 
 ```
 interface IThing { void thing(); }
@@ -930,13 +1003,16 @@ CoreType        ::= QualifiedName (GenericArgs | '.' IDENT)*   -- _parseSimpleTy
                   | CoreType '&' CoreType                       -- AndTypeExpr (_parseInfixTypeExprSuffix)
                   | Type '[' Expr? ']'                          -- array (parsePostfixTypeSuffix)
                   | Type '*'                                    -- pointer-to-T (parsePostfixTypeSuffix)
-                  | 'functype' '(' Type (',' Type)* ')' '->' Type
+                  | 'functype' '(' (Type (',' Type)*)? ')' '->' Type
                                                               -- function type (parseFuncTypeExpr)
                   | '__func_as_type' ...                        -- function-as-type reflection
                                                               --   (parseFuncAsTypeExpr)
                   | StructDecl | ClassDecl | EnumDecl           -- an inline type declaration used as
                                                               --   a type specifier, e.g.
                                                               --   `struct Foo { int x; } foo;`
+                  | 'unsigned' 'int'?                           -- HLSL source only; always means
+                                                              --   `uint` (HLSLUnsignedTypeExpr via
+                                                              --   parseHLSLTraditionalIntegerTypeSpecifier)
                   | 'each' Type | 'expand' Type                 -- pack types; parsed as prefix
                                                               --   expressions (parseEachExpr /
                                                               --   parseExpandExpr via parsePrefixExpr)
@@ -944,6 +1020,10 @@ GenericArgs     ::= '<' GenericArg (',' GenericArg)* '>'        -- parseGenericA
 GenericArg      ::= Type | Expr                                 -- _parseGenericArg; ambiguous,
                                                               --   resolved at check time
 ```
+
+In HLSL source `signed`, and `unsigned` followed by `char`, `short`, or
+`long`, are recognized by the same function only to diagnose them
+(`SignedTypeNameInHlsl`, `UnsupportedTraditionalIntegerTypeNameInHlsl`).
 
 Built-in concrete type names (`int`, `float`, `vector<T,N>`,
 `Texture2D<T>`, `RWStructuredBuffer<T>`, ...) are not part of the

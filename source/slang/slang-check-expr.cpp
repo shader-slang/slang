@@ -314,14 +314,6 @@ static SourceLoc _getMemberOpLoc(Expr* expr)
     return SourceLoc();
 }
 
-void addSiblingScopeForContainerDecl(
-    ASTBuilder* builder,
-    ContainerDecl* dest,
-    ContainerDecl* source)
-{
-    addSiblingScopeForContainerDecl(builder, dest->ownedScope, source);
-}
-
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source)
 {
     auto subScope = builder->create<Scope>();
@@ -361,65 +353,68 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     SourceLoc loc,
     Expr* originalExpr)
 {
-    // Resolve the module for the context
+    // Usage attributes depend on the language version of the module being checked.
+    // We first look for that module in the current lexical scope.
     ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
 
-    // If we don't get the module declaration from the outer scope, we'll
-    // try the visitor context
-    if (!moduleDecl && getShared() && getShared()->getModule())
-        moduleDecl = getShared()->getModule()->getModuleDecl();
+    // Some semantic queries run outside a lexical module scope. We then try the module
+    // recorded in the visitor's shared context.
+    if (!moduleDecl)
+    {
+        auto shared = getShared();
+        // Without a shared context, we have no module language version for this check.
+        if (!shared)
+            return;
 
-    // And if we can't figure out a module, we're called in a context where we
-    // don't care about the deprecation attributes
+        auto module = shared->getModule();
+        // A shared context without a module likewise has no language version to apply.
+        if (!module)
+            return;
+        moduleDecl = module->getModuleDecl();
+    }
+
+    // If neither context provides a module declaration, this query has no language version
+    // against which to check usage attributes.
     if (!moduleDecl)
         return;
 
-    // This is slightly subtle, because we don't want to warn more than
-    // once for the same occurrence, however in some cases this function is
-    // called more than once for the same declref (specifically in the case
-    // of a non-overloaded function, once when the function is identified at
-    // first, and again when it's checked from
-    // CheckInvokeExprWithCheckedOperands).
-    //
-    // The correct fix is probably to make
-    // CheckInvokeExprWithCheckedOperands reuse the original declref,
-    // however that doesn't appear to be a simple change.
-    //
-    // What we do instead is see if there's already been a declRef
-    // constructed for this expression and rest assured that it's already
-    // had a diagnostic emitted.
-    //
-    // The already-resolved declRef must refer to the *same* declaration we are
-    // about to diagnose. For a constructor call such as `int4(int2(1,2), 3)` the
-    // invoke's `functionExpr` is a reference to the *type* `int4`, which always
-    // carries a declRef (to the type, not the constructor). Without the
-    // same-decl check we would treat the type reference as "already diagnosed"
-    // and silently skip the constructor's own `[deprecated]` / `[RemovedSince]`
-    // diagnostic.
+    // We can check a function use once during lookup and again in
+    // `CheckInvokeExprWithCheckedOperands`. We avoid a repeated diagnostic only if that
+    // invocation's checked function expression refers to the same declaration.
     auto originalAppExpr = as<AppExprBase>(originalExpr);
     auto originalAppFunDecl =
         originalAppExpr ? as<DeclRefExpr>(originalAppExpr->functionExpr) : nullptr;
-    if (originalAppFunDecl && originalAppFunDecl->declRef &&
-        originalAppFunDecl->declRef.getDecl() == declRef.getDecl())
+    if (originalAppFunDecl)
     {
-        return;
+        auto originalDeclRef = originalAppFunDecl->declRef;
+        if (originalDeclRef)
+        {
+            // For `int4(int2(1, 2), 3)`, the function expression refers to the type `int4`,
+            // not its constructor. A type-use check does not diagnose constructor attributes.
+            // We suppress a repeat only when the actual declarations are identical.
+            if (originalDeclRef.getDecl() == declRef.getDecl())
+                return;
+        }
     }
 
-    // If the expression location is the same as the declaration location, don't
-    // diagnose. This avoids diagnosing struct member fields which get
-    // referenced by synthesized constructors etc.
-    if (declRef.getDecl() && originalExpr && (declRef.getDecl()->getNameLoc() == originalExpr->loc))
+    // We suppress declaration-use diagnostics at the declaration's name location.
+    // Synthesized constructors refer to fields at those locations, so this rule avoids
+    // reporting their generated field accesses.
+    if (originalExpr)
     {
-        return;
+        if (declRef.getDecl()->getNameLoc() == originalExpr->loc)
+            return;
     }
 
-    // Check whether we're using a removed declaration
+    // We check removal first because a removed declaration requires an error, even if it is
+    // also deprecated. Diagnostics receive the declaration instead of its internal identifier
+    // so `printDiagnosticArg` can use the original name of a renamed shader parameter.
     if (auto removedSinceAttr = declRef.getDecl()->findModifier<RemovedSinceAttribute>())
     {
         if (moduleDecl->languageVersion >= removedSinceAttr->sinceVersion)
         {
             getSink()->diagnose(Diagnostics::RemovedUsage{
-                .declName = declRef.getName(),
+                .decl = declRef.getDecl(),
                 .sinceVersion = removedSinceAttr->sinceVersion,
                 .message = removedSinceAttr->message,
                 .location = loc});
@@ -428,11 +423,12 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
         }
     }
 
-    // Check whether we're using a deprecated declaration
+    // If the declaration has not been removed in this language version, we report deprecation
+    // as a warning. The declaration formatter supplies its user-visible name here as well.
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
-            .declName = declRef.getName(),
+            .decl = declRef.getDecl(),
             .message = deprecatedAttr->message,
             .location = loc});
     }
@@ -475,27 +471,51 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     SourceLoc loc,
     Expr* originalExpr)
 {
-    // Compute the type that this declaration reference will have in context.
-    //
+    // We first need the declaration's checked type and read/write qualifiers. The type query
+    // also checks its header before we use declaration-specific semantic information below.
     auto type = GetTypeForDeclRef(declRef, loc);
 
-    // This is the bottleneck for using declarations which might be
-    // deprecated, diagnose here.
-    if (getSink())
-        diagnoseDeprecatedAndRemovedDeclRefUsage(declRef, loc, originalExpr);
+    // Lookup can find a uniform shadow instead of the parameter the programmer declared.
+    // We diagnose deprecated or removed parameter uses from that original declaration, even
+    // when the expression must refer to mutable shadow storage.
+    auto declRefForUsageDiagnostics = declRef;
 
-    // Construct an appropriate expression based on the structured of
-    // the declaration reference.
-    //
+    // We preserve an immutable alias's parameter identity in the checked expression.
+    // Consider `[[vk::constant_id(7)]] uint count = 3;` followed by
+    // `[numthreads(count, 1, 1)] void main() {}`. Attribute checking must receive a
+    // reference to the parameter declaration that carries the specialization attribute.
+    // `GetTypeForDeclRef` has checked the shadow's header before we inspect its alias flag.
+    if (auto shadow = as<UniformParameterShadowVarDecl>(declRef.getDecl()))
+    {
+        auto parameter = shadow->uniformParameter;
+        declRefForUsageDiagnostics = parameter->getDefaultDeclRef();
+
+        // We canonicalize only immutable aliases. Mutable shadows must retain references to
+        // their own declarations so lowering can access their private storage.
+        if (shadow->shouldBeImmutableAlias)
+        {
+            // A legacy `cbuffer` shadow has the element struct type instead of the parameter's
+            // `ConstantBuffer<T>` type. We retain that shadow to represent reads of the contents.
+            // Other immutable aliases have the parameter's type and need no separate identity.
+            if (shadow->getType()->equals(parameter->getType()))
+            {
+                // The parser creates both declarations at non-generic file or namespace scope,
+                // so the parameter's default declaration reference preserves all needed context.
+                declRef = parameter->getDefaultDeclRef();
+            }
+        }
+    }
+
+    // We report deprecation or removal at this use's location before constructing its
+    // checked expression. For a uniform shadow, we check the parameter selected above.
+    if (getSink())
+        diagnoseDeprecatedAndRemovedDeclRefUsage(declRefForUsageDiagnostics, loc, originalExpr);
+
+    // We now choose the expression kind. A reference without a base becomes a `VarExpr`.
+    // With a base, we distinguish static member references from instance member accesses.
     if (baseExpr)
     {
-        // If there was a base expression, we will have some kind of
-        // member expression.
-
-        // We want to check for the case where the base "expression"
-        // actually names a type, because in that case we are doing
-        // a static member reference.
-        //
+        // A type-valued base, such as `Thing` in `Thing.member`, selects a static member.
         if (auto typeType = as<TypeType>(baseExpr->type->getCanonicalType()))
         {
             // Before forming the reference, we will check if the
@@ -534,7 +554,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         }
         else if (isEffectivelyStatic(declRef.getDecl()))
         {
-            // Extract the type of the baseExpr
+            // A static declaration can also be accessed through a value, as in `value.member`.
+            // We represent its base by the value's type so the resulting `StaticMemberExpr`
+            // identifies the static declaration without requiring an instance value.
             auto baseExprType = baseExpr->type.type;
             SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
             baseTypeExpr->base.type = baseExprType;
@@ -551,9 +573,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
         }
         else
         {
-            // If the base expression wasn't a type, then this
-            // is a normal member expression.
-            //
+            // The remaining case is an instance member accessed through a value. We combine
+            // the member's qualifiers with the restrictions on that base value.
             auto expr = m_astBuilder->create<MemberExpr>();
             expr->loc = loc;
             expr->type = type;
@@ -562,9 +583,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             expr->declRef = declRef;
             expr->memberOperatorLoc = _getMemberOpLoc(originalExpr);
 
-            // If any member declares the following value is a
-            // write only, we must declare the parent as a write
-            // only to avoid modifying the child
+            // Reading a member of a write-only value would also read that base value. We
+            // propagate the base's write-only restriction to the resulting member expression.
             expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
 
             // It's not valid to reference a non-static member with a static
@@ -577,23 +597,23 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 expr->type = m_astBuilder->getErrorType();
             }
 
-            // When referring to a member through an expression,
-            // the result is only an l-value if both the base
-            // expression and the member agree that it should be.
-            //
-            // We have already used the `QualType` from the member
-            // above (that is `type`), so we need to take the
-            // l-value status of the base expression into account now.
+            const bool isFieldWritableThroughWritableBase =
+                expr->type.isLeftValue && as<VarDeclBase>(declRef.getDecl());
+
+            // The member's `QualType` supplies its own l-value status. An ordinary instance
+            // member additionally requires an l-value base. Buffer accesses and property
+            // accessors have the separate rules below when the base is not an l-value.
             if (!baseExpr->type.isLeftValue)
             {
-                // One exception to this is if we're reading the contents
-                // of a GLSL buffer interface block which isn't marked as
-                // read_only
+                // A GLSL buffer interface block provides mutable storage even though its
+                // parameter expression is not an l-value. The member is writable only when
+                // the block is mutable and the member is not read-only on this target.
                 expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) &&
                                          (expr->type.hasReadOnlyOnTarget == false);
 
-                // Another exception is if we are accessing a property
-                // that provides a [nonmutating] setter.
+                // A property may be writable without a writable base. We inspect its first
+                // setter or ref accessor to determine whether it requires writable receiver
+                // storage.
                 if (!expr->type.isLeftValue)
                 {
                     if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
@@ -603,7 +623,11 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                         {
                             if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
                             {
-                                if (member->findModifier<NonmutatingAttribute>())
+                                auto accessorDeclRef =
+                                    m_astBuilder->getMemberDeclRef(declRef, member);
+                                auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+                                if (thisParamInfo && !doesParamPassingModeIndicateWritableStorage(
+                                                         thisParamInfo->mode))
                                 {
                                     isLValue = true;
                                 }
@@ -616,8 +640,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             }
             else
             {
-                // If we are accessing a readonly property, then the result
-                // is not an l-value.
+                // A writable base alone is insufficient for a property: assigning the
+                // property requires a setter or ref accessor. A getter-only property is read-only.
                 if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
                 {
                     bool isLValue = false;
@@ -632,21 +656,27 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                     expr->type.isLeftValue = isLValue;
                 }
             }
+
+            // A field of a read-only memory location is part of that location, provided the
+            // field would be writable through a writable base. A property is excluded because
+            // its accessors do not name a memory location.
+            expr->type.isReadOnlyMemoryLocation = !expr->type.isLeftValue &&
+                                                  baseExpr->type.isReadOnlyMemoryLocation &&
+                                                  isFieldWritableThroughWritableBase;
             return expr;
         }
     }
     else
     {
-        // If there is no base expression, then the result must
-        // be an ordinary variable expression.
-        //
+        // With no base, we construct a `VarExpr` using the checked declaration's qualifiers.
         auto expr = m_astBuilder->create<VarExpr>();
         expr->loc = loc;
         expr->name = name;
         expr->type = type;
         expr->declRef = declRef;
-        // Keep a reference to the original expr if it was a genericApp/member.
-        // This is needed by the language server to locate the original tokens.
+        // Generic applications and member expressions include tokens that are absent from
+        // the resulting `VarExpr`. We retain `originalExpr` for the language server to locate
+        // those tokens in the expression written by the programmer.
         if (as<GenericAppExpr>(originalExpr) || as<MemberExpr>(originalExpr) ||
             as<StaticMemberExpr>(originalExpr))
         {
@@ -690,8 +720,9 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         // however, and so the code here might need updating sooner or
         // later.
         //
-        bool baseIsLVal = QualType(base->type.type).isLeftValue;
-        derefExpr->type.isLeftValue = baseIsLVal;
+        QualType refQualType(base->type.type);
+        derefExpr->type.isLeftValue = refQualType.isLeftValue;
+        derefExpr->type.isReadOnlyMemoryLocation = refQualType.isReadOnlyMemoryLocation;
     }
     else if (isImmutableBufferType(base->type))
     {
@@ -702,6 +733,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
         derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.isReadOnlyMemoryLocation = base->type.isReadOnlyMemoryLocation;
         derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
         derefExpr->type.isWriteOnly = base->type.isWriteOnly;
     }
@@ -973,7 +1005,7 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
             }
             break;
 
-        case LookupResultItem::Breadcrumb::Kind::This:
+        case LookupResultItem::Breadcrumb::Kind::ThisType:
             {
                 // We expect a `this` to always come
                 // at the start of a chain.
@@ -985,64 +1017,65 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                 //
                 auto thisType = calcThisType(breadcrumb->declRef);
 
-                // Next we construct an appropriate expression to
-                // stand in for the implicit `this` or `This` reference.
+                // If we are in a static context, then we do not have a `this` expression, and
+                // the expression we construct will need to start with the `This` type.
                 //
-                // The lookup process will have computed the appropriate
-                // "mode" to use for the implicit `this` or `This`.
+                // Because we are constrained to yield an expression
+                // here, we must construct an expression that
+                // references `This`, and the *type* of that expression
+                // will be `typeof(This)`, which conceptually
+                // `typeof(typeof(this))`
                 //
-                auto thisParameterMode = breadcrumb->thisParameterMode;
-                if (thisParameterMode == LookupResultItem::Breadcrumb::ThisParameterMode::Type)
-                {
-                    // If we are in a static context, then we do not
-                    // have implicit `this` expression, and the expression
-                    // we construct will need to start with the `This`
-                    // type.
-                    //
-                    // Because we are constrained to yield an expression
-                    // here, we must construct an expression that
-                    // references `This`, and the *type* of that expression
-                    // will be `typeof(This)`, which conceptually
-                    // `typeof(typeof(this))`
-                    //
-                    auto thisTypeType = m_astBuilder->getTypeType(thisType);
+                auto thisTypeType = m_astBuilder->getTypeType(thisType);
 
-                    auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
-                    typeExpr->type.type = thisTypeType;
-                    typeExpr->base.type = thisType;
+                auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
+                typeExpr->type.type = thisTypeType;
+                typeExpr->base.type = thisType;
 
-                    bb = typeExpr;
-                }
-                else
-                {
-                    // In a context where both static and instance members can
-                    // be referenced, we will construct a reference to `this`,
-                    // and then rely on downstream logic to ensure that a
-                    // refernece to `this.someStaticMember` will be translated
-                    // over to `This.someStaticMember`.
-                    //
-                    ThisExpr* expr = m_astBuilder->create<ThisExpr>();
-                    expr->type.type = thisType;
-                    expr->loc = loc;
-                    if (auto declRefExpr = as<DeclRefExpr>(originalExpr))
-                        expr->scope = declRefExpr->scope;
-                    else if (auto invokeExpr = as<InvokeExpr>(originalExpr))
-                    {
-                        if (auto calleeDeclRefExpr =
-                                as<DeclRefExpr>(invokeExpr->originalFunctionExpr))
-                            expr->scope = calleeDeclRefExpr->scope;
-                    }
-                    // Whether or not the implicit `this` is mutable depends
-                    // on the context in which it is used, and the lookup
-                    // logic will have computed an appropriate "mode" based
-                    // on the context during lookup.
-                    //
-                    expr->type.isLeftValue =
-                        thisParameterMode ==
-                        LookupResultItem::Breadcrumb::ThisParameterMode::MutableValue;
+                bb = typeExpr;
+            }
+            break;
 
-                    bb = expr;
-                }
+        case LookupResultItem::Breadcrumb::Kind::ThisExpr:
+            {
+                // We expect a `this` to always come
+                // at the start of a chain.
+                SLANG_ASSERT(bb == nullptr);
+
+                auto thisExpr = m_astBuilder->create<ThisExpr>();
+                thisExpr->loc = loc;
+                thisExpr->scope = breadcrumb->getThisExprScope();
+
+                // Lookup switches to `ThisType` after leaving a static callable or property scope,
+                // or a nested type or extension scope. For a `ThisExpr` breadcrumb, member lookup
+                // and `this` checking therefore use the same enclosing type context from the
+                // original scope. For a valid breadcrumb, `checkThisExprWithoutCapturing` cannot
+                // exhaust that scope chain and diagnose `this` outside a type declaration.
+                //
+                // Consider this HLSL example:
+                //
+                //     struct Counter
+                //     {
+                //         static const int elementCount = 4;
+                //         void replace(int[elementCount] values) {}
+                //     };
+                //
+                // Checking the parameter type currently constructs an implicit `this` before
+                // checking has attached `replace`'s receiver parameter information. We check
+                // implicit and explicit `this` expressions through the same routine. We defer
+                // lambda capture until the surrounding member expression has been constructed.
+                //
+                // TODO(tfoley): When implicit `this` denotes a receiver parameter, we should use
+                // its stored parameter information. We currently compute it during signature
+                // checking even for a static member such as `elementCount`, which needs no receiver
+                // value. Issue #13674 tracks separating visibility from accessibility so we can
+                // remove that early receiver parameter computation:
+                // https://github.com/shader-slang/slang/issues/13674
+                bb = checkThisExprWithoutCapturing(thisExpr);
+
+                // This direct helper call bypasses `CheckTerm`, which normally marks the returned
+                // expression as checked.
+                bb->checked = true;
             }
             break;
 
@@ -3463,6 +3496,7 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
+    subscriptExpr->type.isReadOnlyMemoryLocation = baseExpr->type.isReadOnlyMemoryLocation;
 
     return subscriptExpr;
 }
@@ -3575,24 +3609,31 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
     bool needDeref = false;
-    auto baseExpr = checkBaseForMemberExpr(
-        subscriptExpr->baseExpression,
-        CheckBaseContext::Subscript,
-        needDeref);
+    Expr* baseExpr = nullptr;
+    {
+        // As in `visitInvokeExpr`, an enclosing `try` covers the subscript call but not its
+        // operands.
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
 
-    // If the base expression is a type, it means that this is an array declaration,
-    // then we should disable short-circuit in case there is logical expression in
-    // the subscript
+        baseExpr = checkBaseForMemberExpr(
+            subscriptExpr->baseExpression,
+            CheckBaseContext::Subscript,
+            needDeref);
+
+        // If the base expression is a type, it means that this is an array declaration,
+        // then we should disable short-circuit in case there is logical expression in
+        // the subscript
+        auto subVisitor = (as<TypeType>(baseExpr->type.Ptr()) && m_shouldShortCircuitLogicExpr)
+                              ? SemanticsVisitor(disableShortCircuitLogicalExpr())
+                              : *this;
+
+        for (auto& arg : subscriptExpr->indexExprs)
+        {
+            arg = subVisitor.CheckTerm(arg);
+        }
+    }
     auto baseType = baseExpr->type.Ptr();
     auto baseTypeType = as<TypeType>(baseType);
-    auto subVisitor = (baseTypeType && m_shouldShortCircuitLogicExpr)
-                          ? SemanticsVisitor(disableShortCircuitLogicalExpr())
-                          : *this;
-
-    for (auto& arg : subscriptExpr->indexExprs)
-    {
-        arg = subVisitor.CheckTerm(arg);
-    }
 
     // If anything went wrong in the base expression,
     // then just move along...
@@ -3833,6 +3874,16 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             maybeDiagnoseConstVariableAssignment(expr->left);
 
             getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
+        }
+    }
+    else
+    {
+        if (auto var =
+                findGroupSharedVariablePartlyWrittenInDifferentiatedBody(expr->left, expr->left))
+        {
+            getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+                .var = var,
+                .target = expr->left});
         }
     }
     expr->type = type;
@@ -4114,8 +4165,8 @@ static Expr* _peelCastsAndParens(Expr* expr)
 }
 
 // Check whether two expressions refer to the same storage location by
-// comparing their structure in lockstep. Handles the implicit object
-// (`this` == `this`), bare variable / static-member references, member
+// comparing their structure in lockstep. Handles the receiver object (`this` == `this`), bare
+// variable / static-member references, member
 // accesses (s.x == s.x, but not s.x == s.y), and subscripts with matching
 // constant indices (arr[0] == arr[0], but not arr[0] == arr[1]). Returns
 // false for anything it can't prove equal.
@@ -4126,7 +4177,7 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (!a || !b)
         return false;
 
-    // Same implicit object: `this` vs `this`. There is exactly one `this` in a
+    // Same receiver object: `this` vs `this`. There is exactly one `this` in a
     // given method body, so any two `ThisExpr` nodes necessarily refer to the
     // same object; that is why this returns true without comparing them further
     // (there is no per-`this` identity to compare, unlike a named variable).
@@ -4183,28 +4234,58 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     return false;
 }
 
-static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
+/// Return whether a parameter of mode `mode` may be a reference to its argument's storage during
+/// the call, rather than a copy of it.
+static bool _mayParamBeReferenceToArgumentStorage(ParamPassingMode mode)
 {
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    return as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+    // An `in` parameter may become a borrow in `transformParamsToConstRef`, but that borrow is
+    // never a reference to argument storage the call can modify.
+    if (mode == ParamPassingMode::In)
+        return false;
+
+    // The `ref` modes are always references. The language defines `out`, `inout`, and borrow
+    // parameters as copies, but lets the compiler pass them by reference instead, on the
+    // assumption that well-written code cannot tell the difference. Targets make different
+    // choices: when `addArg` lowers such an argument that names a memory location, it passes the
+    // address of that location, which HLSL and GLSL then emit as copying parameters, while SPIR-V,
+    // Metal, CUDA, C++, and WGSL keep it as a pointer to the caller's variable.
+    return true;
 }
 
-static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
+/// Return whether passing overlapping argument storage to parameters of modes `first` and `second`
+/// may be undefined behavior, so that the potential-aliasing warning applies.
+static bool _mayAliasedArgumentsInterfere(ParamPassingMode first, ParamPassingMode second)
 {
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    if (as<OutParamType>(paramType))
-        return "out";
-    if (as<BorrowInOutParamType>(paramType))
-        return "inout";
-    if (as<RefParamType>(paramType))
-        return "ref";
-    return "in";
+    // A copy is taken before the call, so nothing done through the other parameter can affect it.
+    if (!_mayParamBeReferenceToArgumentStorage(first) ||
+        !_mayParamBeReferenceToArgumentStorage(second))
+        return false;
+
+    // A function that declares two reference parameters has opted into reference semantics for
+    // both, so we assume it handles their aliasing. A borrow, `out`, or `inout` parameter has value
+    // semantics that the target may implement by reference, so pairing one with any parameter that
+    // may write the storage still warns.
+    if (isByReferenceParamPassingMode(first) && isByReferenceParamPassingMode(second))
+        return false;
+
+    // Both parameters may be references to the same storage. Two read-only references
+    // (`ref_readonly`, `borrow`, `constref`) cannot change it, but a write through either one
+    // makes the result depend on how the target passed them. Consider this example:
+    //
+    //     int f(inout int a, __borrow int b) { a = 5; return b; }
+    //     int x = 1;
+    //     f(x, x);
+    //
+    // On HLSL, `a` and `b` are copies of `x`, so `f` returns 1. On Metal, both are pointers to
+    // `x`, so `f` returns 5.
+    return doesParamPassingModeIndicateWritableStorage(first) ||
+           doesParamPassingModeIndicateWritableStorage(second);
 }
 
 void SemanticsVisitor::_checkAliasedOutArguments(
     InvokeExpr* invoke,
     FuncType* funcType,
-    FunctionDeclBase* funcDeclBase)
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
 {
     // Operator expressions (compound assignments like `a += a`, prefix/postfix
     // `++a`, etc.) desugar into function calls with `inout` parameters but have
@@ -4218,45 +4299,79 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     Index checkCount = Math::Min(argCount, paramCount);
 
     // For each pair of arguments, check if they refer to the same storage
-    // and at least one parameter is out/inout/ref. We compare expressions
-    // structurally: bare variables (a == a), member accesses (s.x == s.x
-    // but not s.x == s.y), and constant-index subscripts (arr[0] == arr[0]
-    // but not arr[0] == arr[1]).
+    // and their parameters' modes let the aliasing interfere. We compare
+    // expressions structurally: bare variables (a == a), member accesses
+    // (s.x == s.x but not s.x == s.y), and constant-index subscripts
+    // (arr[0] == arr[0] but not arr[0] == arr[1]).
     for (Index i = 0; i < checkCount; ++i)
     {
-        bool iIsOut = _isOutInOutOrRefParam(funcType, i);
+        const auto iMode = funcType->getParamPassingMode(i);
 
         for (Index j = i + 1; j < checkCount; ++j)
         {
-            // At least one of the two must be out/inout/ref.
-            bool jIsOut = _isOutInOutOrRefParam(funcType, j);
-            if (!iIsOut && !jIsOut)
+            const auto jMode = funcType->getParamPassingMode(j);
+            if (!_mayAliasedArgumentsInterfere(iMode, jMode))
                 continue;
 
             if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
                 continue;
 
-            // Both arguments refer to the same variable and at least
-            // one is out/inout/ref. Put the out/inout/ref parameter
-            // first in the diagnostic for clarity.
-            Index first = iIsOut ? i : j;
-            Index second = iIsOut ? j : i;
+            // Both arguments refer to the same variable. Put a parameter that
+            // may be written first in the diagnostic for clarity.
+            const bool iMayBeWritten = doesParamPassingModeIndicateWritableStorage(iMode);
+            Index first = iMayBeWritten ? i : j;
+            Index second = iMayBeWritten ? j : i;
 
             Name* paramNameFirst = nullptr;
             Name* paramNameSecond = nullptr;
-            if (funcDeclBase && funcDeclBase->getParameters().getCount() > first)
-                paramNameFirst = funcDeclBase->getParameters()[first]->getName();
-            if (funcDeclBase && funcDeclBase->getParameters().getCount() > second)
-                paramNameSecond = funcDeclBase->getParameters()[second]->getName();
+            if (paramDeclRefs.getCount() > first)
+                paramNameFirst = paramDeclRefs[first].getName();
+            if (paramDeclRefs.getCount() > second)
+                paramNameSecond = paramDeclRefs[second].getName();
 
             getSink()->diagnose(Diagnostics::PotentiallyAliasedOutParameter{
-                .direction1 = _getDirectionString(funcType, first),
+                .direction1 = funcType->getParamPassingMode(first),
                 .param1 = paramNameFirst,
-                .direction2 = _getDirectionString(funcType, second),
+                .direction2 = funcType->getParamPassingMode(second),
                 .param2 = paramNameSecond,
                 .firstArg = invoke->arguments[first]});
             break; // One warning per outer index i is enough.
         }
+    }
+}
+
+void SemanticsVisitor::checkThrowingCallIsCovered(InvokeExpr* invoke)
+{
+    if (m_enclosingTryClauseType != TryClauseType::None)
+        return;
+    if (m_pendingTryCoverage)
+    {
+        m_pendingTryCoverage->add(invoke);
+        return;
+    }
+    getSink()->diagnose(Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
+}
+
+bool SemanticsVisitor::shouldDeferArgumentTryCoverage(InvokeExpr* expr)
+{
+    if (expr->arguments.getCount() != 1 || as<OperatorExpr>(expr))
+        return false;
+    return m_enclosingTryClauseType != TryClauseType::None || m_pendingTryCoverage;
+}
+
+void SemanticsVisitor::settlePendingTryCoverage(
+    Expr* checkedExpr,
+    List<InvokeExpr*> const& pendingCalls)
+{
+    // A call that the conversion resolved to takes the conversion's place, as `f()` does in
+    // `int(f())`, so the same `try` covers it. A call nested deeper, as in `int(f().x)`, is not
+    // covered.
+    for (auto invoke : pendingCalls)
+    {
+        if (invoke == checkedExpr)
+            checkThrowingCallIsCovered(invoke);
+        else
+            getSink()->diagnose(Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
     }
 }
 
@@ -4281,19 +4396,20 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
             if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
-            {
-                // If the callee throws, make sure we are inside a try clause.
-                if (m_enclosingTryClauseType == TryClauseType::None)
-                {
-                    getSink()->diagnose(
-                        Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
-                }
-            }
+                checkThrowingCallIsCovered(invoke);
 
             auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
-            FunctionDeclBase* funcDeclBase = nullptr;
+            DeclRef<CallableDecl> callableDeclRef;
+            List<DeclRef<ParamDecl>> paramDeclRefs;
             if (funcDeclRefExpr)
-                funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
+            {
+                callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>();
+                if (callableDeclRef)
+                {
+                    paramDeclRefs =
+                        getParametersForCallableSignature(m_astBuilder, callableDeclRef);
+                }
+            }
 
             Index paramCount = funcType->getParamCount();
 
@@ -4305,12 +4421,19 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 if (pp < invoke->arguments.getCount())
                 {
                     argExpr = invoke->arguments[pp];
-                    if (funcDeclBase && funcDeclBase->getParameters().getCount() > pp)
-                        paramDecl = funcDeclBase->getParameters()[pp];
+                    if (paramDeclRefs.getCount() > pp)
+                        paramDecl = paramDeclRefs[pp].getDecl();
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
 
-                if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
+                // A parameter that takes its default value has no argument, and a call through a
+                // value of function type has no parameter declarations, so neither has a
+                // `groupshared` argument to check.
+                //
+                if (paramDecl && argExpr && paramDecl->hasModifier<HLSLGroupSharedModifier>())
+                    checkArgumentOfGroupSharedParam(paramDecl, argExpr);
+
+                if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -4319,9 +4442,14 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     // for an `inout` parameter to be converted in both
                     // directions.
                     //
+                    // A `__ref_readonly` parameter only reads its argument, so the argument
+                    // may also be a memory location that the caller cannot write.
+                    const bool acceptsReadOnlyMemoryLocation =
+                        as<RefReadOnlyParamType>(paramType) != nullptr;
                     if (argExpr)
                     {
-                        if (!argExpr->type.isLeftValue)
+                        if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
+                                                            argExpr->type.isReadOnlyMemoryLocation))
                         {
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
@@ -4430,7 +4558,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
-                                    if (as<RefParamType>(paramType))
+                                    if (as<RefParamTypeBase>(paramType))
                                     {
                                         // Ref types are not allowed to use this mechanism
                                         // because it breaks atomics
@@ -4492,11 +4620,10 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Check for potentially aliased out/inout/ref arguments.
-            // If two arguments refer to the same root variable and at
-            // least one of them is out/inout/ref, the behavior is
-            // undefined (issue #10699).
-            _checkAliasedOutArguments(invoke, funcType, funcDeclBase);
+            // Warn when the same storage is passed to two parameters that may both be references
+            // to it, and at least one may write it (issue #10699).
+            _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
+            checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -5179,23 +5306,38 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         expr->originalFunctionExpr = expr->functionExpr;
     auto treatAsDifferentiableExpr = m_treatAsDifferentiableExpr;
     m_treatAsDifferentiableExpr = nullptr;
-    // Next check the argument expressions
-    for (auto& arg : expr->arguments)
+    // An enclosing `try` covers this call but not the calls in its operands, so we check the
+    // arguments and the callee outside it. A throwing call in the argument of a possible identity
+    // conversion waits for this call to resolve, as in `try int(f())`.
+    List<InvokeExpr*> pendingTryCoverage;
     {
-        arg = CheckExpr(arg);
+        OperandTryCoverageRAII operandTryCoverage(
+            this,
+            shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr);
+        // Next check the argument expressions
+        for (auto& arg : expr->arguments)
+        {
+            arg = CheckExpr(arg);
+        }
     }
 
     // if the expression is '&&' or '||', we will convert it
     // to use short-circuit evaluation.
     if (auto newExpr = convertToLogicOperatorExpr(expr))
+    {
+        settlePendingTryCoverage(newExpr, pendingTryCoverage);
         return newExpr;
+    }
 
     // Fast path: a builtin arithmetic/comparison/bitwise/shift/unary operator on
     // scalar/vector/matrix operands (`a + b`, `a < b`, `v * s`, `-x`, etc.; same or mixed
     // builtin type) is rewritten to a `BuiltinOperatorExpr` and skips generic operator
     // overload resolution.
     if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
+    {
+        settlePendingTryCoverage(builtinOp, pendingTryCoverage);
         return builtinOp;
+    }
 
     // Check for comma operator usage and emit warning if not in for-loop side effect context
     // Skip warning in Slang 2026+ mode where parentheses create tuples
@@ -5231,7 +5373,10 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         }
     }
 
-    expr->functionExpr = CheckTerm(expr->functionExpr);
+    {
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
+        expr->functionExpr = CheckTerm(expr->functionExpr);
+    }
 
     if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
     {
@@ -5262,7 +5407,9 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
             if (!diagnosed)
                 getSink()->diagnose(
                     Diagnostics::CallOperatorNotFound{.type = baseType, .expr = expr});
-            return CreateErrorExpr(expr);
+            auto errorExpr = CreateErrorExpr(expr);
+            settlePendingTryCoverage(errorExpr, pendingTryCoverage);
+            return errorExpr;
         }
         auto callFuncExpr = createLookupResultExpr(
             operatorName,
@@ -5286,6 +5433,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     }
 
     auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+    settlePendingTryCoverage(checkedExpr, pendingTryCoverage);
 
     // Perform additional validation for known built-in functions.
     maybeCheckKnownBuiltinInvocation(checkedExpr);
@@ -5608,7 +5756,9 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
 
     Expr* visitThisExpr(ThisExpr* expr)
     {
-        auto thisTypeDecl = isDeclRefTypeOf<Decl>(expr->type.type);
+        // Parameter modifiers such as `no_diff` are part of the effective `this` parameter's
+        // value type. They do not change the declaration whose value a lambda must capture.
+        auto thisTypeDecl = isDeclRefTypeOf<Decl>(unwrapModifiedType(expr->type.type));
         if (!thisTypeDecl)
             return expr;
         // Don't capture `this` references that already point to the lambda struct
@@ -5657,7 +5807,7 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         // support autodiff, but it is not clear what a correct
         // one-size-fits-all behavior should be in that case.
         //
-        if (as<RefParamType>(primalParamType))
+        if (as<RefParamTypeBase>(primalParamType))
             return primalParamWrapperType;
 
         // Given a primal type that is a wrapper like `Out<T>`, we can
@@ -5764,23 +5914,14 @@ Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
     return nullptr;
 }
 
-Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType thisQualType)
+Type* SemanticsVisitor::getForwardDiffFuncType(
+    FuncType* originalType,
+    std::optional<ParamInfo> thisParamInfo)
 {
     // Resolve diff type here.
     // Note that this type checking needs to be in sync with
     // the auto-generation logic in slang-ir-diff-diff.cpp
     List<Type*> paramTypes;
-
-    Type* thisType = nullptr;
-
-    if (thisQualType.type)
-    {
-        if (thisQualType.isLeftValue)
-            thisType = getCurrentASTBuilder()->getBorrowInOutParamType(thisQualType.type);
-        else
-            thisType = thisQualType.type;
-    }
-
 
     auto resultType = originalType->getResultType();
     if (auto resultPairType = tryGetDifferentialPairType(resultType))
@@ -5790,12 +5931,17 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
-    if (thisType)
+    if (thisParamInfo)
     {
-        // The first parameter is the primal function itself.
-        if (auto diffThisType = _toDifferentialParamType(thisType))
+        auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamInfo->mode);
+        auto thisParamType =
+            getParamTypeWithModeWrapper(m_astBuilder, thisParamInfo->type, differentiatedThisMode);
+        if (auto diffThisType = _toDifferentialParamType(thisParamType))
         {
-            paramTypes.add(diffThisType);
+            auto [diffThisValueType, diffThisMode] =
+                getParamInfoFromTypeWithModeWrapper(diffThisType);
+            paramTypes.add(
+                getParamTypeWithModeWrapper(m_astBuilder, diffThisValueType, diffThisMode));
         }
     }
 
@@ -5812,7 +5958,9 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     return diffType;
 }
 
-Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType thisQualType)
+Type* SemanticsVisitor::getBackwardDiffFuncType(
+    FuncType* originalType,
+    std::optional<ParamInfo> thisParamInfo)
 {
     // Resolve backward diff type here.
     // Note that this type checking needs to be in sync with
@@ -5827,24 +5975,35 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
-    // Handle implicit `this` parameter for non-static member methods.
-    if (thisQualType.type)
+    // Handle the effective `this` parameter of a member method.
+    if (thisParamInfo)
     {
-        if (auto diffPairType = tryGetDifferentialPairType(thisQualType.type))
+        Type* differentiatedThisType = nullptr;
+        auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamInfo->mode);
+        if (auto diffPairType = tryGetDifferentialPairType(thisParamInfo->type))
         {
-            paramTypes.add(
-                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(diffPairType)
-                                         : diffPairType);
+            differentiatedThisType = diffPairType;
+            // A value pair must be passed as writable storage so that reverse-mode AD can
+            // accumulate its differential. Pointer pairs already carry the required indirection,
+            // and the remaining differentiated modes retain their parameter-passing behavior.
+            if (as<DifferentialPairType>(diffPairType) &&
+                differentiatedThisMode == ParamPassingMode::In)
+            {
+                differentiatedThisMode = ParamPassingMode::BorrowInOut;
+            }
         }
         else
         {
-            auto noDiffThisType = m_astBuilder->getModifiedType(
-                thisQualType.type,
-                {m_astBuilder->getNoDiffModifierVal()});
-            paramTypes.add(
-                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
-                                         : noDiffThisType);
+            differentiatedThisType = doesTypeHaveNoDiffModifier(thisParamInfo->type)
+                                         ? thisParamInfo->type
+                                         : m_astBuilder->getModifiedType(
+                                               thisParamInfo->type,
+                                               {m_astBuilder->getNoDiffModifierVal()});
         }
+        paramTypes.add(getParamTypeWithModeWrapper(
+            m_astBuilder,
+            differentiatedThisType,
+            differentiatedThisMode));
     }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
@@ -5910,13 +6069,24 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
 
                 break;
             }
-        case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
             {
-                // Not allowed..
-                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                // We pass a reference parameter through unchanged and treat its storage as
+                // non-differentiable, as `BwdDiffFuncType::_resolveImplOverride` does.
+                //
+                // TODO: Differentiate the storage that a reference parameter refers to.
+                //
+                auto noDiffType = doesTypeHaveNoDiffModifier(paramValType)
+                                      ? paramValType
+                                      : m_astBuilder->getModifiedType(
+                                            paramValType,
+                                            {m_astBuilder->getNoDiffModifierVal()});
+                paramTypes.add(
+                    getParamTypeWithModeWrapper(m_astBuilder, noDiffType, paramPassingMode));
+                break;
             }
-
-            break;
         }
     }
 
@@ -5962,40 +6132,71 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
-    // Extract the implicit `this` type for a statically-referenced non-static
-    // member method (e.g. `Type::method`).  Returns a null QualType for free
-    // functions, static methods, constructors, and member methods referenced
-    // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
-    QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
+    DeclRef<CallableDecl> getBaseFunctionDeclRef(SemanticsVisitor* semantics, Expr* funcExpr)
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
-        // Only produce a this-type when the method is accessed via Type::method
-        // (StaticMemberExpr). When referenced by name within the same struct
-        // (plain DeclRefExpr), the derivative is itself a member method and
-        // the this parameter is handled implicitly.
-        if (!as<StaticMemberExpr>(innerExpr))
-            return QualType();
-        if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
+        auto declRefExpr = as<DeclRefExpr>(innerExpr);
+        if (!declRefExpr)
+            return DeclRef<CallableDecl>();
+
+        auto declRef = declRefExpr->declRef;
+        if (auto genericDeclRef = declRef.as<GenericDecl>())
         {
-            auto declRef = declRefExpr->declRef;
-            // Unwrap GenericDecl to get to the inner callable.
-            if (auto genDecl = as<GenericDecl>(declRef.getDecl()))
-            {
-                declRef = semantics->getASTBuilder()->getMemberDeclRef(
-                    declRef.as<GenericDecl>(),
-                    genDecl->inner);
-            }
-            if (auto callableDeclRef = declRef.as<FunctionDeclBase>())
-            {
-                auto callableDecl = callableDeclRef.getDecl();
-                if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
-                    !as<ConstructorDecl>(callableDecl))
-                {
-                    return getTypeForThisExpr(semantics, callableDeclRef);
-                }
-            }
+            declRef = semantics->getASTBuilder()->getMemberDeclRef(
+                genericDeclRef,
+                genericDeclRef.getDecl()->inner);
         }
-        return QualType();
+        return declRef.as<CallableDecl>();
+    }
+
+    /// Return whether `funcExpr`, the function that a `fwd_diff` or `bwd_diff` differentiates, has
+    /// a reference parameter and a differentiability attribute. Such a function has already been
+    /// rejected at its declaration, so the caller gives the expression an error type instead of
+    /// building a derivative signature.
+    bool isDifferentiationAlreadyRejectedForReferenceParameter(
+        SemanticsVisitor* semantics,
+        Expr* funcExpr)
+    {
+        auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr);
+        if (!funcDeclRef || !hasReferenceParameter(funcDeclRef.getDecl()))
+            return false;
+
+        // Consider this example:
+        //
+        //     [Differentiable]
+        //     float prim(__ref float a, float x) { return a * x; }
+        //     ... fwd_diff(prim)(a, diffPair(x, 1.0)) ...
+        //
+        // `checkDifferentiableCallableSignature` has already reported the reference parameter at
+        // `[Differentiable]`, and no derivative is synthesized for `prim`. Looking up the
+        // `fwd_diff` member would therefore report a second, misleading error that `prim` lacks
+        // one, so we give the expression an error type instead.
+        //
+        // Without an attribute, `prim` has no derivative for the same reason as any function
+        // without one, and we let the lookup report the missing member as usual. That lookup
+        // needs a derivative signature, which keeps the reference parameter as it is.
+        //
+        return funcDeclRef.getDecl()->findModifier<DifferentiableAttribute>() != nullptr;
+    }
+
+    // Extract the effective `this` parameter information for a statically referenced member method
+    // (e.g. `Type::method`). Returns an empty result for declarations without that parameter and
+    // for member methods referenced by name within their own type (e.g.
+    // `[BackwardDerivativeOf(f)]`).
+    std::optional<ParamInfo> getThisParamInfoForBaseFunc(
+        SemanticsVisitor* semantics,
+        Expr* funcExpr)
+    {
+        auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
+        // Only produce a `this` type when the method is accessed via `Type::method`
+        // (`StaticMemberExpr`). When referenced by name within the same struct (a plain
+        // `DeclRefExpr`), the derivative is itself a member method with its own effective `this`
+        // parameter.
+        if (!as<StaticMemberExpr>(innerExpr))
+            return std::nullopt;
+        if (auto callableDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
+            return semantics->findEffectiveThisParamInfo(callableDeclRef);
+        return std::nullopt;
     }
 };
 
@@ -6018,23 +6219,21 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
-        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisType);
-        if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+        if (isDifferentiationAlreadyRejectedForReferenceParameter(semantics, funcExpr))
         {
-            auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
-            if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            return;
+        }
+        auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisParamInfo);
+        if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
+        {
+            if (thisParamInfo)
+                resultDiffExpr->newParameterNames.add(semantics->getName("this"));
+            for (auto paramDeclRef :
+                 getParametersForCallableSignature(semantics->getASTBuilder(), funcDeclRef))
             {
-                funcDecl = as<CallableDecl>(genDecl->inner);
-            }
-            if (funcDecl)
-            {
-                if (thisType.type)
-                    resultDiffExpr->newParameterNames.add(semantics->getName("this"));
-                for (auto param : funcDecl->getParameters())
-                {
-                    resultDiffExpr->newParameterNames.add(param->getName());
-                }
+                resultDiffExpr->newParameterNames.add(paramDeclRef.getName());
             }
         }
     }
@@ -6059,32 +6258,29 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
-        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisType);
-        if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+        if (isDifferentiationAlreadyRejectedForReferenceParameter(semantics, funcExpr))
         {
-            auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
-            if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            return;
+        }
+        auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisParamInfo);
+        if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
+        {
+            if (thisParamInfo)
+                resultDiffExpr->newParameterNames.add(semantics->getName("this"));
+            for (auto paramDeclRef :
+                 getParametersForCallableSignature(semantics->getASTBuilder(), funcDeclRef))
             {
-                funcDecl = as<CallableDecl>(genDecl->inner);
-            }
-            if (funcDecl)
-            {
-                if (thisType.type)
-                    resultDiffExpr->newParameterNames.add(semantics->getName("this"));
-                for (auto param : funcDecl->getParameters())
+                auto param = paramDeclRef.getDecl();
+                if (param->findModifier<NoDiffModifier>() &&
+                    getParamPassingMode(param) == ParamPassingMode::Out)
                 {
-                    if (param->findModifier<NoDiffModifier>())
-                    {
-                        if (param->findModifier<OutModifier>() &&
-                            !param->findModifier<InModifier>() &&
-                            !param->findModifier<InOutModifier>())
-                            continue;
-                    }
-                    resultDiffExpr->newParameterNames.add(param->getName());
+                    continue;
                 }
-                resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));
+                resultDiffExpr->newParameterNames.add(param->getName());
             }
+            resultDiffExpr->newParameterNames.add(semantics->getName("resultGradient"));
         }
     }
 };
@@ -6110,19 +6306,12 @@ struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprChecki
             return;
         }
         resultDiffExpr->type = baseFuncType;
-        if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+        if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
         {
-            auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
-            if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+            for (auto paramDeclRef :
+                 getParametersForCallableSignature(semantics->getASTBuilder(), funcDeclRef))
             {
-                funcDecl = as<CallableDecl>(genDecl->inner);
-            }
-            if (funcDecl)
-            {
-                for (auto param : funcDecl->getParameters())
-                {
-                    resultDiffExpr->newParameterNames.add(param->getName());
-                }
+                resultDiffExpr->newParameterNames.add(paramDeclRef.getName());
             }
         }
     }
@@ -6220,14 +6409,14 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
         }
         // __apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
         // Give it the base function type so overload resolution works with original args.
-        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
-        if (thisType.type)
+        auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
+        if (thisParamInfo)
         {
             List<Type*> paramTypes;
-            paramTypes.add(
-                thisType.isLeftValue
-                    ? semantics->getASTBuilder()->getBorrowInOutParamType(thisType.type)
-                    : thisType.type);
+            paramTypes.add(getParamTypeWithModeWrapper(
+                semantics->getASTBuilder(),
+                thisParamInfo->type,
+                thisParamInfo->mode));
             for (Index i = 0; i < baseFuncType->getParamCount(); i++)
                 paramTypes.add(baseFuncType->getParamTypeWithModeWrapper(i));
 
@@ -6241,17 +6430,14 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
             resultExpr->type = baseFuncType;
         }
 
-        if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+        if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
         {
-            auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
-            if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
-                funcDecl = as<CallableDecl>(genDecl->inner);
-            if (funcDecl)
+            if (thisParamInfo)
+                resultExpr->newParameterNames.add(semantics->getName("this"));
+            for (auto paramDeclRef :
+                 getParametersForCallableSignature(semantics->getASTBuilder(), funcDeclRef))
             {
-                if (thisType.type)
-                    resultExpr->newParameterNames.add(semantics->getName("this"));
-                for (auto param : funcDecl->getParameters())
-                    resultExpr->newParameterNames.add(param->getName());
+                resultExpr->newParameterNames.add(paramDeclRef.getName());
             }
         }
     }
@@ -7306,7 +7492,17 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
     // Check if it's a type cast like float(x), half(x), double(x)
     else if (auto invokeExpr = as<InvokeExpr>(valueExpr))
     {
-        if (invokeExpr->arguments.getCount() == 1)
+        // Only a conversion to the floating-point type can be folded from its argument.
+        // Other one-argument calls, such as `asfloat(0x3F800000u)`, `bit_cast<float>(...)`
+        // or `sqrt(4.0f)`, produce a different value than converting the argument would.
+        bool isConversion = as<TypeCastExpr>(invokeExpr) != nullptr;
+        if (auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            if (as<ConstructorDecl>(funcDeclRefExpr->declRef.getDecl()))
+                isConversion = true;
+        }
+
+        if (isConversion && invokeExpr->arguments.getCount() == 1)
         {
             floatLitExpr = as<FloatingPointLiteralExpr>(invokeExpr->arguments[0]);
             if (!floatLitExpr)
@@ -7597,6 +7793,15 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 {
     expr->arg = CheckTerm(expr->arg);
 
+    // An operand that already failed to check has been reported, so we give the expression an
+    // error type rather than also reporting that the operand is not addressable.
+    //
+    if (as<ErrorType>(expr->arg->type))
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
     expr->type =
@@ -7607,6 +7812,415 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
+}
+
+// Return the sub-expression of `expr` that determines the address space of the storage `expr`
+// names, such as `g` for `g[i].a.x`, by stripping `(...)`, `[i]`, `.field`, and single-component
+// swizzles. The groupshared checks use it to find the declaration that carries `groupshared`.
+//
+// TODO: This query exists only because an expression's checked information does not record its
+// address space; once it does, callers can read that instead.
+static Expr* getSubExpressionDeterminingAddressSpace(Expr* expr)
+{
+    // An address-space modifier such as `groupshared` sits on the declaration of a whole
+    // variable, never on a part of one, so we walk out to the variable. `getValidTypeForAddressOf`
+    // would walk these projections itself, but it judges a field access by the field's
+    // declaration and so loses the base variable's address space (issue #14094).
+    //
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        else if (auto indexExpr = as<IndexExpr>(expr))
+            expr = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            // A multi-element swizzle may be non-contiguous, so it has no address of its own and
+            // the caller materializes a private temporary for it. We stop, so that such an
+            // argument is judged on its own and rejected rather than inheriting the base's address
+            // space.
+            //
+            if (swizzleExpr->elementIndices.getCount() > 1)
+                return expr;
+            expr = swizzleExpr->base;
+        }
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        {
+            if (matrixSwizzleExpr->elementCount > 1)
+                return expr;
+            expr = matrixSwizzleExpr->base;
+        }
+        else if (auto memberExpr = as<MemberExpr>(expr))
+        {
+            // We stop at a member reached through a pointer, because the pointer's own type
+            // carries the address space. We also stop at a member that is not a field stored in
+            // the base: a `static` field is a variable of its own, and a property or method names
+            // no part of the base's storage.
+            //
+            auto memberDecl = memberExpr->declRef.getDecl();
+            if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
+                (memberDecl && memberDecl->hasModifier<HLSLStaticModifier>()))
+                return expr;
+            expr = memberExpr->baseExpression;
+        }
+        else
+            return expr;
+    }
+}
+
+// Return whether `arg` is one of the type-only placeholder arguments that
+// `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types.
+static bool isSpecializeWithArgTypesPlaceholder(Expr* arg)
+{
+    // A placeholder is a bare `VarExpr` with a checked l-value type but neither a name nor a
+    // declaration. It stands for some l-value of its type and names no storage, so a check about
+    // which storage an argument names has no answer for it.
+    //
+    auto varExpr = as<VarExpr>(arg);
+    return varExpr && varExpr->astNodeType == ASTNodeType::VarExpr && !varExpr->name &&
+           !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
+}
+
+// Return whether `expr` has an error type, or is an implicit cast of an expression that has one.
+// The storage checks use it to skip an argument that already failed to check, since a storage
+// diagnostic for it would only repeat the reported error.
+static bool isErrorTypedOrCastFromErrorTyped(Expr* expr)
+{
+    if (as<ErrorType>(expr->type))
+        return true;
+
+    // Coercion wraps an error-typed operand in an implicit cast to the parameter's type, so we
+    // look through that cast.
+    //
+    auto castExpr = as<ImplicitCastExpr>(expr);
+    return castExpr && as<ErrorType>(castExpr->arguments[0]->type);
+}
+
+// Return whether `arg` names thread-group-shared storage, such as `g[i].a` for
+// `groupshared Pair g[4]`.
+bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
+{
+    SLANG_ASSERT(arg);
+
+    // A part of a variable is in the address space of the whole variable, so we judge the whole.
+    //
+    auto addressedExpr = getSubExpressionDeterminingAddressSpace(arg);
+    if (isSpecializeWithArgTypesPlaceholder(addressedExpr))
+        return false;
+
+    // `getValidTypeForAddressOf` gives the pointer type of an addressable expression, and that
+    // type carries the address space, so we read the address space from it instead of deciding
+    // addressability again here.
+    //
+    if (auto ptrType = getValidTypeForAddressOf(
+            this,
+            m_astBuilder,
+            addressedExpr,
+            getType(m_astBuilder, addressedExpr)))
+    {
+        if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
+            return (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
+    }
+    return false;
+}
+
+// Report an error if `argIn`, passed to the `groupshared` parameter `paramIn`, does not name
+// thread-group-shared storage.
+void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn)
+{
+    SLANG_ASSERT(paramIn && argIn && paramIn->hasModifier<HLSLGroupSharedModifier>());
+    if (isSpecializeWithArgTypesPlaceholder(argIn) || isErrorTypedOrCastFromErrorTyped(argIn))
+        return;
+
+    // A `groupshared` parameter is a reference to a thread-group-shared location, so its argument
+    // must name such a location. A private local, a copy, or an rvalue would let the callee treat
+    // memory that no other invocation can see as shared. HLSL proposal 0043 (`groupshared`
+    // Arguments) imposes the same rule.
+    //
+    if (!argumentNamesGroupSharedStorage(argIn))
+        getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
+            .param = getText(paramIn->getName()),
+            .arg = argIn});
+}
+
+// An argument of a call that the call writes back to the caller's storage when it returns: the
+// argument of an `out` or `inout` parameter, or the receiver of a `[mutating]` method, whose
+// implicit `this` is an `inout` parameter.
+struct WrittenBackArgument
+{
+    // The argument as written in the call.
+    Expr* arg = nullptr;
+
+    // The storage that the call writes back to: the operand of an implicit conversion of `arg`,
+    // or otherwise `arg` itself.
+    Expr* storage = nullptr;
+
+    // The parameter, or null for a receiver and for an argument of a call whose callee has no
+    // declaration, such as `bwd_diff(f)(...)`.
+    ParamDecl* param = nullptr;
+
+    bool isReceiver = false;
+
+    bool isConverted() const { return storage != arg; }
+};
+
+// Call `visit` with each argument of `invoke` that the call writes back to, other than arguments
+// that already failed to check.
+template<typename Visit>
+static void forEachWrittenBackArgument(
+    SemanticsVisitor* visitor,
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs,
+    Visit const& visit)
+{
+    Index argCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < argCount; ++i)
+    {
+        // Only an `out` or `inout` parameter is written back. A reference parameter, including a
+        // `groupshared` one, names its argument's storage, so the call accesses that storage in
+        // place and writes nothing back.
+        //
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
+            continue;
+        WrittenBackArgument written;
+        written.arg = invoke->arguments[i];
+        if (isErrorTypedOrCastFromErrorTyped(written.arg))
+            continue;
+
+        // An implicitly converted argument goes through a temporary of the parameter's type, and
+        // the call writes the temporary back to the operand of the conversion.
+        //
+        written.storage = written.arg;
+        if (auto lValueCast = as<LValueImplicitCastExpr>(written.arg))
+            written.storage = lValueCast->arguments[0];
+        if (i < paramDeclRefs.getCount())
+            written.param = paramDeclRefs[i].getDecl();
+        visit(written);
+    }
+
+    // A `[mutating]` method's implicit `this` is an `inout` parameter, so the call also writes back
+    // its receiver: the base expression of the member access. A call through a value of function
+    // type has no declaration to tell us the receiver mode, and no receiver.
+    //
+    if (!calleeDeclRef)
+        return;
+    auto thisParamInfo = visitor->findEffectiveThisParamInfo(calleeDeclRef);
+    if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
+        return;
+    if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
+    {
+        WrittenBackArgument written;
+        written.arg = memberExpr->baseExpression;
+        written.storage = written.arg;
+        written.isReceiver = true;
+        visit(written);
+    }
+}
+
+// The source that makes a call write an argument back. At most one location is valid: the
+// parameter's `out` or `inout` keyword, the method's `[mutating]` attribute, or a method that can
+// modify `this` without one.
+struct WriteBackReason
+{
+    ParamPassingMode mode = ParamPassingMode::BorrowInOut;
+    SourceLoc modeLocation;
+    SourceLoc mutatingLocation;
+    SourceLoc methodLocation;
+};
+
+// Return the source that makes the call to `calleeDeclRef` write `written` back. For a receiver,
+// that is the `[mutating]` attribute, or else the method itself, such as a `set` accessor or a
+// method in HLSL source, where methods are mutating by default. A callee without a declaration,
+// such as `bwd_diff(f)`, has no source to point at, so the reason has no location.
+//
+// TODO: We read the passing mode and its location from the modifiers here, which duplicates what
+// `findEffectiveThisParamInfo` and `getParamPassingMode` already decide and handles only the
+// `[mutating]` and `out` modifiers. The locations belong in `ParamInfo`, so that this code can
+// treat a receiver and an ordinary parameter alike through one query.
+static WriteBackReason getWriteBackReason(
+    WrittenBackArgument const& written,
+    DeclRef<CallableDecl> calleeDeclRef)
+{
+    WriteBackReason reason;
+    if (written.isReceiver)
+    {
+        auto callee = calleeDeclRef.getDecl();
+        if (auto mutating = callee->findModifier<MutatingAttribute>())
+            reason.mutatingLocation = mutating->loc;
+        else
+            reason.methodLocation = callee->loc;
+    }
+    else if (written.param)
+    {
+        reason.mode = getParamPassingMode(written.param);
+        if (auto modeModifier = written.param->findModifier<OutModifier>())
+            reason.modeLocation = modeModifier->loc;
+    }
+    return reason;
+}
+
+// The modes in which autodiff generates a derivative of a function from its body.
+struct ModesDifferentiatedFromBody
+{
+    bool forward = false;
+    bool backward = false;
+
+    bool any() const { return forward || backward; }
+};
+
+// Return the modes in which autodiff generates a derivative of `func` from its body: those in
+// which `func` is marked differentiable and has no custom derivative.
+static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
+    SharedSemanticsContext* shared,
+    FunctionDeclBase* func)
+{
+    ModesDifferentiatedFromBody modes;
+    if (!func)
+        return modes;
+    bool isBackwardDifferentiable = func->hasModifier<BackwardDifferentiableAttribute>();
+    if (!isBackwardDifferentiable && !func->hasModifier<ForwardDifferentiableAttribute>())
+        return modes;
+
+    // A custom derivative may be attached by an attribute on `func`, or by a
+    // `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the derivative. We see the
+    // latter only when the derivative's module is visible from here.
+    //
+    bool hasCustomForward = func->hasModifier<ForwardDerivativeAttribute>() ||
+                            func->hasModifier<HasTrivialForwardDerivativeAttribute>();
+    bool hasCustomBackward = func->hasModifier<BackwardDerivativeAttribute>();
+    for (auto assoc : shared->getAssociatedDeclsForDecl(func))
+    {
+        if (assoc->kind == DeclAssociationKind::ForwardDerivativeFunc)
+            hasCustomForward = true;
+        else if (assoc->kind == DeclAssociationKind::BackwardDerivativeFunc)
+            hasCustomBackward = true;
+    }
+    modes.forward = !hasCustomForward;
+    modes.backward = isBackwardDifferentiable && !hasCustomBackward;
+    return modes;
+}
+
+// Return the thread-group-shared variable that `target` writes part of, if `target` is in the body
+// of a function whose derivative Slang may generate from that body, or null otherwise. `storage`
+// is the storage that `target` writes.
+Decl* SemanticsVisitor::findGroupSharedVariablePartlyWrittenInDifferentiatedBody(
+    Expr* target,
+    Expr* storage)
+{
+    SLANG_ASSERT(target && storage);
+    if (isErrorTypedOrCastFromErrorTyped(target))
+        return nullptr;
+
+    // Consider this example:
+    //
+    //     groupshared float g[4];
+    //     groupshared float4 v;
+    //     void setOne(inout float y) { y = 1.0; }
+    //
+    //     [Differentiable]
+    //     float f(uint i, float x)
+    //     {
+    //         g[i] = x;       // reported
+    //         v.yz += 1.0;    // reported
+    //         setOne(g[i]);   // reported
+    //         v = float4(0);  // not reported
+    //         return x;
+    //     }
+    //
+    // Autodiff prepares the body of `f` for differentiation by replacing the addresses it
+    // computes with values, so each reported write becomes a read of the whole variable, an
+    // update of the part, and a write of the whole variable. Each invocation then stores back
+    // stale copies of the parts that other invocations wrote.
+    //
+    // We report such a write in every function that is marked differentiable and has no visible
+    // custom derivative for some mode, whether or not any code requests that derivative. The rule
+    // is deliberately broader than the set of writes that race in a given program; we chose a
+    // rule that is easy to state over a precise one. A differentiability attribute allows any
+    // module that imports the function to request a derivative generated from its body, and only
+    // this module can check the body, so we check what the attribute allows rather than what one
+    // program requests. For the same reason, a custom derivative that another module declares
+    // does not exempt the function here. Basing the rule on the source, rather than on how
+    // lowering and autodiff currently rewrite each write, also keeps it in step as those passes
+    // change.
+    //
+    if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
+        return nullptr;
+
+    Expr* wholeExpr = storage;
+    while (auto parenExpr = as<ParenExpr>(wholeExpr))
+        wholeExpr = parenExpr->base;
+
+    // A multi-element swizzle, such as `v.yz`, has no address of its own, so we judge the
+    // vector or matrix it selects from.
+    //
+    Expr* addressedExpr = wholeExpr;
+    if (auto swizzleExpr = as<SwizzleExpr>(wholeExpr))
+        addressedExpr = swizzleExpr->base;
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(wholeExpr))
+        addressedExpr = matrixSwizzleExpr->base;
+
+    if (!argumentNamesGroupSharedStorage(addressedExpr))
+        return nullptr;
+
+    // A write of the whole variable, such as `v = float4(0)`, stays a single store.
+    //
+    auto baseExpr = getSubExpressionDeterminingAddressSpace(addressedExpr);
+    if (baseExpr == wholeExpr)
+        return nullptr;
+
+    // A write to part of a `groupshared` parameter stays in place, because autodiff leaves the
+    // storage behind a reference parameter in memory.
+    //
+    auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
+    if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
+        return nullptr;
+    return baseDeclRefExpr->declRef.getDecl();
+}
+
+// Report each argument of `invoke` that the call writes back to part of thread-group-shared
+// memory in the body of a function whose derivative Slang may generate from that body.
+void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    // A call can write its `out` and `inout` arguments and its `[mutating]` receiver, whatever
+    // the callee is, so in a differentiated body each such argument that is part of shared memory
+    // races like an assignment to that part.
+    //
+    bool callIsOperator = as<OperatorExpr>(invoke) != nullptr;
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        {
+            auto var = findGroupSharedVariablePartlyWrittenInDifferentiatedBody(
+                written.arg,
+                written.storage);
+            if (!var)
+                return;
+
+            // A note points at what makes the call write the argument back. A direct argument of
+            // a mutating operator, such as `g[i] += 1`, is written as plainly as by an assignment,
+            // so we report it like one, without pointing into the operator's declaration.
+            //
+            WriteBackReason reason;
+            if (!callIsOperator || written.isConverted())
+                reason = getWriteBackReason(written, calleeDeclRef);
+            getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+                .var = var,
+                .mode = reason.mode,
+                .target = written.arg,
+                .modeLocation = reason.modeLocation,
+                .mutatingLocation = reason.mutatingLocation,
+                .methodLocation = reason.methodLocation});
+        });
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)
@@ -7620,22 +8234,35 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     if (expr->type)
         return expr;
 
-    // Check the term we are applying first
-    auto funcExpr = expr->functionExpr;
-    funcExpr = CheckTerm(funcExpr);
-
-    // Now ensure that the term represents a (proper) type.
+    // As in `visitInvokeExpr`, an enclosing `try` covers the cast but not its operand, and a
+    // throwing call in the operand waits for the cast to resolve, as in `try (int)f()`.
+    List<InvokeExpr*> pendingTryCoverage;
     TypeExp typeExp;
-    typeExp.exp = funcExpr;
-    typeExp = CheckProperType(typeExp);
+    {
+        OperandTryCoverageRAII operandTryCoverage(this, nullptr);
+
+        // Check the term we are applying first
+        auto funcExpr = expr->functionExpr;
+        funcExpr = CheckTerm(funcExpr);
+
+        // Now ensure that the term represents a (proper) type.
+        typeExp.exp = funcExpr;
+        typeExp = CheckProperType(typeExp);
+    }
 
     expr->functionExpr = typeExp.exp;
     expr->type.type = typeExp.type;
 
-    // Next check the argument expression (there should be only one)
-    for (auto& arg : expr->arguments)
     {
-        arg = CheckTerm(arg);
+        OperandTryCoverageRAII operandTryCoverage(
+            this,
+            shouldDeferArgumentTryCoverage(expr) ? &pendingTryCoverage : nullptr);
+
+        // Next check the argument expression (there should be only one)
+        for (auto& arg : expr->arguments)
+        {
+            arg = CheckTerm(arg);
+        }
     }
 
     if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
@@ -7713,6 +8340,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                             getSink()->diagnose(
                                 Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
+                        settlePendingTryCoverage(nullptr, pendingTryCoverage);
                         return coerce(
                             CoercionSite::General,
                             typeExp.type,
@@ -7729,6 +8357,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
     // and constructor calls are semantically equivalent).
     //
     auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+    settlePendingTryCoverage(checkedExpr, pendingTryCoverage);
 
     if (m_parentDifferentiableAttr)
     {
@@ -7775,18 +8404,22 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         return expr;
     }
 
-    auto funcCallee = as<FuncDecl>(callee->declRef.getDecl());
-    Stmt* catchStmt = nullptr;
-    if (funcCallee)
+    // A call that is not an `ErrorType` has a callee that overload resolution typed as a
+    // `FuncType`, whatever kind of declaration or value it names (see
+    // `CompleteOverloadCandidate`), with the error type substituted for this call site.
+    // The `MustUseTryClauseToCallAThrowFunc` check in `CheckInvokeExprWithCheckedOperands`
+    // reads the same `FuncType`.
+    auto calleeFuncType = as<FuncType>(callee->type);
+    SLANG_RELEASE_ASSERT(calleeFuncType);
+    auto calleeDecl = callee->declRef.getDecl();
+    auto calleeErrorType = calleeFuncType->getErrorType();
+    if (calleeErrorType->equals(m_astBuilder->getBottomType()))
     {
-        if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
-        {
-            getSink()->diagnose(
-                Diagnostics::TryInvokeCalleeShouldThrow{.callee = funcCallee, .expr = expr});
-            return expr;
-        }
-        catchStmt = findMatchingCatchStmt(funcCallee->errorType);
+        getSink()->diagnose(
+            Diagnostics::TryInvokeCalleeShouldThrow{.callee = calleeDecl, .expr = expr});
+        return expr;
     }
+    Stmt* catchStmt = findMatchingCatchStmt(calleeErrorType);
 
     if (FindOuterStmt<DeferStmt>(catchStmt))
     {
@@ -7809,11 +8442,11 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
             getSink()->diagnose(Diagnostics::UncaughtTryCallInNonThrowFunc{.expr = expr});
             return expr;
         }
-        if (funcCallee && !parentFunc->errorType->equals(funcCallee->errorType))
+        if (!parentFunc->errorType->equals(calleeErrorType))
         {
             getSink()->diagnose(Diagnostics::ErrorTypeOfCalleeIncompatibleWithCaller{
-                .calleeErrorType = funcCallee->errorType,
-                .callee = funcCallee,
+                .calleeErrorType = calleeErrorType,
+                .callee = calleeDecl,
                 .callerErrorType = parentFunc->errorType,
                 .expr = expr});
             return expr;
@@ -8414,9 +9047,12 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components. Only a single element is a memory location,
+    // because the elements of a matrix row or column need not be adjacent.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        elementCount == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }
@@ -8528,10 +9164,25 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components. A single element is a memory location, while
+    // several elements form a new tuple and so do not name one.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        swizExpr->elementIndices.getCount() == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
     return swizExpr;
+}
+
+/// Return whether the components of a vector swizzle are adjacent and in increasing order, as in
+/// `v.y` or `v.yzw` but not `v.xz` or `v.yx`. Only such a swizzle names a memory location.
+static bool areSwizzleComponentsContiguous(ShortList<uint32_t, 4> const& elementIndices)
+{
+    for (Index i = 1; i < elementIndices.getCount(); i++)
+    {
+        if (elementIndices[i] != elementIndices[0] + uint32_t(i))
+            return false;
+    }
+    return true;
 }
 
 Expr* SemanticsVisitor::CheckSwizzleExpr(
@@ -8636,10 +9287,14 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
                 swizExpr->elementIndices.getCount())));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
-                                 swizExpr->base->type.isLeftValue;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components. It is a memory location only if its components
+    // are adjacent and in order, as in `v.yz`; `v.xz` and `v.yx` can be written component by
+    // component but have no single address.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        areSwizzleComponentsContiguous(swizExpr->elementIndices) &&
+        swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }
@@ -9417,9 +10072,7 @@ Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
     return expr;
 }
 
-// Perform semantic checking of an object-oriented `this`
-// expression.
-Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
+Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
 {
     // A `this` expression will default to immutable.
     expr->type.isLeftValue = false;
@@ -9436,86 +10089,68 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         {
             expr->type.isLeftValue = true;
         }
-        else if (const auto setterDecl = as<SetterDecl>(containerDecl); setterDecl)
-        {
-            // An ordinary setter can mutate its receiver, but `[nonmutating]` promises that the
-            // receiver storage itself is not writable. Recompute the same rule when a synthesized
-            // accessor body is checked instead of relying on the type initially assigned to its
-            // `ThisExpr` by the synthesis path.
-            expr->type.isLeftValue = !setterDecl->hasModifier<NonmutatingAttribute>();
-        }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
-            if (funcDeclBase->hasModifier<MutatingAttribute>())
+            std::optional<ParamInfo> thisParamInfo;
+            if (funcDeclBase->checkState.isBeingChecked() &&
+                !funcDeclBase->isChecked(DeclCheckState::SignatureChecked))
             {
-                expr->type.isLeftValue = true;
+                // The `SignatureChecked` dispatch checks callable-header expressions before
+                // `checkAndAttachEffectiveThisParamInfo` publishes the result. That checking can
+                // recursively enter a parameter type or an untyped default used for type
+                // inference, while `ensureDecl` does not advance the callable's state until the
+                // dispatch returns. Earlier transitions do not check callable-header expressions,
+                // and later transitions have already published the effective parameter
+                // information. Thus every pre-publication `this` expression that reaches this
+                // branch must observe `ScopesWired`.
+                SLANG_ASSERT(funcDeclBase->checkState.getState() == DeclCheckState::ScopesWired);
+                // Consider this example:
+                //
+                //     struct S
+                //     {
+                //         static const int N = 4;
+                //         func f(values: int[this.N]) {}
+                //     }
+                //
+                // Checking `this.N` currently reaches this branch before the callable's checked
+                // receiver parameter information is published. The ordinary semantic query would
+                // try to ensure the in-progress callable to `SignatureChecked` and report a cyclic
+                // reference. We defer diagnostics to the publishing call so each invalid modifier
+                // is reported exactly once.
+                //
+                // TODO(tfoley): We should remove this workaround and read `ThisParamInfoAttribute`
+                // instead of recomputing receiver parameter information while checking a signature.
+                // Issue #13674 tracks deciding where a visible `this` binding is accessible, so
+                // signature checking can reject unavailable receiver uses before requiring their
+                // mode:
+                // https://github.com/shader-slang/slang/issues/13674
+                thisParamInfo = checkEffectiveThisParamInfo(
+                    funcDeclBase,
+                    /* shouldDiagnoseModeAttributes */ false);
             }
-            else if (funcDeclBase->hasModifier<RefAttribute>())
+            else
             {
-                expr->type.isLeftValue = true;
+                thisParamInfo = findEffectiveThisParamInfo(getDefaultDeclRef(funcDeclBase));
             }
 
-            // When a function has been reparented into an AggTypeDeclBase
-            // (e.g., a __func_extension's inner function moved into a
-            // synthesized ExtensionDecl), its parentDecl is the extension
-            // even though the parsing scope chain doesn't include it.
-            // Resolve `this` from the parent extension in this case.
-            if (auto parentExtDecl = as<ExtensionDecl>(funcDeclBase->parentDecl))
+            if (thisParamInfo)
             {
-                if (!funcDeclBase->hasModifier<HLSLStaticModifier>())
-                {
-                    // For func_extension apply on a member method, the extension's
-                    // target is a function-as-type. We want `this` to be the parent
-                    // struct type of that member function, not the function type itself.
-                    // Use the target function's DeclRef to get the correctly
-                    // substituted parent type (e.g., MyVec<float> not MyVec<T>).
-                    if (auto targetDeclRefType = as<DeclRefType>(parentExtDecl->targetType.type))
-                    {
-                        auto targetDeclRef = targetDeclRefType->getDeclRef();
-                        if (auto targetFuncDecl = as<FunctionDeclBase>(targetDeclRef.getDecl()))
-                        {
-                            if (auto parentTypeDecl =
-                                    as<AggTypeDeclBase>(targetFuncDecl->parentDecl))
-                            {
-                                auto thisType = calcThisType(makeDeclRef(parentTypeDecl));
-                                // Apply the target function's substitutions to get
-                                // the specialized parent type.
-                                if (thisType)
-                                {
-                                    expr->type.type = as<Type>(thisType->substitute(
-                                        m_astBuilder,
-                                        SubstitutionSet(targetDeclRef)));
-                                }
-                                return expr;
-                            }
-                        }
-                    }
-                    // Fallback: use the extension's this type directly.
-                    expr->type.type = calcThisType(makeDeclRef(parentExtDecl));
-                    return expr;
-                }
+                expr->type.type = thisParamInfo->type;
+                expr->type.isLeftValue = isThisExprWritable(
+                    getDefaultDeclRef(funcDeclBase).as<CallableDecl>(),
+                    *thisParamInfo);
+                return expr;
             }
         }
         else if (auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl))
         {
             expr->type.type = calcThisType(makeDeclRef(typeOrExtensionDecl));
-            if (m_parentLambdaExpr)
-            {
-                return maybeRegisterLambdaCapture(expr);
-            }
             return expr;
         }
         else if (auto defaultImplDecl = as<InterfaceDefaultImplDecl>(containerDecl))
         {
             expr->type.type =
                 DeclRefType::create(m_astBuilder, DeclRef<Decl>(defaultImplDecl->thisTypeDecl));
-            // A `this` referenced from a lambda body must be registered as a closure
-            // capture, mirroring the AggTypeDeclBase branch above; otherwise the
-            // synthesized closure struct has no field for it (issue #12923).
-            if (m_parentLambdaExpr)
-            {
-                return maybeRegisterLambdaCapture(expr);
-            }
             return expr;
         }
 #if 0
@@ -9557,6 +10192,19 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         sink->diagnose(Diagnostics::ThisExpressionOutsideOfTypeDecl{.expr = expr});
 
     return CreateErrorExpr(expr);
+}
+
+Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
+{
+    auto checkedExpr = checkThisExprWithoutCapturing(expr);
+    if (IsErrorExpr(checkedExpr))
+        return checkedExpr;
+
+    if (m_parentLambdaExpr)
+    {
+        return maybeRegisterLambdaCapture(checkedExpr);
+    }
+    return checkedExpr;
 }
 
 Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)

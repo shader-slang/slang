@@ -33,6 +33,6 @@ void main(
 //CHK_DXIL: dx.op.allocateNodeOutputRecords
 //CHK_DXIL: dx.op.getNodeRecordPtr
 //CHK_DXIL: dx.op.outputComplete
-//CHK_HLSL: tRecs_0.Get(threadIndex_0).value_0 = int(42);
-//CHK_HLSL: gRecs_0.Get(0U).value_0 = int(10);
+//CHK_HLSL: tRecs_0.Get(threadIndex_0).value_0 = 42L;
+//CHK_HLSL: gRecs_0.Get(0U).value_0 = 10L;
 //CHK_HLSL: gRecs_0.OutputComplete();
