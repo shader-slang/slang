@@ -60,15 +60,16 @@ namespace Slang
 {
 
 /// Whether an undefined phi incoming may be materialized as a concrete default
-/// value when its register temp must not be left unwritten. `IRBuilder::
-/// emitDefaultConstruct` with `fallback = false` is the source of truth for
-/// what the concrete value looks like; two exclusions are made here. Struct
-/// and array types expand into a composite built element-by-element from
-/// zeros — the fully-expanded zero materialization that hoisted-variable
-/// legalization deliberately avoids, so those types keep the unwritten temp.
-/// And pointers in the `UserPointer` storage class are excluded because SPIR-V
-/// maps them to PhysicalStorageBuffer pointers, for which `OpConstantNull`
-/// fails validation.
+/// value when its register temp must not be left unwritten. We materialize only
+/// scalar, vector, matrix, and non-`UserPointer` pointer types; everything
+/// else — structs, arrays, tuples, optional, strings, opaque handles, and any
+/// other shape — conservatively keeps the skip. A `true` result does not
+/// guarantee that `emitDefaultConstruct(type, /*fallback=*/false)` returns
+/// non-null: the call site tolerates null and falls back to the old
+/// unwritten-temp behavior. `UserPointer` pointers are excluded because
+/// SPIR-V maps them to PhysicalStorageBuffer pointers, for which
+/// `OpConstantNull` fails validation; on targets where a null store would be
+/// valid the fix therefore does not apply to pointer phis (deliberate).
 static bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
 {
     type = (IRType*)unwrapAttributedType(type);
@@ -76,13 +77,7 @@ static bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
     {
         return ptrType->getAddressSpace() != AddressSpace::UserPointer;
     }
-    if (as<IRBasicType>(type))
-        return true;
-    if (as<IRVectorType>(type))
-        return true;
-    if (as<IRMatrixType>(type))
-        return true;
-    return false;
+    return isScalarOrVectorType(type) || as<IRMatrixType>(type) != nullptr;
 }
 
 struct PhiEliminationContext
@@ -1060,33 +1055,42 @@ struct PhiEliminationContext
             // argument into the temporary for the coresponding
             // parameter.
             //
-            // Note that we use `actualValPtr` here instead of `originalVal`,
-            // so that any logic that might have moved another parameter
-            // into a temporary will influence our result.
+            // Note that we use `srcArg.currentValPtr` here instead of the
+            // argument's original value, so that any logic that might have
+            // moved another parameter into a temporary will influence our
+            // result.
             //
-            // An `IRUndefined` incoming (the `Undefined` family, including the
-            // `LoadFromUninitializedMemory` values that hoisted-variable
-            // legalization stores at loop headers — after SSA promotion they
-            // arrive here as exactly this kind of incoming) means the parameter
-            // is read before it was defined along this path. For ordinary temp
-            // locals, skipping the store is enough: an uninitialized local
-            // already reads as an undefined value. But in register-allocation
-            // mode the temp stands for function-scope memory in the emitted
-            // target module, and leaving it unwritten on this path lets its
-            // previous content flow around a loop back edge; downstream SSA
-            // promotion of that module (for example spirv-opt on our SPIR-V
-            // output) must then treat the register as loop-carried and keep its
-            // content live across the loop body. So in register-allocation mode
-            // we store a concrete default value instead: choosing a concrete
-            // value is a legal refinement of the undefined value, and unlike a
-            // store of the undefined value itself, a constant store survives
-            // downstream optimizers that elide undefined stores. Aggregates and
-            // opaque handles keep the skip, because their default construction
-            // expands into element-wise zeros — the materialization cost that
-            // hoisted-variable legalization deliberately avoids (#11011) — and
-            // an unwritten register is valid output for those shapes even though
-            // it can still carry the liveness regression this fix addresses.
+            // An `IRUndefined` incoming (the whole `Undefined` family — this
+            // includes the `LoadFromUninitializedMemory` values that
+            // `legalizeDefUse` stores when it hoists a value to a loop header,
+            // which after SSA promotion arrive here as exactly this kind of
+            // incoming) means the parameter is read before it was defined along
+            // this path. The internal fast-path callers run without register
+            // allocation, and for their plain local temps skipping the store is
+            // enough: reading an uninitialized local already yields an
+            // undefined value. But register allocation — the default at this
+            // emit-stage call, on every target — makes the temp stand for
+            // function-scope memory in the emitted module, and leaving it
+            // unwritten on this path lets its previous content flow around a
+            // loop back edge; downstream SSA promotion of that module (for
+            // example spirv-opt on our SPIR-V output) must then treat the
+            // register as loop-carried and keep its content live across the
+            // loop body. So we store a concrete default value, and this fires
+            // for any undefined incoming, including plain
+            // partially-initialized locals — the loop-header hoist shape is
+            // only the motivating case. Choosing a concrete value is a legal
+            // refinement of the undefined value, and unlike a store of the
+            // undefined value itself, a constant store survives downstream
+            // optimizers that elide undefined stores. Types without a cheap
+            // concrete default keep the skip: `emitDefaultConstruct` with
+            // `fallback = false` returns null for aggregates (whose default
+            // would expand into element-wise zeros, the materialization cost
+            // that `legalizeDefUse` deliberately avoids, #11011), opaque
+            // handles, and any shape it has no case for. An unwritten register
+            // remains valid output for those types, though it can still carry
+            // the liveness regression this store exists to break.
             //
+            SLANG_ASSERT(m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before);
             auto srcVal = *srcArg.currentValPtr;
             if (as<IRUndefined>(srcVal))
             {
@@ -1104,7 +1108,6 @@ struct PhiEliminationContext
             {
                 // If we are trying to emit a store directly after a load from the same var,
                 // skip the store.
-                SLANG_ASSERT(m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before);
                 auto srcLoad = as<IRLoad>(srcVal);
                 if (srcLoad && srcLoad->getOperand(0) == dstParam.temp &&
                     canLoadBeFoldedAtInst(srcLoad, m_builder.getInsertLoc().getInst()))

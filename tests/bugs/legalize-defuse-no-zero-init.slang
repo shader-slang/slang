@@ -1,7 +1,9 @@
 // Regression test: `legalizeDefUse` (called from `eliminateMultiLevelBreak`)
 // must not leave a fully-expanded `MakeStruct(MakeArray(zeros))` default-init
 // store in the emitted source for an aggregate var that is later
-// unconditionally overwritten by user code.
+// unconditionally overwritten by user code. The hoist's per-entry init (see
+// shader-slang/slang#14493, pinned by the IR check below) is an explicit
+// uninitialized-memory store — it must never materialize zeros.
 //
 // Trigger pattern: a `[ForceInline]` helper function that
 //   1. declares a local struct-of-array,
@@ -10,21 +12,23 @@
 // After inlining + `[ForceUnroll]` lowering + `eliminateMultiLevelBreak`,
 // the var ends up with a `commonDominator` that is a loop's condition block
 // while having uses past the loop's break block. `legalizeDefUse` hoists the
-// var out. Without the fix it also emits a default-init store in the
-// fully-expanded form `MakeStruct(MakeArray(0,0,...))`, which every backend
-// renders as a literal zero array followed by a struct copy.
+// var out. A zero default-init store in the fully-expanded form
+// `MakeStruct(MakeArray(0,0,...))` would make every backend render it as a
+// literal zero array followed by a struct copy.
 // In Metal / HLSL / GLSL output it shows up as
 //   `array<float, int(8)> _S = { 0.0, 0.0, ... }; output_0.data_0 = _S;`,
 // in WGSL as `var _S : array<f32, i32(8)> = array<f32, i32(8)>( 0.0f, ... )`,
 // and in SPIR-V assembly as
 //   `OpConstantComposite ... %float_0 %float_0 ... %float_0`.
 //
-// The user's `[ForceUnroll]` writes overwrite every element, so the
+// The user's `[ForceUnroll]` writes overwrite every element, so a zero
 // initialization is dead. For larger arrays this bloats codegen with
 // hundreds of bytes of zero-stores in the kernel prologue and prevents
 // downstream register allocation from keeping the value in registers.
 //
-// The fix avoids emitting that dead default-init store when hoisting.
+// The fix avoids emitting that dead zero default-init store when hoisting;
+// the per-entry init it does emit is an uninitialized-memory value, not a
+// materialized composite.
 
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL):  -target hlsl  -entry computeMain -stage compute
