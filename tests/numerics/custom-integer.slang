@@ -32,6 +32,11 @@ struct WrappedInt : IScalarSignedIntegerType
         return value;
     }
 
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return condition ? ifTrue : ifFalse;
+    }
+
     static This zero()
     {
         return {0};
@@ -148,6 +153,13 @@ struct SignedIntegerPair<T : IScalarSignedIntegerType> : ISignedIntegerType
     static This fromScalar(Scalar value)
     {
         return {value, value};
+    }
+
+    static This selectComponents(Mask condition, This ifTrue, This ifFalse)
+    {
+        return {
+            condition.x ? ifTrue.x : ifFalse.x,
+            condition.y ? ifTrue.y : ifFalse.y};
     }
 
     static This zero()

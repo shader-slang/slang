@@ -1,0 +1,95 @@
+// Selection through the differentiable shape contract routes derivatives to the chosen components.
+// Mixed masks distinguish component-wise selection from choosing an entire aggregate.
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -Xslang -experimental-feature
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -experimental-feature
+
+import slang.numerics.differentiable;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=results
+RWStructuredBuffer<uint> results;
+
+// A user-defined representation must dispatch through its differentiable conformance as well.
+struct TwoValues : IDifferentiableNumericShapedType
+{
+    typealias Scalar = float;
+    typealias Mask = bool2;
+
+    float first;
+    float second;
+
+    [Differentiable]
+    static This fromScalar(Scalar value)
+    {
+        return {value, value};
+    }
+
+    [Differentiable]
+    static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse)
+    {
+        return {
+            condition.x ? ifTrue.first : ifFalse.first,
+            condition.y ? ifTrue.second : ifFalse.second};
+    }
+}
+
+[Differentiable]
+T chooseComponents<T : IDifferentiableNumericShapedType>(
+    no_diff T.Mask condition, T ifTrue, T ifFalse)
+{
+    return select(condition, ifTrue, ifFalse);
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    // For scalars, both the primal result and its tangent come from the chosen argument.
+    let scalar = fwd_diff(chooseComponents<float>)(
+        false, diffPair(2.0, 3.0), diffPair(7.0, 11.0));
+    results[0] = scalar.p == 7.0; // CHECK: 1
+    results[1] = scalar.d == 11.0; // CHECK: 1
+
+    // Each selected vector component has its own incoming tangent and outgoing adjoint.
+    let mask = bool2(true, false);
+    let vectorForward = fwd_diff(chooseComponents<float2>)(
+        mask, diffPair(float2(2.0, 3.0), float2(1.0, 2.0)),
+        diffPair(float2(10.0, 20.0), float2(3.0, 4.0)));
+    results[2] = (vectorForward.p == float2(2.0, 20.0)).all(); // CHECK: 1
+    results[3] = (vectorForward.d == float2(1.0, 4.0)).all(); // CHECK: 1
+
+    var vectorLeft = diffPair(float2(2.0, 3.0), float2(0.0));
+    var vectorRight = diffPair(float2(10.0, 20.0), float2(0.0));
+    bwd_diff(chooseComponents<float2>)(mask, vectorLeft, vectorRight, float2(5.0, 7.0));
+    results[4] = (vectorLeft.d == float2(5.0, 0.0)).all(); // CHECK: 1
+    results[5] = (vectorRight.d == float2(0.0, 7.0)).all(); // CHECK: 1
+
+    // The matrix witness must preserve its explicit layout in primal and derivative results.
+    typealias Matrix = matrix<float, 2, 3, MatrixLayoutMode.ColumnMajor>;
+    typealias MatrixMask = matrix<bool, 2, 3, MatrixLayoutMode.ColumnMajor>;
+    let matrixMask = MatrixMask(true, false, true, false, true, false);
+    let matrixForward = fwd_diff(chooseComponents<Matrix>)(
+        matrixMask, diffPair(Matrix(2.0), Matrix(3.0)), diffPair(Matrix(5.0), Matrix(7.0)));
+    results[6] = (matrixForward.p == Matrix(2.0, 5.0, 2.0, 5.0, 2.0, 5.0)).all(); // CHECK: 1
+    results[7] = (matrixForward.d == Matrix(3.0, 7.0, 3.0, 7.0, 3.0, 7.0)).all(); // CHECK: 1
+
+    var matrixLeft = diffPair(Matrix(2.0), Matrix(0.0));
+    var matrixRight = diffPair(Matrix(5.0), Matrix(0.0));
+    bwd_diff(chooseComponents<Matrix>)(matrixMask, matrixLeft, matrixRight, Matrix(11.0));
+    results[8] = (matrixLeft.d == Matrix(11.0, 0.0, 11.0, 0.0, 11.0, 0.0)).all(); // CHECK: 1
+    results[9] = (matrixRight.d == Matrix(0.0, 11.0, 0.0, 11.0, 0.0, 11.0)).all(); // CHECK: 1
+
+    let custom = fwd_diff(chooseComponents<TwoValues>)(
+        mask, diffPair(TwoValues(2.0, 3.0), TwoValues.Differential(1.0, 2.0)),
+        diffPair(TwoValues(10.0, 20.0), TwoValues.Differential(3.0, 4.0)));
+    results[10] = bool2(custom.p.first == 2.0, custom.p.second == 20.0).all(); // CHECK: 1
+    results[11] = bool2(custom.d.first == 1.0, custom.d.second == 4.0).all(); // CHECK: 1
+
+    var customLeft = diffPair(TwoValues(2.0, 3.0));
+    var customRight = diffPair(TwoValues(10.0, 20.0));
+    bwd_diff(chooseComponents<TwoValues>)(
+        mask, customLeft, customRight, TwoValues.Differential(5.0, 7.0));
+    results[12] = bool2(customLeft.d.first == 5.0, customLeft.d.second == 0.0).all(); // CHECK: 1
+    results[13] = bool2(customRight.d.first == 0.0, customRight.d.second == 7.0).all(); // CHECK: 1
+}

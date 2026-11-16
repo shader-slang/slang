@@ -12,6 +12,11 @@ T realCurve<T : IReal>(T value, T other)
     return min(sin(value) + exp(value) + sqrt(value), other);
 }
 
+T chooseComponents<T : INumericShapedType>(T.Mask condition, T ifTrue, T ifFalse)
+{
+    return select(condition, ifTrue, ifFalse);
+}
+
 bool allLessThan<T : IComponentwiseOrdered>(T left, T right)
 {
     return all(left < right);
@@ -32,5 +37,6 @@ void computeMain()
         constructFromBuiltinFloatingPoint<CoopVec<float, 4>>(half(0.5));
     CoopVec<float, 4> result = realCurve(value, CoopVec<float, 4>(4.0));
     bool ordered = allLessThan(value, CoopVec<float, 4>(1.0));
-    outputBuffer[0] = result[0] + float(ordered);
+    let selected = chooseComponents(bool4(true, false, true, false), result, value);
+    outputBuffer[0] = selected[0] + selected[1] + float(ordered);
 }
