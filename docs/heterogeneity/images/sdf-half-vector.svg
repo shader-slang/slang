@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="415" viewBox="0 0 640 415" role="img" aria-labelledby="title description">
+<title id="title">The half-vector is a facet normal</title>
+<desc id="description">The surface normal n points upward. The view v points up and left and light l points up and right, both away from the surface point p. The half-vector h is tilted 20 degrees from n and bisects the 110-degree angle between v and l. A small mirror facet is perpendicular to h.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">The half-vector is a facet normal</text>
+<path d="M 48 299 H 592 V 333 H 48 Z" fill="#e8eee7"/>
+<path d="M 48.00,299.00 L 592.00,299.00" stroke="#5b6d62" stroke-width="2" fill="none"/>
+<path d="M 286.00,299.00 L 286.00,92.00" stroke="#387044" stroke-width="2" fill="none" stroke-dasharray="6 6" marker-end="url(#normal)"/>
+<path d="M 286.00,299.00 L 159.81,118.79" stroke="#b25b2b" stroke-width="3" fill="none" marker-end="url(#incoming)"/>
+<path d="M 286.00,299.00 L 520.72,236.11" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 286.00,299.00 L 358.85,98.85" stroke="#a54145" stroke-width="3" fill="none" marker-end="url(#error)"/>
+<path d="M 235.26,280.53 L 336.74,317.47" stroke="#26382f" stroke-width="5" fill="none"/>
+<path d="M 245.85,241.66 A 70 70 0 0 1 309.94,233.22" fill="none" stroke="#5b6d62" stroke-width="1.5"/>
+<path d="M 309.94,233.22 A 70 70 0 0 1 353.61,280.88" fill="none" stroke="#5b6d62" stroke-width="1.5"/>
+<text x="263" y="211" fill="#26382f" font-size="18" font-weight="400" text-anchor="start">β</text>
+<text x="351" y="235" fill="#26382f" font-size="18" font-weight="400" text-anchor="start">β</text>
+<text x="132" y="101" fill="#b25b2b" font-size="20" font-weight="400" text-anchor="middle">view v</text>
+<text x="511" y="214" fill="#286c9b" font-size="20" font-weight="400" text-anchor="middle">light l</text>
+<text x="271" y="89" fill="#387044" font-size="20" font-weight="400" text-anchor="middle">n</text>
+<text x="375" y="96" fill="#a54145" font-size="18" font-weight="400" text-anchor="start">half-vector h</text>
+<text x="129" y="284" fill="#26382f" font-size="18" font-weight="400" text-anchor="start">facet</text>
+<path d="M 179.00,279.00 L 231.00,280.00" stroke="#5b6d62" stroke-width="1" fill="none"/>
+<circle cx="286" cy="299" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="286" y="328" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">p</text>
+<text x="320" y="374" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">h = normalize(v + l)</text>
+<text x="320" y="402" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">Both v and l point away from the surface.</text>
+</g>
+</svg>

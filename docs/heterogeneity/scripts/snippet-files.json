@@ -160,7 +160,56 @@
     "/slang/runtime/resource/buffer_view.slang": "../assets/slangvm/slang/slang/runtime/resource/buffer_view.slang"
   },
   "sphere": {},
-  "tracing": {},
   "shading": {},
-  "blending": {}
+  "blending": {},
+  "environment": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "mirror": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "diffuse": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "accumulation": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "cosine-sampling": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "ggx": {},
+  "glossy": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "frame-loop": {},
+  "camera": {},
+  "sphere-tracer": {},
+  "prng": {},
+  "hemisphere": {},
+  "brdf": {},
+  "path-tracer": {},
+  "progressive-renderer": {},
+  "simple-sphere-tracer": {},
+  "checker-scene": {},
+  "final-scene": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "orbit-controller": {},
+  "interactive-renderer": {},
+  "interactive": {
+    "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
+  },
+  "sphere-distance": {},
+  "intersection": {},
+  "normal-shading": {},
+  "sdf": {},
+  "sphere-sdf": {},
+  "environment-map": {},
+  "display": {},
+  "visibility": {},
+  "lambertian": {},
+  "ggx-sampling": {},
+  "coated-diffuse": {},
+  "scene": {},
+  "box-sdf": {}
 }

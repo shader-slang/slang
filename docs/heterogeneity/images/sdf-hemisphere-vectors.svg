@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420" role="img" aria-labelledby="title description">
+<title id="title">Directions above a surface point</title>
+<desc id="description">A two-dimensional cross-section of a hemisphere above the tangent plane. Several sampled directions point outward from p. The surface normal n points up. Theta is the angle between n and one highlighted sampled direction.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">Directions above a surface point</text>
+<text x="320" y="68" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">A cross-section of the 3D hemisphere</text>
+<path d="M 48 310 H 592 V 352 H 48 Z" fill="#e8eee7"/>
+<path d="M 48.00,310.00 L 592.00,310.00" stroke="#5b6d62" stroke-width="2" fill="none"/>
+<path d="M 120 310 A 200 200 0 0 1 520 310 Z" fill="#eaf2f7" stroke="#9bb7c8" stroke-width="1.5" stroke-dasharray="5 6"/>
+<path d="M 320.00,310.00 L 146.87,273.20" stroke="#286c9b" stroke-width="1.5" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,310.00 L 178.64,203.48" stroke="#286c9b" stroke-width="1.5" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,310.00 L 248.01,148.30" stroke="#286c9b" stroke-width="1.5" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,310.00 L 374.70,141.66" stroke="#286c9b" stroke-width="1.5" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,310.00 L 492.46,270.18" stroke="#286c9b" stroke-width="1.5" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,310.00 L 461.20,182.87" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,310.00 L 320.00,91.00" stroke="#387044" stroke-width="3" fill="none" marker-end="url(#normal)"/>
+<path d="M 320.00,250.00 A 60 60 0 0 1 364.59,269.85" fill="none" stroke="#5b6d62" stroke-width="1.5"/>
+<text x="348" y="237" fill="#26382f" font-size="20" font-weight="400" text-anchor="start">θ</text>
+<text x="337" y="103" fill="#387044" font-size="20" font-weight="400" text-anchor="start">normal n</text>
+<text x="437" y="145" fill="#286c9b" font-size="18" font-weight="400" text-anchor="start">sampled direction</text>
+<circle cx="320" cy="310" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="320" y="340" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">p</text>
+<text x="66" y="340" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="start">tangent plane</text>
+<text x="320" y="385" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">Trace outward to find the light arriving along each ray.</text>
+</g>
+</svg>

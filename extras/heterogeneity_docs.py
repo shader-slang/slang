@@ -1,9 +1,12 @@
 """Resolve repository links and include the browser runtime in the docs site."""
 
 import hashlib
+from html import escape
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
+import re
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
 from markdown.extensions import Extension
@@ -52,6 +55,110 @@ def on_page_markdown(markdown, page, config, **kwargs):
     ]
     config.markdown_extensions.append(RepositoryLinks(config, page))
     return markdown
+
+
+class CellLinks(HTMLParser):
+    """Locate real snippet blocks and links after Markdown has escaped code examples."""
+
+    marker = re.compile(r"(?:runnable|module): ([a-z0-9-]+)(?: backend=(?:none|webgpu))?(?: canvas=[1-9][0-9]*:[1-9][0-9]*)?")
+    void_tags = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+    def __init__(self, html, page_name):
+        super().__init__(convert_charrefs=False)
+        self.html = html
+        self.page_name = page_name
+        self.line_offsets = [0]
+        for match in re.finditer("\n", html):
+            self.line_offsets.append(match.end())
+        self.stack = []
+        self.pending = None
+        self.cells = {}
+        self.links = []
+        self.ids = set()
+        self.feed(html)
+        self.close()
+
+    def source_offset(self):
+        line, column = self.getpos()
+        return self.line_offsets[line - 1] + column
+
+    def handle_comment(self, data):
+        match = self.marker.fullmatch(data.strip())
+        if match and not {"pre", "code"}.intersection(self.stack):
+            self.pending = (match[1] + ".slang", len(self.stack), self.source_offset())
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if attributes.get("id"):
+            self.ids.add(attributes["id"])
+        if self.pending and len(self.stack) == self.pending[1]:
+            name, _, offset = self.pending
+            self.pending = None
+            if tag == "div" and "codehilite" in attributes.get("class", "").split():
+                if name in self.cells:
+                    raise PluginError(f"Duplicate cell in {self.page_name}: {name}")
+                self.cells[name] = offset
+        if tag == "a" and not {"pre", "code"}.intersection(self.stack):
+            url = urlsplit(attributes.get("href", ""))
+            if url.scheme == "cell":
+                name, symbol = unquote(url.path), unquote(url.fragment)
+                if (url.netloc or url.query or not re.fullmatch(r"[a-z0-9-]+\.slang", name)
+                        or (symbol and not re.fullmatch(r"[^\W\d]\w*(?:\.[^\W\d]\w*)*", symbol))):
+                    raise PluginError(f"Invalid cell link in {self.page_name}: {attributes['href']}")
+                self.links.append((self.source_offset(), len(self.get_starttag_text()), attributes, name, symbol))
+        if tag not in self.void_tags:
+            self.stack.append(tag)
+
+    def handle_endtag(self, tag):
+        if tag in self.stack:
+            del self.stack[len(self.stack) - 1 - self.stack[::-1].index(tag):]
+        if self.pending and len(self.stack) < self.pending[1]:
+            self.pending = None
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in self.void_tags:
+            self.handle_endtag(tag)
+
+    def rewrite(self):
+        def anchor(name, symbol):
+            return "cell-" + name + ("--" + symbol if symbol else "")
+
+        targets = {name: {""} for name in self.cells}
+        edits = []
+        for start, length, attributes, name, symbol in self.links:
+            if name not in self.cells:
+                raise PluginError(f"Missing cell linked from {self.page_name}: {name}")
+            targets[name].add(symbol)
+            attributes["href"] = "#" + quote(anchor(name, symbol), safe=".-")
+            attributes["data-cell-link"] = ""
+            tag = "<a " + " ".join(f'{key}="{escape(value or "", quote=True)}"'
+                                   for key, value in attributes.items()) + ">"
+            edits.append((start, start + length, tag))
+        for name, symbols in targets.items():
+            anchors = []
+            for symbol in sorted(symbols):
+                identifier = anchor(name, symbol)
+                if identifier in self.ids:
+                    raise PluginError(f"Reserved cell anchor in {self.page_name}: {identifier}")
+                self.ids.add(identifier)
+                anchors.append(f'<span id="{escape(identifier)}" class="snippet-link-target" '
+                               f'data-cell-target="{name}" data-cell-symbol="{escape(symbol)}" '
+                               'aria-hidden="true"></span>')
+            # Keep the marker immediately before its highlighted block for snippets.js.
+            edits.append((self.cells[name], self.cells[name], "".join(anchors)))
+        html = self.html
+        for start, end, replacement in sorted(edits, reverse=True):
+            html = html[:start] + replacement + html[end:]
+        return html
+
+
+def on_page_content(html, page, config, **kwargs):
+    links = CellLinks(html, page.file.src_uri)
+    html = links.rewrite()
+    # MkDocs collects anchors before this hook; include generated targets in its validation.
+    page.present_anchor_ids.update(links.ids)
+    return html
 
 
 class RuntimeAsset(File):

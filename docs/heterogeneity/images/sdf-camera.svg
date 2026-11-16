@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="445" viewBox="0 0 640 445" role="img" aria-labelledby="title description">
+<title id="title">Position, aim, and field of view</title>
+<desc id="description">Side view of the camera, drawn as a small camera icon whose lens sits at the position. Position is the origin of every ray. The target lies on the forward viewing axis, beyond a virtual image plane. Focal length measures the distance from the camera to that plane in normalized image units, not the distance to the target. A blue ray passes through a pixel sample. Dashed lines through the top and bottom edges show the vertical field of view.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">Position, aim, and field of view</text>
+<text x="320" y="68" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">Side view of a pinhole camera</text>
+<path d="M 100.00,230.00 L 330.00,120.00" stroke="#9baa9e" stroke-width="1.5" fill="none" stroke-dasharray="6 6"/>
+<path d="M 100.00,230.00 L 330.00,340.00" stroke="#9baa9e" stroke-width="1.5" fill="none" stroke-dasharray="6 6"/>
+<path d="M 330.00,120.00 L 330.00,340.00" stroke="#b25b2b" stroke-width="3" fill="none"/>
+<text x="330" y="100" fill="#b25b2b" font-size="18" font-weight="400" text-anchor="middle">virtual image plane</text>
+<path d="M 100.00,230.00 L 550.00,230.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 100.00,230.00 L 500.00,230.00" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<text x="430" y="260" fill="#387044" font-size="18" font-weight="400" text-anchor="middle">forward</text>
+<circle cx="550" cy="230" r="5" fill="#387044" stroke="#fafcf9" stroke-width="2"/>
+<text x="550" y="211" fill="#387044" font-size="20" font-weight="400" text-anchor="middle">target</text>
+<path d="M 100.00,230.00 L 570.00,117.61" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<circle cx="330" cy="175" r="5" fill="#286c9b" stroke="#fafcf9" stroke-width="2"/>
+<text x="490" y="108" fill="#286c9b" font-size="18" font-weight="400" text-anchor="middle">camera ray</text>
+<path d="M 330.00,175.00 L 352.00,191.00" stroke="#286c9b" stroke-width="1" fill="none"/>
+<text x="359" y="204" fill="#286c9b" font-size="18" font-weight="400" text-anchor="start">pixel sample</text>
+<g fill="#e7ede8" stroke="#26382f" stroke-width="1.5" transform="rotate(0.00 100.00 230.00)">
+<rect x="56.00" y="212.00" width="12" height="6" rx="1.5"/>
+<rect x="48.00" y="217.00" width="38" height="26" rx="4"/>
+<path d="M 86.00,225.00 L 99.00,218.00 L 99.00,242.00 L 86.00,235.00 Z"/>
+<circle cx="61.00" cy="226.00" r="2.5" fill="#26382f" stroke="none"/>
+</g>
+<circle cx="100" cy="230" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="92" y="200" fill="#26382f" font-size="20" font-weight="400" text-anchor="end">position</text>
+<text x="92" y="266" fill="#5b6d62" font-size="16" font-weight="400" text-anchor="end">ray origin</text>
+<path d="M 310.00,230.00 L 310.00,340.00" stroke="#5b6d62" stroke-width="1" fill="none"/>
+<path d="M 305.00,230.00 L 315.00,230.00" stroke="#5b6d62" stroke-width="1" fill="none"/>
+<path d="M 305.00,340.00 L 315.00,340.00" stroke="#5b6d62" stroke-width="1" fill="none"/>
+<text x="299" y="290" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="end">1</text>
+<path d="M 100.00,246.00 L 100.00,375.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 100.00,370.00 L 100.00,380.00" stroke="#b25b2b" stroke-width="1.5" fill="none"/>
+<path d="M 330.00,348.00 L 330.00,375.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 330.00,370.00 L 330.00,380.00" stroke="#b25b2b" stroke-width="1.5" fill="none"/>
+<path d="M 100.00,375.00 L 330.00,375.00" stroke="#b25b2b" stroke-width="2" fill="none"/>
+<text x="215" y="400" fill="#b25b2b" font-size="20" font-weight="400" text-anchor="middle">focalLength</text>
+<text x="320" y="434" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">A longer focalLength narrows the view.</text>
+</g>
+</svg>

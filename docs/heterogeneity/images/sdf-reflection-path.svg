@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="470" viewBox="0 0 640 470" role="img" aria-labelledby="title description">
+<title id="title">One path, traced backwards</title>
+<desc id="description">A viewing ray leaves the camera and hits the upper-left of a sphere. The mirror bounce sends a reflected ray up and to the right until it reaches the distant environment, drawn as a dashed arc. The path has two ray segments and one surface bounce.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">One path, traced backwards</text>
+<text x="320" y="68" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">From the camera to the light it sees</text>
+<path d="M 450.45,137.98 A 210 210 0 0 0 195.01,149.13" fill="none" stroke="#9bb7c8" stroke-width="3" stroke-dasharray="8 7"/>
+<text x="462" y="132" fill="#286c9b" font-size="20" font-weight="400" text-anchor="start">environment</text>
+<text x="462" y="154" fill="#5b6d62" font-size="16" font-weight="400" text-anchor="start">infinitely far away</text>
+<circle cx="330.00" cy="310.00" r="90.00" fill="#e8eee7" stroke="#5b6d62" stroke-width="1.5"/>
+<text x="330" y="340" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">sphere</text>
+<path d="M 80.85,183.33 L 296.59,226.43" stroke="#b25b2b" stroke-width="3" fill="none" marker-end="url(#incoming)"/>
+<path d="M 296.59,226.43 L 381.08,106.31" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<g fill="#e7ede8" stroke="#26382f" stroke-width="1.5" transform="rotate(11.30 80.85 183.33)">
+<rect x="36.85" y="165.33" width="12" height="6" rx="1.5"/>
+<rect x="28.85" y="170.33" width="38" height="26" rx="4"/>
+<path d="M 66.85,178.33 L 79.85,171.33 L 79.85,195.33 L 66.85,188.33 Z"/>
+<circle cx="41.85" cy="179.33" r="2.5" fill="#26382f" stroke="none"/>
+</g>
+<circle cx="296.5903660709048" cy="226.4308887164411" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="185" y="190" fill="#b25b2b" font-size="18" font-weight="400" text-anchor="middle">1  viewing ray</text>
+<text x="352" y="170" fill="#286c9b" font-size="18" font-weight="400" text-anchor="start">2  reflected ray</text>
+<text x="282.5903660709048" y="196.4308887164411" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">bounce</text>
+<text x="54.85416331122369" y="225.32763108045998" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">camera</text>
+<text x="320" y="446" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">Two ray segments and one surface bounce.</text>
+</g>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="390" viewBox="0 0 640 390" role="img" aria-labelledby="title description">
+<title id="title">The normal tells us which way a surface faces</title>
+<desc id="description">A point p on a curved surface has an outward unit normal n. The unit vector ell points from p toward the light. Theta is their angle. The normal is perpendicular to the tangent, and the clamped dot product gives the diffuse lighting factor.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">The normal tells us which way a surface faces</text>
+<path d="M 139.79,338.81 A 220 220 0 0 1 500.21,338.81 L 500.21 352 L 139.79 352 Z" fill="#e8eee7"/>
+<path d="M 139.79,338.81 A 220 220 0 0 1 500.21,338.81" fill="none" stroke="#5b6d62" stroke-width="2"/>
+<path d="M 220.00,245.00 L 440.00,245.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<text x="452" y="250" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="start">tangent</text>
+<path d="M 320.00,233.00 L 332.00,233.00" stroke="#9baa9e" stroke-width="1" fill="none"/>
+<path d="M 332.00,233.00 L 332.00,245.00" stroke="#9baa9e" stroke-width="1" fill="none"/>
+<path d="M 320.00,245.00 L 320.00,85.00" stroke="#387044" stroke-width="3" fill="none" marker-end="url(#normal)"/>
+<path d="M 320.00,245.00 L 186.23,124.56" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,183.00 A 62 62 0 0 0 273.93,203.51" fill="none" stroke="#5b6d62" stroke-width="1.5"/>
+<circle cx="320" cy="245" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="338" y="273" fill="#26382f" font-size="20" font-weight="400" text-anchor="start">p</text>
+<text x="337" y="111" fill="#387044" font-size="20" font-weight="400" text-anchor="start">normal n</text>
+<text x="101" y="102" fill="#286c9b" font-size="20" font-weight="400" text-anchor="start">toward light ℓ</text>
+<text x="283" y="170" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">θ</text>
+<text x="320" y="378" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">Facing the light gives a larger dot product.</text>
+</g>
+</svg>

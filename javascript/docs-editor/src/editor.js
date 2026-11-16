@@ -3,7 +3,13 @@ import "monaco-editor/esm/vs/editor/contrib/suggest/browser/suggestController.js
 import "monaco-editor/esm/vs/editor/contrib/hover/browser/hoverContribution.js";
 import "monaco-editor/esm/vs/editor/contrib/parameterHints/browser/parameterHints.js";
 import "monaco-editor/esm/vs/editor/contrib/bracketMatching/browser/bracketMatching.js";
+import "monaco-editor/esm/vs/editor/contrib/contextmenu/browser/contextmenu.js";
+import "monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/goToCommands.js";
+import "monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/link/goToDefinitionAtPosition.js";
+import "monaco-editor/esm/vs/editor/standalone/browser/referenceSearch/standaloneReferenceSearch.js";
 import { FoldingController } from "monaco-editor/esm/vs/editor/contrib/folding/browser/folding.js";
+import { ICodeEditorService } from "monaco-editor/esm/vs/editor/browser/services/codeEditorService.js";
+import { StandaloneServices } from "monaco-editor/esm/vs/editor/standalone/browser/standaloneServices.js";
 import { registerSlang } from "./slang-language.js";
 import { foldingHeaderLine, registerSlangFolding } from "./slang-folding.js";
 
@@ -20,6 +26,8 @@ monaco.editor.defineTheme("slang-docs", {
 });
 
 const services = new Map();
+const cells = new Map();
+const codeEditors = StandaloneServices.get(ICodeEditorService);
 let nextModel = 0;
 const position = value => ({ line: value.lineNumber - 1, character: value.column - 1 });
 const range = value => ({ startLineNumber: value.start.line + 1, startColumn: value.start.character + 1,
@@ -28,6 +36,14 @@ const markdown = value => value?.kind === "markdown" ? { value: value.value, isT
 const kindNames = ["Text", "Method", "Function", "Constructor", "Field", "Variable", "Class", "Interface",
     "Module", "Property", "Unit", "Value", "Enum", "Keyword", "Snippet", "Color", "File", "Reference",
     "Folder", "EnumMember", "Constant", "Struct", "Event", "Operator", "TypeParameter"];
+
+// Monaco's public registerEditorOpener returns the source editor to its caller.
+// Return the actual destination so definition highlights and peek navigation use
+// the right cell, without replacing either editor's model or undo history.
+codeEditors.registerCodeEditorOpenHandler(async input => {
+    const target = cells.get(input.resource.toString());
+    return target ? target.reveal(input.options?.selection) : null;
+});
 
 async function query(model, method, args, token) {
     const service = services.get(model.uri.toString());
@@ -68,6 +84,16 @@ monaco.languages.registerHoverProvider("slang", {
         const hover = await query(model, "hover", { position: position(pos) }, token);
         if (!hover) return null;
         return { range: range(hover.range), contents: [{ value: hover.contents.value, isTrusted: false }] };
+    },
+});
+monaco.languages.registerDefinitionProvider("slang", {
+    async provideDefinition(model, pos, token) {
+        const locations = await query(model, "definition", { position: position(pos) }, token);
+        return (locations || []).flatMap(location => {
+            const uri = monaco.Uri.parse(location.uri);
+            // Only page cells have an editor to reveal; standard-library files do not.
+            return cells.has(uri.toString()) ? [{ uri, range: range(location.range) }] : [];
+        });
     },
 });
 monaco.languages.registerSignatureHelpProvider("slang", {
@@ -150,7 +176,7 @@ class LanguageService {
 }
 
 export function createEditor(container, { source, name, filename, files, onRun, onStatus,
-    getSources = () => ({}), onChange, standardModulesURL, foldLines = [] }) {
+    getSources = () => ({}), onChange, onReveal, standardModulesURL, foldLines = [] }) {
     const uri = monaco.Uri.parse(`file:///${filename ?? `snippet-${++nextModel}-${name}.slang`}`);
     const model = monaco.editor.createModel(source, "slang", uri);
     const editor = monaco.editor.create(container, {
@@ -187,6 +213,29 @@ export function createEditor(container, { source, name, filename, files, onRun, 
         }
     }
     void foldDefaults(foldLines);
+    const navigation = {
+        async reveal(selection, isCurrent = () => true) {
+            await onReveal?.();
+            if (model.isDisposed() || !isCurrent()) return null;
+            const target = model.validateRange(new monaco.Range(
+                selection?.startLineNumber ?? 1, selection?.startColumn ?? 1,
+                selection?.endLineNumber ?? selection?.startLineNumber ?? 1,
+                selection?.endColumn ?? selection?.startColumn ?? 1));
+            const folding = await FoldingController.get(editor)?.getFoldingModel();
+            if (model.isDisposed() || !isCurrent()) return null;
+            // Reveal every enclosing fold immediately, before measuring and scrolling.
+            if (folding) folding.toggleCollapseState(folding.getAllRegionsAtLine(
+                target.startLineNumber, region => region.isCollapsed && target.startLineNumber > region.startLineNumber));
+            resize();
+            editor.layout();
+            editor.setSelection(target);
+            editor.revealRangeInCenter(target, monaco.editor.ScrollType.Immediate);
+            container.scrollIntoView({ block: "center" });
+            editor.focus();
+            return editor;
+        },
+    };
+    cells.set(uri.toString(), navigation);
     // Actions scope keybindings to this editor; an unscoped command runs the last snippet.
     const runAction = editor.addAction({
         id: "run-slang-example", label: "Run example",
@@ -215,6 +264,25 @@ export function createEditor(container, { source, name, filename, files, onRun, 
     });
     return {
         getValue: () => model.getValue(),
+        reveal: navigation.reveal,
+        async findSymbols(name) {
+            const symbols = await query(model, "symbols", {});
+            if (symbols === null) return null;
+            const matches = [];
+            const visit = (symbols, parent = "") => {
+                for (const symbol of symbols) {
+                    const qualified = parent ? `${parent}.${symbol.name}` : symbol.name;
+                    if (qualified === name) matches.push({
+                        name: qualified,
+                        detail: symbol.detail || model.getLineContent(symbol.range.start.line + 1).trim(),
+                        range: range(symbol.selectionRange),
+                    });
+                    visit(symbol.children, qualified);
+                }
+            };
+            visit(symbols);
+            return matches;
+        },
         setValue(value, foldLines = []) {
             model.setValue(value);
             void foldDefaults(foldLines);
@@ -229,6 +297,7 @@ export function createEditor(container, { source, name, filename, files, onRun, 
             clearTimeout(timer);
             service.dispose();
             services.delete(uri.toString());
+            cells.delete(uri.toString());
             focusListener.dispose(); changeListener.dispose(); sizeListener.dispose(); runAction.dispose();
             editor.dispose(); model.dispose();
         },

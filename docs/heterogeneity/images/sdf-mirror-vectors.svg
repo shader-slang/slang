@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="370" viewBox="0 0 640 370" role="img" aria-labelledby="title description">
+<title id="title">One incoming ray, one reflected ray</title>
+<desc id="description">An incoming ray d points down and right to a surface point p. The outward normal n points up. The reflected ray r points up and right. The two angles from the normal to the ray segments above the surface are equal.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">One incoming ray, one reflected ray</text>
+<path d="M 48 270 H 592 V 312 H 48 Z" fill="#e8eee7"/>
+<path d="M 48.00,270.00 L 592.00,270.00" stroke="#5b6d62" stroke-width="2" fill="none"/>
+<path d="M 230.82,189.70 L 320.00,270.00" stroke="#b25b2b" stroke-width="3" fill="none"/>
+<path d="M 141.65,109.41 L 230.82,189.70" stroke="#b25b2b" stroke-width="3" fill="none" marker-end="url(#incoming)"/>
+<path d="M 320.00,270.00 L 498.35,109.41" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 320.00,270.00 L 320.00,82.00" stroke="#387044" stroke-width="3" fill="none" marker-end="url(#normal)"/>
+<path d="M 320.00,213.00 A 57 57 0 0 0 277.64,231.86" fill="none" stroke="#5b6d62" stroke-width="1.5"/>
+<path d="M 320.00,213.00 A 57 57 0 0 1 362.36,231.86" fill="none" stroke="#5b6d62" stroke-width="1.5"/>
+<text x="277" y="201" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">θᵢ</text>
+<text x="363" y="201" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">θᵣ</text>
+<text x="87" y="91" fill="#b25b2b" font-size="20" font-weight="400" text-anchor="start">incoming d</text>
+<text x="448" y="91" fill="#286c9b" font-size="20" font-weight="400" text-anchor="start">reflected r</text>
+<text x="338" y="112" fill="#387044" font-size="20" font-weight="400" text-anchor="start">normal n</text>
+<circle cx="320" cy="270" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="320" y="298" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">p</text>
+<text x="66" y="298" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="start">surface</text>
+<text x="320" y="344" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">θᵢ = θᵣ   ·   Both angles are measured from the normal.</text>
+</g>
+</svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" role="img" aria-labelledby="title description">
+<title id="title">Orbit coordinates</title>
+<desc id="description">Two views of a camera orbiting a target point. In the side view, the camera sits on a dashed circle around the target; pitch is its angle above the horizon and distance is the circle&#x27;s radius. In the top view, yaw is the camera&#x27;s angle around the vertical axis, measured from its starting direction.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">Orbit coordinates</text>
+<text x="320" y="68" fill="#5b6d62" font-size="17" font-weight="400" text-anchor="middle">The camera stays on a sphere around the target and always looks at it.</text>
+<text x="175" y="110" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">Side view</text>
+<circle cx="175.00" cy="250.00" r="105.00" fill="none" stroke="#9baa9e" stroke-width="1.5" stroke-dasharray="5 6"/>
+<path d="M 45.00,250.00 L 305.00,250.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 88.99,189.77 L 175.00,250.00" stroke="#b25b2b" stroke-width="2" fill="none" marker-end="url(#incoming)"/>
+<g fill="#e7ede8" stroke="#26382f" stroke-width="1.5" transform="rotate(35.00 88.99 189.77)">
+<rect x="44.99" y="171.77" width="12" height="6" rx="1.5"/>
+<rect x="36.99" y="176.77" width="38" height="26" rx="4"/>
+<path d="M 74.99,184.77 L 87.99,177.77 L 87.99,201.77 L 74.99,194.77 Z"/>
+<circle cx="49.99" cy="185.77" r="2.5" fill="#26382f" stroke="none"/>
+</g>
+<path d="M 127.00,250.00 A 48 48 0 0 1 135.68,222.47" fill="none" stroke="#387044" stroke-width="2"/>
+<text x="109" y="232" fill="#387044" font-size="17" font-weight="400" text-anchor="end">pitch</text>
+<text x="137.99451767482793" y="205.88723709157009" fill="#286c9b" font-size="17" font-weight="400" text-anchor="start">distance</text>
+<circle cx="175" cy="250" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="185" y="274" fill="#26382f" font-size="17" font-weight="400" text-anchor="start">target</text>
+<text x="175" y="384" fill="#5b6d62" font-size="16" font-weight="400" text-anchor="middle">Drag up or down: pitch. Scroll: distance.</text>
+<text x="470" y="110" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">Top view</text>
+<circle cx="470.00" cy="240.00" r="105.00" fill="none" stroke="#9baa9e" stroke-width="1.5" stroke-dasharray="5 6"/>
+<path d="M 470.00,240.00 L 470.00,365.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 537.49,320.43 L 470.00,240.00" stroke="#b25b2b" stroke-width="2" fill="none" marker-end="url(#incoming)"/>
+<g fill="#e7ede8" stroke="#26382f" stroke-width="1.5" transform="rotate(-130.00 537.49 320.43) translate(0 640.87) scale(1 -1)">
+<rect x="493.49" y="302.43" width="12" height="6" rx="1.5"/>
+<rect x="485.49" y="307.43" width="38" height="26" rx="4"/>
+<path d="M 523.49,315.43 L 536.49,308.43 L 536.49,332.43 L 523.49,325.43 Z"/>
+<circle cx="498.49" cy="316.43" r="2.5" fill="#26382f" stroke="none"/>
+</g>
+<path d="M 470.00,288.00 A 48 48 0 0 0 500.85,276.77" fill="none" stroke="#387044" stroke-width="2"/>
+<text x="458" y="316" fill="#387044" font-size="17" font-weight="400" text-anchor="end">yaw</text>
+<circle cx="470" cy="240" r="5" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="482" y="230" fill="#26382f" font-size="17" font-weight="400" text-anchor="start">target</text>
+<text x="470" y="384" fill="#5b6d62" font-size="16" font-weight="400" text-anchor="middle">Drag left or right: yaw.</text>
+</g>
+</svg>

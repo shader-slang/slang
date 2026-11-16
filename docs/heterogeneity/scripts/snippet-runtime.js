@@ -6,6 +6,7 @@ export async function runSnippet({ source, filename = "main.slang", sources = { 
   let window;
   let executing = false;
   let lastFrame;
+  let reportedAdapter = false;
   let phase = "Checking browser support";
   let output = "";
   let lastOutput = 0;
@@ -31,6 +32,14 @@ export async function runSnippet({ source, filename = "main.slang", sources = { 
   };
   const captureFrame = (presentedCanvas) => {
     if (presentedCanvas !== canvas) return;
+    if (!reportedAdapter) {
+      // Read the device that produced this frame; a separate adapter request could select another GPU.
+      const info = canvas.getContext("webgpu").getConfiguration()?.device.adapterInfo;
+      const name = info?.description?.trim() ||
+        [info?.vendor, info?.architecture].filter(Boolean).join(" ") || "Adapter name unavailable";
+      send({ type: "adapter", name });
+      reportedAdapter = true;
+    }
     lastFrame ??= document.createElement("canvas");
     if (lastFrame.width !== canvas.width) lastFrame.width = canvas.width;
     if (lastFrame.height !== canvas.height) lastFrame.height = canvas.height;

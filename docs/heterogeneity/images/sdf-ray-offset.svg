@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="355" viewBox="0 0 640 355" role="img" aria-labelledby="title description">
+<title id="title">Start the ray just outside the surface</title>
+<desc id="description">The surface point p lies within the hit-tolerance band. A dashed ray beginning at p would immediately hit the surface again. The new origin p plus epsilon n is moved outward along the normal. Its solid blue ray has the same direction. The offset and tolerance band are exaggerated for visibility.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">Start the ray just outside the surface</text>
+<path d="M 48 265 H 592 V 296 H 48 Z" fill="#e8eee7"/>
+<path d="M 48.00,265.00 L 592.00,265.00" stroke="#5b6d62" stroke-width="2" fill="none"/>
+<path d="M 48 247 H 592 V 265 H 48 Z" fill="#f5e8cf"/>
+<path d="M 48.00,247.00 L 592.00,247.00" stroke="#b25b2b" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 215.00,265.00 L 455.00,149.00" stroke="#a54145" stroke-width="2" fill="none" stroke-dasharray="6 6" marker-end="url(#error)"/>
+<path d="M 215.00,193.00 L 455.00,77.00" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<path d="M 215.00,265.00 L 215.00,82.00" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 181.00,193.00 L 181.00,265.00" stroke="#387044" stroke-width="1.5" fill="none"/>
+<path d="M 176.00,193.00 L 186.00,193.00" stroke="#387044" stroke-width="1.5" fill="none"/>
+<path d="M 176.00,265.00 L 186.00,265.00" stroke="#387044" stroke-width="1.5" fill="none"/>
+<circle cx="215" cy="265" r="5" fill="#a54145" stroke="#fafcf9" stroke-width="2"/>
+<circle cx="215" cy="193" r="5" fill="#286c9b" stroke="#fafcf9" stroke-width="2"/>
+<text x="163" y="235" fill="#387044" font-size="20" font-weight="400" text-anchor="start">ε</text>
+<text x="232" y="109" fill="#387044" font-size="20" font-weight="400" text-anchor="start">normal n</text>
+<text x="470" y="86" fill="#286c9b" font-size="18" font-weight="400" text-anchor="start">offset ray</text>
+<text x="469" y="157" fill="#a54145" font-size="18" font-weight="400" text-anchor="start">original ray</text>
+<text x="196" y="181" fill="#286c9b" font-size="20" font-weight="400" text-anchor="end">p + εn</text>
+<text x="215" y="290" fill="#a54145" font-size="20" font-weight="400" text-anchor="middle">p</text>
+<text x="458" y="239" fill="#b25b2b" font-size="18" font-weight="400" text-anchor="start">hit tolerance</text>
+<text x="66" y="289" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="start">surface</text>
+<text x="320" y="331" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">Offset and tolerance exaggerated; ray direction unchanged.</text>
+</g>
+</svg>

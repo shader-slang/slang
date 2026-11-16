@@ -18,6 +18,10 @@ function completion(item) {
     return { ...item, commitCharacters: vector(item.commitCharacters) };
 }
 
+function documentSymbol(symbol) {
+    return { ...symbol, children: vector(symbol.children, documentSymbol) };
+}
+
 async function initialize(data) {
     // The package inventory is authoritative for its standard-module dependencies.
     // Site mappings add custom files; editable cells override both below.
@@ -99,6 +103,8 @@ async function request(data) {
     switch (data.method) {
         case "diagnostics": return vector(server.getDiagnostics(uri));
         case "hover": return server.hover(uri, data.position);
+        case "definition": return vector(server.gotoDefinition(uri, data.position));
+        case "symbols": return vector(server.documentSymbol(uri), documentSymbol);
         case "completion": return vector(server.completion(uri, data.position, data.context), completion);
         case "signatureHelp": {
             const help = server.signatureHelp(uri, data.position);

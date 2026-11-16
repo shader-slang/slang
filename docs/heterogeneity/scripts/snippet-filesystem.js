@@ -1,12 +1,14 @@
 import { HTTPSlangFileSystem } from "../assets/slangvm/src/http-file-system.js";
+import { normalizePath } from "../assets/slangvm/src/file-system.js";
 
 // Keep downloaded runtime bytes on the page, even when an execution worker is terminated.
 const baseURL = new URL("../assets/slangvm/slang/", import.meta.url);
 let libraries;
 let allowedPaths;
 let preloading;
+const mappedFiles = new Map();
 
-export async function preloadRuntime() {
+export async function preloadRuntime(files = {}) {
   if (!preloading) preloading = (async () => {
     const inventory = new HTTPSlangFileSystem(baseURL, { allowedPaths: ["standard-modules.json"] });
     const bytes = await inventory.loadFile("standard-modules.json");
@@ -23,5 +25,24 @@ export async function preloadRuntime() {
     throw error;
   });
   await preloading;
-  return { preloadedFiles: libraries.snapshot(), allowedPaths };
+  const preloadedFiles = libraries.snapshot();
+  await Promise.all(Object.entries(files).map(async ([path, url]) => {
+    const name = normalizePath(path);
+    // Legacy editor mappings name standard-library sources. Execution already has
+    // their compiled modules; do not fetch sources or enable source fallback here.
+    const libraryFile = url === new URL(name.slice(1), baseURL).href;
+    if (libraryFile && (Object.hasOwn(preloadedFiles, name)
+        || Object.hasOwn(preloadedFiles, name.replace(/\.slang$/, ".slang-module")))) return;
+    if (!mappedFiles.has(url)) {
+      mappedFiles.set(url, fetch(url).then(async response => {
+        if (!response.ok) throw new Error(`Cannot load snippet file: ${path}`);
+        return new Uint8Array(await response.arrayBuffer());
+      }).catch(error => {
+        mappedFiles.delete(url); // A later Run can retry a failed download.
+        throw error;
+      }));
+    }
+    preloadedFiles[name] = await mappedFiles.get(url);
+  }));
+  return { preloadedFiles, allowedPaths };
 }

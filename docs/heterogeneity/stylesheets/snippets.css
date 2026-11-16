@@ -8,7 +8,13 @@
   vertical-align: -0.15em;
 }
 
+/* Each snippet is its own stacking context, so the editor's scrollbars and the
+   z-indexed run controls stay below Material's sticky header (z-index 4). The
+   snippet under the pointer or focus is raised so Monaco's hover and suggestion
+   widgets can overlap the snippets after it. */
 .slang-snippet {
+  position: relative;
+  z-index: 0;
   margin: 0 0 24px;
   overflow: hidden;
   border: 1px solid #becfbe;
@@ -16,7 +22,25 @@
   background: #f8faf7;
 }
 
+.slang-snippet:hover,
+.slang-snippet:focus-within {
+  z-index: 1;
+}
+
 .snippet-source { position: relative; }
+.snippet-link-target { display: block; scroll-margin-top: 5rem; }
+.snippet-navigation { padding: 8px 16px; color: #52634f; font-size: 13px; }
+.snippet-navigation-choices { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.snippet-navigation-choices button {
+  padding: 4px 8px;
+  border: 1px solid #becfbe;
+  border-radius: 3px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.snippet-navigation-choices button:hover { background: #eef3eb; }
+.snippet-navigation-choices button:focus-visible { outline: 2px solid #386b22; outline-offset: 1px; }
 .snippet-actions {
   position: absolute;
   top: 8px;
@@ -85,6 +109,16 @@
 .md-typeset .monaco-editor textarea { min-height: 0; padding: 0; border: 0; box-shadow: none; }
 .md-typeset .monaco-editor .view-lines { line-height: inherit; }
 .snippet-status { color: #435342; font-size: 13px; }
+.snippet-result-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; }
+.snippet-adapter {
+  margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
+  color: #727672;
+  font-size: 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 .snippet-display {
   position: relative;
   margin-top: 10px;

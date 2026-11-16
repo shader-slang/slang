@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="310" viewBox="0 0 640 310" role="img" aria-labelledby="title description">
+<title id="title">Roughness spreads the facet normals</title>
+<desc id="description">Two magnified surface profiles have the same average horizontal orientation. The smoother profile has shallow slopes and nearly aligned normals. The rougher profile has steeper slopes and more widely tilted normals. These are illustrative profiles, not actual geometry added to the sphere.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">Roughness spreads the facet normals</text>
+<text x="168" y="88" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">Smoother</text>
+<path d="M 48.00,202.00 L 288.00,202.00" stroke="#9baa9e" stroke-width="2" fill="none" stroke-dasharray="6 6"/>
+<path d="M 48.00,198.00 L 88.00,206.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 68.00,202.00 L 79.77,143.17" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 88.00,206.00 L 128.00,198.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 108.00,202.00 L 96.23,143.17" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 128.00,198.00 L 168.00,206.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 148.00,202.00 L 159.77,143.17" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 168.00,206.00 L 208.00,198.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 188.00,202.00 L 176.23,143.17" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 208.00,198.00 L 248.00,206.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 228.00,202.00 L 239.77,143.17" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 248.00,206.00 L 288.00,198.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 268.00,202.00 L 256.23,143.17" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<text x="472" y="88" fill="#26382f" font-size="20" font-weight="400" text-anchor="middle">Rougher</text>
+<path d="M 352.00,202.00 L 592.00,202.00" stroke="#9baa9e" stroke-width="2" fill="none" stroke-dasharray="6 6"/>
+<path d="M 352.00,180.00 L 392.00,224.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 372.00,202.00 L 416.40,161.64" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 392.00,224.00 L 432.00,180.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 412.00,202.00 L 367.60,161.64" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 432.00,180.00 L 472.00,224.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 452.00,202.00 L 496.40,161.64" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 472.00,224.00 L 512.00,180.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 492.00,202.00 L 447.60,161.64" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 512.00,180.00 L 552.00,224.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 532.00,202.00 L 576.40,161.64" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<path d="M 552.00,224.00 L 592.00,180.00" stroke="#5b6d62" stroke-width="3" fill="none"/>
+<path d="M 572.00,202.00 L 527.60,161.64" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<text x="320" y="267" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">Tiny mirror patches, shown greatly enlarged.</text>
+<text x="320" y="296" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">The sphere&#x27;s visible outline stays the same.</text>
+</g>
+</svg>

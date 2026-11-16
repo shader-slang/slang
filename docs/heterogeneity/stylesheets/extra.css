@@ -157,6 +157,25 @@
   background: var(--hs-green);
 }
 
+/* Deep dives pair the test-tube icon with a softer shade of the theme's green. */
+.md-typeset .admonition.example,
+.md-typeset details.example {
+  --hs-deep-dive-color: #4f7969;
+  border-color: var(--hs-deep-dive-color);
+}
+
+.md-typeset .admonition.example > .admonition-title,
+.md-typeset details.example > summary {
+  background-color: #4f796912;
+  color: var(--hs-deep-dive-color);
+}
+
+.md-typeset .admonition.example > .admonition-title::before,
+.md-typeset details.example > summary::before,
+.md-typeset details.example > summary::after {
+  background-color: var(--hs-deep-dive-color);
+}
+
 .md-typeset .admonition.danger {
   border: 2px solid #ae1c24;
   background: #fff0f0;
@@ -181,7 +200,14 @@
   max-width: 640px;
   border: 1px solid #dce4dd;
   border-radius: 4px;
+  margin-inline: auto;
   margin-bottom: 24px;
+}
+
+.md-typeset img[src*="images/sdf-"][src$=".svg"] {
+  max-width: 480px;
+  border: 0;
+  border-radius: 0;
 }
 
 .md-typeset .tooling-screenshot-placeholder {
@@ -201,4 +227,46 @@
 
 .md-typeset .tooling-screenshot-placeholder figcaption {
   margin: 0;
+}
+
+.md-typeset .arithmatex .katex {
+  font-size: 1.05em;
+}
+
+/* Equation names written as `% label: ...` sit under the equation as a small caption. */
+.md-typeset div.arithmatex .math-label {
+  margin-top: 0.15em;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.64rem;
+  text-align: center;
+}
+
+.md-typeset div.arithmatex .math-label-number {
+  font-weight: 600;
+}
+
+/* `% number` equations shrink to their content so the number can sit just past the
+   right edge without moving the centred equation. */
+.md-typeset div.arithmatex .katex-display > .katex.math-numbered {
+  display: inline-block;
+  position: relative;
+}
+
+.md-typeset div.arithmatex .math-tag {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  margin-left: 1.5em;
+  transform: translateY(-50%);
+  color: var(--md-default-fg-color--light);
+  font-family: var(--md-text-font-family);
+  font-size: 0.64rem;
+  white-space: nowrap;
+}
+
+/* Long display equations scroll locally instead of widening the page on mobile. */
+.md-typeset div.arithmatex {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.3em 0;
 }

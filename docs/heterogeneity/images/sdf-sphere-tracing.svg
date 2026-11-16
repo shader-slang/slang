@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="475" viewBox="0 0 640 475" role="img" aria-labelledby="title description">
+<title id="title">Each distance gives a safe step</title>
+<desc id="description">A horizontal ray starts at p0 outside a circular cross-section of the object. Empty circles at p0, p1, and p2 have radii equal to the signed distance. Each step advances to the next circle&#x27;s centre. The nearest surface point to p0 is below the ray, illustrating why a safe step need not reach the object.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">Each distance gives a safe step</text>
+<text x="320" y="66" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">Circles are cross-sections of empty 3D spheres.</text>
+<circle cx="490.00" cy="325.00" r="105.00" fill="#e8eee7" stroke="#5b6d62" stroke-width="1.5"/>
+<circle cx="235.00" cy="240.00" r="163.79" fill="none" stroke="#286c9b" stroke-width="1.5" stroke-dasharray="5 6"/>
+<circle cx="398.79" cy="240.00" r="19.67" fill="none" stroke="#286c9b" stroke-width="1.5" stroke-dasharray="5 6"/>
+<circle cx="418.47" cy="240.00" r="6.09" fill="none" stroke="#286c9b" stroke-width="1.5" stroke-dasharray="5 6"/>
+<path d="M 235.00,240.00 L 390.39,291.80" stroke="#b25b2b" stroke-width="2" fill="none" stroke-dasharray="6 6"/>
+<text x="303" y="291" fill="#b25b2b" font-size="18" font-weight="400" text-anchor="middle">D(p₀)</text>
+<circle cx="390.38825370469607" cy="291.796084568232" r="4" fill="#b25b2b" stroke="#fafcf9" stroke-width="2"/>
+<path d="M 390.39,291.80 L 330.00,331.00" stroke="#b25b2b" stroke-width="1" fill="none"/>
+<text x="345" y="356" fill="#b25b2b" font-size="18" font-weight="400" text-anchor="end">nearest surface</text>
+<path d="M 235.00,240.00 L 428.36,240.00" stroke="#286c9b" stroke-width="2" fill="none"/>
+<path d="M 235.00,240.00 L 316.90,240.00" stroke="#286c9b" stroke-width="3" fill="none" marker-end="url(#outgoing)"/>
+<text x="296" y="221" fill="#286c9b" font-size="18" font-weight="400" text-anchor="middle">ray direction d</text>
+<circle cx="235" cy="240" r="4" fill="#286c9b" stroke="#fafcf9" stroke-width="2"/>
+<circle cx="398.79360111431225" cy="240" r="4" fill="#286c9b" stroke="#fafcf9" stroke-width="2"/>
+<circle cx="418.4676048107332" cy="240" r="4" fill="#286c9b" stroke="#fafcf9" stroke-width="2"/>
+<circle cx="428.35585997031023" cy="240" r="3" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="226" y="267" fill="#286c9b" font-size="20" font-weight="400" text-anchor="end">p₀</text>
+<path d="M 377.00,192.00 L 398.79,232.00" stroke="#9baa9e" stroke-width="1" fill="none"/>
+<text x="377" y="184" fill="#286c9b" font-size="20" font-weight="400" text-anchor="middle">p₁</text>
+<path d="M 424.00,190.00 L 418.47,232.00" stroke="#9baa9e" stroke-width="1" fill="none"/>
+<text x="424" y="182" fill="#286c9b" font-size="20" font-weight="400" text-anchor="middle">p₂</text>
+<text x="453" y="220" fill="#26382f" font-size="18" font-weight="400" text-anchor="start">hit</text>
+<text x="525" y="377" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">object</text>
+<text x="320" y="456" fill="#26382f" font-size="18" font-weight="400" text-anchor="middle">Advance along the ray by the nearest surface distance.</text>
+</g>
+</svg>

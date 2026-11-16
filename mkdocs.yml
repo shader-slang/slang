@@ -11,6 +11,9 @@ theme:
   name: material
   custom_dir: docs/overrides
   font: false
+  icon:
+    admonition:
+      example: material/test-tube
   palette:
     scheme: default
     primary: custom
@@ -37,7 +40,7 @@ nav:
       - Debugging: debugging.md
       - Event tracking: event-tracking.md
   - Tutorials:
-      - An SDF ray tracer: sdf-path-tracer.md
+      - An SDF path tracer: sdf-path-tracer.md
   - Contributing to the docs: contributing.md
 
 plugins:
@@ -46,6 +49,8 @@ plugins:
 markdown_extensions:
   - admonition
   - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.highlight:
       css_class: codehilite
       guess_lang: false
@@ -57,11 +62,14 @@ markdown_extensions:
       permalink: true
 
 extra_css:
+  - vendor/katex/katex.min.css
   - stylesheets/extra.css
   - stylesheets/code.css
   - stylesheets/snippets.css
 
 extra_javascript:
+  - vendor/katex/katex.min.js
+  - scripts/math.js
   - scripts/snippets.js
 
 hooks:

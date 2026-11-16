@@ -8,6 +8,8 @@ const { createHash } = require("node:crypto");
 const { createRequire } = require("node:module");
 const { chromium } = createRequire(path.resolve(__dirname, "../javascript/docs-editor/package.json"))("playwright");
 const { checkSdfTutorial } = require("./sdf-tutorial-checks.cjs");
+const { checkDocsDefinitions } = require("./docs-definition-checks.cjs");
+const { checkDocsCellLinks } = require("./docs-cell-link-checks.cjs");
 
 (async () => {
     const root = path.resolve(__dirname, "../build/heterogeneity-docs");
@@ -285,6 +287,8 @@ const { checkSdfTutorial } = require("./sdf-tutorial-checks.cjs");
         };
 
         // Keep this inventory complete when docs gain, move, or remove runnable examples.
+        await checkDocsDefinitions(browser, baseURL);
+        await checkDocsCellLinks(browser, baseURL);
         await checkSdfTutorial(browser, baseURL, path.resolve(root, ".."));
         const examples = [
             ["invoking", "first-program", "5"],
@@ -304,7 +308,10 @@ const { checkSdfTutorial } = require("./sdf-tutorial-checks.cjs");
                 .matchAll(/^<!-- runnable: ([a-z0-9-]+)(?: [^>]*)? -->/gm)]
                 .map(match => `${name.slice(0, -3)}/${match[1]}`));
         assert.deepEqual(documented.sort(), ["grid-dispatch/grid-dispatch",
-            "sdf-path-tracer/sphere", "sdf-path-tracer/tracing", "sdf-path-tracer/shading", "sdf-path-tracer/blending",
+            "sdf-path-tracer/sphere", "sdf-path-tracer/intersection", "sdf-path-tracer/shading", "sdf-path-tracer/blending",
+            "sdf-path-tracer/environment", "sdf-path-tracer/mirror", "sdf-path-tracer/diffuse", "sdf-path-tracer/accumulation",
+            "sdf-path-tracer/cosine-sampling", "sdf-path-tracer/glossy", "sdf-path-tracer/final-scene",
+            "sdf-path-tracer/interactive",
             ...examples.map(([route, name]) => `${route}/${name}`)].sort(), "Every runnable example needs browser coverage");
         for (const [route, name, expected] of examples) {
             const context = await browser.newContext();

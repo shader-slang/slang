@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="435" viewBox="0 0 640 435" role="img" aria-labelledby="title description">
+<title id="title">Measure distance to the surface</title>
+<desc id="description">A cross-section of a unit sphere. A is halfway from the centre to the surface, B is on the surface, and C is two units from the centre. Their signed distances are minus one half, zero, and plus one. The radius is one unit.</desc>
+<defs>
+<marker id="normal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#387044"/></marker>
+<marker id="incoming" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#b25b2b"/></marker>
+<marker id="outgoing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#286c9b"/></marker>
+<marker id="error" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#a54145"/></marker>
+</defs>
+<g font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#26382f" stroke-linecap="round" stroke-linejoin="round">
+<text x="320" y="38" fill="#26382f" font-size="24" font-weight="600" text-anchor="middle">Measure distance to the surface</text>
+<text x="320" y="68" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">A cross-section of a sphere with R = 1</text>
+<circle cx="215.00" cy="225.00" r="110.00" fill="#e8eee7" stroke="#5b6d62" stroke-width="1.5"/>
+<path d="M 105.00,225.00 L 435.00,225.00" stroke="#9baa9e" stroke-width="1" fill="none"/>
+<path d="M 215.00,225.00 L 105.00,225.00" stroke="#387044" stroke-width="2" fill="none" marker-end="url(#normal)"/>
+<text x="159" y="210" fill="#387044" font-size="18" font-weight="400" text-anchor="middle">R = 1</text>
+<path d="M 270.00,188.00 L 325.00,188.00" stroke="#b25b2b" stroke-width="2" fill="none"/>
+<path d="M 270.00,183.00 L 270.00,193.00" stroke="#b25b2b" stroke-width="1.5" fill="none"/>
+<path d="M 325.00,183.00 L 325.00,193.00" stroke="#b25b2b" stroke-width="1.5" fill="none"/>
+<text x="297.5" y="177" fill="#b25b2b" font-size="18" font-weight="400" text-anchor="middle">0.5</text>
+<path d="M 325.00,188.00 L 435.00,188.00" stroke="#286c9b" stroke-width="2" fill="none"/>
+<path d="M 325.00,183.00 L 325.00,193.00" stroke="#286c9b" stroke-width="1.5" fill="none"/>
+<path d="M 435.00,183.00 L 435.00,193.00" stroke="#286c9b" stroke-width="1.5" fill="none"/>
+<text x="380.0" y="177" fill="#286c9b" font-size="18" font-weight="400" text-anchor="middle">1</text>
+<circle cx="215" cy="225" r="4" fill="#26382f" stroke="#fafcf9" stroke-width="2"/>
+<text x="206" y="249" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="end">0</text>
+<circle cx="270.0" cy="225.0" r="5" fill="#b25b2b" stroke="#fafcf9" stroke-width="2"/>
+<text x="270.0" y="251" fill="#b25b2b" font-size="20" font-weight="400" text-anchor="middle">A</text>
+<circle cx="325" cy="225" r="5" fill="#387044" stroke="#fafcf9" stroke-width="2"/>
+<text x="340" y="251" fill="#387044" font-size="20" font-weight="400" text-anchor="middle">B</text>
+<circle cx="435" cy="225" r="5" fill="#286c9b" stroke="#fafcf9" stroke-width="2"/>
+<text x="435" y="251" fill="#286c9b" font-size="20" font-weight="400" text-anchor="middle">C</text>
+<path d="M 215.00,266.00 L 215.00,354.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 215.00,349.00 L 215.00,359.00" stroke="#5b6d62" stroke-width="1.5" fill="none"/>
+<path d="M 435.00,266.00 L 435.00,354.00" stroke="#9baa9e" stroke-width="1" fill="none" stroke-dasharray="6 6"/>
+<path d="M 435.00,349.00 L 435.00,359.00" stroke="#5b6d62" stroke-width="1.5" fill="none"/>
+<path d="M 215.00,354.00 L 435.00,354.00" stroke="#5b6d62" stroke-width="1.5" fill="none"/>
+<text x="325" y="380" fill="#5b6d62" font-size="18" font-weight="400" text-anchor="middle">length(C) = 2</text>
+<text x="138" y="416" fill="#b25b2b" font-size="20" font-weight="400" text-anchor="middle">A: D = −0.5</text>
+<text x="320" y="416" fill="#387044" font-size="20" font-weight="400" text-anchor="middle">B: D = 0</text>
+<text x="502" y="416" fill="#286c9b" font-size="20" font-weight="400" text-anchor="middle">C: D = +1</text>
+</g>
+</svg>

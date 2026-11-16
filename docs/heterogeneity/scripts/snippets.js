@@ -1,4 +1,5 @@
-/* Opt in with <!-- runnable: name [backend=none] [canvas=16:9] -->. */
+/* Programs use <!-- runnable: name [backend=none] [canvas=16:9] -->;
+   importable support files use <!-- module: name --> and have no Run button. */
 (() => {
   "use strict";
   const workerURL = new URL("snippet-worker.js", document.currentScript.src);
@@ -6,14 +7,34 @@
   const editorURL = new URL("../assets/editor/editor.js", document.currentScript.src);
   const mappingURL = new URL("snippet-files.json", document.currentScript.src);
   const filesystemURL = new URL("snippet-filesystem.js", document.currentScript.src);
-  const loadRuntimeFiles = () => import(filesystemURL.href).then(module => module.preloadRuntime());
+  const linksURL = new URL("snippet-links.js", document.currentScript.src);
+  let fileMappings;
+  function loadMappings() {
+    if (!fileMappings) fileMappings = fetch(mappingURL).then(response => {
+      if (!response.ok) throw new Error("Cannot load snippet import mappings");
+      return response.json();
+    }).catch(error => {
+      fileMappings = undefined;
+      throw error;
+    });
+    return fileMappings;
+  }
+  const loadRuntimeFiles = async name => {
+    const [module, mappings] = await Promise.all([import(filesystemURL.href), loadMappings()]);
+    if (!mappings[name]) throw new Error(`No import mapping for ${name}`);
+    const files = Object.fromEntries(Object.entries(mappings[name]).map(([path, url]) =>
+      [path, new URL(url, mappingURL).href]));
+    return module.preloadRuntime(files);
+  };
   // Keep HTTP misses for inventoried assets across fresh workers. Unknown import
   // candidates are rejected locally by the filesystem's fixed inventory.
   const missingFileURLs = new Set();
   const cells = new Map();
+  let cellLinks;
   const sourceSnapshot = () => Object.fromEntries(
     Array.from(cells, ([name, cell]) => [`${name}.slang`, cell.getValue()]));
   function sourcesChanged() {
+    cellLinks?.cancel();
     for (const cell of cells.values()) cell.sourcesChanged();
   }
   let editorAssets;
@@ -29,10 +50,7 @@
       document.head.append(css);
       const [bundle, mappings] = await Promise.all([
         import(editorURL.href),
-        fetch(mappingURL).then(response => {
-          if (!response.ok) throw new Error("Cannot load snippet import mappings");
-          return response.json();
-        }),
+        loadMappings(),
         styled,
       ]);
       return { bundle, mappings };
@@ -42,14 +60,14 @@
   const comments = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
   const blocks = [];
   while (comments.nextNode()) {
-    const match = comments.currentNode.textContent.trim().match(/^runnable: ([a-z0-9-]+)(?: backend=(none|webgpu))?(?: canvas=([1-9][0-9]*):([1-9][0-9]*))?$/);
+    const match = comments.currentNode.textContent.trim().match(/^(runnable|module): ([a-z0-9-]+)(?: backend=(none|webgpu))?(?: canvas=([1-9][0-9]*):([1-9][0-9]*))?$/);
     const block = comments.currentNode.nextElementSibling;
     if (match && block?.matches(".codehilite")) {
-      blocks.push([match[1], block, match[2] || "webgpu", match[3] ? [Number(match[3]), Number(match[4])] : null]);
+      blocks.push([match[2], block, match[3] || "webgpu", match[4] ? [Number(match[4]), Number(match[5])] : null, match[1] === "module"]);
     }
   }
 
-  for (const [name, block, backend, aspect] of blocks) {
+  for (const [name, block, backend, aspect, isModule] of blocks) {
     if (cells.has(name)) throw new Error(`Duplicate runnable snippet name: ${name}`);
     const filename = `${name}.slang`;
     const code = block.querySelector("code");
@@ -69,9 +87,14 @@
     const card = document.createElement("section");
     card.className = "slang-snippet";
     card.dataset.snippet = name;
-    card.setAttribute("aria-label", "Runnable Slang example");
+    card.dataset.kind = isModule ? "module" : "runnable";
+    card.setAttribute("aria-label", isModule ? "Importable Slang module" : "Runnable Slang example");
     card.innerHTML = `
       <div class="snippet-filename">${filename}</div>
+      <div class="snippet-navigation" hidden>
+        <div class="snippet-navigation-status" role="status"></div>
+        <div class="snippet-navigation-choices"></div>
+      </div>
       <div class="snippet-source">
         <div class="snippet-actions">
           <button type="button" class="snippet-reset" title="Reset example" aria-label="Reset example">
@@ -89,7 +112,10 @@
       <div class="snippet-language-status" role="status" hidden></div>
       <div class="snippet-source-status" role="status" hidden>Code changed. Run again to update this result.</div>
       <div class="snippet-result" hidden>
-        <div class="snippet-status" role="status"></div>
+        <div class="snippet-result-header">
+          <div class="snippet-status" role="status"></div>
+          <div class="snippet-adapter" hidden></div>
+        </div>
         <div class="snippet-display" hidden></div>
         <pre class="snippet-output" tabindex="0" aria-label="Program output" hidden></pre>
       </div>`;
@@ -101,15 +127,28 @@
       getValue: () => fallback.value,
       setValue: value => { fallback.value = value; sourcesChanged(); },
       setReadOnly: value => { fallback.readOnly = value; },
+      reveal(selection, isCurrent = () => true) {
+        if (!isCurrent()) return;
+        revealCell();
+        fallback.scrollIntoView({ block: "center" });
+        fallback.focus({ preventScroll: true });
+      },
       dispose() {},
     };
+    function revealCell() {
+      for (let ancestor = card.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        if (ancestor.matches("details")) ancestor.open = true;
+      }
+    }
     const languageStatus = card.querySelector(".snippet-language-status");
     const sourceStatus = card.querySelector(".snippet-source-status");
     const run = card.querySelector(".snippet-run");
+    run.hidden = isModule;
     const stop = card.querySelector(".snippet-stop");
     const reset = card.querySelector(".snippet-reset");
     const result = card.querySelector(".snippet-result");
     const status = card.querySelector(".snippet-status");
+    const adapter = card.querySelector(".snippet-adapter");
     const output = card.querySelector(".snippet-output");
     const display = card.querySelector(".snippet-display");
     if (aspect) display.style.aspectRatio = `${aspect[0]} / ${aspect[1]}`;
@@ -125,6 +164,8 @@
         Object.entries(sourceSnapshot()).every(([path, text]) => runSources[path] === text);
     }
     cells.set(name, {
+      element: card,
+      getEditor: async () => { await editorReady; return editor; },
       getValue: () => editor.getValue(),
       sourcesChanged() {
         editor.sourcesChanged?.();
@@ -170,7 +211,7 @@
       run.disabled = reset.disabled = false;
       stop.disabled = false;
       editor.setReadOnly(false);
-      run.hidden = false;
+      run.hidden = isModule;
       if (document.activeElement === stop) run.focus({ preventScroll: true });
       stop.hidden = true;
       card.classList.remove("snippet-running");
@@ -186,10 +227,12 @@
     }
 
     function execute() {
-      if (worker || canvasRun) return;
+      if (isModule || worker || canvasRun) return;
       runSources = sourceSnapshot();
       sourceStatus.hidden = true;
       transcript = "";
+      adapter.textContent = "";
+      adapter.hidden = true;
       output.textContent = "";
       output.hidden = true;
       display.replaceChildren();
@@ -207,6 +250,11 @@
       try {
         const receive = (data) => {
           if (data.type === "missing-file") missingFileURLs.add(data.url);
+          if (data.type === "adapter") {
+            adapter.textContent = data.name;
+            adapter.title = `Rendering GPU: ${data.name}`;
+            adapter.hidden = false;
+          }
           if (data.type === "status") {
             status.textContent = data.text;
             // Canvas programs run until they return or the reader clicks Stop.
@@ -245,7 +293,7 @@
             status.textContent = "Loading timed out; stopping…";
             controller.abort(new Error("Loading exceeded two minutes. Try running again."));
           }, 120000);
-          Promise.all([import(runtimeURL.href), loadRuntimeFiles()]).then(([{ runSnippet }, runtimeFiles]) => runSnippet(
+          Promise.all([import(runtimeURL.href), loadRuntimeFiles(name)]).then(([{ runSnippet }, runtimeFiles]) => runSnippet(
             { filename, sources: runSources, backend, canvas, sizeCanvas, ...runtimeFiles, missingFileURLs: [...missingFileURLs] },
             data => { if (canvasRun === controller) receive(data); },
             controller.signal,
@@ -268,7 +316,7 @@
           if (worker === current) failure("Could not receive the worker's result.");
         };
         timeout = setTimeout(() => failure("Execution exceeded two minutes. Try a smaller program."), 120000);
-        loadRuntimeFiles().then(runtimeFiles => {
+        loadRuntimeFiles(name).then(runtimeFiles => {
           if (worker === current) current.postMessage({
             filename, sources: runSources, backend, ...runtimeFiles, missingFileURLs: [...missingFileURLs],
           });
@@ -319,7 +367,7 @@
     });
     block.replaceWith(card);
     resizeObserver?.observe(display);
-    void loadEditor().then(({ bundle, mappings }) => {
+    const editorReady = loadEditor().then(({ bundle, mappings }) => {
       if (disposed) return;
       if (!mappings[name]) throw new Error(`No import mapping for ${name}`);
       const files = Object.fromEntries(Object.entries(mappings[name]).map(([path, url]) =>
@@ -331,6 +379,7 @@
         editor = bundle.createEditor(container, {
           source: fallback.value, name, filename, files, onRun: execute,
           getSources: sourceSnapshot, onChange: sourcesChanged,
+          onReveal: revealCell,
           standardModulesURL: new URL("../assets/slangvm/slang/standard-modules.json", mappingURL).href,
           foldLines: fallback.value === original ? foldLines : [],
           onStatus(text, error = false) {
@@ -348,4 +397,5 @@
       languageStatus.classList.add("snippet-language-error");
     });
   }
+  void import(linksURL.href).then(({ installCellLinks }) => { cellLinks = installCellLinks(cells); });
 })();

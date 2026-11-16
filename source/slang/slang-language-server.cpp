@@ -1229,7 +1229,22 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
             }
             if (result.uri.getLength() != 0)
             {
-                doc->oneBasedUTF8LocToZeroBasedUTF16Loc(
+                // Convert columns using the definition's text. The caller may have a
+                // shorter line or different Unicode characters at the same line number.
+                RefPtr<DocumentVersion> definitionDoc;
+                if (!m_workspace->openedDocuments.tryGetValue(
+                        uriToCanonicalPath(result.uri),
+                        definitionDoc))
+                {
+                    definitionDoc = new DocumentVersion();
+                    if (auto sourceFile =
+                            version->linkage->getSourceManager()->findSourceFileByPathRecursively(
+                                loc.loc.pathInfo.foundPath))
+                    {
+                        definitionDoc->setText(sourceFile->getContent());
+                    }
+                }
+                definitionDoc->oneBasedUTF8LocToZeroBasedUTF16Loc(
                     loc.loc.line,
                     loc.loc.column,
                     result.range.start.line,
