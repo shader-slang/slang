@@ -59,6 +59,33 @@
 namespace Slang
 {
 
+/// A `DefaultConstruct` of a struct or array type expands into a composite built
+/// element-by-element from zeros, which is the fully-expanded zero materialization
+/// that hoisted-variable legalization avoids. A default-constructed scalar, vector,
+/// matrix or pointer lowers to at most a handful of cheap constants, so those types
+/// are safe to materialize when a register temp needs a definition on every path.
+static bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
+{
+    for (;;)
+    {
+        if (auto attr = as<IRAttributedType>(type))
+            type = attr->getBaseType();
+        else if (auto rateQualified = as<IRRateQualifiedType>(type))
+            type = rateQualified->getValueType();
+        else
+            break;
+    }
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_ArrayType:
+    case kIROp_UnsizedArrayType:
+        return false;
+    default:
+        return true;
+    }
+}
+
 struct PhiEliminationContext
 {
     // We are going to make some effort to re-use intermediate structures across
@@ -1038,19 +1065,46 @@ struct PhiEliminationContext
             // so that any logic that might have moved another parameter
             // into a temporary will influence our result.
             //
-            if (!as<IRUndefined>(*srcArg.currentValPtr))
+            // An `IRUndefined` incoming means the parameter is read before it was defined
+            // along this path. For ordinary temp locals, skipping the store is enough:
+            // an uninitialized local already reads as an undefined value. But in
+            // register-allocation mode the temp stands for function-scope memory in the
+            // emitted target module, and leaving it unwritten on this path lets its
+            // previous content flow around a loop back edge; downstream SSA promotion of
+            // that module (for example spirv-opt on our SPIR-V output) must then treat
+            // the register as loop-carried and keep its content live across the loop
+            // body. So in register-allocation mode we store a `DefaultConstruct` of the
+            // value type instead: choosing a concrete value is a legal refinement of
+            // the undefined value, and unlike storing the undefined value itself, the
+            // store survives downstream optimizers that elide stores of undefined.
+            // Expandable aggregate types are excluded, because materializing them would
+            // re-introduce the expanded zero composites that hoisted-variable
+            // legalization deliberately avoids.
+            //
+            auto srcVal = *srcArg.currentValPtr;
+            if (as<IRUndefined>(srcVal))
+            {
+                if (m_options.useRegisterAllocation &&
+                    canMaterializeUndefinedWithDefaultConstruct(srcVal->getDataType()))
+                {
+                    m_builder.emitStore(
+                        dstParam.temp,
+                        m_builder.emitDefaultConstructRaw(srcVal->getDataType()));
+                }
+            }
+            else
             {
                 // If we are trying to emit a store directly after a load from the same var,
                 // skip the store.
                 SLANG_ASSERT(m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before);
-                auto srcLoad = as<IRLoad>(*srcArg.currentValPtr);
+                auto srcLoad = as<IRLoad>(srcVal);
                 if (srcLoad && srcLoad->getOperand(0) == dstParam.temp &&
                     canLoadBeFoldedAtInst(srcLoad, m_builder.getInsertLoc().getInst()))
                 {
                 }
                 else
                 {
-                    m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
+                    m_builder.emitStore(dstParam.temp, srcVal);
                 }
             }
 

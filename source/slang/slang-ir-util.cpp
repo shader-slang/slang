@@ -3246,10 +3246,9 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                 // instead of before the `if`. This situation can occur in the IR if
                 // the original code is lowered from a `do-while` loop.
                 //
+                bool shouldMoveToHeader = false;
                 if (loopHeaderBlockMap.containsKey(commonDominator))
                 {
-                    bool shouldMoveToHeader = false;
-
                     // Check that the break-block dominates any of the uses are past the break
                     // block
                     for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
@@ -3276,6 +3275,24 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     // common dominator.
                     if (var->getParent() != commonDominator)
                         var->insertBefore(commonDominator->getTerminator());
+
+                    if (shouldMoveToHeader)
+                    {
+                        // The var now lives across the loop's back edge, so a use on a path
+                        // that skips the definition would otherwise read the value stored by
+                        // a previous iteration. Storing an explicit uninitialized value
+                        // re-establishes that reads before the definition are undefined,
+                        // instead of carrying the previous iteration's value around the
+                        // back edge. We use `LoadFromUninitializedMemory` rather than poison
+                        // or a plain undefined value because peephole elides stores of
+                        // those, and this store must survive to SSA construction.
+                        IRBuilder builder(func);
+                        builder.setInsertAfter(var);
+                        builder.emitStore(
+                            var,
+                            builder.emitLoadFromUninitializedMemory(
+                                as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+                    }
                 }
                 else if (shouldDuplicateInstAtUseSite(inst, target))
                 {
@@ -3321,6 +3338,17 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     IRBuilder builder(func);
                     builder.setInsertBefore(commonDominator->getTerminator());
                     IRVar* tempVar = builder.emitVar(inst->getFullType());
+
+                    if (shouldMoveToHeader)
+                    {
+                        // The temp var lives across the loop's back edge; give it the same
+                        // per-iteration uninitialized store as a hoisted var so a use on a
+                        // path that skips the definition reads undefined rather than the
+                        // previous iteration's stored value.
+                        builder.emitStore(
+                            tempVar,
+                            builder.emitLoadFromUninitializedMemory(inst->getFullType()));
+                    }
 
                     traverseUses(
                         inst,
