@@ -18,6 +18,39 @@ namespace Slang
 
 thread_local String g_lastSignalMessage;
 
+#if !SLANG_HAS_EXCEPTIONS
+namespace {
+// A per-thread stack of the `AbortCompilationEscape` guards currently installed by enclosing API
+// boundaries. A fixed depth keeps installation allocation-free; a boundary that finds the stack
+// full installs nothing, so an abort there falls back to the trap in `handleSignal` — the same
+// behavior as an unguarded path.
+constexpr int kMaxAbortCompilationEscapeDepth = 64;
+thread_local AbortCompilationEscape* g_abortCompilationEscapes[kMaxAbortCompilationEscapeDepth];
+thread_local int g_abortCompilationEscapeCount = 0;
+} // namespace
+
+AbortCompilationEscape::AbortCompilationEscape()
+{
+    if (g_abortCompilationEscapeCount < kMaxAbortCompilationEscapeDepth)
+    {
+        active = true;
+        g_abortCompilationEscapes[g_abortCompilationEscapeCount++] = this;
+    }
+}
+
+AbortCompilationEscape::~AbortCompilationEscape()
+{
+    if (active)
+    {
+        // An active guard is always the top of the stack: `handleSignal` consumes the innermost
+        // escape before jumping and marks it inactive, and guards otherwise destroy in reverse
+        // construction order.
+        SLANG_ASSERT(g_abortCompilationEscapes[g_abortCompilationEscapeCount - 1] == this);
+        g_abortCompilationEscapes[--g_abortCompilationEscapeCount] = nullptr;
+    }
+}
+#endif
+
 static const char* _getSignalTypeAsText(SignalType type)
 {
     switch (type)
@@ -173,6 +206,19 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
         throw InternalError(_getMessage(type, message));
     }
 #else
+    // With exceptions disabled nothing can throw, so a compilation abort can only reach recovery
+    // code by jumping: if the abort happened inside an API boundary that installed an
+    // AbortCompilationEscape, hand control back to that boundary, whose recovery branch reports
+    // failure diagnostics and returns. Signal types other than AbortCompilation — assertion
+    // failures and internal errors — never take the escape; they always trap, so real bugs stay
+    // loud in every build.
+    if (type == SignalType::AbortCompilation && g_abortCompilationEscapeCount > 0)
+    {
+        AbortCompilationEscape* escape = g_abortCompilationEscapes[--g_abortCompilationEscapeCount];
+        escape->active = false;
+        longjmp(escape->jumpBuffer, 1);
+    }
+
     // Attempt to drop out into the debugger. If a debugger isn't attached this will likely crash -
     // which is probably the best we can do.
 

@@ -3,6 +3,8 @@
 
 #include "slang-common.h"
 
+#include <setjmp.h>
+
 namespace Slang
 {
 
@@ -19,6 +21,25 @@ enum class SignalType
 
 // Note that message can be passed as nullptr for no message.
 [[noreturn]] void handleSignal(SignalType type, char const* message);
+
+#if !SLANG_HAS_EXCEPTIONS
+// In a build with exceptions disabled `handleSignal` cannot throw, so a compilation abort has
+// no built-in way to reach the recovery code at an API boundary: the process would terminate
+// where an exceptions-enabled build would unwind to a `catch`. A boundary that must recover
+// compilation aborts in every build installs one of these guards (through the
+// SLANG_EXCEPTION_TRY_RECOVERY macro); `handleSignal` then jumps back to `jumpBuffer` for
+// SignalType::AbortCompilation instead of trapping, and the boundary's recovery branch reports
+// failure diagnostics and returns. Guards form a per-thread stack (see slang-signal.cpp) so
+// nested boundaries each unwind to their own frame.
+struct AbortCompilationEscape
+{
+    AbortCompilationEscape();
+    ~AbortCompilationEscape();
+
+    jmp_buf jumpBuffer;
+    bool active = false;
+};
+#endif
 
 // Special handler for assertions that can optionally return based on environment variable.
 // Pass isReleaseAssert=true for assertions that should fire even in release-assert-only mode.
