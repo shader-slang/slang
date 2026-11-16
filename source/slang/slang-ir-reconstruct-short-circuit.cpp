@@ -573,7 +573,7 @@ struct ReconstructShortCircuitContext : public InstPassBase
         if (!isSimpleBranchTo(elseBlock, afterBlock, elseVal))
             return false;
 
-        // Always overwritten below; the shape check above returns for any
+        // Always overwritten below; the shape check below returns for any
         // arm pair other than the two canonical forms.
         IROp logicOp = kIROp_Nop;
         IRBlock* valueArm = nullptr;
@@ -628,9 +628,9 @@ struct ReconstructShortCircuitContext : public InstPassBase
 
         // The parameter carries the user-visible name of the result (for
         // example `passed` in `bool passed = a && b;`); keep it on the
-        // reconstructed operation. When `emitOr`/`emitAnd` constant-folds,
-        // `logicInst` may be a pre-existing shared instruction, and the
-        // transferred name hint is cosmetic there.
+        // reconstructed operation. `emitOr`/`emitAnd` always create a fresh
+        // instruction here (neither op is hoistable or spec-const-deduped),
+        // so the transfer can only touch the instruction just created.
         param->transferDecorationsTo(logicInst);
         param->replaceUsesWith(logicInst);
         param->removeAndDeallocate();

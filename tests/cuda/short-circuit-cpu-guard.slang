@@ -29,12 +29,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         output[tid.x] = 0;
     }
     //CHECK: type: uint32_t
-    //CHECK-NEXT: 1
-    //CHECK-NEXT: 1
-    //CHECK-NEXT: 0
-    //CHECK-NEXT: 0
-    //CHECK-NEXT: 0
-    //CHECK-NEXT: 0
-    //CHECK-NEXT: 0
-    //CHECK-NEXT: 0
+    //CHECK-NEXT: {{^1$}}
+    //CHECK-NEXT: {{^1$}}
+    //CHECK-NEXT: {{^0$}}
+    //CHECK-NEXT: {{^0$}}
+    //CHECK-NEXT: {{^0$}}
+    //CHECK-NEXT: {{^0$}}
+    //CHECK-NEXT: {{^0$}}
+    //CHECK-NEXT: {{^0$}}
 }
