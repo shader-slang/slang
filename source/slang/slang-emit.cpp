@@ -109,6 +109,7 @@
 #include "slang-ir-resolve-varying-input-ref.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir-reconstruct-short-circuit.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-simplify-for-emit.h"
 #include "slang-ir-specialize-address-space.h"
@@ -2839,6 +2840,13 @@ Result linkAndOptimizeIR(
     // Legalization keeps a void placeholder for `differential` to preserve field positions.
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
+
+    // Rebuild short-circuit `&&`/`||` expressions from their diamond form while
+    // the block-parameter (phi) form still exists; `eliminatePhis` below would
+    // otherwise turn the merge parameters into `bool` temporaries that the
+    // downstream C++ compiler cannot turn back into branches. No-op for
+    // targets whose emitted language does not short-circuit.
+    SLANG_PASS(reconstructShortCircuit, targetRequest);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
