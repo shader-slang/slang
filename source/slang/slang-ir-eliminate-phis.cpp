@@ -1079,9 +1079,9 @@ struct PhiEliminationContext
             // value type instead: choosing a concrete value is a legal refinement of
             // the undefined value, and unlike storing the undefined value itself, the
             // store survives downstream optimizers that elide stores of undefined.
-            // Expandable aggregate types are excluded, because materializing them would
-            // re-introduce the expanded zero composites that hoisted-variable
-            // legalization deliberately avoids.
+            // Only types with a cheap, constant-like default (scalars, vectors,
+            // matrices, pointers) are materialized; aggregate and other types fall
+            // back to leaving the temp unwritten, which is the status-quo behavior.
             //
             auto srcVal = *srcArg.currentValPtr;
             if (as<IRUndefined>(srcVal))
