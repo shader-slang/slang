@@ -748,14 +748,31 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
 struct EntryPointParameterState
 {
-    // The semantic of the nearest enclosing declaration that has one, plus how that
-    // declaration spelled it, so a diagnostic can point back at it. `optSemanticName`
-    // is the semantic with any trailing index split off; `ioSemanticIndex` is the
-    // running counter of how many varying slots that semantic has already consumed.
+    // The semantic of the outer-most enclosing declaration that has one, tracked
+    // so layout can apply that semantic to nested leaves (the outer-most-wins
+    // policy) and so the E39034 override diagnostic can point back at it.
+    //
+    // All of these members are assigned together, in one place in
+    // `processEntryPointVaryingParameterDecl`: when no outer semantic is in
+    // effect and a declaration's own semantic is adopted. Until then they are
+    // unpopulated, so the pointer members are only meaningful (and safe to
+    // dereference) while `optSemanticName` is non-null.
+    //
+    // `optSemanticName` is the adopted semantic's base name with any trailing
+    // index split off (used for slot assignment); `ioSemanticIndex` points at
+    // the running counter holding the next slot number the outer semantic
+    // assigns, initialized to the semantic's own parsed index; `optSemanticLoc`
+    // and `optSemanticText` are the spelling and location as written, so the
+    // diagnostic can quote and point at the enclosing declaration;
+    // `optSemanticDecl` is the adopting declaration itself; and
+    // `ioSemanticOverrideCheckedDecls` scopes the E39034 check to one
+    // evaluation per declaration under this semantic.
     String* optSemanticName = nullptr;
     SourceLoc optSemanticLoc;
     String optSemanticText;
+    Decl* optSemanticDecl = nullptr;
     int* ioSemanticIndex = nullptr;
+    HashSet<Decl*>* ioSemanticOverrideCheckedDecls = nullptr;
     EntryPointParameterDirectionMask directionMask;
     int semanticSlotCount;
     Stage stage = Stage::Unknown;
@@ -2005,13 +2022,87 @@ SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
     return info;
 }
 
-// Any semantic with an `SV_` or `NV_` prefix names a system value (a fixed-function
-// input/output such as `SV_Position` or `SV_Depth`) rather than a user-defined
-// varying; the case-insensitive prefix check is the whole classification.
+// Any semantic with an `SV_` or `NV_` prefix is classified as a system value.
+// The set is broader than the fixed-function inputs/outputs the name suggests:
+// `SV_Target` is classified too, even though the layout below treats fragment
+// render-target outputs as ordinary user-defined outputs. The case-insensitive
+// prefix check is the whole classification.
 static bool isSystemValueSemanticName(String const& semanticName)
 {
-    auto lowerCaseName = semanticName.toLower();
-    return lowerCaseName.startsWith("sv_") || lowerCaseName.startsWith("nv_");
+    auto name = semanticName.getUnownedSlice();
+    return name.startsWithCaseInsensitive(toSlice("sv_")) ||
+           name.startsWithCaseInsensitive(toSlice("nv_"));
+}
+
+// The outer-most-wins policy lets an enclosing declaration's semantic silently
+// replace every nested declaration's own semantic. For a user-defined field
+// semantic that composition is the point of the policy (`o.a -> OUTPUT0`,
+// `o.b -> OUTPUT1`), but a system-value semantic names one specific
+// fixed-function input/output, so replacing it silently changes what the
+// shader writes. Consider a fragment entry point declared like:
+//
+//     struct FragmentOut { float4 color : SV_Target; float depth : SV_Depth; };
+//     FragmentOut main() : SV_Target { ... }
+//
+// The result semantic on `main` would re-bind `depth` as `SV_Target1`, an
+// ordinary color output, and the depth output would simply vanish from the
+// generated code. That is never what a spelling of this shape means, so the
+// override is an error (E39034) rather than a silent replacement.
+//
+// A field semantic that names the same slot the outer semantic assigns anyway
+// -- the same base name, with its own index equal to the next slot the outer
+// semantic assigns -- is redundant rather than conflicting, and keeps
+// compiling with unchanged layout.
+//
+// The check is evaluated once per declaration per enclosing semantic, not once
+// per visit, because the walk reaches some declarations more than once at
+// different slot counters: the array path re-walks the element type once per
+// element, so a field inside an array-of-struct is reached with a new counter
+// value at each element. The first visit gives the declaration its single
+// verdict (its own index names the starting slot of its expansion) and later
+// visits reuse it, which also keeps a conflicting array spelling from emitting
+// one error per element. The tuple path (an `Optional<T>` parameter expands
+// to a tuple) has no field decls at all, so it re-uses the enclosing
+// declaration itself as every member's decl; against that re-visit nothing is
+// being overridden -- the declaration *is* the enclosing one -- and the check
+// is skipped.
+//
+// A declaration may carry `[allow("outer-semantic-overrides-system-value-semantic")]`
+// to suppress the error explicitly, for legacy code that really does want the
+// outer semantic to win.
+static void checkForOverriddenSystemValueSemantic(
+    ParameterBindingContext* context,
+    Decl* decl,
+    HLSLSimpleSemantic* semantic,
+    SimpleSemanticInfo const& semanticInfo,
+    EntryPointParameterState const& state)
+{
+    if (!isSystemValueSemanticName(semanticInfo.name))
+        return;
+
+    if (decl == state.optSemanticDecl)
+        return;
+
+    if (shouldDisableDiagnostic(
+            decl,
+            *Diagnostics::OuterSemanticOverridesSystemValueSemantic::getInfo()))
+        return;
+
+    // Evaluate only the first visit of `decl` under this enclosing semantic.
+    if (!state.ioSemanticOverrideCheckedDecls->add(decl))
+        return;
+
+    bool namesSameSlot = semanticInfo.name.getUnownedSlice().caseInsensitiveEquals(
+                             state.optSemanticName->getUnownedSlice()) &&
+                         (semanticInfo.index == *state.ioSemanticIndex);
+    if (!namesSameSlot)
+    {
+        getSink(context)->diagnose(Diagnostics::OuterSemanticOverridesSystemValueSemantic{
+            .fieldSemantic = String(semantic->name.getContent()),
+            .outerSemantic = state.optSemanticText,
+            .fieldSemanticLoc = semantic->loc,
+            .outerSemanticLoc = state.optSemanticLoc});
+    }
 }
 
 static RefPtr<TypeLayout> processSimpleEntryPointParameter(
@@ -2222,7 +2313,12 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // If there is already a semantic name coming from the
     // outer context, we will use it, but if there is no
     // outer semantic *and* the current field/parameter `decl`
-    // has an explicit semantic, we will use that.
+    // has an explicit semantic, we will use that. Under an
+    // already-active outer semantic the declaration's own
+    // semantic no longer affects layout, but it is still
+    // decomposed here so `checkForOverriddenSystemValueSemantic`
+    // below can reject a system-value semantic that the outer
+    // semantic would silently replace.
     //
     // Note: we allocate the storage for the variables that
     // will track the semantic state outside the conditional,
@@ -2231,6 +2327,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     SimpleSemanticInfo semanticInfo;
     int semanticIndex = 0;
+    HashSet<Decl*> semanticOverrideCheckedDecls;
     if (auto semantic = decl ? decl->findModifier<HLSLSimpleSemantic>() : nullptr)
     {
         semanticInfo = decomposeSimpleSemantic(semantic);
@@ -2242,48 +2339,12 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
             state.ioSemanticIndex = &semanticIndex;
             state.optSemanticLoc = semantic->loc;
             state.optSemanticText = semantic->name.getContent();
+            state.optSemanticDecl = decl;
+            state.ioSemanticOverrideCheckedDecls = &semanticOverrideCheckedDecls;
         }
-        else if (isSystemValueSemanticName(semanticInfo.name))
+        else
         {
-            // The outer semantic will win over this declaration's own semantic, per
-            // the policy above. For a user-defined field semantic that composition is
-            // the point of the policy (`o.a -> OUTPUT0, o.b -> OUTPUT1`), but a
-            // system-value semantic names one specific fixed-function input/output,
-            // so overriding it silently changes what the shader writes. Consider:
-            //
-            //     struct FragmentOut { float4 color : SV_Target; float depth : SV_Depth; };
-            //     FragmentOut main() : SV_Target { ... }
-            //
-            // The result semantic on `main` would re-bind `depth` as `SV_Target1`,
-            // an ordinary color output, and the depth output would simply vanish
-            // from the generated code. That is never what a spelling of this shape
-            // means, so it is an error rather than a silent override.
-            //
-            // A field semantic that names the same slot the outer semantic assigns
-            // anyway (the same base name, with its own index equal to the slot the
-            // running counter has reached, like `b : SV_Target1` as the second leaf
-            // under an outer `SV_Target`) is redundant rather than conflicting, and
-            // keeps compiling with unchanged layout.
-            //
-            // The index comparison treats arrays like scalars: the counter advances
-            // by whole arrays while a field's own index is a single number, so
-            // around array-typed leaves the check can both miss a genuinely
-            // redundant spelling (leaving the ordinary outer-wins behavior in
-            // place) and reject a spelling that was only redundant across the
-            // whole array. Array-plus-system-value-semantic spellings are
-            // ambiguous either way, and the diagnostic names both semantics so
-            // the user can resolve it.
-            bool namesSameSlot = (semanticInfo.name.getUnownedSlice().caseInsensitiveEquals(
-                                     state.optSemanticName->getUnownedSlice())) &&
-                                 (semanticInfo.index == *state.ioSemanticIndex);
-            if (!namesSameSlot)
-            {
-                getSink(context)->diagnose(Diagnostics::OuterSemanticOverridesSystemValueSemantic{
-                    .fieldSemantic = String(semantic->name.getContent()),
-                    .outerSemantic = state.optSemanticText,
-                    .fieldSemanticLoc = semantic->loc,
-                    .outerSemanticLoc = state.optSemanticLoc});
-            }
+            checkForOverriddenSystemValueSemantic(context, decl, semantic, semanticInfo, state);
         }
     }
 

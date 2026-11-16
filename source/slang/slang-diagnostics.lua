@@ -5326,11 +5326,14 @@ err(
     note { message = "combine the data into one `[[vk::push_constant]]` block or into the entry point's `uniform` parameters", span { loc = "entryPoint:IRInst" } }
 )
 
+-- Companion to the reserved 30706 `duplicate-system-value-semantic` (#11885):
+-- that check will reject duplicate system-value outputs; this one rejects an
+-- enclosing semantic silently replacing a declaration's system-value output.
 err(
     "outer-semantic-overrides-system-value-semantic",
     39034,
-    "the system-value semantic '~fieldSemantic' is ignored because the enclosing declaration applies its own '~outerSemantic' semantic",
-    span { loc = "fieldSemanticLoc", message = "this system-value semantic would be silently overridden" },
+    "the system-value semantic '~fieldSemantic' would be ignored because the enclosing declaration carries its own '~outerSemantic' semantic",
+    span { loc = "fieldSemanticLoc", message = "this system-value semantic would be ignored" },
     span { loc = "outerSemanticLoc", message = "the enclosing semantic is declared here" }
 )
 
