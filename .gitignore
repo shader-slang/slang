@@ -40,6 +40,9 @@ CMakeUserPresets.json
 *.expected.png
 *.actual.png
 *.actual.txt
+*.actual.cubin
+*.actual.cubin.asm
+*.actual.cubin-asm
 *.slang-repro
 *.slang-ast
 

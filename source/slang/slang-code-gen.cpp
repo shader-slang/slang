@@ -225,6 +225,8 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
 {
     switch (target)
     {
+    case CodeGenTarget::CUDAObjectCodeAssembly:
+    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
@@ -265,6 +267,7 @@ static CodeGenTarget _getDefaultSourceForTarget(CodeGenTarget target)
         {
             return CodeGenTarget::HostCPPSource;
         }
+    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::PTX:
         return CodeGenTarget::CUDASource;
     case CodeGenTarget::DXBytecode:
@@ -617,9 +620,11 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             if (SemanticVersion cudaSMVersion = getCUDASMVersionForAtom(atom);
                 cudaSMVersion.isSet())
             {
-                requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{
-                    DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM,
-                    cudaSMVersion});
+                options.flags |= CompileOptions::Flag::CUDASMArchitectureSpecified;
+                requiredCapabilityVersions.add(
+                    DownstreamCompileOptions::CapabilityVersion{
+                        DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM,
+                        cudaSMVersion});
             }
         }
     }
@@ -1069,6 +1074,8 @@ static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
         return CodeGenTarget::DXIL;
     case CodeGenTarget::SPIRVAssembly:
         return CodeGenTarget::SPIRV;
+    case CodeGenTarget::CUDAObjectCodeAssembly:
+        return CodeGenTarget::CUDAObjectCode;
     case CodeGenTarget::MetalLibAssembly:
         return CodeGenTarget::MetalLib;
     case CodeGenTarget::WGSLSPIRVAssembly:
@@ -1104,6 +1111,7 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::SPIRVAssembly:
     case CodeGenTarget::DXBytecodeAssembly:
     case CodeGenTarget::DXILAssembly:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::MetalLibAssembly:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
@@ -1176,6 +1184,7 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::DXIL:
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::MetalLib:
+    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::PTX:
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
@@ -1306,7 +1315,9 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::DXIL:
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::MetalLib:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::MetalLibAssembly:
+    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::PTX:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:

@@ -32,6 +32,7 @@ struct PassThroughFlag
         Clang = 1 << int(SLANG_PASS_THROUGH_CLANG),
         Generic_C_CPP = 1 << int(SLANG_PASS_THROUGH_GENERIC_C_CPP),
         NVRTC = 1 << int(SLANG_PASS_THROUGH_NVRTC),
+        Nvdisasm = 1 << int(SLANG_PASS_THROUGH_NVDISASM),
         LLVM = 1 << int(SLANG_PASS_THROUGH_LLVM),
         Metal = 1 << int(SLANG_PASS_THROUGH_METAL),
         Tint = 1 << int(SLANG_PASS_THROUGH_TINT),

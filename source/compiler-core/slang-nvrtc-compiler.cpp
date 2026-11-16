@@ -167,6 +167,10 @@ protected:
     // toolkits, where `-pch` is never requested.
     nvrtcResult (*m_nvrtcGetPCHCreateStatus)(nvrtcProgram prog) = nullptr;
 
+    // CUBIN retrieval is optional so older NVRTC libraries remain usable for PTX.
+    nvrtcResult (*m_nvrtcGetCUBINSize)(nvrtcProgram prog, size_t* size) = nullptr;
+    nvrtcResult (*m_nvrtcGetCUBIN)(nvrtcProgram prog, char* data) = nullptr;
+
     // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT*
     // include cuda_fp16.h.
     List<String> m_cudaFp16FoundPaths;
@@ -208,6 +212,11 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_GET_FUNC)
+
+    m_nvrtcGetCUBINSize =
+        (nvrtcResult (*)(nvrtcProgram, size_t*))library->findFuncByName("nvrtcGetCUBINSize");
+    m_nvrtcGetCUBIN =
+        (nvrtcResult (*)(nvrtcProgram, char*))library->findFuncByName("nvrtcGetCUBIN");
 
     // Optional symbol (NVRTC 12.8+). Deliberately outside SLANG_NVRTC_FUNCS, whose members are all
     // required: a null here must not fail init() on an older NVRTC that lacks `-pch`.
@@ -1209,18 +1218,33 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddFp8Bf16Support(
 
 // Return whether the caller supplied an NVRTC architecture option. Leave its value and any
 // conflicting user options for NVRTC to validate, including architectures unknown to Slang.
-static bool _hasExplicitNVRTCArchitecture(Slice<TerminatedCharSlice> arguments)
+static bool _hasExplicitNVRTCArchitecture(
+    Slice<TerminatedCharSlice> arguments,
+    bool& outUsesVirtualArchitecture)
 {
-    for (auto argument : arguments)
+    bool isExplicit = false;
+    outUsesVirtualArchitecture = false;
+    for (Index i = 0; i < arguments.count; ++i)
     {
-        auto text = asStringSlice(argument);
+        auto text = asStringSlice(arguments[i]);
         if (text == "-arch" || text.startsWith("-arch=") || text == "--gpu-architecture" ||
             text.startsWith("--gpu-architecture="))
         {
-            return true;
+            isExplicit = true;
+            UnownedStringSlice value;
+            if (text == "-arch" || text == "--gpu-architecture")
+            {
+                if (i + 1 < arguments.count)
+                    value = asStringSlice(arguments[++i]);
+            }
+            else
+            {
+                value = text.tail(text.indexOf('=') + 1);
+            }
+            outUsesVirtualArchitecture |= value.startsWith("compute_");
         }
     }
-    return false;
+    return isExplicit;
 }
 
 SlangResult NVRTCDownstreamCompiler::compile(
@@ -1235,6 +1259,9 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
     CompileOptions options = getCompatibleVersion(&inOptions);
 
+    if (options.targetType != SLANG_PTX && options.targetType != SLANG_CUDA_OBJECT_CODE)
+        return SLANG_E_INVALID_ARG;
+
     // This compiler can only deal with a single artifact
     if (options.sourceArtifacts.count != 1)
     {
@@ -1247,6 +1274,33 @@ SlangResult NVRTCDownstreamCompiler::compile(
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
     auto diagnostics = ArtifactDiagnostics::create();
     ArtifactUtil::addAssociated(artifact, diagnostics);
+
+    const bool emitCubin = options.targetType == SLANG_CUDA_OBJECT_CODE;
+    bool usesVirtualArchitecture;
+    const bool hasExplicitArchitecture =
+        _hasExplicitNVRTCArchitecture(options.compilerSpecificArguments, usesVirtualArchitecture);
+    const char* error = nullptr;
+    if (emitCubin)
+    {
+        if (!m_nvrtcGetCUBINSize || !m_nvrtcGetCUBIN)
+            error = "CUBIN output requires NVRTC with nvrtcGetCUBIN support (CUDA 11.1 or newer).";
+        else if (options.pipelineType == PipelineType::RayTracing)
+            error = "CUBIN output is not supported for the OptiX ray-tracing pipeline; use PTX.";
+        else if (usesVirtualArchitecture)
+            error = "CUBIN output requires a real architecture (-arch=sm_XX), not compute_XX.";
+        else if (
+            !hasExplicitArchitecture &&
+            !(options.flags & CompileOptions::Flag::CUDASMArchitectureSpecified))
+            error = "CUBIN output requires an explicit CUDA SM capability or -Xnvrtc -arch=sm_XX.";
+    }
+    if (error)
+    {
+        diagnostics->setResult(SLANG_FAIL);
+        diagnostics->setRaw(asCharSlice(UnownedStringSlice(error)));
+        diagnostics->requireErrorDiagnostic();
+        *outArtifact = artifact.detach();
+        return SLANG_FAIL;
+    }
 
     CommandLine cmdLine;
 
@@ -1370,15 +1424,21 @@ SlangResult NVRTCDownstreamCompiler::compile(
     // An explicit downstream architecture overrides the derived one. For example, a caller may
     // pass `-arch=compute_120` before Slang has a corresponding capability. Passing both options
     // would make NVRTC warn or fail, depending on its version, so only emit the caller's option.
-    if (!_hasExplicitNVRTCArchitecture(options.compilerSpecificArguments))
+    if (!hasExplicitArchitecture)
     {
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.
         //
         SemanticVersion version(3);
 
-        // Newer releases of NVRTC only support newer CUDA architectures.
-        if (m_desc.version.m_major > 12 ||
+        // For machine code, preserve the caller's SM selection and let NVRTC report unsupported
+        // architectures. The toolkit-dependent floor below only supplies PTX defaults.
+        if (emitCubin)
+        {
+            version = SemanticVersion(0);
+        }
+        else if (
+            m_desc.version.m_major > 12 ||
             (m_desc.version.m_major == 12 && m_desc.version.m_minor >= 8))
         {
             // NVRTC 12.8+ warns about architectures prior to compute_75 being deprecated
@@ -1416,7 +1476,7 @@ SlangResult NVRTCDownstreamCompiler::compile(
         }
 
         StringBuilder builder;
-        builder << "-arch=compute_";
+        builder << (emitCubin ? "-arch=sm_" : "-arch=compute_");
         builder << version.m_major;
 
         SLANG_ASSERT(version.m_minor >= 0 && version.m_minor <= 9);
@@ -1614,16 +1674,30 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
     if (res == nvrtc::NVRTC_SUCCESS)
     {
-        // We should parse the log to set up the diagnostics
-        size_t ptxSize;
-        SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTXSize(program, &ptxSize));
-
-        List<uint8_t> ptx;
-        ptx.setCount(Index(ptxSize));
-
-        SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTX(program, (char*)ptx.getBuffer()));
-
-        artifact->addRepresentationUnknown(ListBlob::moveCreate(ptx));
+        size_t codeSize = 0;
+        res = emitCubin ? m_nvrtcGetCUBINSize(program, &codeSize)
+                        : m_nvrtcGetPTXSize(program, &codeSize);
+        List<uint8_t> code;
+        if (res == NVRTC_SUCCESS && codeSize != 0)
+        {
+            code.setCount(Index(codeSize));
+            res = emitCubin ? m_nvrtcGetCUBIN(program, (char*)code.getBuffer())
+                            : m_nvrtcGetPTX(program, (char*)code.getBuffer());
+        }
+        if (res != NVRTC_SUCCESS || codeSize == 0)
+        {
+            StringBuilder message;
+            message << "Failed to retrieve " << (emitCubin ? "CUBIN" : "PTX") << ": ";
+            message
+                << (res == NVRTC_SUCCESS ? "NVRTC produced no code." : m_nvrtcGetErrorString(res));
+            diagnostics->appendRaw(SliceUtil::asCharSlice(message));
+            diagnostics->setResult(SLANG_FAIL);
+            diagnostics->requireErrorDiagnostic();
+        }
+        else
+        {
+            artifact->addRepresentationUnknown(ListBlob::moveCreate(code));
+        }
     }
 
     *outArtifact = artifact.detach();
@@ -1632,7 +1706,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
 bool NVRTCDownstreamCompiler::canConvert(const ArtifactDesc& from, const ArtifactDesc& to)
 {
-    return ArtifactDescUtil::isDisassembly(from, to) || ArtifactDescUtil::isDisassembly(to, from);
+    return from.payload == ArtifactPayload::PTX &&
+           (ArtifactDescUtil::isDisassembly(from, to) || ArtifactDescUtil::isDisassembly(to, from));
 }
 
 SlangResult NVRTCDownstreamCompiler::convert(

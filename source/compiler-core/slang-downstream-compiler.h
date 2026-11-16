@@ -173,6 +173,9 @@ struct DownstreamCompileOptions
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
             EnableLogging = 0x40,        ///< If set compiles with support for shader logging
+            // An explicit target capability contributes a CUDASM version. Feature-inferred
+            // requirements alone do not select a machine-code architecture.
+            CUDASMArchitectureSpecified = 0x80,
         };
     };
 

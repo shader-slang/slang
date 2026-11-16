@@ -62,6 +62,8 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         {
             return SourceLanguage::HLSL;
         }
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::PTX:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:

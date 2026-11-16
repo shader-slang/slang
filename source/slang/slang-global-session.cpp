@@ -209,6 +209,14 @@ void Session::_initCodeGenTransitionMap()
 
 
     // Add all the straightforward transitions
+    map.addTransition(
+        CodeGenTarget::CUDASource,
+        CodeGenTarget::CUDAObjectCode,
+        PassThroughMode::NVRTC);
+    map.addTransition(
+        CodeGenTarget::CUDAHeader,
+        CodeGenTarget::CUDAObjectCode,
+        PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::CUDAHeader, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
@@ -263,6 +271,13 @@ ISlangSharedLibraryLoader* Session::getSharedLibraryLoader()
 SlangResult Session::checkCompileTargetSupport(SlangCompileTarget inTarget)
 {
     auto target = CodeGenTarget(inTarget);
+
+    if (target == CodeGenTarget::CUDAObjectCode || target == CodeGenTarget::CUDAObjectCodeAssembly)
+    {
+        auto compiler = getOrLoadDownstreamCompiler(PassThroughMode::NVRTC, nullptr);
+        if (!compiler || compiler->getDesc().version < SemanticVersion(11, 1))
+            return SLANG_E_NOT_AVAILABLE;
+    }
 
     const PassThroughMode mode = getDownstreamCompilerRequiredForTarget(target);
     return (mode != PassThroughMode::None) ? checkPassThroughSupport(SlangPassThrough(mode))

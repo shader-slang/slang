@@ -3921,6 +3921,8 @@ static bool _isPTXTarget(CodeGenTarget target)
     {
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::PTX:
         {
             return true;

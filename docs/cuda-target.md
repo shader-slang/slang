@@ -1,7 +1,7 @@
 Slang CUDA Target Support
 =========================
 
-Slang has preliminary support for producing CUDA source, and PTX binaries using [NVRTC](https://docs.nvidia.com/cuda/nvrtc/index.html).
+Slang supports producing CUDA source, PTX, and CUBIN machine code using [NVRTC](https://docs.nvidia.com/cuda/nvrtc/index.html). It can also disassemble CUBIN to SASS using `nvdisasm`.
 
 NOTE! NVRTC is only available for 64-bit operating systems. On Windows Visual Studio make sure you are compiling for 'x64' and/or use 64 bit Slang binaries.
 
@@ -33,6 +33,53 @@ For producing PTX binaries Slang uses [NVRTC](https://docs.nvidia.com/cuda/nvrtc
 The NVRTC compiler can be accessed directly via the pass through mechanism and is identified by the enum value `SLANG_PASS_THROUGH_NVRTC`.
 
 Much like other targets that use downstream compilers Slang can be used to compile CUDA source directly to PTX via the pass through mechansism. The Slang command line options will broadly be mapped down to the appropriate options for the NVRTC compilation. In the API the `SlangCompileTarget` for CUDA is `SLANG_CUDA_SOURCE` and for PTX is `SLANG_PTX`. These can also be specified on the Slang command line as `-target cuda` and `-target ptx`.
+
+## CUBIN and machine assembly
+
+Use `-target cubin` to compile directly to a CUDA binary. Select the GPU architecture explicitly
+with a CUDA SM capability:
+
+```sh
+slangc kernel.slang -entry computeMain -target cubin -capability cuda_sm_8_0 -o kernel.cubin
+```
+
+The `.cubin` output extension also selects this target when `-target` is omitted. The existing
+`cuobj` target name is an alias. In the API, set `slang::TargetDesc::format` to
+`SLANG_CUDA_OBJECT_CODE` and add a `CompilerOptionName::Capability` entry using
+`IGlobalSession::findCapability("cuda_sm_8_0")` to the target options.
+CUBIN requires NVRTC 11.1 or newer with CUBIN retrieval support. Compilation does not require
+a GPU, but execution requires a compatible GPU and CUDA driver.
+
+An explicit downstream architecture overrides capability-derived selection, including architecture
+names newer than Slang's capability vocabulary:
+
+```sh
+slangc kernel.slang -entry computeMain -target cubin -Xnvrtc -arch=sm_80 -o kernel.cubin
+```
+
+CUBIN requires a real architecture (`sm_XX`). A virtual architecture (`compute_XX`) is rejected.
+Without an explicit SM capability or downstream architecture, compilation reports an error.
+PTX retains its existing architecture defaults. CUBIN output currently supports ordinary CUDA
+kernels; use PTX for the OptiX ray-tracing pipeline. This target produces one architecture per
+output, with no automatic device linking or fat-binary packaging.
+
+Use `-target cubin-asm` to compile once to CUBIN and disassemble that binary to SASS:
+
+```sh
+slangc kernel.slang -entry computeMain -target cubin-asm -capability cuda_sm_8_0 -o kernel.cubin.asm
+```
+
+The API target is `SLANG_CUDA_OBJECT_CODE_ASM`. Both `.cubin.asm` and `.cubin-asm` output
+extensions select assembly output. Add `-dump-intermediates` to a CUBIN compilation to dump
+the binary and its assembly when the disassembler is available. Optional intermediate
+disassembly does not prevent binary output if the tool is unavailable; an explicit assembly
+request reports disassembler failures.
+
+Disassembly requires the CUDA toolkit's `nvdisasm` executable. Specify its executable path or
+containing directory with `-nvdisasm-path`, or call `setDownstreamCompilerPath` with
+`SLANG_PASS_THROUGH_NVDISASM`. An explicit path disables fallback discovery. Otherwise Slang
+searches `CUDA_PATH/bin`, `CUDA_HOME/bin`, and then `PATH`. Use a disassembler that supports the
+selected architecture and compiler output. Binary compilation does not require this executable.
 
 ## Locating NVRTC
 

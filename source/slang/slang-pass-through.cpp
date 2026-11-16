@@ -17,6 +17,7 @@ SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode com
 {
     switch (compiler)
     {
+    case PassThroughMode::Nvdisasm:
     case PassThroughMode::None:
         {
             return SourceLanguage::Unknown;
@@ -120,6 +121,9 @@ PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
             // We need some C/C++ compiler
             return PassThroughMode::GenericCCpp;
         }
+    case CodeGenTarget::CUDAObjectCodeAssembly:
+        return PassThroughMode::Nvdisasm;
+    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::PTX:
         {
             return PassThroughMode::NVRTC;

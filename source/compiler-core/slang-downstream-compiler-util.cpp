@@ -20,6 +20,7 @@
 #include "slang-glslang-compiler.h"
 #include "slang-llvm-compiler.h"
 #include "slang-metal-compiler.h"
+#include "slang-nvdisasm-compiler.h"
 #include "slang-nvrtc-compiler.h"
 #include "slang-tint-compiler.h"
 #include "slang-visual-studio-compiler-util.h"
@@ -364,6 +365,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     outFuncs[int(SLANG_PASS_THROUGH_SPIRV_OPT)] = &SpirvOptDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_LLVM)] = &LLVMDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_SPIRV_DIS)] = &SpirvDisDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_NVDISASM)] = &NvdisasmDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_METAL)] = &MetalDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_TINT)] = &TintDownstreamCompilerUtil::locateCompilers;
 }

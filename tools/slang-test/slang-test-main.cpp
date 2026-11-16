@@ -1692,6 +1692,9 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
         {
             return PassThroughFlag::Generic_C_CPP;
         }
+    case SLANG_CUDA_OBJECT_CODE_ASM:
+        return PassThroughFlag::NVRTC | PassThroughFlag::Nvdisasm;
+    case SLANG_CUDA_OBJECT_CODE:
     case SLANG_PTX:
         {
             return PassThroughFlag::NVRTC;
@@ -1978,6 +1981,19 @@ static SlangResult _extractSlangCTestRequirements(
             const SlangCompileTarget target =
                 TypeTextUtil::findCompileTargetFromName(targetName.getUnownedSlice());
             ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+        }
+        else
+        {
+            // Filename-inferred targets need the same tools as an explicit -target. For example,
+            // a test using only `-o kernel.cubin.asm` still requires NVRTC and nvdisasm.
+            String outputPath;
+            if (SLANG_SUCCEEDED(_extractArg(cmdLine, "-o", outputPath)))
+            {
+                const auto desc = ArtifactDescUtil::getDescFromPath(outputPath.getUnownedSlice());
+                const auto target = ArtifactDescUtil::getCompileTargetFromDesc(desc);
+                if (target != SLANG_TARGET_UNKNOWN)
+                    ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+            }
         }
     }
 

@@ -68,6 +68,7 @@ struct CudaDriverApi
     CudaResult (*cuInit)(unsigned int flags) = nullptr;
     CudaResult (*cuDeviceGetCount)(int* count) = nullptr;
     CudaResult (*cuDeviceGet)(CudaDevice* device, int ordinal) = nullptr;
+    CudaResult (*cuDeviceComputeCapability)(int* major, int* minor, CudaDevice device) = nullptr;
     CudaResult (*cuDevicePrimaryCtxRetain)(CudaContext* context, CudaDevice device) = nullptr;
     CudaResult (*cuDevicePrimaryCtxRelease)(CudaDevice device) = nullptr;
     CudaResult (*cuCtxSetCurrent)(CudaContext context) = nullptr;
@@ -133,6 +134,7 @@ struct CudaDriverApi
         resolve(cuInit, "cuInit");
         resolve(cuDeviceGetCount, "cuDeviceGetCount");
         resolve(cuDeviceGet, "cuDeviceGet");
+        resolve(cuDeviceComputeCapability, "cuDeviceComputeCapability");
         resolve(cuDevicePrimaryCtxRetain, "cuDevicePrimaryCtxRetain");
         resolve(cuDevicePrimaryCtxRelease, "cuDevicePrimaryCtxRelease_v2");
         resolve(cuCtxSetCurrent, "cuCtxSetCurrent");
@@ -271,11 +273,23 @@ static void diagnoseIfNeeded(slang::IBlob* diagnostics, const char* label)
 static void runCoverageCudaRuntimeTest(
     slang::IGlobalSession* globalSession,
     CudaDriverApi& cuda,
-    int counterByteWidth)
+    int counterByteWidth,
+    SlangCompileTarget target = SLANG_PTX,
+    const char* architecture = nullptr)
 {
     slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_PTX;
+    targetDesc.format = target;
     targetDesc.profile = globalSession->findProfile("cuda_sm_7_0");
+    slang::CompilerOptionEntry architectureOption = {};
+    if (architecture)
+    {
+        architectureOption.name = slang::CompilerOptionName::DownstreamArgs;
+        architectureOption.value.kind = slang::CompilerOptionValueKind::String;
+        architectureOption.value.stringValue0 = "nvrtc";
+        architectureOption.value.stringValue1 = architecture;
+        targetDesc.compilerOptionEntries = &architectureOption;
+        targetDesc.compilerOptionEntryCount = 1;
+    }
 
     slang::CompilerOptionEntry coverageOptions[2] = {};
     coverageOptions[0].name = slang::CompilerOptionName::TraceCoverage;
@@ -368,10 +382,15 @@ static void runCoverageCudaRuntimeTest(
     // cuModuleLoadData parses PTX as a NUL-terminated string, and the code
     // blob is not guaranteed to carry the terminator; copying into a String
     // appends one.
-    const String ptx(
-        UnownedStringSlice((const char*)ptxBlob->getBufferPointer(), ptxBlob->getBufferSize()));
+    String ptx;
+    const void* image = ptxBlob->getBufferPointer();
+    if (target == SLANG_PTX)
+    {
+        ptx = String(UnownedStringSlice((const char*)image, ptxBlob->getBufferSize()));
+        image = ptx.getBuffer();
+    }
     CudaModule cudaModule = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuModuleLoadData(&cudaModule, ptx.getBuffer()) == 0);
+    SLANG_CHECK_ABORT(cuda.cuModuleLoadData(&cudaModule, image) == 0);
     CudaModuleGuard moduleGuard{cuda, cudaModule};
     CudaFunction kernel = nullptr;
     SLANG_CHECK_ABORT(cuda.cuModuleGetFunction(&kernel, cudaModule, "computeMain") == 0);
@@ -534,4 +553,40 @@ SLANG_UNIT_TEST(coverageCudaRuntimeDispatch)
     // opt-in on CUDA.
     runCoverageCudaRuntimeTest(globalSession, cuda, 8);
     runCoverageCudaRuntimeTest(globalSession, cuda, 4);
+}
+
+// Exercise the same resource ABI and atomics using real machine code for the attached GPU.
+// This catches CUBIN target-classification errors that an ELF magic check cannot detect.
+SLANG_UNIT_TEST(cubinRuntimeDispatch)
+{
+    CudaDriverApi cuda;
+    if (!cuda.load() || cuda.cuInit(0) != 0)
+    {
+        SLANG_IGNORE_TEST;
+    }
+    int count = 0;
+    if (cuda.cuDeviceGetCount(&count) != 0 || count == 0)
+    {
+        SLANG_IGNORE_TEST;
+    }
+    auto globalSession = unitTestContext->slangGlobalSession;
+    if (SLANG_FAILED(globalSession->checkCompileTargetSupport(SLANG_CUDA_OBJECT_CODE)))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    CudaDevice device;
+    SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
+    int major, minor;
+    SLANG_CHECK_ABORT(cuda.cuDeviceComputeCapability(&major, &minor, device) == 0);
+    // The driver can name real architectures absent from Slang's capability vocabulary, such as
+    // sm_75. Use the explicit downstream override to select the device exactly.
+    StringBuilder architecture;
+    architecture << "-arch=sm_" << major << minor;
+    CudaContext context;
+    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
+    CudaPrimaryContextGuard contextGuard{cuda, device};
+    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
+    runCoverageCudaRuntimeTest(globalSession, cuda, 8, SLANG_CUDA_OBJECT_CODE, architecture.getBuffer());
+    runCoverageCudaRuntimeTest(globalSession, cuda, 4, SLANG_CUDA_OBJECT_CODE, architecture.getBuffer());
 }

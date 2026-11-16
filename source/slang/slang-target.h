@@ -46,6 +46,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     CUDAHeader = SLANG_CUDA_HEADER,
     PTX = SLANG_PTX,
     CUDAObjectCode = SLANG_CUDA_OBJECT_CODE,
+    CUDAObjectCodeAssembly = SLANG_CUDA_OBJECT_CODE_ASM,
     ShaderObjectCode = SLANG_OBJECT_CODE,
     HostHostCallable = SLANG_HOST_HOST_CALLABLE,
     Metal = SLANG_METAL,

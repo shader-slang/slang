@@ -2089,6 +2089,9 @@ void OptionsParser::addOutputPath(char const* inPath)
     String path = String(inPath);
     String ext = Path::getPathExt(path);
 
+    if (ext == "asm" && Path::getPathExt(Path::getPathWithoutExt(path)) == "cubin")
+        ext = "cubin.asm";
+
     if (ext == toSlice("slang-module") || ext == toSlice("slang-lib") || ext == toSlice("dir") ||
         ext == toSlice("zip"))
     {
@@ -3255,6 +3258,8 @@ void OptionsParser::_resolveOutputPaths(
                 {
                 case CodeGenTarget::CPPSource:
                 case CodeGenTarget::CPPHeader:
+                case CodeGenTarget::CUDAObjectCode:
+                case CodeGenTarget::CUDAObjectCodeAssembly:
                 case CodeGenTarget::PTX:
                 case CodeGenTarget::CUDASource:
                 case CodeGenTarget::CUDAHeader:

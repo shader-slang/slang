@@ -225,6 +225,8 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::PTX:
         return true;
     default:
@@ -249,6 +251,8 @@ static bool doesTargetSupportFuncTypedValue(TargetRequest* target)
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::PTX:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::ShaderHostCallable:

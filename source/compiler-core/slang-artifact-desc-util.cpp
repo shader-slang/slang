@@ -311,6 +311,10 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         // Not entirely clear how best to represent PTX here. We could mark as 'Assembly'.
         // Saying it is 'Executable' implies it is Binary (which PTX isn't). Executable also
         // implies 'complete for executation', irrespective of it being text.
+    case SLANG_CUDA_OBJECT_CODE:
+        return Desc::make(Kind::ObjectCode, Payload::CuBin, Style::Kernel, 0);
+    case SLANG_CUDA_OBJECT_CODE_ASM:
+        return Desc::make(Kind::Assembly, Payload::CuBin, Style::Kernel, 0);
     case SLANG_PTX:
         return Desc::make(Kind::ObjectCode, Payload::PTX, Style::Kernel, 0);
     case SLANG_OBJECT_CODE:
@@ -417,6 +421,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 return SLANG_DXIL_ASM;
             case Payload::DXBC:
                 return SLANG_DXBC_ASM;
+            case Payload::CuBin:
+                return SLANG_CUDA_OBJECT_CODE_ASM;
             case Payload::PTX:
                 return SLANG_PTX;
             case Payload::MetalAIR:
@@ -461,6 +467,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 return SLANG_DXIL;
             case Payload::DXBC:
                 return SLANG_DXBC;
+            case Payload::CuBin:
+                return SLANG_CUDA_OBJECT_CODE;
             case Payload::PTX:
                 return SLANG_PTX;
             case Payload::MetalAIR:
@@ -695,6 +703,8 @@ static const KindExtension g_cpuKindExts[] = {
 
 /* static */ ArtifactDesc ArtifactDescUtil::getDescFromPath(const UnownedStringSlice& slice)
 {
+    if (slice.endsWith(".cubin.asm"))
+        return getDescFromExtension(UnownedStringSlice::fromLiteral("cubin.asm"));
     auto extension = Path::getPathExt(slice);
     return getDescFromExtension(extension);
 }
@@ -745,6 +755,8 @@ static UnownedStringSlice _getPayloadExtension(ArtifactPayload payload)
     case Payload::SPIRV:
         return toSlice("spv");
 
+    case Payload::CuBin:
+        return toSlice("cubin");
     case Payload::PTX:
         return toSlice("ptx");
 
@@ -822,6 +834,12 @@ SlangResult ArtifactDescUtil::appendDefaultExtension(const ArtifactDesc& desc, S
             if (isDerivedFrom(desc.payload, ArtifactPayload::CPULike))
             {
                 out << toSlice("asm");
+                return SLANG_OK;
+            }
+
+            if (desc.payload == Payload::CuBin)
+            {
+                out << "cubin.asm";
                 return SLANG_OK;
             }
 

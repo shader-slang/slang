@@ -3020,6 +3020,8 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::MetalLibAssembly:
         return &kMetalLayoutRulesFamilyImpl;
 
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
@@ -3361,6 +3363,8 @@ bool isCUDATarget(CodeGenTarget codeGenTarget)
 
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::PTX:
         return true;
     }
@@ -3461,6 +3465,7 @@ TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
         // Assume we're targeting the compiler's host, so we can just get the
@@ -3532,9 +3537,10 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
             // For CPU based scenarios are generated via C++
             return SourceLanguage::CPP;
         }
-    case CodeGenTarget::CUDAObjectCode:
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDAObjectCodeAssembly:
     case CodeGenTarget::PTX:
         {
             return SourceLanguage::CUDA;

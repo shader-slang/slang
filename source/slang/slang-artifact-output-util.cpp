@@ -66,7 +66,15 @@ namespace Slang
         return SLANG_FAIL;
     }
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-    SLANG_RETURN_ON_FAIL(compiler->convert(artifact, assemblyDesc, outArtifact));
+    ComPtr<IArtifact> assembly;
+    SlangResult result = compiler->convert(artifact, assemblyDesc, assembly.writeRef());
+    // A failed converter may return no artifact; others attach diagnostics to a partial result.
+    if (sink && assembly)
+    {
+        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(sink, compiler, assembly));
+    }
+    SLANG_RETURN_ON_FAIL(result);
+    *outArtifact = assembly.detach();
     auto downstreamElapsedTime =
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     session->addDownstreamCompileTime(downstreamElapsedTime);

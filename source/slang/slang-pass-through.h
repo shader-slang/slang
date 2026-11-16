@@ -50,6 +50,7 @@ namespace Slang
 
 enum class PassThroughMode : SlangPassThroughIntegral
 {
+    Nvdisasm = SLANG_PASS_THROUGH_NVDISASM,
     None = SLANG_PASS_THROUGH_NONE,                  ///< don't pass through: use Slang compiler
     Fxc = SLANG_PASS_THROUGH_FXC,                    ///< pass through HLSL to `D3DCompile` API
     Dxc = SLANG_PASS_THROUGH_DXC,                    ///< pass through HLSL to `IDxcCompiler` API
