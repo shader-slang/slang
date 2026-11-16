@@ -124,13 +124,14 @@ void reraiseAbortCompilation()
 {
     // Propagates the in-flight AbortCompilation outward after a recovery branch has done its
     // local cleanup — the counterpart of `catch (...) { cleanup; throw; }`. The terminal path
-    // below intentionally duplicates handleSignal's trap+exit rather than calling it: a
-    // handleSignal call would re-wrap g_lastSignalMessage, clobbering the original abort text
-    // the boundary that ultimately recovers must report. With no enclosing recovery boundary
-    // left, the abort terminates exactly like an unguarded one.
+    // below intentionally duplicates handleSignal's exit rather than calling it: a handleSignal
+    // call would re-wrap g_lastSignalMessage, clobbering the original abort text the boundary
+    // that ultimately recovers must report. With no enclosing recovery boundary left, the abort
+    // terminates exactly like an unguarded one: the defined internal-compiler-error exit code,
+    // no trap.
     if (!tryJumpToInnermostAbortEscape())
     {
-        SLANG_BREAKPOINT(0);
+        // SLANG_BREAKPOINT(0);
         exit(int(ToolReturnCode::InternalCompilerError));
     }
 }
@@ -296,21 +297,23 @@ void handleAssert(char const* message, char const* file, int line, bool isReleas
     // AbortCompilationEscape, hand control back to that boundary, whose recovery branch reports
     // failure diagnostics and returns. Only SignalType::AbortCompilation takes the escape — all
     // non-AbortCompilation signals (Unexpected, Unimplemented, AssertFailure, Unreachable,
-    // InvalidOperation) always trap, so real bugs stay loud in every build. Note this is a
-    // deliberate divergence from the exceptions build, where those signals throw and boundaries
-    // recover them like any other exception; an internal error leaves compiler state untrustworthy
-    // enough that terminating is the safer outcome here.
+    // InvalidOperation) always terminate the process with the internal-compiler-error exit
+    // code. Note this is a deliberate divergence from the exceptions build, where those signals
+    // throw and boundaries recover them like any other exception; an internal error leaves
+    // compiler state untrustworthy enough that terminating is the safer outcome here.
     if (type == SignalType::AbortCompilation)
     {
         // When no escape is installed this returns false and the abort falls through to the
-        // trap below, exactly like an unguarded path.
+        // exit below, exactly like an unguarded path.
         tryJumpToInnermostAbortEscape();
     }
 
-    // Attempt to drop out into the debugger. If a debugger isn't attached this will likely crash -
-    // which is probably the best we can do.
-
-    SLANG_BREAKPOINT(0);
+    // A debugger trap here would turn every unrecovered abort and internal error into a
+    // SIGILL or STATUS_BREAKPOINT (plus a core dump) inside the embedding process; exiting
+    // with a defined code is the terminal behavior hosts can handle. The breakpoint stays
+    // commented out for quick re-enabling under a debugger.
+    //
+    // SLANG_BREAKPOINT(0);
 
     // 'panic'. Exit with the internal-compiler-error code as we can't throw or catch.
     exit(int(ToolReturnCode::InternalCompilerError));
