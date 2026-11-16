@@ -1026,11 +1026,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         return inStorage;
     }
 
-    context->getSink()->diagnose(
-        Diagnostics::UnknownSystemValueSemantic{
-            .semanticName = semanticNameSpelling,
-            .location = varLayout->sourceLoc,
-        });
+    context->getSink()->diagnose(Diagnostics::UnknownSystemValueSemantic{
+        .semanticName = semanticNameSpelling,
+        .location = varLayout->sourceLoc,
+    });
     return nullptr;
 }
 
@@ -1357,10 +1356,9 @@ void invokePatchConstantFuncInHullShader(
         {
             if (!outputPatchArg)
             {
-                context->getSink()->diagnose(
-                    Diagnostics::UnknownPatchConstantParameter{
-                        .param = param,
-                        .location = param->sourceLoc});
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             param->setFullType(outputPatchArg->getDataType());
@@ -1370,10 +1368,9 @@ void invokePatchConstantFuncInHullShader(
         {
             if (!inputPatchArg)
             {
-                context->getSink()->diagnose(
-                    Diagnostics::UnknownPatchConstantParameter{
-                        .param = param,
-                        .location = param->sourceLoc});
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             auto arrayType = builder.getArrayType(
@@ -1387,19 +1384,17 @@ void invokePatchConstantFuncInHullShader(
             auto layout = findVarLayout(param);
             if (!layout)
             {
-                context->getSink()->diagnose(
-                    Diagnostics::UnknownPatchConstantParameter{
-                        .param = param,
-                        .location = param->sourceLoc});
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             auto sysAttr = layout->findSystemValueSemanticAttr();
             if (!sysAttr)
             {
-                context->getSink()->diagnose(
-                    Diagnostics::UnknownPatchConstantParameter{
-                        .param = param,
-                        .location = param->sourceLoc});
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             if (sysAttr->getName().caseInsensitiveEquals(toSlice("SV_OutputControlPointID")))
@@ -1414,10 +1409,9 @@ void invokePatchConstantFuncInHullShader(
             }
             else
             {
-                context->getSink()->diagnose(
-                    Diagnostics::UnknownPatchConstantParameter{
-                        .param = param,
-                        .location = param->sourceLoc});
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
         }
@@ -3533,9 +3527,8 @@ static void replaceAllUsesOfMeshOutputValWithLegalizedVal(
                 auto argPtrType = as<IRPtrTypeBase>(originalArg->getDataType());
                 if (!argPtrType)
                 {
-                    SLANG_UNEXPECTED(
-                        "it appears a mesh-shader output parameter was passed into a "
-                        "call as by-value argument");
+                    SLANG_UNEXPECTED("it appears a mesh-shader output parameter was passed into a "
+                                     "call as by-value argument");
                     return;
                 }
                 auto argValType = argPtrType->getValueType();
@@ -3593,9 +3586,8 @@ static void replaceAllUsesOfMeshOutputParamWithLegalizedVal(
     //
     if (!as<IRPtrTypeBase>(meshOutputGlobalParam->getDataType()))
     {
-        SLANG_UNEXPECTED(
-            "expected mesh output parameter of entry point to use `borrow in` "
-            "parameter-passing mode");
+        SLANG_UNEXPECTED("expected mesh output parameter of entry point to use `borrow in` "
+                         "parameter-passing mode");
         return;
     }
     //
@@ -5516,10 +5508,9 @@ void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
         }
         else
         {
-            context->getSink()->diagnose(
-                Diagnostics::AmbiguousReferenceIr{
-                    .inst = param,
-                    .location = param->firstUse->getUser()->sourceLoc});
+            context->getSink()->diagnose(Diagnostics::AmbiguousReferenceIr{
+                .inst = param,
+                .location = param->firstUse->getUser()->sourceLoc});
         }
     }
 }

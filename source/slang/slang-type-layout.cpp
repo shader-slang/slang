@@ -5980,12 +5980,11 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             if (context.sink)
             {
                 auto name = classDeclRef.getName();
-                context.sink->diagnose(
-                    Diagnostics::ClassTypeNotSupported{
-                        .name = name ? String(name->text) : String("(anonymous)"),
-                        .location = context.layoutDeclForDiagnostics
-                                        ? context.layoutDeclForDiagnostics->loc
-                                        : classDeclRef.getLoc()});
+                context.sink->diagnose(Diagnostics::ClassTypeNotSupported{
+                    .name = name ? String(name->text) : String("(anonymous)"),
+                    .location = context.layoutDeclForDiagnostics
+                                    ? context.layoutDeclForDiagnostics->loc
+                                    : classDeclRef.getLoc()});
             }
             return createSimpleTypeLayout(SimpleLayoutInfo(), type, rules);
         }
