@@ -66,12 +66,14 @@ namespace Slang
 
 struct ReconstructShortCircuitContext : public InstPassBase
 {
-    TargetRequest* targetReq;
     CapabilitySet targetCaps;
+    // Memoizes `mightHaveSideEffects(SideEffectAnalysisOptions::None, cache)`
+    // results per instruction; the same handle is passed to every call in
+    // this pass.
     Dictionary<IRInst*, bool> sideEffectCache;
 
     ReconstructShortCircuitContext(IRModule* inModule, TargetRequest* inTargetReq)
-        : InstPassBase(inModule), targetReq(inTargetReq), targetCaps(inTargetReq->getTargetCaps())
+        : InstPassBase(inModule), targetCaps(inTargetReq->getTargetCaps())
     {
     }
 
@@ -82,6 +84,17 @@ struct ReconstructShortCircuitContext : public InstPassBase
     // be folded into the text of its use site by the emitter. Every
     // instruction on the path from a memory read to the chain root needs
     // this guarantee (see the file comment).
+    //
+    // Two emitter checks are intentionally NOT mirrored here because this
+    // pass guarantees them structurally: `isSafeToFoldIntoUseSites`' scan
+    // (the use must be in the same block as the definition with no
+    // side-effecting instruction between them) is provided by the rewrite
+    // hoisting a contiguous pure chain into one block and merging the
+    // pass-through blocks, and the `IRSwizzledStore` user veto is
+    // unreachable because a store is impure and can never sit in a hoisted
+    // chain. Keep this mirror and `isNeverFoldedOnCLikeTargets` (which
+    // mirrors `getFoldPolicy`'s Never opcodes) in sync with the emitter
+    // functions when they change.
     bool canFoldIntoUseSite(IRInst* inst, IRUse* use)
     {
         auto user = use->getUser();
@@ -223,18 +236,19 @@ struct ReconstructShortCircuitContext : public InstPassBase
         }
     }
 
+    // Returns whether `inst` observes memory: loads of every flavor are
+    // classified pure (loads from bad addresses are ignored throughout) but
+    // still observe memory, and every call is conservatively treated as
+    // memory-reading. The fold-path check composes this with
+    // `!isReadNoneCall` to exempt calls to `[__readNone]` callees, which
+    // provably read nothing.
+    // The descriptor-heap ops below must stay in sync with the
+    // FoldPolicy::Never bail in canHoistArmInst: this list routes them
+    // into the fold-guarantee checks, and that bail keeps them out of a
+    // reconstructed `||` entirely. kIROp_SPIRVLoadDescriptorFromHeap is
+    // not in the C-family Never table, so it takes the check path.
     bool isMemoryReadingInst(IRInst* inst)
     {
-        // Loads of every flavor are classified pure (loads from bad addresses
-        // are ignored throughout), but they still observe memory, so they
-        // need the fold guarantee. A call is memory-reading unless its callee
-        // is marked `[__readNone]`; we conservatively treat every pure call
-        // as memory-reading.
-        // The descriptor-heap ops below must stay in sync with the
-        // FoldPolicy::Never bail in canHoistArmInst: this list routes them
-        // into the fold-guarantee checks, and that bail keeps them out of a
-        // reconstructed `||` entirely. kIROp_SPIRVLoadDescriptorFromHeap is
-        // not in the C-family Never table, so it takes the check path.
         switch (inst->getOp())
         {
         case kIROp_Load:
@@ -251,9 +265,9 @@ struct ReconstructShortCircuitContext : public InstPassBase
         }
     }
 
-    // Returns true when `inst` is a memory-reading instruction whose callee
-    // (if it is a call) is marked `[__readNone]`, meaning it provably does
-    // not read memory and unconditional evaluation is unobservable.
+    // Returns whether `inst` is a call whose callee resolves to a function
+    // marked `[__readNone]` — it provably does not read memory, so its
+    // unconditional evaluation is unobservable.
     bool isReadNoneCall(IRInst* inst)
     {
         auto call = as<IRCall>(inst);
@@ -265,15 +279,22 @@ struct ReconstructShortCircuitContext : public InstPassBase
         return false;
     }
 
+    // Debug markers are not in `mightHaveSideEffects`' pure list, so its
+    // conservative default already rejects them; the explicit checks in the
+    // arm scans are a self-documenting short-circuit of that classification,
+    // stating the policy that with debug info enabled an arm keeps its shape.
+    static bool isDebugInst(IRInst* inst)
+    {
+        return as<IRDebugLine>(inst) || as<IRDebugVar>(inst) || as<IRDebugScope>(inst);
+    }
+
     // Check one instruction that is part of the value produced by the
     // short-circuit diamond's non-constant arm, and which this pass would move
     // to the block before the diamond. `use` is the single use of `inst` when
     // it has one.
     bool canHoistArmInst(IRInst* inst)
     {
-        // Debug instructions are left in place: with debug info enabled the
-        // arm keeps its shape, which only forgoes this optimization.
-        if (as<IRDebugLine>(inst) || as<IRDebugVar>(inst) || as<IRDebugScope>(inst))
+        if (isDebugInst(inst))
             return false;
 
         // Descriptor-heap loads are pure, so the side-effect check below does
@@ -314,8 +335,12 @@ struct ReconstructShortCircuitContext : public InstPassBase
     {
         // The branch argument must be computed in this arm or already
         // dominate the diamond; a value defined in the sibling blocks would
-        // be freed with them (SSA validity makes that impossible in practice,
-        // but we check rather than assume).
+        // be freed with them. SSA dominance makes that shape unreachable in
+        // valid input (neither the constant arm nor the merge block can
+        // dominate the value arm), and for a matcher a conservative bail is
+        // the right treatment of an out-of-contract shape: the miss only
+        // forgoes the optimization, so a malformed module degrades to the
+        // old code shape instead of asserting.
         {
             auto valueBlock = as<IRBlock>(value->getParent());
             if (valueBlock == constArmBlock || valueBlock == afterBlock)
@@ -376,6 +401,8 @@ struct ReconstructShortCircuitContext : public InstPassBase
         {
             if (inst == armBlock->getTerminator())
                 continue;
+            if (isDebugInst(inst))
+                return false;
             bool isChain = inChain.contains(inst);
             if (!isChain && inst->firstUse)
                 return false; // unrelated live instruction: bail
@@ -395,7 +422,9 @@ struct ReconstructShortCircuitContext : public InstPassBase
                 // chain root must fold into its own use site: the emitter
                 // prints a non-folding instruction as a statement in the
                 // block before the `if`, and anything folded into that
-                // statement is then evaluated unconditionally.
+                // statement is then evaluated unconditionally. A call to a
+                // `[__readNone]` callee provably reads nothing, so it joins
+                // the fold path only through its operands.
                 bool onFoldPath = isMemoryReadingInst(inst) && !isReadNoneCall(inst);
                 for (UInt i = 0; i < inst->getOperandCount() && !onFoldPath; i++)
                     onFoldPath = foldPathInsts.contains(inst->getOperand(i));
@@ -446,7 +475,7 @@ struct ReconstructShortCircuitContext : public InstPassBase
                 return false;
             if (inst->firstUse)
                 return false;
-            if (as<IRDebugLine>(inst) || as<IRDebugVar>(inst) || as<IRDebugScope>(inst))
+            if (isDebugInst(inst))
                 return false;
             if (inst->mightHaveSideEffects(SideEffectAnalysisOptions::None, &sideEffectCache))
                 return false;
@@ -454,6 +483,10 @@ struct ReconstructShortCircuitContext : public InstPassBase
         return true;
     }
 
+    // Returns whether `block` ends in an unconditional branch directly to
+    // `target` passing exactly one block argument — the property the diamond
+    // matcher needs, since each arm must feed exactly the merged value — and
+    // returns that argument in `outArg`.
     bool isSimpleBranchTo(IRBlock* block, IRBlock* target, IRInst*& outArg)
     {
         auto terminator = block->getTerminator();
@@ -493,13 +526,8 @@ struct ReconstructShortCircuitContext : public InstPassBase
             return false;
 
         // The merge block's only predecessors are the two arms.
-        {
-            UInt predCount = 0;
-            for (auto pred [[maybe_unused]] : afterBlock->getPredecessors())
-                predCount++;
-            if (predCount != 2)
-                return false;
-        }
+        if (afterBlock->getPredecessors().getCount() != 2)
+            return false;
 
         // The merge block has a single `Bool` parameter, used exactly once.
         IRParam* param = nullptr;
@@ -596,9 +624,13 @@ struct ReconstructShortCircuitContext : public InstPassBase
     // Fold single-predecessor blocks with no parameters into their
     // predecessor. The diamond rewrite leaves chains of such pass-through
     // blocks behind (each former merge block now only forwards control flow),
-    // and the emitter folds an instruction into a use site only within the
-    // same basic block, so flattening the chain is what lets the whole
-    // `&&`/`||` chain print as one expression.
+    // and the emitter folds an instruction into a use site only when the use
+    // is in the same block as the definition with no side-effecting
+    // instruction between them
+    // (`CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached`), so
+    // flattening the chain is what lets the whole `&&`/`||` chain print as
+    // one expression. Each merge deallocates only the snapshot entry being
+    // visited, after its last use, so iterating the snapshot is safe.
     bool mergeTrivialBlocks(IRGlobalValueWithCode* func)
     {
         bool changed = false;
@@ -655,6 +687,11 @@ struct ReconstructShortCircuitContext : public InstPassBase
         return changed;
     }
 
+    // The fixpoint converges because both mutators are strictly reductive:
+    // each diamond rewrite destroys one `IRIfElse`, each merge removes one
+    // block, and neither ever creates one (the nested-chain case shows the
+    // rounds interleaving — the inner diamond must be rewritten before the
+    // outer arm becomes single-block).
     void processFunc(IRGlobalValueWithCode* func)
     {
         bool changed = true;
@@ -670,8 +707,16 @@ struct ReconstructShortCircuitContext : public InstPassBase
                 auto ifElse = as<IRIfElse>(block->getTerminator());
                 if (!ifElse)
                     continue;
+                // A rewrite deallocates the diamond's arm blocks, which are
+                // further snapshot entries (arms follow the condition block
+                // in layout order), so stop at the first success and let the
+                // outer fixpoint rescan from a fresh snapshot — never
+                // visiting a deallocated block.
                 if (tryReconstructDiamond(block, ifElse))
+                {
                     changed = true;
+                    break;
+                }
             }
 
             if (mergeTrivialBlocks(func))

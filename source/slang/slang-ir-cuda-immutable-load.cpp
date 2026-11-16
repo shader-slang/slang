@@ -94,15 +94,22 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     {
         auto func = builder.createFunc();
         builder.addNameHintDecoration(func, toSlice("slang_ldg"));
-        // The function only reads the immutable location its pointer argument
-        // points to (the caller has checked `isPointerToImmutableLocation`),
-        // so mark it free of side effects, and its pointer parameter as one
-        // through which no side effect can take place. Without the
-        // decorations every call to it is conservatively treated as
-        // side-effecting, which stops the emitter from folding a single-use
-        // `__ldg` call into its use site — the load then has to materialize
+        // The function only reads memory a kernel cannot write to on this
+        // path: the `kIROp_Load` lowering reaches here only after
+        // `isPointerToImmutableLocation` accepted the address, and the
+        // structured-buffer and `__ldg`-site paths lower reads of memory
+        // that is read-only by construction. Marking the function free of
+        // side effects — and its pointer parameter as one through which no
+        // side effect can take place — lets the emitter fold a single-use
+        // `__ldg` call into its use site; without the decorations every call
+        // is conservatively side-effecting and the load has to materialize
         // as a `slang_ldg_N(...)` statement instead of appearing inside the
-        // expression that uses it.
+        // expression that uses it. `NoSideEffect` rather than `__readNone`
+        // is a deliberate strength: a read-none callee is exempt from the
+        // short-circuit pass's fold gate (`isReadNoneCall` treats it as
+        // provably non-reading and hoistable without a fold guarantee),
+        // while a no-side-effect callee stays classified as memory-reading
+        // and therefore fold-gated.
         builder.addDecoration(func, kIROp_NoSideEffectDecoration);
         builder.setInsertInto(func);
         auto block = builder.emitBlock();
