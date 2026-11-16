@@ -253,7 +253,7 @@ class BuiltinOperationIntVal : public IntVal
     // `loc` is the source location of the operator expression being folded; it is used only to
     // locate a divide-by-zero diagnostic. The sink-less substitute/resolve callers leave it
     // defaulted (they never diagnose).
-    static Val* tryFoldImpl(
+    static IntVal* tryFoldImpl(
         ASTBuilder* astBuilder,
         Type* resultType,
         BuiltinOperationKind op,

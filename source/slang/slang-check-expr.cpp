@@ -2508,6 +2508,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         return nullptr;
 
     // Before checking the operation name, let's look at the arguments
+    List<IntVal*> newArgs;
     IntVal* argVals[kMaxArgs];
     IntegerLiteralValue constArgVals[kMaxArgs];
     bool allConst = true;
@@ -2523,6 +2524,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         if (auto constArgVal = as<ConstantIntVal>(argVal))
         {
             constArgVals[a] = constArgVal->getValue();
+            newArgs.add(constArgVal);
         }
         else
         {
@@ -2623,147 +2625,60 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         auto opName = funcDeclRef.getName();
 
-        // handle unary and binary operators
-        if (opName == getName("-"))
+        struct BuiltinOperationMapEntry
         {
-            if (argCount == 1)
+            const char* opName;
+            int argNum;
+            BuiltinOperationKind opKind;
+        };
+
+        static const BuiltinOperationMapEntry builtinOpMap[] = {
+            { "-", 1, BuiltinOperationKind::Neg },
+            { "~", 1, BuiltinOperationKind::BitNot },
+            { "!", 1, BuiltinOperationKind::Not },
+            { "==", 2, BuiltinOperationKind::Eql },
+            { "!=", 2, BuiltinOperationKind::Neq },
+            { "<", 2, BuiltinOperationKind::Less },
+            { ">", 2, BuiltinOperationKind::Greater },
+            { "<=", 2, BuiltinOperationKind::Leq },
+            { ">=", 2, BuiltinOperationKind::Geq },
+            { "&", 2, BuiltinOperationKind::BitAnd },
+            { "|", 2, BuiltinOperationKind::BitOr },
+            { "^", 2, BuiltinOperationKind::BitXor },
+            { "+", 2, BuiltinOperationKind::Add },
+            { "-", 2, BuiltinOperationKind::Sub },
+            { "*", 2, BuiltinOperationKind::Mul },
+            { "/", 2, BuiltinOperationKind::Div },
+            { "%", 2, BuiltinOperationKind::Mod },
+            { "<<", 2, BuiltinOperationKind::Lsh },
+            { ">>", 2, BuiltinOperationKind::Rsh },
+            { "&&", 2, BuiltinOperationKind::And },
+            { "||", 2, BuiltinOperationKind::Or },
+            { "?:", 3, BuiltinOperationKind::Conditional },
+        };
+
+        for (const auto &entry : builtinOpMap)
+        {
+            if (argCount == entry.argNum && opName->text == entry.opName)
             {
-                resultValue = -constArgVals[0];
-            }
-            else if (argCount == 2)
-            {
-                resultValue = constArgVals[0] - constArgVals[1];
+                return BuiltinOperationIntVal::tryFoldImpl(
+                    m_astBuilder,
+                    invokeExpr.getExpr()->type.type,
+                    entry.opKind,
+                    newArgs,
+                    getSink(),
+                    funcDeclRefExpr.getExpr()->loc);
             }
         }
-        else if (opName == getName("+"))
+
+        // special case for unary +
+        if (opName == getName("+"))
         {
             if (argCount == 1)
             {
                 resultValue = constArgVals[0];
             }
-            else if (argCount == 2)
-            {
-                resultValue = static_cast<IntegerLiteralValue>(
-                    static_cast<uint64_t>(constArgVals[0]) +
-                    static_cast<uint64_t>(constArgVals[1]));
-            }
         }
-        else if (opName == getName("!"))
-        {
-            resultValue = constArgVals[0] == 0;
-        }
-        else if (opName == getName("~"))
-        {
-            resultValue = ~constArgVals[0];
-        }
-        else if (opName == getName("&&"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = (constArgVals[0] != 0) && (constArgVals[1] != 0);
-        }
-        else if (opName == getName("||"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
-        }
-
-        // Unsigned/bitwise operators (bit pattern preserved, uint64_t cast is correct)
-#define CASE_UINT(OP)                                                                         \
-    else if (opName == getName(#OP)) do                                                       \
-    {                                                                                         \
-        if (argCount != 2)                                                                    \
-            return nullptr;                                                                   \
-        resultValue =                                                                         \
-            static_cast<uint64_t>(constArgVals[0]) OP static_cast<uint64_t>(constArgVals[1]); \
-    }                                                                                         \
-    while (0)
-
-        CASE_UINT(*);
-        CASE_UINT(&);
-        CASE_UINT(|);
-        CASE_UINT(^);
-        CASE_UINT(!=);
-        CASE_UINT(==);
-#undef CASE_UINT
-
-        // Signed comparison operators (uint64_t cast would break e.g. (-1 < 0))
-        else if (opName == getName(">="))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] >= constArgVals[1];
-        }
-        else if (opName == getName("<="))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] <= constArgVals[1];
-        }
-        else if (opName == getName("<"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] < constArgVals[1];
-        }
-        else if (opName == getName(">"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            resultValue = constArgVals[0] > constArgVals[1];
-        }
-
-        // Shift operators: guard negative count (UB), use modulo for width
-        else if (opName == getName("<<"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            if (constArgVals[1] < 0)
-                return nullptr;
-            const auto shiftCount =
-                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
-                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-            resultValue = static_cast<IntegerLiteralValue>(
-                static_cast<std::make_unsigned_t<IntegerLiteralValue>>(constArgVals[0])
-                << shiftCount);
-        }
-        else if (opName == getName(">>"))
-        {
-            if (argCount != 2)
-                return nullptr;
-            if (constArgVals[1] < 0)
-                return nullptr;
-            const auto shiftCount =
-                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
-                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-            resultValue = constArgVals[0] >> shiftCount;
-        }
-        // binary operators with chance of divide-by-zero
-        // TODO: issue a suitable error in that case
-#define CASE(OP)                                          \
-    else if (opName == getName(#OP)) do                   \
-    {                                                     \
-        if (argCount != 2)                                \
-            return nullptr;                               \
-        if (!constArgVals[1])                             \
-            return nullptr;                               \
-        resultValue = constArgVals[0] OP constArgVals[1]; \
-    }                                                     \
-    while (0)
-        CASE(/);
-        CASE(%);
-#undef CASE
-        else if (opName == getName("?:"))
-        {
-            if (argCount != 3)
-                return nullptr;
-            if (constArgVals[0] != 0)
-                resultValue = constArgVals[1];
-            else
-                resultValue = constArgVals[2];
-        }
-        // TODO(tfoley): more cases
         else
         {
             return nullptr;

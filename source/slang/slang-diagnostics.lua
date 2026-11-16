@@ -1363,6 +1363,13 @@ err(
     span { loc = "location" }
 )
 
+warning(
+    "target-defined-value",
+    30005,
+    "target-defined value",
+    span { loc = "location", message = "the value of expression ~arg0Val ~op ~arg1Val is target-defined."  }
+)
+
 err(
     "break-outside-loop",
     30003,

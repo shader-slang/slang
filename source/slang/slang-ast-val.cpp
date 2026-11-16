@@ -2,6 +2,7 @@
 #include "slang-ast-val.h"
 
 #include "core/slang-uint-set.h"
+#include "core/slang-math-int-ops.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
@@ -2395,7 +2396,62 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
-Val* BuiltinOperationIntVal::tryFoldImpl(
+MathIntType expressionTypeToMathIntType(Type *type)
+{
+    auto exprType = as<BasicExpressionType>(type);
+    SLANG_RELEASE_ASSERT(exprType);
+
+    switch (exprType->getBaseType())
+    {
+        case BaseType::Int:
+            return MathIntType::Int32Type;
+
+        case BaseType::UInt:
+            return MathIntType::UInt32Type;
+
+        case BaseType::Int64:
+        case BaseType::IntPtr:
+            return MathIntType::Int64Type;
+
+        case BaseType::UInt64:
+        case BaseType::UIntPtr:
+            return MathIntType::UInt64Type;
+
+        case BaseType::Int16:
+            return MathIntType::Int16Type;
+
+        case BaseType::UInt16:
+            return MathIntType::UInt16Type;
+
+        case BaseType::Char:
+        case BaseType::Int8:
+            return MathIntType::Int8Type;
+
+        case BaseType::UInt8:
+            return MathIntType::UInt8Type;
+
+        case BaseType::Bool:
+            return MathIntType::BoolType;
+
+        default:
+            SLANG_RELEASE_ASSERT(!"Unhandled base type");
+            return MathIntType::NullType;
+    }
+}
+
+MathIntValue createMathIntValue(ConstantIntVal* c)
+{
+    MathIntType intType{};
+
+    if (auto basicExprType = as<BasicExpressionType>(c->getType()))
+        intType = expressionTypeToMathIntType(basicExprType);
+    else
+        intType = MathIntType::Int64Type; // we don't know the type here, so assume Int64 (TODO: fix this?)
+
+    return MathIntValue::constructFromValue(intType, c->getValue());
+}
+
+IntVal* BuiltinOperationIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
     BuiltinOperationKind op,
@@ -2403,14 +2459,25 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     DiagnosticSink* sink,
     SourceLoc loc)
 {
-    List<ConstantIntVal*> constArgs;
+    size_t numArgs{};
+    std::array<MathIntValue, 3> constArgs{};
+
     for (auto arg : newArgs)
     {
+        if (numArgs >= 3)
+            return nullptr; // too many args for constant folding
+
         auto c = as<ConstantIntVal>(arg);
         if (!c)
             return nullptr; // still symbolic
-        constArgs.add(c);
+
+        MathIntValue v = createMathIntValue(c);
+        SLANG_RELEASE_ASSERT(v.hasValue());
+
+        constArgs.at(numArgs) = v;
+        ++numArgs;
     }
+
 
     // Reject a malformed node whose argument count does not match the operation's arity, so a
     // unary op never reads a missing second operand and a binary op never folds with a
@@ -2418,100 +2485,124 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     const bool isUnary =
         (op == BuiltinOperationKind::Neg || op == BuiltinOperationKind::BitNot ||
          op == BuiltinOperationKind::Not);
-    const Index expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
-    if (constArgs.getCount() != expectedArgs)
+    const size_t expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
+    if (numArgs != expectedArgs)
         return nullptr;
 
-    const IntegerLiteralValue a0 = constArgs[0]->getValue();
-    const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
-    const IntegerLiteralValue a2 = (constArgs.getCount() > 2) ? constArgs[2]->getValue() : 0;
-    // Do the wrapping arithmetic (negate/add/sub/mul) through the unsigned type: signed
-    // overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
-    // unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
-    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
-    const UInt u0 = (UInt)a0;
-    const UInt u1 = (UInt)a1;
-    IntegerLiteralValue r = 0;
+    MathIntType resType;
+    if (auto resultBasicExprType = as<BasicExpressionType>(resultType))
+        resType = expressionTypeToMathIntType(resultBasicExprType);
+    else
+        resType = MathIntType::Int64Type; // we don't know the type here, so assume Int64 (TODO: fix this?)
+
+    const MathIntValue &arg0 = constArgs.at(0);
+    const MathIntValue &arg1 = constArgs.at(1);
+    const MathIntValue &arg2 = constArgs.at(2);
+
+    MathIntResult res{};
+
     switch (op)
     {
     case BuiltinOperationKind::Neg:
-        r = (IntegerLiteralValue)(UInt(0) - u0);
+        res = MathIntOps::neg(resType, arg0);
         break;
     case BuiltinOperationKind::BitNot:
-        r = ~a0;
+        res = MathIntOps::bitwiseNot(resType, arg0);
         break;
     case BuiltinOperationKind::Not:
-        r = (a0 == 0);
+        res = MathIntOps::logicalNot(arg0);
         break;
     case BuiltinOperationKind::Eql:
-        r = (a0 == a1);
+        res = MathIntOps::compEql(arg0, arg1);
         break;
     case BuiltinOperationKind::Neq:
-        r = (a0 != a1);
+        res = MathIntOps::compNeq(arg0, arg1);
         break;
     case BuiltinOperationKind::Less:
-        r = (a0 < a1);
+        res = MathIntOps::compLess(arg0, arg1);
         break;
     case BuiltinOperationKind::Greater:
-        r = (a0 > a1);
+        res = MathIntOps::compGreater(arg0, arg1);
         break;
     case BuiltinOperationKind::Leq:
-        r = (a0 <= a1);
+        res = MathIntOps::compLeq(arg0, arg1);
         break;
     case BuiltinOperationKind::Geq:
-        r = (a0 >= a1);
+        res = MathIntOps::compGeq(arg0, arg1);
         break;
     case BuiltinOperationKind::BitAnd:
-        r = a0 & a1;
+        res = MathIntOps::bitwiseAnd(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::BitOr:
-        r = a0 | a1;
+        res = MathIntOps::bitwiseOr(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::BitXor:
-        r = a0 ^ a1;
+        res = MathIntOps::bitwiseXor(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Add:
-        r = (IntegerLiteralValue)(u0 + u1);
+        res = MathIntOps::add(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Sub:
-        r = (IntegerLiteralValue)(u0 - u1);
+        res = MathIntOps::sub(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Mul:
-        r = (IntegerLiteralValue)(u0 * u1);
+        res = MathIntOps::mul(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Div:
+        res = MathIntOps::div(resType, arg0, arg1);
+        break;
     case BuiltinOperationKind::Mod:
-        if (a1 == 0)
-        {
-            if (sink)
-                sink->diagnose(Diagnostics::DivideByZero{.location = loc});
-            return nullptr;
-        }
-        // `INT64_MIN / -1` overflows and traps (SIGFPE) on real hardware, so handle the
-        // `/ -1` case without dividing: `x / -1 == -x` (wrapping) and `x % -1 == 0`.
-        if (a1 == -1)
-            r = (op == BuiltinOperationKind::Div) ? (IntegerLiteralValue)(UInt(0) - u0) : 0;
-        else
-            r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
+        res = MathIntOps::rem(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Lsh:
+        res = MathIntOps::lsh(resType, arg0, arg1);
+        break;
     case BuiltinOperationKind::Rsh:
-        if (!_tryFoldConstantShift(a0, a1, /*isLeftShift*/ op == BuiltinOperationKind::Lsh, r))
-            return nullptr;
+        res = MathIntOps::rsh(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::And:
-        r = ((a0 != 0) && (a1 != 0)) ? 1 : 0;
+        res = MathIntOps::logicalAnd(arg0, arg1);
         break;
     case BuiltinOperationKind::Or:
-        r = ((a0 != 0) || (a1 != 0)) ? 1 : 0;
+        res = MathIntOps::logicalOr(arg0, arg1);
         break;
     case BuiltinOperationKind::Conditional:
-        r = (a0 != 0) ? a1 : a2;
+        res = MathIntOps::ternaryConditional(arg0, arg1, arg2);
         break;
     default:
         return nullptr;
     }
-    return astBuilder->getIntVal(resultType, r);
+
+    SLANG_RELEASE_ASSERT(res.value.hasValue());
+
+    if (res.flags & MathIntResult::Undefined)
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::DivideByZero{.location = loc});
+
+        return nullptr;
+    }
+
+    if (res.flags & MathIntResult::TargetDefined)
+    {
+        if (sink)
+        {
+            String arg0val;
+            String arg1val;
+
+            sink->diagnose(Diagnostics::TargetDefinedValue{
+                .arg0Val = arg0.toString(),
+                .op =getBuiltinOperationOpText(op),
+                .arg1Val = arg1.toString(),
+                .location = loc});
+        }
+
+        return nullptr;
+    }
+
+    // Note: we'll ignore integer overflows
+
+    return astBuilder->getIntVal(resultType, res.value.getSignedValue());
 }
 
 Val* BuiltinOperationIntVal::_resolveImplOverride()
