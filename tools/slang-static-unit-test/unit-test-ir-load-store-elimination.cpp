@@ -347,11 +347,40 @@ SLANG_UNIT_TEST(irLoadStoreRemovesUnchangedValueStoredBack)
     auto returnInst = builder.emitReturn(load);
 
     checkLoadStoreTestIR(module.get());
+    SLANG_CHECK(address->hasMoreThanOneUse());
     SLANG_CHECK(eliminateRedundantLoadStore(func));
     checkLoadStoreTestIR(module.get());
     SLANG_CHECK(countLoadStoreTestInsts(func, kIROp_Store) == 0);
     SLANG_CHECK(countLoadStoreTestInsts(func, kIROp_Load) == 1);
     SLANG_CHECK(returnInst->getOperand(0) == load);
+}
+
+// The pass must keep a copy from another pointer even when the destination's single use lets us
+// skip the overwrite search. We build that case with a load through one parameter and a store
+// through the other, and require both instructions to remain.
+SLANG_UNIT_TEST(irLoadStoreRetainsCopyThroughSingleUseDestination)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    RefPtr<IRModule> module = IRModule::create(env.getSessionImpl());
+    IRBuilder builder(module.get());
+    auto intType = builder.getIntType();
+    auto pointerType = builder.getPtrType(intType);
+    IRType* parameterTypes[] = {pointerType, pointerType};
+    auto func = beginLoadStoreTestFunction(builder, builder.getVoidType(), 2, parameterTypes);
+    auto destination = func->getFirstParam();
+    auto inputAddress = destination->getNextParam();
+    auto load = builder.emitLoad(inputAddress);
+    auto store = cast<IRStore>(builder.emitStore(destination, load));
+    builder.emitReturn();
+
+    checkLoadStoreTestIR(module.get());
+    SLANG_CHECK_ABORT(destination->hasUses());
+    SLANG_CHECK(!destination->hasMoreThanOneUse());
+    SLANG_CHECK_ABORT(!eliminateRedundantLoadStore(func));
+    checkLoadStoreTestIR(module.get());
+    SLANG_CHECK(countLoadStoreTestInsts(func, kIROp_Load) == 1);
+    SLANG_CHECK(countLoadStoreTestInsts(func, kIROp_Store) == 1);
+    SLANG_CHECK(store->getVal() == load);
 }
 
 // Earlier forwarding can change a store's pointer before the traversal records it. We exercise

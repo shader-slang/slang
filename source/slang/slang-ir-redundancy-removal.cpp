@@ -453,10 +453,11 @@ static MemoryScope getMemoryScopeOfLoadStore(IRInst* inst)
     return (MemoryScope)getIntVal(memoryScope->getMemoryScope());
 }
 
-// Return true when the forward overwrite search can be skipped without missing a match.
+// Return true when `store` is its destination pointer's only use and its block does not end
+// with an `IRUnconditionalBranch`, including `IRLoop`.
 //
-// Returns false when the caller still needs that search to determine whether `store` is
-// overwritten.
+// These conditions rule out an overwrite-search match. Returns false when a match has not
+// been ruled out.
 static bool canSkipStoreOverwriteSearch(IRStoreBase* store)
 {
     // A failed overwrite search can traverse a long block suffix. To avoid that work, we first
@@ -561,16 +562,22 @@ bool tryRemoveRedundantStore(
         }
     }
 
+    // The remaining rules need either a matching overwrite or a load from the same pointer
+    // stored back unchanged. When we can skip the overwrite search, this store is also the
+    // pointer's only use, so there cannot be a load for the store-back rule either.
+    if (canSkipStoreOverwriteSearch(store))
+        return false;
+
     // This store can be removed if there are subsequent stores to the same variable,
     // and there are no insts in between the stores that can read the variable.
     // Additionally, MemoryScope of the `store` must be a sub-set of `nextStore`,
     // otherwise we can not be certain that `nextStore` completely overwrites `store`.
     MemoryScope memoryScopeOfStore = getMemoryScopeOfLoadStore(store);
-    // We still need to try the store-back check below when the overwrite search cannot succeed,
-    // so we bypass only this walk rather than returning from `tryRemoveRedundantStore`.
-    auto firstInstToScan = canSkipStoreOverwriteSearch(store) ? nullptr : store->getNextInst();
     HashSet<IRBlock*> visitedBlocks;
-    for (auto next = firstInstToScan; next;)
+    // `canSkipStoreOverwriteSearch` relies on this walk matching identical pointer operands
+    // and following only `IRUnconditionalBranch`. Extending either rule also requires updating
+    // that predicate so the new matches remain reachable.
+    for (auto next = store->getNextInst(); next;)
     {
         if (auto nextStore = as<IRStore>(next))
         {
@@ -696,6 +703,9 @@ bool tryRemoveRedundantLoad(
     //
     // Ex 2: Store into Invocation, load from Workgroup. Load may/may-not be equal to the Store
     // since the cache managing the Workgroup scope may contain different data than the invocation.
+    // `eliminateRedundantLoadStore` indexes earlier `IRStore` pointer operands in this block
+    // to rule out unsuccessful searches. If we extend the matching or traversal rules below,
+    // we must extend that filter too so it does not hide the new forwarding opportunities.
     for (auto prev = load->getPrevInst(); prev; prev = prev->getPrevInst())
     {
         if (auto store = as<IRStore>(prev))
@@ -729,9 +739,10 @@ bool eliminateRedundantLoadStore(
     {
         // Looking for a matching store before every load can repeatedly scan a long block prefix.
         // We avoid searches with no possible match by indexing the pointer operands of earlier,
-        // surviving `IRStore` instructions in this block. In reachable code, absence from this
-        // index rules out forwarding; a hit leaves the full memory-scope and side-effect checks to
-        // `tryRemoveRedundantLoad`.
+        // surviving `IRStore` instructions in this block. A hit still leaves all memory-scope and
+        // side-effect checks to `tryRemoveRedundantLoad`, so extra entries cost only a search.
+        // A missing entry, however, could hide a valid replacement. The store-registration step
+        // below keeps every candidate represented in reachable code as the pass rewrites the IR.
         HashSet<IRInst*> earlierStorePointerOperands;
         IRInst* nextInst = nullptr;
         for (auto inst = block->getFirstInst(); inst; inst = nextInst)
