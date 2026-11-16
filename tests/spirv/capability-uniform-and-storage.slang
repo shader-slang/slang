@@ -65,6 +65,8 @@ void computeMain()
 {
     outputBuffer[0].data = OUT_FLOAT_TYPE(inputBuffer.data.x);
 #if defined(IN_BFLOAT16)
+    // BFloat16 defines no direct conversion to an integer type, so select
+    // one path via float.
     outputBuffer[1].index = OUT_UINT_TYPE(float(inputBuffer.index));
 #else
     outputBuffer[1].index = OUT_UINT_TYPE(inputBuffer.index);

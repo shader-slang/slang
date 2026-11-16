@@ -10375,11 +10375,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         visited.add(type);
 
-        // Storage-capability classification is explicit by element type:
-        // half, bfloat16 and the 16-bit integers count as 16-bit elements,
-        // and only the 8-bit integers count as 8-bit ones. FP8 element types
-        // are deliberately left unclassified — whether Vulkan's 8-bit
-        // storage rules apply to them is an open spec question.
+        // Storage-capability classification is a per-type spec decision, not
+        // a width property, so each element type gets a deliberate case here
+        // rather than a bit-size lookup: half, BFloat16 and the 16-bit
+        // integers count as 16-bit elements, and only the 8-bit integers
+        // count as 8-bit ones. FloatE4M3/FloatE5M2 are deliberately left
+        // unclassified — whether Vulkan's 8-bit storage rules apply to them
+        // is an open spec question. BFloat16 additionally cannot appear in
+        // stage Input/Output interfaces, where SPIR-V forbids BFloat16
+        // variables, so the Input/Output arm never applies to it.
         switch (type->getOp())
         {
         case kIROp_HalfType:
