@@ -25,14 +25,27 @@ struct FSOut
 {
     float4 color : SV_Target;
     float depth : SV_Depth;
+//RET: E39034
+//RET:            ^^^^^^^^ this system-value semantic would be silently overridden
+//RET_HLSL: E39034
+//RET_HLSL:       ^^^^^^^^ this system-value semantic would be silently overridden
+//RET_GLSL: E39034
+//RET_GLSL:       ^^^^^^^^ this system-value semantic would be silently overridden
+//OUTPARAM: E39034
+//OUTPARAM:       ^^^^^^^^ this system-value semantic would be silently overridden
 };
 
 // Entry-point result semantic overrides the `SV_Depth` field semantic.
 [shader("fragment")]
 FSOut retStruct(float4 pos : SV_Position)
-//RET: E39034
-//RET_HLSL: E39034
-//RET_GLSL: E39034
+    : SV_Target
+//RET:^^^^^^^^^ the enclosing semantic is declared here
+/*RET_HLSL:
+      ^^^^^^^^^ the enclosing semantic is declared here
+*/
+/*RET_GLSL:
+      ^^^^^^^^^ the enclosing semantic is declared here
+*/
 {
     FSOut o;
     o.color = pos;
@@ -43,7 +56,7 @@ FSOut retStruct(float4 pos : SV_Position)
 // The same clobber through an `out` parameter instead of the return value.
 [shader("fragment")]
 void outParam(float4 pos : SV_Position, out FSOut o : SV_Target)
-//OUTPARAM: E39034
+//OUTPARAM:                                           ^^^^^^^^^ the enclosing semantic is declared here
 {
     o.color = pos;
     o.depth = pos.x;
@@ -52,6 +65,8 @@ void outParam(float4 pos : SV_Position, out FSOut o : SV_Target)
 struct Inner
 {
     float depth : SV_Depth;
+//NESTED: E39034
+//NESTED:         ^^^^^^^^ this system-value semantic would be silently overridden
 };
 
 struct NestedOut
@@ -64,7 +79,10 @@ struct NestedOut
 // overrides the `SV_Depth` field.
 [shader("fragment")]
 NestedOut nested(float4 pos : SV_Position)
-//NESTED: E39034
+    : SV_Target
+/*NESTED:
+      ^^^^^^^^^ the enclosing semantic is declared here
+*/
 {
     NestedOut o;
     o.color = pos;
@@ -75,13 +93,15 @@ NestedOut nested(float4 pos : SV_Position)
 struct DepthOnly
 {
     float depth : SV_Depth;
+//USEROUTER: E39034
+//USEROUTER:      ^^^^^^^^ this system-value semantic would be silently overridden
 };
 
 // A user-defined enclosing semantic is just as much an override: the field's
 // `SV_Depth` would become the second COLOR output.
 [shader("fragment")]
 void userOuter(float4 pos : SV_Position, out DepthOnly o : COLOR)
-//USEROUTER: E39034
+//USEROUTER:                                               ^^^^^ the enclosing semantic is declared here
 {
     o.depth = pos.x;
 }

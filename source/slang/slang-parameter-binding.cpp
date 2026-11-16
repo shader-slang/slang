@@ -748,7 +748,13 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
 struct EntryPointParameterState
 {
+    // The semantic of the nearest enclosing declaration that has one, plus how that
+    // declaration spelled it, so a diagnostic can point back at it. `optSemanticName`
+    // is the semantic with any trailing index split off; `ioSemanticIndex` is the
+    // running counter of how many varying slots that semantic has already consumed.
     String* optSemanticName = nullptr;
+    SourceLoc optSemanticLoc;
+    String optSemanticText;
     int* ioSemanticIndex = nullptr;
     EntryPointParameterDirectionMask directionMask;
     int semanticSlotCount;
@@ -1999,6 +2005,15 @@ SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
     return info;
 }
 
+// Any semantic with an `SV_` or `NV_` prefix names a system value (a fixed-function
+// input/output such as `SV_Position` or `SV_Depth`) rather than a user-defined
+// varying; the case-insensitive prefix check is the whole classification.
+static bool isSystemValueSemanticName(String const& semanticName)
+{
+    auto lowerCaseName = semanticName.toLower();
+    return lowerCaseName.startsWith("sv_") || lowerCaseName.startsWith("nv_");
+}
+
 static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     ParameterBindingContext* context,
     Type* type,
@@ -2017,11 +2032,9 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 
     RefPtr<TypeLayout> typeLayout;
 
-    // First we check for a system-value semantic, operating
-    // under the assumption that *any* semantic with an `SV_`
-    // or `NV_` prefix is a system value.
+    // First we check for a system-value semantic.
     //
-    if (sn.startsWith("sv_") || sn.startsWith("nv_"))
+    if (isSystemValueSemanticName(semanticName))
     {
         // Fragment shader color/render target outputs need to be handled
         // specially, because they are declared with an `SV`-prefixed
@@ -2218,15 +2231,59 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     SimpleSemanticInfo semanticInfo;
     int semanticIndex = 0;
-    if (decl && !state.optSemanticName)
+    if (auto semantic = decl ? decl->findModifier<HLSLSimpleSemantic>() : nullptr)
     {
-        if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
-        {
-            semanticInfo = decomposeSimpleSemantic(semantic);
-            semanticIndex = semanticInfo.index;
+        semanticInfo = decomposeSimpleSemantic(semantic);
+        semanticIndex = semanticInfo.index;
 
+        if (!state.optSemanticName)
+        {
             state.optSemanticName = &semanticInfo.name;
             state.ioSemanticIndex = &semanticIndex;
+            state.optSemanticLoc = semantic->loc;
+            state.optSemanticText = semantic->name.getContent();
+        }
+        else if (isSystemValueSemanticName(semanticInfo.name))
+        {
+            // The outer semantic will win over this declaration's own semantic, per
+            // the policy above. For a user-defined field semantic that composition is
+            // the point of the policy (`o.a -> OUTPUT0, o.b -> OUTPUT1`), but a
+            // system-value semantic names one specific fixed-function input/output,
+            // so overriding it silently changes what the shader writes. Consider:
+            //
+            //     struct FragmentOut { float4 color : SV_Target; float depth : SV_Depth; };
+            //     FragmentOut main() : SV_Target { ... }
+            //
+            // The result semantic on `main` would re-bind `depth` as `SV_Target1`,
+            // an ordinary color output, and the depth output would simply vanish
+            // from the generated code. That is never what a spelling of this shape
+            // means, so it is an error rather than a silent override.
+            //
+            // A field semantic that names the same slot the outer semantic assigns
+            // anyway (the same base name, with its own index equal to the slot the
+            // running counter has reached, like `b : SV_Target1` as the second leaf
+            // under an outer `SV_Target`) is redundant rather than conflicting, and
+            // keeps compiling with unchanged layout.
+            //
+            // The index comparison treats arrays like scalars: the counter advances
+            // by whole arrays while a field's own index is a single number, so
+            // around array-typed leaves the check can both miss a genuinely
+            // redundant spelling (leaving the ordinary outer-wins behavior in
+            // place) and reject a spelling that was only redundant across the
+            // whole array. Array-plus-system-value-semantic spellings are
+            // ambiguous either way, and the diagnostic names both semantics so
+            // the user can resolve it.
+            bool namesSameSlot = (semanticInfo.name.getUnownedSlice().caseInsensitiveEquals(
+                                     state.optSemanticName->getUnownedSlice())) &&
+                                 (semanticInfo.index == *state.ioSemanticIndex);
+            if (!namesSameSlot)
+            {
+                getSink(context)->diagnose(Diagnostics::OuterSemanticOverridesSystemValueSemantic{
+                    .fieldSemantic = String(semantic->name.getContent()),
+                    .outerSemantic = state.optSemanticText,
+                    .fieldSemanticLoc = semantic->loc,
+                    .outerSemanticLoc = state.optSemanticLoc});
+            }
         }
     }
 

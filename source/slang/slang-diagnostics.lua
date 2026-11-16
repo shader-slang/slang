@@ -5326,6 +5326,14 @@ err(
     note { message = "combine the data into one `[[vk::push_constant]]` block or into the entry point's `uniform` parameters", span { loc = "entryPoint:IRInst" } }
 )
 
+err(
+    "outer-semantic-overrides-system-value-semantic",
+    39034,
+    "the system-value semantic '~fieldSemantic' is ignored because the enclosing declaration applies its own '~outerSemantic' semantic",
+    span { loc = "fieldSemanticLoc", message = "this system-value semantic would be silently overridden" },
+    span { loc = "outerSemanticLoc", message = "the enclosing semantic is declared here" }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,
