@@ -12,6 +12,7 @@ void main(uint3 tid: SV_DispatchThreadID)
     dst[tid.x] = BFloat16(float(tid.x));
 }
 
+// CHECK-NOT: OpCapability UniformAndStorageBuffer8BitAccess
 // CHECK-DAG: OpCapability UniformAndStorageBuffer16BitAccess
 // CHECK-DAG: OpCapability BFloat16TypeKHR
 // CHECK-NOT: OpCapability UniformAndStorageBuffer8BitAccess
