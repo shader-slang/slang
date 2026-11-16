@@ -1207,10 +1207,33 @@ LoweredValInfo extractField(
             // which means we should just compute an lvalue
             // representing the field address.
             IRInst* irBasePtr = base.val;
-            return LoweredValInfo::ptr(builder->emitFieldAddress(
-                builder->getPtrType(fieldType),
-                irBasePtr,
-                getFieldKey(context, field)));
+            IRType* fieldPtrType = builder->getPtrType(fieldType);
+            if (auto basePtrType = as<IRPtrTypeBase>(unwrapAttributedType(irBasePtr->getDataType())))
+            {
+                // A field of a qualified pointer is only as addressable as its
+                // base: when the base pointer carries a non-default access
+                // qualifier, address space, or data layout, the field address
+                // inherits them instead of defaulting to read-write. Consider
+                // `Ptr<Holder, Access.Read> p`: the address of `p->v` must stay
+                // read-only, so that later decisions about writable storage see
+                // the same qualifications the pointer type carries. Unqualified
+                // bases keep the plain pointer type, so ordinary writable
+                // addresses lower exactly as before.
+                // `IRBuilder::emitFieldAddress(IRInst*, IRInst*)` derives its
+                // result type the same way; this keeps the explicitly-typed path
+                // consistent with it.
+                if (basePtrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
+                    basePtrType->hasAddressSpace() || basePtrType->getDataLayout())
+                {
+                    fieldPtrType = builder->getPtrType(
+                        fieldType,
+                        basePtrType->getAccessQualifier(),
+                        basePtrType->getAddressSpace(),
+                        basePtrType->getDataLayout());
+                }
+            }
+            return LoweredValInfo::ptr(
+                builder->emitFieldAddress(fieldPtrType, irBasePtr, getFieldKey(context, field)));
         }
         break;
     }
