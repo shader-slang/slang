@@ -31,6 +31,7 @@
 //TEST:SIMPLE(filecheck=GLSL):  -target glsl  -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):  -target wgsl  -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV):   -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=IR):    -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -dump-ir-after eliminateMultiLevelBreak
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -compute -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-mtl -compute -entry computeMain -output-using-type
@@ -91,3 +92,9 @@ void computeMain(uint tid : SV_DispatchThreadID)
 
 // SPV:     OpEntryPoint
 // SPV-NOT: OpConstantComposite {{.*}} %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0 %float_0
+
+// The loop-header hoist of the var must carry its per-entry
+// uninitialized-memory init store (shader-slang/slang#14493).
+// IR: ### AFTER eliminateMultiLevelBreak:
+// IR: = LoadFromUninitializedMemory
+// IR-NEXT: store(

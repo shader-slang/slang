@@ -5627,15 +5627,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Poison:
             result = emitOpUndef(parent, inst, inst->getDataType());
             break;
-        case kIROp_DefaultConstruct:
-            // A default-constructed value lowers to a null constant. In practice
-            // this op reaches the emitter from phi elimination materializing an
-            // undefined incoming value that registers cannot leave unwritten (see
-            // slang-ir-eliminate-phis.cpp); null is the cheapest concrete value
-            // for it and, unlike `OpUndef`, downstream optimizers do not drop the
-            // store that carries it.
-            result = emitOpConstantNull(inst, inst->getDataType());
-            break;
         case kIROp_SPIRVAsm:
             result = emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
             break;

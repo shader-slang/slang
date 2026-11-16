@@ -59,31 +59,28 @@
 namespace Slang
 {
 
-/// A `DefaultConstruct` of a struct or array type expands into a composite built
-/// element-by-element from zeros, which is the fully-expanded zero materialization
-/// that hoisted-variable legalization avoids. A default-constructed scalar, vector,
-/// matrix or pointer lowers to at most a handful of cheap constants, so those types
-/// are safe to materialize when a register temp needs a definition on every path.
-/// Anything else (aggregates, opaque handles, anything exotic) falls back to leaving
-/// the temp unwritten, which is the status-quo behavior for undefined reads.
+/// Whether an undefined phi incoming may be materialized as a concrete default
+/// value when its register temp must not be left unwritten. `IRBuilder::
+/// emitDefaultConstruct` with `fallback = false` is the source of truth for
+/// what the concrete value looks like; two exclusions are made here. Struct
+/// and array types expand into a composite built element-by-element from
+/// zeros — the fully-expanded zero materialization that hoisted-variable
+/// legalization deliberately avoids, so those types keep the unwritten temp.
+/// And pointers in the `UserPointer` storage class are excluded because SPIR-V
+/// maps them to PhysicalStorageBuffer pointers, for which `OpConstantNull`
+/// fails validation.
 static bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
 {
-    for (;;)
+    type = (IRType*)unwrapAttributedType(type);
+    if (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        if (auto attr = as<IRAttributedType>(type))
-            type = attr->getBaseType();
-        else if (auto rateQualified = as<IRRateQualifiedType>(type))
-            type = rateQualified->getValueType();
-        else
-            break;
+        return ptrType->getAddressSpace() != AddressSpace::UserPointer;
     }
     if (as<IRBasicType>(type))
         return true;
     if (as<IRVectorType>(type))
         return true;
     if (as<IRMatrixType>(type))
-        return true;
-    if (as<IRPtrTypeBase>(type))
         return true;
     return false;
 }
@@ -1067,21 +1064,28 @@ struct PhiEliminationContext
             // so that any logic that might have moved another parameter
             // into a temporary will influence our result.
             //
-            // An `IRUndefined` incoming means the parameter is read before it was defined
-            // along this path. For ordinary temp locals, skipping the store is enough:
-            // an uninitialized local already reads as an undefined value. But in
-            // register-allocation mode the temp stands for function-scope memory in the
-            // emitted target module, and leaving it unwritten on this path lets its
-            // previous content flow around a loop back edge; downstream SSA promotion of
-            // that module (for example spirv-opt on our SPIR-V output) must then treat
-            // the register as loop-carried and keep its content live across the loop
-            // body. So in register-allocation mode we store a `DefaultConstruct` of the
-            // value type instead: choosing a concrete value is a legal refinement of
-            // the undefined value, and unlike storing the undefined value itself, the
-            // store survives downstream optimizers that elide stores of undefined.
-            // Only types with a cheap, constant-like default (scalars, vectors,
-            // matrices, pointers) are materialized; aggregate and other types fall
-            // back to leaving the temp unwritten, which is the status-quo behavior.
+            // An `IRUndefined` incoming (the `Undefined` family, including the
+            // `LoadFromUninitializedMemory` values that hoisted-variable
+            // legalization stores at loop headers — after SSA promotion they
+            // arrive here as exactly this kind of incoming) means the parameter
+            // is read before it was defined along this path. For ordinary temp
+            // locals, skipping the store is enough: an uninitialized local
+            // already reads as an undefined value. But in register-allocation
+            // mode the temp stands for function-scope memory in the emitted
+            // target module, and leaving it unwritten on this path lets its
+            // previous content flow around a loop back edge; downstream SSA
+            // promotion of that module (for example spirv-opt on our SPIR-V
+            // output) must then treat the register as loop-carried and keep its
+            // content live across the loop body. So in register-allocation mode
+            // we store a concrete default value instead: choosing a concrete
+            // value is a legal refinement of the undefined value, and unlike a
+            // store of the undefined value itself, a constant store survives
+            // downstream optimizers that elide undefined stores. Aggregates and
+            // opaque handles keep the skip, because their default construction
+            // expands into element-wise zeros — the materialization cost that
+            // hoisted-variable legalization deliberately avoids (#11011) — and
+            // an unwritten register is valid output for those shapes even though
+            // it can still carry the liveness regression this fix addresses.
             //
             auto srcVal = *srcArg.currentValPtr;
             if (as<IRUndefined>(srcVal))
@@ -1089,9 +1093,11 @@ struct PhiEliminationContext
                 if (m_options.useRegisterAllocation &&
                     canMaterializeUndefinedWithDefaultConstruct(srcVal->getDataType()))
                 {
-                    m_builder.emitStore(
-                        dstParam.temp,
-                        m_builder.emitDefaultConstructRaw(srcVal->getDataType()));
+                    if (auto defaultValue =
+                            m_builder.emitDefaultConstruct(srcVal->getDataType(), false))
+                    {
+                        m_builder.emitStore(dstParam.temp, defaultValue);
+                    }
                 }
             }
             else
