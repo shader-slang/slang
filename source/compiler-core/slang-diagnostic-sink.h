@@ -613,10 +613,11 @@ void outputExceptionDiagnostic(
 void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics);
 
 #if !SLANG_HAS_EXCEPTIONS
-// Reports the abort message that handleSignal() recorded for the AbortCompilation a
-// SLANG_EXCEPTION_TRY_RECOVERY boundary just escaped from. Severity is Error, matching what
-// the `catch (const AbortCompilationException&)` arm reports in an exceptions-enabled build,
-// so recovery itself can never re-enter the fatal-abort path.
+// Reports the abort message that handleSignal() recorded for the AbortCompilation that a
+// SLANG_EXCEPTION_TRY_RECOVERY boundary just escaped from. Severity is Error — matching what
+// the `catch (const AbortCompilationException&)` arm reports in an exceptions-enabled build —
+// and DiagnosticSink only raises SLANG_ABORT_COMPILATION at Fatal severity and above, so
+// reporting at Error severity keeps the recovery itself from re-entering the fatal-abort path.
 void outputAbortCompilationDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics);
 #endif
 
