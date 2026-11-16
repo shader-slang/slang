@@ -9836,6 +9836,33 @@ static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo 
     return var;
 }
 
+/// Returns whether the effective `this` parameter of `accessorDeclRef` passes
+/// writable storage to the accessor, e.g. because it is declared `[mutating]`.
+///
+/// An accessor that receives writable storage must only be invoked on a base
+/// that can provide it, since the accessor may write through its receiver.
+static bool doesAccessorRequireWritableThis(ASTBuilder* astBuilder, DeclRef<RefAccessorDecl> accessorDeclRef)
+{
+    auto thisParamInfo = findEffectiveThisParamInfo(astBuilder, DeclRef<Decl>(accessorDeclRef));
+    return thisParamInfo.has_value() &&
+           doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode);
+}
+
+/// Returns whether `val` names a memory location that can be written through:
+/// an address whose pointer type carries the read-write access qualifier.
+///
+/// Any other flavor either holds a value (no storage to write) or defers an
+/// accessor choice, so it cannot directly provide writable storage.
+static bool canProvideWritableStorage(LoweredValInfo const& val)
+{
+    if (val.flavor != LoweredValInfo::Flavor::Ptr)
+        return false;
+    auto ptrType = as<IRPtrTypeBase>(unwrapAttributedType(val.val->getDataType()));
+    if (!ptrType)
+        return false;
+    return ptrType->getAccessQualifier() == AccessQualifier::ReadWrite;
+}
+
 LoweredValInfo tryGetAddress(
     IRGenContext* context,
     LoweredValInfo const& inVal,
@@ -9880,6 +9907,23 @@ LoweredValInfo tryGetAddress(
             if (refAccessors.isNonEmpty())
             {
                 auto refAccessor = *refAccessors.begin();
+
+                // Consider `Ptr<Holder, Access.Read> p` and a subscript that
+                // declares both a `[nonmutating] set` and a `[mutating] ref`.
+                // A component write like `p->v[0].x = 3` reaches this point
+                // because the subscript is an l-value (the `set` needs no
+                // writable receiver), yet binding the `ref` accessor here
+                // would pass the read-only base as its writable `this` and
+                // store through the returned pointer into read-only memory.
+                // When the `ref` accessor needs writable storage that the
+                // base cannot provide, we leave the value unbound so that
+                // `assign` performs the get/modify/set round-trip through
+                // the `set` accessor instead.
+                if (doesAccessorRequireWritableThis(context->astBuilder, refAccessor) &&
+                    !canProvideWritableStorage(subscriptInfo->base))
+                {
+                    return val;
+                }
 
                 // The `ref` accessor will return a pointer to the value, so
                 // we need to reflect that in the type of our `call` instruction.
