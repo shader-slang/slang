@@ -9649,6 +9649,12 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_SPIRVLoadDescriptorFromHeap:
     case kIROp_Load: // We are ignoring the possibility of loads from bad addresses, or
                      // `volatile` loads
+    // An immutable-location `__ldg` read under the same convention. This
+    // also lets `propagateFuncProperties` infer `__readNone` for functions
+    // wrapping a bare `__ldg`, exempting such calls from the short-circuit
+    // pass's fold gate — consistent with the movable-Load speculation
+    // convention used elsewhere.
+    case kIROp_CUDALDG:
     case kIROp_LoadReverseGradient:
     case kIROp_ReverseGradientDiffPairRef:
     case kIROp_ImageSubscript:

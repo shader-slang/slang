@@ -252,6 +252,7 @@ struct ReconstructShortCircuitContext : public InstPassBase
         switch (inst->getOp())
         {
         case kIROp_Load:
+        case kIROp_CUDALDG:
         case kIROp_StructuredBufferLoad:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_ByteAddressBufferLoad:
