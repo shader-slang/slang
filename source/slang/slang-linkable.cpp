@@ -467,8 +467,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     ISlangBlob** outDiagnostics)
 {
     // Specialization still walks and mutates linkage-owned front-end state, so keep it
-    // serialized with other component-type front-end operations.
-    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+    // serialized with other component-type front-end operations. The locked region spans
+    // abort-capable semantic work (CheckTerm on user code) and this method is reachable below
+    // EndToEndCompileRequest::compile()'s recovery boundary, so in a build without exceptions
+    // the lock must be an AbortRecoveryLock: a plain lock_guard would be stranded by the longjmp
+    // that recovers an AbortCompilation, permanently blocking every other thread on the linkage.
+    AbortRecoveryLock lock(getLinkage()->getComponentTypeOperationMutex());
 
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);

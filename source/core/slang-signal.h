@@ -6,7 +6,10 @@
 // SLANG_HAS_EXCEPTIONS gates this header's conditional content, and slang-common.h includes
 // this header before it includes slang.h (which owns the definition) — so include it here
 // directly: without it a TU reaching this header first sees the macro undefined and takes the
-// wrong configuration branch.
+// wrong configuration branch. The definition stays in slang.h because SLANG_DISABLE_EXCEPTIONS
+// is an embedder's build flag documented on the public surface; core re-deriving it in a
+// separate config header that both include is a possible cleanup, but it changes the include
+// structure of the public header and is left as a maintainer decision.
 #include "slang.h"
 
 #include <mutex>
@@ -61,20 +64,33 @@ struct AbortCompilationEscape
 
 // A lock guard for a recursive mutex that survives the AbortCompilation longjmp: in a build
 // without exceptions, an abort raised while this lock is held must release it before the jump,
-// exactly as exception unwinding would. Use this instead of `std::lock_guard` whenever the
-// locked region can raise AbortCompilation below a SLANG_EXCEPTION_TRY_RECOVERY boundary;
-// a plain lock_guard there would strand the mutex across the jump.
+// exactly as exception unwinding would. Convert a `std::lock_guard` on a mutex to this guard iff
+// the lock can be held by a frame the recovery jump crosses — a frame strictly below a
+// SLANG_EXCEPTION_TRY_RECOVERY boundary when the abort fires. A lock in the boundary's own frame
+// does not qualify (the recovery return exits its scope normally, releasing it), and neither does
+// a lock whose region cannot raise AbortCompilation.
 class AbortRecoveryLock
 {
 public:
     AbortRecoveryLock(std::recursive_mutex& mutex);
     ~AbortRecoveryLock();
 
-    // The fields below are the push/pop protocol, consumed by handleSignal()'s escape path (see
-    // slang-signal.cpp): it clears `active` (and unlocks the mutex) for the acquisitions the
-    // longjmp crosses, so the destructor of a consumed guard must not unlock again.
+    // The push/pop protocol state, consumed by handleSignal()'s escape path (see
+    // slang-signal.cpp).
+    enum class State
+    {
+        // On the thread's lock stack: the destructor pops the entry and unlocks.
+        Registered,
+        // Released and unregistered by handleSignal for a jump that crossed this frame. The
+        // frame was abandoned, so this destructor cannot run; it asserts that invariant rather
+        // than double-unlocking.
+        Consumed,
+        // The lock stack was full: the mutex is held but unregistered, so the destructor must
+        // still unlock.
+        NeverRegistered,
+    };
     std::recursive_mutex* mutex;
-    bool active = false;
+    State state = State::NeverRegistered;
 };
 
 // Propagates the in-flight AbortCompilation outward after a recovery branch has done its local

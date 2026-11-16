@@ -21,13 +21,15 @@ thread_local String g_lastSignalMessage;
 #if !SLANG_HAS_EXCEPTIONS
 namespace {
 // Per-thread stacks for the abort-recovery machinery. A fixed depth keeps installation
-// allocation-free. The escape stack is sized for the worst realistic nesting of recovery
-// boundaries on one thread — each entry comes from an API boundary the embedder called
-// re-entrantly (compile → link → loadModule → an imported module's own loads), which stays a
-// handful deep; 64 is generous headroom on that. A boundary that finds an escape stack full
-// installs nothing, so an abort inside it is recovered by the innermost boundary already
-// installed — the abort still recovers, one boundary further out than intended. The lock stack
-// follows the same protocol and bound.
+// allocation-free. The escape stack depth is driven by two things: API boundaries the embedder
+// calls re-entrantly (compile → link → loadModule, a handful), and one function-scope guard per
+// module of an in-flight import chain — loadParsedModule and loadSerializedModule are recovery
+// boundaries, so an import chain of N modules keeps N entries alive during checking. 64 covers
+// import chains far deeper than real shader libraries. The stack-full fallback lives in the
+// AbortCompilationEscape header comment, which is the contract for both stacks' bound. One
+// deliberate asymmetry: a full escape stack degrades gracefully (the abort recovers one
+// boundary further out), while a full lock stack strands the mutex — see the
+// AbortRecoveryLock constructor.
 constexpr int kMaxAbortCompilationEscapeDepth = 64;
 thread_local AbortCompilationEscape* g_abortCompilationEscapes[kMaxAbortCompilationEscapeDepth];
 thread_local int g_abortCompilationEscapeCount = 0;
@@ -63,28 +65,41 @@ AbortRecoveryLock::AbortRecoveryLock(std::recursive_mutex& mutex)
     mutex.lock();
     if (g_abortRecoveryLockCount < kMaxAbortCompilationEscapeDepth)
     {
-        active = true;
+        state = State::Registered;
         g_abortRecoveryLocks[g_abortRecoveryLockCount++] = this;
     }
-    // A full lock stack leaves the lock held but unregistered: an abort under it would strand
-    // the mutex. Reaching depth 64 of *nested* recovery locks on one thread requires far more
-    // re-entrancy than the API allows, so this registers as unreachable in practice.
+    // A full lock stack leaves the lock held but unregistered (NeverRegistered): an abort under
+    // it would strand the mutex. Reaching depth 64 of *nested* recovery locks on one thread
+    // requires far more re-entrancy than the API allows, so this registers as unreachable in
+    // practice.
 }
 
 AbortRecoveryLock::~AbortRecoveryLock()
 {
-    if (active)
+    switch (state)
     {
+    case State::Registered:
         SLANG_ASSERT(g_abortRecoveryLocks[g_abortRecoveryLockCount - 1] == this);
         g_abortRecoveryLocks[--g_abortRecoveryLockCount] = nullptr;
+        mutex->unlock();
+        break;
+    case State::NeverRegistered:
+        mutex->unlock();
+        break;
+    case State::Consumed:
+        // handleSignal consumed this guard for a jump that abandoned this frame; a destructor
+        // cannot run in an abandoned frame, so reaching here means the protocol is broken.
+        SLANG_ASSERT(!"consumed AbortRecoveryLock destructor ran — its frame was not abandoned");
+        break;
     }
-    mutex->unlock();
 }
 
 // Pops the innermost installed escape and jumps to it, releasing the recovery locks the jump
 // crosses, mirroring what exception unwinding would have done; locks registered before that
-// escape was installed belong to frames the jump does not cross and stay held. Returns false
-// only when no escape is installed. The message recorded for the in-flight signal is left
+// escape was installed belong to frames the jump does not cross and stay held. On success this
+// longjmps and does not return to this frame; the bool return is false only when no escape is
+// installed, which the caller turns into the trap below (handleSignal) or the unguarded abort's
+// termination (reraiseAbortCompilation). The message recorded for the in-flight signal is left
 // untouched, so a reraise reports the original abort text. No allocation: the signal path may
 // run with a corrupted heap.
 static bool tryJumpToInnermostAbortEscape()
@@ -96,7 +111,7 @@ static bool tryJumpToInnermostAbortEscape()
     while (g_abortRecoveryLockCount > escape->lockStackDepthAtInstall)
     {
         AbortRecoveryLock* lock = g_abortRecoveryLocks[--g_abortRecoveryLockCount];
-        lock->active = false;
+        lock->state = AbortRecoveryLock::State::Consumed;
         lock->mutex->unlock();
     }
     longjmp(escape->jumpBuffer, 1);
@@ -107,8 +122,11 @@ static bool tryJumpToInnermostAbortEscape()
 void reraiseAbortCompilation()
 {
     // Propagates the in-flight AbortCompilation outward after a recovery branch has done its
-    // local cleanup — the counterpart of `catch (...) { cleanup; throw; }`. With no enclosing
-    // recovery boundary left, the abort terminates exactly like an unguarded one.
+    // local cleanup — the counterpart of `catch (...) { cleanup; throw; }`. The terminal path
+    // below intentionally duplicates handleSignal's trap+exit rather than calling it: a
+    // handleSignal call would re-wrap g_lastSignalMessage, clobbering the original abort text
+    // the boundary that ultimately recovers must report. With no enclosing recovery boundary
+    // left, the abort terminates exactly like an unguarded one.
     if (!tryJumpToInnermostAbortEscape())
     {
         SLANG_BREAKPOINT(0);
