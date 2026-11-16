@@ -3148,8 +3148,9 @@ struct TypeLayoutReflection
      *
      * This is an index into this type layout's descriptor sets, not a Vulkan descriptor-set
      * number. Pass it to `getDescriptorSetSpaceOffset()` to query the set's space offset.
-     * A binding range without a descriptor set may return -1; check
-     * `getBindingRangeDescriptorRangeCount()` before enumerating its descriptor ranges.
+     * A binding range without a descriptor set may return an invalid value when the count is
+     * zero; check `getBindingRangeDescriptorRangeCount()` before enumerating its descriptor
+     * ranges.
      */
     SlangInt getBindingRangeDescriptorSetIndex(SlangInt index)
     {
