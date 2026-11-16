@@ -499,9 +499,12 @@ public:
     /// crossed. One nested case bends that claim: while importing module A, an abort inside A's
     /// own import of module B recovers at B's load boundary, whose reset also drops A's
     /// still-live entry — the consequence is limited to suspending recursive-import detection
-    /// for A until A's RAII destructor restores a consistent head. The resets at the compile,
-    /// link and getTargetArtifact boundaries are defensive: their own paths run imports only
-    /// through the load boundaries, which reset first, so they normally see an empty list.
+    /// for A until A's RAII destructor restores a consistent head. MSVC with exceptions enabled
+    /// runs the crossed frames' destructors during the jump, so the list may already be
+    /// consistent here; the reset is then the same mild suspension for any live outer entries.
+    /// The resets at the compile, link and getTargetArtifact boundaries are defensive: their own
+    /// paths run imports only through the load boundaries, which reset first, so they normally
+    /// see an empty list.
     void resetModulesBeingImported() { m_modulesBeingImported = nullptr; }
 
 private:

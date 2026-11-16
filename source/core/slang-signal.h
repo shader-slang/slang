@@ -82,8 +82,9 @@ public:
         // On the thread's lock stack: the destructor pops the entry and unlocks.
         Registered,
         // Released and unregistered by handleSignal for a jump that crossed this frame. The
-        // frame was abandoned, so this destructor cannot run; it asserts that invariant rather
-        // than double-unlocking.
+        // destructor then either never runs (GCC/Clang skip destructors across longjmp) or
+        // runs during MSVC's /EHsc unwinding after the manual unlock — both cases must land in
+        // a no-op, never a second unlock.
         Consumed,
         // The lock stack was full: the mutex is held but unregistered, so the destructor must
         // still unlock.

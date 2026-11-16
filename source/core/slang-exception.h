@@ -59,7 +59,11 @@
 //
 // The sharper hazard is the frames between the abort site and this boundary: the longjmp skips
 // every destructor in them, so RAII state there — memory, and more importantly locks and other
-// shared-state bookkeeping — is silently abandoned. A lock held by a frame below a recovery
+// shared-state bookkeeping — is silently abandoned. How far the abandonment goes depends on the
+// compiler: GCC/Clang skip the crossed frames' destructors entirely, while MSVC with exceptions
+// enabled unwinds them during the jump — the very case that makes the jump formally undefined
+// under the C++ standard's setjmp rules ([csetjmp.syn]); we accept that as the price of the
+// recovery this mechanism exists to provide. A lock held by a frame below a recovery
 // boundary must use AbortRecoveryLock (see slang-signal.h), which handleSignal releases before
 // the jump; any other shared state a callee's RAII owns must either be safe to strand or be
 // restored by the recovery branch itself (for example

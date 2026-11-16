@@ -87,9 +87,10 @@ AbortRecoveryLock::~AbortRecoveryLock()
         mutex->unlock();
         break;
     case State::Consumed:
-        // handleSignal consumed this guard for a jump that abandoned this frame; a destructor
-        // cannot run in an abandoned frame, so reaching here means the protocol is broken.
-        SLANG_ASSERT(!"consumed AbortRecoveryLock destructor ran — its frame was not abandoned");
+        // handleSignal consumed this guard for a jump that abandoned this frame — and with
+        // exceptions enabled, MSVC's /EHsc longjmp unwinds the crossed frames' destructors, so
+        // this destructor legitimately runs there, after the manual unlock. Doing nothing is the
+        // correct completion of the consume; unlocking again would corrupt the mutex.
         break;
     }
 }
