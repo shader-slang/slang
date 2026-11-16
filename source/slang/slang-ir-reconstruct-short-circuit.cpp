@@ -50,12 +50,19 @@ namespace Slang
 // conditional evaluation. A hoisted instruction that did *not* fold would
 // run unconditionally, which for a memory-reading instruction would be a
 // behavior change (the `i < n && a[i]` guarded-access idiom would fault), so
-// memory-reading instructions are additionally held to the same conditions
-// under which the emitter folds an instruction into its use site — including
-// the use-site vetoes it applies for target intrinsics and for vector-typed
-// values (`shouldFoldInstIntoUseSites`, `CLikeSourceEmitter` and its
+// every instruction on the path from a memory read to the chain root is
+// additionally held to the same conditions under which the emitter folds an
+// instruction into its use site — including the use-site vetoes it applies
+// for target intrinsics and for vector-typed values
+// (`shouldFoldInstIntoUseSites`, `CLikeSourceEmitter` and its
 // `CPPSourceEmitter` override that CUDA inherits). Anything that fails these
-// gates keeps its diamond, which is only a missed optimization.
+// gates keeps its diamond, which is only a missed optimization. The fold
+// guarantee holds at pass time: `removeRedundancy` (in `simplifyNonSSAIR`)
+// can later dedup two movable `kIROp_Load`s (constant-buffer pointers, the
+// speculatable ones) hoisted from two different diamonds into one two-use
+// load that then emits as a statement — acceptable because movable loads
+// are Slang's speculatable class, which loop-invariant hoisting already
+// speculates unconditionally.
 
 struct ReconstructShortCircuitContext : public InstPassBase
 {
@@ -72,8 +79,9 @@ struct ReconstructShortCircuitContext : public InstPassBase
     // `CLikeSourceEmitter::shouldFoldInstIntoUseSites` and
     // `CPPSourceEmitter::shouldFoldInstIntoUseSites` (which CUDA inherits):
     // returns whether `inst`, known to be single-use and pure, will actually
-    // be folded into the text of its use site by the emitter. Only
-    // memory-reading instructions need this guarantee (see the file comment).
+    // be folded into the text of its use site by the emitter. Every
+    // instruction on the path from a memory read to the chain root needs
+    // this guarantee (see the file comment).
     bool canFoldIntoUseSite(IRInst* inst, IRUse* use)
     {
         auto user = use->getUser();
@@ -141,6 +149,22 @@ struct ReconstructShortCircuitContext : public InstPassBase
                 if (swizzle->getBase() == inst && swizzle->getElementCount() > 1)
                     return false;
             }
+
+            // The second switch in `CPPSourceEmitter::shouldFoldInstIntoUseSites`:
+            // a vector- or matrix-typed reshape/cast instruction is itself
+            // never folded, regardless of its user.
+            switch (inst->getOp())
+            {
+            case kIROp_MatrixReshape:
+            case kIROp_VectorReshape:
+            case kIROp_IntCast:
+            case kIROp_FloatCast:
+            case kIROp_CastIntToFloat:
+            case kIROp_CastFloatToInt:
+                return false;
+            default:
+                break;
+            }
         }
 
         // A call to a resource object's member function is kept as its own
@@ -169,6 +193,34 @@ struct ReconstructShortCircuitContext : public InstPassBase
         }
 
         return true;
+    }
+
+    // Mirror of the `FoldPolicy::Never` opcodes in
+    // `CLikeSourceEmitter::getFoldPolicy` that can appear inside an
+    // expression chain (declaration-like ops such as `Var`/`Param` cannot).
+    // The `Make*` entries are `Never` only for function-local values
+    // (`isInnerGlobalAggregate`), and chain instructions are always
+    // function-local.
+    bool isNeverFoldedOnCLikeTargets(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeStruct:
+        case kIROp_MakeArray:
+        case kIROp_SwizzleSet:
+        case kIROp_MakeArrayFromElement:
+        case kIROp_MakeCoopVector:
+        case kIROp_UpdateElement:
+        case kIROp_DefaultConstruct:
+        case kIROp_MetalCastToDepthTexture:
+        case kIROp_CoopMatMulAdd:
+        case kIROp_CoopVecMatMulAdd:
+        case kIROp_CoopVecOuterProductAccumulate:
+        case kIROp_CoopVecReduceSumAccumulate:
+            return true;
+        default:
+            return false;
+        }
     }
 
     bool isMemoryReadingInst(IRInst* inst)
@@ -315,8 +367,11 @@ struct ReconstructShortCircuitContext : public InstPassBase
                 return false;
         }
 
-        // Verify every instruction of the arm.
-        List<IRInst*> armInsts;
+        // Verify every instruction of the arm. Arm order is def-before-use,
+        // so operands are visited before the instructions that use them and
+        // `foldPathInsts` is complete for each instruction when it is
+        // checked.
+        HashSet<IRInst*> foldPathInsts;
         for (auto inst = armBlock->getFirstInst(); inst; inst = inst->getNextInst())
         {
             if (inst == armBlock->getTerminator())
@@ -334,10 +389,23 @@ struct ReconstructShortCircuitContext : public InstPassBase
                 auto user = inst->firstUse->getUser();
                 if (!inChain.contains(user) && user != armBlock->getTerminator())
                     return false;
-                if (isMemoryReadingInst(inst) && !isReadNoneCall(inst))
+                // A memory read only stays conditionally evaluated if its
+                // text lands inside the emitted `&&`/`||` operand, so every
+                // instruction on the single-use path from the read to the
+                // chain root must fold into its own use site: the emitter
+                // prints a non-folding instruction as a statement in the
+                // block before the `if`, and anything folded into that
+                // statement is then evaluated unconditionally.
+                bool onFoldPath = isMemoryReadingInst(inst) && !isReadNoneCall(inst);
+                for (UInt i = 0; i < inst->getOperandCount() && !onFoldPath; i++)
+                    onFoldPath = foldPathInsts.contains(inst->getOperand(i));
+                if (onFoldPath)
                 {
+                    if (isNeverFoldedOnCLikeTargets(inst))
+                        return false;
                     if (!canFoldIntoUseSite(inst, inst->firstUse))
                         return false;
+                    foldPathInsts.add(inst);
                 }
             }
             else if (inst->mightHaveSideEffects(SideEffectAnalysisOptions::None, &sideEffectCache))
@@ -409,6 +477,12 @@ struct ReconstructShortCircuitContext : public InstPassBase
         auto thenBlock = ifElse->getTrueBlock();
         auto elseBlock = ifElse->getFalseBlock();
         if (!afterBlock || !thenBlock || !elseBlock)
+            return false;
+        // A merge block that is the `ifElse`'s own parent block (possible
+        // only for the entry block) would turn the rewrite below into an
+        // unconditional self-branch; no known producer creates that shape,
+        // but we check rather than assume.
+        if (block == afterBlock)
             return false;
         if (thenBlock == elseBlock || thenBlock == afterBlock || elseBlock == afterBlock)
             return false;
@@ -609,9 +683,11 @@ struct ReconstructShortCircuitContext : public InstPassBase
 void reconstructShortCircuit(IRModule* module, TargetRequest* targetReq)
 {
     // The rewrite turns the diamond into a source-level short-circuiting
-    // `&&`/`||`, which is only valid where the emitted language
-    // short-circuits: the C-family source targets. WGSL's `&&`/`||` do not
-    // short-circuit, and the GLSL/HLSL/Metal emitters are not covered yet.
+    // `&&`/`||`. The fold vetoes this pass mirrors are those of the
+    // C-family emitters (`CLikeSourceEmitter`/`CPPSourceEmitter`), and the
+    // temp-per-link shape the rewrite removes is only known to hurt the
+    // C-family targets, so the gate stays there: the GLSL/HLSL/Metal/WGSL
+    // emitters are not covered yet.
     if (!(isCUDATarget(targetReq) || (isCPUTarget(targetReq) && !isCPUTargetViaLLVM(targetReq))))
         return;
 
