@@ -4,6 +4,7 @@
 #include "compiler-core/slang-pretty-writer.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-signal.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
@@ -1934,7 +1935,14 @@ void EndToEndCompileRequest::setAllowGLSLInput(bool value)
 
 SlangResult EndToEndCompileRequest::compile()
 {
+    // `res` is assigned between the SLANG_EXCEPTION_TRY_RECOVERY setjmp and the longjmp that an
+    // AbortCompilation can make in a no-exceptions build, so it is indeterminate once the jump
+    // lands; the recovery branch overwrites it, but only a `volatile` local carries a guarantee.
+#if SLANG_HAS_EXCEPTIONS
     SlangResult res = SLANG_FAIL;
+#else
+    volatile SlangResult res = SLANG_FAIL;
+#endif
     double downstreamStartTime = 0.0;
     double totalStartTime = 0.0;
 
@@ -1954,7 +1962,7 @@ SlangResult EndToEndCompileRequest::compile()
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
@@ -2000,6 +2008,21 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
         res = SLANG_E_ABORT;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        // Mirrors the catch (const AbortCompilationException&) arm above: an abort that already
+        // produced a diagnostic is an ordinary compilation failure and keeps the `SLANG_FAIL`
+        // result; an abort with no diagnostic at all is Slang giving up on its own and is
+        // reported as an internal error.
+        if (getSink()->getErrorCount() == 0)
+        {
+            getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exceptionType = "AbortCompilation",
+                .exceptionMessage = getLastSignalMessage()});
+            res = SLANG_E_ABORT;
+        }
     }
 #endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();

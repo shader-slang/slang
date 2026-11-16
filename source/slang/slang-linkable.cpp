@@ -6,6 +6,7 @@
 #include "compiler-core/slang-artifact-impl.h"
 #include "core/slang-char-util.h"
 #include "core/slang-memory-file-system.h"
+#include "core/slang-signal.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lookup.h"
@@ -545,7 +546,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
 
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         auto linked = fillRequirements(this);
         if (!linked)
@@ -568,6 +569,12 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
     catch (...)
     {
         outputExceptionDiagnostic(sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        outputAbortCompilationDiagnostic(sink, outDiagnostics);
         return SLANG_FAIL;
     }
 #endif
@@ -778,7 +785,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             return artifact.get();
         }
     }
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         // If the user hasn't specified any entry points, then we should
         // discover all entrypoints that are defined in linked modules, and
@@ -856,6 +863,21 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             sink.diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
+            sink.getBlobIfNeeded(outDiagnostics);
+        }
+        return nullptr;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        if (outDiagnostics && !*outDiagnostics)
+        {
+            DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+            applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+            applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+            sink.diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exceptionType = "AbortCompilation",
+                .exceptionMessage = getLastSignalMessage()});
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;

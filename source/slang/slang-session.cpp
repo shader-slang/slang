@@ -325,7 +325,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
             DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         auto name = getNamePool()->getName(moduleName);
 
@@ -348,6 +348,12 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
     catch (...)
     {
         outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        outputAbortCompilationDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
 #endif
@@ -373,7 +379,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
     }
 
 
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         // When `source` is null, read the file at `path` and reuse the one blob
         // for the digest and the load so both see identical bytes, incl.
@@ -468,6 +474,12 @@ slang::IModule* Linkage::loadModuleFromBlob(
     catch (...)
     {
         outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        outputAbortCompilationDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
 #endif
