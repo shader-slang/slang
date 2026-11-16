@@ -203,8 +203,8 @@ struct PeepholeContext : InstPassBase
         if (!as<IRVectorType>(inst->getDataType()) && !as<IRMatrixType>(inst->getDataType()))
             return false;
         auto destType = inst->getDataType();
-        auto destElementType =
-            as<IRMatrixType>(destType) ? getMatrixElementType(destType) : getVectorElementType(destType);
+        auto destElementType = as<IRMatrixType>(destType) ? getMatrixElementType(destType)
+                                                          : getVectorElementType(destType);
 
         for (UInt i = 0; i < source->getOperandCount(); i++)
         {
