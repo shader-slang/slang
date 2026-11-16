@@ -104,12 +104,14 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         // `__ldg` call into its use site; without the decorations every call
         // is conservatively side-effecting and the load has to materialize
         // as a `slang_ldg_N(...)` statement instead of appearing inside the
-        // expression that uses it. `NoSideEffect` rather than `__readNone`
-        // is a deliberate strength: a read-none callee is exempt from the
-        // short-circuit pass's fold gate (`isReadNoneCall` treats it as
-        // provably non-reading and hoistable without a fold guarantee),
-        // while a no-side-effect callee stays classified as memory-reading
-        // and therefore fold-gated.
+        // expression that uses it. `NoSideEffect` (not `__readNone`) states
+        // exactly what the function guarantees when synthesized: it reads
+        // memory, and never writes. The later `propagateFuncProperties` pass
+        // may infer `__readNone` for wrappers of pure reads (enabled by the
+        // `kIROp_CUDALDG` purity classification) before the short-circuit
+        // pass runs, and its `isReadNoneCall` exemption then applies — sound,
+        // because a read-none callee's unconditional evaluation is
+        // unobservable by definition.
         builder.addDecoration(func, kIROp_NoSideEffectDecoration);
         builder.setInsertInto(func);
         auto block = builder.emitBlock();

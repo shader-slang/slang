@@ -211,10 +211,12 @@ struct ReconstructShortCircuitContext : public InstPassBase
 
     // Mirror of the `FoldPolicy::Never` opcodes in
     // `CLikeSourceEmitter::getFoldPolicy` that can appear inside an
-    // expression chain (declaration-like ops such as `Var`/`Param` cannot).
-    // The `Make*` entries are `Never` only for function-local values
-    // (`isInnerGlobalAggregate`), and chain instructions are always
-    // function-local.
+    // expression chain. `Var`/`Alloca`/undefined-value ops carry no value
+    // operands, so they can never sit on the fold path, and a non-folding
+    // declaration hoisted before the `if` is harmless. The two undefined
+    // forms below mirror the emitter's undefined-value veto
+    // (`shouldFoldInstIntoUseSites`) defensively even though both are leaf
+    // ops today.
     bool isNeverFoldedOnCLikeTargets(IRInst* inst)
     {
         switch (inst->getOp())
@@ -231,6 +233,8 @@ struct ReconstructShortCircuitContext : public InstPassBase
         case kIROp_CoopVecMatMulAdd:
         case kIROp_CoopVecOuterProductAccumulate:
         case kIROp_CoopVecReduceSumAccumulate:
+        case kIROp_LoadFromUninitializedMemory:
+        case kIROp_Poison:
             return true;
         default:
             return false;
@@ -246,8 +250,9 @@ struct ReconstructShortCircuitContext : public InstPassBase
     // The descriptor-heap ops below must stay in sync with the
     // FoldPolicy::Never bail in canHoistArmInst: this list routes them
     // into the fold-guarantee checks, and that bail keeps them out of a
-    // reconstructed `||` entirely. kIROp_SPIRVLoadDescriptorFromHeap is
-    // not in the C-family Never table, so it takes the check path.
+    // reconstructed `||` entirely. `kIROp_SPIRVLoadDescriptorFromHeap` is
+    // listed for defensive breadth only — Vulkan/SPIR-V legalization
+    // produces it, so it cannot appear on this pass's gated targets.
     bool isMemoryReadingInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -713,7 +718,9 @@ struct ReconstructShortCircuitContext : public InstPassBase
     // each diamond rewrite destroys one `IRIfElse`, each merge removes one
     // block, and neither ever creates one (the nested-chain case shows the
     // rounds interleaving — the inner diamond must be rewritten before the
-    // outer arm becomes single-block).
+    // outer arm becomes single-block). Each successful rewrite restarts the
+    // sweep from a fresh snapshot, so a chain of n links costs O(n) rounds;
+    // acceptable because source-level chains are short.
     void processFunc(IRGlobalValueWithCode* func)
     {
         bool changed = true;

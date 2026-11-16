@@ -1953,6 +1953,10 @@ void CPPSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 
 bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
+    // The short-circuit reconstruction pass
+    // (slang-ir-reconstruct-short-circuit.cpp) mirrors this override's
+    // vector/reshape vetoes to decide whether a hoisted memory read stays
+    // conditionally evaluated; keep the two in sync.
     bool result = Super::shouldFoldInstIntoUseSites(inst);
     if (!result)
         return result;
