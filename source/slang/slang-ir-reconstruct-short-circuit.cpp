@@ -88,13 +88,14 @@ struct ReconstructShortCircuitContext : public InstPassBase
     // Two emitter checks are intentionally NOT mirrored here because this
     // pass guarantees them structurally: `isSafeToFoldIntoUseSites`' scan
     // (the use must be in the same block as the definition with no
-    // side-effecting instruction between them) is provided by the rewrite
-    // hoisting a contiguous pure chain into one block and merging the
-    // pass-through blocks, and the `IRSwizzledStore` user veto is
-    // unreachable because a store is impure and can never sit in a hoisted
-    // chain. Keep this mirror and `isNeverFoldedOnCLikeTargets` (which
-    // mirrors `getFoldPolicy`'s Never opcodes) in sync with the emitter
-    // functions when they change.
+    // side-effecting instruction between them, and not into an
+    // unconditional branch terminator) is provided by the rewrite hoisting
+    // a contiguous pure chain into one block and merging the pass-through
+    // blocks, and the `IRSwizzledStore` user veto is unreachable because a
+    // store is impure and can never sit in a hoisted chain. Keep this
+    // mirror and `isNeverFoldedOnCLikeTargets` (which mirrors
+    // `getFoldPolicy`'s Never opcodes) in sync with the emitter functions
+    // when they change.
     bool canFoldIntoUseSite(IRInst* inst, IRUse* use)
     {
         auto user = use->getUser();

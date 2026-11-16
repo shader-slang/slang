@@ -1736,6 +1736,10 @@ CLikeSourceEmitter::FoldPolicy CLikeSourceEmitter::getFoldPolicy(IRInst* inst)
 
 bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
+    // The short-circuit reconstruction pass
+    // (slang-ir-reconstruct-short-circuit.cpp) mirrors this decision (with
+    // `getFoldPolicy`'s Never opcodes) to decide whether a hoisted memory
+    // read stays conditionally evaluated; keep the two in sync.
     switch (getFoldPolicy(inst))
     {
     case FoldPolicy::Never:
