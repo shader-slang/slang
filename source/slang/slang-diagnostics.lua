@@ -4429,8 +4429,8 @@ standalone_note(
 err(
     "accessor-requires-writable-base",
     40027,
-    "cannot invoke this accessor: it requires a mutable receiver, but the base does not provide writable storage",
-    span { loc = "location", message = "the accessor may write through its receiver, and the base's storage does not permit writes" }
+    "cannot invoke this accessor: its receiver does not provide the writable storage it requires",
+    span { loc = "location", message = "the accessor may write through its receiver, whose storage does not permit writes" }
 )
 
 warning(

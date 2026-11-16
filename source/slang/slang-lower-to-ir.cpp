@@ -1096,8 +1096,6 @@ static bool doesAccessorRequireWritableThis(
 
 static bool isDefinitelyReadOnlyStorage(LoweredValInfo const& val);
 
-static IRPtrTypeBase* tryGetStoragePointerType(LoweredValInfo const& val);
-
 /// Returns the source location of the statement lowering is currently
 /// emitting — the nearest enclosing lowering location rather than the
 /// location of any specific sub-expression. Lowering-side diagnostics follow
@@ -1193,6 +1191,31 @@ IRInst* getFieldKey(IRGenContext* context, DeclRef<Decl> field)
     return getSimpleVal(context, emitDeclRef(context, field, context->irBuilder->getKeyType()));
 }
 
+/// Returns the pointer type to use for a field of `basePtrType`, inheriting
+/// the base pointer's access qualifier, address space, and data layout when
+/// the base carries any non-default qualification — the shape the sibling
+/// derivations (`maybePropagateAddressSpace`, the two-argument
+/// `IRBuilder::emitFieldAddress`) each cover with slightly different
+/// conditions (see `extractField` for why this stays local). Returns null
+/// when the base carries no non-default qualification and the plain pointer
+/// type for the field applies.
+static IRType* getFieldPtrTypeInheritingBaseQualifications(
+    IRBuilder* builder,
+    IRType* fieldType,
+    IRPtrTypeBase* basePtrType)
+{
+    if (basePtrType->getAccessQualifier() == AccessQualifier::ReadWrite &&
+        !basePtrType->hasAddressSpace() && !basePtrType->getDataLayout())
+    {
+        return nullptr;
+    }
+    return builder->getPtrType(
+        fieldType,
+        basePtrType->getAccessQualifier(),
+        basePtrType->getAddressSpace(),
+        basePtrType->getDataLayout());
+}
+
 LoweredValInfo extractField(
     IRGenContext* context,
     IRType* fieldType,
@@ -1234,44 +1257,31 @@ LoweredValInfo extractField(
             // representing the field address.
             IRInst* irBasePtr = base.val;
             IRType* fieldPtrType = builder->getPtrType(fieldType);
+            // A field of a qualified pointer is only as addressable as its
+            // base. The shape where this matters is a base whose address
+            // space is Generic but whose access qualifier is not read-write —
+            // for example the IR pointer type of a `__ref`-style parameter —
+            // because `maybePropagateAddressSpace` (inside `emitFieldAddress`)
+            // already performs the inheritance on its own whenever the base's
+            // address space differs from Generic; a lowered `Ptr<T>` carries
+            // the Device address space, so pointer bases were already
+            // covered. Bases with no non-default qualification keep the
+            // plain 1-operand pointer type, as before. The sibling
+            // derivations of this rebuild differ in exactly the way this bug
+            // family lived in (`maybePropagateAddressSpace` fires only on an
+            // address-space difference; `getPtrType(valueType, oldPtrType)`
+            // also copies the pointer op kind), so the derivation stays
+            // local with the result op pinned to `PtrType` rather than
+            // reusing either.
             if (auto basePtrType =
                     as<IRPtrTypeBase>(unwrapAttributedType(irBasePtr->getDataType())))
             {
-                // A field of a qualified pointer is only as addressable as its
-                // base: when the base pointer carries a non-default access
-                // qualifier, address space, or data layout, the field address
-                // inherits them instead of falling back to the defaults
-                // (read-write access, Generic address space, default buffer
-                // layout). The shape that changes behavior here is a base
-                // whose address space is Generic but whose access qualifier
-                // is not read-write — for example the IR pointer type of a
-                // `__ref`-style parameter — because
-                // `maybePropagateAddressSpace` (inside `emitFieldAddress`)
-                // already performs this inheritance on its own whenever the
-                // base's address space differs from Generic. Ref-param bases
-                // also carry a buffer data layout, so they take the
-                // fully-qualified form here; that matches the two-argument
-                // `IRBuilder::emitFieldAddress`, which always derives all
-                // three qualifications from the base pointer. Bases with no
-                // non-default qualification keep the plain 1-operand pointer
-                // type, as before.
-                //
-                // The sibling derivations of this rebuild —
-                // `maybePropagateAddressSpace` and
-                // `IRBuilder::getPtrType(valueType, oldPtrType)` — differ in
-                // exactly the way this bug family lived in (the former fires
-                // only on an address-space difference, the latter also copies
-                // the pointer op kind); keeping the result op pinned to
-                // `PtrType` here is why this stays a local variant rather
-                // than reusing either.
-                if (basePtrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
-                    basePtrType->hasAddressSpace() || basePtrType->getDataLayout())
-                {
-                    fieldPtrType = builder->getPtrType(
+                if (auto qualified = getFieldPtrTypeInheritingBaseQualifications(
+                        builder,
                         fieldType,
-                        basePtrType->getAccessQualifier(),
-                        basePtrType->getAddressSpace(),
-                        basePtrType->getDataLayout());
+                        basePtrType))
+                {
+                    fieldPtrType = qualified;
                 }
             }
             return LoweredValInfo::ptr(
@@ -10052,14 +10062,17 @@ LoweredValInfo tryGetAddress(
                 // site that has a sound fallback; every other accessor
                 // binding is guarded in `_emitCallToAccessor`, which
                 // diagnoses when no `set` round-trip can save it. Of the
-                // aggressive consumers of an unbound value, `getAddress`
-                // (used for `__ref` parameter arguments) diagnoses
-                // `InvalidLValueForRefParameter` instead of silently binding
-                // a mutating `ref`; `visitAddressOfExpr` (`&expr` lowering)
-                // aborts with an internal error on a non-address result, a
-                // pre-existing sharp edge that checked code cannot reach,
-                // because the checker's `__getAddress`/`&` whitelist admits
-                // only intrinsic ref accessors, never user-declared ones.
+                // aggressive consumers of an unbound value — for example
+                // `getAddress` (used for `__ref` parameter arguments) or the
+                // one-element-tuple fast path in `visitSwizzleExpr` — some
+                // diagnose (`getAddress` reports
+                // `InvalidLValueForRefParameter` rather than silently
+                // binding a mutating `ref`); `visitAddressOfExpr` (`&expr`
+                // lowering) aborts with an internal error on a non-address
+                // result, a pre-existing sharp edge that checked code cannot
+                // reach, because the checker's `__getAddress`/`&` whitelist
+                // admits only intrinsic ref accessors, never user-declared
+                // ones.
                 if (!canBindAccessorToBase(context, refAccessor, subscriptInfo->base))
                 {
                     return val;

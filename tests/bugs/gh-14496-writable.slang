@@ -14,7 +14,7 @@
 // shape, and the SPIR-V emitter hits a pre-existing field-address assertion
 // (reproduced on unmodified master) for the pointer-member variant.
 
-//TEST:SIMPLE(filecheck=IR): -no-codegen -dump-ir -g0
+//TEST:SIMPLE(filecheck=IR): -no-codegen -dump-ir -g0 -experimental-feature
 
 RWStructuredBuffer<uint4> sideTable;
 
@@ -32,6 +32,11 @@ struct V
 
 struct Holder { V v; }
 
+void throughWriteonlyRef(__ref_writeonly V v)
+{
+    v[0].y = 4;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -43,14 +48,23 @@ void computeMain()
     Ptr<Holder> hp = Ptr<Holder>(&h2); // default Access.ReadWrite, AddressSpace.Device
     hp->v[3].z = 7;
     sideTable[1] = h2.v.data[3];
+
+    var wonly = V();
+    throughWriteonlyRef(wonly);
 }
 
+// No write in this file may round-trip through the `set` accessor at any
+// point in the output — a reroute would store into sideTable with index 3.
+//IR-NOT: call %Vx5Foperatorx5Bx5Dx5Fset(
 // The local write must lower to a direct store through the bound `ref`
 // accessor, and the pointer-member write must derive the ReadWrite/Device
 // field pointer (the fully-qualified 4-operand form, access 0) and bind the
-// `ref` through it — two ref calls in total...
+// `ref` through it, and the `__ref_writeonly` base must also bind the `ref`
+// (a reroute would load write-only memory through the getter) — three ref
+// calls in total...
+//IR: call %Vx5Foperatorx5Bx5Dx5Fref(
 //IR: call %Vx5Foperatorx5Bx5Dx5Fref(
 //IR: Ptr(%V, 0 : UInt64,
 //IR: call %Vx5Foperatorx5Bx5Dx5Fref(
-// ...and neither write may round-trip through the `set` accessor.
+// ...and still no `set` call after the last positive match.
 //IR-NOT: call %Vx5Foperatorx5Bx5Dx5Fset(

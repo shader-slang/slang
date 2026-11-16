@@ -80,20 +80,20 @@ void computeMain(Ptr<Holder, Access.Read> p)
 
     // A `[mutating] ref` cannot be invoked on a read-only base.
     uint4 t = p->m[0];
-//CHECK:  ^ cannot invoke this accessor: it requires a mutable receiver, but the base does not provide writable storage
-//CHECK:  ^ the accessor may write through its receiver, and the base's storage does not permit writes
+//CHECK:  ^ cannot invoke this accessor: its receiver does not provide the writable storage it requires
+//CHECK:  ^ the accessor may write through its receiver, whose storage does not permit writes
     sideTable[1] = t;
 
     // A component write on a `[mutating] set` subscript routes through
     // `assign`'s set fallback, which the funnel guard refuses the same way.
     p->s[0].x = 3;
-//CHECK:      ^ cannot invoke this accessor: it requires a mutable receiver, but the base does not provide writable storage
-//CHECK:      ^ the accessor may write through its receiver, and the base's storage does not permit writes
+//CHECK:      ^ cannot invoke this accessor: its receiver does not provide the writable storage it requires
+//CHECK:      ^ the accessor may write through its receiver, whose storage does not permit writes
 
     // A `[mutating]` property setter reaches the same guard.
     p->q.elem = uint4(1, 1, 1, 1);
-//CHECK:      ^ cannot invoke this accessor: it requires a mutable receiver, but the base does not provide writable storage
-//CHECK:      ^ the accessor may write through its receiver, and the base's storage does not permit writes
+//CHECK:      ^ cannot invoke this accessor: its receiver does not provide the writable storage it requires
+//CHECK:      ^ the accessor may write through its receiver, whose storage does not permit writes
 
     // Address-taking is aggressive: it cannot fall back to a `set`
     // round-trip, so the guarded subscript is refused.
