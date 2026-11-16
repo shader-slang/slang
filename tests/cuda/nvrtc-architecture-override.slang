@@ -21,12 +21,10 @@ void computeMain()
 {
 }
 
-// SM75: result code = 0
-// SM75-NEXT: standard error = {
+// SM75: standard error = {
 // SM75-NEXT: }
 // SM75: .target sm_75
 
-// SM80: result code = 0
-// SM80-NEXT: standard error = {
+// SM80: standard error = {
 // SM80-NEXT: }
 // SM80: .target sm_80

@@ -2,6 +2,7 @@
 
 #include "core/slang-io.h"
 #include "core/slang-process.h"
+#include "core/slang-string-util.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
@@ -455,6 +456,306 @@ SLANG_UNIT_TEST(genericEntryPointCompile)
         SLANG_CHECK(
             UnownedStringSlice((char*)code->getBufferPointer())
                 .indexOf(toSlice("vec4(float(X_getValue_0()), 0.0, 8.0, 1.0)")) != -1);
+    }
+}
+
+SLANG_UNIT_TEST(genericEntryPointSpecializationCapabilities)
+{
+    const char* userSourceBody = R"(
+        [require(metal)]
+        struct MetalOnly { uint value; }
+        struct Plain { uint value; }
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void genericMain<T>() {}
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const SlangCompileTarget targets[] = {SLANG_HLSL, SLANG_METAL};
+    const char* typeNames[] = {"Plain", "MetalOnly", "Plain"};
+    const char* entryPointNames[] = {
+        "genericMain<Plain>",
+        "genericMain<MetalOnly>",
+        "genericMain<Plain>"};
+
+    for (auto target : targets)
+    {
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = target;
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "specializationCapabilities",
+            "specializationCapabilities.slang",
+            userSourceBody,
+            diagnostics.writeRef());
+        SLANG_CHECK_ABORT(module != nullptr);
+
+        ComPtr<slang::IEntryPoint> genericEntryPoint;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+            "genericMain",
+            SLANG_STAGE_COMPUTE,
+            genericEntryPoint.writeRef(),
+            diagnostics.writeRef())));
+
+        slang::IComponentType* genericComponents[] = {module, genericEntryPoint.get()};
+        ComPtr<slang::IComponentType> genericProgram;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+            genericComponents,
+            SLANG_COUNT_OF(genericComponents),
+            genericProgram.writeRef(),
+            diagnostics.writeRef())));
+
+        // All API paths share the same function declaration. Build every specialization before
+        // generating code to catch capability requirements leaking between their entry points.
+        enum class SelectionMode
+        {
+            SpecializeEntryPoint,
+            EntryPointExpression,
+            SpecializeComposite,
+        };
+        const SelectionMode modes[] = {
+            SelectionMode::SpecializeEntryPoint,
+            SelectionMode::EntryPointExpression,
+            SelectionMode::SpecializeComposite};
+        for (auto mode : modes)
+        {
+            ComPtr<slang::IComponentType> programs[SLANG_COUNT_OF(typeNames)];
+            for (Index i = 0; i < SLANG_COUNT_OF(typeNames); i++)
+            {
+                ComPtr<slang::IComponentType> specializedComponent;
+                SlangResult result;
+                if (mode == SelectionMode::EntryPointExpression)
+                {
+                    ComPtr<slang::IEntryPoint> entryPoint;
+                    result = module->findAndCheckEntryPoint(
+                        entryPointNames[i],
+                        SLANG_STAGE_COMPUTE,
+                        entryPoint.writeRef(),
+                        diagnostics.writeRef());
+                    specializedComponent = entryPoint;
+                }
+                else
+                {
+                    auto type = module->getLayout()->findTypeByName(typeNames[i]);
+                    SLANG_CHECK_ABORT(type != nullptr);
+                    auto argument = slang::SpecializationArg::fromType(type);
+                    slang::IComponentType* genericComponent =
+                        mode == SelectionMode::SpecializeComposite ? genericProgram.get()
+                                                                   : genericEntryPoint.get();
+                    result = genericComponent->specialize(
+                        &argument,
+                        1,
+                        specializedComponent.writeRef(),
+                        diagnostics.writeRef());
+                }
+
+                if (target == SLANG_HLSL && i == 1)
+                {
+                    SLANG_CHECK(SLANG_FAILED(result));
+                    SLANG_CHECK(
+                        _blobToString(diagnostics).getUnownedSlice().indexOf(toSlice("E36107")) !=
+                        -1);
+                    continue;
+                }
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+                SLANG_CHECK_ABORT(specializedComponent != nullptr);
+
+                ComPtr<slang::IComponentType> composite = specializedComponent;
+                if (mode != SelectionMode::SpecializeComposite)
+                {
+                    slang::IComponentType* components[] = {module, specializedComponent.get()};
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+                        components,
+                        SLANG_COUNT_OF(components),
+                        composite.writeRef(),
+                        diagnostics.writeRef())));
+                }
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    composite->link(programs[i].writeRef(), diagnostics.writeRef())));
+            }
+
+            for (auto& program : programs)
+            {
+                if (!program)
+                    continue;
+                ComPtr<slang::IBlob> code;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    program->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef())));
+                SLANG_CHECK_ABORT(code != nullptr);
+                SLANG_CHECK(code->getBufferSize() != 0);
+            }
+        }
+    }
+}
+
+SLANG_UNIT_TEST(genericEntryPointSpecializationUpgradeWarnings)
+{
+    const char* source = R"(
+        [require(sm_6_7)] struct Needs67 { uint value; }
+        [shader("compute")] [numthreads(1, 1, 1)]
+        void genericMain<T>() {}
+        )";
+    auto globalSession = unitTestContext->slangGlobalSession;
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_6_6");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+    ComPtr<slang::IBlob> diagnostics;
+    auto module =
+        session->loadModuleFromSourceString("m", "m.slang", source, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "genericMain",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef())));
+
+    // Neither a warning nor a successful specialization may change the base requirements.
+    for (Index i = 0; i < 3; i++)
+    {
+        auto argument = slang::SpecializationArg::fromExpr(i == 1 ? "int" : "Needs67");
+        ComPtr<slang::IComponentType> specialized;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            entryPoint->specialize(&argument, 1, specialized.writeRef(), diagnostics.writeRef())));
+        bool hasUpgradeWarning =
+            _blobToString(diagnostics).getUnownedSlice().indexOf(toSlice("warning[E41012]")) != -1;
+        SLANG_CHECK(hasUpgradeWarning == (i != 1));
+    }
+}
+
+SLANG_UNIT_TEST(genericEntryPointSpecializationExecutionModes)
+{
+    const char* source = R"(
+        [require(spvShader64BitIndexingEXT)]
+        struct NeedsIndexing { uint value; }
+        struct Plain { uint value; }
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void genericMain<T>() {}
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    const char* selections[] = {"genericMain<NeedsIndexing>", "genericMain<Plain>"};
+    const char* exportedNames[] = {"indexingMain", "plainMain"};
+    for (Index firstSelection = 0; firstSelection < 2; firstSelection++)
+    {
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV_ASM;
+        targetDesc.profile = globalSession->findProfile("spirv_1_5");
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        // Select both specializations before lowering the shared generic function body, as
+        // slangc does. Loading a module first would miss capability leakage during source lowering.
+        ComPtr<slang::ICompileRequest> request;
+        SLANG_ALLOW_DEPRECATED_BEGIN
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompileRequest(request.writeRef())));
+        int translationUnit = request->addTranslationUnit(
+            SLANG_SOURCE_LANGUAGE_SLANG,
+            "specializationExecutionModes");
+        request->addTranslationUnitSourceString(
+            translationUnit,
+            "specializationExecutionModes.slang",
+            source);
+        for (Index i = 0; i < 2; i++)
+        {
+            Index selectionIndex = (firstSelection + i) % 2;
+            SLANG_CHECK_ABORT(
+                request->addEntryPoint(
+                    translationUnit,
+                    selections[selectionIndex],
+                    SLANG_STAGE_COMPUTE) == i);
+        }
+        request->setCompileFlags(SLANG_COMPILE_FLAG_NO_CODEGEN);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(request->compile()));
+        SLANG_ALLOW_DEPRECATED_END
+
+        // SPIR-V requires distinct exported names for entry points with the same stage. Rename
+        // the selected components before emitting them together, preserving their original order.
+        ComPtr<slang::IModule> module;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(request->getModule(translationUnit, module.writeRef())));
+        ComPtr<slang::IComponentType> entries[2];
+        for (Index i = 0; i < 2; i++)
+        {
+            Index selectionIndex = (firstSelection + i) % 2;
+            ComPtr<slang::IComponentType> entry;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(request->getEntryPoint(i, entry.writeRef())));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                entry->renameEntryPoint(exportedNames[selectionIndex], entries[i].writeRef())));
+        }
+
+        ComPtr<slang::IBlob> diagnostics;
+        slang::IComponentType* components[] = {module.get(), entries[0].get(), entries[1].get()};
+        ComPtr<slang::IComponentType> composite;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+            components,
+            SLANG_COUNT_OF(components),
+            composite.writeRef(),
+            diagnostics.writeRef())));
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(composite->link(program.writeRef(), diagnostics.writeRef())));
+        ComPtr<slang::IBlob> code;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(program->getTargetCode(0, code.writeRef(), diagnostics.writeRef())));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        // Find the emitted function IDs by exported name, independently of disassembler naming.
+        String output = _blobToString(code);
+        List<UnownedStringSlice> lines;
+        StringUtil::calcLines(output.getUnownedSlice(), lines);
+        String indexingId;
+        String plainId;
+        Index entryCount = 0;
+        for (auto line : lines)
+        {
+            List<UnownedStringSlice> operands;
+            StringUtil::splitOnWhitespace(line, operands);
+            if (operands.getCount() < 4 || operands[0] != toSlice("OpEntryPoint"))
+                continue;
+            SLANG_CHECK(operands[1] == toSlice("GLCompute"));
+            if (operands[3] == toSlice("\"indexingMain\""))
+                indexingId = operands[2];
+            if (operands[3] == toSlice("\"plainMain\""))
+                plainId = operands[2];
+            entryCount++;
+        }
+        SLANG_CHECK(entryCount == 2);
+        SLANG_CHECK_ABORT(indexingId.getLength() != 0);
+        SLANG_CHECK_ABORT(plainId.getLength() != 0);
+        SLANG_CHECK(indexingId != plainId);
+
+        StringBuilder indexingMode;
+        indexingMode << "OpExecutionMode " << indexingId << " Shader64BitIndexingEXT";
+        StringBuilder plainMode;
+        plainMode << "OpExecutionMode " << plainId << " Shader64BitIndexingEXT";
+        SLANG_CHECK(output.getUnownedSlice().indexOf(indexingMode.getUnownedSlice()) != -1);
+        SLANG_CHECK(output.getUnownedSlice().indexOf(plainMode.getUnownedSlice()) == -1);
     }
 }
 

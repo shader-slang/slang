@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#makeexistential
-//META: doc_section_digest=12fc3bdfdfd39992f73247a51ecf438875c6398134a12dce64d1e764d8adbf0f
+//META: doc_section_digest=3c0cd4082bd3266d446667eea23ba12280943a5a887c659045a3b6337aa076b0
 //META: purpose=A cast that crosses two inheritance steps feeds the transitively-derived witness table in as makeExistential's second operand.
 //META: intent=functional
 //META: pipeline_stage=lower

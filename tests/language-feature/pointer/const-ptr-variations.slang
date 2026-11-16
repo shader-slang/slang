@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_1):-stage compute -entry computeMain -target spirv -DT1
-//TEST:SIMPLE(filecheck=CHECK_2):-stage compute -entry computeMain -target spirv -DT2
-//TEST:SIMPLE(filecheck=CHECK_3):-stage compute -entry computeMain -target spirv -DT3
+//TEST:SIMPLE(filecheck=CHECK_1,exit-code=-1):-stage compute -entry computeMain -target spirv -DT1
+//TEST:SIMPLE(filecheck=CHECK_2,exit-code=-1):-stage compute -entry computeMain -target spirv -DT2
+//TEST:SIMPLE(filecheck=CHECK_3,exit-code=-1):-stage compute -entry computeMain -target spirv -DT3
 //TEST:SIMPLE(filecheck=CHECK_4):-stage compute -entry computeMain -target spirv -DT4
 
 // Tests for invalid use of `const` with Ptr/T*
@@ -16,12 +16,12 @@ void computeMain(int id : SV_DispatchThreadID)
 {
     // disallowed syntax with modifier `const`
 #ifdef T1
-    // CHECK_1: error
+    // CHECK_1: error[E20001]
     int const* ptr1 = ptr;
 #endif
 
 #ifdef T2
-    // CHECK_2: error
+    // CHECK_2: error[E20001]
     int* const ptr2 = ptr;
 #endif
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/compiler-core/slang-lexer-diagnostic-defs.h
-//META: doc_section_digest=af518dc81beacbbf047dd2bd79f5dfe6a2fa8798385165ce21b183018a6bbf40
+//META: doc_section_digest=6fb9e272b6e8d68e841f64f0078cef85b762ddcd42b466f9c7f1bf05a32fca5d
 //META: purpose=Fires diagnostic E10001 (illegal-character-literal) from a minimum-reproduction input.
 //META: intent=negative
 //META: pipeline_stage=parse

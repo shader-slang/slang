@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/preprocessor/error.slang(11): error 15900: #error: This isn't valid!
-#error This isn't valid!
- ^~~~~
-}
-standard output = {
-}

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=1eced9055efc11b8172cc551a8f3310e41738933d999dd62447ac27360db35ca
+//META: doc_section_digest=28370caff3e53ad4ca487ddccd3ad5653bd2c2329fcec697ace59cf448351749
 //META: purpose=Boundary: two textures annotated with the same `vk::binding(0,0)` still emit positional `[[texture(0)]]` and `[[texture(1)]]` slots on Metal.
 //META: intent=boundary
 //META: pipeline_stage=emit

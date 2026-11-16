@@ -341,6 +341,103 @@ struct SimplifyForEmitContext : public InstPassBase
             processInst(followUpWorkList[i]);
     }
 
+    // Make the two operands of a binary operator the same shape, because the CUDA and C++ preludes
+    // do not define the operators that mix a scalar with a vector or a matrix.
+    //
+    // The core module declares overloads such as `vector<T,N> operator*(vector<T,N>, T)` as a plain
+    // `mul` instruction with one scalar operand and one vector operand. HLSL, GLSL, Metal, WGSL and
+    // SPIR-V accept that shape, but the preludes only define `Vector<T,N> * Vector<T,N>`. For this
+    // example, we splat the scalar with `MakeVectorFromScalar`, so the emitter writes
+    // `float3(1, 2, 3) * float3(2)`:
+    //
+    //     float3 v = float3(1.0, 2.0, 3.0) * 2.0;
+    //
+    // We process any instruction, so that the same rewrite applies to instructions in a function
+    // body and to instructions at module scope.
+    void unifyBinaryExprOperands(IRBuilder& builder, IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_IRem:
+        case kIROp_FRem:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_Leq:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Greater:
+        case kIROp_Eql:
+        case kIROp_Neq:
+            builder.setInsertBefore(inst);
+            SLANG_ASSERT(inst->getOperandCount() == 2);
+            if (as<IRVectorType>(inst->getDataType()))
+            {
+                for (UInt a = 0; a < 2; a++)
+                {
+                    if (as<IRBasicType>(inst->getOperand(a)->getDataType()))
+                    {
+                        auto v = builder.emitMakeVectorFromScalar(
+                            inst->getOperand(1 - a)->getDataType(),
+                            inst->getOperand(a));
+                        inst->setOperand(a, v);
+                    }
+                }
+            }
+            else if (as<IRMatrixType>(inst->getDataType()))
+            {
+                for (UInt a = 0; a < 2; a++)
+                {
+                    if (as<IRBasicType>(inst->getOperand(a)->getDataType()))
+                    {
+                        auto v = builder.emitMakeMatrixFromScalar(
+                            inst->getOperand(1 - a)->getDataType(),
+                            inst->getOperand(a));
+                        inst->setOperand(a, v);
+                    }
+                }
+            }
+
+            break;
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+            // A shift's operands may have different integer types, and its result has the
+            // type of the left operand. Consider this example:
+            //
+            //     int s = -8;
+            //     int3 r = s >> uint3(1, 2, 3);
+            //
+            // The other binary operators splat `s` to the type of the other operand,
+            // `uint3`, but that would turn this arithmetic shift into a logical one. We
+            // splat each scalar operand to a vector of its own type instead, and rely on
+            // the CUDA and C++ preludes for the mixed-type vector shift operators.
+            SLANG_ASSERT(inst->getOperandCount() == 2);
+            if (auto resultVectorType = as<IRVectorType>(inst->getDataType()))
+            {
+                builder.setInsertBefore(inst);
+                for (UInt a = 0; a < 2; a++)
+                {
+                    auto operandType = inst->getOperand(a)->getDataType();
+                    if (as<IRBasicType>(operandType))
+                    {
+                        auto splatType =
+                            builder.getVectorType(operandType, resultVectorType->getElementCount());
+                        inst->setOperand(
+                            a,
+                            builder.emitMakeVectorFromScalar(splatType, inst->getOperand(a)));
+                    }
+                }
+            }
+            break;
+        }
+    }
+
     void unifyBinaryExprOperands(IRGlobalValueWithCode* func)
     {
         IRBuilder builder(func->getModule());
@@ -348,92 +445,27 @@ struct SimplifyForEmitContext : public InstPassBase
         for (auto block : func->getBlocks())
         {
             for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
-            {
-                switch (inst->getOp())
-                {
-                case kIROp_Add:
-                case kIROp_Sub:
-                case kIROp_Mul:
-                case kIROp_Div:
-                case kIROp_IRem:
-                case kIROp_FRem:
-                case kIROp_And:
-                case kIROp_Or:
-                case kIROp_BitAnd:
-                case kIROp_BitOr:
-                case kIROp_BitXor:
-                case kIROp_Leq:
-                case kIROp_Less:
-                case kIROp_Geq:
-                case kIROp_Greater:
-                case kIROp_Eql:
-                case kIROp_Neq:
-                    builder.setInsertBefore(inst);
-                    SLANG_ASSERT(inst->getOperandCount() == 2);
-                    if (as<IRVectorType>(inst->getDataType()))
-                    {
-                        for (UInt a = 0; a < 2; a++)
-                        {
-                            if (as<IRBasicType>(inst->getOperand(a)->getDataType()))
-                            {
-                                auto v = builder.emitMakeVectorFromScalar(
-                                    inst->getOperand(1 - a)->getDataType(),
-                                    inst->getOperand(a));
-                                inst->setOperand(a, v);
-                            }
-                        }
-                    }
-                    else if (as<IRMatrixType>(inst->getDataType()))
-                    {
-                        for (UInt a = 0; a < 2; a++)
-                        {
-                            if (as<IRBasicType>(inst->getOperand(a)->getDataType()))
-                            {
-                                auto v = builder.emitMakeMatrixFromScalar(
-                                    inst->getOperand(1 - a)->getDataType(),
-                                    inst->getOperand(a));
-                                inst->setOperand(a, v);
-                            }
-                        }
-                    }
-
-                    break;
-                case kIROp_Lsh:
-                case kIROp_Rsh:
-                    // A shift's operands may have different integer types, and its result has the
-                    // type of the left operand. Consider this example:
-                    //
-                    //     int s = -8;
-                    //     int3 r = s >> uint3(1, 2, 3);
-                    //
-                    // The other binary operators splat `s` to the type of the other operand,
-                    // `uint3`, but that would turn this arithmetic shift into a logical one. We
-                    // splat each scalar operand to a vector of its own type instead, and rely on
-                    // the CUDA and C++ preludes for the mixed-type vector shift operators.
-                    SLANG_ASSERT(inst->getOperandCount() == 2);
-                    if (auto resultVectorType = as<IRVectorType>(inst->getDataType()))
-                    {
-                        builder.setInsertBefore(inst);
-                        for (UInt a = 0; a < 2; a++)
-                        {
-                            auto operandType = inst->getOperand(a)->getDataType();
-                            if (as<IRBasicType>(operandType))
-                            {
-                                auto splatType = builder.getVectorType(
-                                    operandType,
-                                    resultVectorType->getElementCount());
-                                inst->setOperand(
-                                    a,
-                                    builder.emitMakeVectorFromScalar(
-                                        splatType,
-                                        inst->getOperand(a)));
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
+                unifyBinaryExprOperands(builder, inst);
         }
+    }
+
+    // Apply `unifyBinaryExprOperands` to the instructions at module scope.
+    //
+    // The initializer of a global `static const` is a tree of module-scope instructions with no
+    // function around it. Consider this example:
+    //
+    //     static const float3 kV = float3(1.0, 2.0, 3.0) * 2.0;
+    //
+    // The module has `%kV = mul(makeVector(1, 2, 3), 2.0)`, and `replaceGlobalConstants` has
+    // already replaced every use of the constant by this value, so the emitter writes the
+    // expression at each use. The function-based overload never sees it, and the output would have
+    // `Vector<float, 3>(1, 2, 3) * 2.0f`, which the C++ and CUDA preludes do not define.
+    void unifyBinaryExprOperandsAtModuleScope()
+    {
+        IRBuilder builder(module);
+
+        for (auto inst : module->getGlobalInsts())
+            unifyBinaryExprOperands(builder, inst);
     }
 
     // Turn single element vector values into scalars before using it to call an intrinsic func.
@@ -498,6 +530,8 @@ struct SimplifyForEmitContext : public InstPassBase
 
     void processModule()
     {
+        if (isCPUTarget(targetReq) || isCUDATarget(targetReq))
+            unifyBinaryExprOperandsAtModuleScope();
         processInstsOfType<IRFunc>(kIROp_Func, [this](IRFunc* f) { processFunc(f); });
     }
 };

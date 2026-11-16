@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-fragdepth-and-geometry-primitive-refinements
-//META: doc_section_digest=2a5194c459ed95b6dfdeca1a6bc72af8d96c833b655ce928b16267ebca672dcb
+//META: doc_section_digest=101470099f314769a6fe398920091b45f975c62ef00a261100bcd790353ab103
 //META: purpose=A geometry entry point with an explicit point input primitive keeps InputPoints in the SPIR-V emit — the deferred triangle default-input-primitive fallback does not clash with a real primitive qualifier.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

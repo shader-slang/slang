@@ -34,7 +34,8 @@ bool DeviceCache::DeviceCacheKey::operator==(const DeviceCacheKey& other) const
            profileName == other.profileName && targetFlags == other.targetFlags &&
            defaultMatrixLayoutMode == other.defaultMatrixLayoutMode &&
            nvapiExtUavSlot == other.nvapiExtUavSlot &&
-           dx12ExperimentalFeatures == other.dx12ExperimentalFeatures;
+           dx12ExperimentalFeatures == other.dx12ExperimentalFeatures &&
+           slangGlobalSession == other.slangGlobalSession;
 }
 
 std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& key) const
@@ -47,8 +48,10 @@ std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& ke
     std::size_t h6 = std::hash<int>{}(static_cast<int>(key.defaultMatrixLayoutMode));
     std::size_t h7 = std::hash<uint32_t>{}(key.nvapiExtUavSlot);
     std::size_t h8 = std::hash<bool>{}(key.dx12ExperimentalFeatures);
+    std::size_t h9 = std::hash<slang::IGlobalSession*>{}(key.slangGlobalSession);
 
-    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
+    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7) ^
+           (h9 << 8);
 }
 
 DeviceCache::CachedDevice::CachedDevice()
@@ -120,6 +123,7 @@ SlangResult DeviceCache::acquireDevice(
     key.defaultMatrixLayoutMode = desc.slang.defaultMatrixLayoutMode;
     key.nvapiExtUavSlot = desc.nvapiExtUavSlot;
     key.dx12ExperimentalFeatures = (desc.next != nullptr);
+    key.slangGlobalSession = desc.slang.slangGlobalSession;
 
     // Evict oldest device if we've reached the limit
     evictOldestDeviceIfNeeded();

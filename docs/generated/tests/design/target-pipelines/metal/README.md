@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: 0d4fa8b278a0dd34659e69f7b9ad69965d11c08f9a6f79c3e16ece66be235df9
+model: claude-sonnet-5-5
+generated_at: 2026-11-09T08:45:42+00:00
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: c87e37a1a5223c22d4e04d438c2de88828a622ab6d07f592783cd98801288cb2
 source_doc: docs/generated/design/target-pipelines/metal.md
-source_doc_digest: ffc029803379411a1df51804a20cebcb2622f62d9dcf024e0f9d28c30b81267f
+source_doc_digest: 82e68e4ad859146fd217341f63e301c4b8824488f747a8f32ed284c697fc6a1e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -70,7 +70,14 @@ resource parameter. They currently do not, so the test is listed in
 `metal-append-buffer-params-missing-binding-slot`.
 
 The `## Claims` section below is the bundle's ground-truth enumeration;
-every claim in it is either covered by a row of `## Functional coverage`
+every claim in it is either covered by a row of `**Added at the doc refresh (`#legalizeirformetal`, `#resource-type-spellings`)**
+
+101. `legalizeFuncBody` rewrites a call argument that takes the address of a vector element into a temporary with copy-in/copy-out, because Metal cannot take the address of a vector element.
+102. An `IRImageStore` value is widened to four components, because Metal texture writes take 4-component values.
+103. For `[[texture(N)]]` and `[[sampler(N)]]`, an array of textures or samplers (one fixed-size level) takes the attribute with its base slot.
+104. Nested and unsized texture arrays, and arrays of buffers, get no binding attribute (`[[buffer(N)]]` tests the whole parameter type).
+
+## Functional coverage`
 or classified in `## Untested claims`. Two of the doc's sections —
 `### Entry-point shape` and `### Resource-type spellings` — were added
 after the previous regeneration of this bundle, in answer to doc-gap rows
@@ -181,12 +188,12 @@ the document's own headings.
 66. `LayoutResourceKind::VaryingInput` and `MetalPayload` put `[[stage_in]]` and `[[payload]]` on the parameter instead of a numbered slot.
 67. The `depth*` spelling is not produced by declaring a depth texture: a `SampleCmp*` on an ordinary `Texture2D` goes through the core-module-declared `MetalCastToDepthTexture` opcode.
 
-**`#conditional-gates` / `#requiredloweringpassset-flags` / `#metal-specific-runtime-predicates`**
+**`#conditional-gates` / `#requiredloweringpassset-flags`**
 
 68. Thirty of the thirty-four `RequiredLoweringPassSet` flags gate at least one pass on the Metal path.
 69. `nonVectorCompositeSelect`, `derivativePyBindWrapper`, `dynamicResource` and `barrierFlagValidation` exist but never gate a Metal pass.
 70. `reqSet.reinterpret` is the one flag that can be **set during** the pipeline: `lowerTaggedUnionTypes` sets it when it reports a change.
-71. Vulkan cross-API option flags are filtered out of the Metal pipeline and leave the emitted MSL unchanged.
+71. `invertYOfPositionOutput` and `rcpWOfPositionInput` (Khronos / HLSL only) are filtered out of Phase C for Metal, so Vulkan cross-API option flags leave the emitted MSL unchanged.
 
 **`#loops-in-the-pipeline`**
 
@@ -260,6 +267,10 @@ the document's own headings.
 
 | Claim                                                                                                                                                                                                                  | Intent     | Anchor                                                                                                                                                                     | Tests                                                                                                              |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `legalizeFuncBody` rewrites a call argument that takes the address of a vector element into a temporary with copy-in/copy-out, because Metal cannot take the address of a vector element. | functional | [#legalizeirformetal](../../../../design/target-pipelines/metal.md#legalizeirformetal) | [`vector-element-address-copy-in-copy-out.slang`](vector-element-address-copy-in-copy-out.slang) |
+| An `IRImageStore` value is widened to four components, because Metal texture writes take 4-component values. | functional | [#legalizeirformetal](../../../../design/target-pipelines/metal.md#legalizeirformetal) | [`image-store-widened-to-four-components.slang`](image-store-widened-to-four-components.slang) |
+| An array of textures or samplers (one fixed-size level) still takes `[[texture(N)]]` / `[[sampler(N)]]` with its base slot. | functional | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`texture-and-sampler-arrays-take-base-slot.slang`](texture-and-sampler-arrays-take-base-slot.slang) |
+| Nested texture arrays and arrays of buffers get no binding attribute: `[[buffer(N)]]` tests the whole parameter type (issue 12291). | negative | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`nested-texture-and-buffer-arrays-unbound.slang`](nested-texture-and-buffer-arrays-unbound.slang) |
 | `emitFuncParamLayoutImpl` unwraps `DescriptorHandle<T>` before the per-resource-kind test, so bindless buffer / texture / sampler parameters still receive `[[buffer(N)]]` / `[[texture(N)]]` / `[[sampler(N)]]`.      | functional | [#descriptorhandlet-parameter-binding-emission](../../../../design/target-pipelines/metal.md#descriptorhandlet-parameter-binding-emission)                                 | [`descriptor-handle-params-get-binding-attributes.slang`](descriptor-handle-params-get-binding-attributes.slang)   |
 | Negative: bare `-target metal` stops at the Metal text artifact -- no Apple `metal` compile and no `.metallib` step run.                                                                                               | negative   | [#downstream-apple-metal-compiler](../../../../design/target-pipelines/metal.md#downstream-apple-metal-compiler)                                                           | [`downstream-stops-at-text-no-metallib.slang`](downstream-stops-at-text-no-metallib.slang)                         |
 | `-target metallib-asm` produces an intermediate `.metallib` with Apple's `metal` compiler and then disassembles it with `metal-objdump --disassemble`.                                                                 | expansion  | [#downstream-apple-metal-compiler](../../../../design/target-pipelines/metal.md#downstream-apple-metal-compiler)                                                           | [`metallib-asm-disassembles-intermediate-metallib.slang`](metallib-asm-disassembles-intermediate-metallib.slang)   |
@@ -278,7 +289,7 @@ the document's own headings.
 | Boundary: boolean coverage mode is exempt from the Metal 32-bit cap, so an explicitly requested 64-bit width keeps a `ulong` counter written with a plain non-atomic store.                                            | boundary   | [#metal-caps-coverage-counters-to-32-bits](../../../../design/target-pipelines/metal.md#metal-caps-coverage-counters-to-32-bits)                                           | [`coverage-boolean-exempt-from-cap.slang`](coverage-boolean-exempt-from-cap.slang)                                 |
 | Negative: an explicitly requested 64-bit coverage counter width on Metal is capped with warning E45115 rather than honored.                                                                                            | negative   | [#metal-caps-coverage-counters-to-32-bits](../../../../design/target-pipelines/metal.md#metal-caps-coverage-counters-to-32-bits)                                           | [`coverage-counter-width-64-warns.slang`](coverage-counter-width-64-warns.slang)                                   |
 | With counting-mode coverage on Metal the synthesized `__slang_coverage` buffer is a `uint device*` and each slot is bumped by a 32-bit `atomic_fetch_add_explicit`.                                                    | functional | [#metal-caps-coverage-counters-to-32-bits](../../../../design/target-pipelines/metal.md#metal-caps-coverage-counters-to-32-bits)                                           | [`coverage-counter-capped-to-uint32.slang`](coverage-counter-capped-to-uint32.slang)                               |
-| Negative: Vulkan cross-API options are filtered out of the Metal pipeline, so `-fvk-invert-y` and `-fvk-use-dx-position-w` leave the emitted MSL unchanged.                                                            | negative   | [#metal-specific-runtime-predicates](../../../../design/target-pipelines/metal.md#metal-specific-runtime-predicates)                                                       | [`vk-cross-api-flags-have-no-effect.slang`](vk-cross-api-flags-have-no-effect.slang)                               |
+| Negative: Vulkan cross-API options are filtered out of the Metal pipeline, so `-fvk-invert-y` and `-fvk-use-dx-position-w` leave the emitted MSL unchanged.                                                            | negative   | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination)                                                       | [`vk-cross-api-flags-have-no-effect.slang`](vk-cross-api-flags-have-no-effect.slang)                               |
 | Boundary: the smallest square matrix (`float2x2`) in a device buffer also lowers to packed-vector storage, emitted as MSL `packed_float2`.                                                                             | boundary   | [#metals-three-lowerbufferelementtypetostoragetype-invocations](../../../../design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations) | [`device-buffer-float2x2-packed-vector.slang`](device-buffer-float2x2-packed-vector.slang)                         |
 | The Phase-B `MetalParameterBlock` policy turns resource-typed fields inside a `ParameterBlock` into raw `T device*` descriptor-handle fields, and the block binds as one `constant*` argument.                         | functional | [#metals-three-lowerbufferelementtypetostoragetype-invocations](../../../../design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations) | [`parameter-block-metal-policy.slang`](parameter-block-metal-policy.slang)                                         |
 | The Phase-C `Metal` policy stores a `float3x3` device-buffer field as an array of packed vectors, emitted as MSL `packed_float3`.                                                                                      | functional | [#metals-three-lowerbufferelementtypetostoragetype-invocations](../../../../design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations) | [`device-buffer-matrix-lowers-to-packed-vectors.slang`](device-buffer-matrix-lowers-to-packed-vectors.slang)       |
@@ -326,7 +337,6 @@ the document's own headings.
 | `wrapCBufferElementsForMetal` rewrites a `float4x4` cbuffer element into a `_MatrixStorage_..._natural_<N>` struct inside a `SLANG_ParameterGroup_<name>` wrapper.                                                     | functional | [#wrapcbufferelementsformetal](../../../../design/target-pipelines/metal.md#wrapcbufferelementsformetal)                                                                   | [`cbuffer-matrix-storage-wrap.slang`](cbuffer-matrix-storage-wrap.slang)                                           |
 | A byte-address buffer is emitted as a `uint32_t device*` and a surviving load indexes it by word, as `as_type<T>(buf[(offset)>>2])`. | expansion | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | [`byte-address-buffer-uint32-device-pointer.slang`](byte-address-buffer-uint32-device-pointer.slang) |
 | The Metal-reachable non-uniform surface is `nonuniform(handle)` on a `DescriptorHandle<T>`, which carries no capability requirement and compiles to the plain underlying resource access. | functional | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | [`nonuniform-descriptor-handle-metal.slang`](nonuniform-descriptor-handle-metal.slang) |
-| Negative: the HLSL-spelled `NonUniformResourceIndex(index)` cannot feed the Metal pipeline because its capability set excludes Metal, so the entry point is rejected with E36107 at check time. | negative | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | [`nonuniform-resource-index-rejected-metal.slang`](nonuniform-resource-index-rejected-metal.slang) |
 | Boundary: negative infinity is the third non-finite spelling and is emitted bare as the division `(-1.0 / 0.0)` with no `f` suffix. | boundary | [#phase-d-metal-emit-and-downstream-tools](../../../../design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools) | [`negative-infinity-emitted-as-division.slang`](negative-infinity-emitted-as-division.slang) |
 | An entry point named exactly `main` is renamed on Metal and the rename is reported as warning E40100 rather than applied silently. | negative | [#entry-point-shape](../../../../design/target-pipelines/metal.md#entry-point-shape) | [`main-entry-point-renamed-warning.slang`](main-entry-point-renamed-warning.slang) |
 | An entry point whose name is not exactly `main` is left alone: it keeps its Slang spelling in the emitted Metal and no rename warning is reported. | boundary | [#entry-point-shape](../../../../design/target-pipelines/metal.md#entry-point-shape) | [`non-main-entry-point-name-preserved.slang`](non-main-entry-point-name-preserved.slang) |

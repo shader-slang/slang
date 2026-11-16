@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T17:00:33Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 71774435a40512fdfeaa2771405f426a01abae3299e7b7ac5b896252ae444cc5
+model: claude-sonnet-5-5
+generated_at: 2026-11-02T21:20:48Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: ec9d30d850ec7e35bbb21364629106ad1c885d9bf8f52ed78e6df228739b2df5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This page documents the **layout IR module** built by
 `TargetProgram::createIRModuleForLayout`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 16681), together with the parameter-binding pass that computes
+line 16434), together with the parameter-binding pass that computes
 the `ProgramLayout` it consumes
 ([slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)).
 The layout IR module is a sibling of the per-translation-unit
@@ -41,35 +41,36 @@ behavior rather than emit behavior.
 ## Source
 
 - [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-  — `TargetProgram::createIRModuleForLayout` (line 16681) is the
-  constructor; the global-parameter loop is at lines 16400-16420,
-  the entry-point loop at 16455-16499, the obfuscation gate at
-  16502-16518, and the cache store at 16520.
+  — `TargetProgram::createIRModuleForLayout` (line 16434) is the
+  constructor; the global-parameter loop is at lines 16479-16498,
+  the entry-point loop at 16536-16582, the obfuscation gate at
+  16585-16600, and the cache store at 16603. The accessor
+  `getOrCreateIRModuleForLayout` is defined at line 16074.
 - [slang-target-program.h](../../../../source/slang/slang-target-program.h)
   — declares the lazy accessor `getOrCreateIRModuleForLayout`
-  (line 102), the read-only peek `getExistingIRModuleForLayout`
-  (line 104), the `private` constructor
-  `createIRModuleForLayout` (line 119), and the cache field
-  `m_irModuleForLayout` (line 140).
+  (line 103), the read-only peek `getExistingIRModuleForLayout`
+  (line 105), the `private` constructor
+  `createIRModuleForLayout` (line 120), the cache field
+  `m_irModuleForLayout` (line 151), and the error latch
+  `m_layoutHasErrors` (line 139).
 - [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)
   — computes the `ProgramLayout` instance (`m_layout`) that
   `createIRModuleForLayout` walks.
   `generateParameterBindings(TargetProgram*, DiagnosticSink*)`
-  (line 4453) is the entry point that returns the `ProgramLayout`;
-  `TargetProgram::getOrCreateLayout` (line 4840) is what stores it
+  (line 4456) is the entry point that returns the `ProgramLayout`;
+  `TargetProgram::getOrCreateLayout` (line 4843) is what stores it
   in `m_layout` and then immediately drives
   `createIRModuleForLayout`. `createIRModuleForLayout` asserts that
   `m_layout` is non-null before proceeding.
 - [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
   — computes the per-type `TypeLayout` objects that parameter
-  binding assembles into a `ProgramLayout`. This file is **not**
-  in the page's manifest `watched_paths`; see
-  [Manifest coverage](#manifest-coverage).
+  binding assembles into a `ProgramLayout`. This file is
+  included in the manifest entry's `watched_paths` for this page; see [Manifest coverage](#manifest-coverage).
 - [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
   — owns the diagnostic definitions that parameter binding emits.
-  (Diagnostics moved to this Lua definition file; the generated
+  (Diagnostics are declared in this Lua definition file; the generated
   [slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h)
-  is no longer where new messages are declared.)
+  is not where new messages are declared.)
 
 ## Parameter binding: producing the `ProgramLayout`
 
@@ -81,18 +82,18 @@ Understanding the layout IR module therefore requires knowing what
 that pass guarantees.
 
 `generateParameterBindings(TargetProgram*, DiagnosticSink*)`
-(line 4453) drives the following ordered stages inside one
+(line 4456) drives the following ordered stages inside one
 `ParameterBindingContext`:
 
 | # | Stage | Anchor | What it does |
 |---|---|---|---|
-| 1 | Collect parameters | `collectParameters` (line 4506), then `collectSpecializationParams` (line 4516) | Builds the `sharedContext.parameters` list and the `programLayout->entryPoints` array; entry points are treated much like global parameters. |
-| 2 | Reserve explicit global bindings | `_generateParameterBindings` (line 1587), called per parameter at line 4540 | Honors `register`/`vk::binding`/`layout(binding=)` on *global* parameters, recording them in the used-range sets before anything is auto-allocated. |
-| 3 | Reserve explicit entry-point bindings | `addExplicitVkBindingsForEntryPointParameters` (line 1574), called at line 4544 | Added by PR #11712; see [Explicit `vk::binding` on entry-point parameters](#explicit-vkbinding-on-entry-point-parameters). |
-| 4 | Decide whether a default space is needed | `_calcNeedsDefaultSpace` (line 4196), consumed at lines 4706-4707 | Determines whether descriptor set 0 must be reserved for implicitly-placed parameters. |
-| 5 | Allocate the default space / constant buffer | `allocateUnusedSpaces` (line 855) at line 855 | Claims the first unused space. |
-| 6 | Complete the remaining bindings | `_completeBindings` (line 4092) at line 4765 | Auto-allocates every resource kind not already placed. |
-| 7 | Place the bindless descriptor heap | lines 4809-4834, gated on the target implying `CapabilityName::descriptor_handle` | Scans upward for the first space not in `usedSpaces`, starting from the requested `-bindless-space-index`, and places the heap there. When that is not the requested space and the option was given explicitly, it warns with `Diagnostics::RequestedBindlessSpaceIndexUnavailable` — warning `39012`, "requested bindless space index '~requested' is unavailable, using the next available index '~available'." Either way `programLayout->bindlessSpaceIndex` is set to the space actually chosen. |
+| 1 | Collect parameters | `collectParameters` (call at line 4509), then `collectSpecializationParams` (call at line 4519) | Builds the `sharedContext.parameters` list and the `programLayout->entryPoints` array; entry points are treated much like global parameters. |
+| 2 | Reserve explicit global bindings | `_generateParameterBindings` (line 1587), called per parameter at line 4543 | Honors `register`/`vk::binding`/`layout(binding=)` on *global* parameters, recording them in the used-range sets before anything is auto-allocated. |
+| 3 | Reserve explicit entry-point bindings | `addExplicitVkBindingsForEntryPointParameters` (line 1574), called per entry point at line 4547 | Added by PR #11712; see [Explicit `vk::binding` on entry-point parameters](#explicit-vkbinding-on-entry-point-parameters). |
+| 4 | Decide whether a default space is needed | `_calcNeedsDefaultSpace` (line 4199), consumed at line 4710 | Determines whether descriptor set 0 must be reserved for implicitly-placed parameters. |
+| 5 | Allocate the default space / constant buffer | `allocateUnusedSpaces` (line 855), called at line 4743 | Claims the first unused space. |
+| 6 | Complete the remaining bindings | `_completeBindings` (line 4095), called at line 4768 | Auto-allocates every resource kind not already placed. |
+| 7 | Place the bindless descriptor heap | lines 4809-4837, gated on the target implying `CapabilityName::descriptor_handle` | Scans upward for the first space not in `usedSpaces`, starting from the requested `-bindless-space-index`, and places the heap there. When that is not the requested space and the option was given explicitly, it warns with `Diagnostics::RequestedBindlessSpaceIndexUnavailable` — warning `39012` ("bindless space index unavailable"), with the span message "requested bindless space index '~requested' is unavailable, using the next available index '~available'." Either way `programLayout->bindlessSpaceIndex` is set to the space actually chosen. |
 
 Two bookkeeping structures matter for reading the rest of this
 section, because they are independent and are easy to conflate:
@@ -115,7 +116,7 @@ defaulted binding. It is now honored on targets for which
 `doesTargetSupportVkBindingOnEntryPointParameters` returns true —
 defined in
 [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
-line 3386 as `isKhronosTarget(target) || isWGPUTarget(target)`,
+line 3388 as `isKhronosTarget(target) || isWGPUTarget(target)`,
 i.e. SPIR-V/GLSL and WGSL. Every other target still ignores the
 attribute in this position:
 
@@ -150,14 +151,14 @@ carry at least one honored annotation:
   consumes *two* kinds at once, so this function reserves both the
   descriptor slot and the `InputAttachmentIndex`.
 - `entryPointHasSupportedVkBindingParameters` (line 1894) selects
-  between the two completion paths at line 4019: entry points with
+  between the two completion paths at line 4006: entry points with
   an honored annotation go through
   `completeBindingsForEntryPointParameters` (line 1939), which
   completes parameter-by-parameter; all others take the ordinary
   aggregate `completeBindingsForParameter` path.
 - Inside the per-parameter path,
   `removeNonExplicitEntryPointParameterDescriptorOffsets`
-  (line 1930) drops the synthetic *field-relative* descriptor
+  (line 1914) drops the synthetic *field-relative* descriptor
   offsets so that implicit parameters get real bindings allocated
   from the global context, while
   `copyExistingBindingInfoFromParameter` (line 1841) re-seeds the
@@ -167,20 +168,23 @@ carry at least one honored annotation:
 
 The default-space calculation learned about this too:
 `isEntryPointParameterResourceExplicitlyBoundByVkBinding`
-(line 4148) and `allEntryPointParametersOfKindAreExplicitlyVkBound`
-(line 4177) let `_calcNeedsDefaultSpace` subtract kinds that are
+(line 4135) and `allEntryPointParametersOfKindAreExplicitlyVkBound`
+(line 4164) let `_calcNeedsDefaultSpace` subtract kinds that are
 fully placed by explicit annotations, so an entry point whose
 parameters are all explicitly bound no longer forces a default set.
 
 Whether the annotation is *ignorable* is diagnosed separately, in
 [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp):
-`isVkBindingCompatibleEntryPointParameterType` (line 970) decides
+`isVkBindingCompatibleEntryPointParameterType` (line 1033) decides
 which parameter types can have a binding placed at all, and
-`Diagnostics::UnhandledModOnEntryPointParameter` (line 2416) —
+`Diagnostics::UnhandledModOnEntryPointParameter` (lines 2702-2723) —
 warning `38010`, "modifier on entry point parameter is
 unsupported" — still fires for the rest (for example a plain
 varying scalar), and for programs where not every target in the
-`Linkage` honors the attribute.
+`Linkage` honors the attribute
+(`_allTargetsSupportVkBindingOnEntryPointParameters`, line 1693).
+The same diagnostic is also raised for `[[vk::push_constant]]`,
+`register`, and `packoffset` on entry-point parameters.
 
 ### `vk::input_attachment_index` and descriptor-space occupancy
 
@@ -202,10 +206,10 @@ descriptor set 0:
 
 - `addExplicitParameterBinding` (line 877) now skips
   `markSpaceUsed` for `InputAttachmentIndex` (the guard is at
-  line 997). The index range is still recorded in the used-range
-  set immediately afterwards (line 1002), so overlap detection is
+  line 947). The index range is still recorded in the used-range
+  set afterwards (line 952), so overlap detection is
   unaffected: two parameters that ask for the same attachment index
-  still draw `Diagnostics::ParameterBindingsOverlap` (line 1036) —
+  still draw `Diagnostics::ParameterBindingsOverlap` (line 986) —
   warning `39001`, "explicit binding overlap".
 
   ```slang
@@ -215,8 +219,8 @@ descriptor set 0:
       : SV_Target { return a.SubpassLoad() + b.SubpassLoad(); }
   ```
 
-- `doesEntryPointParameterResourceNeedDefaultSpace` (line 4106)
-  now returns `false` for `InputAttachmentIndex` (line 4211),
+- `doesEntryPointParameterResourceNeedDefaultSpace` (line 4109)
+  now returns `false` for `InputAttachmentIndex` (line 4127),
   alongside the sibling non-descriptor-space kinds
   `PushConstantBuffer`, `RegisterSpace`,
   `SubElementRegisterSpace`, `VaryingInput`, `VaryingOutput`,
@@ -240,7 +244,7 @@ descriptor set 0:
 The observable effect is that a `SubpassInput` entry-point
 parameter no longer causes descriptor set 0 to be reported
 unavailable to the bindless descriptor heap. The source comment at
-lines 938-946 records that the exclusion is deliberately narrow:
+lines 930-945 records that the exclusion is deliberately narrow:
 `VaryingInput`/`VaryingOutput` (with `[[vk::location]]`) and
 `SpecializationConstant` (with `[[vk::constant_id]]`) reach the
 same branch with the same placeholder `space == 0` via
@@ -252,7 +256,7 @@ change.
 
 Parameter binding can fail with diagnostics rather than producing a
 `ProgramLayout`; in that case `getOrCreateLayout` returns `nullptr`
-after checking `sink->getErrorCount()`, and **no layout IR module is
+once `m_layoutHasErrors` is latched, and **no layout IR module is
 built**.
 
 The newest such failure is ray-tracing entry-point parameters on
@@ -261,7 +265,7 @@ returns `nullptr` from `getRayPayloadParameterRules`,
 `getCallablePayloadParameterRules`, or
 `getHitAttributesParameterRules` when the target does not support
 that parameter kind. `processEntryPointVaryingParameter`
-(line 2433) previously passed the null straight into
+(line 2358) previously passed the null straight into
 `createTypeLayoutWith`, which dereferences it — a segfault with no
 diagnostic. PR #12280 (`c3791ed4e`) added three null checks (lines
 2441, 2448, 2480) that instead call
@@ -269,10 +273,10 @@ diagnostic. PR #12280 (`c3791ed4e`) added three null checks (lines
 `Diagnostics::TargetDoesNotSupportRayTracingParameters` — error
 `39032`, declared in
 [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
-with the message "the current compilation target does not support
+with the span message "the current compilation target does not support
 ray tracing entry point parameters for the '~stage' stage". A
 `SLANG_RELEASE_ASSERT(rules)` was also added at the top of
-`createTypeLayoutWith` in
+`createTypeLayoutWith` (line 6525; the assert is at line 6532) in
 [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
 as a backstop for any future null-rules caller.
 
@@ -290,13 +294,16 @@ shader support to CUDA/OptiX backend", #12182) gave that accessor real
 rules, so CUDA now accepts all three parameter kinds and the
 asymmetry is gone.
 
-The WGSL third of that sentence is a statement about its layout-rules
-family, and the example below cannot demonstrate it: WGSL rejects
-ray-tracing *stages* outright, before parameter binding runs at all,
-so `-target wgsl -stage miss` reports `E99997 ... abort compilation:
-unsupported stage` rather than anything about payload layout. That its
-rules exist means only that the family would supply them if a stage
-using them were reachable.
+The WGSL part of that sentence is a statement about its layout-rules
+family, and the example below cannot demonstrate it: WGSL does not support
+ray-tracing *stages*,
+so `-target wgsl -stage miss` is expected to abort with an
+unsupported-stage error from the WGSL emitter
+([slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)
+line 244) rather than report anything about payload layout. This was
+not re-run for this revision. The WGSL family's three accessors return
+the GLSL ray-tracing rules, so the family would supply rules if a
+stage using them were reachable.
 
 ```slang
 struct Payload { float4 color; }
@@ -330,8 +337,9 @@ support these parameters on SPIR-V, HLSL, and GLSL.
 - **Built together with the `ProgramLayout`, not separately.**
   `TargetProgram::getOrCreateLayout`
   ([slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)
-  line 4840) computes `m_layout` via `generateParameterBindings`
-  and then, in the same call, populates `m_irModuleForLayout`:
+  line 4843) takes the linkage's component-type operation mutex,
+  computes `m_layout` via `generateParameterBindings` if it is not yet
+  set, and then, in the same call, populates `m_irModuleForLayout`:
 
   ```cpp
   if (m_layout && !m_irModuleForLayout)
@@ -343,25 +351,29 @@ support these parameters on SPIR-V, HLSL, and GLSL.
   So *any* caller that asks for the program layout also pays for
   the layout IR module. `getOrCreateIRModuleForLayout`
   ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-  line 16321) is a two-line wrapper that calls `getOrCreateLayout`
+  line 16074) is a two-line wrapper that calls `getOrCreateLayout`
   and then returns the now-populated field; it does not itself
   invoke the constructor.
 - **Nothing is built when binding failed.** `getOrCreateLayout`
-  returns `nullptr` immediately after `generateParameterBindings`
-  if `sink->getErrorCount() != 0`, before the
-  `createIRModuleForLayout` call — so a program that hits, say, the
-  ray-tracing-parameter diagnostic above never produces a layout IR
-  module. The absence is directly observable: a `-dump-ir` run of
+  compares `sink->getErrorCount()` before and after
+  `generateParameterBindings` and, if it grew, latches
+  `m_layoutHasErrors` (header line 139). While the latch is set it
+  returns `nullptr` before the `createIRModuleForLayout` call, on that
+  call and on every later call regardless of which sink is passed — so
+  a program that hits, say, the ray-tracing-parameter diagnostic above
+  never produces a layout IR module, and callers never receive the
+  layout of an invalid program. `getOrCreateIRModuleForLayout` then
+  returns the still-null `m_irModuleForLayout`. The absence is directly observable: a `-dump-ir` run of
   such a program prints the `### LOWER-TO-IR:` block emitted at the
-  end of `generateIRForTranslationUnit` (line 15800) and then stops,
+  end of `generateIRForTranslationUnit` (line 15853) and then stops,
   with no `EntryPointLayout(`, `structTypeLayout(` or `[layout(`
   anywhere in the output.
 - `createIRModuleForLayout` itself returns the cached module
-  immediately if one already exists (lines 16355-16356) and
+  immediately if one already exists (lines 16436-16437) and
   otherwise builds it and stores it on `m_irModuleForLayout`. It
-  `SLANG_ASSERT`s that `m_layout` is non-null (line 16687) and then
-  bails out with `nullptr` if it would somehow have been cleared
-  (lines 16362-16363).
+  `SLANG_ASSERT`s that `m_layout` is non-null (line 16440) and then
+  bails out with `nullptr` if it is null in a release build
+  (lines 16442-16443).
 - Ordered **after** semantic check and parameter binding. The
   per-translation-unit executable IR is not a prerequisite of the
   construction itself, but it is what the `[import(...)]` stubs are
@@ -370,10 +382,16 @@ support these parameters on SPIR-V, HLSL, and GLSL.
   [04b-pre-link-passes.md](04b-pre-link-passes.md) has finished for
   the modules involved. It does not run the pre-link mandatory
   optimization sequence; it is consumed by reflection and by
-  `linkIR`, which adds an existing layout module to its module list
-  so layout-decorated global symbols participate in linking
+  `linkIR`, which adds an existing layout module (obtained through
+  `getExistingIRModuleForLayout`) to its module list so
+  layout-decorated global symbols participate in linking
   ([slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
-  lines 2208-2210).
+  lines 2265-2267) and reads the module's global-scope
+  `IRLayoutDecoration` (line 2348). The end-to-end compile request also
+  calls `getOrCreateLayout` and then `getOrCreateIRModuleForLayout` for
+  every target
+  ([slang-compile-request.cpp](../../../../source/slang/slang-compile-request.cpp)
+  lines 880-881).
 
 ## Construction flow
 
@@ -384,8 +402,10 @@ when binding produced no errors:
 ```mermaid
 flowchart TD
   gol[TargetProgram::getOrCreateLayout]
+  layoutGate{"m_layout already set?"}
   gpb[generateParameterBindings]
-  errGate{"sink->getErrorCount() != 0?"}
+  latch["m_layoutHasErrors = true if sink error count rose vs errorCountBefore"]
+  errGate{"m_layoutHasErrors?"}
   bail([return nullptr, no layout IR module])
   cache{cached m_irModuleForLayout?}
   hit([return cached module])
@@ -403,7 +423,9 @@ flowchart TD
   bmn[module.buildMangledNameToGlobalInstMap]
   store[cache on m_irModuleForLayout]
 
-  gol --> gpb --> errGate
+  gol --> layoutGate
+  layoutGate -- no --> gpb --> latch --> errGate
+  layoutGate -- yes --> errGate
   errGate -- yes --> bail
   errGate -- no --> cache
   cache -- yes --> hit
@@ -419,13 +441,13 @@ flowchart TD
 ## Per-global-parameter steps
 
 For each `varLayout` in `globalStructLayout->fields` (lines
-16400-16420 of `createIRModuleForLayout`), where
+16479-16498 of `createIRModuleForLayout`), where
 `globalStructLayout` comes from
-`getScopeStructLayout(programLayout)` at line 16724:
+`getScopeStructLayout(programLayout)` at line 16477:
 
 | # | Step | Function | Notes |
 |---|---|---|---|
-| 1 | Materialize stub `IRGlobalVar` | `materialize(context, ensureDecl(context, varDecl.getDecl())).val` | Produces an `[import(...)]` stub when no definition is present in the layout-IR module. Fails with `SLANG_UNEXPECTED("unhandled value flavor")` if `materialize` returns null. |
+| 1 | Materialize stub `IRGlobalParam` | `materialize(context, ensureDecl(context, varDecl.getDecl())).val` | Produces an `[import(...)]` stub when no definition is present in the layout-IR module. Fails with `SLANG_UNEXPECTED("unhandled value flavor")` if `materialize` returns null. |
 | 2 | Lower the variable layout | `lowerVarLayout(context, varLayout)` | Produces an `IRVarLayout` instruction that encodes the per-variable layout (binding, space, byte offset, ...). |
 | 3 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irVar, irLayout)` | The decoration is what makes the layout queryable on the stub. |
 | 4 | Record in the global type-layout builder | `globalStructTypeLayoutBuilder.addField(irVar, irLayout)` | Feeds the module-level `IRStructTypeLayout` built right after the loop via `_lowerTypeLayoutCommon`. |
@@ -442,8 +464,8 @@ auto irGlobalStructTypeLayout =
 
 When the global scope is wrapped in a parameter group (a constant
 buffer or push-constant block), the module's layout decoration is
-an `IRParameterGroupTypeLayout` rather than the raw struct layout
-(lines 16427-16445). The parameter-group builder calls:
+an `IRVarLayout` whose type layout is an `IRParameterGroupTypeLayout`
+rather than the raw `IRStructTypeLayout` (lines 16506-16524). The parameter-group builder calls:
 
 - `setContainerVarLayout(lowerVarLayout(context, paramGroupTypeLayout->containerVarLayout))`
 - `setElementVarLayout(irElementVarLayout)` where
@@ -460,7 +482,7 @@ builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 ## Per-entry-point steps
 
 For each `entryPointLayout` in `programLayout->entryPoints` (lines
-16455-16499):
+16536-16582):
 
 | # | Step | Function | Notes |
 |---|---|---|---|
@@ -469,14 +491,14 @@ For each `entryPointLayout` in `programLayout->entryPoints` (lines
 | 3 | Lower the function type | `lowerType(context, getFuncType(astBuilder, funcDeclRef))` | Produces an `IRFuncType`. |
 | 4 | Materialize the stub function | `getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType))` | Produces an `IRFunc` skeleton; usually `[import(...)]`. |
 | 5 | Attach import linkage if missing | `if (!irFunc->findDecoration<IRLinkageDecoration>()) builder->addImportDecoration(irFunc, mangledName)` | Wires the stub to its real implementation in the executable IR module by mangled name. |
-| 6 | Forward capability atoms | iterate `inferredCapabilityRequirements` and call `builder->addRequireCapabilityAtomDecoration` for each atom in `[_spirv_1_0, latestSpirvAtom]` or `[metallib_2_3, latestMetalAtom]` | Lets the layout module advertise the SPIR-V / Metal capability set per entry point. Other targets do **not** get capability decorations on layout-module entry points (see [Caveats and gotchas](#caveats-and-gotchas)). |
+| 6 | Forward capability requirements | `SLANG_RELEASE_ASSERT(entryPointLayout->inferredCapabilityRequirements)`, build a `CapabilitySet`, call `lowerEntryPointShader64BitIndexingRequirement(builder, irFunc, set)` (line 15260; adds `IRShader64BitIndexingDecoration` when any target alternative contains `spvShader64BitIndexingEXT`), then call `builder->addRequireCapabilityAtomDecoration` for each atom in `[_spirv_1_0, latestSpirvAtom]` or `[metallib_2_3, latestMetalAtom]` | Lets the layout module advertise the SPIR-V / Metal capability set per entry point. Only SPIR-V-version and Metal-version atoms are forwarded, regardless of the selected target (see [Caveats and gotchas](#caveats-and-gotchas)). |
 | 7 | Lower the entry-point layout | `lowerEntryPointLayout(context, entryPointLayout)` | Produces an `IREntryPointLayout` that encodes parameter bindings and stage. |
 | 8 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irFunc, irEntryPointLayout)` | The decoration the reflection API and the linker query. |
 
 ## Optional obfuscation pass
 
 When `linkage->m_optionSet.shouldObfuscateCode()` is true (lines
-16502-16518):
+16585-16600):
 
 ```cpp
 IRStripOptions stripOptions;
@@ -495,13 +517,13 @@ Note two differences from the executable-module strip block in
 [04b-pre-link-passes.md](04b-pre-link-passes.md):
 
 - `stripSourceLocs = true`, whereas the executable-module block sets
-  it to `false` (line 16057) because that module needs locs
-  preserved for the obfuscated source map (line 16072). The layout
+  it to `false` (line 15810) because that module needs locs
+  preserved for the obfuscated source map (line 15825). The layout
   module has no separate obfuscated source map of its own, so it
   strips locs outright.
 - `shouldStripNameHints = true` unconditionally inside the gate,
   whereas the executable-module block assigns it
-  `linkage->m_optionSet.shouldObfuscateCode()` (line 16048); here
+  `linkage->m_optionSet.shouldObfuscateCode()` (line 15801); here
   the entire block is already inside the `shouldObfuscateCode()`
   test.
 
@@ -512,9 +534,9 @@ just attached are what the rest of the program will query.
 Nothing about this block is separately observable from outside the
 compiler: the layout module is never dumped on its own (see
 [Caveats and gotchas](#caveats-and-gotchas)), and the executable
-module's strip block is gated on the same `shouldObfuscateCode()`
-option (line 16076), so with `-obfuscate` both modules lose their
-name hints together.
+module's strip block takes its `shouldStripNameHints` value from the
+same `shouldObfuscateCode()` option (line 15801), so with `-obfuscate`
+both modules lose their name hints together.
 
 ## What this module is not
 
@@ -529,11 +551,11 @@ name hints together.
   module into its symbol set so its `IRLayoutDecoration`s are visible
   during linking
   ([slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
-  lines 2208-2210).
+  lines 2265-2267).
 - **No function bodies for user-defined functions.** The entry-point
   `IRFunc` instances are stubs; their only purpose is to anchor an
-  `IRLayoutDecoration` and (for SPIR-V / Metal) capability
-  decorations.
+  `IRLayoutDecoration`, an optional `IRShader64BitIndexingDecoration`,
+  and (for SPIR-V / Metal) capability decorations.
 - **No mandatory optimization passes.** The
   `constructSSA` → SCCP → CFG-simplify → peephole → DCE →
   early-inlining-loop sequence documented in
@@ -552,14 +574,15 @@ layout IR modules, so a session compiling for both D3D12 and Vulkan
 holds two independent layout IR modules in memory.
 
 Note that `createIRModuleForLayout` is `private` (declared at
-line 119 of
+line 120 of
 [slang-target-program.h](../../../../source/slang/slang-target-program.h));
 the only in-tree caller is `getOrCreateLayout`.
 
 Use `getExistingIRModuleForLayout()` if you need to peek at the
-cache without forcing construction (declared at line 104 of
+cache without forcing construction (declared at line 105 of
 [slang-target-program.h](../../../../source/slang/slang-target-program.h));
-it returns `nullptr` when nothing has been built yet.
+it returns `nullptr` when nothing has been built yet (or when binding
+failed).
 
 ## Caveats and gotchas
 
@@ -569,19 +592,19 @@ it returns `nullptr` when nothing has been built yet.
   mode if the per-module IR cache feeding the layout walk is
   corrupted or out of sync.
 - **`m_layout` must be set.** The `SLANG_ASSERT(m_layout)` at
-  line 16687 is followed by a redundant `if (!programLayout) return
-  nullptr;` at lines 16362-16363, so in a release build a missing
+  line 16440 is followed by a redundant `if (!programLayout) return
+  nullptr;` at lines 16442-16443, so in a release build a missing
   layout returns `nullptr` rather than crashing; in a debug build
   the assert fires first.
-- **Capability decorations are SPIR-V- and Metal-only.** The atom
-  filter at lines 16488-16489
+- **Only SPIR-V-version and Metal-version atoms are forwarded.** The
+  atom filter at lines 16571-16572
   (`atom >= _spirv_1_0 && atom <= latestSpirvAtom`,
-  `atom >= metallib_2_3 && atom <= latestMetalAtom`) means HLSL,
-  WGSL, and CUDA layout-module entry points do **not** carry
-  capability decorations. Tools that rely on per-entry-point
-  capability metadata for those targets need to consult the
-  executable IR module or the AST-level inferred capability set
-  directly. The decoration is `IRRequireCapabilityAtomDecoration`
+  `atom >= metallib_2_3 && atom <= latestMetalAtom`) filters atom
+  values only. The loop iterates every atom set in the entry point's
+  inferred capability requirements with no target-selection gate, so
+  the filter selects which atoms are retained, not which targets get
+  decorations. Other atoms are never forwarded to the layout module.
+  The decoration is `IRRequireCapabilityAtomDecoration`
   (`kIROp_RequireCapabilityAtomDecoration`), which the IR dumper
   prints as `[requireCapabilityAtom(...)]`. There is no observation
   point at which it can be attributed to the *layout* module:
@@ -590,14 +613,13 @@ it returns `nullptr` when nothing has been built yet.
   executable module's.
 - **`buildMangledNameToGlobalInstMap` runs unconditionally.** Even
   in the no-obfuscation path, the function ends with
-  `irModule->buildMangledNameToGlobalInstMap()` (line 16865) so
+  `irModule->buildMangledNameToGlobalInstMap()` (line 16602) so
   consumers always get a usable mangled-name index.
 - **The entry-point loop asserts on non-`FuncDecl` entry points.**
-  After the two `continue` guards, line 16822 does
-  `SLANG_ASSERT(as<FuncDecl>(funcDeclRef.getDecl()))` before reading
-  `inferredCapabilityRequirements`. An entry-point layout whose decl
-  is not a `FuncDecl` would therefore assert in a debug build and
-  then dereference a null `asFuncDecl` in a release build.
+  After the two `continue` guards the loop reads
+  `entryPointLayout->inferredCapabilityRequirements` behind a
+  `SLANG_RELEASE_ASSERT` (line 16563), so an entry-point layout
+  without recorded requirements fails in release builds too.
 
 ## Option gates
 
@@ -607,25 +629,27 @@ declared in
 
 | Gate | CLI spelling | Accessor | Effect |
 |---|---|---|---|
-| `CompilerOptionName::Obfuscate` | `-obfuscate` | `shouldObfuscateCode()` (line 361) | Enables the strip + DCE block at the end of `createIRModuleForLayout`, and is also passed to the `SharedIRGenContext` constructor at line 547. |
-| `CompilerOptionName::BindlessSpaceIndex` | `-bindless-space-index <index>` | `getIntOption(...)` at [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp) line 4815 | Requests a specific descriptor space for the bindless descriptor heap; parameter binding honors it only if that space is not already in `usedSpaces`. |
+| `CompilerOptionName::Obfuscate` | `-obfuscate` | `shouldObfuscateCode()` (line 384) | Enables the strip + DCE block at the end of `createIRModuleForLayout`, and is also passed to the `SharedIRGenContext` constructor there (line 16456). |
+| `CompilerOptionName::BindlessSpaceIndex` | `-bindless-space-index <index>` | `getIntOption(...)` at [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp) line 4818 | Requests a specific descriptor space for the bindless descriptor heap; parameter binding honors it only if that space is not already in `usedSpaces`. |
 
 The CLI spellings come from the option table in
 [slang-options.cpp](../../../../source/slang/slang-options.cpp)
-(lines 839 and 922), not from the option header.
+(lines 889-890 and 972-974), not from the option header.
 
 Other options in that header — including the
-`shouldIncludeSourceInDebugInfo()` accessor at line 379, which
+`shouldIncludeSourceInDebugInfo()` accessor at line 403, which
 wraps `CompilerOptionName::DebugInfoIncludeSource` — belong to debug
 information and codegen, not to layout, and have no effect on either
 parameter binding or the layout IR module.
 
 ## Manifest coverage
 
-The page's manifest `watched_paths` are
-`slang-lower-to-ir.cpp`, `slang-target-program.h`,
-`slang-parameter-binding.cpp`, and `slang-compiler-options.h`. That
-set does not cover everything this page must cite:
+The page's manifest `watched_paths` are `slang-lower-to-ir.cpp`,
+`slang-target-program.h`, `slang-parameter-binding.cpp`,
+`slang-compiler-options.h`, `core.meta.slang`, `hlsl.meta.slang`,
+`slang-check-shader.cpp`, `slang-diagnostics.lua`, `slang-ir-insts.lua`,
+`slang-ir.cpp`, `slang-options.cpp`, and `slang-type-layout.cpp`. The
+files this page cites and that the manifest watches are:
 
 - [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
   computes the `TypeLayout` objects parameter binding assembles, owns
@@ -637,16 +661,23 @@ set does not cover everything this page must cite:
 - [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)
   owns the "attribute ignored" warnings for annotations that binding
   cannot honor.
-- [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
-  is the consumer that pulls the layout module into linking.
-- [slang-parameter-binding.h](../../../../source/slang/slang-parameter-binding.h)
-  declares the public `generateParameterBindings` entry point.
 - [slang-options.cpp](../../../../source/slang/slang-options.cpp)
   maps the `CompilerOptionName` gates onto their command-line
   spellings.
 
-Those six paths should be added to the manifest entry for this
-page.
+`core.meta.slang`, `hlsl.meta.slang`, `slang-ir-insts.lua`, and
+`slang-ir.cpp` are also watched but nothing on this page depends on
+them beyond the `Shader64BitIndexingDecoration` opcode that
+`slang-ir-insts.lua` defines. Two cited paths are not watched:
+
+- [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
+  is the consumer that pulls the layout module into linking.
+- [slang-parameter-binding.h](../../../../source/slang/slang-parameter-binding.h)
+  declares the `generateParameterBindings(Program*, TargetRequest*,
+  DiagnosticSink*)` overload (line 27); the `TargetProgram*` overload
+  this page describes is defined in `slang-parameter-binding.cpp`.
+
+Those two paths should be added to the manifest entry for this page.
 
 ## See also
 

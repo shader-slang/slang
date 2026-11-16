@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target metal
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry computeMain -stage compute -target metal
 
 RWStructuredBuffer<uint> out;
 

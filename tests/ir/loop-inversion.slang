@@ -30,7 +30,7 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK-LABEL: int a_{{.*}}()
 // CHECK-NOT: break;
 // CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
-// CHECK: [[i]] + int(1);
+// CHECK: [[i]] + 1L;
 // CHECK: if(
 // CHECK: break;
 // CHECK: return
@@ -46,7 +46,7 @@ int a()
 // CHECK-LABEL: int b_{{.*}}()
 // CHECK-NOT: break;
 // CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
-// CHECK: [[i]] + int(1);
+// CHECK: [[i]] + 1L;
 // CHECK: if(
 // CHECK: break;
 // CHECK: return
@@ -66,7 +66,7 @@ int b()
 // CHECK-LABEL: int c_{{.*}}()
 // CHECK-NOT: break;
 // CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
-// CHECK: [[i]] + int(1);
+// CHECK: [[i]] + 1L;
 // CHECK: if(
 // CHECK: break;
 // CHECK: return
@@ -90,7 +90,7 @@ int c()
 // CHECK-LABEL: int d_{{.*}}()
 // CHECK-NOT: break;
 // CHECK: int {{.*}} = j_{{.*}} + [[i:i_[0-9]+]]
-// CHECK: [[i]] + int(1);
+// CHECK: [[i]] + 1L;
 // CHECK: if(
 // CHECK: break;
 // CHECK: return

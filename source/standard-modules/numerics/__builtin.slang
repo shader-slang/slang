@@ -422,6 +422,44 @@ public vector<T, N> __numericInterfaceBuiltinSplitFraction<
     return ::modf(value, integralPart);
 }
 
+/// Returns the fraction from core `modf` and writes the whole part as `int`.
+[__readNone]
+[__unsafeForceInlineEarly]
+public T __numericInterfaceBuiltinSplitFractionWithIntegerPart<T : __BuiltinFloatingPointType>(
+    T value,
+    out int integralPart)
+{
+    return ::modf(value, integralPart);
+}
+
+/// Splits each vector component using the core integer-output `modf` overload.
+[__readNone]
+[__unsafeForceInlineEarly]
+public vector<T, N> __numericInterfaceBuiltinSplitFractionWithIntegerPart<
+    T : __BuiltinFloatingPointType,
+    let N : int>(vector<T, N> value, out vector<int, N> integralPart)
+{
+    return ::modf(value, integralPart);
+}
+
+/// Splits each matrix element, preserving the input layout in both outputs.
+[__readNone]
+[__unsafeForceInlineEarly]
+public matrix<T, R, C, L> __numericInterfaceBuiltinSplitFractionWithIntegerPart<
+    T : __BuiltinFloatingPointType,
+    let R : int,
+    let C : int,
+    let L : MatrixLayoutMode>(matrix<T, R, C, L> value, out matrix<int, R, C, L> integralPart)
+{
+    // The core matrix overload returns a default-layout matrix. We split rows instead so
+    // the returned fractions and integer output both preserve the caller's layout `L`.
+    matrix<T, R, C, L> fractionalPart;
+    [ForceUnroll]
+    for (int row = 0; row < R; ++row)
+        fractionalPart[row] = ::modf(value[row], integralPart[row]);
+    return fractionalPart;
+}
+
 [__readNone]
 [__unsafeForceInlineEarly]
 public void __numericInterfaceBuiltinSinCos<T : __BuiltinFloatingPointType>(

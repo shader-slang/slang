@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-global-parameter-steps
-//META: doc_section_digest=75ec39da5e327b247f3579e584f2bfdf8a7756d5bc9f8880dffb38a09c79480d
+//META: doc_section_digest=5bd56ec3fa9f4c14346ce9f891e07fb31a2a9a681d81060e3fa8d134da97c771
 //META: purpose=The per-global-parameter loop runs once per field of the global struct layout, so two distinct global parameters produce two distinct structFieldLayout entries.
 //META: intent=boundary
 //META: pipeline_stage=layout

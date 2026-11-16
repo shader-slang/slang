@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
-//META: doc_section_digest=8db1d44af39131b43cc8258b2bec4dad2a4381ae619907da2e2b6a9de2021028
+//META: doc_section_digest=31abb67bf5286f69461146710f091d89f6d90d100b6c4de40ee80f2ebf88ef5a
 //META: purpose=Member lookup that exhausts the facet walk without a candidate yields the member-not-found diagnostic (E30027) naming both the missing identifier and the host type.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -141,7 +141,14 @@ function(add_sanitizer_options target)
                 PRIVATE -fsanitize=address -fsanitize=undefined
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-            target_compile_options(${target} PRIVATE /fsanitize=address)
+            # /bigobj is needed because ASan instrumentation adds sections to
+            # every instrumented function, and with optimization on (Release)
+            # a single large translation unit, such as the one embedding the
+            # core module source or slang itself, can exceed the default
+            # 65,279-section limit of an object file (error C1128). We enable
+            # it for every sanitized target instead of naming the ones that
+            # happen to overflow today.
+            target_compile_options(${target} PRIVATE /fsanitize=address /bigobj)
             target_link_options(${target} BEFORE PRIVATE /INCREMENTAL:NO)
             # MSVC's ASan needs debug info to turn the addresses in a report
             # into source locations, and warns (C5072, "ASAN enabled without
@@ -218,6 +225,11 @@ function(set_default_compile_options target)
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
             -Werror=return-local-addr
+            # GCC rejects designated initializers that are out of declaration order,
+            # while Clang only warns (and -Wno-reorder above silences that warning,
+            # since Clang's -Wreorder group includes -Wreorder-init-list). We make it
+            # an error on Clang so such code fails locally rather than only on GCC CI.
+            -Werror=reorder-init-list
             # Some warnings which are on by default in MSVC
             -Wnarrowing
         )

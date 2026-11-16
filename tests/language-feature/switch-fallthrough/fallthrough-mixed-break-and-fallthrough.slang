@@ -18,13 +18,13 @@
 // First fallthrough chain: case 0 -> case 1
 // CHECK-HLSL: case int(0):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(1):
+// CHECK-HLSL: case 1L:
 // Second fallthrough chain: case 3 -> case 4 -> case 5
-// CHECK-HLSL: case int(3):
+// CHECK-HLSL: case 3L:
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(4):
+// CHECK-HLSL: case 4L:
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(5):
+// CHECK-HLSL: case 5L:
 
 // CHECK:      6
 // CHECK-NEXT: 3

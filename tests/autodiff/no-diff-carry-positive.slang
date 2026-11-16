@@ -3,7 +3,7 @@
 // a derivative-carrying value is actually stored into a location that
 // cannot hold a derivative. We must not over-relax the analysis.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost
