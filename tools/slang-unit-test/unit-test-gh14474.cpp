@@ -15,8 +15,13 @@ using namespace Slang;
 // every build configuration. In a build with SLANG_DISABLE_EXCEPTIONS there is no exception to
 // unwind with, so without the AbortCompilationEscape installed at the loadModule /
 // loadModuleFromBlob boundaries the same call terminates the host process instead of returning.
-// This test is deliberately NOT gated on SLANG_HAS_EXCEPTIONS: the recovery contract it pins is
-// the same in both configurations.
+//
+// Which configuration exercises this test: the default build (via the pre-existing catch arms)
+// and a SLANG_DISABLE_EXCEPTIONS-define build, where the recovery branches compiled by that flag
+// genuinely execute — locally verified, since the repeat-failing-load check below fails with a
+// zombie cached module when the cache-cleanup recovery is absent. A true -fno-exceptions build
+// cannot compile this file: the unit-test harness itself uses C++ exceptions
+// (SLANG_UNIT_TEST's try/catch and SLANG_CHECK_ABORT's throw are unconditional).
 //
 // Covered here: the loadModule and loadModuleFromBlob (via loadModuleFromSourceString) abort
 // paths, a repeat failing load exercising the bookkeeping state an aborted import leaves behind,

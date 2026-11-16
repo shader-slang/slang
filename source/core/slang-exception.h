@@ -14,25 +14,33 @@
 // (diagnostics, fallback returns, language-server survival).
 //
 // A boundary that must recover from compilation aborts in every build uses
-// SLANG_EXCEPTION_TRY_RECOVERY instead. Which boundaries that is, is a stated contract: the
-// outermost public entry points that load or compile user code — the boundaries an embedder's
-// failed-compile diagnostics must surface through (module load, end-to-end compile, link and its
-// artifact/code getters). Other guarded sites keep plain SLANG_EXCEPTION_TRY: an abort there
-// still terminates in a build without exceptions, which is today's behavior and the safe default
-// while recovery coverage is extended boundary by boundary.
+// SLANG_EXCEPTION_TRY_RECOVERY instead. Which boundaries qualify is a stated contract: a site is
+// converted when it is a point where an embedder's failed-compile must surface as a returned
+// failure plus diagnostics rather than process death — the outermost public entry points that
+// load or compile user code (module load, end-to-end compile, link and its artifact/code
+// getters) — or an interior site whose catch arm does shared-state cleanup the recovery must
+// reproduce (the module-load registration sites). Other guarded sites keep plain
+// SLANG_EXCEPTION_TRY for now, with two distinct fates in a build without exceptions: an abort
+// at such a site terminates in handleSignal() when no recovery boundary encloses it — today's
+// behavior, and the safe default for the still-unconverted public entry points (specializeType,
+// the reflection API, the language server's own paths) — but when a recovery boundary does
+// enclose it dynamically, the abort reraises straight through the site to that boundary without
+// running its own catch arm, so the site's arm-level effects (for example
+// loadSourceModuleImpl's per-import context reporting) do not happen in that configuration.
+// Coverage is extended boundary by boundary against that contract.
 //
 // In the disabled configuration SLANG_EXCEPTION_TRY_RECOVERY installs a per-thread
 // AbortCompilationEscape and turns the abort into a longjmp back to the boundary. The recovery
 // branch is written as SLANG_EXCEPTION_ABORT_RECOVERY inside the `#else` of the same
 // `#if SLANG_HAS_EXCEPTIONS` — it expands to `else`, completing the `if (setjmp(...) == 0)` the
-// opening macro left open. With exceptions enabled it expands to nothing, so the site compiles to
-// the same try/catch as before. At most sites it mirrors the `catch (const
-// AbortCompilationException&)` arm; a site whose only arm is `catch (const Exception&)` mirrors
-// that instead.
+// opening macro left open. The macro is deliberately NOT defined in the exceptions branch: a
+// site writing it outside its `#else` then fails to compile, which guards against the misuse of
+// placing the recovery branch where the exceptions build could reach it. At most sites it
+// mirrors the `catch (const AbortCompilationException&)` arm; a site whose only arm is
+// `catch (const Exception&)` mirrors that instead.
 #if SLANG_HAS_EXCEPTIONS
 #define SLANG_EXCEPTION_TRY try
 #define SLANG_EXCEPTION_TRY_RECOVERY try
-#define SLANG_EXCEPTION_ABORT_RECOVERY
 #else
 #include <setjmp.h>
 #define SLANG_EXCEPTION_TRY
@@ -55,7 +63,12 @@
 // boundary must use AbortRecoveryLock (see slang-signal.h), which handleSignal releases before
 // the jump; any other shared state a callee's RAII owns must either be safe to strand or be
 // restored by the recovery branch itself (for example
-// Linkage::resetModulesBeingImported()).
+// Linkage::resetModulesBeingImported()). The memory cost is not benign for retrying hosts: a
+// recovered abort abandons the crossed frames' RefPtr-owned state — one full front-end compile
+// attempt per recovered abort, unbounded under repeated retries — which we accept because the
+// alternative in this configuration is terminating the host process. Hosts that need bounded
+// retries need the crossed frames to register their owning state with the escape; that is a
+// follow-up, not part of this mechanism.
 //
 // The recovery counterpart of an exceptions-build catch arm that performs local cleanup and
 // rethrows (for example removing a failed module from the loaded-module caches) is the same

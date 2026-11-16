@@ -1937,9 +1937,11 @@ SlangResult EndToEndCompileRequest::compile()
 {
     // `res` is assigned between the SLANG_EXCEPTION_TRY_RECOVERY setjmp and the longjmp that an
     // AbortCompilation can make in a no-exceptions build, so it is indeterminate once the jump
-    // lands. The recovery branch overwrites it on the reported-nothing path; on the path where a
-    // diagnostic already exists it deliberately keeps the pre-set failure result — and reading
-    // that back is exactly what only a `volatile` local guarantees.
+    // lands. The only write inside the guarded region is `res = executeActions()`, which cannot
+    // complete if the abort fires inside it, so `res` is still SLANG_FAIL at the moment of the
+    // jump. The recovery branch overwrites it on the reported-nothing path; on the path where a
+    // diagnostic already exists it deliberately keeps that pre-set failure result — and reading
+    // it back is exactly what only a `volatile` local guarantees.
 #if SLANG_HAS_EXCEPTIONS
     SlangResult res = SLANG_FAIL;
 #else
@@ -1956,10 +1958,9 @@ SlangResult EndToEndCompileRequest::compile()
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
-    // application). Internally Slang currently uses exceptions for this.
-    //
-    // TODO: Consider using `setjmp()`-style escape so that we can work
-    // with applications that disable exceptions.
+    // application). Internally Slang currently uses exceptions for this, and
+    // a build without exceptions recovers AbortCompilation at this boundary
+    // through the SLANG_EXCEPTION_TRY_RECOVERY escape below.
     //
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
