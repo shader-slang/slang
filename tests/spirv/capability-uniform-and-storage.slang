@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DIN_UINT8
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_UINT16
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_HALF
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DIN_BFLOAT16
 //TEST:SIMPLE(filecheck=CHECKBOTH): -target spirv -profile spirv_1_3 -DIN_UINT8 -DIN_HALF
 //TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DOUT_UINT8
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DOUT_UINT16
@@ -28,6 +29,8 @@ uniform struct {
     uint8_t index;
 #elif defined(IN_UINT16)
     uint16_t index;
+#elif defined(IN_BFLOAT16)
+    BFloat16 index;
 #else
     uint32_t index;
 #endif
@@ -61,5 +64,9 @@ RWStructuredBuffer<st> outputBuffer;
 void computeMain()
 {
     outputBuffer[0].data = OUT_FLOAT_TYPE(inputBuffer.data.x);
+#if defined(IN_BFLOAT16)
+    outputBuffer[1].index = OUT_UINT_TYPE(float(inputBuffer.index));
+#else
     outputBuffer[1].index = OUT_UINT_TYPE(inputBuffer.index);
+#endif
 }
