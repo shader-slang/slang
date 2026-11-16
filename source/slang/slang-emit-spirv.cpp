@@ -10378,6 +10378,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (type->getOp())
         {
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_UInt16Type:
         case kIROp_Int16Type:
             found |= TypeNeedsStorageFlag::kElementSize16;
