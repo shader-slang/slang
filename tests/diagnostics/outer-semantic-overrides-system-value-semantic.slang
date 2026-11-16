@@ -258,6 +258,8 @@ FSOutAllowed allowCase(float4 pos : SV_Position)
 // while the counter has advanced past it, so the index conjunct must reject.
 struct ShiftedOut
 {
+    // consumes slot 0 (a user-defined spelling, silently renumbered by
+    // the outer semantic, as the policy intends)
     float4 a : COLOR0;
     float4 b : SV_Target;
 //SHIFTED: E39034

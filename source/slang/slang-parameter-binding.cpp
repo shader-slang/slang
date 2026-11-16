@@ -2070,11 +2070,12 @@ static bool isSystemValueSemanticName(String const& semanticName)
 // A field semantic that names the same slot the outer semantic assigns anyway
 // -- the same base name, with its own index equal to the next slot the outer
 // semantic assigns -- is redundant rather than conflicting, and keeps
-// compiling with unchanged layout. Slot identity is decided by literal
-// base-name equality, so alias spellings count as conflicts: a field
-// `COLOR0` under an outer `SV_Target` names the same render-target slot as a
-// redundant `SV_Target0` would, but only the `SV_` spelling matches, and the
-// `COLOR0` field errors.
+// compiling with unchanged layout. Slot identity is decided by base-name
+// matching (case-insensitive), not by aliasing: only the outer semantic's
+// own base name is exempt, so any other system-value base name is a
+// conflict even where a backend would alias the two spellings to one
+// slot. Spellings outside the `SV_`/`NV_` family, such as `COLOR0` under
+// `SV_Target`, never reach this check and stay silently overridden.
 //
 // The check is evaluated once per declaration per enclosing semantic, not once
 // per visit, because the walk reaches some declarations more than once at
