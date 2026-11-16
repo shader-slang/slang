@@ -35,11 +35,14 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=VERTOUT):-target spirv -entry vertexOut -stage vertex
 //DIAGNOSTIC_TEST:SIMPLE(diag=NVOUT):-target spirv -entry nvOut -stage vertex
 //DIAGNOSTIC_TEST:SIMPLE(diag=ARRAY):-target spirv -entry arrayConflict -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=SHIFTED):-target spirv -entry shifted -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=NESTADOPT):-target spirv -entry nestedAdopt -stage fragment
 //TEST:SIMPLE(filecheck=REDUNDANT):-target spirv-asm -entry redundant -stage fragment
 //TEST:SIMPLE(filecheck=INDEXED):-target spirv-asm -entry indexed -stage fragment
 //TEST:SIMPLE(filecheck=ARRBENIGN):-target hlsl -entry arrayBenign -stage fragment
 //TEST:SIMPLE(filecheck=OPTIONAL):-target spirv-asm -entry optionalParam -stage fragment
 //TEST:SIMPLE(filecheck=ALLOWED):-target spirv-asm -entry allowCase -stage fragment
+//TEST:SIMPLE(filecheck=ALLOWALL):-target spirv-asm -entry allowAll -stage fragment
 
 struct FSOut
 {
@@ -249,6 +252,74 @@ FSOutAllowed allowCase(float4 pos : SV_Position)
 }
 //ALLOWED-NOT: E39034
 //ALLOWED: OpEntryPoint
+
+// The boundary between "redundant" and "conflict" inside the exemption: same
+// base name as the enclosing semantic, but the field's own index names slot 0
+// while the counter has advanced past it, so the index conjunct must reject.
+struct ShiftedOut
+{
+    float4 a : COLOR0;
+    float4 b : SV_Target;
+//SHIFTED: E39034
+//SHIFTED:     ^^^^^^^^^ this system-value semantic would be ignored
+};
+
+[shader("fragment")]
+ShiftedOut shifted(float4 pos : SV_Position)
+    : SV_Target
+/*SHIFTED:
+      ^^^^^^^^^ the enclosing semantic is declared here
+*/
+{
+    ShiftedOut o;
+    o.a = pos;
+    o.b = pos;
+    return o;
+}
+
+// A semantic can also be adopted at a nested struct field rather than the entry
+// point; the walk's adopting frame is then the field, and the same override
+// verdict applies beneath it.
+struct Inner2
+{
+    float depth : SV_Depth;
+//NESTADOPT: E39034
+//NESTADOPT:      ^^^^^^^^ this system-value semantic would be ignored
+};
+
+struct Outer2
+{
+    Inner2 i : TEXCOORD0;
+//NESTADOPT:   ^^^^^^^^^ the enclosing semantic is declared here
+};
+
+[shader("fragment")]
+void nestedAdopt(float4 pos : SV_Position, out Outer2 o)
+{
+    o.i.depth = pos.x;
+}
+
+// `[allow]` placed on the enclosing struct, not the field: the suppression
+// lookup walks the parent chain, so one attribute silences every nested
+// field.
+[allow("outer-semantic-overrides-system-value-semantic")]
+struct FSOutAllowAll
+{
+    float4 color : SV_Target;
+    float depth : SV_Depth;
+};
+
+[shader("fragment")]
+FSOutAllowAll allowAll(float4 pos : SV_Position)
+    : SV_Target
+{
+    FSOutAllowAll o;
+    o.color = pos;
+    o.depth = pos.x;
+    return o;
+}
+//ALLOWALL-NOT: E39034
+//ALLOWALL: OpEntryPoint
 
 struct SingleOut
 {
