@@ -82,6 +82,8 @@ void aliasConstructor(in Input input)
 */
 }
 #else
+// A wrapped input is not pass-through-able even as an in parameter; the call below makes T
+// concrete and reveals it.
 void consume<T : IInputCarrier>(Optional<T.Item> input) {}
 //NONE:                                          ^^^^^ storage of a structural ray-tracing stage input
 //NONE:                                          ^^^^^ ray-tracing stage input type 'Optional<rt.MissInput<Context>>' may only be used as an 'in' parameter or an initialized local copy

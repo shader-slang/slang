@@ -1636,15 +1636,24 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     if (!TryCheckOverloadCandidateVisibility(context, candidate))
         goto error;
 
-    // The candidate is now fully applied and selected. This is the point where a generic's
-    // parameters became concrete, so the portable ray-tracing checks re-read the callee's body
-    // with these arguments bound; the call itself did not exist when the body was checked
-    // abstractly. The function exits without diagnosing for any reference that is not a
-    // generic specialization.
+    // The candidate is now fully applied; this is the point where a generic's parameters
+    // became concrete, so the portable ray-tracing check re-reads the callee's body with
+    // these arguments bound — the call itself did not exist when the body was checked
+    // abstractly. Completion is a slight over-approximation of selection: a tied ambiguous
+    // candidate set completes every viable candidate, the same as the other completion-time
+    // diagnostics above, so an instantiation the final resolution never uses may be reported
+    // once too. checkSpecializedCallableBody itself exits without diagnosing when the
+    // compilation has not opted in, no loaded module declares a stage input, or the reference
+    // is not a generic specialization, so non-ray-tracing compiles reach only those fast
+    // checks.
     if (candidate.flavor == OverloadCandidate::Flavor::Generic)
     {
         if (!(candidate.flags & OverloadCandidate::Flag::IsPartiallyAppliedGeneric))
         {
+            // The candidate names the GenericDecl itself, while the check needs the inner
+            // callable's declaration reference with the arguments bound; building it through
+            // getGenericAppDeclRef also makes it the same interned value the completed callee
+            // expression carries, which is what the check's per-instantiation dedup keys on.
             auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
             auto genSubst = candidate.subst.findGenericAppDeclRef(genericDeclRef.getDecl());
             if (genericDeclRef && genSubst)
@@ -1656,8 +1665,10 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     }
     else if (candidate.flavor == OverloadCandidate::Flavor::Func)
     {
-        // A callable member of a specialized declaration (for example a method of
-        // `Factory<Input>`) carries the enclosing generic application on its reference.
+        // A plain call's callee reference already carries any enclosing application (a method
+        // of `Factory<Input>`, or the inner function of an already-specialized generic), so it
+        // is passed as-is: the check walks the reference's own substitution chain, unlike the
+        // Generic flavor where the arguments live on the candidate instead.
         PortableRT::checkSpecializedCallableBody(
             this,
             candidate.item.declRef.declRefBase,

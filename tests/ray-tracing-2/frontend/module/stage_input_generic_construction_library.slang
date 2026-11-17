@@ -1,3 +1,7 @@
+// Library half of stage-input-generic-construction-module.slang: declares the generic helpers
+// (in namespace generic_construction) whose bodies only become stage-input uses once a caller
+// binds T. That test compiles this file to a .slang-module and imports it from source and
+// serialized runs; the expectations live there, not here.
 import slang.raytracing.portable;
 
 namespace generic_construction

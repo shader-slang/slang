@@ -52,7 +52,9 @@ void diagnoseDuplicateSchemaEntries(
     SourceLoc satisfyingDeclLoc);
 
 /// Checks whether the variable's storage, parameter direction, and initializer allow an RT
-/// input. The visitor resolves substituted types whose conformances the use site may precede.
+/// input. The visitor is required because resolving a substituted field type can require a
+/// conformance witness that is not checked yet at this use site; the resolver advances the
+/// declaring type on demand.
 void diagnoseInvalidVariableType(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
@@ -113,10 +115,15 @@ void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sin
 
 /// Checks a generic callable's body for stage-input uses that its declaration-time checking could
 /// not see: `specializedCallableDeclRef` is the callable's checked declaration reference with the
-/// concrete generic arguments bound (a `GenericAppDeclRef` in its substitution chain). A null or
-/// unsubstituted reference exits without diagnosing. `instantiationLoc` names the call or
-/// specialization that bound the arguments, and is reported beside any diagnostic found inside the
-/// generic body so the reader can see which concrete call made the type known.
+/// concrete generic arguments bound (a `GenericAppDeclRef` in its substitution chain). The check
+/// silently exits unless the compilation opted into experimental features, a loaded module
+/// declares a stage input, the reference names a callable specialized by a generic application,
+/// the callee's body is not itself mid-check (a recursive generic), and this instantiation was
+/// not already checked — so calling it from every overload completion is cheap for every other
+/// compile. A null or unsubstituted reference also exits without diagnosing. `instantiationLoc`
+/// names the call or specialization that bound the arguments, and is reported beside any
+/// diagnostic found inside the generic body so the reader can see which concrete call made the
+/// type known.
 void checkSpecializedCallableBody(
     SemanticsVisitor* visitor,
     DeclRefBase* specializedCallableDeclRef,

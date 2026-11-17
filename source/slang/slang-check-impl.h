@@ -4730,6 +4730,12 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
 
+// Walks every node reachable from an already-checked declaration, expression, statement, or
+// value, applying the CRTP derived type's visit* overrides along the way. The two process
+// hooks fire for referenced declarations; the top of sourceLocStack is the location of the
+// innermost expression or statement being walked. The traversal does not descend into
+// grouped declaration statements (DeclGroup) or into the operands of a generic application;
+// subclasses that need those shapes override visitDeclGroup / visitGenericAppDeclRef.
 template<typename VisitorType>
 struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
                                        public StmtVisitor<VisitorType>,
@@ -4766,9 +4772,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         }
     };
 
-    virtual void processReferencedDecl(Decl* decl) = 0;
-
-    virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) = 0;
+    virtual void processReferencedDecl(Decl* decl) {}
+    virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) {}
 
     void dispatchIfNotNull(Stmt* stmt)
     {

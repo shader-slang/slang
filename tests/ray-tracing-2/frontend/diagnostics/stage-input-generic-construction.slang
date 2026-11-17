@@ -1,6 +1,9 @@
 // Checks that a generic body's forbidden stage-input uses are diagnosed once the generic's
-// type parameters become concrete, and that allowed copies keep compiling cleanly.
+// type parameters become concrete, and that allowed copies keep compiling cleanly. The
+// SPECIALIZE run checks the same rule when the concrete argument comes from -specialize on a
+// native generic entry point instead of a call.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -ignore-capabilities -target hlsl -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(diag=SPECIALIZE,non-exhaustive): -experimental-feature -ignore-capabilities -target hlsl -entry entryManufacture -specialize rt::MissInput<MissContext> -no-codegen
 
 import slang.raytracing.portable;
 
@@ -135,6 +138,62 @@ uint makeFresh<T>()
     return 1;
 }
 
+// Ordinary instantiations of the same bodies produce no diagnostics: the walk substitutes,
+// classifies, and moves on. This file's exhaustive mode enforces the silence.
+extension ::Payload : IRead
+{
+    uint read() { return value; }
+}
+
+struct PlainCarrier : ICarrier
+{
+    typealias Item = ::Payload;
+};
+
+[shader("compute")]
+void entryManufacture<T>()
+{
+    T t = T();
+//SPECIALIZE: fresh construction of a structural ray-tracing stage input
+}
+
+// Construction in return position reaches the same rule as the local-copy spelling.
+T makeValue<T>()
+{
+    return T();
+//CHECK:    ^ fresh construction of a structural ray-tracing stage input
+//CHECK:    ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+}
+
+// A recursive generic is legal: the abstract body check completes the inner call while the
+// body is still being checked, and the walk must not re-enter it (that would be reported as
+// a cyclic reference). The construction in the body is still diagnosed once.
+uint recurseMake<T>(int depth)
+{
+    if (depth <= 0)
+        return 1;
+    T fresh = T();
+//CHECK:       ^ fresh construction of a structural ray-tracing stage input
+//CHECK:       ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+    return recurseMake<T>(depth - 1);
+}
+
+// Mutual recursion with an ordinary argument stays silent, and must not be a cyclic
+// reference either.
+uint ping<T>(int depth);
+uint pong<T>(int depth)
+{
+    if (depth <= 0)
+        return 0;
+    return ping<T>(depth - 1);
+}
+uint ping<T>(int depth)
+{
+    if (depth <= 0)
+        return 1;
+    return pong<T>(depth - 1);
+}
+
 // A method of a specialized generic struct is a plain call whose callee reference already
 // carries the enclosing application, so the same check runs on it.
 struct Factory<T>
@@ -166,6 +225,15 @@ struct Miss : rt::IMissShader
 //CHECK:^^^^^^^^^ in the instantiation of 'makeFresh'
         Factory<rt::MissInput<Context>>::makeStatic();
 //CHECK:                                           ^ in the instantiation of 'makeStatic'
+
+        // Ordinary instantiations stay silent here by construction (exhaustive mode).
+        input.payload.value += manufacture<PlainCarrier>();
+        let made = makeValue<rt::MissInput<Context>>();
+//CHECK:           ^^^^^^^^^ in the instantiation of 'makeValue'
+        passInput(made);
+        input.payload.value += recurseMake<rt::MissInput<Context>>(2);
+//CHECK:                       ^^^^^^^^^^^ in the instantiation of 'recurseMake'
+        input.payload.value += ping<uint>(4);
 
         let copied = copyInput(input);
         passInput(copied);

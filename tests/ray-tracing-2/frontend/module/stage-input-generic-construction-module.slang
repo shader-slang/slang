@@ -18,6 +18,11 @@ struct Miss : rt::IMissShader
         generic_construction::makeFreshInput<rt::MissInput<Context>>();
         //CHECK: fresh construction of a structural ray-tracing stage input
         //CHECK: in the instantiation of 'makeFreshInput'
+        // The serialized run below keeps signatures only: makeFreshInput's body construction
+        // is NOT diagnosed from a serialized module, because a serialized module's AST has no
+        // function bodies. That gap is deliberately open pending the maintainer's answer on
+        // https://github.com/shader-slang/slang/issues/13686#issuecomment-6944795491 (an
+        // IR-level check would be the follow-up).
         // The hop-based call reaches the same instantiation of makeFreshInput; each
         // instantiation is reported once, however many call sites complete it.
         generic_construction::hopOne<rt::MissInput<Context>>();

@@ -6,6 +6,9 @@
 #include "core/slang-lz4-compression-system.h"
 #include "core/slang-shared-library.h"
 #include "slang-check-impl.h"
+// Linkage's destructor (defined in this file) destroys its
+// RefPtr<PortableRTSpecializationCheckState> member, which needs the complete pointee type that
+// slang-session.h only forward-declares.
 #include "slang-check-portable-ray-tracing.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
