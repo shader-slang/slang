@@ -1216,6 +1216,29 @@ LoweredValInfo extractField(
     }
 }
 
+/// Return whether `declRef` names a member that lowering projects as a keyed
+/// struct field, so that `extractField` is the right way to read or write it
+/// once a base value has been materialized. This covers an ordinary field
+/// `VarDecl` and an `InheritanceDecl` whose base is a `struct` or `class`:
+/// inheritance lowering creates a struct key for such a base and installs it
+/// as the derived type's leading field. Interface bases are excluded because
+/// they lower to witness-table requirements, not fields.
+static bool isFieldLikeMember(DeclRef<Decl> declRef)
+{
+    if (declRef.as<VarDecl>())
+        return true;
+
+    if (auto inheritanceDeclRef = declRef.as<InheritanceDecl>())
+    {
+        if (auto baseDeclRefType = as<DeclRefType>(inheritanceDeclRef.getDecl()->base.type))
+        {
+            auto baseDeclRef = baseDeclRefType->getDeclRef();
+            return baseDeclRef.as<StructDecl>() || baseDeclRef.as<ClassDecl>();
+        }
+    }
+    return false;
+}
+
 LoweredValInfo materialize(IRGenContext* context, LoweredValInfo lowered)
 {
     auto builder = context->irBuilder;
@@ -1295,9 +1318,9 @@ top:
             auto base = materialize(context, boundMemberInfo->base);
 
             auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
+            if (isFieldLikeMember(declRef))
             {
-                lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
+                lowered = extractField(context, boundMemberInfo->type, base, declRef);
                 goto top;
             }
             else if (auto methodDeclRef = declRef.as<CallableDecl>())
@@ -9894,12 +9917,12 @@ LoweredValInfo tryGetAddress(
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
+            if (isFieldLikeMember(declRef))
             {
                 auto baseVal = boundMemberInfo->base;
                 auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
 
-                return extractField(context, boundMemberInfo->type, basePtr, fieldDeclRef);
+                return extractField(context, boundMemberInfo->type, basePtr, declRef);
             }
         }
         break;
@@ -10336,7 +10359,7 @@ top:
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if (auto fieldDeclRef = declRef.as<VarDecl>())
+            if (isFieldLikeMember(declRef))
             {
                 // materialize the base value and move it into
                 // a mutable temporary if needed
@@ -10344,8 +10367,7 @@ top:
                 auto tempVal = moveIntoMutableTemp(context, baseVal);
 
                 // extract the field l-value out of the temporary
-                auto tempFieldVal =
-                    extractField(context, boundMemberInfo->type, tempVal, fieldDeclRef);
+                auto tempFieldVal = extractField(context, boundMemberInfo->type, tempVal, declRef);
 
                 // assign to the field of the temporary l-value
                 assign(context, tempFieldVal, right);
