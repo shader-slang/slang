@@ -1,6 +1,7 @@
 // Khronos entry points can combine multiple logical payload parameters. An empty parameter
 // must not add a dummy when another parameter already supplies physical incoming payload data.
-// The ordinary helper still receives only its scalar argument after empty parameters disappear.
+// The ordinary helper still receives only its scalar argument after the empty parameter,
+// passed by value, disappears from its signature.
 
 //TEST:SIMPLE(filecheck=GLSL): -entry main -stage miss -target glsl -DUSE_CALLABLE=0 -validate-ir
 //TEST:SIMPLE(filecheck=GLSL): -entry main -stage callable -target glsl -DUSE_CALLABLE=1 -validate-ir
@@ -19,8 +20,7 @@ struct Payload
 RWStructuredBuffer<uint> result;
 
 [noinline]
-[noRefInline]
-void useEmpty(__ref Payload empty, uint value)
+void useEmpty(Payload empty, uint value)
 {
     result[1] = value;
 }

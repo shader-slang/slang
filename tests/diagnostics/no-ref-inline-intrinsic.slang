@@ -16,6 +16,11 @@ void intrinsicBump(__ref int x)
     {
     case hlsl:
         __intrinsic_asm "InterlockedAdd($0, 1)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability Shader;
+        };
     }
 }
 

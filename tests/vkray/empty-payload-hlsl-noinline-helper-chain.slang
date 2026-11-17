@@ -1,7 +1,8 @@
 // D3D payload reconstruction belongs at the actual dispatch, not at an ordinary helper call.
 // Nested empty structs and arrays disappear from all three noinline helper signatures, while
 // the branches and atomic writes around the dispatch remain in their original functions.
-// __ref plus noRefInline also opts out of the separate reference-parameter inlining pass.
+// The payload parameters ride through the chain by value, so an empty payload never acquires a
+// physical copy at a helper boundary; the dummy reconstruction happens only at the dispatch.
 // The dummy field carries no logical data: allocate the required storage without initializing it.
 
 //TEST:SIMPLE(filecheck=HLSL): -entry main -stage raygeneration -target hlsl -profile sm_6_6 -O0 -DUSE_CALLABLE=0 -validate-ir
@@ -24,8 +25,7 @@ RaytracingAccelerationStructure scene;
 RWStructuredBuffer<uint> events;
 
 [noinline]
-[noRefInline]
-void dispatchLeaf(__ref Payload rayData, __ref Empty callableData[2], uint tag)
+void dispatchLeaf(Payload rayData, Empty callableData[2], uint tag)
 {
     InterlockedAdd(events[0], tag);
 #if USE_CALLABLE
@@ -42,8 +42,7 @@ void dispatchLeaf(__ref Payload rayData, __ref Empty callableData[2], uint tag)
 }
 
 [noinline]
-[noRefInline]
-void forwardMiddle(__ref Payload rayData, __ref Empty callableData[2], uint tag)
+void forwardMiddle(Payload rayData, Empty callableData[2], uint tag)
 {
     InterlockedAdd(events[2], tag);
     if ((tag & 1) != 0)
@@ -57,8 +56,7 @@ void forwardMiddle(__ref Payload rayData, __ref Empty callableData[2], uint tag)
 }
 
 [noinline]
-[noRefInline]
-void forwardOuter(__ref Payload rayData, __ref Empty callableData[2], uint tag)
+void forwardOuter(Payload rayData, Empty callableData[2], uint tag)
 {
     InterlockedAdd(events[4], tag);
     forwardMiddle(rayData, callableData, tag);
