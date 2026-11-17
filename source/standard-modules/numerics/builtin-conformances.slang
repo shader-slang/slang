@@ -394,6 +394,18 @@ public extension<T : __BuiltinIntegerType & IScalarIntegerType, let N : int>
     }
 }
 
+// Integer matrices used by `IFloatingPointWithIntegerPart` expose their logical shape without
+// requiring the arithmetic and bitwise operations of `IIntegerType`.
+public extension<let R : int, let C : int, let L : MatrixLayoutMode>
+    matrix<int, R, C, L> : INumericShapedType
+{
+    typealias Scalar = int;
+    typealias Mask = matrix<bool, R, C, L>;
+
+    [__unsafeForceInlineEarly]
+    static This fromScalar(Scalar value) { return This(value); }
+}
+
 public extension<
     T : __BuiltinIntegerType & IScalarIntegerType,
     let R : int,

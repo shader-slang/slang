@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: 49fb3c164cd4160806ba5c8b93658e916be3b640948db44af0283376988cf170
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:36:07Z
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: 54cb91466f5e292b483d4106f150242d5f117c6c4b79f29a4e5c5009f9d6fe36
 source_doc: docs/generated/design/name-resolution/visibility.md
-source_doc_digest: 1484c8453b8c00b5a45add048e99af12315352909eaea11bdf446e75743f2de6
+source_doc_digest: d456bfefab10a95e8cb4736ae2925ce82d4e0d35216200aa7968af10208129b0
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -79,7 +79,7 @@ User-observable claims:
 16. Otherwise the visibility is the module's default.
 17. The legacy language treats every unannotated decl as `public`.
 18. Modern versions default to `internal` unless the module is marked `public` at the top: `checkModule` flips the module-wide default to `public` when it finds a `PublicModifier` on the `ModuleDecl`.
-19. `NamespaceDecl` is unconditionally `Public`.
+19. A `NamespaceDecl` with no explicit visibility modifier and no enclosing aggregate or interface to inherit from is `Public`.
 20. Nothing in the fall-back chain is conditioned on a decl being a member of anything, so a function-local `VarDecl` takes the module default like any other unmodified decl and `checkVisibility` runs on it.
 21. In a module declared `public module M;` a local is therefore `public`, so the container-level cap rejects a local whose type is `internal` with `use-of-less-visible-type` (30604) even though the name never escapes the function.
 22. Lookup boundary: if lookup returned candidates but the visibility filter removed all of them, `filterLookupResultByVisibilityAndDiagnose` emits `decl-is-not-visible` (30600) and reports the first offending decl.
@@ -132,6 +132,7 @@ Internal-source facts (enum values, modifier classes, and helper plumbing; no in
 66. `_getTypeVisibility` threads a `Dictionary<Type*, DeclVisibility>` memo through the walk and caches only completed results, so a repeated generic argument such as `Pair<T, T>` is not re-traversed.
 67. A `getSynthesizedExtensionVisibility` target that is neither `Public`, `Internal`, nor `Private` is `SLANG_UNEXPECTED`.
 68. `getMoreRestrictiveVisibility` computes the pairwise minimum of two visibilities after normalizing `Default`.
+69. Distinct concrete specializations such as `extension G<int>` and `extension G<float>` do not see each other's `private` members.
 
 ## Functional coverage
 
@@ -146,6 +147,7 @@ Internal-source facts (enum values, modifier classes, and helper plumbing; no in
 | C30: When every declaration-reference generic argument is at least as visible as the generic itself, the minimum leaves the specialization fully visible and a `public` signature naming it is accepted. | functional | [#container-level-cap](../../../../design/name-resolution/visibility.md#container-level-cap)                                                                   | [`public-decl-with-public-generic-argument-accepted.slang`](public-decl-with-public-generic-argument-accepted.slang)                       |
 | C18: A `public` modifier on the module declaration flips the module-wide default so unannotated decls are `public` instead of `internal`. | functional | [#defaults-by-language-version](../../../../design/name-resolution/visibility.md#defaults-by-language-version)                                                 | [`public-module-default-makes-unannotated-decl-public.slang`](public-module-default-makes-unannotated-decl-public.slang)                   |
 | C20, C21: Nothing in the visibility fall-back chain is conditioned on membership, so a function-local VarDecl in a `public module` takes the `public` default and a local whose type is `internal` is rejected with use-of-less-visible-type (E30604). | negative | [#defaults-by-language-version](../../../../design/name-resolution/visibility.md#defaults-by-language-version) | [`function-local-var-takes-public-module-default.slang`](function-local-var-takes-public-module-default.slang) |
+| C69: Distinct concrete specializations such as `extension G<int>` and `extension G<float>` do not see each other's `private` members, so the cross-extension call does not resolve (undefined identifier, E30015). | negative | [#edge-cases-and-failure-modes](../../../../design/name-resolution/visibility.md#edge-cases-and-failure-modes) | [`private-in-distinct-concrete-extensions-not-shared.slang`](private-in-distinct-concrete-extensions-not-shared.slang) |
 | C8, C48, C50: A `private` decl declared directly inside a `namespace` is rejected with `invalid private visibility` because the diagnostic requires membership in a type, not merely a container. | boundary   | [#edge-cases-and-failure-modes](../../../../design/name-resolution/visibility.md#edge-cases-and-failure-modes)                                                 | [`private-inside-namespace-rejected.slang`](private-inside-namespace-rejected.slang)                                                       |
 | C32, C47: A `public` member inside an `internal` aggregate is rejected by `checkVisibility` with `decl-cannot-have-higher-visibility`. | negative   | [#edge-cases-and-failure-modes](../../../../design/name-resolution/visibility.md#edge-cases-and-failure-modes)                                                 | [`public-inside-internal-struct-rejected.slang`](public-inside-internal-struct-rejected.slang)                                             |
 | C51: A repeated visibility keyword (`public public`) is caught by the conflict-group check as `duplicate-modifier` (31202), not by the 36005 invalid-placement path. | negative   | [#edge-cases-and-failure-modes](../../../../design/name-resolution/visibility.md#edge-cases-and-failure-modes)                                                 | [`duplicate-public-modifier-rejected.slang`](duplicate-public-modifier-rejected.slang)                                                     |
@@ -188,7 +190,7 @@ Internal-source facts (enum values, modifier classes, and helper plumbing; no in
 | C4: The visibility defaults depend only on the module's resolved `languageVersion`; the session-level `SlangGlobalSessionDesc::minLanguageVersion` records a preferred floor and is not consulted by the visibility-classification path. | needs-unit-test | [#concepts](../../../../design/name-resolution/visibility.md#concepts) | `minLanguageVersion` is a C++ session-descriptor field with no `slangc` command-line surface; a unit test constructing global sessions with different floors and checking classification would verify it. |
 | C11: A generic parameter or `GenericTypeConstraintDecl` whose parent is not a `GenericDecl` falls back to `Default` visibility. | implementation-detail | [#per-keyword-semantics](../../../../design/name-resolution/visibility.md#per-keyword-semantics) | The doc names no source shape that puts a `GenericTypeConstraintDecl` under a non-generic parent, so no input distinguishes the fall-back from the ordinary inner-decl path; the inner-decl path itself is covered by [`generic-function-visibility-from-inner.slang`](generic-function-visibility-from-inner.slang). |
 | C17: The legacy language treats every unannotated decl as `public`, so a legacy module's own decls are seen as `public` by any caller regardless of the caller's language version. | needs-multi-file-test | [#defaults-by-language-version](../../../../design/name-resolution/visibility.md#defaults-by-language-version) | Inside one module every decl is reachable whatever its level, so the legacy `public` default is only distinguishable from `internal` across an `import` boundary; and a single file that mentions `public` is upgraded off legacy anyway. |
-| C19: `NamespaceDecl` is unconditionally `Public`. | needs-multi-file-test | [#defaults-by-language-version](../../../../design/name-resolution/visibility.md#defaults-by-language-version) | Within one module a namespace is reachable at any visibility level, so `Public` is only distinguishable from the module default across an `import`. |
+| C19: A `NamespaceDecl` with no explicit visibility modifier and no enclosing aggregate or interface is `Public`. | needs-multi-file-test | [#defaults-by-language-version](../../../../design/name-resolution/visibility.md#defaults-by-language-version) | Within one module a namespace is reachable at any visibility level, so `Public` is only distinguishable from the module default across an `import`. |
 | C22 (second half), C23: `DeclIsNotVisible` names the *first* removed decl, and in language-server mode `filterLookupResultByVisibilityAndDiagnose` returns the unfiltered result so completion keeps offering inaccessible candidates. | needs-unit-test | [#where-visibility-is-filtered](../../../../design/name-resolution/visibility.md#where-visibility-is-filtered) | "First" is an ordering over the internal lookup-result list, and the LSP completion path is not reachable from any slang-test directive; a unit test driving the language-server API would verify both. |
 | C26 (negative direction): An `internal` decl in module A is invisible from a separate module B, the `getModuleDecl(decl) == getModuleDecl(scope)` branch of `isDeclVisibleFromScope`. | needs-multi-file-test | [#per-keyword-semantics](../../../../design/name-resolution/visibility.md#per-keyword-semantics) | Requires two separately compiled translation units plus an `import`; single-file tests can only show the same-module positive. Hand-written coverage exists in `tests/diagnostics/extension-visibility-*.slang`. |
 | C9 (enum half): An `EnumCaseDecl` inherits its visibility from the enclosing enum. | (unclassified) | [#per-keyword-semantics](../../../../design/name-resolution/visibility.md#per-keyword-semantics) | The shape that would isolate the rule — a `private` enum nested in a struct — is rejected with 28 location-less diagnostics; see finding `_meta/findings/private-nested-enum-locationless-visibility-errors.yaml`. |

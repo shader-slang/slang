@@ -947,15 +947,18 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
 
         name = "gl_BaryCoordEXT";
 
-        // Search for nointerpolation keyword to use no-perspective variant of BaryCoord
+        // We select the no-perspective builtin when any declaration in the chain, from the
+        // field out to the entry-point parameter, is `noperspective`. Direct SPIR-V makes this
+        // choice again in `maybeEmitSystemVal`, from the decorations that
+        // `createVarLayoutForLegalizedGlobalParam` copies off the innermost declaration with
+        // any, so the two disagree when `noperspective` is only on an enclosing declaration.
         for (auto paramInfo = outerParamInfo; paramInfo; paramInfo = paramInfo->next)
         {
             auto outerParam = paramInfo->outerParam;
             auto decorParent = outerParam;
             if (auto field = as<IRStructField>(decorParent))
                 decorParent = field->getKey();
-            auto interpolation = decorParent->findDecoration<IRInterpolationModeDecoration>();
-            if (!interpolation || interpolation->getMode() != IRInterpolationMode::NoPerspective)
+            if (!hasInterpolationMode(decorParent, IRInterpolationMode::NoPerspective))
                 continue;
             name = "gl_BaryCoordNoPerspEXT";
             break;

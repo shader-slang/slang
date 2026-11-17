@@ -1,16 +1,16 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T12:52:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-02T21:03:56Z
 target_doc: target-pipelines/cuda.md
 review_report: ../../reviews/target-pipelines/cuda.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 5
+  fixed: 8
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 0
+  deferred: 1
   escalated: 0
 ---
 
@@ -18,19 +18,18 @@ actions:
 
 ## Summary
 
-All five findings (one critical, two major, two minor) were verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and all five held up, so all five were fixed. The critical fix reverses the CPU-like classification: CUDA source artifacts carry payload `CUDA`, not `Cpp`, so `performTypeInlining` and `checkGetStringHashInsts` run while `lowerCombinedTextureSamplers` is unreachable. The document was edited. Two follow-ups for the operator are noted at the end: the per-document prompt still carries the wrong CPU-like instruction, and `source/compiler-core/slang-artifact-desc-util.cpp` is now cited but is not in the page's `watched_paths`.
+Eight of nine findings were verified against the current source and fixed in the document; the doc stays under its 98304-byte cap (97421 bytes) because the F-002 and F-006 edits shortened text. F-004 (diagram control-flow rewrite) is deferred. Action breakdown: 8 fixed, 1 deferred.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed. `source/slang/slang-emit.cpp:995` sets `artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target))`; `source/compiler-core/slang-artifact-desc-util.cpp:306-309` maps `SLANG_CUDA_SOURCE` and `SLANG_CUDA_HEADER` to `Desc::make(Kind::Source, Payload::CUDA, Style::Kernel, 0)`; and `ArtifactDescUtil::isCpuLikeTarget` (line 602) returns, for `ArtifactKind::Source`, true only when the payload equals `Payload::C` or `Payload::Cpp` (line 612) — an exact equality test, not `isDerivedFrom`. CUDA is therefore not CPU-like. Consequently `performTypeInlining` (guarded by `!isCpuLikeTarget` at line 1636) and `checkGetStringHashInsts` (`!isCpuLikeTarget && shouldRunNonEssentialValidation()`, lines 1646-1647) both run for CUDA, and the switch at line 1758 breaks out of its `default` arm at line 1761 before reaching `lowerCombinedTextureSamplers` at line 1769. | Phase B prose item 5 rewritten to state the pass is skipped and why; diagram nodes `pTIN`/`cGSHI` changed from skipped to running with their real gates and `lCTS` changed to skipped; table rows for `performTypeInlining` and `checkGetStringHashInsts` changed from `-` *(skip)* to numbered rows 42a/42b, and row 51 `lowerCombinedTextureSamplers` changed to a `-` *(skip)* row; `combinedTextureSamplers` gate row corrected; one `isCpuLikeTarget` row added to the context-predicate gate table. |
-| F-002 | fixed | Confirmed. `source/slang/slang-ir-legalize-varying-params.cpp:2570-2577` shows `legalizeEntryPointVaryingParamsForCUDA` calling `inlineShaderTerminatingCalleesForRayEntryPoints` (line 2576) before `processModule`, and lines 1939-1958 are a genuine fixed-point loop: `for (bool changed = true; changed;)` re-collects every `IRCall` whose resolved callee satisfies `funcReachesShaderTerminatingIntrinsic` and inlines all of them per iteration. The bound is `Index maxIterations = reachable.getCount() + 1` (line 1937), enforced only by `SLANG_ASSERT(iterationCount++ <= maxIterations)` (line 1941). The page's "single traversal, not a fixed-point iteration" was wrong. | `## Loops in the pipeline`: first paragraph narrowed to "the orchestrator invokes no pass more than once"; second paragraph replaced with the loop's condition, per-iteration body, decreasing-depth convergence argument, and the verbatim bound and assertion. |
-| F-003 | fixed | Confirmed. `source/slang/slang-emit.cpp:1589-1596` is an `if (!minimalOptimization) simplifyIR; else if (requiredLoweringPassSet.generics) eliminateDeadCode;` pair, and `source/slang/slang-emit.cpp:1938-1941` is an `if (minimalOptimization) eliminateDeadCode; else simplifyIR;` pair. Neither `eliminateDeadCode` arm had its own diagram node or table row, so the one-node/one-row coverage rule at `docs/generated/design/_meta/prompts/_common.md:329-338,364-368` was not met. | Phase B diagram: added gate diamonds `minOptGateA` / `minOptGateB` with the alternative `eliminateDeadCode` nodes `dceGen` / `dceLegal` and rewired the three affected edges. Table: row 33 split into 33a (`simplifyIR`) / 33b (`eliminateDeadCode`, `else if reqSet.generics`); row 57 split into 57a (`eliminateDeadCode`) / 57b (`simplifyIR`), with the pre-existing `lowerUntypedResourceHandleToUInt` row renumbered 57b -> 57c to avoid a duplicate label. One `generics` row added to the `RequiredLoweringPassSet` gate table. |
-| F-004 | fixed | Confirmed by re-deriving both citations with `rg -n` against `source/slang/slang-emit.cpp` at HEAD: the `SLANG_PASS(inlineGlobalConstantsForLegalization)` call is at line 1795 (its condition spans lines 1791-1793) and the CPU/CUDA `else`-branch `legalizeEmptyTypes` at line 1911; the diagram's 1624 and 1728 were both stale. | Phase B diagram labels: `line 1624` -> `lines 1791-1795` (the range covering condition and call, matching table row 54) and `line 1728` -> `line 1911`. |
-| F-005 | fixed | Confirmed. `docs/generated/design/_meta/prompts/_common.md:66-67` requires the first body paragraph to name both the coverage and the intended reader; `docs/generated/design/_meta/prompts/target-pipelines-cuda.md:12-15` names compiler developers. The intro named only the subject. | Intro: added one sentence naming compiler developers looking for CUDA pass order, gates, and OptiX handling as the intended reader. |
-
-## Operator follow-ups
-
-- `docs/generated/design/_meta/prompts/target-pipelines-cuda.md:60` still instructs the generator that "`lowerCombinedTextureSamplers` runs for CUDA via the CPU-like" fallthrough. Remediation may not edit prompts (`_remediate.md:92-93`), so this needs the out-of-band correction the reviewer asked for, or the next regeneration will reintroduce F-001.
-- The F-001 fix cites `source/compiler-core/slang-artifact-desc-util.cpp`, which is not in this page's `watched_paths` (`regenerate.py show target-pipelines/cuda.md`). The `isCpuLikeTarget` predicate is load-bearing for three CUDA pass decisions, so the manifest entry should gain that path.
+| F-001 | fixed | source/slang/slang-code-gen.cpp:268-269 maps only PTX to CUDASource; lines 1270-1285 keep CUDAHeader as its own target. | Intro and Phase A: CUDAHeader keeps its own target value; removed "all three" claim. |
+| F-002 | fixed | source/slang/slang-ir-legalize-varying-params.cpp:1779-1786 and 2004-2006 skip unresolved callees, so a lookupWitness callee never reaches the diagnostic. | Replaced the dynamic-dispatch test paragraph with the resolvable-callee boundary. |
+| F-003 | fixed | slang-ir-lower-buffer-element-type.cpp:2698-2714 keeps default-layout Natural matrices; slang-ir-legalize-matrix-types.cpp:18-40 excludes CUDA; slang-ir-lower-cuda-builtin-types.cpp:163-167 builds a scalar array. | Matrix arm described as reachable; storage struct holds scalar array; Phase C rows 18 and 20 qualified as shared ordering. |
+| F-004 | deferred | Valid, but redrawing four diagrams with gate diamonds, per-pass nodes, init node and a validation summary is a broader rewrite that cannot fit the 98304-byte cap (about 880 bytes free) without cutting content. | — |
+| F-005 | fixed | docs/user-guide/09-targets.md:355 has "CUDA and OptiX"; contract item 9 requires the link. | Added user-guide link to See also. |
+| F-006 | fixed | _common.md item 6 requires a single gates table. | Merged four tables into one two-column table; removed sub-headings. |
+| F-007 | fixed | slang-ir-optix-entry-point-uniforms.cpp:259 createParam, 228-232 replaced by kIROp_GetOptiXSbtDataPtr and deleted. | Rewrote "already a global" explanation. |
+| F-008 | fixed | slang-emit.cpp:1902-1904, 2354-2358, 2439-2442 are other CUDA-only calls. | Replaced exclusivity claim with "a CUDA-specific optimization". |
+| F-009 | fixed | slang-emit.cpp:423-434, 522-528, 1592-1598 show an IR-content predicate only. | Removed the importance ranking; stated the two paths. |

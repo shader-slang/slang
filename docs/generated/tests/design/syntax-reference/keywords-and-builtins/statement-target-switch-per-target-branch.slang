@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#statement-keywords
-//META: doc_section_digest=0d8e1ca053b429da8e96d222f706189d5ed5e28ff7285b41aa4ffea890ca7d1f
+//META: doc_section_digest=3571737d4bbbec12cece17f18e8198029c1f511e52b3e3c93fe529db89cc2fc1
 //META: purpose=`__target_switch` is a statement keyword dispatched at statement entry (`parseTargetSwitchStmt`); each `case <target>` arm reuses the documented `case`/`default` keywords and only the arm matching the active target survives into the emitted code.
 //META: intent=functional
 //META: pipeline_stage=parse

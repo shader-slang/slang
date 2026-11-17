@@ -1431,7 +1431,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case glsl:
             __intrinsic_asm "textureQueryLod($0, $1).x";
         case spirv:
-            return (spirv_asm
+            return (spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability ImageQuery;
                 result:$$float2 = OpImageQueryLod $this $location
@@ -1457,7 +1457,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case glsl:
             __intrinsic_asm "textureQueryLod($0, $1).y";
         case spirv:
-            return (spirv_asm
+            return (spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability ImageQuery;
                 result:$$float2 = OpImageQueryLod $this $location
@@ -1589,7 +1589,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     }
                 }
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -1618,7 +1618,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $2)$z";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     OpCapability MinLod;
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
@@ -1649,7 +1649,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $2, $3)$z";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     OpCapability MinLod;
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
@@ -1671,7 +1671,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".Sample";
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
@@ -1709,7 +1709,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctexture($0, $1, $2)$z";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias $bias;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -1739,7 +1739,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureOffset($0, $1, $3, $2)$z";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -1763,7 +1763,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp, status);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
@@ -1807,7 +1807,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case metal:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue;
             };
@@ -1881,7 +1881,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case metal:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue ConstOffset $offset;
             };
@@ -1905,7 +1905,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset, clamp, status);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
@@ -2024,7 +2024,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case metal:
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod $level;
             };
@@ -2074,7 +2074,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case metal:
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level, offset);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
             };
@@ -2094,7 +2094,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level, offset, status);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 %__sparseResultType = OpTypeStruct $$uint $$float;
@@ -2131,7 +2131,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad $gradX $gradY;
             };
@@ -2161,7 +2161,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
             };
@@ -2183,7 +2183,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset, status);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 %__sparseResultType = OpTypeStruct $$uint $$float;
@@ -2243,7 +2243,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias $bias;
             };
@@ -2284,7 +2284,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
             };
@@ -2306,7 +2306,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset, status);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 %__sparseResultType = OpTypeStruct $$uint $$float;
@@ -2419,7 +2419,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     }
                 }
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -2447,7 +2447,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureGradOffset($0, $1, $2, $3, $4)$z";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -2476,7 +2476,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
             __intrinsic_asm "$ctextureGradOffsetClampARB($0, $1, $2, $3, $4, $5)$z";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     OpCapability MinLod;
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
@@ -2498,7 +2498,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp, status);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
@@ -2611,7 +2611,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     }
                 }
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -2639,7 +2639,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureLodOffset($0, $1, $2, $3)$z";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -2662,7 +2662,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleLevel(__getSampler(), location, level, offset, status);
         case spirv:
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
@@ -2790,7 +2790,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return (spirv_asm {
+            return (spirv_asm [__assumeValidResourceOperands] {
                 OpCapability ImageQuery;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float2 = OpImageQueryLod $sampledImage $location;
@@ -2814,7 +2814,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return (spirv_asm {
+            return (spirv_asm [__assumeValidResourceOperands] {
                 OpCapability ImageQuery;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float2 = OpImageQueryLod $sampledImage $location;
@@ -2838,7 +2838,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return (spirv_asm {
+            return (spirv_asm [__assumeValidResourceOperands] {
                 OpCapability ImageQuery;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float2 = OpImageQueryLod $sampledImage $location;
@@ -2862,7 +2862,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return (spirv_asm {
+            return (spirv_asm [__assumeValidResourceOperands] {
                 OpCapability ImageQuery;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float2 = OpImageQueryLod $sampledImage $location;
@@ -3092,7 +3092,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None;
@@ -3160,7 +3160,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __intrinsic_asm "$ctextureOffset($p, $2, $3)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|ConstOffset $offset;
@@ -3225,7 +3225,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __intrinsic_asm "$ctextureOffsetClampARB($p, $2, $3, $4)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     OpCapability MinLod;
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
@@ -3249,7 +3249,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".Sample";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
@@ -3311,7 +3311,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __intrinsic_asm "$ctexture($p, $2, $3)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias $bias;
@@ -3376,7 +3376,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __intrinsic_asm "$ctextureOffset($p, $2, $4, $3)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias|ConstOffset $bias $offset;
@@ -3415,7 +3415,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleBias";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
@@ -3462,7 +3462,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             return __metal_SampleCmp(__metal_asDepthTexture(this), s, location, compareValue);
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue;
@@ -3547,7 +3547,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             return __metal_SampleCmp(__metal_asDepthTexture(this), s, location, compareValue, offset);
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue ConstOffset $offset;
@@ -3585,7 +3585,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmp";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
@@ -3702,7 +3702,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             return __metal_SampleCmpLevel(__metal_asDepthTexture(this), s, location, compareValue, level);
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Lod $level;
@@ -3754,7 +3754,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             return __metal_SampleCmpLevel(__metal_asDepthTexture(this), s, location, compareValue, level, offset);
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Lod|ConstOffset $level $offset;
@@ -3776,7 +3776,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevel";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
@@ -3812,7 +3812,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpGrad";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Grad $gradX $gradY;
@@ -3842,7 +3842,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpGrad";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
@@ -3866,7 +3866,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpGrad";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
@@ -3923,7 +3923,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpBias";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue Bias $bias;
@@ -3963,7 +3963,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpBias";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
@@ -3987,7 +3987,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpBias";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
@@ -4045,7 +4045,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm "$ctextureGrad($p, $2, $3, $4)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad $gradX $gradY;
@@ -4110,7 +4110,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm "$ctextureGradOffset($p, $2, $3, $4, $5)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|ConstOffset $gradX $gradY $offset;
@@ -4175,7 +4175,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm "$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     OpCapability MinLod;
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
@@ -4199,7 +4199,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleGrad";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
@@ -4340,7 +4340,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod $level;
@@ -4406,7 +4406,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __intrinsic_asm "$ctextureLodOffset($p, $2, $3, $4)$z";
             case spirv:
                 let sampledImage = __makeCombinedTextureSampler(this, s);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod|ConstOffset $level $offset;
@@ -4444,7 +4444,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleLevel";
         case spirv:
             let sampledImage = __makeCombinedTextureSampler(this, s);
-            return spirv_asm
+            return spirv_asm [__assumeValidResourceOperands]
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
@@ -4545,7 +4545,7 @@ vector<T.Element,4> __texture_gather(
         __intrinsic_asm "$0.gather($1, $2, int2(0), metal::component($3))";
     case spirv:
         let sampledImage = __makeCombinedTextureSampler(texture, s);
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageGather $sampledImage $location $component;
         };
@@ -4599,7 +4599,7 @@ vector<T.Element,4> __texture_gather(
     case glsl:
         __intrinsic_asm "textureGather($0, $1, $2)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             result:$$vector<T.Element,4> = OpImageGather $sampler $location $component;
         };
     }
@@ -4709,7 +4709,7 @@ vector<T.Element,4> __texture_gather_offsets(
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         let sampledImage = __makeCombinedTextureSampler(texture, s);
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             OpCapability ImageGatherExtended;
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageGather $sampledImage $location $component ConstOffsets $offsets;
@@ -4745,7 +4745,7 @@ vector<T.Element,4> __texture_gather_offsets(
         __intrinsic_asm "textureGatherOffsets($0, $1, $T2[]($2, $3, $4, $5), $6)";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             OpCapability ImageGatherExtended;
             result:$$vector<T.Element,4> = OpImageGather $sampler $location $component ConstOffsets $offsets;
         };
@@ -4785,7 +4785,7 @@ vector<T.Element,4> __texture_gatherCmp(
         __intrinsic_asm "$0.gather_compare($1, $2, $3)";
     case spirv:
         let sampledImage = __makeCombinedTextureSampler(texture, s);
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageDrefGather $sampledImage $location $compareValue;
         };
@@ -4824,7 +4824,7 @@ vector<T.Element,4> __texture_gatherCmp(
     case glsl:
         __intrinsic_asm "textureGather($0, $1, $2)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             result:$$vector<T.Element,4> = OpImageDrefGather $sampler $location $compareValue;
         };
     }
@@ -4860,7 +4860,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
         __intrinsic_asm "$0.gather_compare($1, $2, $3, $4)";
     case spirv:
         let sampledImage = __makeCombinedTextureSampler(texture, s);
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageDrefGather $sampledImage $location $compareValue ConstOffset $offset;
         };
@@ -4898,7 +4898,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     case glsl:
         __intrinsic_asm "textureGatherOffset($0, $1, $2, $3)";
     case spirv:
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             result:$$vector<T.Element,4> = OpImageDrefGather $sampler $location $compareValue ConstOffset $offset;
         };
     }
@@ -4924,7 +4924,7 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         let sampledImage = __makeCombinedTextureSampler(texture, s);
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             OpCapability ImageGatherExtended;
             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
             result:$$vector<T.Element,4> = OpImageDrefGather $sampledImage $location $compareValue ConstOffsets $offsets;
@@ -4957,7 +4957,7 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
         __intrinsic_asm "textureGatherOffsets($0, $1, $2, $T3[]($3, $4, $5, $6))";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
-        return spirv_asm {
+        return spirv_asm [__assumeValidResourceOperands] {
             OpCapability ImageGatherExtended;
             result:$$vector<T.Element,4> = OpImageDrefGather $sampler $location $compareValue ConstOffsets $offsets;
         };
@@ -4999,7 +4999,7 @@ ${
         // CUDA has no depth-compare gather: tex2Dgather takes no compare value and a
         // SamplerComparisonState is a no-op placeholder there, so GatherCmp* is unavailable on
         // CUDA, as SampleCmp* is. `isShadow` here selects the GatherCmp* overloads, not shadow
-        // textures. The `case cuda:` arms below are emitted only when `!isShadow`, because a
+        // textures. The `case cuda:` arm below is emitted only when `!isShadow`, because a
         // `__target_switch` case that the `[require]` excludes is a capability error (E36101).
         const char* gatherTargets = isShadow ? "glsl_hlsl_metal_spirv_wgsl" : "cuda_glsl_hlsl_metal_spirv_wgsl";
 $}
@@ -5052,8 +5052,10 @@ $}
         }
     }
 
+    // tex2Dgather has no offset parameter, so the offset overloads leave CUDA out of [require], as
+    // the Sample* offset overloads do.
     [ForceInline]
-    [require($(gatherTargets), texture_gather)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
@@ -5066,14 +5068,6 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
-        ${ if (!isShadow) { $}
-        case cuda:
-            // tex2Dgather has no offset parameter, so CUDA ignores `offset` here. The Sample*
-            // offset overloads leave CUDA out of [require] instead.
-            static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
-            static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$TR>($0, ($(locationArg)).x, ($(locationArg)).y$(componentArg))";
-        ${ } $}
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -5294,7 +5288,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             if (isCombined != 0)
             {
                 let image = __extractImage(this);
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                     %__sampled:__sampledType(T) = OpImageFetch $image $coord Lod $lod;
@@ -5303,7 +5297,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             }
             else
             {
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled:__sampledType(T) = OpImageFetch $this $coord Lod $lod;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -5361,7 +5355,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 if (isCombined != 0)
                 {
                     let image = __extractImage(this);
-                    return spirv_asm
+                    return spirv_asm [__assumeValidResourceOperands]
                     {
                         // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                         %__sampled:__sampledType(T) = OpImageFetch $image $coord Lod|ConstOffset $lod $offset;
@@ -5370,7 +5364,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 }
                 else
                 {
-                    return spirv_asm
+                    return spirv_asm [__assumeValidResourceOperands]
                     {
                         %__sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset $lod $offset;
                         __truncate $$T result __sampledType(T) %__sampled;
@@ -5402,7 +5396,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
              if (isCombined != 0)
              {
                  let image = __extractImage(this);
-                 return spirv_asm
+                 return spirv_asm [__assumeValidResourceOperands]
                  {
                      OpCapability SparseResidency;
                      %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
@@ -5418,7 +5412,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
              }
              else
              {
-                 return spirv_asm
+                 return spirv_asm [__assumeValidResourceOperands]
                  {
                      OpCapability SparseResidency;
                      %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
@@ -5461,7 +5455,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                     if (isCombined != 0)
                     {
                         let image = __extractImage(this);
-                        return spirv_asm
+                        return spirv_asm [__assumeValidResourceOperands]
                         {
                             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                             %__sampled:__sampledType(T) = OpImageFetch $image $location;
@@ -5470,7 +5464,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                     }
                     else
                     {
-                        return spirv_asm
+                        return spirv_asm [__assumeValidResourceOperands]
                         {
                             %__sampled:__sampledType(T) = OpImageFetch $this $location;
                             __truncate $$T result __sampledType(T) %__sampled;
@@ -5538,7 +5532,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 if (isCombined != 0)
                 {
                     let image = __extractImage(this);
-                    return spirv_asm
+                    return spirv_asm [__assumeValidResourceOperands]
                     {
                         // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                         %__sampled:__sampledType(T) = OpImageFetch $image $location Sample $sampleIndex;
@@ -5547,7 +5541,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 }
                 else
                 {
-                    return spirv_asm
+                    return spirv_asm [__assumeValidResourceOperands]
                     {
                         %__sampled:__sampledType(T) = OpImageFetch $this $location Sample $sampleIndex;
                         __truncate $$T result __sampledType(T) %__sampled;
@@ -5586,7 +5580,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 if (isCombined != 0)
                 {
                     let image = __extractImage(this);
-                    return spirv_asm
+                    return spirv_asm [__assumeValidResourceOperands]
                     {
                         // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                         %__sampled:__sampledType(T) = OpImageFetch $image $location ConstOffset|Sample $offset $sampleIndex;
@@ -5595,7 +5589,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 }
                 else
                 {
-                    return spirv_asm
+                    return spirv_asm [__assumeValidResourceOperands]
                     {
                         %__sampled:__sampledType(T) = OpImageFetch $this $location ConstOffset|Sample $offset  $sampleIndex;
                         __truncate $$T result __sampledType(T) %__sampled;
@@ -5624,7 +5618,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
              if (isCombined != 0)
              {
                  let image = __extractImage(this);
-                 return spirv_asm
+                 return spirv_asm [__assumeValidResourceOperands]
                  {
                      OpCapability SparseResidency;
                      %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
@@ -5640,7 +5634,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
              }
              else
              {
-                 return spirv_asm
+                 return spirv_asm [__assumeValidResourceOperands]
                  {
                      OpCapability SparseResidency;
                      %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
@@ -5771,7 +5765,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     }
                 }
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled:__sampledType(T) = OpImageRead $this $location;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -5872,7 +5866,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             case glsl:
                 __intrinsic_asm "$(glslIntrinsicOffset)";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled:__sampledType(T) = OpImageRead $this $location ConstOffset $offset;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -5904,6 +5898,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         __intrinsic_asm "imageStore($0, $1, $V2)";
     }
 
+    // Metal texture writes lower to `kIROp_ImageStore` (or to a texture atomic) rather than to an
+    // `__intrinsic_asm` string, because `insertMetalTextureFences` finds the writes it fences by
+    // that instruction.
     [require(metal, texture_sm_4_1)]
     __intrinsic_op($(kIROp_ImageStore))
     static void __metalImageStoreArray(This val, vector<uint, Shape.dimensions> location, T value, uint arrayIndex);
@@ -5952,7 +5949,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     }
                 }
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     OpImageWrite $this $location __convertTexel(newValue);
                 };
@@ -6108,7 +6105,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
             case glsl:
                 __intrinsic_asm "$(glslIntrinsicMS)";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled:__sampledType(T) = OpImageRead $this $location Sample $sampleIndex;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -6133,7 +6130,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
             case glsl:
                 __intrinsic_asm "$(glslIntrinsicMSOffset)";
             case spirv:
-                return spirv_asm
+                return spirv_asm [__assumeValidResourceOperands]
                 {
                     %__sampled:__sampledType(T) = OpImageRead $this $location ConstOffset|Sample $offset $sampleIndex;
                     __truncate $$T result __sampledType(T) %__sampled;
@@ -6194,7 +6191,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
                 case glsl:
                     __glslImageStore(location, sampleIndex, newValue);
                 case spirv:
-                    return spirv_asm
+                    return spirv_asm [__assumeValidResourceOperands]
                     {
                         OpImageWrite $this $location __convertTexel(newValue) Sample $sampleIndex;
                     };
@@ -12823,7 +12820,11 @@ $}
 /// HLSL does not allow atomic operations on floating point types. For `InterlockedAdd`, consider using
 /// `RWByteAddressBuffer.InterlockedAddF32` or `RWByteAddressBuffer.InterlockedAddF16` instead when NVAPI is available.
 /// On SPIR-V (Vulkan), all integer and floating point types are supported.
-/// On Metal and WGSL, all floating-point types are not supported.
+/// On Metal, `InterlockedAdd` and `InterlockedExchange` are the only functions in this family that
+/// accept a floating-point `T`, and only a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, floating-point types are not supported.
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
@@ -12864,7 +12865,10 @@ $}
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, all floating-point types are not supported.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, floating-point types are not supported.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12886,7 +12890,9 @@ void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T 
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, `dest` must be in device memory, such as a `RWStructuredBuffer` element or a device
+/// pointer, not a texture, a `RWBuffer` or `groupshared` memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12912,7 +12918,10 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -12940,7 +12949,10 @@ void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T v
 ///
 /// On SPIR-V (Vulkan), this function maps to `OpAtomicCompareExchange`.
 ///
-/// On Metal and WGSL, this function is not available.
+/// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
+/// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
+/// memory.
+/// On WGSL, this function is not available.
 ///
 /// On CUDA, this function maps to `atomicCAS`.
 /// @category atomic
@@ -14656,6 +14668,66 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
     default:
         MATRIX_MAP_BINARY(T, N, M, modf, x, ip);
     }
+}
+
+/// Split into an `int` whole part and a floating-point fractional part.
+///
+/// Nonzero fractional parts have the same sign as `x`.
+/// The whole part must be representable as `int`.
+/// @param x The input value.
+/// @param[out] ip The whole part of `x`, truncated toward zero.
+/// @return The fractional part of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T modf(T x, out int ip)
+{
+    // We split in the input type before converting the whole part, so the fractional part
+    // follows the floating-point `modf` semantics on each target, including for negative inputs.
+    T wholePart;
+    T fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<int>(wholePart);
+    return fractionalPart;
+}
+
+/// Split each component into an `int` whole part and a floating-point fractional part.
+///
+/// Each whole part must be representable as `int`.
+/// @param x The input vector.
+/// @param[out] ip The whole parts of `x`, truncated toward zero.
+/// @return The fractional parts of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+vector<T,N> modf(vector<T,N> x, out vector<int,N> ip)
+{
+    vector<T,N> wholePart;
+    vector<T,N> fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<vector<int,N>>(wholePart);
+    return fractionalPart;
+}
+
+/// Split each element into an `int` whole part and a floating-point fractional part.
+///
+/// Each whole part must be representable as `int`.
+/// @param x The input matrix.
+/// @param[out] ip The whole parts of `x`, truncated toward zero.
+/// @return The fractional parts of `x`.
+/// @category math
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<int,N,M,L> ip)
+{
+    matrix<T,N,M,L> wholePart;
+    matrix<T,N,M> fractionalPart = modf(x, wholePart);
+    ip = __builtin_cast<matrix<int,N,M,L>>(wholePart);
+    return fractionalPart;
 }
 
 /// Masked sum of absolute differences of byte alignments.
@@ -17584,10 +17656,9 @@ WaveMask WaveMaskMatch(WaveMask mask, T value)
     case cuda: __intrinsic_asm "_waveMatchScalar($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     case spirv:
+        __shaderSubgroupPartitionedPreamble<T>();
         return (spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         }).x;
     }
@@ -17605,10 +17676,9 @@ WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
     case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
     case spirv:
+        __shaderSubgroupPartitionedPreamble<T>();
         return (spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         }).x;
     }
@@ -19596,10 +19666,9 @@ uint4 WaveMatch(T value)
     case hlsl: __intrinsic_asm "WaveMatch";
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
+        __shaderSubgroupPartitionedPreamble<T>();
         return spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
@@ -19616,10 +19685,9 @@ uint4 WaveMatch(vector<T,N> value)
     case hlsl: __intrinsic_asm "WaveMatch";
     case glsl: __intrinsic_asm "subgroupPartitionNV($0)";
     case spirv:
+        __shaderSubgroupPartitionedPreamble<T>();
         return spirv_asm
         {
-            OpCapability GroupNonUniformPartitionedNV;
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpGroupNonUniformPartitionNV $$uint4 result $value
         };
     default:
@@ -19844,6 +19912,13 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
 // are emulated by performing an additional operation to the inclusive scan result. Reductions are not supported.
 //
 
+// Declares the extension and capability of the partitioned subgroup operations. For SPIR-V it
+// declares NV when the target requests spvGroupNonUniformPartitionedNV and EXT otherwise (the NV
+// and EXT enumerants are aliases, see those atoms in slang-capabilities.capdef). A target with the
+// NV atom matches both SPIR-V cases, and `__target_switch` takes the most specific one, so exactly
+// one block is emitted. Every SPIR-V partitioned operation declares its extension through this
+// function, because an `OpExtension` in its own `spirv_asm` would declare the same extension even
+// when the target requested the other one.
 __generic<T : __BuiltinType>
 [ForceInline]
 void __shaderSubgroupPartitionedPreamble()
@@ -19853,11 +19928,17 @@ void __shaderSubgroupPartitionedPreamble()
     {
     case glsl:
         __requireTargetExtension("GL_NV_shader_subgroup_partitioned");
-    case spirv:
+    case spvGroupNonUniformPartitionedNV:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_subgroup_partitioned";
             OpCapability GroupNonUniformPartitionedNV;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_subgroup_partitioned";
+            OpCapability GroupNonUniformPartitionedEXT;
         };
     default:
         return;
@@ -20826,7 +20907,7 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
             __intrinsic_asm "($1 = $(glslTextureSizeFunc)($0))";
         case metal: __intrinsic_asm "(*($1) = $0.get_width())";
         case spirv:
-            dim = spirv_asm {
+            dim = spirv_asm [__assumeValidResourceOperands] {
                 OpCapability ImageQuery;
                 result:$$uint = OpImageQuerySize $this;
             };
@@ -20867,7 +20948,7 @@ $}
         case glsl:
             __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
-        case spirv: return spirv_asm {
+        case spirv: return spirv_asm [__assumeValidResourceOperands] {
                 %__sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
@@ -20901,8 +20982,8 @@ $}
                 {
                 case hlsl: __intrinsic_asm "($0)[$1] = $2";
                 case glsl: __intrinsic_asm "imageStore($0, int($1), $V2)";
-                case metal: __intrinsic_asm "$0.write($2, $1)";
-                case spirv: spirv_asm {
+                case metal: __metalImageStore(this, index, newValue);
+                case spirv: spirv_asm [__assumeValidResourceOperands] {
                         OpImageWrite $this $index __convertTexel(newValue);
                     };
                 }
@@ -21275,7 +21356,7 @@ void TraceRay(
         let direction = Ray.Direction;
         let tmin = Ray.TMin;
         let tmax = Ray.TMax;
-        spirv_asm
+        spirv_asm [__assumeValidResourceOperands]
         {
             OpTraceRayKHR
                 /**/ $AccelerationStructure
@@ -21377,7 +21458,7 @@ void TraceMotionRay(
         let tmax = Ray.TMax;
 
         p = Payload;
-        spirv_asm
+        spirv_asm [__assumeValidResourceOperands]
         {
             OpCapability RayTracingMotionBlurNV;
             OpExtension "SPV_NV_ray_tracing_motion_blur";
@@ -22740,7 +22821,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         {
         case glsl: __intrinsic_asm "rayQueryInitializeEXT($0, $1, $2, $3, $4, $5, $6, $7)";
         case spirv:
-            spirv_asm {
+            spirv_asm [__assumeValidResourceOperands] {
                 OpRayQueryInitializeKHR &this $accelerationStructure $rayFlags $instanceInclusionMask $origin $tMin $direction $tMax;
             };
         }
@@ -30299,7 +30380,7 @@ struct CoopMat
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
-    >(__constref groupshared U[V] data, uint element, uint stride)
+    >(const groupshared U[V] data, uint element, uint stride)
     {
         if (matrixLayout == CoopMatMatrixLayout.RowMajor)
             __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
@@ -31054,7 +31135,7 @@ $}
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
-    >(__constref groupshared T[V] data, uint element, uint stride)
+    >(const groupshared T[V] data, uint element, uint stride)
     {
         __target_switch
         {
@@ -31121,7 +31202,7 @@ $}
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
-    >(__constref groupshared U[V] data, uint element, uint stride)
+    >(const groupshared U[V] data, uint element, uint stride)
     {
         __target_switch
         {
@@ -31195,7 +31276,7 @@ $}
         U,
         let V : int,
         let L : int
-    >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
+    >(const groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         let pointer = __getAddress(data[element]);
@@ -31949,7 +32030,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let matrixLayout : CoopMatMatrixLayout,
     let U : int
 >(
-    __constref groupshared T[U] data,
+    const groupshared T[U] data,
     uint element,
     uint stride)
 {
@@ -32942,7 +33023,7 @@ $}
     [__NoSideEffect]
     [require(cooperative_vector)]
     [require(optix_coopvec)]
-    static CoopVec<T, N> load<let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> load<let M : int>(const groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
@@ -32977,7 +33058,7 @@ $}
     [ForceInline]
     [__NoSideEffect]
     [require(spirv, cooperative_vector)]
-    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int>(__constref groupshared const U[M] data, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int>(const groupshared U[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
@@ -32992,7 +33073,7 @@ $}
     [ForceInline]
     [__NoSideEffect]
     [require(spirv, cooperative_vector)]
-    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int, let L : int>(__constref groupshared const vector<U, L>[M] data, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int, let L : int>(const groupshared vector<U, L>[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
@@ -33394,7 +33475,7 @@ $}
     // Careful, this takes the offset in elements
     [ForceInline]
     [require(hlsl)]
-    void __Load(__constref groupshared T buffer[M], uint elemOffset)
+    void __Load(const groupshared T buffer[M], uint elemOffset)
     {
         static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
         __target_switch
@@ -34440,7 +34521,7 @@ CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* b
 // Groupshared
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(const groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(data, byteOffset16ByteAligned);
 }

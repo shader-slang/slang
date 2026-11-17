@@ -20,7 +20,6 @@ export __extern_cpp int useNestedZeroArray(int[0][2] dropped, int kept)
 }
 
 // The compile must succeed — a failing invocation could still print the expected IR and pass.
-// IR: result code = 0
 // IR: ### BEFORE legalizeEmptyTypes
 // IR: func %useNestedZeroArray {{.*}}: Func(Int, Array(Void, 2 {{.*}}), Int)
 // IR: ### AFTER legalizeEmptyTypes

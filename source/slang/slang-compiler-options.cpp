@@ -345,6 +345,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::DumpIntermediates:
         case CompilerOptionName::MinimumSlangOptimization:
         case CompilerOptionName::SkipSPIRVValidation:
+        case CompilerOptionName::ValidateWithDownstreamCompiler:
         case CompilerOptionName::ZeroInitialize:
         case CompilerOptionName::IgnoreCapabilities:
         case CompilerOptionName::RestrictiveCapabilityCheck:
@@ -371,6 +372,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::NoHLSLPackConstantBufferElements:
         case CompilerOptionName::EnableExperimentalPasses:
         case CompilerOptionName::EnableExtendedHLSLBackwardsCompatibility:
+        case CompilerOptionName::HLSLMethodsMutatingByDefault:
         case CompilerOptionName::TrackLiveness:
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:

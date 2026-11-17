@@ -3,7 +3,7 @@
 // Test that using an AndType (conjunction) as the super-type of
 // a generic equality constraint is diagnosed.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 interface IAlpha
 {

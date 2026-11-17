@@ -2,8 +2,8 @@
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability--autodiff-annotations
-//META: doc_section_digest=b0c3a7d91822154a961b319d70bc835f44d68d38eef2d49365b0588620bb973e
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#receiver-parameter-modes
+//META: doc_section_digest=0a94769a669aa12d0fcebf6cfa246eb8793500358434d0e57afd65ad8545f45a
 //META: purpose=`[mutating]` on a method allows assigning to fields through `this`; the mutation is visible after the call.
 //META: intent=functional
 //META: pipeline_stage=check

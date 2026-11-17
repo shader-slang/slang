@@ -18,7 +18,7 @@
 
 // CHECK-HLSL: case int(0):
 // CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(1):
+// CHECK-HLSL: case 1L:
 
 // CHECK:      64
 // CHECK-NEXT: B

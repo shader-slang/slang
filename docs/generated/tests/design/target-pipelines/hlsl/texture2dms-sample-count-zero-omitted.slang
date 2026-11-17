@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-13T00:00:00+00:00
-//META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#shape-of-the-emitted-file
-//META: doc_section_digest=661909b676c08c2d761f60550d882c809f2880516507364f2d914febeee1c6d3
+//META: doc_section_digest=f7d5cbd1c3620eef32d32fe0c7e4e9df28ec40d641f947026a4c21d50fd6e988
 //META: purpose=Boundary: the sample count is appended to the composed multisampled texture type only when it is non-zero, so `Texture2DMS<float4>` emits with no count while `Texture2DMS<float4, 4>` keeps its `4`.
 //META: intent=boundary
 //META: pipeline_stage=emit

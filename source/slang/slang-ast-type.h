@@ -807,6 +807,10 @@ class MatrixExpressionType : public ArithmeticExpressionType
     IntVal* getColumnCount();
     IntVal* getLayout();
 
+    /// Return whether the layout is anything other than the constant `MatrixLayoutMode.Unknown`.
+    /// A generic layout parameter counts as specified, since it may be bound to a real layout.
+    bool hasSpecifiedLayout();
+
     Type* getRowType();
 
     // Overrides should be public so base classes can access

@@ -1,6 +1,6 @@
 //TEST:COMPILE: tests/bugs/13306/struct-types.hlsl -Gec -target hlsl -entry main -validate-ir
 //TEST:COMPILE: tests/bugs/13306/struct-types.hlsl -Gec -target spirv -entry main -validate-ir
-//TEST:SIMPLE_EX(filecheck=CHECK): tests/bugs/13306/struct-types.hlsl -Gec -target hlsl -entry main -DTRY_WRITES
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): tests/bugs/13306/struct-types.hlsl -Gec -target hlsl -entry main -DTRY_WRITES
 
 // Semantic checking must distinguish the fields of `Box<uint>` and `Box<Texture2D<float4>>`,
 // including when either specialization is nested in another `Box`. It must also inspect

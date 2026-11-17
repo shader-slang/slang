@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_ERROR): -target spirv -entry psmain -profile vs_6_0
-//TEST:SIMPLE(filecheck=CHECK_ERROR): -target spirv -entry vsmain -profile ps_6_0
+//TEST:SIMPLE(filecheck=CHECK_ERROR,exit-code=-1): -target spirv -entry psmain -profile vs_6_0
+//TEST:SIMPLE(filecheck=CHECK_ERROR,exit-code=-1): -target spirv -entry vsmain -profile ps_6_0
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry vsmain -profile vs_6_0
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry psmain -profile vs_6_0 -ignore-capabilities
@@ -32,5 +32,5 @@ VSOutput vsmain(float3 PositionOS : POSITION, float3 Color : COLOR0)
 [shader("pixel")]
 float4 psmain(VSOutput input) : SV_TARGET
 {
-    return float4(input.Color, 1);   
+    return float4(input.Color, 1);
 }

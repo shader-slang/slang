@@ -2,12 +2,12 @@
 // existential values carry runtime type information and witness tables that
 // cannot be interpolated between pipeline stages.
 
-//TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexMain -stage vertex
-//TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexMain -stage vertex
-//TEST:SIMPLE(filecheck=CHK2): -target spirv -entry fragmentReturnMain -stage fragment
-//TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry fragmentReturnMain -stage fragment
-//TEST:SIMPLE(filecheck=CHK3): -target spirv -entry fragmentOptionalReturn -stage fragment
-//TEST:SIMPLE(filecheck=CHK3): -target hlsl -entry fragmentOptionalReturn -stage fragment
+//TEST:SIMPLE(filecheck=CHK1,exit-code=-1): -target spirv -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK1,exit-code=-1): -target hlsl -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK2,exit-code=-1): -target spirv -entry fragmentReturnMain -stage fragment
+//TEST:SIMPLE(filecheck=CHK2,exit-code=-1): -target hlsl -entry fragmentReturnMain -stage fragment
+//TEST:SIMPLE(filecheck=CHK3,exit-code=-1): -target spirv -entry fragmentOptionalReturn -stage fragment
+//TEST:SIMPLE(filecheck=CHK3,exit-code=-1): -target hlsl -entry fragmentOptionalReturn -stage fragment
 
 interface IFoo
 {

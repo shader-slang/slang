@@ -1,9 +1,9 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone -std 2026
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -gminimal -std 2026
-//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gnone -std 2025
-//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gminimal -std 2025
-//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gnone -std legacy
-//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gminimal -std legacy
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -gnone -std 2026
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -gminimal -std 2026
+//TEST:SIMPLE(filecheck=CHECK_LEGACY,exit-code=-1): -target spirv -gnone -std 2025
+//TEST:SIMPLE(filecheck=CHECK_LEGACY,exit-code=-1): -target spirv -gminimal -std 2025
+//TEST:SIMPLE(filecheck=CHECK_LEGACY,exit-code=-1): -target spirv -gnone -std legacy
+//TEST:SIMPLE(filecheck=CHECK_LEGACY,exit-code=-1): -target spirv -gminimal -std legacy
 
 // CHECK: error[E30811]
 // CHECK: struct Child : Parent {};

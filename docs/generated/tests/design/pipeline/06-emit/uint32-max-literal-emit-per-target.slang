@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#shared-c-like-base
-//META: doc_section_digest=4b10e63cd2245887946d5a04f643460694312535bff48052c288d542dac985ca
+//META: doc_section_digest=2925195aa74cfaa771484ed6ad98e7d46471401bdbd2dae25ac81dc1530166c0
 //META: purpose=Boundary: the `uint` maximum `4294967295` survives literal emission on every backend — the C-family targets append the `U` suffix that keeps the literal unsigned, WGSL wraps it in `u32(...)`, and SPIR-V encodes it as an `OpConstant %uint`.
 //META: intent=boundary
 //META: pipeline_stage=emit

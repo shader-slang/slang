@@ -3,6 +3,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "core/slang-std-writers.h"
 #include "core/slang-string-util.h"
 #include "core/slang-test-tool-util.h"
@@ -696,13 +697,15 @@ struct AssignValsFromLayoutContext
             ComPtr<ITextureView> textureView;
             SLANG_RETURN_ON_FAIL(texture->getDefaultView(textureView.writeRef()));
 
-            // Determine access mode from the shader parameter's resource type
-            auto handleType = dstCursor.getTypeLayout()->getType();
-            auto resourceType = handleType->getElementType();
-            auto resourceAccess =
-                resourceType ? resourceType->getResourceAccess() : SLANG_RESOURCE_ACCESS_READ_WRITE;
+            // The `TEST_INPUT` kind decides the access: an `RWTexture*` input sets `isRWTexture`,
+            // which also chose the `UnorderedAccess` state (and so the texture's usage) above. The
+            // input kind must match the shader's handle type (`Texture2D.Handle` vs
+            // `RWTexture2D.Handle`), and render-test cannot check that here: on SPIR-V and D3D12
+            // the handle is reflected as a plain `uint2`, which carries no resource access.
+            DescriptorHandleAccess access = srcVal->textureDesc.isRWTexture
+                                                ? DescriptorHandleAccess::ReadWrite
+                                                : DescriptorHandleAccess::Read;
             DescriptorHandle handle;
-            DescriptorHandleAccess access = getDescriptorHandleAccess(resourceAccess);
 
             // Try to get descriptor handle - will fail on backends that don't support it
             auto result = textureView->getDescriptorHandle(access, &handle);
@@ -1670,6 +1673,33 @@ static void renderDocBeginFrame() {}
 static void renderDocEndFrame() {}
 #endif
 
+/// Stops the Vulkan validation layer from also writing its messages to stdout.
+///
+/// The Khronos validation layer logs every message to stdout by itself, in addition to calling
+/// the debug messenger that the device registers. That messenger already collects the messages in
+/// `CoreDebugCallback`, and slang-test appends them to the output of the test. The text on stdout
+/// is therefore redundant, and it breaks the reply of a test server when it contains a blank line,
+/// because the server sends its JSON-RPC replies on stdout. We set `debug_action` to
+/// `VK_DBG_LAYER_ACTION_CALLBACK`, which keeps only the callbacks that the application registers.
+/// A value that the user has already set is left as it is. The layer reads the variable when
+/// the Vulkan instance is created, so this runs before the first device is created.
+static void _routeVulkanValidationMessagesToDebugCallback()
+{
+    const char* const name = "VK_KHRONOS_VALIDATION_DEBUG_ACTION";
+
+    Slang::StringBuilder existingValue;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice(name),
+            existingValue)))
+        return;
+
+#if SLANG_WINDOWS_FAMILY
+    ::SetEnvironmentVariableA(name, "VK_DBG_LAYER_ACTION_CALLBACK");
+#else
+    ::setenv(name, "VK_DBG_LAYER_ACTION_CALLBACK", 0);
+#endif
+}
+
 static SlangResult _innerMain(
     Slang::StdWriters* stdWriters,
     SlangSession* session,
@@ -1986,6 +2016,7 @@ static SlangResult _innerMain(
         {
             if (options.enableDebugLayers)
             {
+                _routeVulkanValidationMessagesToDebugCallback();
                 getRHI()->enableDebugLayers();
             }
             Slang::ComPtr<rhi::IDevice> rhiDevice;
