@@ -185,15 +185,6 @@ void legalizeStore(
             readsTexel,
             storeInst,
             sink);
-        // We warn only on CUDA. Elsewhere, losing a concurrent write to another component of the
-        // texel is the same data race as two threads writing the texel. On CUDA the read is also
-        // undefined after an earlier write to the texel in the same kernel launch (CUDA C++
-        // Programming Guide, "Read/Write Coherency"), so even one thread can lose a write.
-        if (readsTexel)
-        {
-            sink->diagnose(Diagnostics::TexturePartialWriteIsReadModifyWrite{
-                .location = storeInst->sourceLoc});
-        }
     }
 
     IRType* indexingType = builder.getIntType();
