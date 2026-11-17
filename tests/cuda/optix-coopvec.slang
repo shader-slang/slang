@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec
 
-// The PTX directive needs NVRTC and the OptiX 9.1.0 headers (see issue #14557).
 //TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -capability optix_coopvec
 
 // CHECK-PTX: _optix_vector_load_16xi32
