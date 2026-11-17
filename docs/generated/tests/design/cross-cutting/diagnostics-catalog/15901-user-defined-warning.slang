@@ -14,7 +14,7 @@
 // `#warning` reports its message without failing the compile. The CHECK pins
 // the user-defined-warning code, which distinguishes it from `#error`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #warning deliberate user-defined preprocessor warning
 void main() {}
 

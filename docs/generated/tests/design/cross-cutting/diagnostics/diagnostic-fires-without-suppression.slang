@@ -14,7 +14,7 @@
 // silences does reach the user. CHECK pins the code and message at the comma's
 // column, so the suppression tests are known to be changing behaviour.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 int main()
 {
     int x = (1, 2);

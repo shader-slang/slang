@@ -14,7 +14,7 @@
 // that exceed the operand's bit width. A `1 << 40` shift on a 32-bit
 // integer produces a warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 uniform int a;

@@ -15,7 +15,7 @@
 // compiles rather than erroring, the diagnostic is the only observable
 // difference from any other empty statement.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 

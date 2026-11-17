@@ -14,7 +14,7 @@
 // second definition and the companion note at the first, so losing either
 // record fails the exhaustive check.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 #define MY_MACRO 1
 /*CHECK:

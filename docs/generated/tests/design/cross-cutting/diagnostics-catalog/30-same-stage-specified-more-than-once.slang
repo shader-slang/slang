@@ -15,7 +15,7 @@
 // second identical `-stage compute` makes the driver warn; the CHECK pins the
 // duplicate-stage warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute -stage compute
 [numthreads(1,1,1)]
 void main() {}
 

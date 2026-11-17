@@ -14,7 +14,7 @@
 // `#undef` on a name that was never defined is harmless but warned about. The
 // CHECK pins the undefined-macro warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #undef NOT_DEFINED_XYZ
 void main() {}
 

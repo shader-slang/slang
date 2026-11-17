@@ -15,7 +15,7 @@
 // declared at the cbuffer and compares it with the earlier `x`. The
 // result is a warning (E30204), not an error, so compilation succeeds.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main
 
 static const int x = 1;
 //CHECK:         ^ see previous declaration of 'x'

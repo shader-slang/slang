@@ -12,7 +12,7 @@
 // Boundary axis: profile out-of-band — a profile that does not
 // exist in the SM table must be rejected before code generation.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -profile cs_99_99
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -entry main -profile cs_99_99
 //CHECK: unknown profile 'cs_99_99'
 // CHECK: E00014
 

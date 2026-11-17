@@ -14,7 +14,7 @@
 // the table is rejected at command-line parse time with E00013, the
 // dual of the unknown-profile negative.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target zzfooz -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target zzfooz -entry main -stage compute
 //CHECK: unknown code generation target 'zzfooz'
 // CHECK: E00013
 

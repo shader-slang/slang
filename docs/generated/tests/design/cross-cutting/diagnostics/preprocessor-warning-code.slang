@@ -13,7 +13,7 @@
 // 15xxx subsystem range. An unset macro is used in an `#if` condition; the
 // caret-anchored CHECK pins code 15205 and the message naming the macro.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 #if UNSET_MACRO
 /*CHECK:

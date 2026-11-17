@@ -14,7 +14,7 @@
 // the deprecation warning, which only fires if the [deprecated] declaration is
 // the selected candidate.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 float4 makeFour(float2 f2, float f)
 {

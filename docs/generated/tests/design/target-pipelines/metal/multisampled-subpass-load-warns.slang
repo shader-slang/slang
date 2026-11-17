@@ -18,7 +18,7 @@
 // this compile produces, plus the caret-anchored span form the runner
 // reports on the sample-index argument itself.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry main -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target metal -entry main -stage fragment
 
 [[vk::input_attachment_index(0)]] SubpassInputMS<float4> inputMS;
 

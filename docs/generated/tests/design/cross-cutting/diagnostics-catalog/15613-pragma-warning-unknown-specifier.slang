@@ -15,7 +15,7 @@
 // (push/pop/disable/enable/error). A name outside it is diagnosed, which the
 // CHECK pins by code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #pragma warning(bogusspecifier: 30081)
 void main() {}
 

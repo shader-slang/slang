@@ -11,7 +11,7 @@
 //META: catalog_name=link-time-constant-array-size
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 extern static const int N;
 struct S { int arr[N]; }

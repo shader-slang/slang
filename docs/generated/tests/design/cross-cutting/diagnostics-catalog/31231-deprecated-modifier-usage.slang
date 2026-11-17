@@ -13,7 +13,7 @@
 
 // 'volatile' is deprecated in Slang 2025; using it triggers E31231.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-std 2025
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-std 2025
 
 static volatile int b;
 

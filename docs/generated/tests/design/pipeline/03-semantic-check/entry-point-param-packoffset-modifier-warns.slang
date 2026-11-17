@@ -15,7 +15,7 @@
 // the report; if it fires here it fires whenever the modifier appears in this
 // position. CHECK pins E38010 and the message naming the keyword and parameter.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

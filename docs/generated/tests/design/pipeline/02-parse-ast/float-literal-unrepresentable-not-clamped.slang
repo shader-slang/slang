@@ -17,7 +17,7 @@
 // 65504 — a clamping parser would have produced a finite value and a different
 // message.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 static const half tooLarge = 65520.h;
 //CHECK:                     ^^^^^^^ warning E40009

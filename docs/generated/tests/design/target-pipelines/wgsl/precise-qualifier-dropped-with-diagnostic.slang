@@ -16,7 +16,7 @@
 // applies to, and the E56005 code is pinned separately; compilation is
 // expected to continue past the report.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target wgsl -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 

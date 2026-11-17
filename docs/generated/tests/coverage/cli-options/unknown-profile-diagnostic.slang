@@ -16,7 +16,7 @@
 // pinned by error code. Observed message recorded verbatim: "unknown profile
 // 'zzz'".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -profile zzz -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -profile zzz -entry main -stage compute
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

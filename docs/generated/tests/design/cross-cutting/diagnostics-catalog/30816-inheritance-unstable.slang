@@ -11,7 +11,7 @@
 //META: catalog_name=inheritance-unstable
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 struct A {}
 struct B : A {}

@@ -14,7 +14,7 @@
 // A non-zero float literal smaller than the smallest
 // representable subnormal of the target type triggers E40010.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 static const half g = 1.0e-30h;
 

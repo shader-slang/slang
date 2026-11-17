@@ -14,7 +14,7 @@
 // Reading from an `out` parameter before assigning to it produces
 // the uninitialized-out-parameter warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> o;
 

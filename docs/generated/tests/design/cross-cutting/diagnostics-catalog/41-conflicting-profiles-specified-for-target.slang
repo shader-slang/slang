@@ -14,7 +14,7 @@
 // Two different `-profile` values for one target cannot both apply. The CHECK
 // pins the conflicting-profiles error to keep that rejection observable.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -profile sm_6_0 -profile sm_5_0 -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -profile sm_6_0 -profile sm_5_0 -entry main -stage compute
 [numthreads(1,1,1)]
 void main() {}
 

@@ -15,7 +15,7 @@
 // makes option parsing fail; the CHECK pins the unknown-profile code so the
 // rejection cannot silently degrade into a default profile.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-profile bogusprofile
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-profile bogusprofile
 [numthreads(1,1,1)]
 void main() {}
 

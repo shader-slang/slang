@@ -14,7 +14,7 @@
 // Mesh-shader vertex/index outputs must use the `out` direction.
 // Declaring them with `in` triggers the must-be-out warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage mesh
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage mesh
 
 struct V { float4 pos : SV_POSITION; };
 

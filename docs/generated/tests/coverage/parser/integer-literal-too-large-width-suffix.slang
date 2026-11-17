@@ -20,7 +20,7 @@
 // (Pointer) arms of that three-way split fire. This is a warning, so the
 // compile still succeeds.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
 
 static const uint64_t a = 9223372036854775809ll;
 //CHECK:                  ^^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned

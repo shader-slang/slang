@@ -13,7 +13,7 @@
 
 // Minimum reproduction for diagnostic E15404.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #define __FILE__ 5
 void main() { __FILE__; }
 

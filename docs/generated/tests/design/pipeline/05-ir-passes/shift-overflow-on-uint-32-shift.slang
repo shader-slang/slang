@@ -13,7 +13,7 @@
 // overflow (>=N for N-bit operand). Distinct from the existing
 // `<< 40` (signed `int`) test in this bundle.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry main
 
 uniform RWStructuredBuffer<uint> buf;
 uniform uint a;

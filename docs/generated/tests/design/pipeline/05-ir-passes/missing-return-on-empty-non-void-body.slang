@@ -13,7 +13,7 @@
 // empty (no statements at all). The same `E41010` diagnostic fires
 // and attaches to the function name.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 uniform int x;

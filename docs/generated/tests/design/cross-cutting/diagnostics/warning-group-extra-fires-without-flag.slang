@@ -14,7 +14,7 @@
 // carries the extra sentinel; the caret-anchored CHECK asserts it is reported at
 // the offending declarator with no warning flag on the command line.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 int main()
 {
     int enum = 1;

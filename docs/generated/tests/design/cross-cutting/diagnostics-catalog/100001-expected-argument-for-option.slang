@@ -14,7 +14,7 @@
 // `-profile` requires a following value. Omitting it triggers the
 // expected-argument diagnostic.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -profile
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -entry main -stage compute -profile
 
 [numthreads(1,1,1)]
 void main() {}

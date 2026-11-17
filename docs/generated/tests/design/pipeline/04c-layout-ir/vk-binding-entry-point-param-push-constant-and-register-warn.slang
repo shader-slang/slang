@@ -15,7 +15,7 @@
 // warning naming the offending keyword/attribute, so neither is silently
 // dropped.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

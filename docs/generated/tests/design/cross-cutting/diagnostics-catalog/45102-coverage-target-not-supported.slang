@@ -15,7 +15,7 @@
 // buffer; the WGSL backend cannot satisfy this — coverage is
 // skipped with a warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -entry main -stage compute -trace-coverage
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target wgsl -entry main -stage compute -trace-coverage
 
 RWStructuredBuffer<int> o;
 

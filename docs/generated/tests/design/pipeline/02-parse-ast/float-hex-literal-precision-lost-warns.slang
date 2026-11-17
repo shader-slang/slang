@@ -16,7 +16,7 @@
 // actually stored, `0x1.fffffep+0`, showing the parser kept the decoder's
 // rounded result rather than rejecting the literal.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 static const float lossy = 0x1.ffffffp0;
 //CHECK:                   ^^^^^^^^^^^^ warning E40019

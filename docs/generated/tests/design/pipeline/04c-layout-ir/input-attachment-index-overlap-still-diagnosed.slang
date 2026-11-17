@@ -16,7 +16,7 @@
 // warning must still fire, so the index range was recorded even though the
 // placeholder space was not marked used.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv-asm -entry main -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv-asm -entry main -stage fragment
 
 [shader("fragment")]
 float4 main(

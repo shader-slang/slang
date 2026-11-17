@@ -16,7 +16,7 @@
 // the scanner recorded, and the warning is pinned to W10002 so a
 // renumbering cannot pass silently.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 static const int legacy = 017;
 //CHECK:                  ^^^ '0' prefix indicates octal literal

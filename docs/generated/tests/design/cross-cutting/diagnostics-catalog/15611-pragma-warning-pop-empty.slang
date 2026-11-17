@@ -14,7 +14,7 @@
 // `#pragma warning(push/pop)` maintains a stack of diagnostic states. A `pop`
 // with an empty stack is unmatched, and the CHECK pins that warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #pragma warning(pop)
 void main() {}
 

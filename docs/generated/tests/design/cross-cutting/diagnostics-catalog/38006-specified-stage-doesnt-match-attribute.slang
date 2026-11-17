@@ -14,7 +14,7 @@
 // -stage vertex on the command line but [shader("fragment")] on
 // the entry point triggers E38006.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage vertex -entry main -profile sm_5_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive): -target hlsl -stage vertex -entry main -profile sm_5_0
 
 [shader("fragment")]
 float4 main() : SV_Target

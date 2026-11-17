@@ -17,7 +17,7 @@
 // naming the converted value `0` again shows the parser stored what the decoder
 // returned rather than substituting the smallest denormal.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 static const float tooSmall = .700649232e-45;
 //CHECK:                      ^^^^^^^^^^^^^^ warning E40010

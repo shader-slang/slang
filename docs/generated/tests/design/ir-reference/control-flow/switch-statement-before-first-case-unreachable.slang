@@ -12,7 +12,7 @@
 // lowerSwitchCases warns once for the whole leading run. Two statements precede
 // the first label; only the first carries the warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target spirv -entry main -stage compute
 
 uniform int a;
 RWStructuredBuffer<int> buf;

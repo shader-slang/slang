@@ -17,7 +17,7 @@
 // verbatim: "unknown value for option '-O'. Valid values are
 // '0, none, 1, default, 2, high, 3, maximal'".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -O9 -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -O9 -entry main -stage compute
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

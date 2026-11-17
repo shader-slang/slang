@@ -15,7 +15,7 @@
 // about, so a shadowed definition is not silent. The CHECK pins the
 // macro-redefinition warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #define DUP_MACRO 1
 #define DUP_MACRO 2
 void main() {}

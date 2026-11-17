@@ -13,7 +13,7 @@
 
 // Minimum reproduction for diagnostic E10002.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 int x = 0123;
 void main() { x; }
 

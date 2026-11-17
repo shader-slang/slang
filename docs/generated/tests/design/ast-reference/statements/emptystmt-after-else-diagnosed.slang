@@ -11,7 +11,7 @@
 
 // Verifies the warning fires for `else ;` and not for `else {}`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 

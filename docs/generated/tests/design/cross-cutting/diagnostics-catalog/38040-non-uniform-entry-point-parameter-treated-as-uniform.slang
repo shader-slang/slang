@@ -15,7 +15,7 @@
 // and no `uniform` modifier is auto-converted to uniform with a
 // warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry main
 
 [numthreads(1,1,1)]
 void main(int p)

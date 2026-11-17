@@ -15,7 +15,7 @@
 // paths after the same `-entry` is ambiguous, and the CHECK pins the
 // duplicate-output-path error that rejects it.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -o a.hlsl -o b.hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -entry main -stage compute -o a.hlsl -o b.hlsl
 [numthreads(1,1,1)]
 void main() {}
 

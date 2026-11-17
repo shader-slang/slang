@@ -17,7 +17,7 @@
 // on the canonical placement too, the unannotated diagnostic would fail the
 // test rather than passing unnoticed.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-std 2025
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-std 2025
 
 struct [__NonCopyableType] Deprecated { int x; };
 /*CHECK:

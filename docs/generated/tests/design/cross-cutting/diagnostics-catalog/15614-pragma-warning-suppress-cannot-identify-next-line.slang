@@ -13,7 +13,7 @@
 
 // Minimum reproduction for diagnostic E15614.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 //CHECK: E15614
 void main() {}
 #pragma warning(suppress: 41024)

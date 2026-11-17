@@ -14,7 +14,7 @@
 // parameter, so the gate opens and the attribute is reported. CHECK pins
 // E38010 and the attribute name.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

@@ -13,7 +13,7 @@
 // looked up in the pragma callback table, found absent, and treated
 // as a warning ("unknown pragma ignored"). Compilation continues.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 #pragma totally_unknown
 //CHECK:^^^^^^^^^^^^^^^ unknown pragma ignored

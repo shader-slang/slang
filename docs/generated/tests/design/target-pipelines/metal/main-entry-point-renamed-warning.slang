@@ -15,7 +15,7 @@
 // one diagnostic, so pinning the stable code E40100 is sufficient and no
 // other diagnostic is left unannotated.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target metal -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

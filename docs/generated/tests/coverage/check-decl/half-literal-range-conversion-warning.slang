@@ -16,7 +16,7 @@
 // exhaustive check pins both the two suppressed conversions and the two warned
 // ones, which is the only externally visible read-out of that arm.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl
 
 void takesHalf(half x)
 {

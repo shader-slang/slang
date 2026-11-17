@@ -13,7 +13,7 @@
 // A comma operator in a value context triggers comma-operator-used-in-expression;
 // the caret-anchored CHECK pins the rendered code E41024 at the comma's column.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 int main()
 {
     int x = (1, 2);

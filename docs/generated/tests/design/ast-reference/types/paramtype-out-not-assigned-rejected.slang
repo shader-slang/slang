@@ -15,7 +15,7 @@
 // diagnostic on the reading line, which would not fire if `out` were
 // treated as `inout`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 void readsOut(out int x)
 {

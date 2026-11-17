@@ -13,7 +13,7 @@
 // still compiles (the doc says the node is built), but E30525 is
 // reported on the `$for` token.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute -std 2026
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry computeMain -stage compute -std 2026
 
 RWStructuredBuffer<int> outputBuffer;
 

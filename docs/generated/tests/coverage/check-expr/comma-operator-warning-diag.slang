@@ -12,7 +12,7 @@
 // comma sequence in a parenthesized expression triggers the
 // CommaOperatorUsedInExpression warning (E41024); CHECK pins the warning text.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry test -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry test -stage fragment
 
 int test(int a, int b) { return (a, b); }
 //CHECK:                          ^ comma operator used in expression

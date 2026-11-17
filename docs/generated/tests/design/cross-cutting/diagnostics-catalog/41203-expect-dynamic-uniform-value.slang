@@ -14,7 +14,7 @@
 // Writing a per-thread value into a `dynamic_uniform` struct field
 // triggers the uniformity-store warning under -validate-uniformity.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -profile cs_6_0 -validate-uniformity
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -profile cs_6_0 -validate-uniformity
 
 RWStructuredBuffer<int> output;
 

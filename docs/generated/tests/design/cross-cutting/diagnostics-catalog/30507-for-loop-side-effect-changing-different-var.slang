@@ -15,7 +15,7 @@
 // is almost always a copy-paste bug. The checker warns; the CHECK pins the
 // side-effect-on-different-variable warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 void main() { int j = 0; for (int i = 0; i < 4; j++) { } }
 
 //CHECK: E30507

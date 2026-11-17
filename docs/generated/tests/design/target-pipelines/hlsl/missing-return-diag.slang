@@ -13,7 +13,7 @@
 // `reqSet.missingReturn`. A function declared to return `int`
 // with no return statement must fail before reaching HLSL emit.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 

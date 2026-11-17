@@ -15,7 +15,7 @@
 // `float` narrows, so the checker warns rather than errors; the CHECK pins the
 // unrecommended-conversion warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 void main() { float f = 1.5; int i = f; }
 
 //CHECK: E30081

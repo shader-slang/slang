@@ -12,7 +12,7 @@
 // A non-void function with a return only on one branch triggers the
 // missing-return diagnostic from `slang-ir-missing-return.cpp`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main
 
 uniform int x;
 uniform RWStructuredBuffer<int> buf;

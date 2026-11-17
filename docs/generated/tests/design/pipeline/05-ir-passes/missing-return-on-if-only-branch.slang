@@ -12,7 +12,7 @@
 // Control-flow variation on missing-return: the function has an
 // `if (cond) return ...;` but no return on the fall-through path.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

@@ -14,7 +14,7 @@
 // Applying `register(...)` to an entry-point parameter is
 // unsupported and triggers E38010.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage vertex -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage vertex -entry main
 
 float4 main(uniform float4 v : register(c0)) : SV_Position
 {

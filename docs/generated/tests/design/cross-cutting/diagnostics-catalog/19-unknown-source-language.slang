@@ -14,7 +14,7 @@
 // `-lang` selects the source language for the following inputs. A name outside
 // the known set is rejected during option parsing; the CHECK pins that code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-lang bogus
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-lang bogus
 [numthreads(1,1,1)]
 void main() {}
 

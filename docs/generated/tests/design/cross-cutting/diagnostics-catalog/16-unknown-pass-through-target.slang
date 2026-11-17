@@ -15,7 +15,7 @@
 // unrecognised name is rejected while parsing the command line, which the CHECK
 // observes by code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-pass-through bogusdownstream
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-pass-through bogusdownstream
 [numthreads(1,1,1)]
 void main() {}
 

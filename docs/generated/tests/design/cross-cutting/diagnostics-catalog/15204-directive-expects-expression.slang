@@ -13,7 +13,7 @@
 
 // Minimum reproduction for diagnostic E15204.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #if 1
 #elif
 #endif

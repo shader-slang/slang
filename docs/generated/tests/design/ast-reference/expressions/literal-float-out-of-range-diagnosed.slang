@@ -14,7 +14,7 @@
 // surface as a diagnostic. `1e50f` is far outside binary32 range; the CHECK
 // pins the warning code and its caret span over the literal token.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry notMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry notMain -stage compute
 
 void notMain()
 {

@@ -14,7 +14,7 @@
 // observable trace of the base-8 decision is the lexer warning, so the caret
 // span over the whole literal plus the 10002 code is what proves the arm ran.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 void main()
 {

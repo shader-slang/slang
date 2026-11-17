@@ -14,7 +14,7 @@
 // A binding attribute on a global uniform (not inside a constant
 // buffer) is ignored and triggers E39071.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target spirv -stage compute -entry main
 
 [[vk::binding(1,0)]]
 uniform float v;

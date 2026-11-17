@@ -16,7 +16,7 @@
 // values, and the front-end rejects with E00031 at command-line
 // parse.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -profile cs_6_5 -entry main -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -profile cs_6_5 -entry main -stage vertex
 //CHECK: conflicting stages have been specified for entry point 'main'
 // CHECK: E00031
 

@@ -14,7 +14,7 @@
 // A user-defined constructor that exits without assigning all
 // fields triggers the constructor-uninitialized-field warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 struct S {
     int a;

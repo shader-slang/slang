@@ -14,7 +14,7 @@
 // so the expression is not constant-folded out from under the checker
 // before it runs. The code CHECK pins the warning identity.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

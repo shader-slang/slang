@@ -14,7 +14,7 @@
 // The mirror-image mistake: the condition tests a variable the increment never
 // touches. The CHECK pins the predicate-checks-different-variable warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 void main() { int j = 0; for (int i = 0; j < 4; i++) { } }
 
 //CHECK: E30508

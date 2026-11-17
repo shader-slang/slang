@@ -14,7 +14,7 @@
 // Repeating the same `-profile` for one target is redundant. The driver warns
 // instead of failing, and the CHECK pins the duplicate-profile warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -profile sm_6_0 -profile sm_6_0 -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -profile sm_6_0 -profile sm_6_0 -entry main -stage compute
 [numthreads(1,1,1)]
 void main() {}
 

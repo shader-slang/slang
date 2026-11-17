@@ -13,7 +13,7 @@
 
 // An `==` whose result is discarded as a statement fires the warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 void main()
 {

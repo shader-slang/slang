@@ -14,7 +14,7 @@
 // `default`, `suppress`, etc., the preprocessor emits 15613 with
 // the offending specifier interpolated via `~specifier`.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 #pragma warning(maybe: 41024)
 //CHECK:        ^^^^^ E15613
 //CHECK:        ^^^^^ unknown #pragma warning specifier 'maybe'

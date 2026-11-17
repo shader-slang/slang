@@ -15,7 +15,7 @@
 // Requesting it for the HLSL text target produces a warning rather than an
 // error, so the CHECK pins the warning code and the compile still proceeds.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute -separate-debug-info
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry main -stage compute -separate-debug-info
 [numthreads(1,1,1)]
 void main() {}
 

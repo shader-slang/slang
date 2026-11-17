@@ -14,7 +14,7 @@
 // argument to a function with three `inout` parameters; CHECK asserts the
 // caret-anchored W30051 alias warning fires on that argument position.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 

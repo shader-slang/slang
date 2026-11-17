@@ -17,7 +17,7 @@
 // comment below as the characterization record (the matcher matches the code).
 // Observed message: "unknown command-line option '-no-such-option'".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -no-such-option -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-target hlsl -no-such-option -entry main -stage compute
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

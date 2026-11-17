@@ -17,7 +17,7 @@
 // itself in an unsigned 64-bit type yields 0 without the wrap a signed
 // reinterpretation would produce.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 void main()
 {

@@ -15,7 +15,7 @@
 // made-up `-line-directive-mode` value fires the generic unknown-value error,
 // which the CHECK pins by code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-line-directive-mode bogusmode
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-line-directive-mode bogusmode
 [numthreads(1,1,1)]
 void main() {}
 

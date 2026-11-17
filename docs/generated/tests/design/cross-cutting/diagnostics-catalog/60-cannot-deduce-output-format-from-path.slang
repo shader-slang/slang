@@ -15,7 +15,7 @@
 // extension. `.xyz` maps to no known format, so the CHECK pins the
 // cannot-infer-format error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-entry main -stage compute -o out.xyz
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=1):-entry main -stage compute -o out.xyz
 [numthreads(1,1,1)]
 void main() {}
 

@@ -16,7 +16,7 @@
 // compile continues. CHECK pins E40010 on the literal; the warning severity is
 // what lets the surrounding entry point still be emitted.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry computeMain
 
 RWStructuredBuffer<float> outputBuffer;
 

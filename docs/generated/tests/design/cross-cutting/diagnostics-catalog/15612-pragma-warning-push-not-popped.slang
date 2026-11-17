@@ -15,7 +15,7 @@
 // stack unbalanced at end of translation. The CHECK pins the not-popped
 // warning code.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 #pragma warning(push)
 void main() {}
 

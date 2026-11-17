@@ -16,7 +16,7 @@
 // debug-printf extension, so emitting to glsl fails with a capability
 // error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target glsl -stage compute -entry main -profile glsl_450
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target glsl -stage compute -entry main -profile glsl_450
 
 uniform RWStructuredBuffer<int> buf;
 

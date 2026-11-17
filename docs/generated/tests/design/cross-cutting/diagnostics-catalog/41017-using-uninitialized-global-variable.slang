@@ -14,7 +14,7 @@
 // A `static` module-scope variable that is read without initialization
 // triggers the uninitialized-global-variable warning.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):-target hlsl -entry main -stage compute
 
 static int gz;
 RWStructuredBuffer<int> o;
