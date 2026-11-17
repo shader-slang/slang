@@ -707,6 +707,31 @@ struct MyDifferentiableType : IDifferentiable
 }
 ```
 
+### Reference Parameters
+
+A differentiable function, a function with a user-defined derivative, and a user-defined derivative function cannot currently have a by-reference parameter (see [Borrow and Reference Parameters](02-conventional-features.md#borrow-and-reference-parameters)). Any other function can, and a differentiable function can call it under `no_diff`. A differentiable function or a user-defined derivative function can still access thread-group-shared memory directly, through a global `groupshared` variable rather than a `groupshared` parameter.
+
+The exact behavior of an automatically generated derivative with respect to thread-group-shared memory is unspecified. A derivative that Slang generates may access that memory a different number of times, at different points, and in a different order than the original function does (see [Restrictions and Known Issues](#restrictions-and-known-issues)). If a program depends on exactly how its accesses to thread-group-shared memory execute, it should make those accesses in a non-differentiable function. A differentiable function calls it under `no_diff`, and a user-defined derivative function calls it directly.
+
+For example, on a parameter, `groupshared` implies a reference to storage in the thread-group-shared address space, so `load` below cannot be differentiable, but it can read `tile` for `render`. The differentiable function `render` never reads `tile` itself. It passes `tile` to `load` by reference and calls `load` under `no_diff`, so the read happens in `load`:
+
+```csharp
+groupshared float tile[64];
+
+float load(const groupshared float values[64], uint i)
+{
+    return values[i];
+}
+
+[Differentiable]
+float render(uint i, float x)
+{
+    return no_diff(load(tile, i)) * x;
+}
+```
+
+Because the interaction between derivatives and thread-group-shared memory is subtle, we recommend accessing global `groupshared` variables only from non-differentiable functions, and calling those functions from differentiable functions or user-defined derivative functions rather than accessing the variables there directly.
+
 ### Excluding Struct Members from Differentiation
 
 When using automatic `IDifferentiable` conformance synthesis for a `struct` type, Slang will by-default treat all struct members that have a differentiable type as differentiable, and thus include a corresponding field in the generated `Differential` type for the struct.

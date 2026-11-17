@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-08-13T00:00:00+00:00
-source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
-watched_paths_digest: d15d1888c1942e74bb5f0d1c587028144302fd5be5a0ac77096604764c68cf54
+model: claude-sonnet-5-5
+generated_at: 2026-11-08T21:45:00+00:00
+source_commit: ae4e57957a0adad3061b069b0e0eec8217779338
+watched_paths_digest: c75210b432e3db6aa71f338d658742707a25d1cc67b2cb48f88ef09e60881066
 source_doc: docs/generated/design/ir-reference/metadata.md
-source_doc_digest: bc653b5707641f7f1f73c6b6ebb22c7405c29f629b0c6633eef90523062888b8
+source_doc_digest: c2489f1fdd016c14d429f1933f62c61e0d495ccb600777dac49eab3ff951ca67
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -66,7 +66,7 @@ include-flag's `true` form, which needs a second file. Both are recorded in
 Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md). This page is
 a per-opcode reference, so a large fraction of it describes the compiler's own
 structure rather than anything a shader can reveal; the list is therefore split
-into **user-observable claims** (C1–C114, each reachable from a compiled shader)
+into **user-observable claims** (C1–C119, each reachable from a compiled shader)
 and **internal-source facts** (I1–I10, about C++ wrappers, producing functions
 and this documentation set's own bookkeeping). Every C and I identifier below
 appears in exactly one of the two tables that follow.
@@ -84,7 +84,7 @@ appears in exactly one of the two tables that follow.
 9. `existentialTypeLayout` carries attributes only; an interface-typed field such as `ILight light` produces one.
 10. `structTypeLayout` carries one `structFieldLayout` attribute per field, in declaration order.
 11. `tupleTypeLayout` has no producer at HEAD.
-12. `structuredBufferTypeLayout` carries `elementTypeLayout`; a `RWStructuredBuffer<T>` produces one, and its element type `T` gets the fallback `typeLayout`.
+12. `structuredBufferTypeLayout` carries `elementTypeLayout`; a `RWStructuredBuffer<float>` produces one, and its scalar element gets the fallback `typeLayout` (a general `T` is lowered to its own layout opcode).
 13. `ptrTypeLayout` carries attributes only — the pointee layout is deliberately not stored; a pointer field such as `float* p` produces one.
 14. `EntryPointLayout` carries exactly two fixed operands, the parameters layout and the result layout, both `varLayout`s.
 
@@ -112,21 +112,21 @@ appears in exactly one of the two tables that follow.
 31. No `Debug*` opcode exists unless debug information is requested, and the requested `DebugInfoLevel` selects which of them exist.
 32. `-g` with no suffix is `Standard`, and `-g0`..`-g3` name the level explicitly.
 33. At `None` (`-g0`) lowering emits nothing.
-34. `Minimal` (`-g1`) produces `DebugSource` with an empty text operand, `DebugLine`, `DebugFunction`, and — once the inliner has run — `DebugScope` and `DebugInlinedAt`.
-35. `Standard` (`-g`, `-g2`) and `Maximal` (`-g3`) additionally give `DebugSource` the file's text and give each non-included source file a `DebugCompilationUnit`.
+34. `Minimal` (`-g1`) produces `DebugSource` with an empty text operand, a `DebugCompilationUnit` for each non-included source file, `DebugLine`, `DebugFunction`, and — once the inliner has run — `DebugScope` and `DebugInlinedAt`.
+35. `Standard` (`-g`, `-g2`) and `Maximal` (`-g3`) additionally give `DebugSource` the file's text and emit `DebugLexicalBlock` and `DebugScope` records.
 36. `DebugVar` and `DebugValue` never appear at `-g1`.
 37. `-debug-info-include-source` embeds the source text into `DebugSource` even at `Minimal`.
 38. Only `DebugSource` and `DebugCompilationUnit` are hoistable among the debug records.
 39. `DebugSource` carries the file name, the source text, and an included-file flag.
 40. `DebugCompilationUnit` carries a single operand referencing a `DebugSource`.
 41. `DebugLine` carries the source, the start and end line, and the start and end column.
-42. `DebugVar` carries source, line, column and an optional argument index, and its result type is `Ptr<T>`.
+42. `DebugVar` carries source, line, column, scope and an optional argument index, and its result type is `Ptr<T>`.
 43. `DebugValue` carries the `DebugVar` in operand 0 and the value in operand 1.
-44. `DebugInlinedAt` carries line, column, file, the debug function inlined into, and an optional outer frame.
+44. `DebugInlinedAt` carries line, column, file, the scope inlined into, and an optional outer frame.
 45. `DebugFunction` carries name, line, column, file, debug type and an optional parent scope, and the owning function links to it by `DebugFuncDecoration`.
 46. `DebugInlinedVariable` has no producer at HEAD.
-47. `DebugScope` carries a scope in operand 0 and, when it has one, an inlining context in operand 1.
-48. `DebugNoScope` has no producer at HEAD: the inliner closes an inlined region by restoring the caller's scope with a `DebugScope` instead.
+47. `DebugScope` carries a `DebugFunction` or `DebugLexicalBlock` scope in operand 0 and, when it has one, an inlining context in operand 1.
+48. `DebugNoScope` is declared with no operands and has no producer at HEAD: the inliner closes an inlined region by restoring the caller's scope with a `DebugScope` instead.
 49. `DebugBuildIdentifier` carries a build identifier and a flags operand, and is created only under `-separate-debug-info`.
 50. `EmbeddedDownstreamIR` carries an integer `CodeGenTarget` operand and an `IRBlobLit` payload.
 
@@ -207,7 +207,7 @@ appears in exactly one of the two tables that follow.
 
 ### Notable opcodes — `DebugFunction`
 
-99. `DebugFunction` picks the five- or six-operand form rather than storing a null, so the trailing operand is absent at `Minimal`, where no compilation unit is built at all.
+99. `DebugFunction` picks the five- or six-operand form rather than storing a null, so the trailing operand is present whenever the function's file has a compilation unit, including at `Minimal`, and absent for an `#include`d or `#line`-remapped file.
 100. The trailing operand is the `DebugCompilationUnit` of the source file the function is *defined* in, so an imported function resolves to its own module's unit and an `#include`d or `#line`-remapped file never gets one.
 
 ### Notable opcodes — `DebugVar`
@@ -222,7 +222,7 @@ appears in exactly one of the two tables that follow.
 
 ### Notable opcodes — `DebugScope`
 
-105. `DebugScope` operand 0 references the enclosing scope — a `DebugFunction` for a function-level scope, or another `DebugScope` for a nested block — and operand 1, when present, records the inlining context.
+105. `DebugScope` operand 0 references the scope being made current — a `DebugFunction` or a `DebugLexicalBlock` — and operand 1, when present, records the inlining context.
 106. The `DebugScope` that restores an ordinary caller scope after an inlined call carries only the caller's `DebugFunction`, with no inlining-context operand.
 
 ### Notable opcodes — `SPIRVAsmOperand` printed forms
@@ -241,17 +241,25 @@ appears in exactly one of the two tables that follow.
 112. The three type functions compute a SPIR-V type from their operand at emit time rather than holding a value present in the IR.
 113. `__truncate` is accepted in operand 0 of a `SPIRVAsmInst` alongside a `SPIRVAsmOperandEnum` or `SPIRVAsmOperandLiteral`.
 
+### Notable opcodes — `DebugLexicalBlock`, `DebugScope`, `DebugVar` (added at refresh)
+
+115. `DebugLexicalBlock` carries source, line, column and a `parentScope` that is a `DebugFunction` or another `DebugLexicalBlock`; for a braced block directly in a function body the parent is the `DebugFunction`.
+116. `DebugLexicalBlock` records are created only at `Standard` and above, so a `Minimal` compile of a braced block emits none.
+117. Lowering emits the one-operand form of `DebugScope`, naming a `DebugLexicalBlock`, when it enters a braced block.
+118. A `DebugVar`'s fourth operand is its scope: the `DebugFunction` for a function-level local and the `DebugLexicalBlock` for a local in a nested block.
+119. A `Minimal` compile builds a `DebugCompilationUnit` and the `DebugFunction` carries it as its trailing `parentScope` operand.
+
 ### Internal-source facts
 
-- **I1.** The four families live in distinct Lua entry groups and comprise fifty-nine concrete opcodes.
-- **I2.** Thirty-eight of the fifty-nine have hand-written C++ wrappers and twenty-one are emitted by the FIDDLE template, because an entry declaring only `min_operands` gets no generated accessors.
+- **I1.** The four families live in distinct Lua entry groups and comprise sixty concrete opcodes.
+- **I2.** Thirty-nine of the sixty have hand-written C++ wrappers and twenty-one are emitted by the FIDDLE template, because an entry declaring only `min_operands` gets no generated accessors.
 - **I3.** Layout and layout-attribute opcodes are produced by AST-to-IR lowering rather than by an IR pass.
 - **I4.** The whole `SPIRVAsm*` group comes from one visitor, `visitSPIRVAsmExpr`.
 - **I5.** The `Debug*` opcodes are split across lowering, the inliner, the debug-value-store pass, type legalization and `linkAndOptimizeIR`.
 - **I6.** `Layout`, `TypeLayout`, `Attr`, `SemanticAttr`, `LayoutResourceInfoAttr` and `SPIRVAsmOperand` are abstract grouping entries defining a contiguous opcode range, so `as<IRAttr>()` is a range comparison and no instruction ever carries one of those opcodes.
-- **I7.** The `Debug*` opcodes are eleven sibling top-level entries with no common parent, so there is no `as<IRDebugInst>()`.
+- **I7.** The `Debug*` opcodes are twelve sibling top-level entries with no common parent, so there is no `as<IRDebugInst>()`.
 - **I8.** `IRBuilder::getTupleFieldLayoutAttr` creates the attribute with the layout as its only operand while `IRTupleFieldLayoutAttr::getLayout()` reads operand 1.
-- **I9.** The `DebugVar` Lua operand names are stale aliases for `(source, line, col, argIndex?)`, and the generated `getType()` shadows `IRInst::getType()`.
+- **I9.** The `DebugVar` Lua entry declares only `min_operands = 5` although the real operands are `(source, line, col, scope, argIndex?)`, read through the hand-written accessors.
 - **I10.** Three producers of opcodes on this page are outside the document's `watched_paths` and should be added.
 
 ## Functional coverage
@@ -266,13 +274,13 @@ appears in exactly one of the two tables that follow.
 | C23: The Aligned attribute records the access alignment of a load or a store, appearing in the operand tail of those instructions rather than in a type layout. | functional | [#attr-family](../../../../design/ir-reference/metadata.md#attr-family) | [`aligned-attr-on-load-and-store.slang`](aligned-attr-on-load-and-store.slang) |
 | C24: The MemoryScope attribute records the memory scope of a coherent store, sitting after the Aligned attribute in the store's operand tail. | functional | [#attr-family](../../../../design/ir-reference/metadata.md#attr-family) | [`memory-scope-attr-on-coherent-store.slang`](memory-scope-attr-on-coherent-store.slang) |
 | C31, C32, C33, C34: At debug level None (-g0) lowering emits no Debug records at all, while the same shader at -g1 produces the source, function and line records. | boundary | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-level-none-emits-no-records.slang`](debug-level-none-emits-no-records.slang) |
-| C34, C44: DebugInlinedAt records one frame of an inlining chain as line, column, source file and the debug function it was inlined into, with the outer-frame operand absent at the outermost frame -- and it exists at -g1 once the inliner has run. | functional | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-inlined-at-frame-operands.slang`](debug-inlined-at-frame-operands.slang) |
-| C35, C36: Debug level Minimal (-g1) produces no DebugCompilationUnit and no DebugVar or DebugValue, all three of which the Standard level adds. | boundary | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-level-minimal-omits-var-value-and-unit.slang`](debug-level-minimal-omits-var-value-and-unit.slang) |
+| C34, C44: DebugInlinedAt records one frame of an inlining chain as line, column, source file and the scope it was inlined into, with the outer-frame operand absent at the outermost frame -- and it exists at -g1 once the inliner has run. | functional | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-inlined-at-frame-operands.slang`](debug-inlined-at-frame-operands.slang) |
+| C35, C36: Debug level Minimal (-g1) produces no DebugVar or DebugValue, both of which the Standard level adds; the DebugCompilationUnit is built at every level above None. | boundary | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-level-minimal-omits-var-value-and-unit.slang`](debug-level-minimal-omits-var-value-and-unit.slang) |
 | C37: The -debug-info-include-source flag embeds the source text into DebugSource even at Minimal, the one exception to the debug-level rule. | boundary | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-info-include-source-embeds-text-at-minimal.slang`](debug-info-include-source-embeds-text-at-minimal.slang) |
 | C39, C97: DebugSource records a source file's path, its embedded text, and a flag saying whether the file was included. | functional | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-source-records-path-and-include-flag.slang`](debug-source-records-path-and-include-flag.slang) |
 | C40: DebugCompilationUnit declares the compilation unit with a single operand referencing a DebugSource. | functional | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-compilation-unit-references-debug-source.slang`](debug-compilation-unit-references-debug-source.slang) |
 | C43: DebugValue reports the current value of a DebugVar, taking the variable declaration in operand 0 and the value in operand 1. | functional | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-value-reports-debug-var.slang`](debug-value-reports-debug-var.slang) |
-| C45, C99: DebugFunction carries the optional trailing parentScope operand at full debug level, where a DebugCompilationUnit exists for it to reference; the five-operand form appears only at -g1. | boundary | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-function-parent-scope-at-full-debug.slang`](debug-function-parent-scope-at-full-debug.slang) |
+| C45, C99: DebugFunction carries the optional trailing parentScope operand at full debug level, referencing the DebugCompilationUnit. | boundary | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-function-parent-scope-at-full-debug.slang`](debug-function-parent-scope-at-full-debug.slang) |
 | C45: DebugFunction declares a function for the debugger with its name, line, column, source file and function type, and the owning function links to it by decoration. | functional | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-function-name-line-col-file-type.slang`](debug-function-name-line-col-file-type.slang) |
 | C46: No DebugInlinedVariable opcode is produced anywhere, even when a call is inlined under debug info. | negative | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-inlined-variable-has-no-producer.slang`](debug-inlined-variable-has-no-producer.slang) |
 | C49: DebugBuildIdentifier records the build identifier of the compilation together with a flags operand when separate debug information is requested. | functional | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-build-identifier-with-separate-debug-info.slang`](debug-build-identifier-with-separate-debug-info.slang) |
@@ -280,11 +288,11 @@ appears in exactly one of the two tables that follow.
 | C103: One if statement is marked at both its predicate and its after location, and a for statement gets separate condition and increment markers. | functional | [#debugline](../../../../design/ir-reference/metadata.md#debugline) | [`debug-line-if-predicate-and-after-markers.slang`](debug-line-if-predicate-and-after-markers.slang), [`debug-line-separate-for-condition-and-increment.slang`](debug-line-separate-for-condition-and-increment.slang) |
 | C104: Lowering emits no DebugLine markers inside a Slang-synthesized constructor, so a debugger cannot step into compiler-generated code. | negative | [#debugline](../../../../design/ir-reference/metadata.md#debugline) | [`debug-line-skips-synthesized-constructor.slang`](debug-line-skips-synthesized-constructor.slang) |
 | C41: DebugLine pins an instruction to a source range with five operands: the source file, the start and end lines, and the start and end columns. | functional | [#debugline](../../../../design/ir-reference/metadata.md#debugline) | [`debug-line-five-operand-range.slang`](debug-line-five-operand-range.slang) |
-| C47, C105: A DebugScope opens a lexical scope whose operand 0 references the enclosing scope, a DebugFunction for a function-level scope, and whose operand 1 records the inlining context. | functional | [#debugscope](../../../../design/ir-reference/metadata.md#debugscope) | [`debug-scope-references-debug-function.slang`](debug-scope-references-debug-function.slang) |
-| C48, C106: An inlined region is closed by a DebugScope that restores the caller's function scope with the caller's DebugFunction as its only operand, not by DebugNoScope. | boundary | [#debugscope](../../../../design/ir-reference/metadata.md#debugscope) | [`debug-no-scope-replaced-by-caller-scope-restore.slang`](debug-no-scope-replaced-by-caller-scope-restore.slang) |
+| C47, C105: A DebugScope opens a lexical scope whose operand 0 references the enclosing scope, a DebugFunction for a function-level scope, and whose operand 1 records the inlining context. | functional | [#debugscope-and-debugnoscope](../../../../design/ir-reference/metadata.md#debugscope-and-debugnoscope) | [`debug-scope-references-debug-function.slang`](debug-scope-references-debug-function.slang) |
+| C48, C106: An inlined region is closed by a DebugScope that restores the caller's function scope with the caller's DebugFunction as its only operand, not by DebugNoScope. | boundary | [#debugscope-and-debugnoscope](../../../../design/ir-reference/metadata.md#debugscope-and-debugnoscope) | [`debug-no-scope-replaced-by-caller-scope-restore.slang`](debug-no-scope-replaced-by-caller-scope-restore.slang) |
 | C98: Compiling at -g1 leaves the DebugSource text operand an empty string, so the record carries the path without a copy of the file. | boundary | [#debugsource](../../../../design/ir-reference/metadata.md#debugsource) | [`debug-source-text-operand-empty-at-minimal.slang`](debug-source-text-operand-empty-at-minimal.slang) |
 | C42, C101: A DebugVar for an ordinary local omits the argument-index operand, and the variable's own type is the pointee of the instruction's pointer result type rather than an operand. | boundary | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | [`debug-var-local-result-type-is-pointer.slang`](debug-var-local-result-type-is-pointer.slang) |
-| C42: A DebugVar for an entry-point parameter carries the optional argument-index operand after source, line and column. | boundary | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | [`debug-var-param-carries-arg-index.slang`](debug-var-param-carries-arg-index.slang) |
+| C42: A DebugVar for an entry-point parameter carries the optional argument-index operand after source, line, column and scope. | boundary | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | [`debug-var-param-carries-arg-index.slang`](debug-var-param-carries-arg-index.slang) |
 | C2, C72: A laid-out instruction is connected to its layout by a layout decoration whose operand is a concrete Layout child, printed as a separate Void-typed definition elsewhere in the dump. | functional | [#layout](../../../../design/ir-reference/metadata.md#layout) | [`layout-decoration-reaches-concrete-layout-child.slang`](layout-decoration-reaches-concrete-layout-child.slang) |
 | C10: A structTypeLayout carries one structFieldLayout attribute per field, and those attributes appear in field declaration order. | functional | [#layout-family](../../../../design/ir-reference/metadata.md#layout-family) | [`struct-type-layout-field-attrs-in-declaration-order.slang`](struct-type-layout-field-attrs-in-declaration-order.slang) |
 | C12: A structured-buffer parameter lowers to a structuredBufferTypeLayout whose operand 0 is the element type layout. | functional | [#layout-family](../../../../design/ir-reference/metadata.md#layout-family) | [`structured-buffer-type-layout-element-operand.slang`](structured-buffer-type-layout-element-operand.slang) |
@@ -325,6 +333,11 @@ appears in exactly one of the two tables that follow.
 | C14: An EntryPointLayout has exactly two fixed operands and no attribute tail: the parameters layout and the result layout, both varLayouts. | functional | [#varlayout-and-entrypointlayout](../../../../design/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`entry-point-layout-two-varlayout-operands.slang`](entry-point-layout-two-varlayout-operands.slang) |
 | C3: A varLayout has one fixed operand, the type layout, followed by a variable-length tail of attributes. | functional | [#varlayout-and-entrypointlayout](../../../../design/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`varlayout-type-layout-then-attr-tail.slang`](varlayout-type-layout-then-attr-tail.slang) |
 | C74: An EntryPointLayout's result layout covers only the return value, so an out parameter is laid out in the parameters layout instead. | boundary | [#varlayout-and-entrypointlayout](../../../../design/ir-reference/metadata.md#varlayout-and-entrypointlayout) | [`entry-point-layout-result-excludes-out-param.slang`](entry-point-layout-result-excludes-out-param.slang) |
+| C115: DebugLexicalBlock carries source, line, column and a parentScope that is the enclosing DebugFunction for a braced block directly in the function body, and is created at Standard debug level. | functional | [#debuglexicalblock](../../../../design/ir-reference/metadata.md#debuglexicalblock) | [`debug-lexical-block-operands-parent-is-function.slang`](debug-lexical-block-operands-parent-is-function.slang) |
+| C116: DebugLexicalBlock records exist only at Standard debug level and above, so a Minimal compile of a braced block emits none. | boundary | [#debuglexicalblock](../../../../design/ir-reference/metadata.md#debuglexicalblock) | [`debug-lexical-block-absent-at-minimal.slang`](debug-lexical-block-absent-at-minimal.slang) |
+| C117: Lowering emits a one-operand DebugScope naming a DebugLexicalBlock when it enters a braced block. | functional | [#debugscope-and-debugnoscope](../../../../design/ir-reference/metadata.md#debugscope-and-debugnoscope) | [`debug-scope-one-operand-names-lexical-block.slang`](debug-scope-one-operand-names-lexical-block.slang) |
+| C118: A DebugVar's fourth operand is its scope: the DebugFunction for a function-level local and the DebugLexicalBlock for a local declared in a nested block. | functional | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | [`debug-var-scope-operand-function-and-lexical-block.slang`](debug-var-scope-operand-function-and-lexical-block.slang) |
+| C119: At Minimal debug level a DebugCompilationUnit is built and the DebugFunction carries it as its trailing parentScope operand. | boundary | [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) | [`debug-function-parent-scope-present-at-minimal.slang`](debug-function-parent-scope-present-at-minimal.slang) |
 
 ## Untested claims
 
@@ -339,18 +352,18 @@ appears in exactly one of the two tables that follow.
 | C57, C58, C59, C60, C64, C109 (location-kind half): the texel-conversion operand, the three ray `...FromLocation` operand kinds, and the NonSemantic.DebugPrintf instruction-set operand. | gpu-vulkan-extension | [#spirvasmoperand](../../../../design/ir-reference/metadata.md#spirvasmoperand) | The texel-conversion kind needs an inline-asm image store, the three location kinds need ray-tracing entry points with the matching Vulkan capability set, and the debug-printf set needs that extended instruction set enabled -- none of which this bundle's compute entry points can request. |
 | C90 (invalid-extent half): an invalid extent surfaces as `-2` in the raw `LayoutSize` operand. | implementation-detail | [#size-and-offset](../../../../design/ir-reference/metadata.md#size-and-offset) | The `-1` unsized sentinel is reachable from an unbounded resource array and is covered, but no Slang declaration was found that makes a layout report an *invalid* extent, so the `-2` spelling has no surface to drive it from. |
 | C100: `DebugFunction`'s trailing operand is the `DebugCompilationUnit` of the file the function is defined in, so an imported function resolves to its own module's unit and an `#include`d or `#line`-remapped file never gets one. | needs-multi-file-test | [#debugfunction](../../../../design/ir-reference/metadata.md#debugfunction) | Distinguishing "the defining module's unit" from "the entry point's unit" needs a second module to import from, and the `#include` half needs a second file to include; a single-file test only ever has one compilation unit to point at. |
-| I1, I2: The four families comprise fifty-nine concrete opcodes across distinct Lua entry groups, thirty-eight of which have hand-written C++ wrapper structs because their entries declare only `min_operands` and so get no generated accessors. | internal-source-fact | [#source](../../../../design/ir-reference/metadata.md#source) | Which wrappers are hand-written and which are generated is a property of the compiler's own headers with no consequence a compiled shader can reveal. |
+| I1, I2: The four families comprise sixty concrete opcodes across distinct Lua entry groups, thirty-nine of which have hand-written C++ wrapper structs because their entries declare only `min_operands` and so get no generated accessors. | internal-source-fact | [#source](../../../../design/ir-reference/metadata.md#source) | Which wrappers are hand-written and which are generated is a property of the compiler's own headers with no consequence a compiled shader can reveal. |
 | I3, I4, I5: The layout family is produced by AST-to-IR lowering rather than by an IR pass, the whole `SPIRVAsm*` group comes from one visitor, and the `Debug*` opcodes are split across lowering, the inliner, the debug-value-store pass, type legalization and `linkAndOptimizeIR`. | internal-source-fact | [#source](../../../../design/ir-reference/metadata.md#source) | Which C++ function creates a record is not observable from a dump, which shows only that the record exists in a given snapshot; the snapshot-ordering consequence that *is* observable is already exercised by the tests that read from `-dump-ir-after performForceInlining`. |
 | I6, I7: `Layout`, `TypeLayout`, `Attr`, `SemanticAttr`, `LayoutResourceInfoAttr` and `SPIRVAsmOperand` are abstract grouping entries that define a contiguous opcode range so `as<IRAttr>()` is a range comparison, and the `Debug*` opcodes have no such grouping parent. | internal-source-fact | [#family-hierarchy](../../../../design/ir-reference/metadata.md#family-hierarchy) | The consequence the claim is about is the shape of a C++ range check; the only user-visible part -- that no instruction ever carries an abstract opcode -- is implied by every layout test in this bundle naming a concrete opcode instead. |
 | I8: `IRBuilder::getTupleFieldLayoutAttr` creates the attribute with the layout as its only operand while `IRTupleFieldLayoutAttr::getLayout()` reads operand 1. | internal-source-fact | [#tuplefieldlayout-and-caselayout](../../../../design/ir-reference/metadata.md#tuplefieldlayout-and-caselayout) | Both the builder and the accessor are dormant -- nothing in the tree calls either -- so the disagreement cannot be reached from any shader; it is a note for whoever revives the opcode. |
-| I9: The `DebugVar` Lua operand names are stale aliases for `(source, line, col, argIndex?)`, and the generated `getType()` shadows `IRInst::getType()`. | internal-source-fact | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | Accessor naming is a C++-level hazard; the operand *meanings* it warns about are what the two `DebugVar` tests pin, and a dump cannot show which accessor a caller would have used. |
+| I9: The `DebugVar` Lua entry declares only `min_operands = 5` although the real operands are `(source, line, col, scope, argIndex?)`, read through the hand-written accessors. | internal-source-fact | [#debugvar](../../../../design/ir-reference/metadata.md#debugvar) | Accessor naming is a C++-level detail; the operand *meanings* it warns about are what the two `DebugVar` tests pin, and a dump cannot show which accessor a caller would have used. |
+| C99, C100 (absent half): `DebugFunction` has the five-operand form only for a function whose source file is `#include`d or `#line`-remapped, since a `Minimal` compile now builds the compilation unit. | needs-multi-file-test | [#debugfunction](../../../../design/ir-reference/metadata.md#debugfunction) | The absent form needs an included file that never gets a compilation unit; a single-file test cannot reach it. |
+| C110 addendum: in `Detailed` dump mode the inline-asm operands are not folded into their `SPIRVAsmInst` and keep separate definitions. | needs-cli-test | [#spir-v-inline-asm](../../../../design/ir-reference/metadata.md#spir-v-inline-asm) | The default dump folds them and no slangc option used in this bundle selects the detailed dump mode. |
 | I10: Three producers of opcodes on this page are outside the document's `watched_paths` and should be added. | process-doc | [#manifest-coverage](../../../../design/ir-reference/metadata.md#manifest-coverage) | A statement about this documentation set's own staleness tracking, not about compiler behavior. |
 
 ## Doc gaps observed
 
-| Anchor | Kind | Gap | Suggested addition |
-| --- | --- | --- | --- |
-| [#debugscope](../../../../design/ir-reference/metadata.md#debugscope) | drift-from-source | The section says `DebugNoScope` is declared with `min_operands = 1`, is read through `IRDebugNoScope::getScope()` and is produced by `slang-ir-inline.cpp`, and lists `DebugScope`'s operands as `scope, inlinedAt`; the same producer claim appears under [#debug-info-family](../../../../design/ir-reference/metadata.md#debug-info-family) in the producer list and the `-g1` record list. Since #13175 nothing creates `DebugNoScope`: `IRBuilder::emitDebugNoScope` has no caller, and the opcode is `min_operands = 0` with no accessor. The dump after `performForceInlining` instead shows the inlined body closed by a one-operand `DebugScope` naming the caller's `DebugFunction`. | Give `DebugScope`'s operands as `scope, inlinedAt?` and describe the one-operand form as the caller-scope restore that follows an inlined call. Mark `DebugNoScope` as having no producer at HEAD, as the page already does for `DebugInlinedVariable`, and drop it from the inliner's producer list and the `-g1` record list. |
+NA
 
 All fourteen gaps previously listed here were fixed on the documentation side
 (`docs/generated/design/_meta/doc-gap-state.json`) and the answers are now in

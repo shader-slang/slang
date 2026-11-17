@@ -511,7 +511,7 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 
         // `__noinline__` is a declaration specifier, so it belongs in this specifier
         // sequence. Kernels are call-graph roots with no caller to be inlined into, so the
-        // request is honoured for ordinary device functions only.
+        // request is honored for ordinary device functions only.
         if (inst->findDecoration<IRNoInlineDecoration>())
         {
             m_writer->emit("__noinline__ ");

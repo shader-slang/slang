@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T09:58:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-03T08:34:20Z
 target_doc: ir-reference/values.md
 review_report: ../../reviews/ir-reference/values.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 5
+  fixed: 9
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -17,19 +17,19 @@ actions:
 # Remediation report for ir-reference/values.md
 
 ## Summary
-All five findings were fixed. The missing `Reshape and pack helpers` subsection
-now exists, the false `ReinterpretOptional` producer claim is replaced by a
-"no producer at HEAD" classification that also records the stale source comment
-behind it, four aggregate-constructor origin cells gained their real AST
-producers, the descriptor-handle conversion count was corrected from four to
-six, and the IR-pass mechanics in that callout were trimmed to a producer
-classification plus a link. The document was edited, so `mark-fresh` is needed.
+
+All nine findings were verified against current source and found valid; all nine were fixed in the doc. F-006 was fixed for the two code blocks only; the over-long callouts were not trimmed. The doc stays well under its 98304-byte cap.
 
 ## Actions
+
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `docs/generated/design/_meta/prompts/ir-reference-values.md:48-49` names `Reshape and pack helpers` as its own table and the page had none. The arithmetic/logical split was left alone: `_common.md:230-232` explicitly encourages sub-tables for large groups, so two tables covering the prompt's `Arithmetic and logic` group is not a contract violation, whereas an absent group is. | Moved `matrixReshape`, `vectorReshape`, `getTupleElement`, and `getTargetTupleElement` out of `Aggregate constructors` into a new `### Reshape and pack helpers` table; rows unchanged apart from F-003. |
-| F-002 | fixed | Confirmed. `source/slang/slang-ir-typeflow-set.cpp:266-274` carries a comment claiming it emits the opcode but returns `openOptional(...)`, which builds the if-else itself; there is no `emitReinterpretOptional` and no `kIROp_ReinterpretOptional` construction anywhere in `source/`, and `source/slang/slang-ir-lower-reinterpret.cpp:228-260` only consumes existing instances. The stale comment is a real (harmless) source bug. | Conversions row origin changed to "no producer at HEAD" with the stale-comment explanation; live-but-unproduced count raised from four to five and a paragraph added for the opcode. |
-| F-003 | fixed | Verified each producer in `source/slang/slang-lower-to-ir.cpp`: `visitPackExpr` at 6542 calls `emitMakeValuePack` at 6550, `visitEachExpr` at 6554 calls `emitGetTupleElement` at 6558, `visitMakeArrayFromElementExpr` at 6757 calls `emitMakeArrayFromElement` at 6765, and the initializer-list path calls `emitMakeMatrix` at 6887 and `emitMakeTuple` at 6965. `makeValuePack` was wrongly listed as purely synthesized. | Added the AST classes and visitor line numbers to the `makeMatrix`, `makeArrayFromElement`, `makeTuple`, `makeValuePack`, and `getTupleElement` origin cells. |
-| F-004 | fixed | Confirmed: the conversions table at lines 297-302 holds six descriptor-handle conversion opcodes, matching the six Lua entries in `source/slang/slang-ir-insts.lua` at 2756-2757 and 2773-2778, but the callout counted four by skipping the `uint2` pair. | Callout now says six opcodes in three pairs, names the `uint2` pair explicitly, and the closing contrast reads "These six". |
-| F-005 | fixed | `ir-reference-values.md:72-75` forbids IR-pass behaviour. The peephole fold was pure optimization behaviour with no bearing on opcode shape or origin; the buffer-element-type detail was reduced to the producer identification the `AST origin` classification needs, as the reviewer allows. | Deleted the peephole-fold sentence; replaced the `convertOriginalToLowered` / `convertLoweredToOriginal` mechanics with a named producing pass plus a link to `../pipeline/05-ir-passes.md`. |
+| F-001 | fixed | slang-ir-insts.lua:785 says "tuple in target language"; no targetSwitch relation | makeTargetTuple row: positional target-language tuple for PyTorch binding; removed targetSwitch link |
+| F-002 | fixed | glsl.meta.slang:600-662 route through asint/asuint/asfloat; line 768 is `unpack8` with BitCast | bitCast row: example now `unpack8`, BitsTo family explained |
+| F-003 | fixed | slang-ir-insts.h declares IR-prefixed structs; _common.md requires the prefix | added `IR` to 147 wrapper cells (scripted column rewrite, not per-cell Edit) |
+| F-004 | fixed | core.meta.slang:2132-2141, 2240-2241 name different declarations | producers now `NativeString.__init(String)`, `NativeRef<T>.__init(T)`, `__managed_ptr_attach` |
+| F-005 | fixed | slang-ir-insts.lua:974-990 defines distinct non-infectious semantics | added LoadFromUninitializedMemory paragraph under the Poison callout |
+| F-006 | fixed | _common.md forbids code blocks in notable callouts | two code blocks converted to inline prose; callout length not trimmed |
+| F-007 | fixed | slang-lower-to-ir.cpp:11837-11850 lowers initialized `let` without IRVar | var statement qualified with the `let` exception |
+| F-008 | fixed | literals have no operands; blob has a named producer | literal operand cells now em-dash; blob origin `emitEmbeddedDownstreamIR` | 
+| F-009 | fixed | slang-lower-to-ir.cpp:1008-1018 says no backend can emit castToVoid | removed blanket emitter-support claim; castToVoid excluded explicitly |

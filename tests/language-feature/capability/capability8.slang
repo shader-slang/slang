@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK-PASS): -target glsl -entry computeMain -stage compute -profile sm_5_0
-//TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -entry computeMain -stage compute -profile sm_5_0
 
 // Test that we diagnose an error when calling a method that requires a capability that is not
 // available in the target.

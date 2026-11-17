@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#blockstmt-and-seqstmt
-//META: doc_section_digest=74085b8937a2f64c1cc81b32d872d42eeb0f485c431b126cafe3c352926dd739
+//META: doc_section_digest=b7945f88c46da1ac38d5eef1017c65ea1540af45af3be9fa70d93d8265ed6154
 //META: purpose=An empty BlockStmt `{}` is accepted in statement position and has no observable effect; the surrounding state is preserved across the block.
 //META: intent=boundary
 //META: pipeline_stage=check

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#typeequalitywitness
-//META: doc_section_digest=ae0256db7c6caf32ee7e4a47cbd236446d0b2a84b81a63e27c4674a88e24c42e
+//META: doc_section_digest=ca78fdfd5d0ba9cc35db3faa8107dac6b7810fc5e4cb813599e86a977f47d4d3
 //META: purpose=A constraint discharged by a type-equality fact lowers to TypeEqualityWitness(subType, superType) typed witness_table_t of that type.
 //META: intent=functional
 //META: pipeline_stage=lower

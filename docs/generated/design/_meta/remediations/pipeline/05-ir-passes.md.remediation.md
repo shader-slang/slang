@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T14:30:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-02T21:22:30Z
 target_doc: pipeline/05-ir-passes.md
 review_report: ../../reviews/pipeline/05-ir-passes.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 3
+  fixed: 5
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,12 +18,14 @@ actions:
 
 ## Summary
 
-All three findings (two major, one minor) were verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and all three were fixed. The stale watched-path note now mentions only the one path that is genuinely unwatched, and four pass-table purpose cells were rewritten to match the APIs their headers declare. Nothing was rejected, deferred, or escalated; the document was edited.
+All five findings were verified against the current source and fixed in the document. The document was also trimmed from 67,257 to about 62,000 bytes while adding the Purpose text, so it is under 64 KB.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `docs/generated/design/_meta/manifest.yaml` lines 196-207 list `source/slang/slang-emit-spirv.cpp` among this page's watched paths, and the `SPIR-V legalize` row is present in the target-specific table. `source/slang/slang-check-out-of-bound-access.cpp` is still absent from the manifest, so that half of the note remains actionable. | `## How the passes are ordered` note: dropped the SPIR-V clause, kept only the `slang-check-out-of-bound-access.cpp` gap. |
-| F-002 | fixed | `source/slang/slang-ir-specialize-arrays.h:9-20` documents `specializeArrayParameters` as specializing calls to functions taking `struct` parameters with array fields; `source/slang/slang-ir-defunctionalization.h:1-16` is labelled "Aspirational filename" and declares only `specializeHigherOrderParameters`, which rewrites calls passing global functions. | `Specialize arrays` purpose rewritten; the `Defunctionalization` row renamed to `Specialize higher-order parameters` with the tagged-union claim removed. |
-| F-003 | fixed | `source/slang/slang-ir-late-require-capability.h:12-18` says the pass processes and eliminates `LateRequireCapability` insts and diagnoses missing capabilities under `-restrictive-capability-check`; `source/slang/slang-ir-string-hash.h:13-25` declares the hashed-string-literal pool helpers plus `checkGetStringHashInsts`. | `Late require capability` and `String hash` purpose cells rewritten to the declared behavior. |
+| F-001 | fixed | source/slang/slang-emit.cpp:2653-2657 runs lowerCopyLogical for GLSL; slang-ir-spirv-legalize.cpp:2985-2994 for SPIR-V before 1.4 | Copy-logical row now names both call sites |
+| F-002 | fixed | source/slang/slang-lower-to-ir.cpp:15846-15855 dumps a LOWER-TO-IR snapshot | Ordering section now says plain calls lack headers but appear in LOWER-TO-IR |
+| F-003 | fixed | slang-ir-any-value-marshalling.cpp:78-89 and 1325-1336 key on type and size | Row now says one pair per (type, size) combination |
+| F-004 | fixed | Prompt requires a Pass / File / Purpose table | Target-specific table renamed to Purpose with a behavior description per row, target kept as prefix |
+| F-005 | fixed | Prompt limit is 64 KB | Condensed coverage, AnyValue inference, validate, global-values, CUDA builtin, defer-load and metadata cells |

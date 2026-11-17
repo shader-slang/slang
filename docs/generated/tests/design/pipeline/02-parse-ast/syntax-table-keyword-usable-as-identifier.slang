@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#syntax-as-declaration
-//META: doc_section_digest=2f9794c989f398d67a2574f7be028ccd18d983616ef12148195597f2f24c3a0d
+//META: doc_section_digest=7a94c65efea4dafb7e691a1cc86ee508924c217e2202277cec81a4e249cff22c
 //META: purpose=Modifier and attribute keywords are identifiers bound to syntax in the active environment, not lexer-level reserved words, so `nointerpolation` and `unroll` can also be ordinary local variable names.
 //META: intent=functional
 //META: pipeline_stage=parse

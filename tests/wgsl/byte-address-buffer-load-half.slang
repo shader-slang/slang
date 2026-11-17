@@ -30,20 +30,14 @@
 // 0 and the high half by 16, for scalars and for `Record` fields at 2-byte offsets.
 // Each loaded word is shifted, bit-cast, and element 0 of the bitcast is the loaded half.
 // CONST: fn constantOffsetMain
-// CONST: [[W0:_S[0-9]+]] : u32 = pool_{{[0-9]+}}[(u32(0))/4]
-// CONST-NEXT: [[H0:_S[0-9]+]] : vec2<f16> = bitcast<vec2<f16>>(([[W0]] >> (u32(0))))
-// CONST: [[W1:_S[0-9]+]] : u32 = pool_{{[0-9]+}}[(u32(0))/4]
-// CONST-NEXT: [[H1:_S[0-9]+]] : vec2<f16> = bitcast<vec2<f16>>(([[W1]] >> (u32(16))))
-// CONST: [[W2:_S[0-9]+]] : u32 = pool_{{[0-9]+}}[(u32(256))/4]
-// CONST-NEXT: [[H2:_S[0-9]+]] : vec2<f16> = bitcast<vec2<f16>>(([[W2]] >> (u32(0))))
-// CONST: [[W3:_S[0-9]+]] : u32 = pool_{{[0-9]+}}[(u32(256))/4]
-// CONST-NEXT: [[H3:_S[0-9]+]] : vec2<f16> = bitcast<vec2<f16>>(([[W3]] >> (u32(16))))
-// CONST: [[W4:_S[0-9]+]] : u32 = pool_{{[0-9]+}}[(u32(260))/4]
-// CONST-NEXT: [[F:_S[0-9]+]] : f32 = bitcast<f32>([[W4]])
-// CONST: [[W5:_S[0-9]+]] : u32 = pool_{{[0-9]+}}[(u32(264))/4]
-// CONST-NEXT: [[H5:_S[0-9]+]] : vec2<f16> = bitcast<vec2<f16>>(([[W5]] >> (u32(0))))
-// CONST: [[W6:_S[0-9]+]] : u32 = pool_{{[0-9]+}}[(u32(264))/4]
-// CONST: f32([[H0]][i32(0)]), f32([[H1]][i32(0)]), f32([[H2]][i32(0)]) + f32([[H3]][i32(0)]), f32([[H5]][i32(0)]) + f32(bitcast<vec2<f16>>(([[W6]] >> (u32(16))))[i32(0)]) + [[F]])
+// CONST: outputBuffer_{{[0-9]+}}[dispatchThreadID_{{[0-9]+}}.x] = vec4<f32>(
+// CONST-SAME: f32(bitcast<vec2<f16>>((pool_{{[0-9]+}}[(u32(0))/4] >> (u32(0))))[i32(0)]),
+// CONST-SAME: f32(bitcast<vec2<f16>>((pool_{{[0-9]+}}[(u32(0))/4] >> (u32(16))))[i32(0)]),
+// CONST-SAME: f32(bitcast<vec2<f16>>((pool_{{[0-9]+}}[(u32(256))/4] >> (u32(0))))[i32(0)])
+// CONST-SAME: + f32(bitcast<vec2<f16>>((pool_{{[0-9]+}}[(u32(256))/4] >> (u32(16))))[i32(0)]),
+// CONST-SAME: f32(bitcast<vec2<f16>>((pool_{{[0-9]+}}[(u32(264))/4] >> (u32(0))))[i32(0)])
+// CONST-SAME: + f32(bitcast<vec2<f16>>((pool_{{[0-9]+}}[(u32(264))/4] >> (u32(16))))[i32(0)])
+// CONST-SAME: + bitcast<f32>(pool_{{[0-9]+}}[(u32(260))/4]));
 
 struct Record
 {

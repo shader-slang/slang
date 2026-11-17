@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0): -target spirv -entry computeMain -stage compute
 
 // Regression test for #10212.
 //

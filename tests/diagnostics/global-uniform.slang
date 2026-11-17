@@ -1,6 +1,6 @@
 // global-uniform.slang
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
-//DIAGNOSTIC_TEST:COMMAND_LINE_SIMPLE(diag=CHECK):-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):-target hlsl
+//DIAGNOSTIC_TEST:COMMAND_LINE_SIMPLE(diag=CHECK,exit-code=0):-target hlsl
 
 // An attempt to declare a global variable that actually declares a
 // global shader parameter should be diagnosed, unless `uniform` was used.
