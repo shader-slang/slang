@@ -1105,12 +1105,12 @@ class GLSLBindingAttribute : public Attribute
     FIDDLE(...)
     // The Vulkan descriptor `binding` and `set` indices. Both are stored as `IntVal`s so
     // that expressions over link-time constants (e.g. derived from `extern` constants)
-    // can be used. A null field means the argument was never specified — on any
-    // validating pass — and reads as descriptor index 0. That happens in two cases:
-    // the defaulted `set` of `[[vk::binding(x)]]`, and a GLSL layout qualifier that
-    // named only the other argument (`layout(set = N)` leaves `binding` null, and the
-    // merge path can later fill either one). Parameter binding resolves both
-    // against the linked program via `ComponentType::tryFoldIntVal`
+    // can be used. A null field means the argument was not specified on any validation
+    // pass — GLSL `binding`/`set` qualifiers arrive as separate modifiers that merge,
+    // each re-validating the attribute — and reads as descriptor index 0. That covers
+    // the defaulted `set` of `[[vk::binding(x)]]` and a qualifier that named only the
+    // other argument (`layout(set = N)` leaves `binding` null). Parameter binding
+    // resolves both against the linked program via `ComponentType::tryFoldIntVal`
     // (source/slang/slang-linkable.h); the one consumer that cannot resolve them is the
     // GLSL `offset` layout path in the checker, which needs a concrete index at check
     // time and rejects symbolic values with a diagnostic.
@@ -1134,9 +1134,10 @@ FIDDLE()
 class GLSLOffsetLayoutAttribute : public Attribute
 {
     FIDDLE(...)
-    // Defaults to zero so the symbolic-binding skip path in the checker (which cannot
-    // assign an offset and stops compilation with an error anyway) leaves a defined
-    // value behind for any reader.
+    // Defaults to zero: the checker's symbolic-binding skip path cannot assign an
+    // offset, and although the emitted error fails the compile request, later phases
+    // keep walking the AST while diagnostics are collected — the default keeps that
+    // walk defined instead of reading an uninitialized field.
     FIDDLE() int64_t offset = 0;
 };
 
