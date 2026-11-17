@@ -2632,6 +2632,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             BuiltinOperationKind opKind;
         };
 
+        // TODO: switch to getBuiltinOperationKindFromString()
         static const BuiltinOperationMapEntry builtinOpMap[] = {
             { "-", 1, BuiltinOperationKind::Neg },
             { "~", 1, BuiltinOperationKind::BitNot },
