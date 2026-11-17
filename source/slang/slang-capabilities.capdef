@@ -625,6 +625,10 @@ def SPV_KHR_shader_clock : _spirv_1_0;
 /// [EXT]
 def SPV_NV_shader_subgroup_partitioned : _spirv_1_0;
 
+/// Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
+/// [EXT]
+def SPV_EXT_shader_subgroup_partitioned : _spirv_1_3;
+
 /// Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
 /// [EXT]
 def SPV_KHR_subgroup_rotate : _spirv_1_3;
@@ -862,9 +866,20 @@ def spvGroupNonUniformQuad : _spirv_1_3;
 /// [EXT]
 def spvGroupNonUniformVote : _spirv_1_3;
 
-/// Represents the SPIR-V capability for group non-uniform partitioned operations.
+/// Represents the SPIR-V capability for group non-uniform partitioned operations (cross-vendor standard).
 /// [EXT]
-def spvGroupNonUniformPartitionedNV : _spirv_1_3 + SPV_NV_shader_subgroup_partitioned;
+def spvGroupNonUniformPartitionedEXT : _spirv_1_3 + SPV_EXT_shader_subgroup_partitioned;
+
+// The NV and EXT names of the capability, opcodes and group operations are aliases for the same
+// enumerants (e.g. 5297 for the capability, 5296 for OpGroupNonUniformPartition). As with
+// shader invocation reorder, the NV atom implies the EXT atom, so a target that requests NV also
+// satisfies every requirement written for EXT. The partitioned intrinsics declare
+// SPV_EXT_shader_subgroup_partitioned by default, and SPV_NV_shader_subgroup_partitioned when the
+// target requests the NV atom.
+/// Represents the SPIR-V capability for group non-uniform partitioned operations (NVIDIA-specific).
+/// Inherits from spvGroupNonUniformPartitionedEXT so that NV implies EXT capability.
+/// [EXT]
+def spvGroupNonUniformPartitionedNV : _spirv_1_3 + SPV_NV_shader_subgroup_partitioned + spvGroupNonUniformPartitionedEXT;
 
 /// Represents the SPIR-V capability for group non-uniform rotate operations.
 /// [EXT]
@@ -2661,7 +2676,8 @@ alias subgroup_quad = GL_KHR_shader_subgroup_quad
 /// [Compound]
 alias subgroup_partitioned = _sm_6_5
                            | _cuda_sm_7_0
-                           | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
+                           | _GL_KHR_shader_subgroup_ballot + _GL_KHR_shader_subgroup_arithmetic + _GL_NV_shader_subgroup_partitioned
+                           | spvGroupNonUniformBallot + spvGroupNonUniformArithmetic + spvGroupNonUniformPartitionedEXT;
 
 
 /// Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
