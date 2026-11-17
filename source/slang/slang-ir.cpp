@@ -4,6 +4,7 @@
 #include "core/slang-basic.h"
 #include "core/slang-platform.h"
 #include "core/slang-writer.h"
+#include "slang-ir-clone.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -878,6 +879,8 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getFile(),
             funcType,
             oldDebugFunc->getParentScope());
+        for (auto decoration : oldDebugFunc->getDecorations())
+            cloneDecoration(decoration, newDebugFunc);
         debugFuncDecor->removeAndDeallocate();
         builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
     }
@@ -3691,8 +3694,8 @@ IRInst* IRBuilder::emitDebugFunction(
     IRInst* debugType,
     IRInst* parentScope)
 {
-    // The parent scope is an optional trailing operand: it is absent when no scope was recorded
-    // (Minimal debug level emits no compilation unit), so we never store a null operand.
+    // The parent scope is an optional trailing operand. Included or line-remapped sources may
+    // have no associated compilation unit, so omit the operand instead of storing null.
     if (parentScope)
     {
         IRInst* args[] = {name, line, col, file, debugType, parentScope};
@@ -6114,6 +6117,7 @@ IRInst* IRBuilder::emitSwizzle(
     UInt elementCount,
     IRInst* const* elementIndices)
 {
+    SLANG_RELEASE_ASSERT(type);
     auto inst = createInstWithTrailingArgs<IRSwizzle>(
         this,
         kIROp_Swizzle,

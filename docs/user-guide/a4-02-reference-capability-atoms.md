@@ -655,6 +655,9 @@ Extensions
 > (the name the emitter declares); the emitter adds that `OpExtension` on the pre-1.5 path
 > (it is core from 1.5 on), while this dependency records the relationship in the model.
 
+`SPV_EXT_shader_subgroup_partitioned`
+> Represents the cross-vendor SPIR-V extension for shader subgroup partitioned.
+
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
 
@@ -776,6 +779,10 @@ Extensions
 `spvBindlessTextureNV`
 > Represents the SPIR-V capability for the bindless texture.
 
+`spvComputeShaderDerivativesKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_compute_shader_derivatives extension
+> (also available as SPV_NV_compute_shader_derivatives).
+
 `spvCooperativeMatrixBlockLoadsNV`
 > Represents the SPIR-V capability for cooperative matrix 2
 
@@ -839,8 +846,12 @@ Extensions
 `spvGroupNonUniformClustered`
 > Represents the SPIR-V capability for group non-uniform clustered operations.
 
+`spvGroupNonUniformPartitionedEXT`
+> Represents the SPIR-V capability for group non-uniform partitioned operations (cross-vendor standard).
+
 `spvGroupNonUniformPartitionedNV`
-> Represents the SPIR-V capability for group non-uniform partitioned operations.
+> Represents the SPIR-V capability for group non-uniform partitioned operations (NVIDIA-specific).
+> Inherits from spvGroupNonUniformPartitionedEXT so that NV implies EXT capability.
 
 `spvGroupNonUniformQuad`
 > Represents the SPIR-V capability for group non-uniform quad operations.
@@ -877,6 +888,15 @@ Extensions
 
 `spvMinLod`
 > Represents the SPIR-V capability for using minimum LOD operations.
+
+`spvNonSemanticInfoKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_non_semantic_info extension.
+
+`spvPhysicalStorageBufferEXT`
+> Represents the SPIR-V capability for using the SPV_EXT_physical_storage_buffer extension.
+
+`spvPhysicalStorageBufferKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_physical_storage_buffer extension.
 
 `spvQuadControlKHR`
 > Represents the SPIR-V capability for quad group control.
@@ -938,8 +958,17 @@ Extensions
 `spvSparseResidency`
 > Represents the SPIR-V capability for sparse residency.
 
+`spvSubgroupRotateKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_subgroup_rotate extension.
+
 `spvTensorAddressingNV`
 > Represents the SPIR-V capability for tensor addressing
+
+`spvUserTypeGOOGLE`
+> Represents the SPIR-V capability for using the SPV_GOOGLE_user_type extension.
+
+`spvVariablePointersKHR`
+> Represents the SPIR-V capability for using the SPV_KHR_variable_pointers extension.
 
 `spvVulkanMemoryModelDeviceScopeKHR`
 > Represents the SPIR-V capability for vulkan memory model.

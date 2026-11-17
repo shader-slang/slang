@@ -4,7 +4,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=HALF2,exit-code=-1): -target wgsl -entry fragHalf2 -stage fragment
 
 // A generic wrapper called with float compiles with no diagnostic.
-//DIAGNOSTIC_TEST:SIMPLE(diag=GEN): -target wgsl -entry fragGeneric -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=GEN,exit-code=0): -target wgsl -entry fragGeneric -stage fragment
 
 // HALF: WGSL derivative built-ins take only f32 values
 [shader("fragment")]

@@ -83,8 +83,29 @@ set_target_properties(
     PROPERTIES FOLDER generated
 )
 
-# Install only current outputs so files left by an older build are not packaged.
-install(
-    FILES ${portable_raytracing_copied_files} ${portable_raytracing_module_file}
-    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang/raytracing
+# Record this module's serialized output in the shared manifest consumed by the
+# optional slang-standard-modules monolithic library.
+list(APPEND SLANG_STANDARD_MODULE_FILES ${portable_raytracing_module_file})
+set(SLANG_STANDARD_MODULE_FILES
+    "${SLANG_STANDARD_MODULE_FILES}"
+    CACHE INTERNAL
+    "Built standard .slang-module files"
 )
+list(APPEND SLANG_STANDARD_MODULE_TARGETS slang-portable-raytracing-module)
+set(SLANG_STANDARD_MODULE_TARGETS
+    "${SLANG_STANDARD_MODULE_TARGETS}"
+    CACHE INTERNAL
+    "Producer targets for standard .slang-module files"
+)
+
+# Install only current outputs so files left by an older build are not packaged.
+# The monolithic library embeds the serialized module, so the loose files are
+# not installed when it is enabled.
+if(NOT SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY)
+    install(
+        FILES
+            ${portable_raytracing_copied_files}
+            ${portable_raytracing_module_file}
+        DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang/raytracing
+    )
+endif()

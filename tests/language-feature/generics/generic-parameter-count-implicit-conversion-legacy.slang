@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -std 2026
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -std 2026
 
 // Confirm that a speculative conversion-cost query does not suppress the compatibility warning
 // when overload resolution later materializes the selected conversion.

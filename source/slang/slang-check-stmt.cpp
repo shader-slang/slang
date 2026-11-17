@@ -111,38 +111,16 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
                 ensureAllDeclsRec(genericDecl, DeclCheckState::DefinitionChecked);
         }
 
-        // Consider this code:
-        // ```
-        // {
-        //       int a = 5 + b; // should error.
-        //       int b = 3;
-        // }
-        //
-        // ```
-        // In order to detect the error trying to use `b` before it's declared within
-        // a block, our lookup logic contains a condition that ignores a decl if its
-        // `hiddenFromLookup` field is set to `true`.
-        // See _lookUpDirectAndTransparentMembers().
-        // This field will be set to false when we reach the decl through the DeclStmt.
-        // The members of a group are revealed one at a time, in order.
-        //
-        if (auto seqStmt = as<SeqStmt>(stmt->body))
+        // We hide every local owned by this scope until its declaration is checked.
+        // In HLSL, that includes `for` initializers nested under other statements, such as
+        // `int x = i; for (int i = 0; i < 2; ++i) {}`. Looking only at the block's immediate
+        // declaration statements would let the earlier read bind to the later loop variable.
+        // `checkDeclAtDeclarationPoint` reveals each variable after checking its initializer;
+        // `_lookUpDirectAndTransparentMembers` skips variables still hidden from lookup.
+        for (auto decl : stmt->scopeDecl->getDirectMemberDecls())
         {
-            for (auto subStmt : seqStmt->stmts)
-            {
-                if (auto declStmt = as<DeclStmt>(subStmt))
-                {
-                    if (auto decl = as<Decl>(declStmt->decl))
-                    {
-                        decl->hiddenFromLookup = true;
-                    }
-                    else if (auto declGroup = as<DeclGroup>(declStmt->decl))
-                    {
-                        for (auto dd : declGroup->decls)
-                            dd->hiddenFromLookup = true;
-                    }
-                }
-            }
+            if (isLocalVar(decl))
+                decl->hiddenFromLookup = true;
         }
     }
     checkStmt(stmt->body);

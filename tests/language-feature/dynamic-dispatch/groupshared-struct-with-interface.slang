@@ -11,7 +11,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=REPORT,non-exhaustive):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
+//DIAGNOSTIC_TEST:SIMPLE(diag=REPORT,exit-code=0,non-exhaustive):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#texture-and-image
-//META: doc_section_digest=9181b1e074afdf780bb1918cb592389fdbe5dee019af40f1c48f4b6cb9064e6b
+//META: doc_section_digest=dea38283cf7abef972fc229f2afd4d0c0e478c21f406938bc0ffa72b2564baab
 //META: purpose=`Texture1D::Load(int2(off, lod))` surfaces in `main` as a `call specialize(%Load, ..., TextureShape1DType, ...)(%tex, %coord)`. The doc's `imageLoad` opcode itself lives inside the helper body; only the call form is observable from `main`.
 //META: intent=expansion
 //META: pipeline_stage=lower

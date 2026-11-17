@@ -1,11 +1,11 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:18:48+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-03T06:55:57Z
 target_doc: ast-reference/expressions.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 8e2a1a1b289d2a99a65d0dbd1eee944a77ca8b0eb9415e18a3e6fc23cb52c0bf
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 69dce39dbf6b349f7f3cd835ce76adc9b75dc93c8ef91cd0955e180dfa1cd465
+source_commit: 56b1b0b83fb96f88f36da7e37cd9c2c7f27af70c
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,42 +13,36 @@ checklist:
   style_consistency: partial
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 6
+finding_count: 5
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 5
-  nit: 0
+  major: 0
+  minor: 4
+  nit: 1
 ---
 
 # Review report for ast-reference/expressions.md
 
 ## Summary
 
-The document has valid front matter, resolving links, and complete concrete-node coverage, but it needs targeted corrections in four checklist dimensions. Most importantly, the `CastOptionalExpr` callout contains detailed IR-lowering behavior that the per-document prompt explicitly forbids on this AST-reference page.
+The document covers all 94 concrete expression classes and has valid cross-references. It needs localized corrections and contract cleanup. The most significant inaccuracy is the claim that floating-point literal values are not rounded to their suffix type: the lexer helper already performs suffix-dependent conversion before the parser stores the value.
 
 ## Items checked
 
-- Read the target, `_common.md`, its per-document prompt, and both dependency documents.
-- Verified the document against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, which was also review-time `HEAD`.
-- Compared all 93 table rows with the 93 concrete expression classes in `slang-ast-expr.h`; all nine `FIDDLE(abstract)` intermediates were excluded from the table.
-- Spot-checked more than 20 claims covering AST inheritance and fields, parser entry points, keyword dispatch, literals, calls, casts, member access, generic application, lambdas, pack queries, autodiff expressions, and inline SPIR-V.
-- Verified all relative links and anchors with the generated-doc linter. The body contains zero line-number citations, so there were no citation line numbers to re-derive.
-- Confirmed the recorded watched-path digest matches `regenerate.py digest ast-reference/expressions.md`.
+- Reviewed against the **current working tree**, which, as specified by the operator, equals the document’s source commit for all of `source/`. No files were written.
+- Read `_review.md`, `_common.md`, and the document-specific prompt; ran `regenerate.py show ast-reference/expressions.md`.
+- Compared all 94 table class names with concrete FIDDLE declarations in `slang-ast-expr.h`; found no missing classes or abstract-class rows.
+- Spot-checked more than 10 claims: expression inheritance, application fields, member-access fields, optional-conversion fields and construction, literal conversion, lambda body construction, tuple version gating, disabled tuple-type parsing, HLSL integer-specifier parsing, static subscript names, parser entry points, and size/alignment/count operand parsing.
+- Resolved all 87 Markdown links, covering 20 distinct destinations; checked referenced anchors and generated-page manifest entries. Dependency documents were consulted only for cross-reference checks.
+- Found **zero line-number citations** in the target document’s body.
+- Checked required sections, table columns, callouts, front-matter keys and formats, diagram conventions, and the size cap: 33,558 bytes against 98,304 allowed.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | Opening, lines 12-18 | The first paragraph states what the page covers, but the intended reader appears only in a separate `Audience:` paragraph. The universal contract requires both facts in the first paragraph. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first paragraph to state both coverage and intended reader. | Fold the audience sentence into the opening paragraph so that paragraph names both the `Expr` catalog and its developer audience. |
-| F-002 | minor | `## Family hierarchy`, lines 38-80 | The hierarchy omits the `OverloadedExpr` / `OverloadedExpr2` family even though the per-document prompt explicitly requests it among the families shown. Both classes appear later in the table and callout, so only the required hierarchy view is incomplete. | `docs/generated/design/_meta/prompts/ast-reference-expressions.md:14-17`; declarations at `source/slang/slang-ast-expr.h:54-85`. | Add `OverloadedExpr` and `OverloadedExpr2` as sibling leaves under `Expr` in the hierarchy diagram. |
-| F-003 | minor | `### VarExpr and DeclRefExpr`, lines 251-258 | The statement `every identifier use starts life as a VarExpr` is too broad. Member identifiers after `.`, `->`, and `::` are parsed directly into `MemberExpr`, `DerefMemberExpr`, or `StaticMemberExpr`, not first represented by a `VarExpr`. | `source/slang/slang-parser.cpp:9172-9204` constructs those member nodes and assigns their member names directly. | Change this to “every bare/unqualified name expression starts as a `VarExpr`,” then explicitly exclude member-name positions. |
-| F-004 | minor | `### LiteralExpr family`, lines 260-268 | The prose implies that every literal's inherited `Token` stores its originating token and makes source text recoverable. The keyword-literal callbacks for `true`, `false`, `nullptr`, and `none` create their nodes without assigning `LiteralExpr::token`; keyword dispatch preserves only `loc`. | `source/slang/slang-parser.cpp:1146-1174` consumes the keyword and fills location only; `source/slang/slang-parser.cpp:7986-8008` creates the four keyword-literal nodes without setting `token`. | Qualify the statement: numeric, character, and string literal paths populate `token`; keyword literals retain source location but do not populate the inherited token field. |
-| F-005 | minor | `### OverloadedExpr and OverloadedExpr2`, lines 222-231 | The claim `if resolution fails, the checker reports an "ambiguous" diagnostic` conflates two distinct failure modes. Ambiguous best candidates produce an ambiguous-overload diagnostic, while zero applicable candidates produce a no-applicable-overload diagnostic. | `source/slang/slang-check-overload.cpp:3507-3518` diagnoses no applicable overload; `source/slang/slang-check-overload.cpp:3599-3659` diagnoses ambiguity. | Say that checking diagnoses either no applicable candidate or ambiguity, depending on why overload resolution failed. |
-| F-006 | major | `### CastOptionalExpr`, lines 322-334 | The final sentences describe the lowering algorithm in detail: binding `innerVarDecl`, lowering `innerCoercedExpr`, and emitting a has-value branch. The per-document prompt explicitly forbids IR lowering of expressions on this page. | `docs/generated/design/_meta/prompts/ast-reference-expressions.md:54-59`; the out-of-scope prose is at target lines 331-334. | Remove the lowering sequence. Keep the AST-field explanation through `innerCoercedExpr`, then link `../pipeline/04-ast-to-ir.md` for lowering behavior. |
-
-## No-issues notes
-
-- Front matter contains every required key, uses a full SHA and hex digest, and reproduces the mandatory warning exactly.
-- All required top-level sections appear in the prescribed order, and every grammar/source link resolves.
-- Parser claims for expression precedence entry points, member syntax, lambda bodies, adjacent-string concatenation, and `ThisInterfaceExpr` construction match the recorded source.
+| F-001 | minor | `## Nodes`, line 95; `### LiteralExpr family`, lines 296–309 | The table says `value` is “not rounded to `suffixType`,” and the callout describes it as the “value as written.” The parser stores its helper’s result unchanged, but that result has already undergone suffix-dependent rounding or truncation. | `source/compiler-core/slang-lexer.cpp:1309` truncates hexadecimal values for Half/Float; line 1329 parses decimal Float into a `float`; line 1347 rounds Half. `source/slang/slang-parser.cpp:9180` stores the returned value. | Describe `value` as the suffix-converted value returned by the lexer helper. Retain the narrower statement that the parser performs no additional rounding, and remove the table’s contrary claim. |
+| F-002 | minor | `### LambdaExpr and LambdaDecl`, lines 375–380 | The claim that block-bodied and expression-bodied lambdas “build the same shape” is incorrect. Their outer `LambdaExpr` matches, but their `bodyStmt` nodes differ. | `source/slang/slang-parser.cpp:8838` assigns `parseBlockStatement()` for a braced body; line 8844 creates a `ReturnStmt` directly for an expression body. | State explicitly that the braced form stores a block, whereas the expression form stores a direct synthesized `ReturnStmt`; remove “build the same shape.” |
+| F-003 | minor | `## Nodes`, lines 107, 109, 116, 118 | Several named fields omit their required types: `argumentDelimeterLocs`, `tryClauseType`, and both `memberOperatorLoc` entries. | `docs/generated/design/_meta/prompts/_common.md`, AST table contract, requires `name: Type`. Declarations are in `source/slang/slang-ast-expr.h:231`, `:263`, `:339`, and `:355`. | Use `argumentDelimeterLocs: List<SourceLoc>`, `tryClauseType: TryClauseType`, and `memberOperatorLoc: SourceLoc` in the affected cells. |
+| F-004 | nit | `### LiteralExpr family`; `### Type-expression family` | These callouts exceed the required 2–5 sentences each; both span multiple explanatory paragraphs. | `docs/generated/design/_meta/prompts/_common.md`, AST reference section 5, specifies “2–5 sentences each.” The target’s callouts occupy lines 285–314 and 391–424. | Condense each callout to at most five sentences, preserving source-backed distinctions and using existing links for further detail. |
+| F-005 | minor | `### BuiltinOperatorExpr`, lines 234–238 | The explanation of how IR lowering chooses floating-point versus integer remainder exceeds this page’s explicitly permitted scope, although the header supports the claim. | `docs/generated/design/_meta/prompts/ast-reference-expressions.md`, “Forbidden content,” excludes “IR lowering of expressions.” `source/slang/slang-ast-expr.h:296` documents the field and its lowering use. | Keep the field’s check-time meaning and its relevance to `Mod`; replace the lowering implementation explanation with a link to `../pipeline/04-ast-to-ir.md`. |

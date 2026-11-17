@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#failure-modes
-//META: doc_section_digest=917434add55b557b228b443846eefc5d6962c4a14daa202ebe626eecee22d1ca
+//META: doc_section_digest=35a0377e8327c387000594e690000a91232b821b59188e50e4c846f99b749334
 //META: purpose=The statement parser keeps a declaration parsed inside a function body when it is a variable, a `struct`, a `typedef`, a `typealias`, or a `using`, so all five forms declare usable names.
 //META: intent=functional
 //META: pipeline_stage=parse

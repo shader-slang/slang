@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
-//META: doc_section_digest=5ecc062dc93859b69b080811db13201d5e12052d67767a4d49a4d8787cb40272
+//META: doc_section_digest=d08158ea09ba0a32a48d37035a53b103ee4e6cf5465c5f5427df02f5ade4cbbb
 //META: purpose=Boundary: entry-point-decorations surfaces a large `[numthreads(64, 1, 1)]` value on HLSL — alternative numthreads axis to the (1,1,1) and small default cases.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass
