@@ -37,7 +37,6 @@
 30062	note	implicit-cast-used-as-lvalue-ref	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value with a reference
 30063	note	implicit-cast-used-as-lvalue-type	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value with this type
 30064	note	implicit-cast-used-as-lvalue	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value for this usage
-30067	err	mutating-method-on-function-input-parameter-error	mutating method called on `in` parameter
 30068	warning	mutating-method-on-function-input-parameter-warning	mutating method called on `in` parameter
 30071	err	var-cannot-be-unsized	cannot instantiate unsized type
 30072	err	param-cannot-be-unsized	function parameter cannot be unsized

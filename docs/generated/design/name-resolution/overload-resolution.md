@@ -312,7 +312,7 @@ The individual steps:
    parameter is a borrow, so it is rejected as an immutable value
    instead)
    ([slang-check-overload.cpp lines
-   1097-1135](../../../../source/slang/slang-check-overload.cpp)).
+   1077-1107](../../../../source/slang/slang-check-overload.cpp)).
 5. **`TryCheckOverloadCandidateConstraints`**
    ([slang-check-overload.cpp line
    1145](../../../../source/slang/slang-check-overload.cpp)) — for an
