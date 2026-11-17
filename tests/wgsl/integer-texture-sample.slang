@@ -1,8 +1,8 @@
 // WGSL's sampling builtins take only f32 textures, so sampling an integer texture is reported at
 // compile time instead of emitting textureSample* on a texture_2d<u32>, which the WGSL validator
 // rejects at pipeline creation. Load and Gather of an integer texture stay valid.
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SAMPLE):-target wgsl -stage compute -entry sampleLevelMain
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=GRAD):-target wgsl -stage compute -entry sampleGradMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SAMPLE,exit-code=-1):-target wgsl -stage compute -entry sampleLevelMain
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=GRAD,exit-code=-1):-target wgsl -stage compute -entry sampleGradMain
 //TEST:SIMPLE(filecheck=OK): -target wgsl -stage compute -entry loadGatherMain
 
 Texture2D<uint> ids;

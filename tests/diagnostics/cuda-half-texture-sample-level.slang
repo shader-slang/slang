@@ -6,15 +6,15 @@
 // per-specialization type predicate, so it must not fire for a symbolic T).
 
 // SamplerState-argument form: tex.SampleLevel(sampler, location, level)
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1): -target cuda -entry eHalf -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2): -target cuda -entry eHalf2 -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3): -target cuda -entry eHalf3 -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H4): -target cuda -entry eHalf4 -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3D): -target cuda -entry eHalf4_3D -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2DA): -target cuda -entry eHalf4_2DArr -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H1,exit-code=-1): -target cuda -entry eHalf -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2,exit-code=-1): -target cuda -entry eHalf2 -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3,exit-code=-1): -target cuda -entry eHalf3 -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H4,exit-code=-1): -target cuda -entry eHalf4 -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H3D,exit-code=-1): -target cuda -entry eHalf4_3D -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=H2DA,exit-code=-1): -target cuda -entry eHalf4_2DArr -stage compute
 
 // Combined texture-sampler form: sampler2D.SampleLevel(location, level)
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=HC): -target cuda -entry eHalfCombined -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=HC,exit-code=-1): -target cuda -entry eHalfCombined -stage compute
 
 // Supported texel types emit a clean call, with no diagnostic.
 //TEST:SIMPLE(filecheck=FLOAT): -target cuda -entry eFloat -stage compute
@@ -27,7 +27,7 @@
 // (an exhaustive DIAGNOSTIC_TEST with no annotations passes iff zero diagnostics
 // are emitted), proving the guard does not fire for a symbolic T. A separate
 // code-generation check confirms the concrete float specialization still emits.
-//DIAGNOSTIC_TEST:SIMPLE(diag=GEN): -target cuda -entry eGenericFloat -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=GEN,exit-code=0): -target cuda -entry eGenericFloat -stage compute
 //TEST:SIMPLE(filecheck=GENERIC): -target cuda -entry eGenericFloat -stage compute
 
 Texture2D<half>        gHalf;

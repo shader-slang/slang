@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK,exit-code=0): -target spirv -entry computeMain
 
 // Using before assigning
 float regular_undefined_use(out float3 v)

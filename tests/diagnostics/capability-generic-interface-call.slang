@@ -6,10 +6,10 @@
 //GENERIC: error[E361
 
 // Direct calls and calls through an ordinary helper already reject the same stage mismatch.
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL): -entry main -target hlsl -no-codegen -DCALL_MODE=1
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL): -entry main -target hlsl -no-codegen -DCALL_MODE=1 -std 2026
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL): -entry main -target hlsl -no-codegen -DCALL_MODE=2
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL): -entry main -target hlsl -no-codegen -DCALL_MODE=2 -std 2026
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL,exit-code=-1): -entry main -target hlsl -no-codegen -DCALL_MODE=1
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL,exit-code=-1): -entry main -target hlsl -no-codegen -DCALL_MODE=1 -std 2026
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL,exit-code=-1): -entry main -target hlsl -no-codegen -DCALL_MODE=2
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CONTROL,exit-code=-1): -entry main -target hlsl -no-codegen -DCALL_MODE=2 -std 2026
 //CONTROL: error[E36107]: unavailable features in entry point
 
 interface IFoo

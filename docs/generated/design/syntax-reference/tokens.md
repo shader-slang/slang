@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: f9f5d896244f335b58e2e5be3e3edf7c2ed88f52837dc87e7dc720b4087e3700
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 420d22e36762196fb735538454cabb173bfdf2b017241535d0a3ffa6e9e4a75d
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -74,28 +74,8 @@ set at lex time: `_maybeLexNumberSuffix`
 ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
 lines 561-583) folds *any* run of ASCII letters, digits, and
 underscores after the numeric body into the token's raw text, and
-leaves the meaning to the consumer. The accepted sets and the
-diagnostics for a rejected one therefore belong to the decode helpers,
-not to the lexer proper:
-
-- `getIntegerLiteralValue` (lines 789-838) reads the base prefix and
-  digit run and hands the unconsumed tail back to its caller as the
-  suffix. It diagnoses only overflow, as
-  `LexerDiagnostics::integerLiteralTooLargeForAnyType` (E10012), when
-  the digits do not fit in 64 bits. Its caller
-  `parseIntegerLiteralExpr` in
-  [slang-parser.cpp](../../../../source/slang/slang-parser.cpp)
-  (lines 8614-8719, with the suffix loop at 8637-8686) is what accepts `u`/`U`, `l`/`L`, `ll`/`LL`, and
-  `z`/`Z` in any order — the two letters of `ll` must match in case —
-  and reports `Diagnostics::InvalidIntegerLiteralSuffix` (*invalid
-  suffix '...' on integer literal*) for anything else.
-- `getFloatingPointLiteralValue` (lines 1137-1391) accepts an empty
-  suffix or `f`/`F` for `float`, `h`/`H`/`hf`/`HF`/`fh`/`FH` for
-  `half`, and `l`/`L`/`lf`/`LF`/`fl`/`FL` for `double`, and reports
-  anything else as `FloatingPointLiteralType::BadSuffix` (lines
-  1273-1287). A one-letter suffix is case-insensitive; a two-letter
-  one must have both letters in the same case, so `hf` and `HF` are
-  accepted while `Hf` is not.
+leaves the meaning to the consumer. Suffix acceptance and its
+diagnostics are handled later, when the literal is parsed.
 
 ### Trivia (whitespace and comments)
 
@@ -142,8 +122,8 @@ Listed by spelling; the lexer routes each through the per-character
 | `RightArrow` | `->` punctuation | Function return type, member access through pointer |
 | `DoubleRightArrow` | `=>` punctuation | Lambda syntax (its only parser consumer) |
 | `At` | `@` punctuation (`slang-lexer.cpp` lines 2418-2420) | Lexed as a distinct kind; no parser consumer at this commit |
-| `Dollar` | `$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang value operand inside a `spirv_asm` block (`$this`, `$location` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1215); also introduces the compile-time `$for` statement |
-| `DollarDollar` | `$$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang *type* operand inside a `spirv_asm` block (`result:$$float2` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1215) |
+| `Dollar` | `$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang value operand inside a `spirv_asm` block (`$this`, `$location` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1437); also introduces the compile-time `$for` statement, which `parseCompileTimeStmt` in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) (line 7268) still reads but diagnoses as deprecated from language version 2025 and as removed from 202c |
+| `DollarDollar` | `$$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang *type* operand inside a `spirv_asm` block (`result:$$float2` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1437) |
 
 ### Operators
 
@@ -224,8 +204,10 @@ public:
 
 The `charsNameUnion` is a tagged union: when the `Name` flag bit is
 set, the token text is interned as a `Name*` (used for identifiers
-and keywords); otherwise the token holds a raw pointer plus length
-into the original source buffer.
+and keywords); otherwise the token holds a pointer plus length to its text. That
+text normally points into the original source buffer, but when
+backslash-newline sequences were folded out of the token the pointer
+refers to scrubbed text in lexer-owned arena memory instead.
 
 ## Token flags
 
@@ -256,7 +238,7 @@ macro whose body is `((x) + 1)`:
 Directive *recognition* is the reader of the flag itself: a `Pound`
 token starts a directive only when it carries `AtStartOfLine`
 ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
-line 4833).
+line 4896).
 
 ## Special-case lexing rules
 
@@ -288,8 +270,10 @@ implements several context-sensitive rules:
   between `<` and `>`; the quoted form is a single `StringLiteral`.
 - **Raw string literals.** A string opened with `R"delimiter(` is
   closed only by `)delimiter"` for an arbitrary `delimiter`. Inside,
-  newlines and backslashes are taken literally — no escape processing
-  is performed. Implementation lives in `_lexRawStringLiteralBody`
+  no escape decoding is performed and newlines are kept, but the shared
+  character reader still folds a backslash immediately followed by a
+  newline out of the stored token text (the `ScrubbingNeeded` path), so
+  that one sequence is not preserved literally. Implementation lives in `_lexRawStringLiteralBody`
   (`slang-lexer.cpp` lines 1782-1829, with the closing-delimiter
   termination check around lines 1802-1812), invoked from the `R"`
   arm of the string-literal dispatch at line 2166. A bare `"` as the
@@ -360,20 +344,12 @@ Every token's `SourceLoc` is a 32-bit integer decoded by
 The integer is a key into one `SourceView`, not a pair of locations:
 the interpretation is chosen by the `SourceLocType` argument
 (`Nominal`, which honours `#line` directives and source maps;
-`Actual`, which ignores them; and `Emit`, which honours `#line` but
-ignores source maps). Where a macro-expanded or otherwise derived
-view came from is recorded separately, on the `SourceView` itself, and
-retrieved with `getInitiatingSourceLoc`.
-
-`__LINE__` is the user-level surface that reads the decoded location:
-the preprocessor expands it by calling `SourceManager::getHumaneLoc`
-on the invocation's initiating location
-([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
-lines 2318-2348), and that method's `SourceLocType` parameter defaults
-to `Nominal`. A `#line` directive — recorded by `HandleLineDirective`
-through `SourceView::addLineDirective` (line 4233) — is therefore the
-user-visible way to change what a token reports, both through
-`__LINE__` and in diagnostic line numbers.
+`Actual`, which ignores them; and `Emit`, which honours `#line` and
+follows source maps except obfuscated ones). Where a derived view came
+from is recorded on the `SourceView` and retrieved with
+`getInitiatingSourceLoc`; `__LINE__` reads the decoded `Nominal`
+location through `SourceManager::getHumaneLoc`, so a `#line` directive
+is the user-visible way to change what a token reports.
 
 ## What this catalog does not cover
 

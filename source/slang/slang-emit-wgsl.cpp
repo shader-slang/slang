@@ -1743,7 +1743,20 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             emitOperand(inst->getOperand(0), leftSide(outerPrec, info));
             m_writer->emit(" ");
 
-            m_writer->emit(info.op);
+            // WGSL defines `^` only for integer scalars and vectors. `|` and `&` are also
+            // defined for `bool` and `vecN<bool>`, but for those types the exclusive-or is the
+            // not-equal comparison `!=`, which is component-wise on vectors.
+            // https://www.w3.org/TR/WGSL/#bit-expr
+            // https://www.w3.org/TR/WGSL/#comparison-expr
+            if (inst->getOp() == kIROp_BitXor &&
+                as<IRBoolType>(getVectorElementType(inst->getDataType())))
+            {
+                m_writer->emit(getInfo(EmitOp::Neq).op);
+            }
+            else
+            {
+                m_writer->emit(info.op);
+            }
 
             m_writer->emit(" (");
             emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
@@ -1851,11 +1864,28 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Neg:
         {
             auto opType = inst->getOperand(0)->getDataType();
-            if (as<IRMatrixType>(opType) || as<IRVectorType>(opType))
+            if (auto vectorType = as<IRVectorType>(opType))
             {
-                // Lower every vector/matrix negation uniformly to "(type(0) - op0)". (WGSL has a
-                // native unary '-' only for signed float/int vectors; matrices and unsigned
-                // vectors have none, and the subtraction matches '-x' for the signed cases too.)
+                // WGSL has a native unary '-' for f32, f16 and i32 vectors. Use it: for floats,
+                // "T(0) - x" is not the same operation, since 0.0 - (+0.0) is +0.0 while -(+0.0)
+                // is -0.0. The generic unary emission handles the operand's precedence.
+                switch (vectorType->getElementType()->getOp())
+                {
+                case kIROp_FloatType:
+                case kIROp_HalfType:
+                case kIROp_DoubleType:
+                case kIROp_IntType:
+                    return false;
+                default:
+                    break;
+                }
+            }
+            if (as<IRMatrixType>(opType) || as<IRVectorType>(opType) ||
+                (isIntegralType(opType) && !getIntTypeSigned(opType)))
+            {
+                // Lower matrix negation and unsigned scalar and vector negation to
+                // "(type(0) - op0)": WGSL has no unary '-' for them. For unsigned integers the
+                // subtraction is exact, with two's complement wrap-around.
                 // The explicit parentheses wrap the whole subtraction, so its outer context is
                 // effectively lowest-precedence: pass EmitOp::General (not the incoming outerPrec)
                 // and emit op0 as the subtraction's right-hand side. This wraps an operand that

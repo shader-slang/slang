@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#forward-mode
-//META: doc_section_digest=ff7339aef6c3ffedb9466f9df10a8adb3a5ae02fe094735a717bd998cd8bc62a
+//META: doc_section_digest=328436a3e1ac7ba4a32f6c5a0c5421e03200780194110def75518088f8387192
 //META: purpose=A trivial forward derivative runs the primal and returns zero output differentials, ignoring the incoming tangents.
 //META: intent=functional
 //META: pipeline_stage=runtime

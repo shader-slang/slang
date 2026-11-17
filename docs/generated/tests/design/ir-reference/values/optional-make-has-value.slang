@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#result--optional--conditional-helpers
-//META: doc_section_digest=c6530a50486d7dbd37de911a5b051159a9daacde724b2a9b71968138031143b2
+//META: doc_section_digest=b3ddfcf6633a61b27422d8bc64aaf60fdf964f353e9c9daf4a37f1c4514a9235
 //META: purpose=`Optional<T>` constructors (`return x;` and `return none;`) lower to `makeOptionalValue` / `makeOptionalNone`, and accessors `o.hasValue` / `o.value` lower to `optionalHasValue` / `getOptionalValue`.
 //META: intent=functional
 //META: pipeline_stage=lower
