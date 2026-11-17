@@ -1,29 +1,17 @@
-// Regression test for #13833: a borrow parameter (`__constref`) is an immutable borrow of its
-// argument, so the callee must not be able to write it. On targets that lower a borrow to a
-// pointer (CPU, CUDA, SPIR-V, WGSL) a write used to reach the caller's storage.
+// A borrow parameter (`__constref`) is an immutable borrow of its argument: the body may not
+// write it, because on targets that lower a borrow to a pointer the write would reach the
+// caller's storage. Reads still work, and a legacy (C-style) `in` parameter stays a mutable
+// local copy.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 struct S { int a[4]; }
 
 [noinline] int bump(__constref S s) { s.a[0] = 7; return s.a[0]; }
+//diag:                                      ^ left of '=' is not an l-value
+//diag:                                      ^ left of '=' is not an l-value.
 [noinline] int bumpInt(__constref int x) { x = 9; return x; }
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<int> outputBuffer;
-
-[numthreads(1, 1, 1)]
-void computeMain()
-{
-    S s;
-    s.a = { 1, 1, 1, 1 };
-    int x = 1;
-    outputBuffer[0] = bump(s);
-    outputBuffer[1] = s.a[0];
-    outputBuffer[2] = bumpInt(x);
-    outputBuffer[3] = x;
-}
-//CHECK: 7
-//CHECK: 1
-//CHECK: 9
-//CHECK: 1
+//diag:                                      ^ left of '=' is not an l-value
+//diag:                                      ^ left of '=' is not an l-value.
+[noinline] int readBorrow(__constref S s) { return s.a[0]; }
+[noinline] int bumpLegacyIn(in int x) { x = x + 10; return x; }

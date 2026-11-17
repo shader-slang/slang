@@ -1725,15 +1725,12 @@ ExprInfo getTypeForDeclRef(
             info.valueCategory = paramInfo.valueCategory;
             info.access = paramInfo.access;
 
-            // A legacy (C-style) `in` parameter is a mutable local copy.
-            //
-            // TODO(#13833): A borrow is an immutable borrow of its argument, so its body should
-            // not be able to write it, and code that does is already incorrect. Making it
-            // read-only is a bug fix that requires updating existing tests, so we leave it to a
-            // separate change. Until then, a borrow follows the rule for `in`.
+            // A legacy (C-style) `in` parameter is a mutable local copy. A borrow is not: it is
+            // an immutable borrow of its argument, so the body sees it as a read-only value in
+            // either parameter style, and writing it is an error rather than a silent change to
+            // the caller's storage.
             const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
-            if (!isModernParam &&
-                (mode == ParamPassingMode::In || mode == ParamPassingMode::BorrowIn))
+            if (!isModernParam && mode == ParamPassingMode::In)
             {
                 info.valueCategory = ExprValueCategory::MemoryLocation;
                 info.access = ExprAccess::ReadWrite;
