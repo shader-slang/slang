@@ -142,7 +142,21 @@ void EntryPoint::acceptVisitor(
 
 void EntryPoint::buildHash(DigestBuilder<SHA1>& builder)
 {
-    SLANG_UNUSED(builder);
+    // Hash the entry point's identity: its name, name override, profile (which carries
+    // the stage), and mangled name. An entry point's parameters take part in program
+    // layout — an earlier entry point's `ParameterBlock` shifts later entry points'
+    // descriptor sets — so two linked programs that differ only in a sibling entry
+    // point generate different code for their shared entry point, and a cache key
+    // that omits the sibling's identity (as `getEntryPointHash` does, since it names
+    // only the requested entry point) collides. Only value-like fields are hashed:
+    // the entry point's parameter *types* are part of the module source, which
+    // `Module::buildHash` already digests, and name plus stage uniquely identify an
+    // entry point within a module; pointer-bearing state must stay out so the same
+    // program hashes identically across processes.
+    builder.append(m_name ? m_name->text : String());
+    builder.append(m_entryPointNameOverride);
+    builder.append(m_profile.raw);
+    builder.append(m_mangledName);
 }
 
 List<Module*> const& EntryPoint::getModuleDependencies()
