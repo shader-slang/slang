@@ -8,6 +8,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -g0
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -g0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -g0
 
 groupshared float sh[1];
 
@@ -25,7 +26,7 @@ float readSh(uint i)
 // CUDA: *[[P]] = 2.0f;
 // METAL-LABEL: storeReadStorePtr_0(
 // METAL: *[[P:p_[0-9]+]] = [[V:v_[0-9]+]];
-// METAL-NEXT: readSh_0(
+// METAL: readSh_0(
 // METAL: *[[P]] = 2.0f;
 [noinline]
 float storeReadStorePtr(Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p, float v, uint i)
@@ -48,4 +49,4 @@ void computeMain()
 }
 
 // CHECK: type: float
-// CHECK-NEXT: {{^}}7{{$}}
+// CHECK-NEXT: {{^}}7.000000{{$}}

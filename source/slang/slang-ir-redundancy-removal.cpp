@@ -603,7 +603,12 @@ bool tryRemoveRedundantStore(
             }
             break;
         default:
-            if (canInstHaveSideEffectAtAddress(func, next, store->getPtr(), calleeSideEffectCache))
+            if (canInstHaveSideEffectAtAddress(
+                    func,
+                    next,
+                    store->getPtr(),
+                    MemoryEffectMode::ReadsOrWrites,
+                    calleeSideEffectCache))
             {
                 hasAddrUse = true;
             }
@@ -649,6 +654,7 @@ bool tryRemoveRedundantStore(
                             func,
                             inst,
                             store->getPtr(),
+                            MemoryEffectMode::WritesOnly,
                             calleeSideEffectCache))
                     {
                         valueMayChange = true;
@@ -721,7 +727,8 @@ bool tryRemoveRedundantLoad(
             }
         }
 
-        if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr(), calleeSideEffectCache))
+        if (canInstHaveSideEffectAtAddress(
+                func, prev, load->getPtr(), MemoryEffectMode::WritesOnly, calleeSideEffectCache))
         {
             break;
         }

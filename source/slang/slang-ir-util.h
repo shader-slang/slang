@@ -527,15 +527,29 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
-// `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
-// in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
-// Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per
-// callee.
+// What `canInstHaveSideEffectAtAddress` asks about a call in its `kIROp_Call` case: whether
+// the call may write the memory at `addr`, or whether it may also read it.
+enum class MemoryEffectMode
+{
+    // A pass that moves or forwards a value only needs to know whether a call may change the
+    // memory at `addr`; a read does not disturb the value it computes with.
+    WritesOnly,
+    // A pass that eliminates a store also needs to know whether a call may read the memory at
+    // `addr`: a read makes the stored value observable before an overwriting store arrives.
+    ReadsOrWrites,
+};
+
+// `calleeSideEffectCache` memoizes the `WritesOnly` callee classification and may be null; see
+// `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h for the authoritative
+// sharing/staleness contract this function depends on. The `ReadsOrWrites` classification is a
+// shallow decoration lookup (`isReadNoneCallee`) and is not cached. Turns the `kIROp_Call`
+// case's callee query O(1) after the first lookup per callee.
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
     IRInst* addr,
-    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
+    MemoryEffectMode mode,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache);
 
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.

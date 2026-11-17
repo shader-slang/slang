@@ -1686,6 +1686,7 @@ bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
     IRInst* addr,
+    MemoryEffectMode mode,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     // A texel holds scalar or vector data, never a resource handle, on every target, so an
@@ -1740,13 +1741,27 @@ bool canInstHaveSideEffectAtAddress(
             //
             if (!isCallerExclusiveRoot(func, getRootAddr(addr)))
             {
-                // Only a callee that is side-effect free and does not read from memory is
-                // safe here: it cannot change `addr`, and it does not order anything. Any other
-                // callee, or an unknown one, may change `addr`.
+                // A callee is safe to run past only when it cannot touch the memory at `addr`
+                // in the way `mode` asks about. A caller that only cares about writes may run
+                // past a callee without observable side effects, since `NoSideEffect` rules out
+                // observable writes. A caller that also cares about reads, such as
+                // dead-store elimination, may only run past a `ReadNone` callee: `NoSideEffect`
+                // still permits the callee to read memory it is not given a pointer to, such
+                // as a global or groupshared variable. Any other callee, or an unknown one,
+                // may change or read `addr`.
                 //
                 auto callee = call->getCallee();
-                if (!callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
-                    return true;
+                switch (mode)
+                {
+                case MemoryEffectMode::WritesOnly:
+                    if (!callee || doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
+                        return true;
+                    break;
+                case MemoryEffectMode::ReadsOrWrites:
+                    if (!callee || !isReadNoneCallee(callee))
+                        return true;
+                    break;
+                }
             }
 
             // If any pointer typed argument of the call inst may overlap addr, return true.
