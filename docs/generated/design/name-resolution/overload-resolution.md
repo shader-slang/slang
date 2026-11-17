@@ -307,9 +307,10 @@ The individual steps:
    rejected here,
    and in `ForReal` mode emits
    `Diagnostics::MutatingMethodOnImmutableValue` (plus
-   `MutatingMethodOnFunctionInputParameterError` or
    `MutatingMethodOnFunctionInputParameterWarning` for a mutating call
-   on a legacy-syntax function input parameter)
+   on a copyable legacy-syntax `in` parameter; a non-copyable `in`
+   parameter is a borrow, so it is rejected as an immutable value
+   instead)
    ([slang-check-overload.cpp lines
    1097-1135](../../../../source/slang/slang-check-overload.cpp)).
 5. **`TryCheckOverloadCandidateConstraints`**

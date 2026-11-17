@@ -1687,13 +1687,6 @@ err(
     span { loc = "expr:Expr", message = "a class can only be initialized by a `new` clause" }
 )
 
-err(
-    "mutating-method-on-function-input-parameter-error",
-    30067,
-    "mutating method called on `in` parameter",
-    span { loc = "location", message = "mutating method '~method:Name' called on `in` parameter '~param:Name'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended" }
-)
-
 warning(
     "mutating-method-on-function-input-parameter-warning",
     30068,

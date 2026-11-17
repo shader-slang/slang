@@ -1086,37 +1086,22 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 return false;
             }
 
-            // The parameters of functions declared using traditional/legacy
-            // syntax are currently exposed as mutable locals within the body
-            // of the relevant function. As such, it is legal to call `[mutating]`
-            // methods on such a function parameter. However, doing so is typically
-            // indicative of an error on the programmer's part.
-            //
-            // We will detect such cases here and issue a diagnostic that explains
-            // the situation.
+            // A legacy (C-style) `in` parameter is a mutable local copy, so calling a
+            // `[mutating]` method on one is legal but typically indicates an error on the
+            // programmer's part, since the changes will not be visible to the caller. A
+            // non-copyable `in` parameter is a borrow rather than a copy, so it is a
+            // read-only value in the body and a mutating call on it is rejected above; only a
+            // copyable `in` parameter reaches here.
             //
             if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
             {
                 if (auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
                 {
-                    const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
-
-                    if (isNonCopyable)
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterError{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
-                    else
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
+                    getSink()->diagnose(
+                        Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
+                            .method = funcDeclRef.getName(),
+                            .param = paramDecl->getName(),
+                            .location = context.loc});
                 }
             }
         }
