@@ -733,15 +733,46 @@ Modifier* SemanticsVisitor::validateAttribute(
         //
         // Binding attribute may also be created from GLSL style layout qualifiers where only one of
         // the args are specified, hence check for each individually.
+        // Link-time constant arguments are checked with a null diagnostic sink, so an
+        // argument that does not fold returns null silently. A present-but-invalid
+        // argument must not be treated like a never-specified one (that would silently
+        // bind at index 0), so diagnose it with the same "not a compile-time constant"
+        // error a plain constant argument gets and drop the attribute; a valid half
+        // must not survive as a partial explicit binding.
+        bool anyInvalidArgument = false;
         IntVal* binding = nullptr;
         if (attr->args[0])
+        {
             binding = checkLinkTimeConstantIntVal(attr->args[0]);
+            if (!binding)
+            {
+                // An argument that already reported its own error (an undefined
+                // identifier, a type error) must not be re-diagnosed here — only a
+                // checked-but-non-constant expression gets the "not a compile-time
+                // constant" error.
+                if (!IsErrorExpr(attr->args[0]))
+                    getSink()->diagnose(
+                        Diagnostics::ExpectedIntegerConstantNotConstant{
+                            .location = attr->args[0]->loc});
+                anyInvalidArgument = true;
+            }
+        }
 
         IntVal* set = nullptr;
         if (attr->args[1])
+        {
             set = checkLinkTimeConstantIntVal(attr->args[1]);
+            if (!set)
+            {
+                if (!IsErrorExpr(attr->args[1]))
+                    getSink()->diagnose(
+                        Diagnostics::ExpectedIntegerConstantNotConstant{
+                            .location = attr->args[1]->loc});
+                anyInvalidArgument = true;
+            }
+        }
 
-        if (!binding && !set)
+        if (anyInvalidArgument || (!binding && !set))
         {
             return nullptr;
         }
@@ -2666,6 +2697,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
                     Diagnostics::GlslOffsetRequiresConcreteBinding{
                         .location = glslBindingAttribute->loc});
             }
+            // The tracker keys offsets on a 32-bit `int` binding index, so a concrete
+            // binding above INT32_MAX (representable in the `IntVal` field since this
+            // change) narrows silently here — meaningless as a Vulkan binding either way.
             if (canTrackOffsets)
             {
                 if (glslOffsetAttribute->args.getCount() == 0)
