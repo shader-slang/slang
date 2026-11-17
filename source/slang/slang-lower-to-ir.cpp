@@ -1167,6 +1167,11 @@ IRInst* getFieldKey(IRGenContext* context, DeclRef<Decl> field)
     return getSimpleVal(context, emitDeclRef(context, field, context->irBuilder->getKeyType()));
 }
 
+/// Extract `field` out of `base`: `field` can be a `VarDecl` field, or the
+/// `InheritanceDecl` of a struct/class base, both resolved through the struct
+/// key that `visitInheritanceDecl` registers for the member. A deferred base
+/// (BoundMember or BoundStorage) cannot be projected yet, so the projection
+/// re-defers by wrapping `field` in a nested BoundMemberInfo.
 LoweredValInfo extractField(
     IRGenContext* context,
     IRType* fieldType,
@@ -1218,17 +1223,12 @@ LoweredValInfo extractField(
 
 /// Return whether `baseType` is a `struct` or `class` type. Inheritance
 /// lowering creates a struct key for exactly these bases and installs the
-/// base as the derived type's leading keyed field, so this predicate is the
-/// single classification both of the key-creation site in
-/// `visitInheritanceDecl` and of the field-like-member test below agree on.
+/// base as the derived type's leading keyed field, so both the key-creation
+/// site in `visitInheritanceDecl` and `isFieldLikeMember` below share this
+/// single classification.
 static bool isStructOrClassBase(Type* baseType)
 {
-    if (auto baseDeclRefType = as<DeclRefType>(baseType))
-    {
-        auto baseDeclRef = baseDeclRefType->getDeclRef();
-        return baseDeclRef.as<StructDecl>() || baseDeclRef.as<ClassDecl>();
-    }
-    return false;
+    return isDeclRefTypeOf<StructDecl>(baseType) || isDeclRefTypeOf<ClassDecl>(baseType);
 }
 
 /// Return whether `declRef` names a member that lowering projects as a keyed
@@ -1236,21 +1236,26 @@ static bool isStructOrClassBase(Type* baseType)
 /// a base, whether the base is materialized for a read, addressed for an
 /// l-value, or copied into a mutable temporary for a write. A deferred
 /// BoundMemberInfo can also carry a CallableDecl method, handled by the
-/// method branch of `materialize`; this predicate covers the two
-/// field-like flavors.
+/// method branch of `materialize`; a method is never an l-value (the front
+/// end rejects assigning to it before lowering), so the other two consumers
+/// only see the field-like flavors.
 ///
 /// The InheritanceDecl arm accepts exactly the bases `isStructOrClassBase`
-/// classifies: only those have a key that `extractField` can resolve. Other
-/// base kinds are excluded — an interface base lowers to a witness-table
-/// requirement, and a GLSLInterfaceBlockDecl base is installed as a field but
-/// never given a key, so projecting either would not resolve. A ClassDecl base
+/// classifies: `visitInheritanceDecl` creates a struct key only for those, and
+/// only a registered key lets `extractField` resolve the member. Other base
+/// kinds are excluded — an interface base lowers to a witness-table
+/// requirement, and a GLSLInterfaceBlockDecl base is installed as a field
+/// without its InheritanceDecl lowering producing a struct key, so projecting
+/// either through the keyed-field path would not resolve. A ClassDecl base
 /// cannot reach the consumers today (visitCastToSuperTypeExpr handles struct
 /// supers only) but is accepted to keep this predicate identical to
 /// key creation. Reading the unspecialized `getDecl()->base.type` is safe
-/// because the only producer of a deferred InheritanceDecl
-/// (emitCastToConcreteSuperTypeRec) likewise holds an unspecialized decl-ref,
-/// and substituting generic arguments never changes which declaration a base
-/// refers to, only its type arguments.
+/// because the only site that introduces an InheritanceDecl into a
+/// BoundMemberInfo (emitCastToConcreteSuperTypeRec) likewise holds an
+/// unspecialized decl-ref — the re-deferrals in `tryGetAddress` and
+/// `extractField` copy that declRef verbatim — and substituting generic
+/// arguments never changes which declaration a base refers to, only its
+/// type arguments.
 static bool isFieldLikeMember(DeclRef<Decl> declRef)
 {
     if (declRef.as<VarDecl>())
@@ -9935,10 +9940,13 @@ LoweredValInfo tryGetAddress(
             // to a field or an inherited base subobject in something, but
             // for whatever reason the higher-level logic was not able to
             // turn it into a pointer already (maybe the base value for the
-            // field reference is a `BoundStorage`, etc.).
+            // member reference is a `BoundStorage`, etc.).
             //
-            // We need to read the entire base value out, modify the member
-            // we care about, and then write it back.
+            // Try to form a pointer to the member: aggressively get the
+            // base's address, then project the member address out of it.
+            // When the base itself cannot be addressed, `extractField`
+            // re-defers and the caller resolves the value instead (e.g.
+            // `assign` performs a read-modify-write).
 
             auto declRef = boundMemberInfo->declRef;
             if (isFieldLikeMember(declRef))
@@ -11155,10 +11163,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (isStructOrClassBase(superType))
         {
-            // TODO: the witness that a type inherits from a `struct`
-            // type should probably be a key that will be used for
-            // a field that holds the base type...
-            //
             auto irKey = getBuilder()->createStructKey();
             StringBuilder sb;
             sb << "key_" << getMangledName(context->astBuilder, inheritanceDecl);
