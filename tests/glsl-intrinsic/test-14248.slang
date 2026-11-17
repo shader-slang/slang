@@ -1,10 +1,10 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target hlsl
-//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target wgsl
-//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target metal
-//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cuda
-//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cpp
+//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target wgsl -o test-14248.wgsl
+//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target metal -o test-14248.metal
+//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cuda -o test-14248.cu
+//TEST:SIMPLE_EX: -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cpp -o test-14248.cpp
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -llvm -compute -entry computeMain -source-language glsl -output-using-type
 
