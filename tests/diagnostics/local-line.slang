@@ -1,9 +1,12 @@
-//TEST:SIMPLE_LINE:-entry computeMain -target spirv -stage compute -emit-spirv-via-glsl
-//TEST:SIMPLE_LINE:-entry computeMain -target dxil -profile cs_6_0 
-//TEST:SIMPLE_LINE:-entry computeMain -target dxbc  -stage compute
-//TEST:SIMPLE_LINE:-entry computeMain -target shader-dll -stage compute
-//TEST:SIMPLE_LINE:-entry computeMain -capability cuda_sm_8_0 -target ptx -stage compute 
-//TEST:SIMPLE_LINE(filecheck=CHECK):-entry computeMain -target spirv -stage compute -emit-spirv-via-glsl
+// Every lane expects the compilation to fail because computeMain calls __SyntaxError(); the
+// exit-code annotations and the CHECK below depend on that failure. The .expected file holds
+// the line number of that first diagnostic, so it moves when lines change above the failure.
+//TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -target spirv -stage compute -emit-spirv-via-glsl
+//TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -target dxil -profile cs_6_0
+//TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -target dxbc -stage compute
+//TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -target shader-dll -stage compute
+//TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -capability cuda_sm_8_0 -target ptx -stage compute
+//TEST:SIMPLE_LINE(filecheck=CHECK,exit-code=-1):-entry computeMain -target spirv -stage compute -emit-spirv-via-glsl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

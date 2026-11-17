@@ -1,8 +1,9 @@
-//TEST:COMPARE_COMPUTE_EX(filecheck=CHECK):-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX(filecheck=CHECK,exit-code=1):-cpu -compute -shaderobj
 
 // render-test must report a failure from `RenderTestApp::update` (here, `applyBinding` failing
 // because the shader has no parameter named `doesNotExist`) through its result code, rather than
-// exiting successfully without producing any output.
+// exiting successfully without producing any output. The expected exit code is 1, not -1: a
+// failure the tool reports at runtime is a generic tool failure, not a compile failure.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=doesNotExist
 RWStructuredBuffer<int> outputBuffer;
