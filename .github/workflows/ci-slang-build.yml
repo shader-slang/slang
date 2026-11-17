@@ -110,19 +110,6 @@ jobs:
         with:
           platform: ${{ inputs.os }}
 
-      # Temporary timing sweep for #14504; remove with the WASM-only harness.
-      - name: Sample VM startup timing before APT
-        if: inputs.platform == 'wasm'
-        env:
-          REPRO_ATTEMPT: ${{ github.run_attempt }}
-        run: |
-          delay_seconds=$(( ((REPRO_ATTEMPT - 1) % 5) * 60 ))
-          echo "Waiting ${delay_seconds}s to sample a different boot-to-APT interval"
-          sleep "$delay_seconds"
-          echo "VM uptime before common setup:"
-          cat /proc/uptime
-          cloud-init status --long || true
-
       - name: Setup
         uses: ./.github/actions/common-setup
         with:

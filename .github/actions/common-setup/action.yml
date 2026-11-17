@@ -59,6 +59,27 @@ runs:
         # it. An empty value keeps the default toolset on the other runners.
         toolset: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && '14.44' || '' }}
 
+    # Temporary reproduction synchronization for #14504. Observe the existing
+    # background operation; do not launch or alter the competing APT process.
+    - name: Align WASM setup with a background package-list update
+      if: inputs.os == 'linux' && inputs.platform == 'wasm'
+      shell: bash
+      run: |
+        cloud-init status --long || true
+        for ((sample = 0; sample < 600; sample++)); do
+          if sudo -n lslocks --raw --noheadings --notruncate --output PID,PATH | awk '
+            $2 == "/var/lib/apt/lists/lock" { found = 1 }
+            END { exit !found }
+          '; then
+            echo "Background lists lock observed; proceeding immediately to APT"
+            cat /proc/uptime
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "No background lists lock observed within ten minutes"
+        exit 124
+
     - name: Install dependencies (Linux only)
       if: inputs.os == 'linux'
       shell: bash
