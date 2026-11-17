@@ -469,10 +469,13 @@ private:
             m_call->getCallee(),
             m_args.getCount(),
             m_args.getArrayView().getBuffer());
-        // The rebuilt call replaces the original call in the IR, so it must keep the source
-        // location the user wrote. Diagnostics that fire on a call after legalization (for
-        // example, the resource-selection warnings) read that location; without this copy they
-        // would report no source position at all.
+        // A rebuilt instruction takes the place of the original in the IR, so it must carry the
+        // source location the user wrote. Diagnostics that fire after legalization (for example,
+        // the resource-selection warnings) report that location; without it they can at best
+        // report a use of the call rather than the call site itself. The same replacement rule
+        // holds on the legalizer's other rebuild paths (the generic recreate in legalizeInst,
+        // printf, cooperative-matrix element functors, and abort), each of which copies the
+        // location the same way.
         newCall->sourceLoc = m_call->sourceLoc;
         return newCall;
     }
@@ -826,7 +829,10 @@ static LegalVal legalizeLoad(IRTypeLegalizationContext* context, LegalVal legalP
     }
 }
 
-static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
+static LegalVal legalizePrintf(
+    IRTypeLegalizationContext* context,
+    IRInst* inst,
+    ArrayView<LegalVal> args)
 {
     ShortList<IRInst*> legalArgs;
     for (auto arg : args)
@@ -845,11 +851,13 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
             SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor for printf operand");
         }
     }
-    return LegalVal::simple(context->builder->emitIntrinsicInst(
+    auto newPrintf = context->builder->emitIntrinsicInst(
         context->builder->getVoidType(),
         kIROp_Printf,
         (UInt)legalArgs.getCount(),
-        legalArgs.getArrayView().getBuffer()));
+        legalArgs.getArrayView().getBuffer());
+    newPrintf->sourceLoc = inst->sourceLoc;
+    return LegalVal::simple(newPrintf);
 }
 
 /// Validate abort payload argument types after variadic-pack and pair legalization.
@@ -2184,7 +2192,7 @@ static LegalVal legalizeInst(
         result = legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
         break;
     case kIROp_Printf:
-        result = legalizePrintf(context, args);
+        result = legalizePrintf(context, inst, args);
         break;
     case kIROp_Abort:
         result = legalizeAbort(context, inst, args);
@@ -2360,6 +2368,7 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                         inst->getFullType(),
                         legalArg.getSimple(),
                         inst->getOperand(1));
+                    newInst->sourceLoc = inst->sourceLoc;
                     inst->replaceUsesWith(newInst);
                     inst->removeAndDeallocate();
                     return LegalVal::simple(newInst);
@@ -2378,6 +2387,7 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                     inst->getOperand(0),
                     inst->getOperand(1));
 
+                newInst->sourceLoc = inst->sourceLoc;
                 inst->replaceUsesWith(newInst);
                 inst->removeAndDeallocate();
                 return LegalVal::simple(newInst);
@@ -2504,6 +2514,7 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
                 inst->getOp(),
                 argCount,
                 newArgs.getArrayView().getBuffer());
+            newInst->sourceLoc = inst->sourceLoc;
             inst->replaceUsesWith(newInst);
             inst->removeFromParent();
             context->replacedInstructions.add(inst);
