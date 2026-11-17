@@ -2644,11 +2644,15 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         if (const auto glslBindingAttribute = syntaxNode->findModifier<GLSLBindingAttribute>())
         {
             // A `binding` argument that was never specified means index 0 (GLSL
-            // `layout(set = N, offset = ...)`). The auto-offset scheme assigns a
-            // next-offset per concrete descriptor binding index, so a binding index that
-            // is still a symbolic link-time constant (e.g. derived from an `extern`
-            // constant) cannot be tracked at check time; the offset layout qualifier is
-            // a GLSL-source legacy path with no link-time story, so diagnose it here.
+            // `layout(set = N, offset = ...)`). The offset tracker keys every offset by a
+            // concrete descriptor binding index, and checking never re-runs after linking,
+            // so a binding index that is still a symbolic link-time constant (e.g. derived
+            // from an `extern` constant) cannot participate: diagnose it and skip offset
+            // assignment for this declaration entirely — including an explicit
+            // `layout(offset = N)`, which goes through the same per-binding bookkeeping.
+            // Linking a module that defines the constant later cannot help here, so the
+            // message names the concrete-index constraint rather than the link-time
+            // remedies that `binding-attribute-requires-concrete-value` offers.
             IntegerLiteralValue bindingIndex = 0;
             bool canTrackOffsets = true;
             if (auto bindingConst = as<ConstantIntVal>(glslBindingAttribute->binding))
@@ -2658,8 +2662,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
             else if (glslBindingAttribute->binding)
             {
                 canTrackOffsets = false;
-                getSink()->diagnose(Diagnostics::BindingAttributeRequiresConcreteValue{
-                    .location = glslBindingAttribute->loc});
+                getSink()->diagnose(
+                    Diagnostics::GlslOffsetRequiresConcreteBinding{
+                        .location = glslBindingAttribute->loc});
             }
             if (canTrackOffsets)
             {

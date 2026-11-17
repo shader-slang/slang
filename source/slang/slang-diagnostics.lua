@@ -5333,6 +5333,13 @@ err(
     span { loc = "location", message = "an argument of '[[vk::binding(...)]]' is a link-time constant that is not a concrete value here; provide a default or link a module that defines it" }
 )
 
+err(
+    "glsl-offset-requires-concrete-binding",
+    39035,
+    "GLSL offset layout qualifier requires a concrete binding index",
+    span { loc = "location", message = "the GLSL 'offset' layout qualifier requires a concrete 'binding' index at compile time to track per-binding offsets; link-time constant expressions are not supported on this legacy GLSL path" }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,
