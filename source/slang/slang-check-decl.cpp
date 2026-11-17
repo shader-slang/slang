@@ -12755,8 +12755,6 @@ void SemanticsVisitor::_fillInGenericConstraintPathResolutionTableForInheritance
     if (!interfaceDecl)
         return;
 
-    // For each inheritance requirement in the interface,
-    // determine the canonical path from subType to that inherited interface.
     // We use declaration keys within `pathResolutionTable`, whose `baseType` identifies this
     // interface application. Path selection also needs that application's substitutions.
     for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(m_astBuilder, interfaceDecl))
@@ -12766,7 +12764,7 @@ void SemanticsVisitor::_fillInGenericConstraintPathResolutionTableForInheritance
         if (!reqType)
             continue;
 
-        // Try to get the witness that shows subType conforms to reqType
+        // We select the proof using the specialized base type for this interface application.
         auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
         if (!subIsReqWitness)
             continue;

@@ -1,3 +1,4 @@
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute,cuda):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
@@ -5,13 +6,13 @@
 
 // Companion executable regression test for
 // https://github.com/shader-slang/slang/issues/13996.
-// The diamond `IDerived : IBase<int>, IBase<float>` shares the lexical
-// inheritance declaration `IBase<T> : IRoot`, so the shared `IRoot`
-// conformance of `S` must resolve to a single witness table and each
-// application's own requirements must stay distinct. This test dispatches
-// the `T`-dependent requirement `check` through both applications of the
-// generic interface, so a witness that resolved through the wrong
-// application would produce the wrong value rather than passing silently.
+// The companion compile repro pins the diamond's shared-table property (the
+// duplicate-table assertion fires without the fix); what this file adds is
+// executed evidence that each application's own requirement stays distinct:
+// the `T`-dependent requirement `check` is dispatched through both
+// applications of the generic interface, so a witness that resolved through
+// the wrong application would produce the wrong value rather than passing
+// silently.
 
 interface IRoot
 {

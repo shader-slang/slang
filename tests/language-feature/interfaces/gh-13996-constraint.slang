@@ -4,6 +4,11 @@
 // https://github.com/shader-slang/slang/issues/13996.
 // This shape already compiled before the fix; it guards the
 // specialized-enumeration invariant of the path-resolution table.
+// A regression in that invariant surfaces here as a compile failure or
+// internal error inside `viaIDerived` (a wrong-application witness no
+// longer resolves the right `calc` overload); the computed value itself
+// is not checked because executing this constraint path at runtime
+// currently trips the separate existential-dispatch internal error.
 // `checkGenericConstraintConformances` builds canonical inheritance paths for
 // constraints, reusing the same path classifier. Here the shared inheritance
 // declaration has a *generic* base (`IBase<T> : IRoot<T>`), so the path table

@@ -16,12 +16,18 @@ interface IBase<T> : IRoot {}
 interface IDerived : IBase<int>, IBase<float> {}
 struct S : IDerived {}
 
-// The same diamond with the applications listed in the opposite order: the
-// canonical path is whichever application is processed first, so both orderings
-// must classify their own path as canonical and the other as a stored proof.
+// The same diamond with the applications listed in the opposite order.
+// Canonicity is selected by the witness that inheritance linearization
+// returns, not by enumeration order alone: whichever application the
+// linearized proof goes through classifies its own path as canonical and
+// records the other as a stored proof, so `SR` guards the mirror-image
+// owner/proof assignment from `S`.
 interface IDerivedR : IBase<float>, IBase<int> {}
 struct SR : IDerivedR {}
 
+// The parameter-taking functions mirror the original report: referencing the
+// conforming types forces their conformance checking (and the shared-table
+// registration the header describes) during this compile.
 int test(S value)
 {
     return 1;
