@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: a1400965484079a2374214623ac9dd300f710b183369b58b4730c5f2f8c798f4
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T08:09:45Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: a4029edc3abd590ad67edfef94772eff296140ceb8dff5e1e1d47a84eaada224
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -26,9 +26,9 @@ Two conventions used in the tables below follow the sibling pages. A
 `‡` in the **C++ wrapper** column means the `IRFoo` struct is written
 out by hand in a header rather than generated from the Lua entry; see
 [C++ wrappers: hand-written vs generated](#c-wrappers-hand-written-vs-generated).
-A `†` in the **Operands** column means the Lua entry declares only
-`min_operands`, so the generated wrapper carries no named accessors
-and consumers call `getOperand(i)` directly.
+A `†` in the **Operands** column marks a name recovered from the C++
+accessor rather than the Lua entry. `(N unnamed)` means the Lua entry
+declares only `min_operands = N`, so consumers call `getOperand(i)`.
 
 ## Source
 
@@ -39,21 +39,22 @@ three Lua intermediate groups at lines 1015-1046 of
 `DifferentialPairGetDifferentialBase` (1029-1038), and
 `DifferentialPairGetPrimalBase` (1040-1046). Every opcode that
 *translates* a function value into some differentiated form lives
-under the hoistable `TranslateBase` group at lines 2820-2855. The
+under the hoistable `TranslateBase` group at lines 2853-2892. The
 checkpointing opcodes `checkpointObj`, `loopExitValue`, and
-`ReportCheckpointStore` are at lines 1612-1625; `detachDerivative` is
+`ReportCheckpointStore` are at lines 1612-1629; `detachDerivative` is
 at line 1152; the four reverse-mode placeholder opcodes are at lines
-1256-1265; `DiffTypeInfo` is at lines 1123-1127. The built-in
+1257-1269; `DiffTypeInfo` is at lines 1121-1127. The built-in
 requirement key sits next to the ordinary `key` entry at lines
-925-931, and its matching decoration is at lines 2304-2309.
+926-932, and its matching decoration is at lines 2326-2336.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) —
-either by hand (the `IRTranslateBase` leaves at lines 647-737, the
-pair bases and `IRDetachDerivative` at lines 2430-2464, the
-checkpoint objects at lines 2054-2067, `IRBuiltinRequirementKey` and
-`IRBuiltinRequirementDecoration` at lines 470-491) or by the FIDDLE
-template at line 3125 of the same header.
+either by hand (the `IRTranslateBase` leaves at lines 675-764, the
+placeholder structs at lines 1983-2005, the pair bases and
+`IRDetachDerivative` at lines 2457-2491, the checkpoint objects at
+lines 2081-2094, `IRBuiltinRequirementKey` and
+`IRBuiltinRequirementDecoration` at lines 497-519) or by the FIDDLE
+template at line 3157 of the same header.
 
 Three distinct producers put these opcodes into a module.
 
@@ -61,31 +62,36 @@ The **core module** is the origin of every differential-pair opcode
 and of `detachDerivative`. `DifferentialPair<T>` in
 [core.meta.slang](../../../../source/slang/core.meta.slang) declares
 its `__init` with `__intrinsic_op($(kIROp_MakeDifferentialPair))`
-(line 786) and its `p` / `v` / `d` properties with
+(line 833) and its `p` / `v` / `d` properties with
 `DifferentialPairGetPrimal` / `DifferentialPairGetDifferential`
-(lines 791, 797, 803); `DifferentialPtrPair<T>` declares the
-corresponding pointer-flavored four (lines 877-894). The free
+(lines 838, 844, 850); `DifferentialPtrPair<T>` declares the
+corresponding pointer-flavored four (lines 924-941). The free
 function `diffPair(primal, diff)` in
 [diff.meta.slang](../../../../source/slang/diff.meta.slang) (line
 1329) is a second spelling of `MakeDiffPair`, and `detach<T>(T x)`
-(line 2081) is the origin of `detachDerivative`.
+(line 2168) is the origin of `detachDerivative`.
 
 **Semantic checking** is the origin of most `TranslateBase` opcodes,
 via a mechanism that is easy to miss because it does not appear as a
 `visit*` method. `SynthesizedFuncDecl`
 ([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line
-760) carries a `uint32_t irOp` field plus a `List<Val*> operands`;
+811) carries a `uint32_t irOp` field plus a `List<Val*> operands`;
 [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp) synthesizes such decls while checking a
 differentiable callable and stores the intended opcode in `irOp`.
-Lowering then reads that field at line 13858 of
+Lowering then reads that field at line 13915 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp),
-lowers each `Val` operand, calls `emitIntrinsicInst` with
-`(IROp)synFuncDecl->irOp`, and replaces the placeholder `IRFunc` with
-the resulting inst. The sibling `SynthesizedStructDecl` path at line
-12454 does the same thing for the reverse-mode *context types*, which
+lowers each operand, calls `emitIntrinsicInst` with
+`(IROp)synFuncDecl->irOp` (line 13962), and replaces the placeholder
+`IRFunc` with the resulting inst. The sibling `SynthesizedStructDecl`
+path at line 12565 does the same thing for the reverse-mode *context types*, which
 [types.md](types.md#differentiation-types) owns. The `AST origin`
-column below names the checking function that sets `irOp`; all of
-them go through this one lowering site.
+column below names the checking function that sets `irOp`; every
+`SynthesizedFuncDecl` origin goes through this one lowering site. The
+two synthesized derivative witness opcodes take a distinct path: checking
+(`extendContainerDecl` in `slang-check-decl.cpp`, lines 9877 and 16261)
+builds an `InheritanceDecl` carrying a `SynthesizedModifier`, and
+`visitInheritanceDecl` in `slang-lower-to-ir.cpp` (lines 11138-11165)
+emits `(IROp)synModifier->op` instead of a witness table.
 
 **The autodiff passes themselves** produce the remainder. The
 central consumer is `TranslationContext::maybeTranslateInst` in
@@ -107,18 +113,24 @@ No opcode in this family produces target code. `finalizeAutoDiffPass`
 ([slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp)
 line 1174) runs `processPairTypes` to rewrite `MakeDiffPair` into a
 `MakeStruct` and the two projections into field accesses, then
-`removeDetachInsts` and `removeTypeAnnotations`; `lowerDiffTypeInfoInsts`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 882)
+`removeDetachInsts`, `removeTypeAnnotations`, `stripNoDiffTypeAttribute`,
+`stripAutoDiffDecorations`, and `releaseDifferentiableInterfaces`;
+`lowerDiffTypeInfoInsts`
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 897)
 would rewrite `DiffTypeInfo` into a `makeTuple` if any existed.
-Both are gated on `requiredLoweringPassSet.autodiff`, which
-`calcRequiredLoweringPassSet` (line 405 of the same file) sets on
-seeing any `IRTranslateBase`, `IRTranslatedTypeBase`,
-`IRDifferentialPairTypeBase`, or `IRMakeDifferentialPairBase` inst.
+Both are gated on `requiredLoweringPassSet.autodiff` (lines 1592 and
+1611 of the same file); when it is unset, only
+`stripAutoDiffDecorations` runs. `calcRequiredLoweringPassSet` (line 409)
+sets the flag on seeing any `IRTranslateBase`, `IRTranslatedTypeBase`,
+`IRDifferentialPairTypeBase`, `IRMakeDifferentialPairBase`,
+`IRDifferentialPairGetDifferentialBase`, or
+`IRDifferentialPairGetPrimalBase` inst, or an `IRAttributedType` carrying
+`IRNoDiffAttr`, and on `DiffTypeInfo` in its opcode switch (line 526).
 One opcode can nonetheless reach the emitter: `builtinRequirementKey`
 is hoistable, so it may survive specialization as an unreferenced
 global, and `ensureGlobalInst` in
 [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
-(line 5338) skips it explicitly as metadata that produces no code.
+(line 5431) skips it explicitly as metadata that produces no code.
 
 Related opcodes documented elsewhere: the differential-pair and
 reverse-mode-context *types* are in
@@ -178,7 +190,7 @@ accessors.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `GetDifferential` | `IRDifferentialPairGetDifferential` | `pair` | | `DifferentialPair<T>.d` getter | Reads the differential component of a `DifferentialPair`. |
-| `GetDifferentialPtr` | `IRDifferentialPtrPairGetDifferential` | † `min=1` | | `DifferentialPtrPair<T>.d` getter | Reads the differential pointer of a `DifferentialPtrPair`. |
+| `GetDifferentialPtr` | `IRDifferentialPtrPairGetDifferential` | (1 unnamed) | | `DifferentialPtrPair<T>.d` getter | Reads the differential pointer of a `DifferentialPtrPair`. |
 | `GetPrimal` | `IRDifferentialPairGetPrimal` | `pair` | | `DifferentialPair<T>.p` / `.v` getters | Reads the primal component of a `DifferentialPair`. |
 | `GetPrimalRef` | `IRDifferentialPtrPairGetPrimal` ‡ | `ptrPair` | | `DifferentialPtrPair<T>.p` / `.v` getters | Reads the primal pointer of a `DifferentialPtrPair`. |
 
@@ -193,17 +205,31 @@ are reached through `getBase()` in practice.
 Everything in this section is a child of the hoistable
 `TranslateBase` group, so identical translation requests dedupe to a
 single IR value before the translation pass ever sees them. The dedupe
-is keyed on the request itself — opcode plus operands — so it is the
-*base function* that decides identity, not the call site:
+is keyed on the request itself — opcode, full result type, and
+operands (`IRInstKey` in
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 2246) — so
+it is the *base function* that decides identity, not the call site,
+the enclosing function, or the entry point. The lookup goes through the
+module's global-value-numbering map (`_findOrEmitHoistableInst`,
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines 2810-2880),
+which is shared by every function in the module:
 
 ```slang
 buf[0] = __fwd_diff(f)(DifferentialPair<float>(a, d)).d;
 buf[1] = __fwd_diff(f)(DifferentialPair<float>(d, a)).p;
 ```
 
-lowers to one `let %fwd = ForwardDifferentiate(%f)` that both `call`
-insts share, however many times `__fwd_diff(f)` is written and
-whatever arguments each call passes.
+lowers (in the `-dump-ir` LOWER-TO-IR section) to a single
+
+```
+let %fwd : ... = ForwardDifferentiate(%f)
+```
+
+and both `call %fwd(...)` insts name that same `%fwd`, however many
+times `__fwd_diff(f)` is written and whatever arguments each call
+passes. Requests with identical opcode, type, and operands share one
+inst; a second `ForwardDifferentiate` appears only for a different
+base function (or result type).
 
 Every entry declares only `min_operands`, except `ForwardDifferentiate`
 which also names `baseFn`.
@@ -212,37 +238,37 @@ which also names `baseFn`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `ForwardDifferentiate` | `IRForwardDifferentiate` ‡ | `baseFn` | H | `ForwardDifferentiateExpr` (`__fwd_diff(...)`) via `visitForwardDifferentiateExpr`; also `ForwardDifferentiateVal` via `visitForwardDifferentiateVal` | Asks for the forward-mode (JVP) derivative of a function value. |
-| `TrivialForwardDifferentiate` | `IRTrivialForwardDifferentiate` | † `min=1` | H | `SynthesizedFuncDecl` `fwd_diff` created by `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` / `[HasTrivialForwardDerivative]` | Asks for a derivative that runs the primal and returns zero output differentials, ignoring incoming tangents. |
-| `ForwardDifferentiatePropagate` | `IRForwardDifferentiatePropagate` ‡ | † `min=1` | H | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) line 419 | Forward-mode propagate function used while unzipping a reverse-mode body. |
+| `ForwardDifferentiate` | `IRForwardDifferentiate` ‡ | `baseFn` | H | `ForwardDifferentiateExpr` (`__fwd_diff(...)`) via `visitForwardDifferentiateExpr`; also `ForwardDifferentiateVal` via `visitForwardDifferentiateVal`; also `SynthesizedFuncDecl` `fwd_diff` from `synthesizeDifferentiabilityRequirements`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute` | Asks for the forward-mode (JVP) derivative of a function value. |
+| `TrivialForwardDifferentiate` | `IRTrivialForwardDifferentiate` | (1 unnamed) | H | `SynthesizedFuncDecl` `fwd_diff` created by `synthesizeDifferentiabilityRequirements` for `[TreatAsDifferentiable]` / `[HasTrivialForwardDerivative]` | Asks for a derivative that runs the primal and returns zero output differentials, ignoring incoming tangents. |
+| `ForwardDifferentiatePropagate` | `IRForwardDifferentiatePropagate` ‡ | (1 unnamed) | H | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) line 419 | Forward-mode propagate function used while unzipping a reverse-mode body. |
 
 #### Reverse-mode
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `BackwardDifferentiate` | `IRBackwardDifferentiate` ‡ | † `min=3` | H | `BackwardDifferentiateVal` via `visitBackwardDifferentiateVal`; also created internally by the translation pass | Asks for the whole reverse-mode bundle for a function value. |
-| `BackwardDifferentiatePrimal` | `IRBackwardDifferentiatePrimal` ‡ | † `min=1` | H | `SynthesizedFuncDecl` `apply_bwd` from `checkDifferentiableCallableCommon`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute`; also `BackwardDifferentiatePrimalVal` | Primal-only phase: computes and returns the values the propagate phase will need. |
-| `BackwardDifferentiatePropagate` | `IRBackwardDifferentiatePropagate` ‡ | † `min=1` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness`; also `BackwardDifferentiatePropagateVal` | Propagate phase: consumes the recorded context and an output adjoint, produces input adjoints. |
-| `BackwardRemat` | `IRBackwardRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `checkDifferentiableCallableCommon`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute` | Rematerialization phase: recomputes primal values from the minimal context instead of reading a full checkpoint. |
-| `TrivialBackwardDifferentiate` | `IRTrivialBackwardDifferentiate` | † `min=1` | H | no AST origin — built by the translation pass as the root of the trivial five-tuple | Trivial-adjoint counterpart of `BackwardDifferentiate`. |
-| `TrivialBackwardDifferentiatePrimal` | `IRTrivialBackwardDifferentiatePrimal` | † `min=1` | H | `SynthesizedFuncDecl` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` | Trivial primal phase. |
-| `TrivialBackwardDifferentiatePropagate` | `IRTrivialBackwardDifferentiatePropagate` | † `min=1` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Trivial propagate phase. |
-| `TrivialBackwardRemat` | `IRTrivialBackwardRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `checkDifferentiableCallableCommon` for `[TreatAsDifferentiable]` | Trivial remat phase. |
+| `BackwardDifferentiate` | `IRBackwardDifferentiate` ‡ | (3 unnamed) | H | `BackwardDifferentiateVal` via `visitBackwardDifferentiateVal` (line 2593 of [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)); also created internally by the translation pass; no user-written expression produces it (see [BackwardDifferentiate](#backwarddifferentiate)) | Asks for the whole reverse-mode bundle for a function value. |
+| `BackwardDifferentiatePrimal` | `IRBackwardDifferentiatePrimal` ‡ | (1 unnamed) | H | `SynthesizedFuncDecl` `apply_bwd` from `synthesizeDifferentiabilityRequirements`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute`; also `BackwardDifferentiatePrimalVal` | Primal-only phase: computes and returns the values the propagate phase will need. |
+| `BackwardDifferentiatePropagate` | `IRBackwardDifferentiatePropagate` ‡ | (1 unnamed) | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness`; also `BackwardDifferentiatePropagateVal` | Propagate phase: consumes the recorded context and an output adjoint, produces input adjoints. |
+| `BackwardRemat` | `IRBackwardRemat` | (1 unnamed) | H | `SynthesizedFuncDecl` `remat` from `synthesizeDifferentiabilityRequirements`, `trySynthesizeDiffFuncRequirementWitness`, `checkDerivativeAttribute` | Rematerialization phase: recomputes primal values from the minimal context instead of reading a full checkpoint. |
+| `TrivialBackwardDifferentiate` | `IRTrivialBackwardDifferentiate` | (1 unnamed) | H | no AST origin — built by the translation pass as the root of the trivial five-tuple | Trivial-adjoint counterpart of `BackwardDifferentiate`. |
+| `TrivialBackwardDifferentiatePrimal` | `IRTrivialBackwardDifferentiatePrimal` | (1 unnamed) | H | `SynthesizedFuncDecl` from `synthesizeDifferentiabilityRequirements` for `[TreatAsDifferentiable]` | Trivial primal phase. |
+| `TrivialBackwardDifferentiatePropagate` | `IRTrivialBackwardDifferentiatePropagate` | (1 unnamed) | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Trivial propagate phase. |
+| `TrivialBackwardRemat` | `IRTrivialBackwardRemat` | (1 unnamed) | H | `SynthesizedFuncDecl` `remat` from `synthesizeDifferentiabilityRequirements` for `[TreatAsDifferentiable]` | Trivial remat phase. |
 
 None of these opcodes reaches target code, but the functions and types
-the reverse-mode passes build from them do, under generated names that
-appear in every source-level text target — HLSL, GLSL, Metal, WGSL,
-CUDA and C++ alike. SPIR-V is the exception: its output carries no
-`OpName` for the derivative function, so a SPIR-V reader has to match
-on structure rather than on the name. `generateName` in
+the reverse-mode passes build from them do, carrying generated IR name
+hints. A hint that survives optimization can appear in target output
+(for SPIR-V, as an `OpName` record via `IRNameHintDecoration`; see
+[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
+line 6327). `generateName` in
 [slang-ir-autodiff-rev.cpp](../../../../source/slang/slang-ir-autodiff-rev.cpp)
 gives the propagate function the prefix `s_bwdProp_` (lines 405 and
-726) and the full intermediate-context struct the prefix
-`s_bwdCallableCtx_` (lines 314 and 727), so `f` yields `s_bwdProp_f`
+728) and the full intermediate-context struct the prefix
+`s_bwdCallableCtx_` (lines 314 and 729), so `f` yields `s_bwdProp_f`
 alongside a `s_bwdCallableCtx_f` struct carrying the hoisted primal
 state. Forward mode is the same shape one prefix over:
 [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp)
-line 2271 builds `s_fwd_<orig>`.
+line 2295 builds `s_fwd_<orig>`.
 
 #### Legacy bridge
 
@@ -256,31 +282,31 @@ taking one element out of the resolved five-tuple.
 three functions — `apply_bwd`, `remat`, and propagate — which
 `maybeTranslateLegacyBackwardDerivative` in
 [slang-ir-autodiff-rev.cpp](../../../../source/slang/slang-ir-autodiff-rev.cpp)
-(lines 759-761) reads as operands 0, 1, and 2.
+(lines 761-763) reads as operands 0, 1, and 2.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `LegacyBackwardDifferentiate` | `IRLegacyBackwardDifferentiate` | † `min=3` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Old-style combined reverse-mode request. |
-| `BackwardFromLegacyBwdDiffFunc` | `IRBackwardFromLegacyBwdDiffFunc` | † `min=2` | H | no AST origin — built by the translation pass to root the legacy five-tuple | Reinterprets a legacy combined reverse function as the current bundle. |
-| `BackwardPrimalFromLegacyBwdDiffFunc` | `IRBackwardPrimalFromLegacyBwdDiffFunc` ‡ | † `min=2` | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the primal phase out of a legacy combined function. |
-| `BackwardRematFromLegacyBwdDiffFunc` | `IRBackwardRematFromLegacyBwdDiffFunc` | † `min=2` | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the remat phase. |
-| `BackwardPropagateFromLegacyBwdDiffFunc` | `IRBackwardPropagateFromLegacyBwdDiffFunc` ‡ | † `min=2` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Projects the propagate phase. |
+| `LegacyBackwardDifferentiate` | `IRLegacyBackwardDifferentiate` | (3 unnamed) | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Old-style combined reverse-mode request. |
+| `BackwardFromLegacyBwdDiffFunc` | `IRBackwardFromLegacyBwdDiffFunc` | (2 unnamed) | H | no AST origin — built by the translation pass to root the legacy five-tuple | Reinterprets a legacy combined reverse function as the current bundle. |
+| `BackwardPrimalFromLegacyBwdDiffFunc` | `IRBackwardPrimalFromLegacyBwdDiffFunc` ‡ | (2 unnamed) | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the primal phase out of a legacy combined function. |
+| `BackwardRematFromLegacyBwdDiffFunc` | `IRBackwardRematFromLegacyBwdDiffFunc` | (2 unnamed) | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff` and `translateBwdDerivativeAttributeToAD2` | Projects the remat phase. |
+| `BackwardPropagateFromLegacyBwdDiffFunc` | `IRBackwardPropagateFromLegacyBwdDiffFunc` ‡ | (2 unnamed) | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` | Projects the propagate phase. |
 
 #### Synthesized derivative witnesses
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `FunctionCopy` | `IRFunctionCopy` | † `min=1` | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff`, `_funcExtensionApply`, `translateBwdDerivativeAttributeToAD2` | Names an existing function as the body of a synthesized derivative member; translated to its own operand. |
-| `SynthesizedForwardDerivativeWitnessTable` | `IRSynthesizedForwardDerivativeWitnessTable` | † `min=1` | H | `SynthesizedFuncDecl` from `trySynthesizeDiffFuncRequirementWitness` and `checkDifferentiableCallableCommon`; also emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3646 | Stands for an `IForwardDifferentiable` witness table that has to be built for a higher-order derivative. |
-| `SynthesizedBackwardDerivativeWitnessTable` | `IRSynthesizedBackwardDerivativeWitnessTable` | † `min=1` | H | as above, plus [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3659 | Same, for `IBackwardDifferentiable`. |
-| `MakeIDifferentiableWitness` | `IRMakeIDifferentiableWitness` | † `min=1` | H | no AST origin — emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 101 | Requests an `IDifferentiable` witness for a `DifferentialPair` / `DifferentialPtrPair` type. |
-| `SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | `IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | † `min=2` | H | none at this commit — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would bridge a legacy combined reverse function into the modern witness form. |
-| `IdentityRemat` | `IRIdentityRemat` | † `min=1` | H | `SynthesizedFuncDecl` `remat` from `_funcExtensionApply` — whose only surface, `__func_extension`, is gated behind `-experimental-feature` (see below) | Marks the remat phase as the identity, for a user-provided `__apply` whose `MinimalContext` is its `BwdCallable`. |
+| `FunctionCopy` | `IRFunctionCopy` | (1 unnamed) | H | `SynthesizedFuncDecl` from `_funcExtensionBackwardDiff`, `_funcExtensionApply`, `translateBwdDerivativeAttributeToAD2` | Names an existing function as the body of a synthesized derivative member; translated to its own operand. |
+| `SynthesizedForwardDerivativeWitnessTable` | `IRSynthesizedForwardDerivativeWitnessTable` | (1 unnamed) | H | `InheritanceDecl` with `SynthesizedModifier`, made via `extendContainerDecl` in `trySynthesizeDiffFuncRequirementWitness` and `synthesizeDifferentiabilityRequirements`, lowered by `visitInheritanceDecl`; also emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3677 | Stands for an `IForwardDifferentiable` witness table that has to be built for a higher-order derivative. |
+| `SynthesizedBackwardDerivativeWitnessTable` | `IRSynthesizedBackwardDerivativeWitnessTable` | (1 unnamed) | H | `InheritanceDecl` with `SynthesizedModifier`, as above, plus [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 3690 | Same, for `IBackwardDifferentiable`. |
+| `MakeIDifferentiableWitness` | `IRMakeIDifferentiableWitness` | (1 unnamed) | H | no AST origin — emitted by [slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) line 101 | Requests an `IDifferentiable` witness for a `DifferentialPair` / `DifferentialPtrPair` type. |
+| `SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | `IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc` | (2 unnamed) | H | no producer at HEAD — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would bridge a legacy combined reverse function into the modern witness form. |
+| `IdentityRemat` | `IRIdentityRemat` | (1 unnamed) | H | `SynthesizedFuncDecl` `remat` from `_funcExtensionApply` — whose only surface, `__func_extension`, is gated behind `-experimental-feature` (see below) | Marks the remat phase as the identity, for a user-provided `__apply` whose `MinimalContext` is its `BwdCallable`. |
 
 The `__func_extension` surface behind the `_funcExtensionApply` and
 `_funcExtensionBackwardDiff` origins above is experimental and is
 rejected in user code unless `-experimental-feature` is passed:
-`visitFuncExtensionDecl` (lines 16269-16275 of
+`visitFuncExtensionDecl` (lines 17466-17472 of
 [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp))
 diagnoses any `__func_extension` decl that neither sets that option nor
 comes from the core module. The exemption is what lets core-module
@@ -315,7 +341,7 @@ mark values that stand in for a gradient or for one half of an
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `DiffTypeInfo` | `IRDiffTypeInfo` | — | H | none at this commit — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would hold the witness tables describing a function's differentiable types; `lowerDiffTypeInfoInsts` rewrites it to a `makeTuple`. |
+| `DiffTypeInfo` | `IRDiffTypeInfo` | — | H | no producer at HEAD — see [Opcodes with no producer at HEAD](#opcodes-with-no-producer-at-head) | Would hold the witness tables describing a function's differentiable types; `lowerDiffTypeInfoInsts` rewrites it to a `makeTuple`. |
 
 ### Built-in requirement keys
 
@@ -347,9 +373,9 @@ value live and recomputing it.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `checkpointObj` | `IRCheckpointObject` ‡ | † `min=1` (`getVal()`) | | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 285-288 | Marks a value as a distinct copy for checkpointing, so hoisting can keep in-loop and out-of-loop uses apart. |
-| `loopExitValue` | `IRLoopExitValue` ‡ | † `min=1` (`getVal()`) | | no AST origin — emitted by [slang-ir-autodiff-primal-hoist.cpp](../../../../source/slang/slang-ir-autodiff-primal-hoist.cpp) line 393 | Records the value of an SSA variable at a loop exit so reverse mode can read it. |
-| `ReportCheckpointStore` | `IRReportCheckpointStore` | `storedType, originalFunc, storeRef` | | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 994 and 1146 | Marker that a checkpoint store was inserted, consumed by the checkpoint-report emitter. |
+| `checkpointObj` | `IRCheckpointObject` ‡ | `val` † | | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 285-288 | Marks a value as a distinct copy for checkpointing, so hoisting can keep in-loop and out-of-loop uses apart. |
+| `loopExitValue` | `IRLoopExitValue` ‡ | `val` † | | no AST origin — emitted by [slang-ir-autodiff-primal-hoist.cpp](../../../../source/slang/slang-ir-autodiff-primal-hoist.cpp) line 393 | Records the value of an SSA variable at a loop exit so reverse mode can read it. |
+| `ReportCheckpointStore` | `IRReportCheckpointStore` | `storedType, originalFunc, storeRef` | | no AST origin — emitted by [slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp) lines 1002 and 1150 | Marker that a checkpoint store was inserted, consumed by the checkpoint-report emitter. |
 | `detachDerivative` | `IRDetachDerivative` ‡ | `value` | | `detach<T>(T x)`, `__intrinsic_op($(kIROp_DetachDerivative))`; also `visitDetachExpr` and `visitTreatAsDifferentiableExpr` | Returns its operand unchanged but blocks derivative propagation through it. |
 
 ## Notable opcodes
@@ -378,11 +404,14 @@ that reverse `MakeDiffPair`. In source they are the `.d` and
 forward-mode transcriber emits them when it needs only one component
 of a pair it or a callee bundled. `lowerPairAccess` in
 [slang-ir-autodiff-pairs.cpp](../../../../source/slang/slang-ir-autodiff-pairs.cpp)
-(line 480) rewrites all four projections into a field access on the
-lowered pair struct, and `lowerMakePair` (line 448) rewrites both
+(line 504) rewrites all four projections into a field access on the
+lowered pair struct, and `lowerMakePair` (line 472) rewrites both
 constructors into a `makeStruct`; both are driven by
-`processPairTypes` (line 592). No pass folds
-`GetPrimal(MakeDiffPair(a, b))` down to `a` before that rewrite.
+`processPairTypes` (line 616). Before that rewrite, the unzip pass
+can already eliminate a primal projection whose base pair it has
+mapped, replacing it with the recorded primal
+([slang-ir-autodiff-unzip.cpp](../../../../source/slang/slang-ir-autodiff-unzip.cpp)
+lines 796-803).
 The `GetPrimalRef` / `GetDifferentialPtr` variants project the
 pointer-flavored pairs built by `MakeDiffRefPair`.
 
@@ -428,9 +457,16 @@ itself.
 product) of `baseFn`. It is the one differentiation operator a user
 can produce directly from an expression: `__fwd_diff(f)` parses to a
 `ForwardDifferentiateExpr` and `visitForwardDifferentiateExpr`
-(line 5878 of [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)) emits the opcode. It is also
+(line 5316 of [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)) emits the opcode. When the expression is
+directly invoked, semantic checking first rewrites it into a member
+lookup of `fwd_diff` on the callable (`convertHigherOrderExprToLookup`,
+[slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
+lines 4023 and 4612); that member is a `SynthesizedFuncDecl` whose
+`irOp` is `ForwardDifferentiate`, so lowering produces the same opcode
+through the synthesized-decl path described under [Source](#source). The
+opcode is also
 emitted when lowering a `ForwardDifferentiateVal` stored in a witness
-table (line 2492). Because the opcode is hoistable, two `__fwd_diff`
+table (line 2514). Because the opcode is hoistable, two `__fwd_diff`
 references to the same function are the same IR value, and the
 translation pass therefore builds the derivative once.
 
@@ -443,7 +479,7 @@ declares `getApplyFunc()`, `getContextType()`, and
 `getBwdPropFunc()` reading operands 0, 1, and 2 — but every producer
 at this commit builds the inst with exactly one operand.
 `IRBuilder::emitBackwardDifferentiateInst`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3759)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3791)
 passes a single `baseFn`, and the translation pass's own synthesized
 root ([slang-ir-translate.cpp](../../../../source/slang/slang-ir-translate.cpp) line 173) passes `1, &operand`. None
 of the three accessors has a caller. Treat the opcode as
@@ -454,9 +490,20 @@ nothing reads.
 
 The user-facing `__bwd_diff` form does not reach IR: semantic
 checking resolves `BackwardDifferentiateExpr` earlier, and
-`visitBackwardDifferentiateExpr` (line 5972 of
+`visitBackwardDifferentiateExpr` (line 5410 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp))
-calls `SLANG_UNEXPECTED`. The same is true
+calls `SLANG_UNEXPECTED`. What `__bwd_diff(f)` becomes is a member
+lookup of `bwd_diff` on the callable, built by
+`convertHigherOrderExprToLookup` in
+[slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
+(line 4023). The `bwd_diff` member it finds is a `SynthesizedFuncDecl`
+whose `irOp` is `LegacyBackwardDifferentiate` (synthesized from the
+callable's `apply_bwd`, `remat` and propagate members by
+`trySynthesizeDiffFuncRequirementWitness`, line 9818 of
+[slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp))
+or `FunctionCopy` (user-provided `bwd_diff`, lines 17265 and 21027), so
+the call site lowers to an ordinary `call` on that inst, and no
+source expression lowers to `BackwardDifferentiate` directly. The same is true
 of `PrimalSubstituteExpr` — `[PrimalSubstitute]` and
 `[PrimalSubstituteOf]` are AST-level attributes declared in
 [diff.meta.slang](../../../../source/slang/diff.meta.slang), and there is no `PrimalSubstitute` opcode.
@@ -464,7 +511,7 @@ of `PrimalSubstituteExpr` — `[PrimalSubstitute]` and
 ### `BackwardDifferentiatePrimal`, `BackwardRemat`, and `BackwardDifferentiatePropagate`
 
 These are the three function-valued phases of reverse mode, and they
-are also the three members that `checkDifferentiableCallableCommon`
+are also the three members that `synthesizeDifferentiabilityRequirements`
 synthesizes on the `IBackwardDifferentiable` / `IBwdCallable`
 extension it creates for a `[Differentiable]` callable: `apply_bwd`
 gets `irOp = kIROp_BackwardDifferentiatePrimal`, `remat` gets
@@ -506,18 +553,18 @@ because identity comes from the operand.
 
 `getInterfaceRequirementKey`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 1726) computes the role from the requirement's
+line 1748) computes the role from the requirement's
 `BuiltinRequirementModifier` — promoting, for example,
 `DifferentialType` to `DifferentialWitness` when the requirement
 being keyed is the associated *conformance* rather than the
 associated type — then calls `getBuiltinRequirementKey` and attaches
-`BuiltinRequirementDecoration` (lines 1814-1820).
+`BuiltinRequirementDecoration` (lines 1840-1843).
 `getInterfaceEntryByBuiltinRequirement`
 ([slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp)
 line 229) scans that decoration to find an entry by role. Because a
 built-in requirement can be reached through dynamic dispatch, the
 `lookupKey` operand of `GetDispatcher` is typed as a plain `IRInst`
-rather than `IRStructKey` (see the comment at lines 3222-3225 of
+rather than `IRStructKey` (see the comment at lines 3264-3267 of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)).
 
 ### `checkpointObj` and `ReportCheckpointStore`
@@ -529,15 +576,15 @@ value it wraps needs before the primal-hoisting pass can decide
 whether to checkpoint or recompute it. The unzip pass wraps the
 primal return value and the minimal-context value with it, and
 [slang-ir-autodiff-primal-hoist.cpp](../../../../source/slang/slang-ir-autodiff-primal-hoist.cpp)
-(line 2778) consumes it.
+(line 2779) consumes it.
 
 `ReportCheckpointStore(storedType, originalFunc, storeRef)` is the
 diagnostic channel for the same machinery, and nothing is printed
 unless `-report-checkpoint-intermediates`
 ([slang-options.cpp](../../../../source/slang/slang-options.cpp) line
-622) asks for it. The report is a `standalone_note` with the id `-1`
+635) asks for it. The report is a `standalone_note` with the id `-1`
 ([slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
-line 5916), whose leading line names the marker's two informative
+line 6427), whose leading line names the marker's two informative
 operands — the `originalFunc` and the total size — as
 
 ```
@@ -550,15 +597,15 @@ as `<count> instances of <size> bytes (<typeName>)`; that is where the
 `storedType` operand surfaces. Its `storeRef` operand is
 a weak reference to the store or address inst; if the store is later
 eliminated, the operand becomes `Poison`, and the reporting walk in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 271)
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 282)
 skips that entry instead of reporting a store that no longer exists.
 Dead-code elimination gives that operand its weak status in
 `isWeakReferenceOperand`
-([slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) line
-652), so a removed store is replaced with poison rather than held
+([slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) lines
+645-649), so a removed store is replaced with poison rather than held
 alive by the marker; the marker itself survives only because the
 conservative `mightHaveSideEffects` test in
-`shouldInstBeLiveIfParentIsLive` (line 531) keeps it, and the
+`shouldInstBeLiveIfParentIsLive` (line 512) keeps it, and the
 reporting walk removes it.
 
 ### `detachDerivative`
@@ -566,31 +613,48 @@ reporting walk removes it.
 `detachDerivative(value)` returns its operand unchanged but blocks
 derivative propagation through it, so the value looks constant to the
 autodiff system. It has two spellings in source: the core-module
-`detach<T>(T x)` intrinsic, and `no_diff` / `[TreatAsDifferentiable]`
-applied to an expression — `visitTreatAsDifferentiableExpr` (line
-5890 of [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)) wraps a materialized `IRLoad` in a
-`detachDerivative` so that `no_diff` behaves the same on local-array
-indexing as on resource indexing. `removeDetachInsts`, called from
-`finalizeAutoDiffPass`, deletes them once differentiation is done.
+`detach<T>(T x)` intrinsic (`visitDetachExpr`, line 5326 of
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp), emits it for a `DetachExpr`), and `no_diff` /
+`[TreatAsDifferentiable]` applied to an expression —
+`visitTreatAsDifferentiableExpr` (line 5341 of the same file) wraps a
+materialized `IRLoad` in a `detachDerivative` so that `no_diff` behaves
+the same on local-array indexing as on resource indexing. When the
+expression is a `call` instead, that visitor adds
+`TreatCallAsDifferentiableDecoration` (for the `no_diff` flavor) to the
+call and emits no `detachDerivative`.
+`removeDetachInsts`, called from `finalizeAutoDiffPass`, deletes the
+insts once differentiation is done.
 
 `no_diff` on a *parameter declaration* is a different construct and
 produces no `detachDerivative` inst at all. There it is a modifier, not
 an expression: checking moves a `NoDiffModifierVal` off the parameter's
-type onto the `ParamDecl` as a `NoDiffModifier` (lines 6766-6781 of
+type onto the `ParamDecl` as a `NoDiffModifier`
+(`_moveNoDiffFromTypeToParamDecl`, lines 7103-7135 of
 [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
-with the same move for ordinary var decls at lines 2876-2878), and the
-differentiability queries read it from either place
-(`doesTypeHaveNoDiffModifier`, lines 5337 and 5338). The
-attributed-type spelling that carries it is owned by
-[types.md](types.md#differentiation-types).
+with the same move for ordinary var decls at lines 3225-3232), and the
+differentiability queries read it from either place (for example
+`_hasNoDiffReturnSignature`, lines 5687-5690). In the lowered IR the
+parameter is not marked by an inst: the function's parameter type is
+`Attributed(T, no_diff)`, an `IRAttributedType` over the `NoDiffAttr`
+that `visitNoDiffModifierVal` (line 3075 of
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp))
+produces, e.g. `param %k : Attributed(Int, %no_diff)` for
+`no_diff int k`. `stripNoDiffTypeAttribute` (line 987 of
+[slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp)),
+called from `finalizeAutoDiffPass`, replaces an `Attributed` type whose
+only attribute is `NoDiffAttr` with its base type, so the marker does
+not survive to emission. The step that re-attaches the modifier to the
+parameter type of the function signature is outside this page's
+watched paths and is not described here. The attributed-type spelling
+is owned by [types.md](types.md#differentiation-types).
 
 ### C++ wrappers: hand-written vs generated
 
 Every opcode on this page has an `IR<struct_name>` wrapper; none is
-wrapper-less. The FIDDLE template at line 3120 of
+wrapper-less. The FIDDLE template at line 3157 of
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) walks
 the whole Lua tree through `getAllOtherInstStructsData` in
-[slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (line 152)
+[slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (line 145)
 and emits a struct for every entry whose `IR<struct_name>` is not
 already declared, so hand-written and generated wrappers are mutually
 exclusive by construction — the test is literally
@@ -610,13 +674,13 @@ the header body does not spell it out, while an entry that declares
 only `min_operands` yields no accessors at all. Second, several
 hand-written leaves declare a bare `IRUse base;` member. That is not
 extra storage: `IRInst::getOperands`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 240)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 241)
 assumes operands begin immediately after `sizeof(IRInst)`, so the
 member aliases operand 0.
 
-The two abstract pair bases are hand-written too, and their accessor
+The three abstract pair bases are hand-written too, and their accessor
 names differ from the Lua operand names of their leaves:
-`IRMakeDifferentialPairBase` (line 2431) offers `getPrimalValue()` and
+`IRMakeDifferentialPairBase` (line 2457) offers `getPrimalValue()` and
 `getDifferentialValue()` where the leaf entries name their operands
 `primal` and `differential`, and the two projection bases offer
 `getBase()` where the leaves name their operand `pair` or `ptrPair`.
@@ -637,14 +701,14 @@ The four placeholders `LoadReverseGradient`,
 `ReverseGradientDiffPairRef`, `PrimalParamRef`, and `DiffParamRef`
 each have an `IRBuilder` helper declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) (lines
-4144-4147) and defined in
+4198-4201) and defined in
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (lines
-5503-5541), but no caller anywhere in `source/`. The first two are
+5542-5589), but no caller anywhere in `source/`. The first two are
 still named in two consumer switches — the transposition pass lists
 them among the opcodes that cannot affect a gradient
 ([slang-ir-autodiff-transpose.cpp](../../../../source/slang/slang-ir-autodiff-transpose.cpp)
-line 1569), and
-`IRInst::mightHaveSideEffects` (line 9456 of
+line 1580), and
+`IRInst::mightHaveSideEffects` (line 9648, inside the function starting at 9488, of
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp)) treats
 them as side-effect-free — so removing them would be a visible
 change; `PrimalParamRef` and `DiffParamRef` have neither producer nor
@@ -657,7 +721,7 @@ needing autodiff finalization on seeing one. The AST side of the
 feature does exist — `__hasDiffTypeInfo(T)` parses to a
 `HasDiffTypeInfoConstraintDecl` and is solved to a
 `HasDiffTypeInfoWitness` — but `visitHasDiffTypeInfoWitness` (line
-2670 of [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)) lowers that witness to a void value,
+2705 of [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)) lowers that witness to a void value,
 and `emitGenericConstraintDecl` for the constraint emits a void
 parameter, so no `DiffTypeInfo` inst is ever built.
 
@@ -689,6 +753,11 @@ stable-name table. It has neither a producer nor a consumer.
 - [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) — the
   translation, forward, unzip, transpose, and primal-hoist passes that
   consume and produce the opcodes documented here.
+- [../ast-reference/expressions.md](../ast-reference/expressions.md),
+  [../ast-reference/declarations.md](../ast-reference/declarations.md),
+  [../ast-reference/values.md](../ast-reference/values.md) — the
+  differentiation expressions, synthesized declarations, and
+  differentiation values named in the AST origin column.
 - [../../../design/autodiff.md](../../../design/autodiff.md) — design
   rationale for the split into primal / propagate / remat phases and
   for the checkpointing model.

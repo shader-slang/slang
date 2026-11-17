@@ -7,6 +7,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-eliminate-undefined-opaque-handles.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-inline.h"
@@ -2577,16 +2578,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         auto atomDecor = as<IRRequireCapabilityAtomDecoration>(decor);
                         switch (atomDecor->getAtom())
                         {
-                        case CapabilityName::spirv_1_3:
+                        case CapabilityName::_spirv_1_3:
                             m_sharedContext->requireSpirvVersion(0X10300);
                             break;
-                        case CapabilityName::spirv_1_4:
+                        case CapabilityName::_spirv_1_4:
                             m_sharedContext->requireSpirvVersion(0X10400);
                             break;
-                        case CapabilityName::spirv_1_5:
+                        case CapabilityName::_spirv_1_5:
                             m_sharedContext->requireSpirvVersion(0X10500);
                             break;
-                        case CapabilityName::spirv_1_6:
+                        case CapabilityName::_spirv_1_6:
                             m_sharedContext->requireSpirvVersion(0X10600);
                             break;
                         }
@@ -3454,6 +3455,10 @@ void legalizeIRForSPIRV(
 
     // Run DCE to clean up any values that became unused after removing unreachable code
     eliminateDeadCode(module);
+
+    // An undefined opaque handle that is still present would be emitted as an `OpUndef` that
+    // Vulkan forbids (VUID-StandaloneSpirv-OpUndef-12464), so we report it instead.
+    diagnoseUndefinedOpaqueHandles(module, codeGenContext->getSink());
 
     buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
 

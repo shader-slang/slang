@@ -317,11 +317,21 @@ struct UnzippingContext
                 {
                     return clonedVar;
                 }
-                else if (paramDirection == ParameterDirectionInfo::BorrowInOut)
+                else if (
+                    paramDirection == ParameterDirectionInfo::BorrowInOut ||
+                    paramDirection.kind == ParameterDirectionInfo::Kind::Ref)
                 {
-                    // For inout parameters, we need to store the original value into the cloned var
-                    // at the beginning of the function, and then load from the cloned var at every
-                    // use.
+                    // For inout and reference parameters, we need to store the original value into
+                    // the cloned var at the beginning of the function, and then load from the
+                    // cloned var at every use.
+                    //
+                    // TODO: A clone is wrong for a reference parameter, because the callee may
+                    // reach the same storage through another parameter, and a clone hides its
+                    // writes through one from its reads through the other. We do not reach this
+                    // with a reference parameter today, because a differentiable callee with one
+                    // is rejected during checking; supporting it needs the argument's address
+                    // passed through instead.
+                    //
                     if (auto use = findUniqueStoredVal(var))
                         primalBuilder->emitStore(
                             clonedVar,
@@ -974,7 +984,8 @@ struct ExtractPrimalFuncContext
         IRBuilder& builder,
         IRStructKey* baseKey,
         IRInst* inst,
-        IRInst* intermediateOutput)
+        IRInst* intermediateOutput,
+        List<IRInst*>* capturedValues = nullptr)
     {
         auto field = addIntermediateContextField(inst->getDataType(), intermediateOutput);
         field->sourceLoc = inst->sourceLoc;
@@ -982,6 +993,13 @@ struct ExtractPrimalFuncContext
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
             cloneDecoration(nameHint, key);
         builder.addPrimalValueStructKeyDecoration(inst, baseKey, key);
+        if (capturedValues)
+        {
+            capturedValues->add(inst);
+            // Checkpoint reporting needs an address; normal captures remain SSA values.
+            if (!shouldReportCheckpoints || !originalFunc)
+                return;
+        }
         auto fieldAddr = builder.emitFieldAddress(
             builder.getPtrType(inst->getFullType()),
             intermediateOutput,
@@ -1077,6 +1095,7 @@ struct ExtractPrimalFuncContext
         builder.setInsertBefore(paramBlock->getFirstOrdinaryInst());
         auto outMinimalContextVar = builder.emitVar((IRType*)minimalContextType);
         auto outParamContextVar = rematFuncBuilder.emitVar((IRType*)paramsContextType);
+        List<IRInst*> capturedParameterValues;
 
         List<IRBlock*> primalBlocksList;
 
@@ -1109,12 +1128,7 @@ struct ExtractPrimalFuncContext
                                     outParamContextVar);
                                 field->sourceLoc = inst->sourceLoc;
 
-                                rematFuncBuilder.emitStore(
-                                    rematFuncBuilder.emitFieldAddress(
-                                        builder.getPtrType(valToStore->getFullType()),
-                                        outParamContextVar,
-                                        field->getKey()),
-                                    valToStore);
+                                capturedParameterValues.add(valToStore);
 
                                 rematFuncBuilder.addPrimalValueStructKeyDecoration(
                                     inst,
@@ -1167,7 +1181,8 @@ struct ExtractPrimalFuncContext
                                 rematFuncBuilder,
                                 paramsContextKey,
                                 primalToRematFuncMapping.mapOldValToNew[inst],
-                                outParamContextVar);
+                                outParamContextVar,
+                                &capturedParameterValues);
                         }
                         else
                         {
@@ -1235,7 +1250,9 @@ struct ExtractPrimalFuncContext
         rematFuncBuilder.emitReturn(rematFuncBuilder.emitMakeStruct(
             (IRType*)fullContextType,
             List<IRInst*>(
-                rematFuncBuilder.emitLoad(outParamContextVar),
+                // Field stores prevent SSA promotion and hide the original arguments
+                // from context expansion and aggregate parameter copy elision.
+                rematFuncBuilder.emitMakeStruct(paramsContextType, capturedParameterValues),
                 rematFuncMinimalContextParam)));
 
         return unzippedFunc;

@@ -6,12 +6,12 @@
 // and contains a field of that interface type) means there is no base case for
 // size inference.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//TEST:SIMPLE(filecheck=CHECK): -target glsl
-//TEST:SIMPLE(filecheck=CHECK): -target cpp
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cpp
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl
 
 dyn interface IFoo
 {

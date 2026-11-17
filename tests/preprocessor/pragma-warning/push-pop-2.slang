@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 // #ifdef support
 #pragma warning (error : 30081)
 #pragma warning (push)

@@ -1107,6 +1107,7 @@ meanings of their `CompilerOptionValue` encodings.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
 | EnableExtendedHLSLBackwardsCompatibility | Enables [additional backwards-compatibility features for legacy HLSL](#backwards-compatibility-option-for-legacy-hlsl), such as uniform parameter temporaries. `intValue0` encodes a bool value. |
+| HLSLMethodsMutatingByDefault | Selects the [default receiver mode for HLSL methods](#default-receiver-mode-for-hlsl-methods). `intValue0` encodes a bool value; the default is false. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
 | Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
@@ -1121,6 +1122,7 @@ meanings of their `CompilerOptionValue` encodings.
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
+| ValidateWithDownstreamCompiler | Specifies whether or not to compile or validate the emitted code with the downstream compiler or validator that matches the target (for example the Metal compiler for `metal`, DXC for `hlsl` with shader model 6.0 or higher and FXC below that, glslang for `glsl`, Tint for `wgsl`, NVRTC for `cuda`, the C++ compiler for `cpp`, and the SPIR-V validator for `spirv`). The compile fails if the downstream tool is not available, cannot run, or reports an error, or if the target has no downstream tool. `SkipSPIRVValidation` has priority for SPIR-V targets. `intValue0` encodes a bool value for the setting. |
 | Capability | Specify an additional capability available in the compilation target. Can be a string or int value kind. `stringValue0` encodes the capability name as listed in [Capability Atoms](a4-02-reference-capability-atoms.md). `intValue0` encodes the raw capability representation returned by `IGlobalSession::findCapability`. |
 | DefaultImageFormatUnknown | Whether or not to use `unknown` as the image format when emitting SPIR-V for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting. |
 | DisableDynamicDispatch | (Internal use only) Disables generation of dynamic dispatch code. `intValue0` encodes a bool value for the setting. |
@@ -1181,6 +1183,35 @@ The final tool invocation can still order some arguments differently, because ex
 The downstream compiler decides how repeated or conflicting arguments are handled, and that behavior can differ between tools and between versions of the same tool. Slang does not guarantee either "last one wins" or a rejection. For example, NVRTC 12.6 rejects `--fmad=true --fmad=false` with "defined more than once". NVRTC 13.0.88 has been reported to accept the same pair with a warning and use `false`, and to accept two identical `--fmad=false` arguments silently. To control a flag precisely, pass it at one level only.
 
 Earlier versions of Slang could discard the session's entire argument list for a tool when a target description or `linkWithOptions` also supplied arguments for that tool, so the session's `--gpu-architecture` was lost in the example above. Slang now passes both lists.
+
+### Default Receiver Mode for HLSL Methods
+
+By default, methods are non-mutating; their receiver (the implicit `this` parameter) is given the `in` mode.
+In a call such as `counter.increment()`, `counter` is the object passed through that parameter.
+For HLSL input only, the `-fhlsl-methods-mutating-by-default` command-line option changes the default mode for receiver parameters to `inout`, allowing methods to modify that object.
+For example, this HLSL method can modify its receiver when the option is enabled:
+
+```hlsl
+struct Counter
+{
+    int value;
+
+    void increment()
+    {
+        value++;
+    }
+};
+```
+
+Without the option, `increment` needs an explicit `[mutating]` attribute.
+With the option, calls to methods that do not specify a mode for `this` require a writable object, even when the method body only reads its fields.
+Explicit attributes such as `[mutating]` and `[nonmutating]`, or `const` after a method's parameter list, still select the mode for `this` regardless of this option.
+Property and subscript setters keep their mutating default.
+The option has no effect on Slang or GLSL input, including Slang modules imported by HLSL code.
+
+In the API, set `CompilerOptionName::HLSLMethodsMutatingByDefault` in `SessionDesc::compilerOptionEntries` before loading modules.
+Use `CompilerOptionValueKind::Int` with `intValue0` set to `1` to enable the option or `0` to disable it.
+Omitting the option keeps methods non-mutating by default.
 
 ### Backwards Compatibility Option for Legacy HLSL
 

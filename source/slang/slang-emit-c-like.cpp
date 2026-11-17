@@ -1404,6 +1404,14 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int64:
                     {
+                        // `-9223372036854775808LL` is the negation of a literal that does not
+                        // fit in a `long long`, which C-family compilers warn about (or reject),
+                        // so the minimum is written as an expression of in-range literals.
+                        if (int64_t(litInst->value.intVal) == INT64_MIN)
+                        {
+                            m_writer->emit("(-9223372036854775807LL - 1LL)");
+                            break;
+                        }
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
                         m_writer->emit("LL");
                         break;
@@ -1709,7 +1717,7 @@ CLikeSourceEmitter::FoldPolicy CLikeSourceEmitter::getFoldPolicy(IRInst* inst)
     //
     if (as<IRModuleInst>(inst->getParent()))
     {
-        if (!inst->mightHaveSideEffects())
+        if (!inst->mightHaveSideEffects(SideEffectAnalysisOptions::None, &m_calleeSideEffectCache))
             return FoldPolicy::Always;
     }
 
@@ -1773,7 +1781,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         return false;
 
     // Don't fold something that might have side effects:
-    if (inst->mightHaveSideEffects())
+    if (inst->mightHaveSideEffects(SideEffectAnalysisOptions::None, &m_calleeSideEffectCache))
         return false;
 
     // Don't fold instructions that are marked `[precise]`.
@@ -1985,7 +1993,7 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached(IRInst* inst)
                 return true;
         }
 
-        if (ii->mightHaveSideEffects())
+        if (ii->mightHaveSideEffects(SideEffectAnalysisOptions::None, &m_calleeSideEffectCache))
             return false;
     }
 }

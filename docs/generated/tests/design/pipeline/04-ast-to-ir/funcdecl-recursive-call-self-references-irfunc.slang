@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=73a8b7d64d9596c97c899fba163502910f89289de9adea3eac1da3e0599596e6
+//META: doc_section_digest=dd99e7be1e43f7dbf1c422a81f414e18dee5066cd4a3a5026a22bae8d7e540e8
 //META: purpose=A FuncDecl that calls itself lowers to a single IRFunc whose body contains a `call %self(...)` instruction targeting the same IRFunc — the doc's `InvokeExpr -> IRCall` row applied to a self-reference.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -15,7 +15,10 @@
 // name appearing both on `func %factorial` and inside `call
 // %factorial(...)`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
+// Later passes reject recursion on every target (E55201), so the test
+// expects exit code -1; the lowering IR dump is still emitted first.
+
+//TEST:SIMPLE(filecheck=CHECK, exit-code=-1):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;
@@ -34,3 +37,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // CHECK-LABEL: func %factorial
 // CHECK: call %factorial(%{{.*}})
+// CHECK: E55201

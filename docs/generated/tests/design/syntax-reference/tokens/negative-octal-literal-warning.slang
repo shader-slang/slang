@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/tokens.md#special-case-lexing-rules
-//META: doc_section_digest=d3d4c02ac4dafd74393b443c556304f894229442554014fb013287b9cae88960
+//META: doc_section_digest=02a80201a5690a8a624d91ba229db896f43d7b71e5abd5c2e95980b3d576102d
 //META: purpose=Negative - a leading-digit run after `0` is lexed base-8 only after the lexer reports the `'0' prefix indicates octal literal` warning (W10002).
 //META: intent=negative
 //META: pipeline_stage=lex

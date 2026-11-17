@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#functype
-//META: doc_section_digest=1aae0462f279ac2b648e03663edfa7d1a259b7889cb50a6d6ae179281e018a5e
+//META: doc_section_digest=ec7fb3af8ac52fbfa85f29879864eda7df1485be04cba1defcab59284c8b6a53
 //META: purpose=A FuncType's operand list ends with an error type; a callable declared `throws E` threads its ordinary result to the caller when no error is raised.
 //META: intent=functional
 //META: pipeline_stage=runtime

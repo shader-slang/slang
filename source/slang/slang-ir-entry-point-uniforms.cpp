@@ -556,7 +556,14 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             IRType* layoutType = nullptr;
 
-            if (m_options.targetReq->getOptionSet().shouldUseScalarLayout())
+            if (isWGPUTarget(m_options.targetReq))
+            {
+                // WGSL has no scalar or C layout for the `uniform` address space (arrays need
+                // a 16-byte stride), so keep the default std140 layout, which is also what
+                // reflection reports for WGSL entry-point parameters.
+                layoutType = builder.getType(kIROp_DefaultBufferLayoutType);
+            }
+            else if (m_options.targetReq->getOptionSet().shouldUseScalarLayout())
                 layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
             else if (m_options.targetReq->getOptionSet().shouldUseCLayout())
                 layoutType = builder.getType(kIROp_CBufferLayoutType);

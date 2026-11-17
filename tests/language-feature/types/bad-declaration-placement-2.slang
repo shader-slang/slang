@@ -2,7 +2,7 @@
 //
 // Second parser pass checks
 //
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain
 
 void testGenericFunc<T>(T t)
 {

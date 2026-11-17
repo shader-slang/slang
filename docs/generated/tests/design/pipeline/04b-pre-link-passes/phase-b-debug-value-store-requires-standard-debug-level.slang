@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-b-mandatory-pre-optimization-transformations
-//META: doc_section_digest=09d7020162c923ab03acb173454bec8822828843cdb98846ded36a61470ed1b3
+//META: doc_section_digest=d068109314516b9597bd450c12afb40a134d080ee926d40efa3dc2825592f91e
 //META: purpose=Phase B's insertDebugValueStore (B6) emits DebugValue insts binding locals to their debug variables only when the debug-info level is Standard or higher.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

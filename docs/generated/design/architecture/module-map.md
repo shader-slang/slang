@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 2464030004e84d0c0aa0884184d6030f75a67784d237bd0c6558593236696070
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: ad5cfc68952f75bc650d1948578b7524c289308afe465ed1d94f5fa2ddb91081
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -117,7 +117,11 @@ lives in the [pipeline](../pipeline) and
 | Module library | `slang-module-library.h`, `slang-module-library.cpp` | Bundles compiled modules into reusable libraries |
 | Linkage | `slang-session.h`, `slang-session.cpp` | The class behind the public `slang::ISession` — a per-configuration scope owning search paths, target settings, and the source manager |
 | Linkable components | `slang-linkable.h`, `slang-linkable.cpp`, `slang-linkable-impls.h`, `slang-linkable-impls.cpp` | `IComponentType` and its composite / specialized variants — the linkable-program abstraction used by the back-end |
-| Session (global) | `slang-global-session.h`, `slang-global-session.cpp` | Process-wide `Session` class behind `slang::IGlobalSession` |
+| Session (global) | `slang-global-session.h`, `slang-global-session.cpp` | Global-session-scoped `Session` class behind `slang::IGlobalSession` |
+| Name lookup | [slang-lookup.h](../../../../source/slang/slang-lookup.h), `slang-lookup.cpp`, `slang-lookup-spirv.h` | Scope and member lookup filtered by a `LookupMask` of declaration kinds |
+| Name mangling | [slang-mangle.h](../../../../source/slang/slang-mangle.h), `slang-mangle.cpp` | Mangled linkage names for declarations and their hashed forms |
+| Parameter binding and layout | [slang-parameter-binding.h](../../../../source/slang/slang-parameter-binding.h), `slang-parameter-binding.cpp`, [slang-type-layout.h](../../../../source/slang/slang-type-layout.h), `slang-type-layout.cpp` | Assigns binding locations or registers to shader parameters, using the per-target layout rules for types |
+| Bytecode interpreter | [slang-vm.h](../../../../source/slang/slang-vm.h), `slang-vm.cpp`, `slang-vm-bytecode.h`, `slang-vm-bytecode.cpp`, `slang-vm-inst-impl.h`, `slang-vm-inst-impl.cpp` | `ByteCodeInterpreter` and the bytecode format that executes the VM emitter's output |
 
 ### Frontend (lex / preprocess / parse)
 
@@ -190,14 +194,14 @@ One file per checking concern; all collaborate through
 
 ### IR passes
 
-The `slang-ir-*` family contains 163 `.cpp` files — 326 files counting
+The `slang-ir-*` family contains 167 `.cpp` files — 334 files counting
 their headers — that implement analyses and
 transformations on the IR. **Do not enumerate them
 here**; the pass categories and per-pass entries belong in
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md). Examples
 of the categories visible from filenames:
 
-- Cleanup / canonicalization (`slang-ir-dce`, `slang-ir-simplify`,
+- Cleanup / canonicalization (`slang-ir-dce`, `slang-ir-simplify-cfg`,
   `slang-ir-cleanup-void`).
 - Specialization and generics (`slang-ir-specialize`,
   `slang-ir-defunctionalization`, `slang-ir-bind-existentials`,
@@ -207,20 +211,23 @@ of the categories visible from filenames:
   `slang-ir-autodiff-unzip`, `slang-ir-autodiff-loop-analysis`,
   `slang-ir-autodiff-cfg-norm`, `slang-ir-autodiff-pairs`,
   `slang-ir-autodiff-primal-hoist`, `slang-ir-autodiff-region`,
+  `slang-ir-expand-autodiff-parameter-contexts`,
   `slang-ir-check-differentiability`).
 - Layout / binding (`slang-ir-collect-global-uniforms`,
-  `slang-ir-com-interface`, `slang-ir-byte-address-legalize`).
+  `slang-ir-com-interface`, `slang-ir-byte-address-legalize`,
+  `slang-ir-legalize-resource-globals`).
 - Validation (`slang-ir-check-recursion`,
   `slang-ir-check-shader-parameter-type`,
   `slang-ir-check-unsupported-inst`,
   `slang-ir-check-optional-none-usage`,
+  `slang-ir-check-push-constant-blocks`,
   `slang-ir-check-specialize-generic-with-existential`,
   `slang-ir-detect-uninitialized-resources`).
 - Coverage instrumentation (`slang-ir-coverage-instrument`).
 - Target-specific lowering (passes whose name starts with a target
   prefix or is suffixed with the target acronym:
   `slang-ir-hlsl-legalize`, `slang-ir-spirv-legalize`,
-  `slang-ir-metal-legalize`, `slang-ir-wgsl-legalize`), plus
+  `slang-ir-metal-legalize`, `slang-ir-wgsl-legalize`, `slang-ir-ray-tracing-legalize`), plus
   target-specific helper headers such as `slang-ir-util-hlsl`, which
   holds the HLSL `Barrier` flag-validation helpers rather than a pass.
 - Control-flow restructuring (`slang-ir-simplify-cfg`,
@@ -318,9 +325,10 @@ See [../cross-cutting/core-module.md](../cross-cutting/core-module.md).
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| Configuration | `slang-standard-module-config.h.in` | CMake-templated configuration header |
+| Configuration | `slang-standard-module-config.h.in` | CMake-templated configuration header carrying the standard-module directory and file names and the default-disabled note IDs (`SLANG_DISABLE_NOTE_IDS`) |
 | Neural module | [neural/](../../../../source/standard-modules/neural) | Standard module for neural / ML workloads |
 | Experimental modules | [experimental/](../../../../source/standard-modules/experimental) | Modules not yet promoted to the stable set; currently the work-graph module (`workgraph.slang`) |
+| Functional module | [functional/](../../../../source/standard-modules/functional) | Higher-order element operations (`map` and related) added by `extension` to fixed-size arrays, vectors, and matrices in `functional.slang`; marked `[ExperimentalModule]`, so importers must enable experimental features |
 | Numerics module | [numerics/](../../../../source/standard-modules/numerics) | Representation-independent numeric interfaces and generic operations, split across `interfaces.slang`, the `*-conformances.slang` files, `wrappers.slang`, and a parallel `differentiable-*` set; marked `[ExperimentalModule]`, so importers must enable experimental features |
 
 ## prelude/ — per-target prelude headers
@@ -350,17 +358,17 @@ output can be compiled by the downstream toolchain.
 | --- | --- | --- |
 | glslang shim | [slang-glslang.cpp](../../../../source/slang-glslang/slang-glslang.cpp), `slang-glslang.h`, `slang-glslang.version-script` | Bridge to Khronos glslang for SPIR-V via GLSL; the version script is the export list both the ELF and macOS builds derive from, so a new entry point must be added there as well as in the C++ |
 
-## source/slang-dispatcher/ — downstream-tool dispatcher
+## source/slang-dispatcher/ — command-line dispatcher
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| Dispatcher entry | [main.cpp](../../../../source/slang-dispatcher/main.cpp) | Common dispatcher for downstream-tool invocation |
+| Dispatcher entry | [main.cpp](../../../../source/slang-dispatcher/main.cpp) | Dispatches Slang CLI subcommands: `compile` delegates to `slangc`, `interpret` to `slangi`, plus `help` and `version` |
 
 ## source/slang-rt/ — runtime library
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| Runtime | [slang-rt.cpp](../../../../source/slang-rt/slang-rt.cpp), `slang-rt.h` | Runtime library used by emitted CPU/Torch/CUDA targets |
+| Runtime | [slang-rt.cpp](../../../../source/slang-rt/slang-rt.cpp), `slang-rt.h` | Runtime library linked for host-style CPU outputs, including PyTorch C++ bindings; not used by CUDA output |
 
 ## source/slang-record-replay/ — public-API record/replay
 

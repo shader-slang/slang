@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: e3b167a7b5a8744a5ce8c1f92bde754b9f8fe285c549d34e941e9e49a45542f2
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: fbf01df9017d66463a64e01622276ae0c4dd5286d0596b4b1a494ffe03ab0b91
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -44,11 +44,9 @@ behavior, but the declaration a user actually names is written in the
 core module ([core.meta.slang](../../../../source/slang/core.meta.slang),
 [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang), and the
 GLSL/HLSL compatibility modules) and bound to the C++ class by a
-`__magic_type(...)` attribute. Those module sources are not among this
-page's watched paths, so a magic type added on the Slang side alone does
-not mark this page stale; adding
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) to this
-document's `watched_paths` in the manifest would close that gap.
+`__magic_type(...)` attribute. Both of those module sources are among this
+page's watched paths; the GLSL/HLSL compatibility modules are not, so a
+magic type added only there does not mark this page stale.
 
 To test whether an arbitrary `Type*` is a `DeclRefType` naming a
 particular declaration, use the `isDeclRefTypeOf<T>` template declared
@@ -124,17 +122,20 @@ flowchart TD
   PtrTypeBase --> ExplicitRefType
   PtrTypeBase --> ParamPassingModeType
   ParamPassingModeType --> OutParamTypeBase
-  ParamPassingModeType --> RefParamType
+  ParamPassingModeType --> RefParamTypeBase
   ParamPassingModeType --> BorrowInParamType
   OutParamTypeBase --> OutParamType
   OutParamTypeBase --> BorrowInOutParamType
+  RefParamTypeBase --> RefParamType
+  RefParamTypeBase --> RefReadOnlyParamType
+  RefParamTypeBase --> RefWriteOnlyParamType
 ```
 
 Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 `BuiltinType`, `DataLayoutType`, `TextureShapeType`, `ResourceType`,
 `TextureTypeBase`, `PointerLikeType`,
 `HLSLStructuredBufferTypeBase`, `ParameterGroupType`,
-`StringTypeBase`, `OutParamTypeBase`.
+`StringTypeBase`, `OutParamTypeBase`, `RefParamTypeBase`.
 
 ## Nodes
 
@@ -146,7 +147,7 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 | `BottomType` | `Type` | (operand-encoded) | (none) | The bottom/empty type that has no values; the result type of a function that can never return and the error type of one that cannot fail. |
 | `DeclRefType` | `Type` | `declRef: DeclRef<Decl>` | [type ref](../syntax-reference/grammar.md#types) | A type defined by reference to a declaration (`StructDecl`, `InterfaceDecl`, `EnumDecl`, ...). |
 | `TypeType` | `Type` | `type: Type*` | (none) | The type *of* a type expression (i.e. the "kind" `Type`); `float` in `float(2)` has type `TypeType(float)`. |
-| `NamedExpressionType` | `Type` | `declRef: DeclRef<TypeDefDecl>` | [typedef ref](../syntax-reference/grammar.md#types) | A `typedef` / `typealias` alias. Its `_toTextOverride` ([slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line 1414) prints the alias's `declRef`, so any consumer that formats *this* node shows the alias name — but `_createCanonicalTypeOverride` (line 1422) resolves it to the aliased type, and a consumer that canonicalizes first shows the resolved type instead. The distinction is canonicalization, not two printing paths. Type-mismatch diagnostics and emitted target code are both in the second category: given `typealias Celsius = float`, they say `float`, never `Celsius`. |
+| `NamedExpressionType` | `Type` | `declRef: DeclRef<TypeDefDecl>` | [typedef ref](../syntax-reference/grammar.md#types) | A `typedef` / `typealias` alias; see [Notable nodes](#namedexpressiontype). |
 | `NamespaceType` | `Type` | `declRef: DeclRef<NamespaceDeclBase>` | (none) | The type of a namespace or module expression. |
 | `GenericDeclRefType` | `Type` | `declRef: DeclRef<GenericDecl>` | (none) | A reference to a generic declaration without its arguments applied. |
 | `FuncType` | `Type` | leading param `Type*` operands, then `result: Type*`, then `error: Type*` | [function type](../syntax-reference/grammar.md#types) | Function type with parameter types, result type, and error type. |
@@ -172,8 +173,10 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 | `ParamPassingModeType` | `PtrTypeBase` | (operand-encoded) | (none) | Common base for parameter-passing modes. |
 | `OutParamType` | `OutParamTypeBase` | (operand-encoded) | [out param](../syntax-reference/grammar.md#types) | `out T` parameter type. |
 | `BorrowInOutParamType` | `OutParamTypeBase` | (operand-encoded) | [inout param](../syntax-reference/grammar.md#types) | `inout T` parameter type. |
-| `RefParamType` | `ParamPassingModeType` | (operand-encoded) | (none) | `ref T` parameter type. |
-| `BorrowInParamType` | `ParamPassingModeType` | (operand-encoded) | (none) | Immutable borrow input parameter, written `__constref` and printed as `borrow T`; an input-only counterpart of `inout`, not a `ref` mode. |
+| `RefParamType` | `RefParamTypeBase` | (operand-encoded) | (none) | `ref T` parameter type (`ParamPassingMode::RefReadWrite`). |
+| `RefReadOnlyParamType` | `RefParamTypeBase` | (operand-encoded) | (none) | Read-only by-reference parameter type, printed as `ref_readonly T` (`ParamPassingMode::RefReadOnly`). |
+| `RefWriteOnlyParamType` | `RefParamTypeBase` | (operand-encoded) | (none) | Write-only by-reference parameter type, printed as `ref_writeonly T` (`ParamPassingMode::RefWriteOnly`). |
+| `BorrowInParamType` | `ParamPassingModeType` | (operand-encoded) | (none) | Immutable borrow input parameter, written `__borrow` (legacy alias `__constref`) and printed as `borrow T`; an input-only counterpart of `inout`, not a `ref` mode. |
 | `NullPtrType` | `BuiltinType` | (operand-encoded) | (none) | Type of `nullptr`. |
 | `NoneType` | `BuiltinType` | (operand-encoded) | (none) | Type of `none`. |
 | `TextureType` | `TextureTypeBase` | `elementType: Type*, sampleCount: Val*, format: Val*` | (none) | HLSL-flavor `Texture*<T>` (sampled). |
@@ -283,6 +286,10 @@ for that class (see
 
 ## Notable nodes
 
+### NamedExpressionType
+
+Its `_toTextOverride` ([slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line 1392) prints the alias's `declRef`, so formatting *this* node shows the alias name. `_createCanonicalTypeOverride` (line 1400) resolves it to the aliased type, so a consumer that canonicalizes first shows the resolved type. Type-mismatch diagnostics and emitted target code are in the second category: given `typealias Celsius = float`, they say `float`.
+
 ### DeclRefType
 
 By far the most common type. A `DeclRefType` carries a decl-ref to a
@@ -297,7 +304,8 @@ a `DeclRefType` of a particular declaration class. See the `decl-ref`
 entry in [../glossary.md](../glossary.md).
 
 An important consequence: a core-module type only gets its own C++
-class here when it is bound to one with `__magic_type(...)`. A builtin
+class here when it is bound to one with `__magic_type(...)` (scalar
+builtins are registered through `__builtin_type(...)` instead). A builtin
 declared with `__intrinsic_type(...)` alone — for example the
 work-graph record types `NodeOutputArray` and `EmptyNodeOutputArray`
 in
@@ -328,8 +336,10 @@ wraps rather than saturating or being diagnosed, so a `uint` holding
 *literals*: `_determineIntegerLiteralType` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) picks
 the narrowest type that holds the value — `int`, then `int64`, for an
-unsuffixed decimal — and diagnoses `IntegerLiteralTooLarge` for a
-decimal literal past the range of `int64` instead of truncating it.
+unsuffixed decimal — and diagnoses `IntegerLiteralTooLarge` for an
+signed decimal literal of `INT64_MAX + 2` or more instead of truncating
+it; a literal of exactly `INT64_MAX + 1` is left to the checker, which
+diagnoses it unless it is negated.
 
 ### ErrorType and BottomType
 
@@ -370,8 +380,16 @@ followed by the result type and then the error type. A parameter's
 qualifier is not stored beside its type — it *is* part of the type,
 because each parameter operand is the user-perceived type wrapped in a
 parameter-mode type (`OutParamType` for `out T`,
-`BorrowInOutParamType` for `inout T`, `RefParamType` for `ref T`), which
-a caller must unwrap to recover the plain type and the passing mode. The
+`BorrowInOutParamType` for `inout T`, `BorrowInParamType` for `borrow T`,
+and `RefParamType` / `RefReadOnlyParamType` / `RefWriteOnlyParamType` for
+the three by-reference modes), which a caller must unwrap to recover the
+plain type and the passing mode. `FuncType::getParamInfo` does that
+through `getParamInfoFromTypeWithModeWrapper`, which returns a
+`ParamInfo` (value `type` plus separate `mode`, declared in
+[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h))
+and asserts that the value type is not itself a mode wrapper, so a mode
+has exactly one representation. An `in` parameter has no wrapper type.
+The
 error-type slot is always present rather than optional: a callable that
 cannot fail records the bottom type there — spelled `never` when
 printed (`BottomType::_toTextOverride`,
@@ -440,7 +458,7 @@ because the per-kind conversions are declared separately. Both derive
 from `BuiltinType` rather than `PointerLikeType`, because a handle is
 not dereferenced to reach members of an element type. Neither type
 survives to code emission — the handle is reduced back to its `uint`
-heap index during IR lowering (see
+heap index by the `lowerUntypedResourceHandleToUInt` IR pass before emission (see
 [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md)).
 
 ### Pack / variadic type family
