@@ -4721,14 +4721,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when overlapping storage is passed to two parameters that may both be
             // references to it, and at least one may write it (issue #10699). The
             // receiver of a method call joins the comparison as one more storage the
-            // call may write: it is the base of a plain member callee, never an entry
+            // call may write: it is the base of the callee expression, never an entry
             // of `invoke->arguments`, and its passing mode comes from the method
             // declaration rather than the `FuncType` (issue #13758). Both are set
-            // together or not at all: a deref callee (`p->method()`) names the
-            // pointee as its receiver while its base expression names the pointer,
-            // and a callee with no base expression (a bare function reference)
-            // has none to compare, so those calls skip the receiver pair —
-            // a missed warning, never a wrong one.
+            // together or not at all; the skip cases are described at the
+            // `GetBaseExpr` call below.
             Expr* receiverExpr = nullptr;
             std::optional<ParamPassingMode> receiverMode;
             if (callableDeclRef)
