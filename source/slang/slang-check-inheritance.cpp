@@ -1179,13 +1179,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // that reads the declRef), requirement-witness lookup (which falls
             // back to a null path) and interface-upcast normalization (which
             // passes the witness through) — read the witness's own sub/sup
-            // operands or only the `isEquality` flag. `TryUnifyWitnesses` and
-            // `DeclaredSubtypeWitness::_substituteImplOverride` do read the
-            // recorded constraint's endpoints (its declared `sup`, and its
-            // position in the enclosing generic's argument list), so a projected
-            // witness reaching generic inference would unify against the
-            // shallower relation; no such path exists today, and the limitation
-            // is recorded in the PR's risk discussion.
+            // operands or only the `isEquality` flag.
+            // `DeclaredSubtypeWitness::_substituteImplOverride` does read the
+            // recorded constraint (its position in the enclosing generic's
+            // argument list): substituting a projected witness through a generic
+            // application would replace it with the caller's witness for the
+            // shallower `X == Y` relation; no such path exists today.
             auto satisfyingWitness =
                 astBuilder->getDeclaredSubtypeWitness(selfType, baseType, evidenceDeclRef);
             addDirectBaseType(baseType, satisfyingWitness);
