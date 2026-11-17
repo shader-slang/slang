@@ -417,9 +417,12 @@ jobs:
           NV_INFERENCE_TOKEN: ${{ secrets.NV_INFERENCE_TOKEN }}
         with:
           show-debug-output: ${{ (vars.SLANG_CLAUDE_DEBUG_ENV == '1' || vars.SLANG_CLAUDE_DEBUG_ENV == 'true') && 'true' || 'false' }}
-          nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
-          nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
-          nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}
+          # Open-weights models on the NVIDIA inference endpoint. The runner uses
+          # the opus slot as --model, so GLM 5.3 fills opus and sonnet, and the
+          # flash variant fills the haiku (subagent) slot.
+          nv-inference-opus-model: nvidia/zai-org/glm-5.3
+          nv-inference-sonnet-model: nvidia/zai-org/glm-5.3
+          nv-inference-haiku-model: nvidia/zai-org/glm-5.3-flash
           max-turns: "60"
           track-progress: "false"
           use-sticky-comment: "false"
