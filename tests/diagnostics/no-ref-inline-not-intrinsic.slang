@@ -3,10 +3,13 @@
 // express a `__ref` parameter on every target (HLSL emits the closest form
 // `inout`, which copies and loses the aliasing `__ref` promises), so the
 // attribute only applies to intrinsic declarations, whose bodies are never
-// emitted as target function definitions. The rejection cases below carry
-// `[noinline]` where it could have mattered: even with both attributes an
-// ordinary function cannot keep a `__ref` call boundary, so `[noRefInline]`
-// is rejected regardless.
+// emitted as target function definitions. The `bump` case carries `[noinline]`
+// as well: even with both attributes an ordinary function cannot keep a
+// `__ref` call boundary, so `[noRefInline]` is rejected regardless. The
+// `gsWrite` case also pins the removal that follows the rejection: the
+// attribute is gone, so the call takes the default force-inlining path and
+// the groupshared parameter never reaches the HLSL inlining check (exactly
+// the two E31002 rows below, and no E30708 for `gsWrite`).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
 
@@ -65,6 +68,18 @@ void targetIntrinsicWithBody(__ref int x) { x += 1; }
 */
 void forwardOnly(__ref int x);
 
+// The rejected attribute is removed, so this call takes the default
+// force-inlining path; the groupshared parameter must not produce the
+// groupshared-on-HLSL diagnostic the removed attribute would have caused.
+[noRefInline]
+/*CHECK:
+ ^^^^^^^^^^^ invalid attribute placement
+ ^^^^^^^^^^^ attribute 'noRefInline' is not valid here
+*/
+[noinline] void gsWrite(uint tid, groupshared uint scratch[8]) { scratch[tid] = tid; }
+
+groupshared uint gsScratch[8];
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main()
@@ -73,5 +88,6 @@ void main()
     bump(v);
     mixed(v);
     targetIntrinsicWithBody(v);
+    gsWrite(0u, gsScratch);
     buf[2] = v;
 }

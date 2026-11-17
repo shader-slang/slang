@@ -1,13 +1,14 @@
 // The companion test `no-ref-inline-not-intrinsic.slang` covers the rejection
 // of `[noRefInline]` on ordinary functions. This one guards the accepted
-// shapes those intrinsics rely on: a `__target_switch` + `__intrinsic_asm`
-// body, a bare `__intrinsic_asm` body, a `__stage_switch` body, and `spirv_asm`
-// arms in both the statement and the `return` spelling (parentheses allowed),
-// all with a `__ref` parameter, must stay legal so the core module's
-// mesh-shading intrinsics (`SetMeshOutputCounts`, `DispatchMesh`) keep
-// compiling. The uncalled definitions below exist to exercise the classifier;
-// only `intrinsicBump` is emitted, and its `spirv` arm is there to match the
-// accepted two-arm shape, not to be exercised by the `-target hlsl` run.
+// shapes, all with a `__ref` parameter: the `__target_switch` +
+// `__intrinsic_asm` body with a `return spirv_asm` arm is the shape the core
+// module's mesh-shading intrinsics (`SetMeshOutputCounts`, `DispatchMesh`)
+// rely on; the bare `__intrinsic_asm` body, the `__stage_switch` body, and
+// the statement spelling of `spirv_asm` (parentheses allowed) are accepted
+// by design. The uncalled definitions below exist to exercise the classifier;
+// only `intrinsicBump` is called, so only its asm expansion reaches the
+// output, and its `spirv` arm is there to match the accepted two-arm shape,
+// not to be exercised by the `-target hlsl` run.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

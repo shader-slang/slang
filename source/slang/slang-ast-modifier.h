@@ -2096,12 +2096,14 @@ class NoInlineAttribute : public Attribute
     FIDDLE(...)
 };
 
-/// A `[noRefInline]` attribute represents a request to not force inline a
-/// function specifically due to a refType parameter. It is only applicable to
-/// intrinsic declarations, which never emit a target function definition; an
-/// ordinary function that kept a `__ref` parameter through to emit would get a
-/// lossy translation on targets with no reference syntax (HLSL approximates it
-/// as `inout`, which copies and loses the aliasing `__ref` promises).
+/// A `[noRefInline]` attribute represents a request to not force-inline a
+/// function specifically due to a `__ref` parameter. It is only applicable to
+/// intrinsic declarations, which can never reach a target that lacks reference
+/// syntax with a `__ref` parameter; an ordinary function that kept one through
+/// to emit would get a lossy translation on such a target (HLSL approximates it
+/// as `inout`, which copies and loses the aliasing `__ref` promises). The
+/// attribute is accepted only on the declaration that carries the intrinsic
+/// definition, and the front end rejects every other placement.
 FIDDLE()
 class NoRefInlineAttribute : public Attribute
 {

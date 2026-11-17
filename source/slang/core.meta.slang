@@ -5110,6 +5110,10 @@ attribute_syntax [KnownBuiltin(name)] : KnownBuiltinAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__GLSLRequireShaderInputParameter(parameterNumber:int)] : GLSLRequireShaderInputParameterAttribute;
 
+/// Marks an intrinsic declaration as exempt from the reference-parameter
+/// force-inlining pass. Only applicable to intrinsic declarations; the front
+/// end rejects every other placement.
+// @hidden:
 __attributeTarget(FuncDecl)
 attribute_syntax [noRefInline] : NoRefInlineAttribute;
 
