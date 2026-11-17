@@ -746,19 +746,19 @@ public:
     void processReferencedDecl(Decl*) override {}
     void processDeclModifiers(Decl*, SourceLoc) override {}
 
-    void visitVarDeclBase(VarDeclBase* varDecl) override
+    void visitVarDeclBase(VarDeclBase* varDecl)
     {
         _checkVarDecl(varDecl);
         Base::visitVarDeclBase(varDecl);
     }
 
-    void visitDeclGroup(DeclGroup* group) override
+    void visitDeclGroup(DeclGroup* group)
     {
         for (auto decl : group->decls)
             dispatchIfNotNull(decl);
     }
 
-    void visitInvokeExpr(InvokeExpr* expr) override
+    void visitInvokeExpr(InvokeExpr* expr)
     {
         // A construction resolves to a constructor invocation, including the synthesized
         // default constructor the abstract body saw for `T()` and `T.Item()`.
@@ -768,12 +768,9 @@ public:
         Base::visitInvokeExpr(expr);
     }
 
-    void visitDefaultConstructExpr(DefaultConstructExpr* expr) override
-    {
-        _checkConstructionExpr(expr);
-    }
+    void visitDefaultConstructExpr(DefaultConstructExpr* expr) { _checkConstructionExpr(expr); }
 
-    void visitInitializerListExpr(InitializerListExpr* expr) override
+    void visitInitializerListExpr(InitializerListExpr* expr)
     {
         // `T t = {}` constructs through the constructor, exactly as the direct spelling of
         // `MissInput<C> t = {}` does, so the braced form is a construction too.
@@ -781,7 +778,7 @@ public:
         Base::visitInitializerListExpr(expr);
     }
 
-    void visitGenericAppDeclRef(GenericAppDeclRef* genericAppDeclRef) override
+    void visitGenericAppDeclRef(GenericAppDeclRef* genericAppDeclRef)
     {
         if (!visitedVals.add(genericAppDeclRef))
             return;
