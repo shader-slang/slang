@@ -3557,9 +3557,9 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 enum class TextComparisonCoversExitCode
 {
     /// The runner compares against expected text that contains the `result code = N` line — an
-    /// `.expected` file, or the fixed default text of the runners that pass one — so the check
-    /// applies only to a test with a `filecheck=` or `diag=` prefix, whose comparison does not
-    /// necessarily check that line.
+    /// `.expected` file, or a fixed default text the runner passes when the test has none — so
+    /// the check applies only to a test with a `filecheck=` or `diag=` prefix, whose comparison
+    /// does not necessarily check that line.
     Yes,
 
     /// The compared text never contains the result code, so the check applies to every test of
