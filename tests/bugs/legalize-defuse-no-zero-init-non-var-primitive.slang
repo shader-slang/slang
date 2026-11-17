@@ -2,9 +2,8 @@
 //
 // This test drives the non-`IRVar` path in `legalizeDefUse` with a primitive
 // `float` value produced inside loop control flow that gets rewritten by
-// `eliminateMultiLevelBreak`. The loop-header hoist must carry a per-entry
-// init (shader-slang/slang#14493): for this scalar shape a concrete default
-// store, which survives every pipeline including minimal-optimization builds.
+// `eliminateMultiLevelBreak`. The path must create the temp var without a
+// dead default-init store.
 
 //TEST:SIMPLE(filecheck=IR): -target spirv-asm -entry computeMain -stage compute -dump-ir-after eliminateMultiLevelBreak
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
@@ -47,7 +46,3 @@ void computeMain(uint tid : SV_DispatchThreadID)
 
 // IR: ### AFTER eliminateMultiLevelBreak:
 // IR-NOT: defaultConstruct
-// The loop-header hoist of the non-var value must carry its per-entry init
-// store — a concrete default for this scalar shape
-// (shader-slang/slang#14493).
-// IR: store(%{{[A-Za-z0-9_]+}}, 0 : Float)

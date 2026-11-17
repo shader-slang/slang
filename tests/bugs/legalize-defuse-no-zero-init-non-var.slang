@@ -81,7 +81,3 @@ void computeMain(uint tid : SV_DispatchThreadID)
 
 // IR: ### AFTER eliminateMultiLevelBreak:
 // IR-NOT: defaultConstruct
-// The loop-header hoist of the struct-typed non-var value must carry its
-// per-entry uninitialized-memory init store (shader-slang/slang#14493).
-// IR: = LoadFromUninitializedMemory
-// IR-NEXT: store(

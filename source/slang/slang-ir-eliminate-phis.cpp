@@ -59,6 +59,12 @@
 namespace Slang
 {
 
+bool PhiEliminationOptions::shouldEliminatePhiForType(IRType* type) const
+{
+    return !preserveScalarAndVectorPhis || !isScalarOrVectorType(unwrapAttributedType(type));
+}
+
+
 struct PhiEliminationContext
 {
     // We are going to make some effort to re-use intermediate structures across
@@ -228,10 +234,7 @@ struct PhiEliminationContext
 
         if (m_options.useRegisterAllocation)
         {
-            m_registerAllocation = allocateRegistersForFunc(
-                func,
-                m_dominatorTree,
-                m_options.eliminateCompositeTypedPhiOnly);
+            m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree, m_options);
             m_mapRegToTempVar = createTempVarForInsts(func);
         }
     }
@@ -455,8 +458,7 @@ struct PhiEliminationContext
                 m_mapRegToTempVar.tryGetValue(registerInfo->get(), temp);
             }
 
-            bool shouldAllocTemp =
-                !m_options.eliminateCompositeTypedPhiOnly || isCompositeType(param->getFullType());
+            bool shouldAllocTemp = m_options.shouldEliminatePhiForType(param->getFullType());
 
             if (!temp && shouldAllocTemp)
             {
@@ -1034,68 +1036,23 @@ struct PhiEliminationContext
             // argument into the temporary for the coresponding
             // parameter.
             //
-            // Note that we use `srcArg.currentValPtr` here instead of the
-            // argument's original value, so that any logic that might have
-            // moved another parameter into a temporary will influence our
-            // result.
+            // Note that we use `actualValPtr` here instead of `originalVal`,
+            // so that any logic that might have moved another parameter
+            // into a temporary will influence our result.
             //
-            // An `IRUndefined` incoming (the whole `Undefined` family — this
-            // includes the `LoadFromUninitializedMemory` values that SSA
-            // construction synthesizes when a partially-initialized local is
-            // read before its first store) means the parameter is read before
-            // it was defined along this path. `legalizeDefUse`'s hoisted vars
-            // no longer arrive here as undefined for scalar, vector, matrix
-            // and pointer types — their per-entry init is already a concrete
-            // default — so this branch mainly covers ordinary locals. The internal fast-path
-            // callers run without register allocation, and for their plain local temps skipping the
-            // store is enough: reading an uninitialized local already yields an undefined value.
-            // But register allocation — the default at this emit-stage call, on every target —
-            // makes the temp stand for function-scope memory in the emitted module, and leaving it
-            // unwritten on this path lets its previous content flow around a
-            // loop back edge; downstream SSA promotion of that module (for
-            // example spirv-opt on our SPIR-V output) must then treat the
-            // register as loop-carried and keep its content live across the
-            // loop body. So we store a concrete default value, and this fires
-            // for any undefined incoming, including plain
-            // partially-initialized locals — the loop-header hoist shape is
-            // only the motivating case. Choosing a concrete value is a legal
-            // refinement of the undefined value, and unlike a store of the
-            // undefined value itself, a constant store survives downstream
-            // optimizers that elide undefined stores. Types without a cheap
-            // concrete default keep the skip: `emitDefaultConstruct` with
-            // `fallback = false` returns null for aggregates (whose default
-            // would expand into element-wise zeros, the materialization cost
-            // that `legalizeDefUse` deliberately avoids, #11011), opaque
-            // handles, and any shape it has no case for. An unwritten register
-            // remains valid output for those types, though it can still carry
-            // the liveness regression this store exists to break.
-            //
-            SLANG_ASSERT(m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before);
-            auto srcVal = *srcArg.currentValPtr;
-            if (as<IRUndefined>(srcVal))
-            {
-                if (m_options.useRegisterAllocation &&
-                    canMaterializeUndefinedWithDefaultConstruct(srcVal->getDataType()))
-                {
-                    if (auto defaultValue =
-                            m_builder.emitDefaultConstruct(srcVal->getDataType(), false))
-                    {
-                        m_builder.emitStore(dstParam.temp, defaultValue);
-                    }
-                }
-            }
-            else
+            if (!as<IRUndefined>(*srcArg.currentValPtr))
             {
                 // If we are trying to emit a store directly after a load from the same var,
                 // skip the store.
-                auto srcLoad = as<IRLoad>(srcVal);
+                SLANG_ASSERT(m_builder.getInsertLoc().getMode() == IRInsertLoc::Mode::Before);
+                auto srcLoad = as<IRLoad>(*srcArg.currentValPtr);
                 if (srcLoad && srcLoad->getOperand(0) == dstParam.temp &&
                     canLoadBeFoldedAtInst(srcLoad, m_builder.getInsertLoc().getInst()))
                 {
                 }
                 else
                 {
-                    m_builder.emitStore(dstParam.temp, srcVal);
+                    m_builder.emitStore(dstParam.temp, *srcArg.currentValPtr);
                 }
             }
 

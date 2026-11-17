@@ -378,13 +378,6 @@ bool isValueType(IRInst* type);
 
 bool isScalarOrVectorType(IRInst* type);
 
-/// Whether an undefined value of `type` may be materialized as a concrete
-/// default value (`emitDefaultConstruct(type, /*fallback=*/false)`).
-/// Scalar, vector, matrix, and non-`UserPointer` pointer types qualify.
-/// A `true` result does not guarantee the fold returns non-null: pointer
-/// kinds `emitDefaultConstruct` has no case for silently do not.
-bool canMaterializeUndefinedWithDefaultConstruct(IRType* type);
-
 bool isSimpleDataType(IRType* type);
 
 bool isSimpleHLSLDataType(IRInst* inst);
