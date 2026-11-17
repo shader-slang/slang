@@ -55,10 +55,13 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-static SlangResult _getSlangDiagnosticSeverity(
+// Matches a severity word at the start of inText, shared by both Slang diagnostic renderings:
+// the classic single-line form `path(11): error 31101: ...` and the rust-style header
+// `error[E30015]: ...`. Sets outPrefix to the matched word and outSeverity to its class.
+static SlangResult _matchSlangSeverityPrefix(
     const UnownedStringSlice& inText,
     ArtifactDiagnostic::Severity& outSeverity,
-    Int& outCode)
+    UnownedStringSlice& outPrefix)
 {
     UnownedStringSlice text(inText.trim());
 
@@ -70,36 +73,31 @@ static SlangResult _getSlangDiagnosticSeverity(
         UnownedStringSlice::fromLiteral("internal error"),
         UnownedStringSlice::fromLiteral("unknown error")};
 
-    Int index = -1;
-
     for (Index i = 0; i < SLANG_COUNT_OF(prefixes); ++i)
     {
-        const auto& prefix = prefixes[i];
-        if (text.startsWith(prefix))
+        if (text.startsWith(prefixes[i]))
         {
-            index = i;
-            break;
+            outPrefix = prefixes[i];
+            outSeverity = (i == 0)   ? ArtifactDiagnostic::Severity::Info
+                          : (i == 1) ? ArtifactDiagnostic::Severity::Warning
+                                     : ArtifactDiagnostic::Severity::Error;
+            return SLANG_OK;
         }
     }
+    return SLANG_FAIL;
+}
 
-    switch (index)
-    {
-    case -1:
-        return SLANG_FAIL;
-    case 0:
-        outSeverity = ArtifactDiagnostic::Severity::Info;
-        break;
-    case 1:
-        outSeverity = ArtifactDiagnostic::Severity::Warning;
-        break;
-    default:
-        outSeverity = ArtifactDiagnostic::Severity::Error;
-        break;
-    }
+static SlangResult _getSlangDiagnosticSeverity(
+    const UnownedStringSlice& inText,
+    ArtifactDiagnostic::Severity& outSeverity,
+    Int& outCode)
+{
+    UnownedStringSlice prefix;
+    SLANG_RETURN_ON_FAIL(_matchSlangSeverityPrefix(inText, outSeverity, prefix));
 
     outCode = 0;
 
-    UnownedStringSlice tail = text.tail(prefixes[index].getLength()).trim();
+    UnownedStringSlice tail = inText.trim().tail(prefix.getLength()).trim();
     if (tail.getLength() > 0)
     {
         SLANG_RETURN_ON_FAIL(StringUtil::parseInt(tail, outCode));
