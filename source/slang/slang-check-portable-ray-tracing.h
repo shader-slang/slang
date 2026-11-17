@@ -27,6 +27,8 @@ public:
     HashSet<Val*> checkedSpecializationDeclRefs;
     Index loadedModuleCountAtScan = -1;
     bool stageInputsLoaded = false;
+    // Number of nested body walks in flight on this linkage; caps the walker's stack use.
+    Index currentWalkDepth = 0;
 };
 
 namespace PortableRT
@@ -120,7 +122,10 @@ void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sin
 /// declares a stage input, the reference names a callable specialized by a generic application,
 /// the callee's body is not itself mid-check (a recursive generic), and this instantiation was
 /// not already checked — so calling it from every overload completion is cheap for every other
-/// compile. A null or unsubstituted reference also exits without diagnosing. `instantiationLoc`
+/// compile. A null or unsubstituted reference also exits without diagnosing. One coverage
+/// limit: a helper imported from a serialized `.slang-module` keeps its signature but not its
+/// body, so forbidden body constructions inside such a helper are not diagnosed here (an
+/// IR-level check is the follow-up; see the tracking discussion on #13686). `instantiationLoc`
 /// names the call or specialization that bound the arguments, and is reported beside any
 /// diagnostic found inside the generic body so the reader can see which concrete call made the
 /// type known.

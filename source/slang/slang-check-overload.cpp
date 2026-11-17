@@ -1645,7 +1645,8 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     // once too. checkSpecializedCallableBody itself exits without diagnosing when the
     // compilation has not opted in, no loaded module declares a stage input, or the reference
     // is not a generic specialization, so non-ray-tracing compiles reach only those fast
-    // checks.
+    // checks — plus, on the Generic path below, the interning of the rebuilt application
+    // reference, which the completed callee expression re-creates moments later anyway.
     if (candidate.flavor == OverloadCandidate::Flavor::Generic)
     {
         if (!(candidate.flags & OverloadCandidate::Flag::IsPartiallyAppliedGeneric))

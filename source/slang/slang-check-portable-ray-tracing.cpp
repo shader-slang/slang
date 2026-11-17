@@ -171,9 +171,9 @@ static RestrictedTypeKind _getDirectRestrictedTypeKind(Type* type)
 // reached is the most resolved form available. A lookup whose witness is not a subtype witness
 // (an optional conformance recorded as a NoneWitness, for example) also stops the loop with
 // the type unresolved; callers then classify it as ordinary, matching what the declaration-time
-// checks concluded while the conformance was unresolved. The return value is therefore the
-// most resolved form of the input, never null: an input type comes back unchanged, and a
-// resolvable chain comes back as its target.
+// checks concluded while the conformance was unresolved. The return value is the most resolved
+// form of the input, and is null only when the input itself is null: a non-null type comes back
+// as its most resolved form even when a step stops the loop early.
 static Type* _resolveSubstitutedFieldType(SemanticsVisitor* visitor, Type* type)
 {
     HashSet<Val*> visited;
@@ -195,7 +195,15 @@ static Type* _resolveSubstitutedFieldType(SemanticsVisitor* visitor, Type* type)
                 subDeclRefType = isDeclRefTypeOf<AggTypeDeclBase>(witness->getSub());
             if (!subDeclRefType)
                 return type;
-            visitor->ensureDecl(subDeclRefType.getDecl(), DeclCheckState::ReadyForConformances);
+            // Advance the declaring type's conformance checking on demand, guarding the same
+            // mid-check window the body walk guards: advancing a declaration whose own checking
+            // is in flight would be answered with a spurious cyclic-reference fatal. In that
+            // window the witness table is simply not ready yet, so the lookup stays unresolved
+            // and classifies as ordinary — the same answer the declaration-time checks had.
+            if (!subDeclRefType.getDecl()->checkState.isBeingChecked())
+            {
+                visitor->ensureDecl(subDeclRefType.getDecl(), DeclCheckState::ReadyForConformances);
+            }
         }
         auto resolvedType = as<Type>(type->resolve());
         if (!resolvedType)
@@ -231,16 +239,24 @@ static Type* _resolveSubstitutedFieldType(SemanticsVisitor* visitor, Type* type)
 // `struct Node { Ptr<Node> next; }` from walking into themselves forever, and a field whose
 // type is not checked yet — for example while the struct's own declaration is still being
 // formed — is skipped: the declaration-time checks own it once the declaration completes.
+static const int kRestrictedTypeWalkDepthLimit = 32;
+
 static RestrictedTypeKind _getRestrictedTypeKindImpl(
     SemanticsVisitor* visitor,
     Type* type,
-    HashSet<Type*>& visited)
+    HashSet<Type*>& visited,
+    int depth)
 {
     type = unwrapModifiedType(type);
     auto kind = _getDirectRestrictedTypeKind(type);
     if (kind != RestrictedTypeKind::None)
         return kind;
 
+    // The visited set only stops chains that repeat a type: a struct whose field names its own
+    // generic form with a *growing* argument (struct A<T> { Ptr<A<T[]>> next; }) produces a
+    // distinct interned type at every hop, so a depth budget bounds those instead of the stack.
+    if (depth > kRestrictedTypeWalkDepthLimit)
+        return RestrictedTypeKind::None;
     if (!visited.add(type))
         return RestrictedTypeKind::None;
 
@@ -248,7 +264,7 @@ static RestrictedTypeKind _getRestrictedTypeKindImpl(
             type,
             [&](Type* elementType)
             {
-                kind = _getRestrictedTypeKindImpl(visitor, elementType, visited);
+                kind = _getRestrictedTypeKindImpl(visitor, elementType, visited, depth + 1);
                 return kind != RestrictedTypeKind::None;
             }))
         return kind;
@@ -265,7 +281,7 @@ static RestrictedTypeKind _getRestrictedTypeKindImpl(
         auto fieldType = _resolveSubstitutedFieldType(visitor, getType(astBuilder, fieldDeclRef));
         if (!fieldType)
             continue;
-        kind = _getRestrictedTypeKindImpl(visitor, fieldType, visited);
+        kind = _getRestrictedTypeKindImpl(visitor, fieldType, visited, depth + 1);
         if (kind != RestrictedTypeKind::None)
             return kind;
     }
@@ -275,7 +291,7 @@ static RestrictedTypeKind _getRestrictedTypeKindImpl(
 static RestrictedTypeKind _getRestrictedTypeKind(SemanticsVisitor* visitor, Type* type)
 {
     HashSet<Type*> visited;
-    return _getRestrictedTypeKindImpl(visitor, type, visited);
+    return _getRestrictedTypeKindImpl(visitor, type, visited, 0);
 }
 
 // Reports an invalid use of an RT builtin type: a stage input or the stage interface itself.
@@ -905,14 +921,13 @@ public:
 
 private:
     // Returns the substituted, resolved form of an abstract checked type, or null when the
-    // substitution does not change it. Substituted associated types resolve through conformance
-    // witness tables that may not be checked yet at the call site, so resolve through the same
-    // helper the storage classifier uses.
-    // Returns the substituted, resolved form of an abstract checked type, or null when the
     // substitution does not change it — the caller's signal that the declaration-time checks
     // already covered this declaration concretely, so the walk skips it. The low-level
     // substituteImpl is used for its diff output, which the higher-level applyToType does not
-    // expose; the resolver never returns null, so null here means only "unchanged".
+    // expose. Substituted associated types resolve through conformance witness tables that may
+    // not be checked yet at the call site, so the result routes through the same resolver the
+    // storage classifier uses; that resolver returns null only for a null input, so null here
+    // means only "unchanged".
     Type* _substituteCheckedType(Type* type)
     {
         int diff = 0;
@@ -925,8 +940,11 @@ private:
         return _resolveSubstitutedFieldType(this, substitutedType);
     }
 
-    // Every report pairs the use with the note naming the instantiation that made the type
-    // concrete, so a future diagnostic added here cannot forget its note.
+    // Reports pair the use with the note naming the instantiation that made the type concrete,
+    // so a diagnostic added here has its note alongside by construction. One benign edge: two
+    // alias-equivalent instantiations of the same body deduplicate the primary error (same
+    // location) while their notes carry distinct call-site locations, so the second pair can
+    // surface as an extra note without a new error above it.
     template<typename Diagnostic>
     void _reportUse(Diagnostic const& diagnostic)
     {
@@ -949,15 +967,22 @@ private:
         if (!declaredType)
             return;
         auto substitutedType = _substituteCheckedType(declaredType);
-        if (!substitutedType ||
-            _getRestrictedTypeKind(this, substitutedType) == RestrictedTypeKind::None)
+        if (!substitutedType)
+            return;
+        // Switch on the classified kind, as the concrete path does, so a container holding the
+        // stage interface reports the runtime-value error rather than a storage message that
+        // would read as conditionally legal. The storage allowance stays keyed on the *direct*
+        // input spelling, exactly as in the concrete predicate: a wrapped input is a container
+        // the caller cannot hand over, so it is rejected even in an allowed position.
+        auto kind = _getRestrictedTypeKind(this, substitutedType);
+        if (kind == RestrictedTypeKind::None)
             return;
 
         if (_getDirectStageInputKind(substitutedType) != Stage::Unknown &&
             _isAllowedStageInputStorage(varDecl))
             return;
 
-        if (as<RayTracingStageInterfaceType>(substitutedType))
+        if (kind == RestrictedTypeKind::StageInterface)
         {
             _reportUse(Diagnostics::StructuralRayTracingStageRuntimeValue{
                 .type = substitutedType,
@@ -987,17 +1012,20 @@ private:
             .location = expr->loc});
     }
 
-    // A call inside the generic body may itself be generic, with arguments still in terms of
-    // this generic's parameters. Once the outer substitution makes those arguments concrete,
-    // the callee's body needs the same walk — this is how a chain of generic helpers is
-    // covered. A call whose arguments were already concrete in the abstract body was checked
-    // when the abstract body itself was checked, so only a changed application recurses.
+    // A call inside the generic body may itself be generic. The substitution decides whether
+    // the callee's arguments are already the ones it will be checked with: an application the
+    // outer substitution leaves unchanged was completed (and checked) at its own site, except
+    // for one shape — a recursive call whose arguments were concrete during the callee's own
+    // abstract body check, which was skipped mid-check and removed from the dedup set so this
+    // walk can pick it up. The per-specialization dedup set is therefore the sole re-entry
+    // gate; it also bounds how far a chain of distinct specializations can nest, together
+    // with the walk-depth cap in the entry function.
     void _checkInnerSpecialization(GenericAppDeclRef* genericAppDeclRef)
     {
         int diff = 0;
         auto specialized = static_cast<DeclRefBase*>(
             genericAppDeclRef->substituteImpl(getASTBuilder(), subst, &diff));
-        if (!diff || !specialized || specialized == genericAppDeclRef)
+        if (!specialized)
             return;
         SourceLoc innerLoc =
             sourceLocStack.getCount() ? sourceLocStack.getLast() : instantiationLoc;
@@ -1133,6 +1161,7 @@ void checkSpecializedCallableBody(
         instantiationLoc,
         getText(callableDecl->getName()));
     checker.dispatchIfNotNull(callableDecl);
+    state->currentWalkDepth--;
 }
 
 } // namespace PortableRT

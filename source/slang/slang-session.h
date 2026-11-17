@@ -251,9 +251,9 @@ public:
     List<RefPtr<LoadedModule>> loadedModulesList;
 
     // Generic instantiations whose bodies PortableRT has already validated after
-    // specialization, so one instantiation is checked once per compilation no matter
-    // how many call sites complete it. Lazily created; the state type lives in
-    // slang-check-portable-ray-tracing.h.
+    // specialization, so one instantiation is checked once per linkage lifetime no matter
+    // how many call sites complete it (a linkage is assumed to serve a single compilation).
+    // Lazily created; the state type lives in slang-check-portable-ray-tracing.h.
     RefPtr<class PortableRTSpecializationCheckState> m_portableRTSpecializationCheckState;
 
     // Map from the path (or uniqueIdentity if available) of a module file to its definition

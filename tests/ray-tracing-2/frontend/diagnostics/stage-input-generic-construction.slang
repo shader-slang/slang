@@ -194,6 +194,79 @@ uint ping<T>(int depth)
     return pong<T>(depth - 1);
 }
 
+// A recursive call supplying concrete stage-input arguments must not escape: its completion
+// happens mid-check and is skipped, and the outer walk re-enters it through the dedup reset.
+uint userConcrete<T>(int depth)
+{
+    if (depth <= 0)
+    {
+        T fresh = T();
+//CHECK:           ^ fresh construction of a structural ray-tracing stage input
+//CHECK:           ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+        return 1;
+    }
+    return userConcrete<rt::MissInput<MissContext>>(depth - 1);
+//CHECK:   ^^^^^^^^^^^^ in the instantiation of 'userConcrete'
+}
+
+// Grouped declaration statements reach the same rules: the walker descends into DeclGroups.
+uint multi<T>()
+{
+    T a = T(), b = T();
+//CHECK:   ^ fresh construction of a structural ray-tracing stage input
+//CHECK:   ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+//CHECK:            ^ fresh construction of a structural ray-tracing stage input
+//CHECK:            ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+    T c, d;
+/*CHECK:
+      ^ storage of a structural ray-tracing stage input
+      ^ ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
+         ^ storage of a structural ray-tracing stage input
+         ^ ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
+*/
+    return 1;
+}
+
+// The rejected storage positions of the shared predicate, through the walk path.
+uint rejectVariants<T>()
+{
+    static T s = T();
+//CHECK:     ^ storage of a structural ray-tracing stage input
+//CHECK:     ^ ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
+//CHECK:          ^ fresh construction of a structural ray-tracing stage input
+//CHECK:          ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+    T outParam;
+/*CHECK:
+      ^^^^^^^^ storage of a structural ray-tracing stage input
+      ^^^^^^^^ ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
+*/
+    T uniformParam;
+/*CHECK:
+      ^^^^^^^^^^^^ storage of a structural ray-tracing stage input
+      ^^^^^^^^^^^^ ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
+*/
+    return 1;
+}
+
+// A generic whose local becomes the stage interface itself reports the runtime-value error,
+// the same message the concrete spelling produces.
+uint probe<T>()
+{
+    T stage;
+/*CHECK:
+      ^^^^^ runtime use of a structural ray-tracing stage type
+      ^^^^^ structural ray-tracing stage type 'rt.IMissShader' has no runtime representation
+*/
+    return 1;
+}
+
+// A struct whose field names its own generic form with a growing argument classifies within
+// the depth budget instead of exhausting the stack.
+struct GrowA<T>
+{
+    Ptr<GrowA<T[]>> next;
+}
+
 // A method of a specialized generic struct is a plain call whose callee reference already
 // carries the enclosing application, so the same check runs on it.
 struct Factory<T>
@@ -234,6 +307,20 @@ struct Miss : rt::IMissShader
         input.payload.value += recurseMake<rt::MissInput<Context>>(2);
 //CHECK:                       ^^^^^^^^^^^ in the instantiation of 'recurseMake'
         input.payload.value += ping<uint>(4);
+        input.payload.value += userConcrete<uint>(2);
+        input.payload.value += probe<rt::IMissShader>();
+//CHECK:                       ^^^^^ in the instantiation of 'probe'
+        input.payload.value += multi<rt::MissInput<Context>>();
+//CHECK:                       ^^^^^ in the instantiation of 'multi'
+        input.payload.value += rejectVariants<rt::MissInput<Context>>();
+//CHECK:                       ^^^^^^^^^^^^^^ in the instantiation of 'rejectVariants'
+
+        // The same instantiation completed twice reports once: the exhaustive mode fails on
+        // any duplicate diagnostic this second call would emit.
+        makeFresh<rt::MissInput<Context>>();
+
+        // A growing generic struct classifies within the depth budget and stays silent.
+        GrowA<int> grow;
 
         let copied = copyInput(input);
         passInput(copied);

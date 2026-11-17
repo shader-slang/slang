@@ -45,5 +45,7 @@ public struct InputCarrier : ICarrier
 
 // A generic signature written in terms of T.Item stores an input once substituted, and the
 // signature is part of the serialized module even when bodies are not.
-public void acceptOptionalItem<T : ICarrier>(Optional<T.Item> input) {}
+// The default keeps the call site argument-free; `none` names an absent optional without
+// constructing one.
+public void acceptOptionalItem<T : ICarrier>(Optional<T.Item> input = none) {}
 }

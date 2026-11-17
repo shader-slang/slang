@@ -4732,8 +4732,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
 // Walks every node reachable from an already-checked declaration, expression, statement, or
 // value, applying the CRTP derived type's visit* overrides along the way. The two process
-// hooks fire for referenced declarations; the top of sourceLocStack is the location of the
-// innermost expression or statement being walked. The traversal does not descend into
+// hooks fire for referenced declarations and default to no-ops, so a subclass that only
+// inspects nodes (both in-tree subclasses override them; a future one that forgets simply
+// sees nothing rather than failing to compile); the top of sourceLocStack is the location of
+// the innermost expression or statement being walked. The traversal does not descend into
 // grouped declaration statements (DeclGroup) or into the operands of a generic application;
 // subclasses that need those shapes override visitDeclGroup / visitGenericAppDeclRef.
 template<typename VisitorType>
