@@ -6,6 +6,7 @@
 #include "core/slang-lz4-compression-system.h"
 #include "core/slang-shared-library.h"
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"

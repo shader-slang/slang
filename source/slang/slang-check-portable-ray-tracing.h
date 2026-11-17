@@ -17,6 +17,15 @@ class MagicTypeModifier;
 struct SemanticsVisitor;
 class EntryPoint;
 
+// Per-compilation state for the post-specialization stage-input checks: the set of generic
+// instantiations whose bodies were already validated after substitution. Specialized decl-refs
+// are interned Vals, so pointer identity distinguishes instantiations.
+class PortableRTSpecializationCheckState : public RefObject
+{
+public:
+    HashSet<Val*> checkedSpecializationDeclRefs;
+};
+
 namespace PortableRT
 {
 
@@ -91,6 +100,17 @@ DeclRef<FuncDecl> findEntryPointByName(
 
 /// Diagnoses stage inputs exposed by a selected native entry-point signature.
 void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
+
+/// Checks a generic callable's body for stage-input uses that its declaration-time checking could
+/// not see: `specializedCallableDeclRef` is the callable's checked declaration reference with the
+/// concrete generic arguments bound (a `GenericAppDeclRef` in its substitution chain). A null or
+/// unsubstituted reference exits without diagnosing. `instantiationLoc` names the call or
+/// specialization that bound the arguments, and is reported beside any diagnostic found inside the
+/// generic body so the reader can see which concrete call made the type known.
+void checkSpecializedCallableBody(
+    SemanticsVisitor* visitor,
+    DeclRefBase* specializedCallableDeclRef,
+    SourceLoc instantiationLoc);
 
 /// Sets the public and target names for an entry point selected by its source stage type.
 void initializeEntryPoint(EntryPoint* entryPoint, Name* entryPointName, Type* stageType);

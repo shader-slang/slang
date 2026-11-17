@@ -3,6 +3,7 @@
 #include "slang-ast-base.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
 
@@ -1634,6 +1635,34 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
     if (!TryCheckOverloadCandidateVisibility(context, candidate))
         goto error;
+
+    // The candidate is now fully applied and selected. This is the point where a generic's
+    // parameters became concrete, so the portable ray-tracing checks re-read the callee's body
+    // with these arguments bound; the call itself did not exist when the body was checked
+    // abstractly. The function exits without diagnosing for any reference that is not a
+    // generic specialization.
+    if (candidate.flavor == OverloadCandidate::Flavor::Generic)
+    {
+        if (!(candidate.flags & OverloadCandidate::Flag::IsPartiallyAppliedGeneric))
+        {
+            auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
+            auto genSubst = candidate.subst.findGenericAppDeclRef(genericDeclRef.getDecl());
+            if (genericDeclRef && genSubst)
+                PortableRT::checkSpecializedCallableBody(
+                    this,
+                    m_astBuilder->getGenericAppDeclRef(genericDeclRef, genSubst->getArgs()),
+                    context.loc);
+        }
+    }
+    else if (candidate.flavor == OverloadCandidate::Flavor::Func)
+    {
+        // A callable member of a specialized declaration (for example a method of
+        // `Factory<Input>`) carries the enclosing generic application on its reference.
+        PortableRT::checkSpecializedCallableBody(
+            this,
+            candidate.item.declRef.declRefBase,
+            context.loc);
+    }
 
     {
         Expr* baseExpr;

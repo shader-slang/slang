@@ -1,0 +1,34 @@
+import slang.raytracing.portable;
+
+namespace generic_construction
+{
+public struct Payload { uint value; }
+public struct Record { uint value; }
+
+public struct TraceContext : rt::ITraceContext
+{
+    public typealias AccelerationStructure = rt::AccelerationStructure;
+    public typealias Motion = rt::NoMotion;
+}
+
+public struct Context : rt::IPayloadContext
+{
+    public typealias TraceContext = generic_construction::TraceContext;
+    public typealias Payload = generic_construction::Payload;
+    public typealias Record = generic_construction::Record;
+}
+
+// The library declares the generic helper; its body is only checked abstractly here, and the
+// construction is diagnosed when a caller supplies a stage input as T.
+public uint makeFreshInput<T>()
+{
+    T fresh = T();
+    return 1;
+}
+
+// A chain of generic hops through the library must reach the same check.
+public uint hopOne<T>()
+{
+    return makeFreshInput<T>();
+}
+}

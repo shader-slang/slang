@@ -3953,6 +3953,15 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
 
+    // The supplied arguments just made the entry point's generic parameters concrete, the same
+    // specialization boundary a call in a function body completes at overload resolution. Run
+    // the portable ray-tracing body check against the bound reference; it exits without
+    // diagnosing when the reference carries no generic application.
+    PortableRT::checkSpecializedCallableBody(
+        &visitor,
+        specializedFuncDeclRef.declRefBase,
+        specializedFuncDeclRef.getDecl()->loc);
+
     // The generic arguments supplied through -specialize or IComponentType::specialize are now
     // bound to the entry point's generic parameters. For example, specializing genericMain<T>
     // with MetalOnly makes specializedFuncDeclRef identify genericMain<MetalOnly>.

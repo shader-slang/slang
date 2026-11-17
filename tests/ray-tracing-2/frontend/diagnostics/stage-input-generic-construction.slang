@@ -129,6 +129,7 @@ struct Miss : rt::IMissShader
         input.payload.value += manufacture<Carrier>();
         input.payload.value += consume<rt::MissInput<Context>>();
         input.payload.value += hopOne<rt::MissInput<Context>>();
+        makeFresh<rt::MissInput<Context>>();
 
         let copied = copyInput(input);
         passInput(copied);

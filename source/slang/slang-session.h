@@ -250,6 +250,12 @@ public:
     // This is a list of unique modules loaded, in the order they were encountered.
     List<RefPtr<LoadedModule>> loadedModulesList;
 
+    // Generic instantiations whose bodies PortableRT has already validated after
+    // specialization, so one instantiation is checked once per compilation no matter
+    // how many call sites complete it. Lazily created; the state type lives in
+    // slang-check-portable-ray-tracing.h.
+    RefPtr<class PortableRTSpecializationCheckState> m_portableRTSpecializationCheckState;
+
     // Map from the path (or uniqueIdentity if available) of a module file to its definition
     Dictionary<String, RefPtr<LoadedModule>> mapPathToLoadedModule;
 
