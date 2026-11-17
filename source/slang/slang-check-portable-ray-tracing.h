@@ -51,14 +51,21 @@ void diagnoseDuplicateSchemaEntries(
     Type* schemaType,
     SourceLoc satisfyingDeclLoc);
 
-/// Checks whether the variable's storage, parameter direction, and initializer allow an RT input.
-void diagnoseInvalidVariableType(DiagnosticSink* sink, VarDeclBase* varDecl);
+/// Checks whether the variable's storage, parameter direction, and initializer allow an RT
+/// input. The visitor resolves substituted types whose conformances the use site may precede.
+void diagnoseInvalidVariableType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    VarDeclBase* varDecl);
 
 /// Diagnoses restricted RT types used as function results.
-void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl);
+void diagnoseInvalidReturnType(SemanticsVisitor* visitor, DiagnosticSink* sink, CallableDecl* decl);
 
 /// Diagnoses restricted RT types used as property results.
-void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* decl);
+void diagnoseInvalidPropertyType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    PropertyDecl* decl);
 
 /// Allows the ray-tracing stage-interface and descriptor AST types in imported library
 /// declarations.

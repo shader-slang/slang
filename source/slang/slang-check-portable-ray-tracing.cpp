@@ -132,6 +132,9 @@ static DeclRef<FuncDecl> _getStageImplementationFromSubtypeWitness(
     return invokeWitness.getDeclRef().as<FuncDecl>();
 }
 
+// Defined below, after getStageInputKind, which the module scan reads.
+static bool _compilationCanDeclareStageInputs(Linkage* linkage);
+
 // Only the library's stage interfaces and input views have restricted value uses. A user struct
 // implementing a stage interface is an ordinary value; identifying it never requires inheritance.
 enum class RestrictedTypeKind
@@ -166,7 +169,57 @@ static RestrictedTypeKind _getDirectRestrictedTypeKind(Type* type)
 // walking into themselves forever, and a field whose type is not checked yet — for example while
 // the struct's own declaration is still being formed — is skipped rather than treated as
 // ordinary; the declaration-time checks cover it once complete.
-static RestrictedTypeKind _getRestrictedTypeKindImpl(Type* type, HashSet<Type*>& visited)
+// Resolves a substituted type to the concrete type it names, so the classifier can read the
+// declaration. Two indirections are ordinary for a field that was written in terms of a generic
+// parameter:
+// 1. An associated type such as `T.Item` with `T = Carrier` substitutes to a lookup through the
+//    conformance witness. Resolving it reads the conformance's witness table, which exists once
+//    the declaring type reaches ReadyForConformances; the use site can be checked before that
+//    state, so advance it on demand here.
+// 2. The concrete member may be a typealias (Carrier.Item is one), so follow `typealias`
+//    declarations to the type they name, the same as an ordinary source type.
+// Each step can expose another lookup (for example an alias to a nested associated type), so
+// the loop applies the same treatment to each result.
+static Type* _resolveSubstitutedFieldType(SemanticsVisitor* visitor, Type* type)
+{
+    for (Index step = 0; type && step < 4; ++step)
+    {
+        LookupDeclRef* lookup = nullptr;
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            DeclRefBase* declRefBase = declRefType->getDeclRef();
+            lookup = as<LookupDeclRef>(declRefBase);
+        }
+        if (lookup)
+        {
+            auto witness = as<SubtypeWitness>(lookup->getWitness());
+            DeclRef<AggTypeDeclBase> subDeclRefType;
+            if (witness)
+                subDeclRefType = isDeclRefTypeOf<AggTypeDeclBase>(witness->getSub());
+            if (!subDeclRefType)
+                break;
+            visitor->ensureDecl(subDeclRefType.getDecl(), DeclCheckState::ReadyForConformances);
+        }
+        type = as<Type>(type->resolve());
+        if (!type)
+            return nullptr;
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto typeDefDeclRef = declRefType->getDeclRef().as<TypeDefDecl>())
+            {
+                type = getType(type->getASTBuilder(), typeDefDeclRef);
+                continue;
+            }
+        }
+        break;
+    }
+    return type;
+}
+
+static RestrictedTypeKind _getRestrictedTypeKindImpl(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Type*>& visited)
 {
     type = unwrapModifiedType(type);
     auto kind = _getDirectRestrictedTypeKind(type);
@@ -180,7 +233,7 @@ static RestrictedTypeKind _getRestrictedTypeKindImpl(Type* type, HashSet<Type*>&
         type,
         [&](Type* elementType)
         {
-            kind = _getRestrictedTypeKindImpl(elementType, visited);
+            kind = _getRestrictedTypeKindImpl(visitor, elementType, visited);
             return kind != RestrictedTypeKind::None;
         });
     if (kind != RestrictedTypeKind::None)
@@ -195,29 +248,33 @@ static RestrictedTypeKind _getRestrictedTypeKindImpl(Type* type, HashSet<Type*>&
     auto astBuilder = type->getASTBuilder();
     for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::All))
     {
-        auto fieldType = getType(astBuilder, fieldDeclRef);
+        auto fieldType = _resolveSubstitutedFieldType(visitor, getType(astBuilder, fieldDeclRef));
         if (!fieldType)
             continue;
-        kind = _getRestrictedTypeKindImpl(fieldType, visited);
+        kind = _getRestrictedTypeKindImpl(visitor, fieldType, visited);
         if (kind != RestrictedTypeKind::None)
             return kind;
     }
     return RestrictedTypeKind::None;
 }
 
-static RestrictedTypeKind _getRestrictedTypeKind(Type* type)
+static RestrictedTypeKind _getRestrictedTypeKind(SemanticsVisitor* visitor, Type* type)
 {
     HashSet<Type*> visited;
-    return _getRestrictedTypeKindImpl(type, visited);
+    return _getRestrictedTypeKindImpl(visitor, type, visited);
 }
 
 // Reports an invalid use of an RT builtin type: a stage input or the stage interface itself.
 // "RT builtin" means a compiler-recognized library type, not necessarily a C++ BuiltinType.
 // Concrete structs implementing the interface remain ordinary types. Returns true when an error
 // is reported, or false when the supplied type needs no diagnostic.
-static bool _diagnoseInvalidBuiltinTypeUse(DiagnosticSink* sink, Type* type, SourceLoc location)
+static bool _diagnoseInvalidBuiltinTypeUse(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    Type* type,
+    SourceLoc location)
 {
-    switch (_getRestrictedTypeKind(type))
+    switch (_getRestrictedTypeKind(visitor, type))
     {
     case RestrictedTypeKind::StageInterface:
         // The interface itself, e.g. IMissShader, cannot be a runtime value. A concrete struct
@@ -384,9 +441,13 @@ static ConcreteTypePack* _getEntryTypes(ASTBuilder* astBuilder, Type* entryListT
 void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
     SLANG_RELEASE_ASSERT(!entryPoint->isStructuralRayTracingEntryPoint());
-    auto diagnoseInputType = [sink](Type* type, SourceLoc location)
+    SharedSemanticsContext sharedContext(entryPoint->getLinkage(), entryPoint->getModule(), sink);
+    SemanticsVisitor visitor(&sharedContext);
+    if (!_compilationCanDeclareStageInputs(entryPoint->getLinkage()))
+        return;
+    auto diagnoseInputType = [&visitor, sink](Type* type, SourceLoc location)
     {
-        if (_getRestrictedTypeKind(type) == RestrictedTypeKind::StageInput)
+        if (_getRestrictedTypeKind(&visitor, type) == RestrictedTypeKind::StageInput)
         {
             sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
                 .type = type,
@@ -658,8 +719,14 @@ void diagnoseDuplicateSchemaEntries(
 // A direct input is allowed as a non-uniform in parameter or an initialized non-static local.
 // Globals, fields, and other parameter directions are rejected. The input types have private
 // constructors, so ordinary constructor access checking rejects direct construction.
-void diagnoseInvalidVariableType(DiagnosticSink* sink, VarDeclBase* varDecl)
+void diagnoseInvalidVariableType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    VarDeclBase* varDecl)
 {
+    auto linkage = visitor->getShared()->m_linkage;
+    if (!linkage || !_compilationCanDeclareStageInputs(linkage))
+        return;
     auto type = varDecl->getType();
     // Recognize the input type itself, such as MissInput<C>. Unknown means it is not a stage input.
     if (_getDirectStageInputKind(type) != Stage::Unknown)
@@ -684,17 +751,21 @@ void diagnoseInvalidVariableType(DiagnosticSink* sink, VarDeclBase* varDecl)
     // checks restricted types inside built-in containers and the stage interface itself.
     // Reaching this call does not imply an error: ordinary types, including concrete stage
     // structs, pass without a diagnostic.
-    _diagnoseInvalidBuiltinTypeUse(sink, type, varDecl->loc);
+    _diagnoseInvalidBuiltinTypeUse(visitor, sink, type, varDecl->loc);
 }
 
 // Rejects results such as `rt::MissInput<C> makeInput();`. Inputs may be received as in parameters
 // and copied locally, but a function cannot promise a new input. Constructors do not have
 // a separately declared return type, so they are not subject to this check.
-void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl)
+void diagnoseInvalidReturnType(SemanticsVisitor* visitor, DiagnosticSink* sink, CallableDecl* decl)
 {
+    auto linkage = visitor->getShared()->m_linkage;
+    if (!linkage || !_compilationCanDeclareStageInputs(linkage))
+        return;
     if (as<ConstructorDecl>(decl))
         return;
     _diagnoseInvalidBuiltinTypeUse(
+        visitor,
         sink,
         decl->returnType.type,
         decl->returnType.exp ? decl->returnType.exp->loc : decl->loc);
@@ -702,9 +773,16 @@ void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl)
 
 // Rejects a property such as `property rt::MissInput<C> input { get; }`. Payload and record
 // properties have ordinary application-defined result types and remain legal.
-void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* propertyDecl)
+void diagnoseInvalidPropertyType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    PropertyDecl* propertyDecl)
 {
+    auto linkage = visitor->getShared()->m_linkage;
+    if (!linkage || !_compilationCanDeclareStageInputs(linkage))
+        return;
     _diagnoseInvalidBuiltinTypeUse(
+        visitor,
         sink,
         propertyDecl->type.type,
         propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc);
@@ -794,14 +872,19 @@ public:
 
 private:
     // Returns the substituted, resolved form of an abstract checked type, or null when the
-    // substitution does not change it.
+    // substitution does not change it. Substituted associated types resolve through conformance
+    // witness tables that may not be checked yet at the call site, so resolve through the same
+    // helper the storage classifier uses.
     Type* _substituteCheckedType(Type* type)
     {
         int diff = 0;
         auto substitutedVal = type->substituteImpl(getASTBuilder(), subst, &diff);
         if (!diff || !substitutedVal)
             return nullptr;
-        return as<Type>(substitutedVal->resolve());
+        auto substitutedType = as<Type>(substitutedVal);
+        if (!substitutedType)
+            return nullptr;
+        return _resolveSubstitutedFieldType(this, substitutedType);
     }
 
     void _reportUse(Diagnostics::StructuralRayTracingInputConstruction const& diagnostic)
@@ -831,7 +914,8 @@ private:
         if (!declaredType)
             return;
         auto substitutedType = _substituteCheckedType(declaredType);
-        if (!substitutedType || _getRestrictedTypeKind(substitutedType) == RestrictedTypeKind::None)
+        if (!substitutedType ||
+            _getRestrictedTypeKind(this, substitutedType) == RestrictedTypeKind::None)
             return;
 
         if (_getDirectStageInputKind(substitutedType) != Stage::Unknown)
@@ -895,6 +979,17 @@ private:
 // modules declare none can ever be diagnosed by these checks.
 static bool _declTreeDeclaresStageInputs(Decl* decl)
 {
+    // A generic declaration holds its parameters and constraints as members, but its inner
+    // declaration — where a generic struct's own annotations live — is not a member, so follow
+    // it explicitly.
+    if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        if (auto inner = getInner(genericDecl))
+        {
+            if (_declTreeDeclaresStageInputs(inner))
+                return true;
+        }
+    }
     if (auto aggTypeDecl = as<AggTypeDecl>(decl))
     {
         if (getStageInputKind(aggTypeDecl) != Stage::Unknown)
@@ -920,6 +1015,30 @@ static PortableRTSpecializationCheckState* _getCheckState(Linkage* linkage)
     return state;
 }
 
+// Returns true when a loaded module of this compilation declares one of the stage-input
+// structures. Only such a declaration classifies as a restricted type, so when none is
+// loaded, no check below can report anything. The scan runs once per load-count change and
+// its result is cached on the linkage.
+static bool _compilationCanDeclareStageInputs(Linkage* linkage)
+{
+    auto state = _getCheckState(linkage);
+    if (state->loadedModuleCountAtScan != linkage->loadedModulesList.getCount())
+    {
+        state->loadedModuleCountAtScan = linkage->loadedModulesList.getCount();
+        state->stageInputsLoaded = false;
+        for (auto loadedModule : linkage->loadedModulesList)
+        {
+            auto moduleDecl = loadedModule ? loadedModule->getModuleDecl() : nullptr;
+            if (moduleDecl && _declTreeDeclaresStageInputs(moduleDecl))
+            {
+                state->stageInputsLoaded = true;
+                break;
+            }
+        }
+    }
+    return state->stageInputsLoaded;
+}
+
 void checkSpecializedCallableBody(
     SemanticsVisitor* visitor,
     DeclRefBase* specializedCallableDeclRef,
@@ -937,26 +1056,11 @@ void checkSpecializedCallableBody(
     if (!linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
         return;
 
-    // The opt-in is broader than this feature: every standard-module build passes it too. Scan
-    // the loaded modules once per load-count change for an actual stage-input declaration, and
-    // keep compiles that define none of them — the core module itself, numerics, and ordinary
-    // shaders — at their existing checking speed.
+    // The opt-in is broader than this feature: every standard-module build passes it too. Only
+    // a loaded stage-input declaration can make a type restricted, so a compilation with none
+    // has nothing to check.
     auto state = _getCheckState(linkage);
-    if (state->loadedModuleCountAtScan != linkage->loadedModulesList.getCount())
-    {
-        state->loadedModuleCountAtScan = linkage->loadedModulesList.getCount();
-        state->stageInputsLoaded = false;
-        for (auto loadedModule : linkage->loadedModulesList)
-        {
-            auto moduleDecl = loadedModule ? loadedModule->getModuleDecl() : nullptr;
-            if (moduleDecl && _declTreeDeclaresStageInputs(moduleDecl))
-            {
-                state->stageInputsLoaded = true;
-                break;
-            }
-        }
-    }
-    if (!state->stageInputsLoaded)
+    if (!_compilationCanDeclareStageInputs(linkage))
         return;
 
     SubstitutionSet subst(specializedCallableDeclRef);

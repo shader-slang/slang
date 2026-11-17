@@ -2707,7 +2707,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     // Therefore, the body visitor will not check them for invalid RT builtin type use.
     // Run that check here instead, now that their types and initializers are known.
     if (varDecl->isChecked(DeclCheckState::DefinitionChecked))
-        PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
+        PortableRT::diagnoseInvalidVariableType(this, getSink(), varDecl);
 
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
@@ -3662,7 +3662,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     // Check after initialization and type inference: `let copy = input` is valid, while
     // `MissInput<C> fresh;` has no initializer and must be rejected.
-    PortableRT::diagnoseInvalidVariableType(getSink(), varDecl);
+    PortableRT::diagnoseInvalidVariableType(this, getSink(), varDecl);
 
     TypeTag varTypeTags = getTypeTags(varDecl->getType());
 
@@ -16651,10 +16651,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
-        PortableRT::diagnoseInvalidVariableType(getSink(), paramDecl);
+        PortableRT::diagnoseInvalidVariableType(this, getSink(), paramDecl);
     }
 
-    PortableRT::diagnoseInvalidReturnType(getSink(), decl);
+    PortableRT::diagnoseInvalidReturnType(this, getSink(), decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -18132,7 +18132,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
-    PortableRT::diagnoseInvalidPropertyType(getSink(), decl);
+    PortableRT::diagnoseInvalidPropertyType(this, getSink(), decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }
