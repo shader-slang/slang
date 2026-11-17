@@ -1216,13 +1216,41 @@ LoweredValInfo extractField(
     }
 }
 
+/// Return whether `baseType` is a `struct` or `class` type. Inheritance
+/// lowering creates a struct key for exactly these bases and installs the
+/// base as the derived type's leading keyed field, so this predicate is the
+/// single classification both of the key-creation site in
+/// `visitInheritanceDecl` and of the field-like-member test below agree on.
+static bool isStructOrClassBase(Type* baseType)
+{
+    if (auto baseDeclRefType = as<DeclRefType>(baseType))
+    {
+        auto baseDeclRef = baseDeclRefType->getDeclRef();
+        return baseDeclRef.as<StructDecl>() || baseDeclRef.as<ClassDecl>();
+    }
+    return false;
+}
+
 /// Return whether `declRef` names a member that lowering projects as a keyed
-/// struct field, so that `extractField` is the right way to read or write it
-/// once a base value has been materialized. This covers an ordinary field
-/// `VarDecl` and an `InheritanceDecl` whose base is a `struct` or `class`:
-/// inheritance lowering creates a struct key for such a base and installs it
-/// as the derived type's leading field. Interface bases are excluded because
-/// they lower to witness-table requirements, not fields.
+/// struct field, so that `extractField` is the right way to project it out of
+/// a base, whether the base is materialized for a read, addressed for an
+/// l-value, or copied into a mutable temporary for a write. A deferred
+/// BoundMemberInfo can also carry a CallableDecl method, handled by the
+/// method branch of `materialize`; this predicate covers the two
+/// field-like flavors.
+///
+/// The InheritanceDecl arm accepts exactly the bases `isStructOrClassBase`
+/// classifies: only those have a key that `extractField` can resolve. Other
+/// base kinds are excluded — an interface base lowers to a witness-table
+/// requirement, and a GLSLInterfaceBlockDecl base is installed as a field but
+/// never given a key, so projecting either would not resolve. A ClassDecl base
+/// cannot reach the consumers today (visitCastToSuperTypeExpr handles struct
+/// supers only) but is accepted to keep this predicate identical to
+/// key creation. Reading the unspecialized `getDecl()->base.type` is safe
+/// because the only producer of a deferred InheritanceDecl
+/// (emitCastToConcreteSuperTypeRec) likewise holds an unspecialized decl-ref,
+/// and substituting generic arguments never changes which declaration a base
+/// refers to, only its type arguments.
 static bool isFieldLikeMember(DeclRef<Decl> declRef)
 {
     if (declRef.as<VarDecl>())
@@ -1230,11 +1258,7 @@ static bool isFieldLikeMember(DeclRef<Decl> declRef)
 
     if (auto inheritanceDeclRef = declRef.as<InheritanceDecl>())
     {
-        if (auto baseDeclRefType = as<DeclRefType>(inheritanceDeclRef.getDecl()->base.type))
-        {
-            auto baseDeclRef = baseDeclRefType->getDeclRef();
-            return baseDeclRef.as<StructDecl>() || baseDeclRef.as<ClassDecl>();
-        }
+        return isStructOrClassBase(inheritanceDeclRef.getDecl()->base.type);
     }
     return false;
 }
@@ -9908,12 +9932,12 @@ LoweredValInfo tryGetAddress(
             auto boundMemberInfo = val.getBoundMemberInfo();
 
             // If we hit this case, then it means that we have a reference
-            // to a single field in something, but for whatever reason the
-            // higher-level logic was not able to turn it into a pointer
-            // already (maybe the base value for the field reference is
-            // a `BoundStorage`, etc.).
+            // to a field or an inherited base subobject in something, but
+            // for whatever reason the higher-level logic was not able to
+            // turn it into a pointer already (maybe the base value for the
+            // field reference is a `BoundStorage`, etc.).
             //
-            // We need to read the entire base value out, modify the field
+            // We need to read the entire base value out, modify the member
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
@@ -10351,11 +10375,12 @@ top:
             auto boundMemberInfo = left.getBoundMemberInfo();
 
             // If we hit this case, then it means that we are trying to set
-            // a single field in someting that is not atomically set-able.
-            // (e.g., an element of a value where the `subscript` operation
-            // has `get` and `set` but not a `ref` accessor).
+            // a field or an inherited base subobject in something that is
+            // not atomically set-able. (e.g., an element of a value where
+            // the `subscript` operation has `get` and `set` but not a `ref`
+            // accessor).
             //
-            // We need to read the entire base value out, modify the field
+            // We need to read the entire base value out, modify the member
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
@@ -11128,24 +11153,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // What is the super-type that we have declared we inherit from?
         Type* superType = inheritanceDecl->base.type;
 
-        if (auto superDeclRefType = as<DeclRefType>(superType))
+        if (isStructOrClassBase(superType))
         {
-            if (superDeclRefType->getDeclRef().as<StructDecl>() ||
-                superDeclRefType->getDeclRef().as<ClassDecl>())
-            {
-                // TODO: the witness that a type inherits from a `struct`
-                // type should probably be a key that will be used for
-                // a field that holds the base type...
-                //
-                auto irKey = getBuilder()->createStructKey();
-                StringBuilder sb;
-                sb << "key_" << getMangledName(context->astBuilder, inheritanceDecl);
-                addLinkageDecoration(context, irKey, inheritanceDecl, sb.getUnownedSlice());
-                getBuilder()->addNameHintDecoration(irKey, UnownedTerminatedStringSlice("base"));
-                auto keyVal = LoweredValInfo::simple(irKey);
-                context->setGlobalValue(inheritanceDecl, keyVal);
-                return keyVal;
-            }
+            // TODO: the witness that a type inherits from a `struct`
+            // type should probably be a key that will be used for
+            // a field that holds the base type...
+            //
+            auto irKey = getBuilder()->createStructKey();
+            StringBuilder sb;
+            sb << "key_" << getMangledName(context->astBuilder, inheritanceDecl);
+            addLinkageDecoration(context, irKey, inheritanceDecl, sb.getUnownedSlice());
+            getBuilder()->addNameHintDecoration(irKey, UnownedTerminatedStringSlice("base"));
+            auto keyVal = LoweredValInfo::simple(irKey);
+            context->setGlobalValue(inheritanceDecl, keyVal);
+            return keyVal;
         }
 
         // A witness table may need to be generic, if the outer
