@@ -211,9 +211,10 @@ struct ReconstructShortCircuitContext : public InstPassBase
 
     // Mirror of the `FoldPolicy::Never` opcodes in
     // `CLikeSourceEmitter::getFoldPolicy` that can appear inside an
-    // expression chain. `Var`/`Alloca`/undefined-value ops carry no value
-    // operands, so they can never sit on the fold path, and a non-folding
-    // declaration hoisted before the `if` is harmless. The `Make*` entries
+    // expression chain. `Var` and the undefined-value ops carry no value
+    // operands and `Alloca`'s size is never on the fold path, so these ops
+    // can never sit there, and a non-folding declaration hoisted before
+    // the `if` is harmless. The `Make*` entries
     // are unconditional here while the emitter classifies module-scope
     // aggregates `Always` (`isInnerGlobalAggregate`) — sound because chain
     // instructions are always function-local. The two undefined forms

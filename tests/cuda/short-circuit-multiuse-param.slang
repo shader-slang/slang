@@ -2,7 +2,7 @@
 // replaces the merge block's parameter with the reconstructed operation,
 // which is only valid while the parameter has exactly one use. The common
 // `bool passed = a && b; if (passed) ... if (passed) ...` shape therefore
-// reconstructs never. (Companion to shader-slang/slang#14494.)
+// is therefore never reconstructed. (Companion to shader-slang/slang#14494.)
 
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target cuda
 

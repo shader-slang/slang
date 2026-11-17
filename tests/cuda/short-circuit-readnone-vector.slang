@@ -11,8 +11,8 @@
 
 RWStructuredBuffer<uint> output;
 
-// The intrinsic definition references `$0` twice, so the call cannot fold
-// into its user's text.
+// A vector-typed call consumed by a multi-component `.xy` swizzle fails the
+// C++/CUDA emitter's swizzle fold veto, so the call stays a temporary.
 __target_intrinsic(cuda, "(($0) + ($0))")
 [__readNone]
 [ForceInline]
