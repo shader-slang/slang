@@ -5,13 +5,15 @@
 // int8 / uint8 / FloatE4M3 / FloatE5M2 are valid for MatrixA / MatrixB).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedType -stage compute
 
+// Test 1b: the same unsupported element type, constructed from a buffer-loaded
+// value.  After GetLength is inlined, this exercises the same emitter path as
+// Test 1 (the prelude's GetLength default-constructs its local), so it is a
+// second regression guard for the E50000 recovery rather than a distinct
+// lowering path.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedTypeFromBuffer -stage compute
+
 // Test 2: invalid shape (8x16 instead of 16x16) for MatrixA on CUDA
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SHAPE, non-exhaustive): -target cuda -entry testInvalidShape -stage compute
-
-// Test 2b: same unsupported element type as Test 1, but constructed from a
-// runtime (buffer-loaded) value — a second, non-constant-folding
-// diagnosed-compile case for the unsupported-element-type diagnostic.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedTypeLiveValue -stage compute
 
 // Test 3a: invalid (A, B, C, D) type combination — AType != BType
 // (A=int8 but B=half is not a valid pairing for CUDA mma).
@@ -59,7 +61,7 @@ void testInvalidShape()
 
 [shader("compute")]
 [numthreads(32, 1, 1)]
-void testUnsupportedTypeLiveValue()
+void testUnsupportedTypeFromBuffer()
 {
     var mat = CoopMat<double, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>(
         double(outputBuffer[0]));

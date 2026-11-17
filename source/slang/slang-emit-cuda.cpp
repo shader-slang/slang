@@ -1166,18 +1166,15 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             {
                 // emitWMMAFragmentType has already diagnosed the error, and the
                 // sink error-count check at the end of emission fails the
-                // compile, so nothing emitted here reaches NVRTC.  This
-                // placeholder keeps only the expression slot of
-                // `Type _Sname = <expr>;` valid; the type slot is emitted
-                // separately by the type-name path, which has already failed
-                // and substituted its own placeholder for this type.  We emit
-                // the scalar operand rather than the CoopMatMulAdd recovery's
-                // `(Type{})` because constructing a value of the result type
-                // could re-enter the emitWMMAFragmentType call that just
-                // failed.  An invalid-typed MakeCoopMatrixFromScalar is
-                // folded away before emission by the frontend, so this
-                // recovery is defensive: it keeps emission correct for any
-                // path that does emit the instruction.
+                // compile, so nothing emitted here reaches NVRTC.  Default
+                // construction of a CoopMat lowers to this instruction
+                // (IRBuilder::emitDefaultConstruct), so an invalid-typed
+                // instance reaches emission — for example the prelude's
+                // GetLength, which default-constructs a local.  We emit the
+                // scalar operand so the initializer slot of
+                // `Type _Sname = <expr>;` stays syntactically valid; it does
+                // not depend on the result type's name, which has already
+                // failed to emit.
                 emitOperand(scalarValue, getInfo(EmitOp::General));
                 return true;
             }
@@ -1800,13 +1797,12 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     // TODO: We should add a pass in IR to validate the coop matrix types, such that
     // we can provide better diagnostic messages here.  Until then the emitter
     // diagnoses these errors, and every caller of emitWMMAFragmentType must
-    // handle the SLANG_FAIL it returns after diagnosing.
+    // handle the SLANG_FAIL it returns after diagnosing.  The diagnostics below
+    // carry no location because the type inst's sourceLoc is the core module's
+    // CoopMat definition, not the user's instantiation site; threading a user
+    // location through belongs with that IR validation pass.
     if (!typeCheck(elementType->getOp(), matrixUse))
     {
-        // The diagnostics carry no location because the type inst's sourceLoc
-        // is the core module's CoopMat definition, not the user's
-        // instantiation site; threading a user location through belongs with
-        // the IR validation pass noted in the TODO above.
         getSink()->diagnose(Diagnostics::CooperativeMatrixUnsupportedElementType{
             .elementType = typeName,
             .matrixUse = matrixUse == SLANG_COOPERATIVE_MATRIX_USE_A
@@ -1814,8 +1810,6 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
                              : (matrixUse == SLANG_COOPERATIVE_MATRIX_USE_B ? "B" : "C")});
         return SLANG_FAIL;
     }
-
-    outStr << "Slang_CUDA_WMMA::WmmaFragment<";
 
     FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
     if (!shape.isValid())
@@ -1829,8 +1823,8 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
         return SLANG_FAIL;
     }
 
-    outStr << typeName << "," << shape.m << ", " << shape.n << ", " << shape.k << ", "
-           << getMatrixUseName(matrixUse) << ">";
+    outStr << "Slang_CUDA_WMMA::WmmaFragment<" << typeName << "," << shape.m << ", " << shape.n
+           << ", " << shape.k << ", " << getMatrixUseName(matrixUse) << ">";
 
     return SLANG_OK;
 }

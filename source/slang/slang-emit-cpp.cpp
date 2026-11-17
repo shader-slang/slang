@@ -150,6 +150,8 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
 
     m_typeNameMap.add(type, handle);
 
+    // StringSlicePool::add never returns the null handle; this asserts that
+    // contract on both paths above.
     SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
     return m_slicePool.getSlice(handle);
 }

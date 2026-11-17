@@ -93,7 +93,14 @@ protected:
 
     const UnownedStringSlice* getVectorElementNames(Index elemCount);
 
-    // Replaceable for classes derived from CPPSourceEmitter
+    // Replaceable for classes derived from CPPSourceEmitter.  Appends the
+    // target's C++ spelling of `type` to `out`.  A failure is in contract when
+    // it has already diagnosed the reason (for example an invalid
+    // cooperative-matrix element type or shape on CUDA); `out` may hold
+    // partial text after a failure, so a caller must not use it after one.
+    // `_getTypeName` surfaces a failure that diagnosed nothing as an
+    // internal-error diagnostic and substitutes a placeholder name, so an
+    // unhandled failure cannot pass silently.
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
 
     const UnownedStringSlice* getVectorElementNames(IRVectorType* vectorType);
