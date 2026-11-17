@@ -1,3 +1,5 @@
+// Every lane expects the compilation to fail because computeMain calls __SyntaxError(); the
+// exit-code annotations and the CHECK below depend on that failure.
 //TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -target spirv -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -target dxil -profile cs_6_0 
 //TEST:SIMPLE_LINE(exit-code=-1):-entry computeMain -target dxbc  -stage compute
