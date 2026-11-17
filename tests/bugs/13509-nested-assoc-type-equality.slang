@@ -65,6 +65,8 @@ uint readAttributes<C>(Input<C> input)
     return uint(a.barycentricCoord.x * 100.0);
 }
 
+// A `let` binding keeps the substituted type in an inferred local rather
+// than a declared parameter type.
 uint readViaLet<C>(Input<C> input)
     where C : IContext
     where C.Primitive == TrianglePrimitive
@@ -82,6 +84,8 @@ uint readViaProperty<C>(PropertyInput<C> input)
     return uint(input.attributes.barycentricCoord.x * 100.0);
 }
 
+// A call to a generic declared *without* the equality constraint: its return
+// type stays abstract, so the caller must still see the projection.
 uint readViaCall<C>(Input<C> input)
     where C : IContext
     where C.Primitive == TrianglePrimitive

@@ -45,6 +45,8 @@ struct S<C : ICtx>
     C.H.Data f;
 }
 
+// The positive control: `good` exists on both `GoodData` and the projected
+// `GoodData` base the congruence derives level by level, so it must resolve.
 uint g<C>(S<C> s)
     where C : ICtx
     where C == Evil

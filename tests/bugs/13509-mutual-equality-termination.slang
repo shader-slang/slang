@@ -1,12 +1,13 @@
-// Regression test for #13509: mutual equality constraints between two
+// White-box termination guard for the equality-congruence projection
+// (shader-slang/slang#13509): mutual equality constraints between two
 // same-depth abstract associated-type accesses (`C.Primitive == D.Primitive`
 // and the reverse) must not send the inheritance computation of the nested
-// access into a cycle — the body must check, the compilation must terminate,
-// and the concrete instantiation must produce the right value. The member
-// call here resolves through the declared bounds (the directed path); the
-// equalities add mutual bases at the `C.Primitive` level, so the frames of
-// `C.Primitive.Attributes` and `D.Primitive.Attributes` see each other's
-// facets while a projection is attempted.
+// access into a cycle. This shape also compiles on master — the member call
+// resolves through the declared bounds (the directed path), and the level-1
+// cycle is already broken there — so its value is forward-looking: it is the
+// one test where the projection runs inside mutually-cycling, in-progress
+// frames with an abstract far endpoint, and it fails (a hang or a spurious
+// "cyclic inheritance" error) if the projection ever regresses there.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
