@@ -293,16 +293,13 @@ SlangResult DocMarkupExtractor::_extractMarkup(
 
                 if (i == 0)
                 {
-                    if (startLine.isMemoryContained(line.begin()))
-                    {
-                        // For now we'll ignore tabs, and that the indent amount is, the amount of
-                        // *byte* NOTE! This is only appropriate for ASCII without tabs.
-                        maxIndent =
-                            _calcIndent(UnownedStringSlice(startLine.begin(), line.begin()));
-
-                        // Let's strip the start stuff
-                        line = removeStart(foundMarkup.type, line);
-                    }
+                    // The pool owns the logical spelling separately from the file bytes.
+                    // We measure indentation at the comment's physical position and remove
+                    // the opener from the logical text used for extraction.
+                    const char* commentBegin = sourceFile->getContent().begin() + offset;
+                    SLANG_RELEASE_ASSERT(startLine.isMemoryContained(commentBegin));
+                    maxIndent = _calcIndent(UnownedStringSlice(startLine.begin(), commentBegin));
+                    line = removeStart(foundMarkup.type, line);
                 }
 
                 if (i == linesCount - 1)

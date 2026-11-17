@@ -3,7 +3,6 @@ range: 16,12 - 16,18
 content:
 ```
 #define marker standardMarker 
-
 ```
 
 {REDACTED}.slang(12)
@@ -15,7 +14,6 @@ range: 16,12 - 16,18
 content:
 ```
 #define marker vfxMarker 
-
 ```
 
 {REDACTED}.slang(9)
@@ -27,7 +25,6 @@ range: 16,12 - 16,18
 content:
 ```
 #define marker vfxMarker 
-
 ```
 
 {REDACTED}.slang(9)
@@ -39,7 +36,6 @@ range: 16,12 - 16,18
 content:
 ```
 #define marker standardMarker 
-
 ```
 
 {REDACTED}.slang(12)
@@ -51,7 +47,6 @@ range: 16,12 - 16,18
 content:
 ```
 #define marker vfxMarker 
-
 ```
 
 {REDACTED}.slang(9)
@@ -63,7 +58,6 @@ range: 16,12 - 16,18
 content:
 ```
 #define marker standardMarker 
-
 ```
 
 {REDACTED}.slang(12)

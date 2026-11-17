@@ -6,6 +6,11 @@
 // Spaces and comment-like slashes are characters in a physical header name.
 #include<header-name/header with spaces.slang.h>
 
+// A comment or escaped newline before the operand must not end header-name lexing.
+#include/**/<header-name//regular.slang.h>
+#include\
+<header-name/header with spaces.slang.h>
+
 // An expanded angle-bracket operand is assembled from ordinary macro tokens.
 #define HEADER_OPERAND <header-name/regular.slang.h>
 #include HEADER_OPERAND
