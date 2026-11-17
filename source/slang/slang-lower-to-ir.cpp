@@ -16426,20 +16426,26 @@ IREntryPointLayout* lowerEntryPointLayout(
 
 /// Check if a DeclRef<FuncDecl> refers to an unspecialized generic function,
 /// i.e. a FuncDecl inside a GenericDecl where the generic has not been
-/// concretely specialized. Returns false for non-FuncDecl refs.
+/// concretely specialized. The enclosing generic may wrap the function
+/// directly (an ordinary generic function) or an outer declaration such as
+/// its stage struct (a structural ray-tracing entry point), so this walks to
+/// the nearest enclosing generic. Returns false for non-FuncDecl refs.
 bool isUnspecializedGenericFuncDeclRef(DeclRef<Decl> declRef)
 {
     auto funcDecl = as<FuncDecl>(declRef.getDecl());
     if (!funcDecl)
         return false;
 
-    auto genericDecl = as<GenericDecl>(funcDecl->parentDecl);
+    auto parentDecl = (Decl*)funcDecl;
+    while (parentDecl && !as<GenericDecl>(parentDecl))
+        parentDecl = parentDecl->parentDecl;
+    auto genericDecl = as<GenericDecl>(parentDecl);
     if (!genericDecl)
         return false;
 
-    // No GenericAppDeclRef means the generic was never applied
+    // No generic application for that generic means it was never applied
     // (e.g. entry points from [shader(...)] created with makeDeclRef(funcDecl)).
-    auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase);
+    auto genericAppDeclRef = SubstitutionSet(declRef).findGenericAppDeclRef(genericDecl);
     if (!genericAppDeclRef)
         return true;
 
@@ -16447,12 +16453,12 @@ bool isUnspecializedGenericFuncDeclRef(DeclRef<Decl> declRef)
     // (applied but not yet substituted with concrete values).
     // Currently only two states exist: fully specialized or not at all.
     // If partial specialization is added, this logic will need updating.
-    for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
+    for (auto arg : genericAppDeclRef->getArgs())
     {
         DeclRef<Decl> argDeclRef;
-        if (auto intVal = as<DeclRefIntVal>(genericAppDeclRef->getArg(i)))
+        if (auto intVal = as<DeclRefIntVal>(arg))
             argDeclRef = intVal->getDeclRef();
-        else if (auto type = as<DeclRefType>(genericAppDeclRef->getArg(i)))
+        else if (auto type = as<DeclRefType>(arg))
             argDeclRef = type->getDeclRef();
         if (argDeclRef.getDecl() && argDeclRef.getDecl()->parentDecl == genericDecl)
             return true;

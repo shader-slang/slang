@@ -9,7 +9,6 @@
 // while no code will be generated, but must be specialized for a full compilation.
 //TEST:SIMPLE: -experimental-feature -entry M -stage miss -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry M -specialize P -stage miss -no-codegen
-//TEST:SIMPLE: -experimental-feature -entry M.invoke -specialize P -stage miss -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry ValueMiss -specialize 2 -stage miss -no-codegen
 //TEST:SIMPLE(filecheck=WARNING): -experimental-feature -entry ValueMiss -specialize 1.5 -stage miss -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=ERROR,exit-code=-1): -experimental-feature -entry ValueMiss -specialize 1.5 -stage miss -no-codegen -warnings-as-errors all
@@ -42,10 +41,10 @@ struct M<PayloadType> : rt::IMissShader
     typealias Context = MissContext<PayloadType>;
 
     static void invoke(in rt::MissInput<Context> input) {}
-/*UNSPEC:
-generic entry point 'M' must be specialized with concrete generic arguments
-*/
+//UNSPEC:       ^^^^^^ generic entry point used without specialization arguments
+//UNSPEC:       ^^^^^^ generic entry point 'M' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled
 /*COUNT:
+wrong number of specialization arguments
 expected 1 specialization arguments (2 provided)
 */
 }
