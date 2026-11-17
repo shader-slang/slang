@@ -298,6 +298,22 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointSeparateSpecialization)
     SLANG_CHECK(
         String(_getEntryPointReflection(composedProgram, 1)->getNameOverride()) ==
         String(specializedRReflection->getNameOverride()));
+
+    // An unspecialized structural entry in a composed program must survive layout generation:
+    // IR-for-layout skips it like an ordinary unspecialized generic rather than lowering its
+    // free-parameter contract types. This pins the classification the layout skip relies on.
+    SLANG_CHECK(bareMEntry->getSpecializationParamCount() == 1);
+    slang::IComponentType* unspecializedComponents[] = {module, bareMEntry.get()};
+    ComPtr<slang::IComponentType> unspecializedProgram;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+        unspecializedComponents,
+        SLANG_COUNT_OF(unspecializedComponents),
+        unspecializedProgram.writeRef(),
+        diagnostics.writeRef())));
+    SLANG_CHECK_ABORT(unspecializedProgram != nullptr);
+    auto unspecializedLayout = unspecializedProgram->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(unspecializedLayout != nullptr);
+    SLANG_CHECK(unspecializedLayout->getEntryPointCount() == 1);
 }
 
 
