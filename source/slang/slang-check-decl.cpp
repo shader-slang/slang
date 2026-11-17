@@ -14038,10 +14038,10 @@ static bool isIntrinsicFuncBodyStmt(Stmt* stmt)
 {
     if (as<IntrinsicAsmStmt>(stmt))
         return true;
-    // An empty body is not a definition to emit, so an empty block or sequence
-    // is not an intrinsic definition either, mirroring the empty target switch
-    // below: an unimplemented arm means the function is defined by ordinary
-    // statements somewhere or nowhere at all.
+    // An empty block or sequence contains no intrinsic assembly, so the
+    // function is defined by ordinary statements and does reach emit; reject
+    // it here, mirroring the empty target switch below, whose unimplemented
+    // arms equally leave nothing intrinsic to lower.
     if (auto blockStmt = as<BlockStmt>(stmt))
         return blockStmt->body != nullptr && isIntrinsicFuncBodyStmt(blockStmt->body);
     if (auto seqStmt = as<SeqStmt>(stmt))
