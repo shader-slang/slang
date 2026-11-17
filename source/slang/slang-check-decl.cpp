@@ -3934,24 +3934,20 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // An `extern` constant's own value is its default initializer, folded as far
             // as check time allows (further `extern` references inside it stay symbolic,
             // e.g. `export extern static const int B = A + 1;` folds to a polynomial over
-            // `A`). `_validateCircularVarDefinition` instead yields a self-referential
-            // `DeclRefIntVal` for externs — the right result when folding a *reference* to
-            // the variable, but the wrong value for the variable itself: the
-            // exported-constants map publishes `val` as the default a linked module can
-            // override, and a self-referential entry would make every resolution of `B`
-            // come back as `B`. The header-check fold only handles literals, because it
-            // runs on the not-yet-checked initializer; here the initializer is checked,
-            // so fold it first. Check-time circularity detection stays unavailable for
-            // extern constants — the extern branch of the constant folder returns the
-            // symbolic reference without walking the initializer — so a self-referential
-            // or mutually-cyclic extern default is accepted here. A cyclic constant that
-            // is only consumed in layout-resolvable positions surfaces there as an
-            // unresolved value (the binding-attribute diagnostic); one whose initializer
-            // is lowered (any constant declaration is) can still trip IR lowering's own
-            // unguarded recursion over self-referential initializers, a pre-existing
-            // lowering limitation tracked separately.
-            if (varDecl->hasModifier<ExternModifier>() && varDecl->findModifier<ConstModifier>() &&
-                isScalarIntegerType(varDecl->type))
+            // `A`): the exported-constants map publishes `val` as the overridable default
+            // a linked module replaces, and the self-referential `DeclRefIntVal` that
+            // `_validateCircularVarDefinition` yields for externs — the right result for
+            // a *reference* to the variable — would make every resolution of `B` come
+            // back as `B`. The earlier fold in `SemanticsDeclHeaderVisitor::
+            // checkVarDeclCommon` only handles literals because it runs on the
+            // not-yet-checked initializer; the initializer is checked here. Check-time
+            // circularity detection is unavailable for extern constants (the constant
+            // folder's extern branch never walks initializers), so a cyclic default is
+            // accepted here and surfaces as an unresolved value at layout — unless its
+            // initializer is lowered, which can still trip IR lowering's pre-existing
+            // unguarded recursion over self-referential initializers (issue #14556).
+            if (varDecl->hasModifier<ExternModifier>() &&
+                varDecl->hasModifier<ConstModifier>() && isScalarIntegerType(varDecl->type))
             {
                 varDecl->val =
                     tryConstantFoldExpr(initExpr, ConstantFoldingKind::LinkTime, nullptr);
