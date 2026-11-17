@@ -194,6 +194,15 @@ void computeMain()
     // element paired with its own field does not warn.
     inoutAndInoutPrefix(arrS[gIdx], arrS[gIdx].v);
 
+    // Negative: a deref callee (`p->method()`) skips the receiver pair —
+    // its base expression names the pointer while the receiver storage is
+    // the pointee — so no warning fires for the aliasing argument either way.
+    {
+        S* p = &s;
+        p->mutInout(s);
+        p->mutInout(*p);
+    }
+
     // Negative: a property is mediated by accessors, so an argument naming it
     // does not name storage inside its base — neither against the receiver
     // nor in an argument pair.

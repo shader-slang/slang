@@ -4718,7 +4718,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Warn when the same storage is passed to two parameters that may both be
+            // Warn when overlapping storage is passed to two parameters that may both be
             // references to it, and at least one may write it (issue #10699). The
             // receiver of a method call joins the comparison as one more storage the
             // call may write: it is the base of a plain member callee, never an entry
