@@ -59,7 +59,7 @@ void ASTPrinter::addType(Type* type)
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
             auto elementType = matrixType->getElementType();
-            if (as<BasicExpressionType>(elementType))
+            if (as<BasicExpressionType>(elementType) && !matrixType->hasSpecifiedLayout())
             {
                 matrixType->getElementType()->toText(m_builder);
                 if (as<ConstantIntVal>(matrixType->getRowCount()) &&
@@ -1086,7 +1086,10 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto spirvAsmExpr = as<SPIRVAsmExpr>(expr))
     {
-        sb << "spirv_asm {";
+        sb << "spirv_asm ";
+        if (spirvAsmExpr->assumeValidResourceOperands)
+            sb << "[__assumeValidResourceOperands] ";
+        sb << "{";
         bool first = true;
         for (auto& inst : spirvAsmExpr->insts)
         {

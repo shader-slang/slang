@@ -32,6 +32,20 @@ struct PeepholeContext : InstPassBase
             inst->removeAndDeallocate();
     }
 
+    /// Return the texture type of a combined texture-sampler of type `combinedType`, that is the
+    /// same texture type with its combined flag cleared. It is the type that `__getTexture()`
+    /// returns.
+    IRType* getTextureTypeOfCombined(IRBuilder& builder, IRTextureTypeBase* combinedType)
+    {
+        List<IRInst*> operands;
+        for (UInt i = 0; i < combinedType->getOperandCount(); i++)
+            operands.add(combinedType->getOperand(i));
+        auto isCombined = combinedType->getIsCombinedInst();
+        operands[kCoreModule_TextureIsCombinedParameterIndex] =
+            builder.getIntValue(isCombined->getDataType(), 0);
+        return builder.getType(combinedType->getOp(), operands.getCount(), operands.getBuffer());
+    }
+
     bool tryFoldElementExtractFromUpdateInst(IRInst* inst)
     {
         bool isAccessChainEqual = false;
@@ -162,6 +176,59 @@ struct PeepholeContext : InstPassBase
         default:
             return false;
         }
+    }
+
+    // Rewrites a numeric cast of a vector or matrix built from scalar literals into the same
+    // vector or matrix built from casted literals, and returns whether it rewrote `inst`.
+    //
+    // Consider this module-scope constant, compiled with the default column-major layout:
+    //
+    //     static const row_major float2x2 m = float2x2(0, 1, 2, 3);
+    //
+    // Lowering produces `floatCast(makeMatrix(0.0f, 1.0f, 2.0f, 3.0f))`, because the initializer
+    // has the default layout and the declaration does not. Scalar casts of literals are folded by
+    // SCCP, but SCCP does not look through `makeVector` and `makeMatrix`, so the cast survives.
+    // The CPP and CUDA emitters then keep both instructions as separate globals, and the
+    // `__device__` initializer of the cast is dynamic, which NVRTC rejects.
+    //
+    // We rewrite the cast as `makeMatrix(floatCast(0.0f), ...)` of the destination type. SCCP
+    // folds the scalar casts, so the result is one constant that every target can emit in place.
+    // We handle only operands that are all scalar literals, in which case each operand is one
+    // element and the cast applies to each element independently.
+    bool tryFoldCastOfConstantVectorOrMatrix(IRInst* inst)
+    {
+        auto source = inst->getOperand(0);
+        if (source->getOp() != kIROp_MakeVector && source->getOp() != kIROp_MakeMatrix)
+            return false;
+        if (!as<IRVectorType>(inst->getDataType()) && !as<IRMatrixType>(inst->getDataType()))
+            return false;
+        auto destType = inst->getDataType();
+        auto destElementType = as<IRMatrixType>(destType) ? getMatrixElementType(destType)
+                                                          : getVectorElementType(destType);
+
+        for (UInt i = 0; i < source->getOperandCount(); i++)
+        {
+            if (!as<IRConstant>(source->getOperand(i)))
+                return false;
+        }
+
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+        builder.setInsertBefore(inst);
+        List<IRInst*> elements;
+        for (UInt i = 0; i < source->getOperandCount(); i++)
+        {
+            auto element = source->getOperand(i);
+            elements.add(builder.emitIntrinsicInst(destElementType, inst->getOp(), 1, &element));
+        }
+        auto result = builder.emitIntrinsicInst(
+            inst->getDataType(),
+            source->getOp(),
+            elements.getCount(),
+            elements.getBuffer());
+        inst->replaceUsesWith(result);
+        maybeRemoveOldInst(inst);
+        return true;
     }
 
     bool tryOptimizeArithmeticInst(IRInst* inst)
@@ -1225,7 +1292,15 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+                else if (inst->getOp() == kIROp_IntCast || inst->getOp() == kIROp_FloatCast)
+                {
+                    changed |= tryFoldCastOfConstantVectorOrMatrix(inst);
+                }
             }
+            break;
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+            changed |= tryFoldCastOfConstantVectorOrMatrix(inst);
             break;
         case kIROp_CastUntypedResourceHandleToUInt:
             {
@@ -1327,6 +1402,85 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+            }
+            break;
+        case kIROp_CombinedTextureSamplerGetTexture:
+        case kIROp_CombinedTextureSamplerGetSampler:
+            if (auto combined = as<IRMakeCombinedTextureSampler>(inst->getOperand(0)))
+            {
+                // `getTexture(makeCombinedTextureSampler(t, s))` is `t`, and `getSampler` of it is
+                // `s`. The sampler can be extracted as a `SamplerState` or as a
+                // `SamplerComparisonState`, and only `s` of the matching type can stand in for it.
+                auto part = inst->getOp() == kIROp_CombinedTextureSamplerGetTexture
+                                ? combined->getTexture()
+                                : combined->getSampler();
+                if (part->getFullType() == inst->getFullType())
+                {
+                    inst->replaceUsesWith(part);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                    break;
+                }
+
+                // An uninitialized combined texture-sampler is rewritten below to hold an
+                // uninitialized `SamplerState`. A `SamplerComparisonState` view of that sampler is
+                // also uninitialized, so it gets an uninitialized value of its own type.
+                if (!as<IRLoadFromUninitializedMemory>(part))
+                    break;
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                inst->replaceUsesWith(builder.emitLoadFromUninitializedMemory(inst->getFullType()));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            else if (as<IRPoison>(inst->getOperand(0)))
+            {
+                // The texture or sampler of a poison value is poison, as is a load through a
+                // poison pointer.
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                inst->replaceUsesWith(builder.getPoison(inst->getFullType()));
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_LoadFromUninitializedMemory:
+            {
+                // A never-written combined texture-sampler holds a never-written texture and a
+                // never-written sampler. We expand it into `makeCombinedTextureSampler` of those
+                // two values, so that the folds above extract them like the parts of any other
+                // combined value, and every extraction of the texture sees the same texture.
+                //
+                // Only direct SPIR-V emission constructs a combined value from its parts. Other
+                // targets either lower a combined value to a structure, in
+                // `lowerCombinedTextureSamplers`, or keep it as one opaque value, and they have no
+                // lowering for `makeCombinedTextureSampler`. Extractions from the structure of an
+                // uninitialized value already see one texture.
+                if (!targetProgram)
+                    break;
+                if (!targetProgram->shouldEmitSPIRVDirectly())
+                    break;
+                auto combinedType = as<IRTextureTypeBase>(inst->getDataType());
+                if (!combinedType)
+                    break;
+                if (!combinedType->isCombined())
+                    break;
+                if (!inst->hasUses())
+                    break;
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto texture = builder.emitLoadFromUninitializedMemory(
+                    getTextureTypeOfCombined(builder, combinedType));
+                auto sampler = builder.emitLoadFromUninitializedMemory(
+                    builder.getType(kIROp_SamplerStateType));
+                inst->replaceUsesWith(
+                    builder.emitMakeCombinedTextureSampler(inst->getFullType(), texture, sampler));
+                maybeRemoveOldInst(inst);
+                changed = true;
             }
             break;
         case kIROp_OptionalHasValue:

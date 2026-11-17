@@ -1815,6 +1815,11 @@ local insts = {
 				},
 			},
 			{ branch = { struct_name = "BranchDecoration" } },
+			-- Marks a `SPIRVAsm` block whose whole execution, including output writes, has undefined
+			-- behavior when any opaque resource value operand is undefined, including either part of a
+			-- combined texture/sampler. Type functions such as `__imageType(x)` do not count as value
+			-- operands. This internal decoration has no operands.
+			{ assumeValidResourceOperands = { struct_name = "AssumeValidResourceOperandsDecoration" } },
 			{
 				flatten = {
 					struct_name = "FlattenDecoration",

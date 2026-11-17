@@ -17,8 +17,9 @@
 // first calls need one reconstruction without dispatch. `dispatchedIndex` and
 // `dispatchedCondition` choose separately declared textures and need a texture dispatch.
 // The first four entry points use a cbuffer condition and fixed texel coordinate to make their
-// resource choices uniform. `projectedIndex` uses a varying sampler choice and texture projection
-// to check that the replacement index remains marked as nonuniform.
+// resource choices uniform. `projectedIndex` uses a varying sampler choice and extracts the
+// texture from a pair constructed with the selected sampler, to check that the extracted texture is
+// accessed with the replacement index.
 
 Texture2D<float4> firstTexture;
 Texture2D<float4> secondTexture;
@@ -214,10 +215,10 @@ float4 singleRecipeCondition(float2 uv : TEXCOORD) : SV_Target
     return __makeCombinedTextureSampler(texture, sampler).SampleLevel(uv, 0);
 }
 
-// Both sampler alternatives in `pair` contain the same `textures[index]`. Extracting its texture
-// merges equal index payloads, which fold to the earlier call result itself. The replacement
-// result must keep the nonuniform-index classification needed by the final array access.
-// PROJECTED: OpDecorate %[[INDEX:[^ ]+]] NonUniform{{( |$)}}
+// The texture extracted from `pair` is the `textures[index]` that `pair` was constructed from,
+// whichever sampler was selected. The fetch is therefore the same ordinary array access as
+// `textures[index].Load(int3(0))`, and it must use the merged result of the dispatched calls as its
+// index.
 // PROJECTED: %[[CHOICE:[^ ]+]] = OpFOrdGreaterThan %bool{{( |$)}}
 // PROJECTED: OpSelectionMerge %[[CALL_MERGE:[^ ]+]] None
 // PROJECTED: OpBranchConditional %[[CHOICE]] %[[CALL_A:[^ ]+]] %[[CALL_B:[^ ]+]]{{( |$)}}
@@ -232,7 +233,7 @@ float4 singleRecipeCondition(float2 uv : TEXCOORD) : SV_Target
 // PROJECTED: OpStore %[[RESULT_SLOT]] %[[RESULT_B]]{{( |$)}}
 // PROJECTED: OpBranch %[[CALL_MERGE]]{{( |$)}}
 // PROJECTED: %[[CALL_MERGE]] = OpLabel
-// PROJECTED: %[[INDEX]] = OpLoad %uint %[[RESULT_SLOT]]{{( |$)}}
+// PROJECTED: %[[INDEX:[^ ]+]] = OpLoad %uint %[[RESULT_SLOT]]{{( |$)}}
 // PROJECTED: %[[IMAGE_PTR:[^ ]+]] = OpAccessChain {{[^ ]+}} %textures %[[INDEX]]{{( |$)}}
 // PROJECTED: %[[IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %[[IMAGE_PTR]]{{( |$)}}
 // PROJECTED: OpImageFetch {{[^ ]+}} %[[IMAGE]]{{( |$)}}
