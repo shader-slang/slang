@@ -14051,13 +14051,15 @@ static bool isIntrinsicFuncBodyStmt(Stmt* stmt)
 {
     if (as<IntrinsicAsmStmt>(stmt))
         return true;
-    // The empty forms are producible parser output: `{}` gives a `BlockStmt`
-    // whose body is null, and `case hlsl:` with no statements gives a
-    // `TargetCaseStmt` whose body is null. The parser builds no empty
-    // `SeqStmt`, but the guard keeps the rule total for every shape the
-    // recursion can reach. All three mean the same thing: an empty body or
-    // arm still lowers to an empty definition that does reach emit, where a
-    // `__ref` parameter would get the lossy translation, so none qualifies.
+    // An empty `{}` body parses as a `BlockStmt` whose body is an
+    // `EmptyStmt`, which falls through to the `return false` below, so the
+    // null-body guard is not reachable from parser output; like the
+    // `SeqStmt` guard it keeps the rule total (the parser builds no empty
+    // `SeqStmt`). A `case hlsl:` arm with no statements is the live null
+    // case: it gives a `TargetCaseStmt` whose body is null. All three mean
+    // the same thing: an empty body or arm still lowers to an empty
+    // definition that does reach emit, where a `__ref` parameter would get
+    // the lossy translation, so none qualifies.
     if (auto blockStmt = as<BlockStmt>(stmt))
         return blockStmt->body != nullptr && isIntrinsicFuncBodyStmt(blockStmt->body);
     if (auto seqStmt = as<SeqStmt>(stmt))
