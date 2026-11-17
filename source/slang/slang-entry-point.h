@@ -212,6 +212,15 @@ public:
     /// Set the default physical name independently of the source-level lookup name.
     void setEntryPointNameOverride(String name) { m_entryPointNameOverride = _Move(name); }
 
+    class EntryPointSpecializationInfo;
+
+    /// Returns the target name this selection should use: a specialization's derived name (a
+    /// specialized structural ray-tracing stage names itself from its concrete stage type) when
+    /// one is recorded, else the base entry point's override. An explicit rename takes
+    /// precedence over both; renaming consumers apply that precedence themselves, so IR linking
+    /// and parameter binding resolve the rest of the rule in this one place.
+    String getEffectiveEntryPointNameOverride(EntryPointSpecializationInfo* specializationInfo);
+
     /// Get the profile associated with the entry point
     ///
     /// Note: only the stage part of the profile is expected

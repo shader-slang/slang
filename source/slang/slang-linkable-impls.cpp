@@ -517,13 +517,10 @@ SpecializedComponentType::SpecializedComponentType(
                 funcDeclRef = specializationInfo->specializedFuncDeclRef;
 
             (*mangledEntryPointNames).add(getMangledName(m_astBuilder, funcDeclRef));
-            // A specialization can replace the target name (a specialized structural
-            // ray-tracing stage names itself from its concrete stage type); renaming the
-            // entry point afterwards still takes precedence, via visitRenamedEntryPoint.
-            String nameOverride = entryPoint->getEntryPointNameOverride(0);
-            if (specializationInfo && specializationInfo->entryPointNameOverride.getLength())
-                nameOverride = specializationInfo->entryPointNameOverride;
-            (*entryPointNameOverrides).add(nameOverride);
+            // A specialization can replace the target name; renaming the entry point
+            // afterwards still takes precedence, via visitRenamedEntryPoint.
+            (*entryPointNameOverrides)
+                .add(entryPoint->getEffectiveEntryPointNameOverride(specializationInfo));
         }
 
         void visitRenamedEntryPoint(
