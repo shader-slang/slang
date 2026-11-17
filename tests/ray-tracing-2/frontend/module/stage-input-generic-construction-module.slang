@@ -15,11 +15,18 @@ struct Miss : rt::IMissShader
 
     static void invoke(in rt::MissInput<Context> input)
     {
-        input.payload.value += generic_construction::makeFreshInput<rt::MissInput<Context>>();
+        generic_construction::makeFreshInput<rt::MissInput<Context>>();
         //CHECK: fresh construction of a structural ray-tracing stage input
-        input.payload.value += generic_construction::hopOne<rt::MissInput<Context>>();
-        //CHECK: fresh construction of a structural ray-tracing stage input
-        //SERIALIZED: fresh construction of a structural ray-tracing stage input
-        //SERIALIZED: fresh construction of a structural ray-tracing stage input
+        //CHECK: in the instantiation of 'makeFreshInput'
+        // The hop-based call reaches the same instantiation of makeFreshInput; each
+        // instantiation is reported once, however many call sites complete it.
+        generic_construction::hopOne<rt::MissInput<Context>>();
+        // A signature written in terms of T.Item is checked through the imported module's
+        // declaration reference, which the serialized module keeps.
+        generic_construction::acceptOptionalItem<generic_construction::InputCarrier>();
+        //CHECK: storage of a structural ray-tracing stage input
+        //CHECK: in the instantiation of 'acceptOptionalItem'
+        //SERIALIZED: storage of a structural ray-tracing stage input
+        //SERIALIZED: in the instantiation of 'acceptOptionalItem'
     }
 }

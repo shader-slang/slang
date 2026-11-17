@@ -31,6 +31,7 @@ struct CallableContext : rt::ICallableContext
 {
     typealias TraceContext = ::TraceContext;
     typealias CallableData = ::Payload;
+    typealias Record = void;
 }
 
 interface IRead
@@ -58,7 +59,8 @@ struct Carrier : ICarrier
 uint manufacture<T : ICarrier>()
 {
     T.Item local = T.Item();
-    //CHECK: ^^^^^^^ fresh construction of a structural ray-tracing stage input
+//CHECK:                 ^ fresh construction of a structural ray-tracing stage input
+//CHECK:                 ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
     return local.read();
 }
 
@@ -66,11 +68,16 @@ uint manufacture<T : ICarrier>()
 uint consume<T>()
 {
     T t = T();
-    //CHECK: ^^ fresh construction of a structural ray-tracing stage input
+//CHECK:   ^ fresh construction of a structural ray-tracing stage input
+//CHECK:   ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
     T t1;
-    //CHECK: ^^ storage of a structural ray-tracing stage input
+/*CHECK:
+      ^^ storage of a structural ray-tracing stage input
+      ^^ ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
+*/
     T t2 = {};
-    //CHECK: ^^ fresh construction of a structural ray-tracing stage input
+//CHECK:   ^ fresh construction of a structural ray-tracing stage input
+//CHECK:   ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
     return 1;
 }
 
@@ -78,13 +85,15 @@ uint consume<T>()
 uint hopTwo<T>()
 {
     T hopLocal = T();
-    //CHECK: ^^^^^^ fresh construction of a structural ray-tracing stage input
+//CHECK:          ^ fresh construction of a structural ray-tracing stage input
+//CHECK:          ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
     return 1;
 }
 
 uint hopOne<T>()
 {
     return hopTwo<T>();
+//CHECK:   ^^^^^^ in the instantiation of 'hopTwo'
 }
 
 // A generic struct field only becomes an input after substitution; the use that supplies the
@@ -98,21 +107,31 @@ struct Box<T : ICarrier>
 struct BadBox
 {
     rt::MissInput<MissContext> value;
-    //CHECK: ^^^^^ storage of a structural ray-tracing stage input
+//CHECK:                       ^^^^^ storage of a structural ray-tracing stage input
+//CHECK:                       ^^^^^ ray-tracing stage input type 'rt.MissInput<MissContext>' may only be used as an 'in' parameter or an initialized local copy
+// The rejected field's constructor access error follows the storage error.
+//CHECK: declaration not accessible
+//CHECK: 'MissInput.init' is not accessible from the current context.
 }
 
 void useBox(Box<Carrier> box) {}
-//CHECK: ^^^ storage of a structural ray-tracing stage input
+//CHECK:                 ^^^ storage of a structural ray-tracing stage input
+//CHECK:                 ^^^ ray-tracing stage input type 'Box<Carrier>' may only be used as an 'in' parameter or an initialized local copy
 
 // Every stage-input kind reaches the same construction rule.
 uint makeFresh<T>()
 {
     T fresh = T();
-    //CHECK: ^^ fresh construction of a structural ray-tracing stage input
-    //CHECK: ^^ fresh construction of a structural ray-tracing stage input
-    //CHECK: ^^ fresh construction of a structural ray-tracing stage input
-    //CHECK: ^^ fresh construction of a structural ray-tracing stage input
-    //CHECK: ^^ fresh construction of a structural ray-tracing stage input
+//CHECK:       ^ fresh construction of a structural ray-tracing stage input
+//CHECK:       ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+//CHECK:       ^ fresh construction of a structural ray-tracing stage input
+//CHECK:       ^ ray-tracing stage input type 'rt.ClosestHitInput<HitContext>' cannot be constructed here; it must come from the current invocation
+//CHECK:       ^ fresh construction of a structural ray-tracing stage input
+//CHECK:       ^ ray-tracing stage input type 'rt.AnyHitInput<HitContext>' cannot be constructed here; it must come from the current invocation
+//CHECK:       ^ fresh construction of a structural ray-tracing stage input
+//CHECK:       ^ ray-tracing stage input type 'rt.IntersectionInput<HitContext>' cannot be constructed here; it must come from the current invocation
+//CHECK:       ^ fresh construction of a structural ray-tracing stage input
+//CHECK:       ^ ray-tracing stage input type 'rt.CallableInput<CallableContext>' cannot be constructed here; it must come from the current invocation
     return 1;
 }
 
@@ -127,9 +146,12 @@ struct Miss : rt::IMissShader
     static void invoke(in rt::MissInput<Context> input)
     {
         input.payload.value += manufacture<Carrier>();
+//CHECK:                       ^^^^^^^^^^^ in the instantiation of 'manufacture'
         input.payload.value += consume<rt::MissInput<Context>>();
+//CHECK:                       ^^^^^^^ in the instantiation of 'consume'
         input.payload.value += hopOne<rt::MissInput<Context>>();
         makeFresh<rt::MissInput<Context>>();
+//CHECK:^^^^^^^^^ in the instantiation of 'makeFresh'
 
         let copied = copyInput(input);
         passInput(copied);
@@ -144,6 +166,7 @@ struct ClosestHit : rt::IClosestHitShader
     static void invoke(in rt::ClosestHitInput<Context> input)
     {
         makeFresh<rt::ClosestHitInput<Context>>();
+//CHECK:^^^^^^^^^ in the instantiation of 'makeFresh'
     }
 }
 
@@ -154,6 +177,7 @@ struct AnyHit : rt::IAnyHitShader
     static void invoke(in rt::AnyHitInput<Context> input)
     {
         makeFresh<rt::AnyHitInput<Context>>();
+//CHECK:^^^^^^^^^ in the instantiation of 'makeFresh'
     }
 }
 
@@ -164,6 +188,7 @@ struct Intersection : rt::IIntersectionShader
     static void invoke(in rt::IntersectionInput<Context> input)
     {
         makeFresh<rt::IntersectionInput<Context>>();
+//CHECK:^^^^^^^^^ in the instantiation of 'makeFresh'
     }
 }
 
@@ -174,5 +199,6 @@ struct Callable : rt::ICallableShader
     static void invoke(in rt::CallableInput<Context> input)
     {
         makeFresh<rt::CallableInput<Context>>();
+//CHECK:^^^^^^^^^ in the instantiation of 'makeFresh'
     }
 }

@@ -31,4 +31,15 @@ public uint hopOne<T>()
 {
     return makeFreshInput<T>();
 }
+
+public interface ICarrier { associatedtype Item; }
+
+public struct InputCarrier : ICarrier
+{
+    typealias Item = rt::MissInput<Context>;
+}
+
+// A generic signature written in terms of T.Item stores an input once substituted, and the
+// signature is part of the serialized module even when bodies are not.
+public void acceptOptionalItem<T : ICarrier>(Optional<T.Item> input) {}
 }
