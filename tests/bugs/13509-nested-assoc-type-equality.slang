@@ -6,7 +6,7 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=buf
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buf
 RWStructuredBuffer<uint> buf;
 
 interface IPrimitive
@@ -116,6 +116,15 @@ uint readOneLevel<C>(PrimInput<C> input)
     return input.prim.kind;
 }
 
+// The constraint discovery must not depend on the order the `where` clauses
+// are listed in: the equality constraint may precede the conformance bound.
+uint readReversedOrder<C>(Input<C> input)
+    where C.Primitive == TrianglePrimitive
+    where C : IContext
+{
+    return uint(input.attributes.barycentricCoord.x * 100.0);
+}
+
 // A function declared *without* the equality constraint returns the nested
 // type in its abstract form; a caller that has the constraint must still be
 // able to use the result.
@@ -219,9 +228,10 @@ void computeMain()
     buf[6] = readWorkaround(input);
     buf[7] = readOneLevel(primInput);
     buf[8] = read3(input3);
+    buf[9] = readReversedOrder(input);
 }
 
-// buf[0], buf[3], buf[4], buf[6]: barycentricCoord.x * 100.
+// buf[0], buf[3], buf[4], buf[6], buf[9]: barycentricCoord.x * 100.
 // buf[1]: barycentricCoord.y * 100.
 // buf[2]: barycentricCoord.x * 100 through the property.
 // buf[5]: the fresh-spelling control uses 0.5.
@@ -236,3 +246,4 @@ void computeMain()
 //CHECK-NEXT: 75
 //CHECK-NEXT: 3
 //CHECK-NEXT: 42
+//CHECK-NEXT: 75
