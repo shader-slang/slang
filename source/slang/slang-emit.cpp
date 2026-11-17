@@ -1939,7 +1939,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
         {
             auto targetCaps = targetRequest->getTargetCaps();
-            if (!targetCaps.implies(CapabilityAtom::optix_coopvec))
+            if (!isOptixCoopVecEnabled(targetCaps))
                 SLANG_PASS(lowerCooperativeVectors, sink);
         }
         break;

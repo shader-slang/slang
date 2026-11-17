@@ -173,9 +173,14 @@ struct DownstreamCompileOptions
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
             EnableLogging = 0x40,        ///< If set compiles with support for shader logging
-            RequireOptix = 0x80,         ///< If set the source depends on OptiX headers; the
-                                         ///< downstream compiler must make the OptiX SDK headers
-                                         ///< and defines available
+            RequireOptix = 0x80,         ///< If set the source depends on OptiX and the compile
+                                         ///< must fail when the OptiX SDK is unavailable: the
+                                         ///< downstream compiler adds the SDK's include path and
+                                         ///< defines SLANG_CUDA_ENABLE_OPTIX, which unlocks the
+                                         ///< OptiX section of the CUDA prelude. Set for
+                                         ///< ray-tracing entry points and for targets whose
+                                         ///< capabilities imply optix_coopvec; downstream
+                                         ///< compilers without OptiX support ignore the flag.
         };
     };
 

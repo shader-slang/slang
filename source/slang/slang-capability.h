@@ -500,6 +500,15 @@ inline CapabilityAtom asAtom(T name)
     return CapabilityAtom(name);
 }
 
+/// True when `targetCaps` implies the `optix_coopvec` capability, meaning the emitted CUDA
+/// source uses OptiX cooperative-vector constructs. The CUDA emitter and the downstream-compile
+/// setup both consult this single predicate, so what gets emitted and what OptiX support the
+/// downstream compile prepares cannot drift apart.
+inline bool isOptixCoopVecEnabled(CapabilitySet const& targetCaps)
+{
+    return targetCaps.implies(CapabilityAtom::optix_coopvec);
+}
+
 /// Returns the CUDA Shader Model version named by a `_cuda_sm_X_Y` capability atom
 /// (for example `_cuda_sm_8_9` -> 8.9), or an unset `SemanticVersion` for any atom that
 /// does not name a CUDA SM.

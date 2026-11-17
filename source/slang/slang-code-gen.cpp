@@ -951,18 +951,20 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 case Stage::Miss:
                 case Stage::Callable:
                     options.pipelineType = DownstreamCompileOptions::PipelineType::RayTracing;
+                    // OptiX ray-tracing entry points always compile against the OptiX headers,
+                    // independent of what the rest of the emitted source uses.
                     options.flags |= CompileOptions::Flag::RequireOptix;
                     break;
                 }
             }
 
-            // The emitted code can depend on OptiX for reasons other than the
-            // pipeline: the optix_coopvec capability makes the CUDA emitter emit
-            // OptiX cooperative-vector types and calls even for a compute-stage
-            // entry point. The capability test mirrors the emitter's own
-            // (the CLikeSourceEmitter constructor), so the emitter and the
-            // downstream compiler setup use the same fact.
-            if (targetCaps.implies(CapabilityAtom::optix_coopvec))
+            // Flags derived from the target's capabilities are a fact about the target, not
+            // about the entry-point stages above. The optix_coopvec capability makes the CUDA
+            // emitter emit OptiX cooperative-vector types and calls even for a compute-stage
+            // entry point, so the downstream compile needs the OptiX headers.
+            // isOptixCoopVecEnabled is the same predicate the emitter keys on, keeping
+            // emission and the downstream setup on one fact.
+            if (isOptixCoopVecEnabled(targetCaps))
             {
                 options.flags |= CompileOptions::Flag::RequireOptix;
             }

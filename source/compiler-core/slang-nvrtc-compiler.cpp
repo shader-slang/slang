@@ -1428,8 +1428,9 @@ SlangResult NVRTCDownstreamCompiler::compile(
     List<const char*> headers;
     List<const char*> headerIncludeNames;
 
-    // If the code depends on OptiX, we need to add the appropriate search paths to the
-    // command line. This happens for ray-tracing pipelines, but also whenever the
+    // If the code depends on OptiX, the compile needs the OptiX SDK on its include
+    // path and the SLANG_CUDA_ENABLE_OPTIX define, which unlocks the OptiX section of
+    // the CUDA prelude. This happens for ray-tracing pipelines, but also whenever the
     // emitted source references OptiX constructs (such as cooperative vectors).
     //
     if (options.flags & DownstreamCompileOptions::Flag::RequireOptix)
@@ -1443,9 +1444,10 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     // OptiX requires this flag for ray-tracing pipelines (OptiX Programming Guide, section
-    // 6.1). It prevents the compiler from removing callables as dead code. Other pipelines
-    // that only use OptiX device-side constructs (e.g. cooperative vectors from a compute
-    // shader) don't need it.
+    // 6.1). It prevents the compiler from removing callables as dead code. Pipelines that
+    // only use direct OptiX device-side calls don't need it: the optixCoopVec* invocations
+    // emitted for a cooperative-vector compute shader are statically resolved device
+    // functions, with no callables for dead-code elimination to strip.
     if (options.pipelineType == PipelineType::RayTracing)
     {
         cmdLine.addArg("--relocatable-device-code=true");

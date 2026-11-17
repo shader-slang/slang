@@ -113,7 +113,7 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     m_effectiveProfile = desc.effectiveProfile;
 
     auto targetCaps = getTargetReq()->getTargetCaps();
-    isOptixCoopVec = targetCaps.implies(CapabilityAtom::optix_coopvec);
+    isOptixCoopVec = isOptixCoopVecEnabled(targetCaps);
 }
 
 SlangResult CLikeSourceEmitter::init()

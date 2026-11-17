@@ -1,6 +1,9 @@
 // `-validate-with-downstream-compiler` makes slangc run NVRTC on the emitted CUDA source, so this
 // test covers the downstream compile of the OptiX cooperative-vector calls, not just the emitted
-// text. slang-test removes the option on machines that lack the downstream tool.
+// text. The downstream compile needs both NVRTC and the OptiX headers; source checkouts vendor
+// the headers in the external/optix-dev submodule, so CI satisfies both. slang-test removes the
+// option only when NVRTC itself is absent, so a failure on a machine with NVRTC but no OptiX SDK
+// is an environment problem, not a regression.
 
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec -entry computeMain -stage compute -validate-with-downstream-compiler
 
