@@ -2441,12 +2441,10 @@ MathIntType expressionTypeToMathIntType(Type *type)
 
 MathIntValue createMathIntValue(ConstantIntVal* c)
 {
-    MathIntType intType{};
+    auto basicExprType = as<BasicExpressionType>(c->getType());
+    SLANG_RELEASE_ASSERT(basicExprType);
 
-    if (auto basicExprType = as<BasicExpressionType>(c->getType()))
-        intType = expressionTypeToMathIntType(basicExprType);
-    else
-        intType = MathIntType::Int64Type; // we don't know the type here, so assume Int64 (TODO: fix this?)
+    MathIntType intType{expressionTypeToMathIntType(basicExprType)};
 
     return MathIntValue::constructFromValue(intType, c->getValue());
 }
@@ -2462,6 +2460,11 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
     size_t numArgs{};
     std::array<MathIntValue, 3> constArgs{};
 
+    // we need a concrete result type for folding
+    auto resultBasicExprType = as<BasicExpressionType>(resultType);
+    if (!resultBasicExprType)
+        return nullptr;
+
     for (auto arg : newArgs)
     {
         if (numArgs >= 3)
@@ -2470,6 +2473,9 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
         auto c = as<ConstantIntVal>(arg);
         if (!c)
             return nullptr; // still symbolic
+
+        if (!as<BasicExpressionType>(c->getType()))
+            return nullptr; // argument without a concrete type can't be folded
 
         MathIntValue v = createMathIntValue(c);
         SLANG_RELEASE_ASSERT(v.hasValue());
@@ -2489,11 +2495,7 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
     if (numArgs != expectedArgs)
         return nullptr;
 
-    MathIntType resType;
-    if (auto resultBasicExprType = as<BasicExpressionType>(resultType))
-        resType = expressionTypeToMathIntType(resultBasicExprType);
-    else
-        resType = MathIntType::Int64Type; // we don't know the type here, so assume Int64 (TODO: fix this?)
+    MathIntType resType{expressionTypeToMathIntType(resultBasicExprType)};
 
     const MathIntValue &arg0 = constArgs.at(0);
     const MathIntValue &arg1 = constArgs.at(1);
