@@ -1,5 +1,9 @@
-// All ref/borrow parameter-passing mode spellings remain accepted on
-// parameters: `__ref`, `__constref`, `__borrow` and the legacy `const __ref`.
+// The non-experimental ref/borrow parameter-passing mode spellings remain
+// accepted on parameters: `__ref`, `__constref`, `__borrow` and the legacy
+// `const __ref`. `__ref_readonly` and `__ref_writeonly` are omitted here
+// because user code needs the experimental option for them; their positive
+// parameter coverage lives in the ref-param-readonly-* / ref-param-writeonly-*
+// tests in this directory.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

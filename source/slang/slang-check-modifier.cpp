@@ -1582,7 +1582,8 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
 {
     switch (modifierType)
     {
-        // Allowed only on parameters and global variables.
+        // Parameter-direction and aliasing/passing-mode modifiers; at most one per
+        // declaration. (Allowed positions are enforced in isModifierAllowedOnDecl.)
     case ASTNodeType::InModifier:
         return modifierType;
     case ASTNodeType::OutModifier:

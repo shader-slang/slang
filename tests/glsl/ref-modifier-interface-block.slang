@@ -1,6 +1,9 @@
 // The ref and borrow passing-mode modifiers are parameter-only, so applying
-// them to a GLSL interface block declaration is rejected with error 31201
-// the same way it is on globals and struct fields.
+// them to a GLSL uniform block declaration is rejected with error 31201, the
+// same rule as on globals (diagnose-ref-non-param-decl.slang) and struct
+// fields (diagnose-ref-interface-struct-field.slang). The parser represents
+// such a block as a global variable carrying the modifiers, so these cases
+// exercise the global arm of the rule through the GLSL spelling.
 
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl/ref-modifier-interface-block.slang -stage compute -entry computeMain -target glsl
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang glsl tests/glsl/ref-modifier-interface-block.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
