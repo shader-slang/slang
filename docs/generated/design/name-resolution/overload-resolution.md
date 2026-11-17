@@ -308,9 +308,9 @@ The individual steps:
    and in `ForReal` mode emits
    `Diagnostics::MutatingMethodOnImmutableValue` (plus
    `MutatingMethodOnFunctionInputParameterWarning` for a mutating call
-   on a copyable legacy-syntax `in` parameter; a non-copyable `in`
-   parameter is a borrow, so it is rejected as an immutable value
-   instead)
+   on a legacy-syntax `in` parameter the body can write; any other
+   input parameter — a non-copyable `in` that is a borrow, or one made
+   immutable by `const` — is rejected as an immutable value instead)
    ([slang-check-overload.cpp lines
    1077-1107](../../../../source/slang/slang-check-overload.cpp)).
 5. **`TryCheckOverloadCandidateConstraints`**

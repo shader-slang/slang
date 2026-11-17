@@ -7599,7 +7599,8 @@ static PtrType* getValidTypeForAddressOf(
             // `__ref_writeonly` parameter's address stays read-write: the qualifier set has no
             // write-only pointer, so the read it also permits is the pre-existing unchecked
             // read of write-only storage. All three return branches below inherit this
-            // access. The access of other variables' addresses is left unchanged for now.
+            // access. The access of other variables' addresses — a `const` local included —
+            // is left unchanged for now.
             AccessQualifier ptrAccess = AccessQualifier::ReadWrite;
             if (as<ParamDecl>(varDecl))
             {
