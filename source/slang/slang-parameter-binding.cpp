@@ -1163,6 +1163,10 @@ static void _resolveGLSLBindingAttribute(
     outSet = 0;
     auto program = context->getTargetProgram()->getProgram();
     bool anyUnresolved = false;
+    bool bindingOutOfRange = false;
+    bool setOutOfRange = false;
+    IntegerLiteralValue outOfRangeBindingValue = 0;
+    IntegerLiteralValue outOfRangeSetValue = 0;
     if (attr->binding)
     {
         if (auto bindingVal = program->tryFoldIntVal(attr->binding))
@@ -1170,9 +1174,8 @@ static void _resolveGLSLBindingAttribute(
             outBinding = bindingVal->getValue();
             if (outBinding < 0 || outBinding > 0xFFFFFFFF)
             {
-                getSink(context)->diagnose(Diagnostics::BindingAttributeValueOutOfRange{
-                    .value = outBinding,
-                    .location = attr->loc});
+                bindingOutOfRange = true;
+                outOfRangeBindingValue = outBinding;
                 outBinding = 0;
             }
         }
@@ -1186,14 +1189,23 @@ static void _resolveGLSLBindingAttribute(
             outSet = setVal->getValue();
             if (outSet < 0 || outSet > 0xFFFFFFFF)
             {
-                getSink(context)->diagnose(Diagnostics::BindingAttributeValueOutOfRange{
-                    .value = outSet,
-                    .location = attr->loc});
+                setOutOfRange = true;
+                outOfRangeSetValue = outSet;
                 outSet = 0;
             }
         }
         else
             anyUnresolved = true;
+    }
+    // One out-of-range diagnostic per invocation, like the unresolved-value error below:
+    // the message cannot say which argument failed, so a second identical error at the
+    // same location would only repeat it. When both arguments are out of range the
+    // message reports the binding argument's value.
+    if (bindingOutOfRange || setOutOfRange)
+    {
+        getSink(context)->diagnose(Diagnostics::BindingAttributeValueOutOfRange{
+            .value = (bindingOutOfRange ? outOfRangeBindingValue : outOfRangeSetValue),
+            .location = attr->loc});
     }
     if (anyUnresolved)
     {

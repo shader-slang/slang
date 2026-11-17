@@ -24,10 +24,20 @@ RWStructuredBuffer<uint> negResult;
 */
 RWStructuredBuffer<uint> wrapResult;
 
+// Both arguments out of range: one diagnostic per attribute, reporting the binding
+// argument's value.
+[[vk::binding(NegSlot, NegSlot)]]
+/*CHECK:
+      ^^^^^^^ binding attribute resolved to an out-of-range descriptor index
+      ^^^^^^^ an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier resolved to '-1', outside the valid descriptor index range [0, 4294967295]
+*/
+RWStructuredBuffer<uint> bothResult;
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 threadID : SV_DispatchThreadID)
 {
     negResult[threadID.x] = threadID.x;
     wrapResult[threadID.x] = threadID.x;
+    bothResult[threadID.x] = threadID.x;
 }
