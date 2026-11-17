@@ -56,14 +56,14 @@ static __borrow int staticBorrowGlobal;
 
 static __ref_readonly int staticRefReadonlyGlobal;
 /*CHECK:
-       ^^^^^^^^^^^^^^^ E31201
-       ^^^^^^^^^^^^^^^ modifier '__ref_readonly' is not allowed here.
+       ^^^^^^^^^^^^^^ E31201
+       ^^^^^^^^^^^^^^ modifier '__ref_readonly' is not allowed here.
 */
 
 static __ref_writeonly int staticRefWriteonlyGlobal;
 /*CHECK:
-       ^^^^^^^^^^^^^^^^ E31201
-       ^^^^^^^^^^^^^^^^ modifier '__ref_writeonly' is not allowed here.
+       ^^^^^^^^^^^^^^^ E31201
+       ^^^^^^^^^^^^^^^ modifier '__ref_writeonly' is not allowed here.
 */
 
 [numthreads(1, 1, 1)]
