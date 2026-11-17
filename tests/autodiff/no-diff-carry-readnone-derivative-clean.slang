@@ -9,7 +9,6 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
 
-// CHECK: result code = 0
 // CHECK-NOT: error[E41031]
 // CHECK-NOT: derivative is lost
 // CHECK: void main(

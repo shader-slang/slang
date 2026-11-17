@@ -53,11 +53,18 @@ Options:
   --tmux             Start a tmux session named after the branch or review in
                      the new worktree and use the branch as the terminal title.
   --no-submodules    Skip submodule initialization.
+  --force            Replace existing state. If the branch already exists, it
+                     is deleted first. If a worktree already exists at the
+                     destination (or has the branch checked out), it is
+                     removed first, including its uncommitted changes.
+                     A destination that is not a git worktree is never
+                     deleted.
   -h, --help         Show this help.
 
 Examples:
   $me git-worktree-add
   $me --tmux git-worktree-add
+  $me --force git-worktree-add
   $me --base release/2026.1 --dir ../descriptor-fix descriptor-heap-access
   $me --review https://github.com/shader-slang/slang/pull/11267
   $me --review https://github.com/shader-slang/slang/pull/11267 review-11267
@@ -247,9 +254,68 @@ review_repo_matches_configured_remote() {
   return 1
 }
 
+# Convert a directory path to its canonical absolute form so that two paths for
+# the same directory compare equal. Paths that do not exist are returned as is.
+canonical_dir() {
+  local path="$1"
+  if [[ -d "$path" ]]; then
+    (cd "$path" && pwd -P)
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
+# Fill the global array worktreeConflicts with the shell paths of all worktrees
+# that are located at directory $1 or have branch $2 checked out. Such worktrees
+# must be removed before the branch can be deleted and the directory reused.
+# Dies if one of them is the main worktree or the worktree this script runs in.
+collect_conflicting_worktrees() {
+  local targetDir
+  local targetBranch="$2"
+  local currentDir
+  local line
+  local paths=()
+  local branches=()
+  local i
+
+  targetDir="$(canonical_dir "$1")"
+  currentDir="$(canonical_dir "$repoRootShell")"
+  worktreeConflicts=()
+
+  # The first record of "worktree list --porcelain" is the main worktree.
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    case "$line" in
+    "worktree "*)
+      paths+=("$(canonical_dir "$(to_shell_path "${line#worktree }")")")
+      branches+=("")
+      ;;
+    "branch "*)
+      branches[$((${#branches[@]} - 1))]="${line#branch }"
+      ;;
+    esac
+  done < <(git_run worktree list --porcelain)
+
+  i=0
+  while [[ $i -lt ${#paths[@]} ]]; do
+    if [[ "${paths[$i]}" == "$targetDir" || "${branches[$i]}" == "refs/heads/$targetBranch" ]]; then
+      if [[ $i -eq 0 ]]; then
+        die "Cannot replace the main worktree: ${paths[$i]}"
+      fi
+      if [[ "${paths[$i]}" == "$currentDir" ]]; then
+        die "Cannot replace the worktree this script is running in: ${paths[$i]}"
+      fi
+      worktreeConflicts+=("${paths[$i]}")
+    fi
+    i=$((i + 1))
+  done
+}
+
 branchInput=""
 baseRef=""
 dstDirInput=""
+forceReplace=0
+worktreeConflicts=()
 initSubmodules=1
 startTmux=0
 reviewInput=""
@@ -290,6 +356,9 @@ while [[ $# -gt 0 ]]; do
     ;;
   --no-submodules)
     initSubmodules=0
+    ;;
+  --force)
+    forceReplace=1
     ;;
   --)
     shift
@@ -357,8 +426,8 @@ if [[ -n "$reviewInput" ]]; then
     die "Invalid branch name: $branchName"
   fi
 
-  if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
-    die "Branch already exists: $branchName"
+  if [[ $forceReplace -eq 0 ]] && git_run show-ref --verify --quiet "refs/heads/$branchName"; then
+    die "Branch already exists: $branchName. Use --force to replace it."
   fi
   worktreeName="$branchName"
   worktreeName="${worktreeName//\//-}"
@@ -373,8 +442,8 @@ else
     die "Invalid branch name: $branchName"
   fi
 
-  if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
-    die "Branch already exists: $branchName"
+  if [[ $forceReplace -eq 0 ]] && git_run show-ref --verify --quiet "refs/heads/$branchName"; then
+    die "Branch already exists: $branchName. Use --force to replace it."
   fi
 
   if [[ -z "$baseRef" ]]; then
@@ -414,8 +483,8 @@ else
 fi
 dstDirGit="$(to_git_path "$dstDirShell")"
 
-if [[ -e "$dstDirShell" ]]; then
-  die "Destination already exists: $dstDirShell"
+if [[ -e "$dstDirShell" && $forceReplace -eq 0 ]]; then
+  die "Destination already exists: $dstDirShell. Use --force to replace it if it is a worktree."
 fi
 
 dstParent="$(dirname "$dstDirShell")"
@@ -433,6 +502,34 @@ log "Worktree: $dstDirShell"
 
 log "Pruning stale worktree records..."
 git_run worktree prune
+
+if [[ $forceReplace -eq 1 ]]; then
+  # All validation is done at this point, so it is safe to delete things.
+  branchExists=0
+  if git_run show-ref --verify --quiet "refs/heads/$branchName"; then
+    branchExists=1
+    if [[ "$baseRef" == "$branchName" || "$baseRef" == "refs/heads/$branchName" ]]; then
+      die "Cannot use --force when the base ref is the branch being replaced: $baseRef"
+    fi
+  fi
+
+  collect_conflicting_worktrees "$dstDirShell" "$branchName"
+  worktreeIndex=0
+  while [[ $worktreeIndex -lt ${#worktreeConflicts[@]} ]]; do
+    log "Removing existing worktree: ${worktreeConflicts[$worktreeIndex]}"
+    git_run worktree remove --force "$(to_git_path "${worktreeConflicts[$worktreeIndex]}")"
+    worktreeIndex=$((worktreeIndex + 1))
+  done
+
+  if [[ $branchExists -eq 1 ]]; then
+    log "Deleting existing branch: $branchName"
+    git_run branch -q -D "$branchName"
+  fi
+
+  if [[ -e "$dstDirShell" ]]; then
+    die "Destination already exists and is not a git worktree, so --force will not delete it: $dstDirShell"
+  fi
+fi
 
 log "Adding worktree and creating branch..."
 git_run worktree add -q -b "$branchName" "$dstDirGit" "$baseRef"

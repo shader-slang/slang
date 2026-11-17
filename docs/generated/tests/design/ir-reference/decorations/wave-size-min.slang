@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#entry-point-and-stage
-//META: doc_section_digest=babb40e44ba0eb7addfafeddc37185c8c3bbed4c27b3b7fc8a2469d95b33aca1
+//META: doc_section_digest=dba27f1411ac31618a8d7cd73ed506a70bd92102a42f2b59e56aa750058110fa
 //META: purpose=Boundary - WaveSize(4) at the small-lane edge produces waveSize(4 : Int) in the dump.
 //META: intent=boundary
 //META: pipeline_stage=lower

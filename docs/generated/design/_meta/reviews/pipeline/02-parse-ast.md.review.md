@@ -1,11 +1,11 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T08:19:21+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:20:25Z
 target_doc: pipeline/02-parse-ast.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 0199faf4e426ba466aba526a350e702abad4289ecdf404224cde287299d5da24
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 4246bb60e01045efde01e27a0e773a37c259f70db6c6e96b5162994eb761d09a
+source_commit: be3c344414f6541ba6731813b36591a94cd05482
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -15,9 +15,9 @@ checklist:
   front_matter_validity: pass
 finding_count: 3
 severity_breakdown:
-  critical: 0
+  critical: 1
   major: 0
-  minor: 3
+  minor: 2
   nit: 0
 ---
 
@@ -25,26 +25,22 @@ severity_breakdown:
 
 ## Summary
 
-The page is comprehensive and mostly source-aligned, with all links and line-number citations resolving correctly. Three minor inaccuracies remain: generic-application speculation does not use `ParsingCursor`, C-style generic functions contradict the claim that every generic declaration follows a declaration keyword, and `ASTBuilder::create<T>()` rejects `Val` types at compile time rather than asserting at runtime.
+The document covers the required topics and largely matches the implementation, but needs three corrections. The most important issue is its assertion that typedef and underlying-type spellings directly share a `Type*`: the source preserves named types and canonicalizes them separately. The error-recovery description also overstates its coverage, and one line citation is stale.
 
 ## Items checked
 
-- Verified 30 cited line anchors and ranges against `slang-parser.cpp`, `slang-parser.h`, and `slang-ast-base.h` at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`; every citation lands on the stated declaration or behavior.
-- Spot-checked more than 25 factual claims, including parser entry-point signatures, parsing stages, deferred bodies, syntax lookup, recovery sets, AST family bases, FIDDLE-backed casts, AST interning, generic constraints, associated-type constraint relocation, modifier parsing, operator-name diagnostics, and floating-point literal diagnostics.
-- Resolved all 45 relative Markdown links (22 unique targets) at the recorded source commit and confirmed every referenced generated peer is present in the manifest.
-- Swept 170 backticked identifiers and 15 source filenames against the recorded source tree; no fabricated symbol or filename was found.
-- Verified the required section structure, front-matter fields, 32 KB size cap, and watched-path digest; `regenerate.py lint` reported no errors or warnings.
+- Reviewed against the **current working tree**, which the operator states equals the document’s source commit for all of `source/`.
+- Read `_review.md`, `_common.md`, and the document-specific prompt; ran `regenerate.py show pipeline/02-parse-ast.md` to obtain the manifest entry and resolved watched paths.
+- Spot-checked more than 20 claims: both parser entry signatures, deferred bodies and scopes, parsing stages, syntax lookup and callbacks, generic disambiguation and FOLLOW tokens, annotation skipping, error recovery, AST family inheritance, casting, builder interning, constraint forms, associated-type constraint placement, modifier version gates, declaration nesting, and integer/floating-point literal handling.
+- Checked every explicit line-number citation, including ranges and citations that inherit their filename from surrounding prose.
+- Resolved all 55 Markdown links, covering 27 distinct destinations; checked target-file existence at the recorded source commit, generated-page manifest membership, and both fragment targets. Read dependency and peer passages only for cross-reference checks.
+- Verified required sections, audience introduction, front-matter keys and formats, relative-link style, and absence of raw Liquid openers. The document is 32,579 bytes, below its 32,768-byte cap.
+- No files were written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Parser`, lines 48-52; `## Generics ambiguity`, lines 274-281 | The page says `TokenReader::ParsingCursor` save/restore is used by the generic-application disambiguator and describes that path as parsing then rolling back. `tryParseGenericApp` instead copies the `Parser`, speculatively parses on the copy, and leaves the original token reader untouched; it reparses on the original parser only after the follow-set check commits. | `source/slang/slang-parser.cpp:3009-3048` constructs `Parser newParser(*parser)`, parses with `newParser`, and calls `parseGenericApp(parser, base)` only on success. `source/slang/slang-parser.cpp:7956-7965` delegates the `<` case to that helper. | Replace the `ParsingCursor` claim with the actual copied-parser speculation mechanism, and say failure leaves `<` unread for ordinary infix parsing rather than saying the parser rolls back. |
-| F-002 | minor | `## Generics ambiguity`, lines 282-285 | The statement that generic declarations are unambiguous because they always appear after a declaration keyword is too broad. Traditional C-style generic functions such as `float f<T>(T x)` reach `ParseDeclaratorDecl`; there, `<` after the parsed declarator is itself one of the tokens that selects the function-declaration branch. | `source/slang/slang-parser.cpp:3576-3584` begins the traditional declarator path, and `source/slang/slang-parser.cpp:3680-3702` treats either `(` or `<` after the declarator as a function and calls `parseTraditionalFuncDecl`; `source/slang/slang-parser.cpp:2357-2367` then calls `parseOptGenericDecl`. | Reword this to say declaration context makes the generic parameter list unambiguous, while noting that both keyword-led declarations and C-style function declarators can introduce a `GenericDecl`. |
-| F-003 | minor | `### ASTBuilder`, lines 259-263 | The page says `ASTBuilder::create<T>()` “asserts” if `T` is a `Val`, which suggests a runtime assertion. The API uses `static_assert`, so such code fails to compile. | `source/slang/slang-ast-builder.h:249-255` contains `static_assert(!IsBaseOf<Val, T>::Value, "ASTBuilder::create cannot be used to create a Val, use getOrCreate instead.")`. | Change “it asserts” to “it fails to compile via `static_assert`” and retain the direction to use `getOrCreate<T>()`. |
-
-## No-issues notes
-
-- The two-stage parsing account matches `parseSourceFile`, `parseOptBody`, `SemanticsVisitor::maybeParseStmt`, and `parseUnparsedStmt`.
-- The syntax-as-declaration account matches `tryLookUpSyntaxDecl`, `tryParseUsingSyntaxDecl`, `g_parseSyntaxEntries`, and `populateBaseLanguageModule`.
-- All generic-constraint forms and diagnostics described in the page match `maybeParseGenericConstraints`, `parseOptionalGenericConstraints`, `parseAssocType`, and `parseInterfaceConstraintDecl`.
+| F-001 | critical | `### ASTBuilder`, lines 375–382 | The explanation that `float3` and `vector<float, 3>` “intern to the same `Type*`” conflates interning with canonicalization. A typedef spelling can retain a separate `NamedExpressionType`; the identical-signature conclusion does not establish raw pointer identity. This gives compiler developers an incorrect invariant for comparing types. | `source/slang/slang-syntax.cpp:958–963`: `getNamedType` interns a `NamedExpressionType` keyed by the typedef declaration reference. `source/slang/slang-ast-type.cpp:1400–1405` separately resolves that named type to its underlying canonical type. `source/slang/slang-ast-base.h:586` exposes `getCanonicalType()` through `resolve()`. | Preserve the redeclaration example, but explain that the spellings denote the same canonical type. Explicitly distinguish interning identical node descriptions from canonicalizing typedef wrappers; remove the claim of direct pointer identity between these spellings. |
+| F-002 | minor | `### Error recovery`, lines 233–255 | “Every other recovery site goes through `TryRecoverBefore`” omits the identifier-text overload of `ReadToken`. The conclusion that recovery outside blocks targets a closing token “rather than … a separator” is also too broad: `readTokenImpl` forwards whatever token was expected. | `source/slang/slang-parser.cpp:479–515`: `Parser::ReadToken(const char*)` performs its own balanced-token recovery loop until the requested identifier or a closing token. At `source/slang/slang-parser.cpp:703`, `readTokenImpl` calls `TryRecoverBefore(this, expected)` without restricting `expected` to closing tokens. | Scope the two-site inventory specifically to callers of `TryRecoverBefore`. Add the identifier-text overload’s separate recovery behavior, and state that `readTokenImpl` can recover before any expected token, including a separator; matched-region recovery targets the region’s closing token. |
+| F-003 | minor | `## Modifier parsing`, lines 495–497 | The citation places `ParseModifiers` at line `1237`, which is inside a different helper’s diagnostic branch. | `source/slang/slang-parser.cpp:1237` contains `SLANG_DIAGNOSE_UNEXPECTED`; `ParseModifiers` begins at `source/slang/slang-parser.cpp:1279`, as the document itself correctly states earlier. | Change this citation from `1237` to `1279`. |

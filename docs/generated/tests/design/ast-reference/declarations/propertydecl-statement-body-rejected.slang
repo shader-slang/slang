@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#accessordecl-family
-//META: doc_section_digest=8cebf6056445131d843ba65809820ad0e5294659556653bcb7502aa0a4f723ef
+//META: doc_section_digest=03169737d36df2cb366066a627de816d73fb2852ec3bfa331a119195dabda0c0
 //META: purpose=A property body is a braced list of accessor declarations, so a body made of statements is a parse error rather than an implicit getter; only the empty body and the semicolon form leave the declaration with no accessor for checking to fill in.
 //META: intent=negative
 //META: pipeline_stage=parse

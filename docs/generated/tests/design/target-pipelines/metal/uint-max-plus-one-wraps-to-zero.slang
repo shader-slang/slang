@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=1eced9055efc11b8172cc551a8f3310e41738933d999dd62447ac27360db35ca
+//META: doc_section_digest=28370caff3e53ad4ca487ddccd3ad5653bd2c2329fcec697ace59cf448351749
 //META: purpose=Boundary: `0xFFFFFFFFu + 1u` folds to `0U` in the emitted Metal text while the same constant added to a runtime value survives as `4294967295U`.
 //META: intent=boundary
 //META: pipeline_stage=emit

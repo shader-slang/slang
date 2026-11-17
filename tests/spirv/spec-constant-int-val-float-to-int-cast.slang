@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry computeMain -stage compute -target spirv
 
 // CHECK: error[E38041]
 // CHECK: const float X

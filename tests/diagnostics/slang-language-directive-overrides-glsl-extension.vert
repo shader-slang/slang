@@ -1,6 +1,6 @@
 // A valid `#language` directive selects Slang even when the file extension would select GLSL.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 #language 2026
 //CHECK: source-language directive selects slang and overrides the file-extension-implied glsl source language

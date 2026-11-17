@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 
 // Similar to const-to-nodiff-function-diagnostic-improvement.slang, but with a CoopVec type

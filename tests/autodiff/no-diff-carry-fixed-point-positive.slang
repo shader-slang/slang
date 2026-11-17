@@ -2,7 +2,7 @@
 // loop back-edges must trigger another propagation pass. Otherwise a later
 // differentiable call can be missed and E41031 can be lost.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost

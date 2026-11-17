@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: bae895251b3106e15916b42965c0c503d5cfbfd673f03819aa78209b6ce07073
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 1b502949c96c75dab4349b13cd31e60f4dda8f636185cafb9180bfb42c5b401a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -31,11 +31,12 @@ Every entry has a mandatory `See:` link to the peer document under
 lookup aid; the peer document is the source of truth.
 
 This page does **not** redefine terms that already live in the
-user-facing language/runtime glossary at
-[../../language-reference/glossary.md](../../language-reference/glossary.md)
+user-facing language/runtime reference, which has moved to the
+`shader-slang/spec` repository (see
+[../../language-reference/README.md](../../language-reference/README.md))
 (threads, dispatch, observable behavior, tangled function, ...).
 A handful of terms (notably `entry point`) have both a runtime sense and
-a compile-pipeline sense; in those cases the language-reference glossary
+a compile-pipeline sense; in those cases the language reference
 owns the runtime sense and this page covers the compile-pipeline sense
 explicitly.
 
@@ -63,7 +64,8 @@ explicitly.
 : An `IRParam` instruction at the head of an `IRBlock` that names a
   value flowing into the block from each predecessor. Slang's IR uses
   block parameters as the SSA-without-phi encoding: each predecessor's
-  branch terminator passes one argument per parameter, and there are no
+  `unconditionalBranch` or `loop` terminator passes one argument per
+  parameter, and there are no
   separate `phi` instructions. Block parameters are listed first in the
   block; non-parameter instructions follow. Contrast with the
   conventional `phi` node (see `single static assignment (SSA)`).
@@ -76,14 +78,9 @@ explicitly.
   [slang-capabilities.capdef](../../../source/slang/slang-capabilities.capdef).
   Atoms are combined into capability sets that gate the use of intrinsics
   and decide whether a function is callable on a given target. Atoms name
-  targets and their versions (`metallib_3_2`), stages (`node`, the
-  work-graph stage), and extensions
-  (`SPV_KHR_physical_storage_buffer`). Version atoms are special-cased in
-  set arithmetic: `isTargetVersionAtom` and `isSpirvVersionAtom` in
-  [slang-capability.cpp](../../../source/slang/slang-capability.cpp)
-  identify them, and a `*_latest` alias family (`spirv_latest`,
-  `metallib_latest`, `sm_latest`, `GLSL_latest`) tracks the newest
-  version of each.
+  targets and their versions (`metallib_3_2`), stages, and extensions
+  (`SPV_KHR_physical_storage_buffer`); version atoms are special-cased
+  in set arithmetic.
 
   See: [cross-cutting/targets.md](cross-cutting/targets.md)
 
@@ -100,10 +97,10 @@ explicitly.
   candidates' implicit-conversion chains. Each named conversion has a
   `kConversionCost_*` level in
   [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h);
-  per-argument costs are summed by `getImplicitConversionCostWithKnownArg`
-  in
-  [slang-check-conversion.cpp](../../../source/slang/slang-check-conversion.cpp).
-  Anything at or above `kConversionCost_GeneralConversion` is rejected
+  overload checking sums the per-argument costs into
+  `conversionCostSum` in `slang-check-overload.cpp`, while
+  `getImplicitConversionCostWithKnownArg` only adjusts the cost of one
+  conversion. Anything at or above `kConversionCost_GeneralConversion` is rejected
   for implicit use.
 
   See: [name-resolution/overload-resolution.md](name-resolution/overload-resolution.md)
@@ -115,18 +112,6 @@ explicitly.
   compiled at build time and, when `SLANG_EMBED_CORE_MODULE` is on,
   embedded into the primary `slang-compiler` shared library; `libslang`
   survives only as a backward-compatibility alias for that artefact.
-
-  See: [cross-cutting/core-module.md](cross-cutting/core-module.md)
-
-**standard module** `[Slang]`
-: A module compiled separately from the core module and shipped as a
-  `.slang-module` file in a versioned directory next to the compiler
-  shared library, loaded at runtime by an `import` whose qualified name
-  maps to a subdirectory of that directory. Distinct from the *core*
-  module, which is embedded in the library and needs no `import`. Three
-  exist at `source_commit` — `neural`, `experimental` (the work-graph
-  module) and `numerics` — and all three carry `[ExperimentalModule]`,
-  so importing one without `-experimental-feature` fails with `E00104`.
 
   See: [cross-cutting/core-module.md](cross-cutting/core-module.md)
 
@@ -149,10 +134,11 @@ explicitly.
   External: https://en.wikipedia.org/wiki/Dead_code_elimination
 
 **decl-ref** `[Slang]`
-: A pair of a declaration plus the generic and existential substitutions
-  needed to refer to it in a specific context. Internally `DeclRef`
-  in [slang-ast-base.h](../../../source/slang/slang-ast-base.h); the type
-  system carries decl-refs rather than bare declarations so that
+: A reference to a declaration together with the generic specialization
+  needed to refer to it in a specific context. The underlying node is
+  `DeclRefBase`, a `Val` declared in
+  [slang-ast-base.h](../../../source/slang/slang-ast-base.h); most
+  checker code handles the typed `DeclRef<T>` wrapper instead. The type system carries decl-refs rather than bare declarations so that
   generic instantiation is uniform with ordinary name lookup. Decl-refs
   are produced by name resolution (see
   [name-resolution/lookup.md](name-resolution/lookup.md)).
@@ -164,7 +150,7 @@ explicitly.
   been applied to one declaration, declared as an `enum class ... :
   uint8_t` at
   [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h)
-  line 476. In order the rungs are `Unchecked`,
+  line 478. In order the rungs are `Unchecked`,
   `ReadyForParserLookup`, `ModifiersChecked`, `ScopesWired`,
   `SignatureChecked`, `ReadyForReference`, `ReadyForLookup`,
   `ReadyForConformances`, `TypesFullyResolved`, `AttributesChecked`,
@@ -279,14 +265,15 @@ explicitly.
 **fossil format** `[Slang]`
 : The memory-mappable binary serialization format used for compiled
   modules, defined in
-  [slang-fossil.h](../../../source/slang/slang-fossil.h); the
-  `ISerializerImpl` backend that writes and reads it is the separate
-  [slang-serialize-fossil.h](../../../source/slang/slang-serialize-fossil.h).
-  A pointer inside fossilized data is a `RelativePtr` — an offset
-  relative to the address of the pointer itself — so a fossilized object
-  graph is traversable directly once the file is mapped, with **no**
+  [slang-fossil.h](../../../source/slang/slang-fossil.h). A pointer
+  inside fossilized data is a `FossilizedPtr`, a 32-bit offset relative
+  to the pointer's own address, so a fossilized object graph is
+  traversable directly once the file is mapped, with **no**
   pointer-fixup pass at load. A finished fossil blob is what a RIFF data
-  chunk contains, so the two formats nest rather than compete.
+  chunk contains, so the two formats nest rather than compete. The IR
+  payload carries its own `serializationVersion`, checked against
+  `kSupportedSerializationVersion` (2 at `source_commit`) in
+  [slang-serialize-ir.cpp](../../../source/slang/slang-serialize-ir.cpp).
 
   See: [cross-cutting/serialization.md](cross-cutting/serialization.md)
 
@@ -339,8 +326,8 @@ explicitly.
 **IRDecoration** `[Slang]`
 : A non-essential annotation attached to an IR instruction —
   things like name hints, layout, binding indices, target intrinsics, or
-  loop hints. Decoration opcodes have the `*Decoration` suffix in
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) and are
+  loop hints. Decoration opcodes live in the `Decoration` family of
+  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua), with wrapper structs conventionally named `*Decoration`, and are
   preserved through optimization unless explicitly dropped. Synonym:
   `decoration`. The full per-opcode catalog is in
   [ir-reference/decorations.md](ir-reference/decorations.md).
@@ -372,7 +359,11 @@ explicitly.
 **IRModule** `[Slang]`
 : The top-level container for an IR program. It holds module-scope
   values (hoistable instructions, global variables, functions) and is
-  the unit of linking and serialization. The `module` opcode and the
+  the unit of linking and serialization. Its module version
+  (`m_version`) must fall in the inclusive range
+  `k_minSupportedModuleVersion`..`k_maxSupportedModuleVersion` declared
+  in [slang-ir.h](../../../source/slang/slang-ir.h), which is 37..37 at
+  `source_commit`. The `module` opcode and the
   other module-structure opcodes are tabulated in
   [ir-reference/structure.md](ir-reference/structure.md).
 
@@ -390,7 +381,8 @@ explicitly.
   which that header includes. The opcode is stored in `IRInst::m_op`
   and read via `IRInst::getOp()`; downstream casts (`as<IRFoo>()`,
   `cast<IRFoo>()`) test the opcode against a contiguous range
-  determined by the Lua nesting.
+  determined by the Lua nesting. At `source_commit` the enum holds 865
+  concrete opcodes.
 
   See: [cross-cutting/ir-instructions.md](cross-cutting/ir-instructions.md),
   [ir-reference/index.md](ir-reference/index.md)
@@ -403,11 +395,15 @@ explicitly.
   `IRGlobalVar` and entry-point `IRFunc` instances for one
   specific target's layout rules. The layout IR module is a
   sibling of the executable per-translation-unit IR module: it
-  is cached on `TargetProgram::m_irModuleForLayout`, is not fed
-  into `linkAndOptimizeIR`, and carries no function bodies for
-  user-defined functions. SPIR-V and Metal targets additionally
-  receive `IRRequireCapabilityAtomDecoration`s on entry-point
-  stubs; other targets do not.
+  is cached on `TargetProgram::m_irModuleForLayout`, is never itself
+  the module that `linkAndOptimizeIR` optimizes — `linkIR` in
+  [slang-ir-link.cpp](../../../source/slang/slang-ir-link.cpp) adds it to
+  its input module list so layouts can be attached to the linked
+  program — and carries no function bodies for user-defined functions.
+  Entry-point stubs also receive an
+  `IRRequireCapabilityAtomDecoration` for each SPIR-V-version or
+  Metal-version atom in the entry point's inferred requirements,
+  whichever target is being laid out.
 
   See: [pipeline/04c-layout-ir.md](pipeline/04c-layout-ir.md)
 
@@ -420,6 +416,17 @@ explicitly.
 
   See: [pipeline/01-lex-preprocess.md](pipeline/01-lex-preprocess.md)
   External: https://en.wikipedia.org/wiki/Lexical_analysis
+
+**link-time symbol alias** `[Slang]`
+: The `= Type` form of a `struct` declaration, as in
+  `export struct Foo : IFoo = Bar;`. Despite the syntax it is *not* a
+  type alias — `typealias` is that — but a name resolved when modules
+  are linked: lowering turns it into an `IRSymbolAlias`, and until the
+  link step supplies the aliased symbol the declaration owns no fields,
+  which is why field-wise construction is suppressed for it exactly as
+  it is for a bodyless `extern struct`.
+
+  See: [syntax-reference/grammar.md](syntax-reference/grammar.md)
 
 **linkage** `[Slang]`
 : The compile-time object that scopes loaded modules, search paths,
@@ -435,25 +442,15 @@ explicitly.
 
   See: [architecture/overview.md](architecture/overview.md)
 
-**link-time symbol alias** `[Slang]`
-: The `= Type` form of a `struct` declaration, as in
-  `export struct Foo : IFoo = Bar;`. Despite the syntax it is *not* a
-  type alias — `typealias` is that — but a name resolved when modules
-  are linked: lowering turns it into an `IRSymbolAlias`, and until the
-  link step supplies the aliased symbol the declaration owns no fields,
-  which is why field-wise construction is suppressed for it exactly as
-  it is for a bodyless `extern struct`.
-
-  See: [syntax-reference/grammar.md](syntax-reference/grammar.md)
-
 **lookup breadcrumb** `[Slang]`
 : A linked navigation step recorded during name lookup so that the
   checker can reconstruct the canonical AST expression for a found
   decl. `LookupResultItem_Breadcrumb::Kind` enumerates the kinds:
   `Member` (a transparent in-scope decl was looked through), `Deref`
   (a pointer-like value was implicitly dereferenced), `SuperType` (a
-  super-type witness was applied), `This` (an implicit `this`/`This`
-  needs to be supplied). Declared in
+  super-type witness was applied), `ThisExpr` (a member of an enclosing
+  type is reached through an implicit `this` expression), `ThisType` (a
+  member of an enclosing type is reached through its `This` type). Declared in
   [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h).
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)
@@ -506,11 +503,12 @@ explicitly.
   which carries a `SyntaxClass<NodeBase> magicNodeType` naming the
   corresponding C++ `Type` subclass, so the front end has a dedicated
   class for the type. `__intrinsic_type` alone produces an
-  `IntrinsicTypeModifier`, which carries only a `uint32_t irOp`, so the
-  type's identity is purely an IR opcode with no C++ subclass behind it.
+  `IntrinsicTypeModifier`, which carries a `uint32_t irOp` plus a list of literal
+  `irOperands`, so the type's identity is purely an IR opcode with no C++
+  subclass behind it.
   Both modifiers are declared in
   [slang-ast-modifier.h](../../../source/slang/slang-ast-modifier.h)
-  (lines 589 and 613); a declaration may carry both.
+  (lines 647 and 671); a declaration may carry both.
 
   See: [cross-cutting/core-module.md](cross-cutting/core-module.md),
   [syntax-reference/keywords-and-builtins.md](syntax-reference/keywords-and-builtins.md)
@@ -592,12 +590,14 @@ explicitly.
   generic specificity. Slang's implementation builds `OverloadCandidate`
   records and filters them through a multi-stage pipeline in
   [slang-check-overload.cpp](../../../source/slang/slang-check-overload.cpp).
-  Builtin operators on scalar, vector, and matrix operands never reach
-  that pipeline: `convertToBuiltinArithmeticOp` in
-  [slang-check-expr.cpp](../../../source/slang/slang-check-expr.cpp)
-  rewrites them to a `BuiltinOperatorExpr` carrying the resolved
-  `BuiltinOperationKind`. That fast path replaced an earlier
-  memoization cache over operator lookups, which no longer exists.
+  A fast path, `convertToBuiltinArithmeticOp` in
+  [slang-check-expr.cpp](../../../source/slang/slang-check-expr.cpp),
+  rewrites supported builtin operators on scalar, vector, and matrix
+  operands to a `BuiltinOperatorExpr` carrying the resolved
+  `BuiltinOperationKind`; unsupported cases, including matrix operands
+  in GLSL operator scope, still go through normal overload resolution.
+  That fast path replaced an earlier memoization cache over operator
+  lookups, which no longer exists.
 
   See: [name-resolution/overload-resolution.md](name-resolution/overload-resolution.md)
   External: https://en.wikipedia.org/wiki/Function_overloading
@@ -687,12 +687,12 @@ explicitly.
   External: https://en.wikipedia.org/wiki/Recursive_descent_parser
 
 **required lowering pass set** `[Slang]`
-: A struct of 34 boolean flags —
+: A struct of 40 boolean flags —
   `RequiredLoweringPassSet`, declared in
   [slang-code-gen.h](../../../source/slang/slang-code-gen.h) — that
   records which kinds of IR a module actually contains. It is filled by
   `calcRequiredLoweringPassSet`
-  ([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 405), and
+  ([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 409), and
   then gates most of the backend pipeline: a pass is skipped outright
   when its flag is clear. The scan runs more than once — post-link and
   again post-specialization — and the flags accumulate rather than
@@ -769,9 +769,8 @@ explicitly.
   refer to that single definition. Slang's IR is in SSA form. Instead
   of `phi` nodes, Slang uses `block parameter`s: each `IRBlock`
   declares parameters via leading `IRParam` instructions, and each
-  predecessor's branch terminator (`unconditionalBranch`,
-  `conditionalBranch`, `loop`, `ifElse`, `Switch`) passes one argument
-  per parameter. See
+  `unconditionalBranch` or `loop` terminator passes one argument per
+  destination parameter. See
   [ir-reference/control-flow.md](ir-reference/control-flow.md) for the
   per-opcode catalog.
 
@@ -801,6 +800,21 @@ explicitly.
 
   See: [pipeline/05-ir-passes.md](pipeline/05-ir-passes.md),
   [ir-reference/generics-and-existentials.md](ir-reference/generics-and-existentials.md)
+
+**standard module** `[Slang]`
+: A module compiled separately from the core module and shipped as a
+  `.slang-module` file in a versioned directory next to the compiler
+  shared library, loaded at runtime by an `import` whose qualified name
+  maps to a subdirectory of that directory. Distinct from the *core*
+  module, which is embedded in the library and needs no `import`. Four
+  module groups exist at `source_commit` — `neural`, `experimental`
+  (the work-graph module), `numerics` and `functional` — and all four
+  carry `[ExperimentalModule]`, so importing one requires experimental
+  features to be enabled; the check is made from the module's AST
+  modifier when the import is resolved in
+  [slang-session.cpp](../../../source/slang/slang-session.cpp).
+
+  See: [cross-cutting/core-module.md](cross-cutting/core-module.md)
 
 **syntax-decl** `[Slang]`
 : A declaration that binds a keyword to a parser callback, so the
@@ -842,21 +856,12 @@ explicitly.
 **target legalization driver** `[Slang]`
 : A target-specific IR pass that performs the bulk of one target's
   pre-emit transformations as a single call. Exactly three exist:
-  `legalizeIRForMetal`
-  ([slang-ir-metal-legalize.cpp](../../../source/slang/slang-ir-metal-legalize.cpp)),
-  `legalizeIRForWGSL`
-  ([slang-ir-wgsl-legalize.cpp](../../../source/slang/slang-ir-wgsl-legalize.cpp)),
-  and `legalizeIRForSPIRV`
-  ([slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp)).
-  Where each one runs is a common confusion: the Metal and WGSL drivers
-  are `SLANG_PASS` calls inside `linkAndOptimizeIR`
-  ([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 1000),
-  whereas the SPIR-V driver is *not* — it is called from
-  `emitSPIRVFromIR` in
-  [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp),
-  so it belongs to the emit step that follows link-and-optimize. HLSL
-  and CUDA have no driver at all; their target-specific work is done
-  through individual `SLANG_PASS` calls.
+  `legalizeIRForMetal`, `legalizeIRForWGSL`, and `legalizeIRForSPIRV`.
+  The Metal and WGSL drivers are `SLANG_PASS` calls inside
+  `linkAndOptimizeIR` ([slang-emit.cpp](../../../source/slang/slang-emit.cpp)
+  lines 2422 and 2452), whereas the SPIR-V driver is called from
+  `emitSPIRVFromIR`, so it belongs to the emit step that follows
+  link-and-optimize. HLSL and CUDA have no driver at all.
 
   See: [target-pipelines/index.md](target-pipelines/index.md)
 
@@ -869,8 +874,8 @@ explicitly.
   `targetSwitch`, `GenericAsm`, `missingReturn`, `unreachable`, and
   `defer`. Membership is decided by opcode range, so `discard` —
   declared one line after the family closes — is *not* a terminator
-  even though it ends pixel processing. Branch terminators carry
-  per-target arguments that supply the destination block's
+  even though it ends pixel processing. The `unconditionalBranch` and `loop` terminators carry
+  arguments that supply the destination block's
   `block parameter`s; a `yield` closes the single block inside an
   `expand` instruction, carrying that iteration's pattern value, while a
   `generic`'s body instead ends in `return_val`, which is what
@@ -921,7 +926,8 @@ explicitly.
 **visibility** `[Slang]`
 : An access-control attribute attached to a declaration and projected
   onto each scope it appears in. The three levels — `Public`,
-  `Internal`, `Private` — are the `DeclVisibility` enum in
+  `Internal`, `Private`; the default is `Internal` — are the
+  `DeclVisibility` enum in
   [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h),
   expressed in source by the `public`/`internal`/`private` keywords
   (modeled by `VisibilityModifier` subclasses in

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: 2694a491ee2f94e50d717023bd6df07444c657a539dba963a29092910bc0d9ae
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T08:34:07Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: e47a6f43c0eb2a5586546cd7f7a5b275cfa12cbb91caecfcd280aa2045cbc433
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -64,8 +64,13 @@ From the command line, `slangc <source> -o <output>.slang-module`
 writes a container, and `-dump-module` and `-get-module-info` read one
 back: the first prints the deserialized IR, the second the module's
 name, its module version, and the version of the compiler that wrote
-it. Those three fields are exactly what `readSerializedModuleInfo`
-returns, without deserializing the instruction graph.
+it. Those three fields are what `readSerializedModuleInfo` returns,
+without deserializing the instruction graph; `compilerVersion` and
+`name` are optional out-parameters, and an optional fourth
+(`serializationVersion`) reports the payload's format version.
+`-get-supported-module-versions` prints the module-version window
+described under
+[Versioning](#versioning-and-backwards-compatibility).
 
 ## Backends
 
@@ -96,10 +101,9 @@ void serialize(S const& serializer, MyThing& value)
 }
 ```
 
-The same template runs in both directions. This rules out
-"serialize" / "deserialize" code drift by construction. The
-`SLANG_SCOPED_SERIALIZER_STRUCT` macro brackets a structural scope so
-the format can record nesting; the field-by-field calls do the work.
+The same template runs in both directions, which rules out
+"serialize" / "deserialize" drift by construction.
+`SLANG_SCOPED_SERIALIZER_STRUCT` brackets a structural scope.
 
 `serialize(serializer, value.object)` — pointer fields — work because
 the serializer maintains a graph of objects it has already visited
@@ -134,22 +138,20 @@ Fossil is the sole concrete backend at this commit.
 /
 [slang-serialize-fossil.cpp](../../../../source/slang/slang-serialize-fossil.cpp).
 "Fossil" is a memory-mappable binary format defined in `slang-fossil.h`
-(referenced from the fossil header). Per the comments in
-[slang-serialize-fossil.h](../../../../source/slang/slang-serialize-fossil.h):
-
-> Deserializing data is an important place where security issues can
-> arise, so it is usually important to perform validation checks
-> throughout the process, and fail fast rather than risk reading
-> mal-formed data.
-
+(referenced from the fossil header). The writer in
+[slang-serialize-fossil.cpp](../../../../source/slang/slang-serialize-fossil.cpp)
+emits the header magic, a total-blob-size field that is filled in when the
+blob is laid out (`writeTotalBlobSize`), and the flags.
 The validation cost is configurable via the macro
-`SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` (a compile-time
-define, default 1). When enabled, validation failures call
-`SLANG_UNEXPECTED("invalid format encountered in serialized data")`;
-when the define is set to 0 the same conditions become plain
-`SLANG_ASSERT`s. The header comment notes this toggle exists to
-measure the performance cost of validation on a key serialization
-path — loading the core module from the `slang.dll` binary.
+`SLANG_ENABLE_VALIDATION_FOSSIL`, defined with a fallback of 0 in
+`slang-fossil.h` (not a watched path) and set from the CMake option of
+the same name (`SLANG_ENABLE_VALIDATION_FOSSIL`, declared with no
+default, so off unless set, in the top-level `CMakeLists.txt`).
+When enabled, `SLANG_SERIALIZE_FOSSIL_VALIDATE` failures
+call `SLANG_UNEXPECTED("invalid format encountered in serialized
+data")`; when disabled the same conditions become plain
+`SLANG_ASSERT`s. The toggle exists because validation costs
+performance when loading the trusted core module.
 
 The format is designed for **memory-mapped** deserialization: a pointer
 in the serialized data is a 32-bit offset relative to the address of
@@ -210,20 +212,9 @@ bytes land in `stringLengths` / `stringChars`. Reading the file back
 with `-dump-module` therefore prints it inside the IR listing, as
 `EmbeddedDownstreamIR(<targetCode> : Int, ...)`.
 
-The RIFF wrapping is what allows tools to inspect partial structure
-of a `.slang-module` file (chunk types, sizes) without parsing the
-inner serialized content — useful for sanity checks and recovery.
-
-A separate *RIFF serializer backend* — an `ISerializerImpl` that wrote
-each value as its own chunk, in files named `slang-serialize-riff.h` /
-`slang-serialize-riff.cpp` — used to sit alongside the Fossil backend.
-It was deleted (commit `52cb4e12e`) because its only remaining callers
-were branches of a hard-coded-off `USE_RIFF` switch in
-[slang-serialize-ir.cpp](../../../../source/slang/slang-serialize-ir.cpp),
-so no build ever compiled it. Nothing replaced it: Fossil is the
-encoding for values, and RIFF survives only as the container described
-above. Earlier revisions of this page linked those two files; they no
-longer exist.
+A former separate *RIFF serializer backend* (`slang-serialize-riff.{h,cpp}`)
+was deleted; Fossil is the encoding for values, and RIFF survives only
+as the container described above.
 
 ## IR flat-module read path
 
@@ -256,15 +247,11 @@ after it — literals are moved to the end of the module's child list by
 | 2     | `IntLit`, 0 operands       | 0             | `1`                    |
 
 `operandIndices` is the concatenation of those slices, `[-1, -1, 1]`.
-Every instruction contributes its type-use slot whether or not it has a
-type, followed by its operands; nothing marks where one instruction's
-run ends, so the reader recovers that from
-`instAllocInfo[i].operandCount`. The two `-1` entries here are not
-missing operands but missing *types* — of the module instruction and of
-`IntType` itself — since `instMap` maps `nullptr` to `-1` once and the
-same encoding then covers a null type and a null operand. The
-constant's value is not in this table at all: `42` is the single entry
-of `literals`.
+Every instruction contributes its type-use slot, then its operands; the
+reader recovers each run's end from `instAllocInfo[i].operandCount`.
+The two `-1` entries are missing *types* (of the module instruction and
+of `IntType`), encoded like a null operand. The value `42` is the single
+entry of `literals`.
 
 Because the flat tables come from a file that may be malformed,
 `deserializeFromFlatModule` treats their relationships as
@@ -272,7 +259,11 @@ serialized invariants and validates them with `SLANG_RELEASE_ASSERT`
 before dereferencing — for example that `childCounts` and `sourceLocs`
 each have one entry per instruction, that every `operandIndices` read
 stays in range and resolves to a valid instruction index
-(`-1 <= index < numInsts`), and that string-literal lengths are
+(`-1 <= index < numInsts`), that the running total of
+`operandCount + 1` over the allocated instructions never exceeds the
+size of `operandIndices` (checked before each `_allocateInst`, so an
+inflated `operandCount` cannot size an operand array the file has no
+data for), and that string-literal lengths are
 non-negative, fit in `uint32_t`, and do not run past the end of
 `stringChars`. After the walk it asserts that every flat table was
 fully consumed (`instIndex == numInsts`,
@@ -288,13 +279,11 @@ same flag after deserializing and returns `SLANG_FAIL`, so the caller in
 [slang-serialize-container.cpp](../../../../source/slang/slang-serialize-container.cpp)
 sees an unloadable module rather than a crash.
 
-The recursive rebuild and the matching write-side traversal share a
-fixed recursion budget, `kMaxIRSerializationDepth` (512) declared in
+The recursive rebuild and the write-side traversal share a recursion
+budget, `kMaxIRSerializationDepth` (512) in
 [slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h),
-asserted on each level of `go`/`traverseInstsInSerializationOrder` so a
-deeply-nested or adversarial module fails fast instead of overflowing
-the C++ stack. Keeping the bound on both sides keeps round-trips
-symmetric.
+asserted on each level so an adversarial module fails fast instead of
+overflowing the C++ stack.
 
 ## Source-location serialization
 
@@ -314,44 +303,29 @@ serialized).
 
 A reached line lands in exactly one of two lists, chosen by whether a
 `#line` directive was in effect there: `SerialSourceLocWriter::addSourceLoc`
-adds a plain `LineInfo` (physical line index plus its start offset)
-when the view has no entry covering the location, and an
-`AdjustedLineInfo` — that same physical `LineInfo`, plus the remapped
-line index and the overridden path — when it does. Neither list is a
-substitute for the other on load. The reader takes the *physical*
-`LineInfo` out of both lists to rebuild the line-break array, and then
-turns each `AdjustedLineInfo` back into a `SourceView::Entry` whose
-`m_lineAdjust` is the remapped index minus the physical one. That is
-the representation a live `SourceManager` uses for a `#line` override
-in the first place, so a reloaded location resolves to the physical
-line or to the remapped line and path depending on which the consumer
-asks for, exactly as in the session that wrote it; the remapping is
-never baked into the line table.
+adds a plain `LineInfo` (physical line index plus start offset) when no
+view entry covers the location, and an `AdjustedLineInfo` (that physical
+`LineInfo` plus the remapped line index and overridden path) when one
+does. The reader takes the *physical* `LineInfo` out of both lists to
+rebuild the line-break array, then turns each `AdjustedLineInfo` back
+into a `SourceView::Entry` whose `m_lineAdjust` is the remapped index
+minus the physical one, so a reloaded location resolves exactly as in
+the writing session; the remapping is never baked into the line table.
 
-"Which the consumer asks for" is a real choice rather than a hedge: a
-source-manager query takes a `SourceLocType` that selects the physical
-view or the `#line`-adjusted one, and that parameter — not anything
-recorded in the serialized data — decides which of the two a given
-consumer sees. [../syntax-reference/tokens.md#source-location](../syntax-reference/tokens.md#source-location)
-covers that selection and the `__LINE__` surface that reads it.
+A source-manager query takes a `SourceLocType` that selects the
+physical or the `#line`-adjusted view; that parameter, not the
+serialized data, decides which a consumer sees. See
+[../syntax-reference/tokens.md#source-location](../syntax-reference/tokens.md#source-location).
 
-What a consumer then *does* with the location is outside this document.
-Two things are worth knowing while you are here, though, because both
-are easy to mistake for serialization behaviour. The first is that
-whether a `#line` directive appears in emitted text at all, and in
-which spelling, is a compile option rather than a property of the
-serialized locations:
-`-line-directive-mode` ([slang-options.cpp](../../../../source/slang/slang-options.cpp)
-line 857) takes `none`, `source-map`, `default`, `standard`, or `glsl`
-— `standard` being C-style `#line <n> "<path>"` and `glsl` the form
-that carries a file *number* instead of a name — and its own help text
-records the default as C-style directives for HLSL and C/C++ output and
-GLSL-style directives for GLSL output. The second is that the emitted
-rendering is per-target and is documented with the backends, in
+What a consumer does with the location is outside this document. Note
+that whether a `#line` directive appears in emitted text, and in which
+spelling, is a compile option rather than a property of the serialized
+locations: `-line-directive-mode`
+([slang-options.cpp](../../../../source/slang/slang-options.cpp) line
+879) takes `none`, `source-map`, `default`, `standard`, or `glsl`. The
+per-target rendering is documented in
 [../pipeline/06-emit.md](../pipeline/06-emit.md) and the
-[../target-pipelines/](../target-pipelines) pages; none of the emit
-sources are watched by this document, so this page deliberately does
-not tabulate them.
+[../target-pipelines/](../target-pipelines) pages.
 
 Driver: [slang-serialize-source-loc.cpp](../../../../source/slang/slang-serialize-source-loc.cpp).
 
@@ -382,30 +356,40 @@ so inserting or reordering entries in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) does
 not renumber what is already on disk. Second, the whole payload carries
 `IRModuleInfo::serializationVersion`; `readSerializedModuleIR_` compares
-it against `kSupportedSerializationVersion` (currently `1`) and returns
+it against `kSupportedSerializationVersion` (currently `2`) and returns
 `SLANG_FAIL` on a mismatch, with a comment marking that comparison as
 the place a future multi-version reader would branch. The full design is
 described in
 [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).
 
-Two different version numbers are in play, and only one of them can
-fail a load. `IRModuleInfo::serializationVersion` versions the *fossil
-schema* of the payload; it is the value `readSerializedModuleIR_`
-compares, and that comparison is the only version check on the read
-path. The module carries a second, unrelated number: `IRModule::m_version`
-is serialized next to the module's name in `handleIRModule` and handed
-straight back out by `readSerializedModuleInfo`, never compared to
-anything. It versions the module's IR semantics rather than its
-encoding, and it is what `-get-module-info` prints as `Module Version`;
-the inclusive window `-get-supported-module-versions` prints
-(`IRModule::k_minSupportedModuleVersion` and
-`k_maxSupportedModuleVersion`, declared in `slang-ir.h`, which is
-outside this page's watched paths) bounds *that* number. The two are
-therefore separate namespaces: a module whose `Module Version` sits
-inside the published window still fails to load if its
-`serializationVersion` is not the single value this reader accepts, and
-no code in the watched paths rejects a module for falling outside the
-window.
+Two different version numbers are in play. `IRModuleInfo::serializationVersion`
+versions the *fossil schema* of the payload. `IRModule::m_version` is
+serialized next to the module's name in `handleIRModule` and versions the
+module's IR semantics rather than its encoding; it is what
+`-get-module-info` prints as `Module Version`. The window
+`-get-supported-module-versions` prints is
+`IRModule::k_minSupportedModuleVersion` to `k_maxSupportedModuleVersion`
+(both `37` at this commit), declared in `slang-ir.h` together with
+`IRModule::isModuleVersionSupported`, an inclusive range test. The
+comment there says adding an IR instruction requires a new writer
+version, and that earlier modules stay supported only while their AST and
+IR representations remain compatible with the reader.
+
+Both numbers are now checked on the read path, in different places:
+
+- `readSerializedModuleInfo` (metadata only) returns
+  `SLANG_E_NOT_AVAILABLE` when `serializationVersion` is not the
+  supported value, after writing it to the optional
+  `serializationVersion` out-parameter so the caller can report it; a null
+  module pointer returns `SLANG_FAIL`. It does not check `m_version`.
+- `readSerializedModuleIR_` returns `SLANG_FAIL` for an unsupported
+  `serializationVersion`, a null module pointer, or an `m_version` outside
+  the window (`isModuleVersionSupported`).
+- The module-loading paths in `slang-session.cpp` (outside the watched
+  paths) call `readSerializedModuleInfo` first, diagnose
+  `UnsupportedSerializedModuleFormatVersion` on `SLANG_E_NOT_AVAILABLE`
+  and `UnsupportedSerializedModuleVersion` when `isModuleVersionSupported`
+  fails, then deserialize.
 
 The `Unrecognized` opcode that appears at the head of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) plays
@@ -413,9 +397,7 @@ a role here: when `getStableNameOpcode` yields `kIROp_Invalid` — the
 module was written by a newer compiler that knows a stable name this
 one does not — the reader substitutes `kIROp_Unrecognized` and sets
 `_foundUnrecognizedInstructions`, which turns into the recoverable
-`SLANG_FAIL` described above. The Lua comment requires that
-`Unrecognized` never survive past deserialization.
-
+`SLANG_FAIL` described above. 
 ## Round-trip and repro files
 
 The repro machinery captures a single `slangc` invocation as a
@@ -446,12 +428,17 @@ For an **AST** field:
 For an **IR** change:
 
 1. IR serialization does not walk per-instruction C++ fields; it writes
-   the fixed `FlatInstTable` schema. Adding information therefore means
-   changing that schema, not adding a field visit.
+   the generic `FlatInstTable`, which records each instruction's opcode,
+   operand count, and operands uniformly. Ordinary new operands,
+   decorations, and instructions fit that schema with no serializer edit.
 2. The reader accepts exactly one serialization version and fails
-   otherwise, so there are no per-field version gates; a schema change
-   means bumping the serialization version and updating the
-   compatibility story (see
+   otherwise, so there are no per-field version gates. Only a change to
+   the encoding itself or to a special payload representation (the flat
+   tables, literals, strings) means bumping
+   `kSupportedSerializationVersion`. A new IR instruction instead means
+   moving `IRModule::k_maxSupportedModuleVersion`
+   (and the minimum, if older modules would decode differently), plus
+   updating the compatibility story (see
    [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md)).
 
 Either way, exercise the round-trip with the serialization unit tests,
@@ -470,25 +457,15 @@ such as
   not in the container `.cpp` that uses them.
 - The full backwards-compatibility policy, which lives in
   [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).
-- The historical repro format. Treat it as removed.
+- Repro format details are outside this page's watched paths.
 
 ## Manifest coverage
 
-Every source file this page cites for serialization behavior is inside
-the manifest's `watched_paths` for it, so a change to any of them marks
-this page stale. That covers:
-
-- [source/slang/slang-serialize-types.h](../../../../source/slang/slang-serialize-types.h)
-  and
-  [source/slang/slang-serialize-types.cpp](../../../../source/slang/slang-serialize-types.cpp)
-  — the chunk codes and the string-table encoder.
-- [source/slang/slang-ir-insts-stable-names.h](../../../../source/slang/slang-ir-insts-stable-names.h),
-  [source/slang/slang-ir-insts-stable-names.cpp](../../../../source/slang/slang-ir-insts-stable-names.cpp),
-  and
-  [source/slang/slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)
-  — the opcode↔stable-name mapping the IR reader depends on, its
-  implementation, and its generator input.
-- [source/core/slang-riff.h](../../../../source/core/slang-riff.h) and
-  [source/core/slang-riff.cpp](../../../../source/core/slang-riff.cpp)
-  — the container implementation. The manifest no longer lists the
-  deleted `slang-serialize-riff.{h,cpp}`.
+The serialization drivers, the types/chunk-code files, the opcode
+stable-name files, and `source/core/slang-riff.{h,cpp}` are in the
+manifest's `watched_paths`, so a change to them marks this page stale.
+Some behavior described here lives in unwatched files, so changes
+confined to them do not trigger freshness tracking: `slang-fossil.h`
+(Fossil validation and format layout), `slang-relative-ptr.h`, and
+`slang-session.cpp` (module-loading version checks). The deleted
+`slang-serialize-riff.{h,cpp}` are no longer listed.
