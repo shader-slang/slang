@@ -2097,7 +2097,10 @@ class NoInlineAttribute : public Attribute
 };
 
 /// A `[noRefInline]` attribute represents a request to not force inline a
-/// function specifically due to a refType parameter.
+/// function specifically due to a refType parameter. It is only applicable to
+/// intrinsic declarations, which never emit a target function definition; an
+/// ordinary function that kept a `__ref` parameter through to emit would get a
+/// lossy translation on targets with no reference syntax.
 FIDDLE()
 class NoRefInlineAttribute : public Attribute
 {

@@ -14016,6 +14016,72 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
     return newContext;
 }
 
+// An intrinsic declaration defines its behavior for each target with intrinsic
+// assembly rather than ordinary Slang statements, so it never lowers to a
+// target function definition that would have to spell out a `__ref` parameter.
+// This covers the `__intrinsic_op` and `__target_intrinsic` modifier forms, a
+// body that is only `__intrinsic_asm` statements, and a `__target_switch`
+// body whose every case is an `__intrinsic_asm` statement or a
+// `return spirv_asm {…}`. Consider the core module's mesh-shading intrinsics:
+//
+//     [noRefInline]
+//     void DispatchMesh(uint3 grid, __ref Payload meshPayload)
+//     {
+//         __target_switch
+//         {
+//         case hlsl: __intrinsic_asm "DispatchMesh";
+//         case spirv: return spirv_asm { OpEmitMeshTasksEXT …; };
+//         }
+//     }
+//
+// The switch arms are statements inside the function body, not modifiers on
+// the declaration, so the test inspects the body structure and not only the
+// modifier list.
+//
+static bool isIntrinsicFuncBodyStmt(Stmt* stmt)
+{
+    if (as<IntrinsicAsmStmt>(stmt))
+        return true;
+    if (auto blockStmt = as<BlockStmt>(stmt))
+        return blockStmt->body != nullptr && isIntrinsicFuncBodyStmt(blockStmt->body);
+    if (auto seqStmt = as<SeqStmt>(stmt))
+    {
+        if (seqStmt->stmts.getCount() == 0)
+            return false;
+        for (auto innerStmt : seqStmt->stmts)
+        {
+            if (!isIntrinsicFuncBodyStmt(innerStmt))
+                return false;
+        }
+        return true;
+    }
+    if (auto targetSwitchStmt = as<TargetSwitchStmt>(stmt))
+    {
+        // A `__stage_switch` is a `TargetSwitchStmt` too, and its intrinsic-asm
+        // arms equally leave no target function definition, so both are
+        // accepted here. A target switch with no cases leaves every arm
+        // unimplemented, which is not an intrinsic definition.
+        if (targetSwitchStmt->targetCases.getCount() == 0)
+            return false;
+        for (auto targetCase : targetSwitchStmt->targetCases)
+        {
+            if (targetCase->body == nullptr || !isIntrinsicFuncBodyStmt(targetCase->body))
+                return false;
+        }
+        return true;
+    }
+    if (auto returnStmt = as<ReturnStmt>(stmt))
+        return as<SPIRVAsmExpr>(returnStmt->expression) != nullptr;
+    return false;
+}
+
+static bool isIntrinsicFuncDecl(FunctionDeclBase* decl)
+{
+    if (decl->hasModifier<IntrinsicOpModifier>() || decl->hasModifier<TargetIntrinsicModifier>())
+        return true;
+    return decl->body != nullptr && isIntrinsicFuncBodyStmt(decl->body);
+}
+
 void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
     auto newContext = registerDifferentiableTypesForFunc(decl);
@@ -14074,6 +14140,26 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     }
 
     decl->body = maybeParseStmt(decl->body, newContext);
+
+    // A `[noRefInline]` function keeps its `__ref` parameters across the call
+    // boundary, and a non-intrinsic function would then reach emit with a
+    // reference parameter that targets without reference syntax (HLSL) can
+    // only approximate as `inout`, which copies and loses the aliasing `__ref`
+    // promises. The attribute is therefore only meaningful on an intrinsic
+    // declaration, which never emits a function definition. We validate it
+    // here, once the body is parsed, because the intrinsic-asm forms are body
+    // statements rather than declaration modifiers.
+    if (auto noRefInlineAttr = decl->findModifier<NoRefInlineAttribute>())
+    {
+        if (!isIntrinsicFuncDecl(decl))
+        {
+            getSink()->diagnose(Diagnostics::AttributeNotApplicable{
+                .attrName = noRefInlineAttr->getKeywordName(),
+                .attr = noRefInlineAttr});
+            removeModifier(decl, noRefInlineAttr);
+        }
+    }
+
     if (const auto body = decl->body)
     {
         auto parentDecl = decl->parentDecl;
