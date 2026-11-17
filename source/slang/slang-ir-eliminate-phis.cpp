@@ -59,27 +59,6 @@
 namespace Slang
 {
 
-/// Whether an undefined phi incoming may be materialized as a concrete default
-/// value when its register temp must not be left unwritten. We materialize only
-/// scalar, vector, matrix, and non-`UserPointer` pointer types; everything
-/// else — structs, arrays, tuples, optional, strings, opaque handles, and any
-/// other shape — conservatively keeps the skip. A `true` result does not
-/// guarantee that `emitDefaultConstruct(type, /*fallback=*/false)` returns
-/// non-null: the call site tolerates null and falls back to the old
-/// unwritten-temp behavior. `UserPointer` pointers are excluded because
-/// SPIR-V maps them to PhysicalStorageBuffer pointers, for which
-/// `OpConstantNull` fails validation; on targets where a null store would be
-/// valid the fix therefore does not apply to pointer phis (deliberate).
-static bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
-{
-    type = (IRType*)unwrapAttributedType(type);
-    if (auto ptrType = as<IRPtrTypeBase>(type))
-    {
-        return ptrType->getAddressSpace() != AddressSpace::UserPointer;
-    }
-    return isScalarOrVectorType(type) || as<IRMatrixType>(type) != nullptr;
-}
-
 struct PhiEliminationContext
 {
     // We are going to make some effort to re-use intermediate structures across
@@ -1061,16 +1040,17 @@ struct PhiEliminationContext
             // result.
             //
             // An `IRUndefined` incoming (the whole `Undefined` family — this
-            // includes the `LoadFromUninitializedMemory` values that
-            // `legalizeDefUse` stores when it hoists a value to a loop header,
-            // which after SSA promotion arrive here as exactly this kind of
-            // incoming) means the parameter is read before it was defined along
-            // this path. The internal fast-path callers run without register
-            // allocation, and for their plain local temps skipping the store is
-            // enough: reading an uninitialized local already yields an
-            // undefined value. But register allocation — the default at this
-            // emit-stage call, on every target — makes the temp stand for
-            // function-scope memory in the emitted module, and leaving it
+            // includes the `LoadFromUninitializedMemory` values that SSA
+            // construction synthesizes when a partially-initialized local is
+            // read before its first store) means the parameter is read before
+            // it was defined along this path. `legalizeDefUse`'s hoisted vars
+            // no longer arrive here as undefined for scalar, vector, matrix
+            // and pointer types — their per-entry init is already a concrete
+            // default — so this branch mainly covers ordinary locals. The internal fast-path
+            // callers run without register allocation, and for their plain local temps skipping the
+            // store is enough: reading an uninitialized local already yields an undefined value.
+            // But register allocation — the default at this emit-stage call, on every target —
+            // makes the temp stand for function-scope memory in the emitted module, and leaving it
             // unwritten on this path lets its previous content flow around a
             // loop back edge; downstream SSA promotion of that module (for
             // example spirv-opt on our SPIR-V output) must then treat the

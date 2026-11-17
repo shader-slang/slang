@@ -602,6 +602,18 @@ bool isScalarOrVectorType(IRInst* type)
     }
 }
 
+bool canMaterializeUndefinedWithDefaultConstruct(IRType* type)
+{
+    type = (IRType*)unwrapAttributedType(type);
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        // SPIR-V maps UserPointer storage to PhysicalStorageBuffer pointers,
+        // for which OpConstantNull fails validation.
+        return ptrType->getAddressSpace() != AddressSpace::UserPointer;
+    }
+    return isScalarOrVectorType(type) || as<IRMatrixType>(type) != nullptr;
+}
+
 bool isSimpleDataType(IRType* type)
 {
     type = (IRType*)unwrapAttributedType(type);
@@ -3179,6 +3191,28 @@ bool shouldDuplicateInstAtUseSite(IRInst* inst, TargetProgram* target)
     return false;
 }
 
+/// Store the per-entry init for a variable hoisted to a loop header by
+/// `legalizeDefUse`. Scalar, vector, matrix and ordinary pointer types get a
+/// concrete default value: it survives every downstream pipeline, including
+/// minimal-optimization builds where no SSA promotion runs — there a store
+/// of an undefined value does not reach the emitted module, and the concrete
+/// default is what keeps the hoisted value from being loop-carried. Every
+/// other type (aggregates, opaque handles) gets a `LoadFromUninitializedMemory`
+/// store, which never materializes constants but relies on SSA promotion or
+/// memory-resident var semantics to re-establish per-entry freshness.
+static void emitHoistedVarPerEntryInit(IRBuilder& builder, IRVar* var, IRType* valueType)
+{
+    if (canMaterializeUndefinedWithDefaultConstruct(valueType))
+    {
+        if (auto defaultValue = builder.emitDefaultConstruct(valueType, false))
+        {
+            builder.emitStore(var, defaultValue);
+            return;
+        }
+    }
+    builder.emitStore(var, builder.emitLoadFromUninitializedMemory(valueType));
+}
+
 void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
 {
     // After multi-level break lowering, we may create situations where an inst
@@ -3290,30 +3324,20 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                         // header we moved it to (or of an enclosing loop when the header
                         // itself sits inside one), so a use on a path that skips the
                         // definition would otherwise observe a value stored on an earlier
-                        // entry. Storing an explicit uninitialized value re-establishes
-                        // that reads before the definition are undefined, instead of
-                        // carrying an earlier entry's value around the back edge. This
-                        // fires whether or not the var moved: the store is placed right
-                        // after the var, so it always precedes the first real write of an
-                        // entry, and it cannot fire twice across the rerun loop — once
-                        // the var sits in the header block, that block is a loop header,
-                        // not a loop condition block, so `loopHeaderBlockMap` no longer
-                        // matches it. We use `LoadFromUninitializedMemory` rather than
-                        // poison or a plain undefined value because peephole elides
-                        // stores of those. The per-entry freshness matters most where
-                        // nothing else re-establishes it: a memory-resident var (partial
-                        // or element stores, which SSA promotion cannot rewrite), and
-                        // minimal-optimization builds where `constructSSA` never runs.
-                        // On the SSA-promotable path `constructSSA` re-derives an
-                        // equivalent undefined incoming on its own, so this store's value
-                        // there is consistency at the producer, not the existence of the
-                        // phi incoming.
+                        // entry. A per-entry init re-establishes that reads before the
+                        // definition are undefined, instead of carrying an earlier entry's
+                        // value around the back edge. This fires whether or not the var
+                        // moved: the store is placed right after the var, so it always
+                        // precedes the first real write of an entry, and it cannot fire
+                        // twice across the rerun loop — once the var sits in the header
+                        // block, that block is a loop header, not a loop condition block,
+                        // so `loopHeaderBlockMap` no longer matches it.
                         IRBuilder builder(func);
                         builder.setInsertAfter(var);
-                        builder.emitStore(
+                        emitHoistedVarPerEntryInit(
+                            builder,
                             var,
-                            builder.emitLoadFromUninitializedMemory(
-                                var->getDataType()->getValueType()));
+                            var->getDataType()->getValueType());
                     }
                 }
                 else if (shouldDuplicateInstAtUseSite(inst, target))
@@ -3364,9 +3388,9 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     if (shouldMoveToHeader)
                     {
                         // The temp var lives across the back edge of the loop whose
-                        // header received it, so give it the same per-entry uninitialized
-                        // store as a hoisted var: a use on a path that skips the definition
-                        // reads undefined rather than an earlier entry's stored value.
+                        // header received it, so give it the same per-entry init as a
+                        // hoisted var: a use on a path that skips the definition reads
+                        // undefined rather than an earlier entry's stored value.
                         // `inst->getFullType()` is the value type being stored — the
                         // same value type `emitVar` wrapped in a pointer two lines up.
                         // The var branch derives it from the var's pointer type instead
@@ -3375,9 +3399,7 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                         // non-var inst being legalized. (The duplicate-at-use-site
                         // branch above needs no init: it clones the definition to each
                         // use, so no def-less path exists.)
-                        builder.emitStore(
-                            tempVar,
-                            builder.emitLoadFromUninitializedMemory(inst->getFullType()));
+                        emitHoistedVarPerEntryInit(builder, tempVar, inst->getFullType());
                     }
 
                     traverseUses(

@@ -15,9 +15,13 @@
 // loop and used past its break block. After inlining into `main`'s bounce
 // loop, the hoisted value lives across the `TraceRay` call.
 //
-// Artifacts of the fix are checked at three layers. In the IR right after
-// `eliminateMultiLevelBreak`, the hoist must store an explicit
-// uninitialized-memory value into the hoisted var. In emitted SPIR-V and HLSL,
+// Artifacts of the fix are checked at four layers. In the IR right after
+// `eliminateMultiLevelBreak`, the hoist must carry a per-entry init: for this
+// scalar shape a concrete default store (undefined-memory stores do not
+// survive minimal-optimization pipelines). The `-minimum-slang-optimization`
+// SPIR-V variant pins the reporter's production flow (shader-slang/slang#14493
+// comment): the per-entry concrete store at the loop preheader is what keeps
+// the value from being loop-carried there. In default-emitted SPIR-V and HLSL,
 // the exhausted-search path — the one that stores the multi-level break level
 // marker (2) into the level variable when exiting the inlined region — must
 // not leave the phi-elimination result register unwritten: the level marker
@@ -30,6 +34,7 @@
 // regression in default construction for those types, since the store silently
 // falls back to the old unwritten-register behavior).
 
+//TEST:SIMPLE(filecheck=SPVMIN): -target spirv-asm -stage raygeneration -entry main -emit-spirv-directly -minimum-slang-optimization
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -stage raygeneration -entry main -emit-spirv-directly
 //TEST:SIMPLE(filecheck=IR): -target spirv-asm -stage raygeneration -entry main -dump-ir-after eliminateMultiLevelBreak
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage raygeneration -entry main
@@ -111,8 +116,14 @@ void mainMat()
 }
 
 // IR: ### AFTER eliminateMultiLevelBreak:
-// IR: = LoadFromUninitializedMemory
-// IR-NEXT: store(
+// The per-entry init at the hoist site: a concrete default for this scalar
+// shape (undefined-memory stores do not survive minimal-optimization
+// pipelines, and the concrete value keeps the register from being
+// loop-carried everywhere).
+// IR: store(%{{[A-Za-z0-9_]+}}, 0 : Float)
+
+// SPVMIN: OpStore %{{[A-Za-z0-9_]+}} %uint_0
+// SPVMIN-NEXT: OpStore %{{[A-Za-z0-9_]+}} %float_0
 
 // SPV: %[[F0:[A-Za-z0-9_]+]] = OpConstant %float 0
 // SPV: OpStore %{{[A-Za-z0-9_]+}} %int_2
@@ -127,12 +138,10 @@ void mainMat()
 // SPVVEC: OpStore %{{[A-Za-z0-9_]+}} %int_2
 // SPVVEC-NEXT: OpStore %{{[A-Za-z0-9_]+}} %[[V0]]
 
-// HLSLVEC: _S{{[0-9]+}} = 2L;
 // HLSLVEC: _S{{[0-9]+}} = (float4)0.0f;
 
 // SPVMAT: %[[M0:[A-Za-z0-9_]+]] = OpConstantComposite %mat2v2float
 // SPVMAT: OpStore %{{[A-Za-z0-9_]+}} %int_2
 // SPVMAT-NEXT: OpStore %{{[A-Za-z0-9_]+}} %[[M0]]
 
-// HLSLMAT: _S{{[0-9]+}} = 2L;
 // HLSLMAT: _S{{[0-9]+}} = float2x2(0.0f, 0.0f, 0.0f, 0.0f);
