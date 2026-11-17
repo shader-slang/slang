@@ -1,12 +1,14 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
-//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target hlsl
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
 //TEST:SIMPLE_EX(filecheck=CHECK_WGSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target wgsl
 //TEST:SIMPLE_EX(filecheck=CHECK_METAL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target metal
 //TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cuda
 //TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cpp
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -llvm -compute -entry computeMain -source-language glsl -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -entry computeMain -source-language glsl -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer B
@@ -19,10 +21,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // CHECK_GLSL: inverse(
     // CHECK_SPIR: MatrixInverse{{ }}
-    // CHECK_HLSL: void computeMain(
+    // CHECK_HLSL-NOT: E41012
+    // CHECK_HLSL-COUNT-4: determinant(
+    // CHECK_WGSL-NOT: E41012
     // CHECK_WGSL: determinant(
+    // CHECK_METAL-NOT: E41012
     // CHECK_METAL: determinant(
+    // CHECK_CUDA-NOT: E41012
     // CHECK_CUDA: void computeMain(
+    // CHECK_CPP-NOT: E41012
     // CHECK_CPP: void _computeMain(
     // BUF: 1
 
@@ -39,7 +46,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && i2[1][0] == 0.0
         && i2[1][1] == 0.25;
 
-    // 3x3: unit upper triangular; its inverse is integral.
+    // 3x3: unit triangular; its inverse is integral.
     const mat3 m3 = mat3(1.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 4.0, 1.0);
     const mat3 i3 = inverse(m3);
     ok = ok
@@ -47,7 +54,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && i3[0][1] == 0.0 && i3[1][1] == 1.0 && i3[2][1] == -4.0
         && i3[0][2] == 0.0 && i3[1][2] == 0.0 && i3[2][2] == 1.0;
 
-    // 4x4: unit upper triangular; its inverse is integral.
+    // 4x4: unit triangular; its inverse is integral.
     const mat4 m4 =
         mat4(1.0, 0.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0.0, 4.0, 1.0, 0.0, 0.0, 0.0, 8.0, 1.0);
     const mat4 i4 = inverse(m4);
@@ -56,6 +63,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && i4[0][1] == 0.0 && i4[1][1] == 1.0 && i4[2][1] == -4.0 && i4[3][1] == 32.0
         && i4[0][2] == 0.0 && i4[1][2] == 0.0 && i4[2][2] == 1.0 && i4[3][2] == -8.0
         && i4[0][3] == 0.0 && i4[1][3] == 0.0 && i4[2][3] == 0.0 && i4[3][3] == 1.0;
+
+#if defined(TARGET_HLSL)
+    // 1x1 matrices only legalize on the HLSL target, so only that compile leg
+    // runs this case.
+    const matrix<float, 1, 1> m1 = matrix<float, 1, 1>(2.0);
+    const matrix<float, 1, 1> i1 = inverse(m1);
+    ok = ok && i1[0][0] == 0.5;
+#endif
 
     outputBuffer.result = int(ok);
 }
