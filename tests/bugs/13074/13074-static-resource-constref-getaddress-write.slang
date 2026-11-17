@@ -8,7 +8,7 @@ static Texture2D<float4> cachedTexture = input0;
 [noinline]
 void replaceThroughConstRef(__constref Texture2D<float4> value)
 {
-    Texture2D<float4>* address = (Texture2D<float4>*)&value;
+    Texture2D<float4>* address = (Texture2D<float4>*)(__getAddress(value));
     *address = input1;
 }
 
@@ -25,10 +25,9 @@ void main()
     output[0] = cachedTexture.Load(int3(0, 0, 0));
 }
 
-// The explicit pointer cast lets the callee write through the programmer-declared `__constref`
-// parameter.
-// The generated parameter for `replaceCachedTexture` must therefore copy the updated resource back
-// to `main` instead of treating the call as read-only.
+// The callee writes the resource through an explicit cast of the read-only `__getAddress`
+// pointer — the escape hatch the borrow rule still permits — so the generated parameter for
+// `replaceCachedTexture` must still copy the updated resource back to `main`.
 //CHECK-LABEL: void replaceCachedTexture_0(
 //CHECK: replaceThroughConstRef_0(&cachedTexture_1,
 //CHECK: *cachedTexture_0 = cachedTexture_1;

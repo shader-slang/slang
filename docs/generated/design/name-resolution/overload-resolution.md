@@ -307,14 +307,15 @@ The individual steps:
    rejected here,
    and in `ForReal` mode emits
    `Diagnostics::MutatingMethodOnImmutableValue` (plus
-   `MutatingMethodOnFunctionInputParameterError` or
    `MutatingMethodOnFunctionInputParameterWarning` for a mutating call
-   on a legacy-syntax function input parameter)
+   on a legacy-syntax `in` parameter the body can write; any other
+   input parameter — a non-copyable `in` that is a borrow, or one made
+   immutable by `const` — is rejected as an immutable value instead)
    ([slang-check-overload.cpp lines
-   1097-1135](../../../../source/slang/slang-check-overload.cpp)).
+   1077-1107](../../../../source/slang/slang-check-overload.cpp)).
 5. **`TryCheckOverloadCandidateConstraints`**
    ([slang-check-overload.cpp line
-   1145](../../../../source/slang/slang-check-overload.cpp)) — for an
+   1113](../../../../source/slang/slang-check-overload.cpp)) — for an
    explicit generic application `G<A, B>`, this step validates the
    `where`-clauses on `G`'s parameters against the inferred
    substitutions and fills in any generic arguments left to defaults.
@@ -324,7 +325,7 @@ The individual steps:
    ([slang-check-impl.h line
    3751](../../../../source/slang/slang-check-impl.h), called at
    [slang-check-overload.cpp line
-   1221](../../../../source/slang/slang-check-overload.cpp)) — the same
+   1189](../../../../source/slang/slang-check-overload.cpp)) — the same
    fixpoint loop used for inferred generic arguments — rather than a
    per-constraint linear pass. It passes only the explicitly-provided
    ordinary prefix (`candidate.explicitGenericArgCount` arguments) via

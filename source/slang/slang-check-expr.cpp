@@ -709,14 +709,20 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, Type* elementType, Source
     derefExpr->type = ExprInfo(elementType);
     derefExpr->checked = true;
 
-    if (as<PtrType>(base->type))
+    if (auto ptrType = as<PtrType>(base->type))
     {
-        // TODO(tfoley): It is not clear why this is being unconditionally
-        // treated as read-write when the `Ptr` types in the core module has an
-        // `AccessQualifier` parameter that can be used to form a read-only pointer.
-        //
         derefExpr->type.valueCategory = ExprValueCategory::MemoryLocation;
-        derefExpr->type.access = ExprAccess::ReadWrite;
+        // A pointer's access qualifier says what the dereference permits: a `Read` or
+        // `Immutable` pointer derefs to a read-only location, so writing through any member
+        // of it is an error rather than a silent write to storage the pointer only borrowed.
+        // A generic `Access` argument that is not resolved may be `Read`, so the deref is
+        // read-only — the same default the subscript path applies, and the one
+        // `getExprInfoOfRefTarget` gives an unresolved reference.
+        auto ptrAccessQual = as<ConstantIntVal>(ptrType->getAccessQualifier());
+        bool isReadOnly = !ptrAccessQual ||
+                          AccessQualifier(ptrAccessQual->getValue()) == AccessQualifier::Read ||
+                          AccessQualifier(ptrAccessQual->getValue()) == AccessQualifier::Immutable;
+        derefExpr->type.access = isReadOnly ? ExprAccess::ReadOnly : ExprAccess::ReadWrite;
     }
     else if (auto refType = as<ExplicitRefType>(base->type))
     {
@@ -7584,6 +7590,24 @@ static PtrType* getValidTypeForAddressOf(
         {
             auto variableType = varDeclRef.substitute(m_astBuilder, targetType);
             auto varDecl = varDeclRef.getDecl();
+
+            // The address of a function parameter is read-write exactly when the body can
+            // write the parameter: the operand's info was already computed by
+            // getTypeForDeclRef, so a borrow, a modern `in` parameter, a `const` parameter, or
+            // a `__ref_readonly` parameter all get a read-only address, and a write through it
+            // is an error rather than a silent change to the caller's storage. A
+            // `__ref_writeonly` parameter's address stays read-write: the qualifier set has no
+            // write-only pointer, so the read it also permits is the pre-existing unchecked
+            // read of write-only storage. All three return branches below inherit this
+            // access. The access of other variables' addresses — a `const` local included —
+            // is left unchanged for now.
+            AccessQualifier ptrAccess = AccessQualifier::ReadWrite;
+            if (as<ParamDecl>(varDecl))
+            {
+                ptrAccess =
+                    baseExpr->type.canWrite() ? AccessQualifier::ReadWrite : AccessQualifier::Read;
+            }
+
             bool hasVulkanHitObjectAttributesAttribute = false;
             bool hasHLSLGroupSharedModifier = false;
             for (auto modifier : varDecl->modifiers)
@@ -7604,7 +7628,7 @@ static PtrType* getValidTypeForAddressOf(
             {
                 return m_astBuilder->getPtrType(
                     variableType,
-                    AccessQualifier::ReadWrite,
+                    ptrAccess,
                     AddressSpace::Generic,
                     m_astBuilder->getDefaultLayoutType());
             }
@@ -7613,7 +7637,7 @@ static PtrType* getValidTypeForAddressOf(
             {
                 return m_astBuilder->getPtrType(
                     variableType,
-                    AccessQualifier::ReadWrite,
+                    ptrAccess,
                     AddressSpace::GroupShared,
                     m_astBuilder->getDefaultLayoutType());
             }
@@ -7632,7 +7656,7 @@ static PtrType* getValidTypeForAddressOf(
                 //   etc.) handle it conservatively/correctly.
                 return m_astBuilder->getPtrType(
                     variableType,
-                    AccessQualifier::ReadWrite,
+                    ptrAccess,
                     AddressSpace::UserPointer,
                     m_astBuilder->getDefaultLayoutType());
             }

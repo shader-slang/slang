@@ -200,7 +200,6 @@
 30064	UNCOVERED	note	implicit-cast-used-as-lvalue	slang-diagnostics.lua	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value for this usage
 30065	covered	err	new-can-only-be-used-to-initialize-a-class	slang-diagnostics.lua	`new` can only be used to initialize a class
 30066	covered	err	class-can-only-be-initialized-with-new	slang-diagnostics.lua	class can only be initialized by `new`
-30067	UNCOVERED	err	mutating-method-on-function-input-parameter-error	slang-diagnostics.lua	mutating method called on `in` parameter
 30068	UNCOVERED	warning	mutating-method-on-function-input-parameter-warning	slang-diagnostics.lua	mutating method called on `in` parameter
 30070	covered	err	unsized-member-must-appear-last	slang-diagnostics.lua	unsized member must be last
 30071	UNCOVERED	err	var-cannot-be-unsized	slang-diagnostics.lua	cannot instantiate unsized type

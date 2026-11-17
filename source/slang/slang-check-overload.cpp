@@ -1086,37 +1086,21 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 return false;
             }
 
-            // The parameters of functions declared using traditional/legacy
-            // syntax are currently exposed as mutable locals within the body
-            // of the relevant function. As such, it is legal to call `[mutating]`
-            // methods on such a function parameter. However, doing so is typically
-            // indicative of an error on the programmer's part.
-            //
-            // We will detect such cases here and issue a diagnostic that explains
-            // the situation.
+            // A legacy (C-style) `in` parameter is a mutable local copy, so calling a
+            // `[mutating]` method on one is legal but typically indicates an error on the
+            // programmer's part, since the changes will not be visible to the caller. Only a
+            // parameter the body can write reaches here: a non-copyable `in` parameter is a
+            // borrow rather than a copy, and a parameter made immutable by `const` is equally
+            // a read-only value, so both are rejected above as immutable values.
             //
             if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
             {
                 if (auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
                 {
-                    const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
-
-                    if (isNonCopyable)
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterError{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
-                    else
-                    {
-                        getSink()->diagnose(
-                            Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
-                                .method = funcDeclRef.getName(),
-                                .param = paramDecl->getName(),
-                                .location = context.loc});
-                    }
+                    getSink()->diagnose(Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
+                        .method = funcDeclRef.getName(),
+                        .param = paramDecl->getName(),
+                        .location = context.loc});
                 }
             }
         }
@@ -1687,7 +1671,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             // then the call is an l-value if base is l-value.
                             //
                             // If Ptr<T, Access> we only need to check for ReadWrite
-                            // Access (if ReadWrite result is an LValue. By default a
+                            // Access (if ReadWrite result is an LValue). By default a
                             // Ptr<...> is Read-only (unresolved generic argument & Access::Read).
                             if (auto base = GetBaseExpr(baseExpr))
                             {
@@ -1695,7 +1679,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                                 {
                                     auto accessQualifier =
                                         as<ConstantIntVal>(ptrTypeBase->getAccessQualifier());
-                                    if (!accessQualifier ||
+                                    if (accessQualifier &&
                                         AccessQualifier(accessQualifier->getValue()) ==
                                             AccessQualifier::ReadWrite)
                                     {

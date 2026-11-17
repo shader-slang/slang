@@ -523,7 +523,7 @@ Slang supports overloading of functions based on parameter types.
 
 Function parameters may be marked with a _direction_ qualifier:
 
-* `in` (the default) indicates a by-value input parameter
+* `in` (the default) indicates a by-value input parameter; a non-copyable `in` parameter is an immutable borrow rather than a copy
 * `out` indicates an output parameter
 * `inout` or `in out` indicates an input/output parameter
 
@@ -546,7 +546,7 @@ Slang has additional parameter modifiers for borrows and references:
 
 > #### Note ####
 > These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.
-> As with `out` and `inout`, Slang does not check that a program respects the access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior.
+> As with `out` and `inout`, Slang does not check that a program respects the caller-side access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior. The callee-side rule is checked: writing a borrow parameter in the body of the function is a compile-time error. (As in C, an explicit pointer cast can discard read-only-ness; writes through such a cast are not checked and have undefined behavior.)
 
 A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we expect user code to use.
 Its argument must be a `groupshared` variable, a part of one, or another `groupshared` parameter, and the function accesses that memory while other invocations in the thread group can access it too.
