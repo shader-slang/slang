@@ -6,7 +6,7 @@
 // to one at a call inside the callee is a mismatch the front end can see from the signatures
 // alone (shader-slang/slang#13836). The warning is opt-in, in the `all` group: this test
 // runs it with `-Wall` and pins that it stays off by default, that the other warning groups
-// do not turn it on, and that a per-id `-Wno-` suppresses it. Bouncing the value through a
+// (`-Wextra`, `-Wpedantic`) do not turn it on, and that a per-id `-Wno-` suppresses it. Bouncing the value through a
 // local temporary restores the exclusivity guarantee and silences it. A direct `groupshared`
 // argument such as `g[i]` is deliberately not diagnosed: barriers may legitimately
 // synchronize its aliases during the call, and the checker cannot see that (the removed
@@ -17,6 +17,7 @@
 
 // The groups are independent, and a per-id disable wins: neither may turn this `all` warning on.
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -Wextra -target hlsl -entry computeMain -stage compute -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -Wpedantic -target hlsl -entry computeMain -stage compute -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -Wall -Wno-passing-non-exclusive-memory-to-exclusive-parameter -target hlsl -entry computeMain -stage compute -experimental-feature
 
 // With -Wall, and with an explicit per-id enable, the warning appears.
@@ -43,6 +44,8 @@ void viaRef(__ref int y)
     innerOut(y);
 //CHECK:     ^ passing non-exclusive memory ('y') to a function ('innerOut') that requires exclusive access
 //CHECK:     ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'y' does not guarantee that
+    // Silent: the callee's `__ref` parameter requires no exclusivity, so reference-to-
+    // reference forwarding stays quiet.
     takesRef(y);
 }
 
@@ -95,9 +98,21 @@ void viaWriteonly(__ref_writeonly int w)
 // parameter's storage forwarded as the receiver warns too.
 void viaMutating(__ref Counter c)
 {
+        // The extra indent puts the receiver at a column the `//CHECK:` caret can reach: the
+        // annotation prefix is eight characters, so a caret cannot point before column nine.
         c.bump();
 //CHECK:^ passing non-exclusive memory ('c') to a function ('bump') that requires exclusive access
 //CHECK:^ parameter 'this' requires exclusive access to its argument for the duration of the call, but reference parameter 'c' does not guarantee that
+}
+
+// A generic reference parameter keeps its parameter type through resolution, so forwarding
+// one warns; the callee renders under its declared name however the call was specialized.
+void innerGeneric<U>(inout U x) { }
+void viaGenericRef<T>(__ref T y)
+{
+    innerGeneric(y);
+//CHECK:         ^ passing non-exclusive memory ('y') to a function ('innerGeneric') that requires exclusive access
+//CHECK:         ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'y' does not guarantee that
 }
 
 // --- Silent: the argument guarantees exclusivity, or the callee does not require it ---
@@ -139,6 +154,7 @@ void computeMain(uint i : SV_GroupIndex)
     viaWriteonly(g[i]);
     Counter cMain = Counter();
     viaMutating(cMain);
+    viaGenericRef(g[i]);
     viaIn(1);
     viaInOut(g[i]);
     takesLocal();

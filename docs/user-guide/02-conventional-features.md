@@ -535,8 +535,13 @@ While the call is in progress, nothing else should read or write the argument's 
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
-> Slang does not check this contract in general; if other code accesses the argument's memory during the call, the program has undefined behavior.
-> One statically knowable mismatch does carry an opt-in warning: with `-Wall`, Slang warns when a reference parameter of the enclosing function is forwarded to an `out` or `inout` parameter at a call inside the callee (or given to a `[mutating]` method as its receiver), since the signatures alone show the exclusivity contract cannot be guaranteed; a local temporary restores it.
+> Slang does not check in general that a program gives an `out` or `inout` parameter exclusive access to its argument; if other code accesses the argument's memory during the call, the program has undefined behavior.
+> One statically knowable case does carry an opt-in check: with `-Wall`, Slang warns (warning 30712) when a function forwards one of its reference parameters to an `out` or `inout` parameter of a function it calls, or gives one to a method whose callee may modify its `this` (a `[mutating]` method, a `set` accessor, or a method written in HLSL source, where methods are mutating by default), since the signatures alone show the exclusivity contract cannot be guaranteed:
+> ```
+> void inner(inout int x) { x += 1; }
+> void f(__ref int y) { inner(y); }  // warns under -Wall: `y` may be aliased
+> ```
+> Copying the value through a local temporary restores the guarantee; suppress the warning per-id with `-Wno-passing-non-exclusive-memory-to-exclusive-parameter`.
 
 #### Borrow and Reference Parameters ####
 
