@@ -52,6 +52,12 @@ runs:
         # release jobs use it to build host generators before switching to
         # their explicit cross-compilation toolchain.
         arch: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && 'arm64' || 'x64' }}
+        # We select MSVC 14.44 on Windows ARM64 because MSVC 14.52.37025, which
+        # runner image 20261112.217.1 ships as the default, crashes cl.exe with
+        # C1001 (actions/runner-images#15328). The LLVM prebuilt key below names
+        # the same toolset, and sccache-populate.yml builds that prebuilt with
+        # it. An empty value keeps the default toolset on the other runners.
+        toolset: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && '14.44' || '' }}
 
     - name: Install dependencies (Linux only)
       if: inputs.os == 'linux'
@@ -126,6 +132,9 @@ runs:
         compiler: ${{ inputs.compiler }}
         platform: ${{ inputs.platform }}
         llvm-hash: ${{ hashFiles('external/build-llvm.sh', 'external/llvm-*.patch') }}
+        # A prebuilt that a newer toolset built can need standard-library symbols
+        # that MSVC 14.44 lacks, so Windows ARM64 uses a prebuilt built with 14.44.
+        toolset: ${{ (inputs.os == 'windows' && runner.arch == 'ARM64') && 'msvc14.44' || '' }}
         build-if-missing: "true"
         github-token: ${{ github.token }}
 
