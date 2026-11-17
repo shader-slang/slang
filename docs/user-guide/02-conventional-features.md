@@ -535,7 +535,9 @@ While the call is in progress, nothing else should read or write the argument's 
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
-> Slang does not check that a program gives an `out` or `inout` parameter exclusive access to its argument; if other code accesses the argument's memory during the call, the program has undefined behavior.
+> Slang performs a best-effort syntactic check and emits a warning (diagnostics 30051 and 30134) when it can prove that the same storage is passed to two parameters that may both reference it, or to a parameter and the receiver of a `[mutating]` or `[__ref]` method.
+> The check does not enforce exclusivity: it is advisory, and it only covers structurally provable aliasing.
+> If other code accesses the argument's memory during the call, the program has undefined behavior.
 
 #### Borrow and Reference Parameters ####
 
@@ -546,7 +548,7 @@ Slang has additional parameter modifiers for borrows and references:
 
 > #### Note ####
 > These modifiers exist mainly to support the Slang core module. Their spelling and their implementation are subject to change, so we recommend that user code avoid them, with the exception of `groupshared` described below.
-> As with `out` and `inout`, Slang does not check that a program respects the access rules of a borrow (there is no borrow checker); a program that violates them has undefined behavior.
+> As with `out` and `inout`, Slang does not enforce the access rules of a borrow (there is no borrow checker; the aliasing warnings described above are advisory); a program that violates them has undefined behavior.
 
 A parameter marked `groupshared` is a reference to thread-group-shared memory, and is the one kind of reference parameter we expect user code to use.
 Its argument must be a `groupshared` variable, a part of one, or another `groupshared` parameter, and the function accesses that memory while other invocations in the thread group can access it too.
