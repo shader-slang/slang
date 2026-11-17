@@ -1103,8 +1103,12 @@ FIDDLE()
 class GLSLBindingAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() int32_t binding = 0;
-    FIDDLE() int32_t set = 0;
+    // The Vulkan descriptor `binding` and `set` indices. Both are stored as `IntVal`s so
+    // that expressions over link-time constants (e.g. derived from `extern` constants) can
+    // be used; consumers resolve them to concrete integers against the linked program via
+    // `Program::tryFoldIntVal` when computing parameter bindings.
+    FIDDLE() IntVal* binding = nullptr;
+    FIDDLE() IntVal* set = nullptr;
 };
 
 FIDDLE()

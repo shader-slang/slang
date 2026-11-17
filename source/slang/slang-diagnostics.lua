@@ -5326,6 +5326,13 @@ err(
     note { message = "combine the data into one `[[vk::push_constant]]` block or into the entry point's `uniform` parameters", span { loc = "entryPoint:IRInst" } }
 )
 
+err(
+    "binding-attribute-requires-concrete-value",
+    39034,
+    "binding attribute requires a concrete value",
+    span { loc = "location", message = "an argument of '[[vk::binding(...)]]' is a link-time constant that is not a concrete value here; provide a default or link a module that defines it" }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,

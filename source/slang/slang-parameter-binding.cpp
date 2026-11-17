@@ -1137,6 +1137,47 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
     return false;
 }
 
+// Resolve the `binding` and `set` values stored on a `[[vk::binding(...)]]` attribute against
+// the linked program. The attribute keeps them as `IntVal`s so that expressions over
+// link-time constants (e.g. derived from `extern` constants) can select their value via a
+// linked override; here is where they must become the concrete indices the layout consumes.
+// An argument that was never specified (`layout(binding = N)` alone, or the defaulted
+// `set`) means index 0. Returns false (after diagnosing) when a specified value is a
+// link-time constant that cannot be resolved, e.g. an `extern` constant with no default
+// initializer and no linked definition; the outputs are set to 0 in that case.
+static bool _tryResolveGLSLBindingAttribute(
+    ParameterBindingContext* context,
+    GLSLBindingAttribute* attr,
+    IntegerLiteralValue& outBinding,
+    IntegerLiteralValue& outSet)
+{
+    outBinding = 0;
+    outSet = 0;
+    bool resolved = true;
+    auto program = context->getTargetProgram()->getProgram();
+    if (attr->binding)
+    {
+        if (auto bindingVal = program->tryFoldIntVal(attr->binding))
+            outBinding = bindingVal->getValue();
+        else
+            resolved = false;
+    }
+    if (attr->set)
+    {
+        if (auto setVal = program->tryFoldIntVal(attr->set))
+            outSet = setVal->getValue();
+        else
+            resolved = false;
+    }
+    if (!resolved)
+    {
+        getSink(context)->diagnose(
+            Diagnostics::BindingAttributeRequiresConcreteValue{.location = attr->loc});
+        return false;
+    }
+    return true;
+}
+
 static void addExplicitParameterBindings_GLSL(
     ParameterBindingContext* context,
     RefPtr<ParameterInfo> parameterInfo,
@@ -1251,9 +1292,12 @@ static void addExplicitParameterBindings_GLSL(
             // Try to find `binding` and `set`
             if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
             {
+                IntegerLiteralValue binding = 0;
+                IntegerLiteralValue set = 0;
+                _tryResolveGLSLBindingAttribute(context, glslBindingAttr, binding, set);
                 info[kResInfo].resInfo = foundResInfo;
-                info[kResInfo].semanticInfo.index = glslBindingAttr->binding;
-                info[kResInfo].semanticInfo.space = glslBindingAttr->set;
+                info[kResInfo].semanticInfo.index = binding;
+                info[kResInfo].semanticInfo.space = set;
             }
         }
         else if (
@@ -1264,15 +1308,18 @@ static void addExplicitParameterBindings_GLSL(
             // Try to find `set`
             if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
             {
+                IntegerLiteralValue binding = 0;
+                IntegerLiteralValue set = 0;
+                _tryResolveGLSLBindingAttribute(context, attr, binding, set);
                 info[kResInfo].resInfo = foundResInfo;
-                if (attr->binding != 0)
+                if (binding != 0)
                 {
                     getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
                         .paramName = varDecl.getName(),
-                        .binding = (int64_t)attr->binding,
+                        .binding = (int64_t)binding,
                         .location = attr->loc});
                 }
-                info[kResInfo].semanticInfo.index = attr->set;
+                info[kResInfo].semanticInfo.index = set;
                 info[kResInfo].semanticInfo.space = 0;
             }
         }
@@ -1521,25 +1568,28 @@ static bool addExplicitVkBindingForEntryPointParameter(
     {
         if (auto explicitResourceInfo = findVkBindingEntryPointParameterResourceInfo(varLayout))
         {
+            IntegerLiteralValue binding = 0;
+            IntegerLiteralValue set = 0;
+            _tryResolveGLSLBindingAttribute(context, attr, binding, set);
             LayoutSemanticInfo semanticInfo;
             LayoutSize count = explicitResourceInfo->count;
             if (explicitResourceInfo->kind == LayoutResourceKind::DescriptorTableSlot)
             {
                 semanticInfo.kind = LayoutResourceKind::DescriptorTableSlot;
-                semanticInfo.index = attr->binding;
-                semanticInfo.space = attr->set;
+                semanticInfo.index = binding;
+                semanticInfo.space = set;
             }
             else if (explicitResourceInfo->kind == LayoutResourceKind::SubElementRegisterSpace)
             {
                 semanticInfo.kind = LayoutResourceKind::SubElementRegisterSpace;
-                if (attr->binding != 0)
+                if (binding != 0)
                 {
                     getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
                         .paramName = varDecl.getName(),
-                        .binding = (int64_t)attr->binding,
+                        .binding = (int64_t)binding,
                         .location = attr->loc});
                 }
-                semanticInfo.index = attr->set;
+                semanticInfo.index = set;
                 semanticInfo.space = 0;
             }
             else
