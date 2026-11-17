@@ -3566,20 +3566,31 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 /// Tests that compare with an `.expected` file do not need this check, because the result code is
 /// a part of the text they compare.
 ///
+/// `textComparisonCoversExitCode` says whether the runner's comparison already fails on an
+/// unexpected exit code for a test that has neither a `diag=` nor a `filecheck=` prefix, because
+/// the compared text contains the `result code = N` line. It is true for every runner that
+/// compares the tool output (`SIMPLE`, `INTERPRET`, `REFLECTION`, `DISPATCHER` and the compute
+/// comparison family), so for those runners the check applies only to a test with one of the
+/// prefixes. It is false for `SIMPLE_LINE`, whose comparison covers only the line number of the
+/// first diagnostic, so the check applies to every test of that runner. A `SIMPLE_LINE` test
+/// with a `diag=` prefix keeps the `-1` default of a diagnostic test.
+///
 /// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
 /// exit code is not the expected one, after it reports the mismatch.
 static bool _checkExpectedExitCode(
     TestContext* context,
     const TestInput& input,
     int resultCode,
-    bool& outMismatch)
+    bool& outMismatch,
+    bool textComparisonCoversExitCode)
 {
     outMismatch = false;
 
     String diagPrefix;
     String fileCheckPrefix;
     const bool isDiagTest = input.testOptions->getDiagTestPrefix(diagPrefix);
-    if (!isDiagTest && !input.testOptions->getFileCheckPrefix(fileCheckPrefix))
+    const bool hasFileCheckPrefix = input.testOptions->getFileCheckPrefix(fileCheckPrefix);
+    if (textComparisonCoversExitCode && !isDiagTest && !hasFileCheckPrefix)
         return true;
 
     auto reporter = context->getTestReporter();
@@ -3705,7 +3716,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
 
     bool exitCodeMismatch = false;
-    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch, true))
         return TestResult::Fail;
 
     return _validateOutput(
@@ -3742,6 +3753,10 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
         return TestResult::Pass;
     }
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch, false))
+        return TestResult::Fail;
+
     // Parse all the diagnostics so we can extract line numbers
     auto diagnostics = ArtifactDiagnostics::create();
     if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(
@@ -3768,7 +3783,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
         actualOutput << "No output diagnostics\n";
     }
 
-    return _validateOutput(context, input, actualOutput, false);
+    return _validateOutput(context, input, actualOutput, exitCodeMismatch);
 }
 
 TestResult runInterpreterTest(TestContext* context, TestInput& input)
@@ -3824,7 +3839,7 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
     String actualOutput = getOutput(exeRes);
 
     bool exitCodeMismatch = false;
-    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch, true))
         return TestResult::Fail;
 
     return _validateOutput(
@@ -3862,11 +3877,15 @@ TestResult runDispatcherTest(TestContext* context, TestInput& input)
 
     String actualOutput = getOutput(exeRes);
 
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch, true))
+        return TestResult::Fail;
+
     return _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -4071,7 +4090,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     }
 
     bool exitCodeMismatch = false;
-    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch))
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch, true))
         return TestResult::Fail;
 
     return _validateOutput(context, input, actualOutput, exitCodeMismatch);
@@ -5137,11 +5156,14 @@ TestResult runComputeComparisonImpl(
 
     // Check the stdout/stderr from the compiler process
     auto actualOutput = getOutput(exeRes);
+    bool exitCodeMismatch = false;
+    if (!_checkExpectedExitCode(context, input, exeRes.resultCode, exitCodeMismatch, true))
+        return TestResult::Fail;
     auto compileResult = _validateOutput(
         context,
         input,
         actualOutput,
-        false,
+        exitCodeMismatch,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n");
 
     // check against reference output
