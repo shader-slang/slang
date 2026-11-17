@@ -33,7 +33,6 @@ struct Root
 }
 
 uniform Root* gRoot;
-uniform RWStructuredBuffer<int> gOther;
 uniform int gUniformVar;
 groupshared int gSharedVar;
 

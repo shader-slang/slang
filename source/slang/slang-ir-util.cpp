@@ -1727,9 +1727,11 @@ static bool canInstReadResourceContentsAtAddress(IRInst* inst, IRInst* addr)
     auto resourceRoot = getRootBufferOrAddr(inst->getOperand(0));
 
     // The same root may name the very resource whose contents `inst` reads: a constant buffer
-    // that nests an `RWStructuredBuffer` resolves both an element pointer into that buffer and
-    // the buffer operand of a `buf.Load(i)` to the same constant-buffer global parameter, whose
-    // class alone (`ConstantBuffer` cannot alias with anything) would wrongly report no overlap.
+    // that nests an `RWStructuredBuffer` can resolve both an element pointer into that buffer
+    // and the buffer operand of a `buf.Load(i)` to the same constant-buffer global parameter,
+    // whose class alone (`ConstantBuffer` cannot alias with anything) would wrongly report no
+    // overlap. When the nested buffer's handle instead reaches the load unpeeled, the class
+    // check below still answers conservatively through its `Unknown` class.
     //
     if (addrRoot == resourceRoot)
         return true;
