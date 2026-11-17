@@ -3860,7 +3860,14 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             // the stage struct's `invoke` method, so its enclosing generic wraps the struct:
             // applying that generic produces the specialized stage struct, not a function.
             // Walk to the nearest enclosing generic the same way other declaration-ref
-            // consumers do, carrying the function's own substitutions.
+            // consumers do, carrying the function's own substitutions. This targets the
+            // nearest generic while parameter collection gathers every enclosing generic's
+            // parameters, so a stage struct nested inside a further generic (say
+            // `Outer<T>` containing `M<P>` selected as `Outer.M`) advertises parameters this
+            // application cannot yet bind: the arguments go to `M`'s generic first, and the
+            // outer one needs a follow-up application that no current spelling performs. The
+            // assert below holds because both walks descend the same parent-decl chain: a
+            // nonzero collected count implies the enclosing generic exists.
             genericDeclRef =
                 getGenericParentDeclRef(getLinkage()->getASTBuilder(), &visitor, m_funcDeclRef);
         }
@@ -3876,7 +3883,11 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         if (isVariadic)
             genericArgCount = argCount - existentialSpecializationParamCount;
 
-        if (genericArgCount < 0)
+        // The command-line path only ever forwards an argument count equal to the declared
+        // specialization parameters, but the public specialize() API forwards any count, so
+        // an under-application must be rejected here: the collection loop below would
+        // otherwise read specialization arguments past the caller's buffer.
+        if (genericArgCount < 0 || genericArgCount > argCount)
         {
             sink->diagnose(Diagnostics::MismatchSpecializationArguments{
                 .expected = (int64_t)(genericSpecializationParamCount +
@@ -3999,19 +4010,22 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
                 true,
                 &foundStage,
                 &stageType);
-            info->entryPointNameOverride = PortableRT::getEntryPointName(
-                PortableRT::getSourceTypeName(astBuilder, stageType).getUnownedSlice(),
-                getStage());
+            info->entryPointNameOverride =
+                PortableRT::getStageTargetName(astBuilder, stageType, getStage());
         }
         else
         {
             // The generic application or the solver failed without diagnosing: an applied
             // generic that stays partially applied and whose remaining parameter the solver
-            // cannot complete yields an empty decl-ref here (for example a defaulted
-            // parameter whose default fails its own constraint). Without this check the
+            // cannot complete yields an empty decl-ref here. Without this check the
             // unspecialized initializer above would survive and the specialization would
-            // report success with generic placeholder types; fail it here instead so the
-            // ordinary argument-count mismatch diagnostic surfaces.
+            // report success with generic placeholder types. This is a satisfiability
+            // failure, not a count failure — the counts here already match — so report it
+            // directly rather than letting the outer consumed-count check emit a
+            // self-contradictory "wrong number" message.
+            sink->diagnose(Diagnostics::UnableToSpecializeEntryPoint{
+                .entryPoint = getName(),
+                .location = m_funcDeclRef.getDecl()->loc});
             return nullptr;
         }
 
