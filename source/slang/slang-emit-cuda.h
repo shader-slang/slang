@@ -135,6 +135,15 @@ protected:
     void _emitInitializerListContent(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);
 
+    /// Append the CUDA C++ name of `coopMatType` (a
+    /// `Slang_CUDA_WMMA::WmmaFragment<...>` instantiation) to `outName`.
+    /// Returns SLANG_FAIL after diagnosing the reason when the element type
+    /// (E50000) or shape (E50001) is invalid for this target, in which case
+    /// `outName` is empty on the element-type path but holds an unclosed
+    /// `Slang_CUDA_WMMA::WmmaFragment<` prefix on the shape path, so callers
+    /// must not use it after a failure.  Every caller must handle the
+    /// SLANG_FAIL; the overall compile fails on the first recorded error
+    /// regardless of how many times an invalid type is diagnosed.
     SlangResult emitWMMAFragmentType(IRCoopMatrixType* coopMatType, StringBuilder& outName);
     RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };

@@ -123,14 +123,33 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
     }
 
     StringBuilder builder;
+    Index errorCountBefore = getSink()->getErrorCount();
     if (SLANG_SUCCEEDED(calcTypeName(type, m_target, builder)))
     {
         handle = m_slicePool.add(builder);
     }
+    else
+    {
+        // calcTypeName is allowed to fail when it has already diagnosed the
+        // reason (for example an invalid cooperative-matrix element type or
+        // shape on CUDA).  A failure that diagnosed nothing would otherwise
+        // silently emit the placeholder below into an otherwise-successful
+        // compile, so we surface it as an internal-error diagnostic instead.
+        if (getSink()->getErrorCount() == errorCountBefore)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(
+                getSink(),
+                SourceLoc(),
+                "calcTypeName failed without diagnosing the reason");
+        }
+        // The recorded error fails the overall compile, so the placeholder
+        // name never reaches a downstream compiler; it only keeps declarations
+        // that use this type syntactically valid.
+        handle = m_slicePool.add("SlangInvalidType");
+    }
 
     m_typeNameMap.add(type, handle);
 
-    SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
     return m_slicePool.getSlice(handle);
 }
 
