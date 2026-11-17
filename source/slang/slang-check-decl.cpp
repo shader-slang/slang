@@ -1207,10 +1207,14 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        dispatchIfNotNull(expr->declRef.declRefBase);
-
-        // Pass down the callee location
-        processDeclModifiers(expr->declRef.getDecl(), expr->loc);
+        // Delegate to visitDeclRefExpr so a static-member reference gets full
+        // parity with every other member reference: the referenced member's
+        // [require]s and any requirements carried by the member's type both
+        // propagate. The declRefBase walk alone never reaches the inner member
+        // decl of the MemberDeclRef that a generic parent builds (its Decl
+        // operand is ASTNode-kind, not a ValNode), so without this delegation
+        // the member's requirements are silently dropped.
+        visitDeclRefExpr(expr);
     }
     void visitInitializerListExpr(InitializerListExpr* expr)
     {
