@@ -3,6 +3,13 @@
 // flavor": the base upcast defers a keyed-field projection into a
 // BoundMemberInfo, and the consumers of that info only accepted VarDecl
 // members, rejecting the InheritanceDecl of a struct base.
+//
+// The Counter/ICounter conformance case guards a different invariant:
+// interface bases must keep lowering to witness-table requirements rather
+// than fields, so interface conformance stays untouched by the field-like
+// path. The Counting scenarios at the end pin the accessor call counts of a
+// deferred inherited-field write (two gets: the temporary materialization
+// and the write-back merge) against the one-get direct-field analog.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -vk
@@ -95,10 +102,24 @@ int readCount(ICounter counter)
     return counter.count;
 }
 
+static int gGets = 0;
+static int gSets = 0;
+
+struct Counting
+{
+    Payload stored = {};
+
+    property Payload counted
+    {
+        get { gGets += 1; return stored; }
+        set { gSets += 1; stored = newValue; }
+    }
+}
+
 //TEST_INPUT:ubuffer(data=[0 0], stride=8):name=buf
 RWStructuredBuffer<Payload> buf;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -140,7 +161,22 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     addFive(h.payload2);
     outputBuffer[7] = h.stored2.value; // CHECK: 6.0
 
-    // A struct conforming to an interface keeps working.
+    // A struct conforming to an interface keeps working: interface bases lower
+    // to witness-table requirements, never fields, so the field-like path
+    // must leave them untouched.
     Counter counter = {9};
     outputBuffer[8] = readCount(counter); // CHECK: 9
+
+    // An inherited-field write through a get/set property reads the property
+    // twice (the temporary materialization and the write-back merge) and
+    // writes it once; the own-field write below reads and writes it once.
+    Counting counting = {};
+    counting.counted.value = 8.0;
+    outputBuffer[9] = float(gGets); // CHECK: 2
+    outputBuffer[10] = float(gSets); // CHECK: 1
+    outputBuffer[11] = counting.counted.value; // CHECK: 8.0
+
+    counting.counted.extra = 9.0;
+    outputBuffer[12] = float(gGets); // CHECK: 4
+    outputBuffer[13] = float(gSets); // CHECK: 2
 }
