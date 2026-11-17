@@ -13,6 +13,6 @@ __LINE__
 
 __LINE__
 
-// CHECK: 6
+// CHECK: 4
 // CHECK: "Hello"
-// CHECK: 16
+// CHECK: 14
