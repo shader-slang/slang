@@ -1097,11 +1097,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
             {
                 if (auto paramDecl = isReferenceIntoFunctionInputParameter(context.baseExpr))
                 {
-                    getSink()->diagnose(
-                        Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
-                            .method = funcDeclRef.getName(),
-                            .param = paramDecl->getName(),
-                            .location = context.loc});
+                    getSink()->diagnose(Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
+                        .method = funcDeclRef.getName(),
+                        .param = paramDecl->getName(),
+                        .location = context.loc});
                 }
             }
         }
