@@ -60,6 +60,17 @@ static ResourceOperationControlFlowDependence calculateResourceOperationControlF
     CodeGenContext* codeGenContext,
     IRInst* originalConsumer);
 
+/// Return the location to report for an operation that resource selection moves into
+/// conditional branches. A consumer synthesized by an earlier pass, such as a call rebuilt
+/// by type legalization, may carry no source location; we fall back to its first located
+/// use so the warning still points at relevant user code, and only report without a
+/// location when nothing better exists.
+static SourceLoc getOriginalConsumerSourceLoc(IRInst* originalConsumer)
+{
+    return originalConsumer->sourceLoc.isValid() ? originalConsumer->sourceLoc
+                                                 : findFirstUseLoc(originalConsumer);
+}
+
 void diagnoseResourceSelectionDispatch(CodeGenContext* codeGenContext, IRInst* originalConsumer)
 {
     // We choose the diagnostic before `specializeResourceSelections` copies the original operation
@@ -74,13 +85,13 @@ void diagnoseResourceSelectionDispatch(CodeGenContext* codeGenContext, IRInst* o
     case ResourceOperationControlFlowDependence::Derivative:
         codeGenContext->getSink()->diagnose(
             Diagnostics::ResourceSelectionIntroducesConditionalDerivative{
-                .location = originalConsumer->sourceLoc,
+                .location = getOriginalConsumerSourceLoc(originalConsumer),
             });
         return;
     case ResourceOperationControlFlowDependence::Unknown:
         codeGenContext->getSink()->diagnose(
             Diagnostics::ResourceSelectionIntroducesConditionalUnknownOperation{
-                .location = originalConsumer->sourceLoc,
+                .location = getOriginalConsumerSourceLoc(originalConsumer),
             });
         return;
     }
