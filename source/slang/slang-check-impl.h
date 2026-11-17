@@ -4730,6 +4730,402 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
 
+template<typename VisitorType>
+struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
+                                       public StmtVisitor<VisitorType>,
+                                       public ExprVisitor<VisitorType>,
+                                       public ValVisitor<VisitorType>,
+                                       public DeclVisitor<VisitorType>
+{
+    SemanticsDeclReferenceVisitor(SemanticsContext const& outer)
+        : SemanticsDeclVisitorBase(outer)
+    {
+    }
+
+    List<SourceLoc> sourceLocStack;
+
+    struct PushSourceLocRAII
+    {
+        List<SourceLoc>& stack;
+        bool shouldPop = false;
+        PushSourceLocRAII(List<SourceLoc>& sourceLocStack, SourceLoc loc)
+            : stack(sourceLocStack)
+        {
+            if (loc.isValid())
+            {
+                stack.add(loc);
+                shouldPop = true;
+            }
+        }
+        ~PushSourceLocRAII()
+        {
+            if (shouldPop)
+            {
+                stack.removeLast();
+            }
+        }
+    };
+
+    virtual void processReferencedDecl(Decl* decl) = 0;
+
+    virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) = 0;
+
+    void dispatchIfNotNull(Stmt* stmt)
+    {
+        if (!stmt)
+            return;
+        PushSourceLocRAII sourceLocRAII(sourceLocStack, stmt->loc);
+        return StmtVisitor<VisitorType>::dispatch(stmt);
+    }
+    void dispatchIfNotNull(Expr* expr)
+    {
+        if (!expr)
+            return;
+        PushSourceLocRAII sourceLocRAII(sourceLocStack, expr->loc);
+        return ExprVisitor<VisitorType>::dispatch(expr);
+    }
+    void dispatchIfNotNull(Val* val)
+    {
+        if (!val)
+            return;
+        return ValVisitor<VisitorType>::dispatch(val);
+    }
+    void dispatchIfNotNull(DeclBase* val)
+    {
+        if (!val)
+            return;
+        return DeclVisitor<VisitorType>::dispatch(val);
+    }
+
+    // Expr Visitor
+    void visitExpr(Expr*) {}
+
+    void visitOpenRefExpr(OpenRefExpr* expr) { dispatchIfNotNull(expr->innerExpr); }
+
+    void visitIndexExpr(IndexExpr* subscriptExpr)
+    {
+        for (auto arg : subscriptExpr->indexExprs)
+            dispatchIfNotNull(arg);
+        dispatchIfNotNull(subscriptExpr->baseExpression);
+    }
+
+    void visitParenExpr(ParenExpr* expr) { dispatchIfNotNull(expr->base); }
+
+    void visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto element : expr->elements)
+            dispatchIfNotNull(element);
+    }
+
+    void visitAddressOfExpr(AddressOfExpr* expr) { dispatchIfNotNull(expr->arg); }
+
+    void visitAssignExpr(AssignExpr* expr)
+    {
+        dispatchIfNotNull(expr->left);
+        dispatchIfNotNull(expr->right);
+    }
+
+    void visitGenericAppExpr(GenericAppExpr* genericAppExpr)
+    {
+        dispatchIfNotNull(genericAppExpr->functionExpr);
+        for (auto arg : genericAppExpr->arguments)
+            dispatchIfNotNull(arg);
+    }
+
+    void visitSharedTypeExpr(SharedTypeExpr* expr) { dispatchIfNotNull(expr->base.exp); }
+
+    void visitInvokeExpr(InvokeExpr* expr)
+    {
+        dispatchIfNotNull(expr->functionExpr);
+        for (auto arg : expr->arguments)
+            dispatchIfNotNull(arg);
+    }
+
+    // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
+    // `InvokeExpr`, so it needs its own recursion into the operands -- otherwise decl references
+    // inside an operand (and their inferred capability requirements) would be missed.
+    void visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        for (auto arg : expr->arguments)
+            dispatchIfNotNull(arg);
+    }
+
+    void visitTypeCastExpr(TypeCastExpr* expr)
+    {
+        dispatchIfNotNull(expr->functionExpr);
+        for (auto arg : expr->arguments)
+            dispatchIfNotNull(arg);
+    }
+
+    void visitDerefExpr(DerefExpr* expr) { dispatchIfNotNull(expr->base); }
+    void visitMatrixSwizzleExpr(MatrixSwizzleExpr* expr) { dispatchIfNotNull(expr->base); }
+    void visitSwizzleExpr(SwizzleExpr* expr) { dispatchIfNotNull(expr->base); }
+    void visitOverloadedExpr(OverloadedExpr*) { return; }
+    void visitOverloadedExpr2(OverloadedExpr2*) { return; }
+    void visitAggTypeCtorExpr(AggTypeCtorExpr*) { return; }
+    void visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr) { dispatchIfNotNull(expr->valueArg); }
+    void visitModifierCastExpr(ModifierCastExpr* expr) { dispatchIfNotNull(expr->valueArg); }
+    void visitLetExpr(LetExpr* expr) { dispatchIfNotNull(expr->body); }
+    void visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
+    {
+        dispatchIfNotNull(expr->declRef.declRefBase);
+    }
+
+    void visitDeclRefExpr(DeclRefExpr* expr)
+    {
+        dispatchIfNotNull(expr->type.type);
+        dispatchIfNotNull(expr->declRef.declRefBase);
+
+        // Pass down the callee location
+        processDeclModifiers(expr->declRef.getDecl(), expr->loc);
+    }
+
+    void visitMemberExpr(MemberExpr* expr)
+    {
+        dispatchIfNotNull(expr->baseExpression);
+        visitDeclRefExpr(expr);
+    }
+
+    void visitStaticMemberExpr(StaticMemberExpr* expr)
+    {
+        dispatchIfNotNull(expr->declRef.declRefBase);
+    }
+    void visitInitializerListExpr(InitializerListExpr* expr)
+    {
+        for (auto arg : expr->args)
+        {
+            dispatchIfNotNull(arg);
+        }
+    }
+
+    void visitThisExpr(ThisExpr*) { return; }
+
+    void visitThisTypeExpr(ThisTypeExpr*) { return; }
+    void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr*) { return; }
+    void visitThisInterfaceExpr(ThisInterfaceExpr*) { return; }
+    void visitAndTypeExpr(AndTypeExpr* expr)
+    {
+        dispatchIfNotNull(expr->left.type);
+        dispatchIfNotNull(expr->right.type);
+    }
+    void visitPointerTypeExpr(PointerTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+    void visitAsTypeExpr(AsTypeExpr* expr)
+    {
+        dispatchIfNotNull(expr->value);
+        dispatchIfNotNull(expr->witnessArg);
+    }
+    void visitIsTypeExpr(IsTypeExpr* expr)
+    {
+        dispatchIfNotNull(expr->value);
+        dispatchIfNotNull(expr->witnessArg);
+    }
+    void visitMakeOptionalExpr(MakeOptionalExpr* expr)
+    {
+        dispatchIfNotNull(expr->value);
+        dispatchIfNotNull(expr->typeExpr);
+    }
+    void visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        dispatchIfNotNull(expr->valueArg);
+        // innerVarDecl is synthetic; innerCoercedExpr references it
+        dispatchIfNotNull(expr->innerCoercedExpr);
+    }
+    void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr*) { return; }
+    void visitSPIRVAsmExpr(SPIRVAsmExpr*) { return; }
+    void visitModifiedTypeExpr(ModifiedTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+    void visitFuncTypeExpr(FuncTypeExpr* expr)
+    {
+        for (const auto& t : expr->parameters)
+        {
+            dispatchIfNotNull(t.type);
+        }
+        dispatchIfNotNull(expr->result.type);
+    }
+    void visitTupleTypeExpr(TupleTypeExpr* expr)
+    {
+        for (auto t : expr->members)
+        {
+            dispatchIfNotNull(t.type);
+        }
+    }
+    void visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        for (auto arg : expr->args)
+            dispatchIfNotNull(arg);
+    }
+    void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+    {
+        dispatchIfNotNull(expr->packOperand.type);
+        dispatchIfNotNull(expr->emptyType.type);
+        dispatchIfNotNull(expr->nonEmptyType.type);
+    }
+    void visitTryExpr(TryExpr* expr) { dispatchIfNotNull(expr->base); }
+    void visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    {
+        dispatchIfNotNull(expr->baseFunction);
+    }
+    void visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
+    {
+        dispatchIfNotNull(expr->innerExpr);
+    }
+
+    // Stmt Visitor
+
+    void visitDeclStmt(DeclStmt* stmt) { dispatchIfNotNull(stmt->decl); }
+
+    void visitBlockStmt(BlockStmt* stmt) { dispatchIfNotNull(stmt->body); }
+
+    void visitSeqStmt(SeqStmt* seqStmt)
+    {
+        for (auto stmt : seqStmt->stmts)
+            dispatchIfNotNull(stmt);
+    }
+
+    void visitLabelStmt(LabelStmt* stmt) { dispatchIfNotNull(stmt->innerStmt); }
+
+    void visitBreakStmt(BreakStmt*) { return; }
+
+    void visitContinueStmt(ContinueStmt*) { return; }
+
+    void visitDoWhileStmt(DoWhileStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->predicate);
+        dispatchIfNotNull(stmt->statement);
+    }
+
+    void visitForStmt(ForStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->initialStatement);
+        dispatchIfNotNull(stmt->predicateExpression);
+        dispatchIfNotNull(stmt->sideEffectExpression);
+        dispatchIfNotNull(stmt->statement);
+    }
+
+    void visitCompileTimeForStmt(CompileTimeForStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->rangeBeginExpr);
+        dispatchIfNotNull(stmt->rangeEndExpr);
+        dispatchIfNotNull(stmt->body);
+    }
+
+    void visitSwitchStmt(SwitchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->condition);
+        dispatchIfNotNull(stmt->body);
+    }
+
+    void visitCaseStmt(CaseStmt* stmt) { dispatchIfNotNull(stmt->expr); }
+
+    void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
+    {
+        for (auto targetCase : stmt->targetCases)
+            dispatchIfNotNull(targetCase);
+    }
+
+    void visitTargetCaseStmt(TargetCaseStmt* stmt) { dispatchIfNotNull(stmt->body); }
+
+    void visitIntrinsicAsmStmt(IntrinsicAsmStmt*) { return; }
+
+    void visitDefaultStmt(DefaultStmt*) { return; }
+
+    void visitIfStmt(IfStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->predicate);
+        dispatchIfNotNull(stmt->positiveStatement);
+        dispatchIfNotNull(stmt->negativeStatement);
+    }
+
+    void visitUnparsedStmt(UnparsedStmt*) { return; }
+
+    void visitEmptyStmt(EmptyStmt*) { return; }
+
+    void visitDiscardStmt(DiscardStmt*) { return; }
+
+    void visitReturnStmt(ReturnStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
+
+    void visitThrowStmt(ThrowStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->errorVar);
+        dispatchIfNotNull(stmt->tryBody);
+        dispatchIfNotNull(stmt->handleBody);
+    }
+
+    void visitWhileStmt(WhileStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->predicate);
+        dispatchIfNotNull(stmt->statement);
+    }
+
+    void visitGpuForeachStmt(GpuForeachStmt*) { return; }
+
+    void visitExpressionStmt(ExpressionStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitRequireCapabilityStmt(RequireCapabilityStmt*) { return; }
+
+    // Val Visitor
+
+    void visitDirectDeclRef(DirectDeclRef* declRef)
+    {
+        // If we have already visited, return.
+        // Otherwise add it to visited set.
+        if (!visitedVals.add(declRef))
+            return;
+
+        processReferencedDecl(declRef->getDecl());
+    }
+
+    void visitVal(Val* val)
+    {
+        // If we have already visited, return.
+        // Otherwise add it to visited set.
+        if (!visitedVals.add(val))
+            return;
+
+        for (Index i = 0; i < val->getOperandCount(); i++)
+        {
+            auto& operand = val->m_operands[i];
+            switch (operand.kind)
+            {
+            case ValNodeOperandKind::ValNode:
+                dispatchIfNotNull(val->getOperand(i));
+                break;
+            default:
+                break;
+            }
+        }
+        return;
+    }
+
+    HashSet<Val*> visitedVals;
+
+    // Decl visitor
+    void visitDeclBase(DeclBase*) {}
+
+    void visitContainerDecl(ContainerDecl* decl)
+    {
+        for (auto m : decl->getDirectMemberDecls())
+        {
+            dispatchIfNotNull(m);
+        }
+    }
+
+    void visitFunctionDeclBase(FunctionDeclBase* decl)
+    {
+        visitContainerDecl(decl);
+        dispatchIfNotNull(decl->body);
+    }
+
+    void visitVarDeclBase(VarDeclBase* varDecl)
+    {
+        dispatchIfNotNull(varDecl->type.type);
+        dispatchIfNotNull(varDecl->initExpr);
+    }
+};
+
 bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
