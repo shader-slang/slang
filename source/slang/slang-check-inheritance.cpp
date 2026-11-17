@@ -1126,7 +1126,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // the interface that declares `A`, and add the projected type as an equality
         // base. For the example, `TriangleAttributes` becomes a base of
         // `C.Primitive.Attributes` and `barycentricCoord` resolves, exactly as it does
-        // for a freshly spelled `C.Primitive.Attributes`.
+        // for a freshly spelled `C.Primitive.Attributes`. The projection is restricted
+        // to the access's direct source; an equality on a deeper source is consumed by
+        // the shallower access's own frame, so the chain resolves level by level.
         auto tryAddEqualityCongruenceBase = [&](Facet facet)
         {
             // Only an equality facet projects. The facet's witness is the declared
@@ -1143,6 +1145,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             Decl* requirementDecl = selfLookupDeclRef->getDecl();
             auto interfaceType = as<DeclRefType>(selfLookupDeclRef->getWitness()->getSup());
             if (!interfaceType)
+                return;
+
+            // The congruence applies only at the access's direct source: `X == Y`
+            // projects onto `selfType == X.A` as `X.A == Y.A`. An equality on a deeper
+            // source (for a self type `X.B.A`) would have to project through the whole
+            // access path (`Y.B.A`), never onto `Y.A` alone, so it is consumed by the
+            // shallower frame of `X.B` instead and must be skipped here.
+            if (!declaredWitness->getSub()->getCanonicalType()->equals(
+                    selfLookupDeclRef->getLookupSource()->getCanonicalType()))
                 return;
 
             Type* otherEndpoint = declaredWitness->getSup();
