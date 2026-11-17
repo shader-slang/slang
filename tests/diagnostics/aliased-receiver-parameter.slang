@@ -1,4 +1,8 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -experimental-feature -warnings-disable 30816
+
+// (30816 is the unstable-inheritance warning the Base/Derived case below
+// trips; it is documented as removable, so the id is disabled rather than
+// pinned.)
 
 // Test that the potential-aliasing warnings cover an argument that
 // aliases the receiver of a `[mutating]` or `[__ref]` method, reported
@@ -70,7 +74,35 @@ struct P
 
 struct IntArr { int e[2]; }
 
+// A method inherited from a base type is called on the derived value, with
+// the receiver wrapped in a super-type cast that names the same storage.
+struct Base
+{
+    int bv;
+
+    [mutating] void m(inout int x) { bv = 5; x = 7; }
+}
+
+struct Derived : Base {}
+
+void baseAndIntPrefix(inout Base a, inout int b) { a.bv = 5; b = 7; }
+
+void inoutVecAndElem(inout float4 a, inout float b) { a.x = b; }
+
+void inoutMatAndRow(inout float4x4 a, inout float4 b) { a[0] = b; }
+
+void inoutVecAndSwizzle(inout float4 a, inout float2 b) { a.x = b.x; }
+
+void bufAndElem(__borrow RWStructuredBuffer<int> a, inout int b) { b = a[0]; }
+
+void ptrAndField(inout S* a, inout int b) { b = 0; }
+
 static int gIdx = 1;
+
+// A module-scope buffer is a shader parameter, so reading it (as the
+// `bufAndElem` case below does through `buf[0]`) has no uninitialized-read
+// warning the way a local buffer variable would.
+RWStructuredBuffer<int> aliasTestBuf;
 
 void twoInout(inout S a, inout S b) { a.v = 5; b.v = 7; }
 
@@ -103,11 +135,15 @@ void computeMain()
     NC nc;
     nc.v = 3;
     IntArr arrObj;
+    Derived d;
+    Derived d2;
+    float4 v;
+    float4x4 m;
 
     // Positive control: the same storage to two inout parameters warns (#10699).
     twoInout(s, s);
 //CHECK:     ^ potentially aliased argument to a parameter that may be written
-//CHECK:     ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:     ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
 
     // Positive: a `[mutating]` receiver is `inout` storage the call may write,
     // so an argument naming the receiver, or a subobject of it, warns. A
@@ -117,37 +153,40 @@ void computeMain()
     // and an array element is a receiver like any other l-value.
     {
         s.mutInout(s);
-//CHECK:^ argument may alias the receiver of a method that may write it
-//CHECK:^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing the same value to both may produce undefined behavior
+//CHECK:^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing overlapping storage to both may produce undefined behavior
         s.mutBorrow(s);
-//CHECK:^ argument may alias the receiver of a method that may write it
-//CHECK:^ argument for 'borrow' parameter 'other' may alias the receiver of the call, passed 'inout'; passing the same value to both may produce undefined behavior
+//CHECK:^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:^ argument for 'borrow' parameter 'other' may alias the receiver of the call, passed 'inout'; passing overlapping storage to both may produce undefined behavior
         s.mutInoutField(s.v);
-//CHECK:^ argument may alias the receiver of a method that may write it
-//CHECK:^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing the same value to both may produce undefined behavior
+//CHECK:^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing overlapping storage to both may produce undefined behavior
         s.refBorrow(s);
-//CHECK:^ argument may alias the receiver of a method that may write it
-//CHECK:^ argument for 'borrow' parameter 'other' may alias the receiver of the call, passed 'ref'; passing the same value to both may produce undefined behavior
+//CHECK:^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:^ argument for 'borrow' parameter 'other' may alias the receiver of the call, passed 'ref'; passing overlapping storage to both may produce undefined behavior
         s.refInOut(s);
-//CHECK:^ argument may alias the receiver of a method that may write it
-//CHECK:^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'ref'; passing the same value to both may produce undefined behavior
+//CHECK:^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'ref'; passing overlapping storage to both may produce undefined behavior
         arrS[0].mutInout(arrS[0]);
-//CHECK:    ^ argument may alias the receiver of a method that may write it
-//CHECK:    ^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing the same value to both may produce undefined behavior
+//CHECK:    ^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:    ^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing overlapping storage to both may produce undefined behavior
         arrS[0].mutInoutField(arrS[0].v);
-//CHECK:    ^ argument may alias the receiver of a method that may write it
-//CHECK:    ^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing the same value to both may produce undefined behavior
+//CHECK:    ^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:    ^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing overlapping storage to both may produce undefined behavior
         outer.inner.mutInout(outer);
-//CHECK:      ^^^^^ argument may alias the receiver of a method that may write it
-//CHECK:      ^^^^^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing the same value to both may produce undefined behavior
+//CHECK:      ^^^^^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:      ^^^^^ argument for 'inout' parameter 'other' may alias the receiver of the call, passed 'inout'; passing overlapping storage to both may produce undefined behavior
+        d.m(d.bv);
+//CHECK:^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:^ argument for 'inout' parameter 'x' may alias the receiver of the call, passed 'inout'; passing overlapping storage to both may produce undefined behavior
     }
 
     // Positive: an unannotated method on a non-copyable receiver is
     // effectively borrowed, so it warns like any other writable borrow.
     {
         nc.plainBorrow(nc.v);
-//CHECK:^^ argument may alias the receiver of a method that may write it
-//CHECK:^^ argument for 'inout' parameter 'x' may alias the receiver of the call, passed 'borrow'; passing the same value to both may produce undefined behavior
+//CHECK:^^ argument may alias the receiver of a call that may write the aliased storage
+//CHECK:^^ argument for 'inout' parameter 'x' may alias the receiver of the call, passed 'borrow'; passing overlapping storage to both may produce undefined behavior
     }
 
     // Positive: an access path that is a prefix of another argument's access
@@ -157,19 +196,33 @@ void computeMain()
     // `arrObj`'s storage for any `gIdx`).
     inoutAndInoutPrefix(s, s.v);
 //CHECK:                ^ potentially aliased argument to a parameter that may be written
-//CHECK:                ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:                ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
     inoutAndInoutPrefix(arrS[0], arrS[0].v);
 //CHECK:                    ^ potentially aliased argument to a parameter that may be written
-//CHECK:                    ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:                    ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
     inoutAndInoutPrefixRev(s.v, s);
 //CHECK:                     ^ potentially aliased argument to a parameter that may be written
-//CHECK:                     ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:                     ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
     inoutBoxAndIntPrefix(box, box.s.v);
 //CHECK:                 ^^^ potentially aliased argument to a parameter that may be written
-//CHECK:                 ^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:                 ^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
     arrAndElem(arrObj, arrObj.e[gIdx]);
 //CHECK:       ^^^^^^ potentially aliased argument to a parameter that may be written
-//CHECK:       ^^^^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:       ^^^^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
+
+    // Positive: a vector or matrix element lives inside its base's storage,
+    // so subscripting extends the access path like an array element does;
+    // and an argument upcast to a base type names the same storage as the
+    // derived value, so `d.bv` is still contained in `d` through the cast.
+    inoutVecAndElem(v, v[0]);
+//CHECK:            ^ potentially aliased argument to a parameter that may be written
+//CHECK:            ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
+    inoutMatAndRow(m, m[0]);
+//CHECK:           ^ potentially aliased argument to a parameter that may be written
+//CHECK:           ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
+    baseAndIntPrefix(d, d.bv);
+//CHECK:             ^ potentially aliased argument to a parameter that may be written
+//CHECK:             ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing overlapping storage to both may produce undefined behavior
 
     // Negative: an `in` parameter is a copy taken before the call, so a
     // prefix-aliased argument never warns. Exhaustive mode fails the test if a
@@ -189,6 +242,13 @@ void computeMain()
     s.mutInout(s2);
     s.mutInoutField(s2.v);
     arrS[0].mutInout(arrS[1]);
+    d.m(d2.bv);
+
+    // Negative: a multi-component swizzle binds through a temporary, so it
+    // does not name storage inside its base; a buffer subscript names storage
+    // pointed to, like any pointer or buffer index.
+    inoutVecAndSwizzle(v, v.xy);
+    bufAndElem(aliasTestBuf, aliasTestBuf[0]);
 
     // Negative: a dynamic index inside the *shared* path is never provable
     // (the identical-path check compares constant indices only), so a dynamic
@@ -199,11 +259,14 @@ void computeMain()
     // pointer as its receiver, which the structural proof cannot see through,
     // so the receiver pair never fires for it — including when the argument is
     // the pointer itself (`p->setPtr(p)`) or the pointee (`p->mutInout(*p)`).
+    // A deref member in an *argument* path (`p->v`) names the pointee's field,
+    // not the pointer's storage, so it does not alias the pointer argument.
     {
         S* p = &s;
         p->mutInout(s);
         p->mutInout(*p);
         p->setPtr(p);
+        ptrAndField(p, p->v);
     }
 
     // Negative: a property is mediated by accessors, so an argument naming it

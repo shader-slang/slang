@@ -535,7 +535,7 @@ While the call is in progress, nothing else should read or write the argument's 
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
-> Slang performs a best-effort syntactic check and emits a warning (diagnostics 30051 and 30134) when it can prove that the same storage is passed to two parameters that may both reference it, or to a parameter and the receiver of a `[mutating]` or `[__ref]` method (or a method that is effectively borrowed, such as a plain method on a non-copyable type).
+> Slang performs a best-effort syntactic check and emits a warning (diagnostics 30051 and 30134) when it can prove that overlapping storage — the same location, or one contained in the other, such as `s` and `s.v` — reaches two parameters that may both reference it and at least one may write it (a pair of explicit `__ref` parameters has opted into reference semantics and does not warn), or reaches a parameter and the receiver of a `[mutating]` or `[__ref]` method, or of a method that is effectively borrowed such as a plain method on a non-copyable type, under the same rule.
 > The check does not enforce exclusivity: it is advisory, and it only covers structurally provable aliasing.
 > If other code accesses the argument's memory during the call, the program has undefined behavior.
 

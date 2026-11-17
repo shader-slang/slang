@@ -4218,16 +4218,17 @@ public:
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
     /// Diagnose potential-argument-aliasing on `invoke`: pairs of explicit arguments whose
     /// storage provably overlaps (identical or prefix access paths), and each argument against
-    /// `receiverExpr`, the method call's receiver, when both `receiverExpr` and `receiverMode`
-    /// are set (the caller sets them as a pair, or neither). All pairs are judged by
-    /// `_mayAliasedArgumentsInterfere` on the parameters' passing modes, and each comparison
-    /// emits at most one warning (W30051 for argument pairs, W30134 for the receiver pair).
-    void _checkAliasedOutArguments(
+    /// `receiver`, the method call's receiver paired with its effective passing mode, when set
+    /// (the caller sets the pair or leaves it empty). All pairs are judged by
+    /// `_mayAliasedArgumentsInterfere` on the parameters' passing modes. Warning budgets:
+    /// argument pairs warn at most once per outer argument index (a call with several
+    /// pairwise-aliased arguments can emit several W30051s), and the receiver pair emits at
+    /// most one W30134 per call.
+    void _checkPotentiallyAliasedArguments(
         InvokeExpr* invoke,
         FuncType* funcType,
         List<DeclRef<ParamDecl>> const& paramDeclRefs,
-        Expr* receiverExpr,
-        std::optional<ParamPassingMode> receiverMode);
+        std::optional<std::pair<Expr*, ParamPassingMode>> receiver);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
 
     /// Diagnose `invoke`, a call whose callee may throw, unless a `try` covers it. While its
