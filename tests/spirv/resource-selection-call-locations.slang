@@ -9,25 +9,28 @@
 // source location of the original call, so each warning points at the consumer in `main`
 // instead of printing without a location. The plain-texture control never goes through
 // that rebuild and must keep its located warning unchanged.
+// The GLSL library expresses implicit sampling as a textual target intrinsic, so its
+// conservative classification yields the unknown-requirement warning instead of the
+// derivative warning SPIR-V reports for the same source.
 // WRAPPED-SAMPLE-NOT: warning[E5602{{[01]}}]
 // WRAPPED-SAMPLE: warning[E56020]: resource selection introduces conditional execution
-// WRAPPED-SAMPLE: --> {{.*}}resource-selection-call-locations.slang:58:25
+// WRAPPED-SAMPLE: --> {{.*}}resource-selection-call-locations.slang:61:25
 // WRAPPED-SAMPLE-NOT: warning[E5602{{[01]}}]
 // WRAPPED-LEVEL-NOT: warning[E5602{{[01]}}]
 // WRAPPED-LEVEL: warning[E56021]: resource selection introduces conditional execution
-// WRAPPED-LEVEL: --> {{.*}}resource-selection-call-locations.slang:58:25
+// WRAPPED-LEVEL: --> {{.*}}resource-selection-call-locations.slang:61:25
 // WRAPPED-LEVEL-NOT: warning[E5602{{[01]}}]
 // PLAIN-SAMPLE-NOT: warning[E5602{{[01]}}]
 // PLAIN-SAMPLE: warning[E56020]: resource selection introduces conditional execution
-// PLAIN-SAMPLE: --> {{.*}}resource-selection-call-locations.slang:64:23
+// PLAIN-SAMPLE: --> {{.*}}resource-selection-call-locations.slang:67:23
 // PLAIN-SAMPLE-NOT: warning[E5602{{[01]}}]
 // WRAPPED-SAMPLE-GLSL-NOT: warning[E5602{{[01]}}]
 // WRAPPED-SAMPLE-GLSL: warning[E56021]: resource selection introduces conditional execution
-// WRAPPED-SAMPLE-GLSL: --> {{.*}}resource-selection-call-locations.slang:58:25
+// WRAPPED-SAMPLE-GLSL: --> {{.*}}resource-selection-call-locations.slang:61:25
 // WRAPPED-SAMPLE-GLSL-NOT: warning[E5602{{[01]}}]
 // WRAPPED-LEVEL-GLSL-NOT: warning[E5602{{[01]}}]
 // WRAPPED-LEVEL-GLSL: warning[E56021]: resource selection introduces conditional execution
-// WRAPPED-LEVEL-GLSL: --> {{.*}}resource-selection-call-locations.slang:58:25
+// WRAPPED-LEVEL-GLSL: --> {{.*}}resource-selection-call-locations.slang:61:25
 // WRAPPED-LEVEL-GLSL-NOT: warning[E5602{{[01]}}]
 
 Texture2D texture;
