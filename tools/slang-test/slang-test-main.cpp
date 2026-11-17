@@ -3552,13 +3552,14 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     return result;
 }
 
-/// Whether the text comparison of a runner covers the exit code, which says for which tests
-/// `_checkExpectedExitCode` needs to run.
+/// Whether the runner's text comparison already pins the exit code, which decides for which
+/// tests `_checkExpectedExitCode` must run.
 enum class TextComparisonCoversExitCode
 {
-    /// The compared text contains the `result code = N` line — an `.expected` file or the
-    /// runner's default expected text — so the check applies only to a test with a `filecheck=`
-    /// or `diag=` prefix, whose comparison ignores that line.
+    /// The runner compares against expected text that contains the `result code = N` line — an
+    /// `.expected` file, or the fixed default text of the runners that pass one — so the check
+    /// applies only to a test with a `filecheck=` or `diag=` prefix, whose comparison does not
+    /// necessarily check that line.
     Yes,
 
     /// The compared text never contains the result code, so the check applies to every test of
@@ -3577,15 +3578,21 @@ enum class TextComparisonCoversExitCode
 /// be 0 (success), -1 (the compilation failed because of errors in the input) or 1 (the command
 /// line was invalid, or the tool failed to run), as in the exit codes that `slangc -help` lists.
 /// The test fails for another value. The exit code -2 is never an expected result, because it
-/// reports an internal compiler error, which is a bug in the compiler.
+/// reports an internal compiler error, which is a bug in the compiler. A runner classified `Yes`
+/// returns early for a test without a `filecheck=` or `diag=` prefix, so such a test ignores
+/// `exit-code=` entirely; `SIMPLE_LINE` (`No`) validates the option on every test.
 ///
-/// `TextComparisonCoversExitCode::Yes` fits every runner that compares the tool output:
-/// `runSimpleTest` (the `SIMPLE`, `SIMPLE_EX` and `COMMAND_LINE_SIMPLE` types),
-/// `runInterpreterTest`, `runReflectionTest`, `runDispatcherTest` and `runComputeComparisonImpl`
-/// (the compute comparison family). `TextComparisonCoversExitCode::No` fits `SIMPLE_LINE`, whose
-/// comparison covers only the line number of the first diagnostic, so its check runs on every
-/// test. `SIMPLE_LINE` does not support `diag=`; a test that checks diagnostic annotations uses
-/// `SIMPLE`.
+/// `TextComparisonCoversExitCode::Yes` fits every runner that compares against expected text
+/// containing the `result code = N` line: `runSimpleTest` (the `SIMPLE` and `SIMPLE_EX` types,
+/// and `COMMAND_LINE_SIMPLE` through `runSimpleCompareCommandLineTest`, which forwards to it),
+/// `runInterpreterTest`, `runDispatcherTest` and `runComputeComparisonImpl` (the compute
+/// comparison family), which pass a fixed default text when the test has no `.expected` file,
+/// and `runReflectionTest`, which compares against an `.expected` file and passes no default
+/// text. `TextComparisonCoversExitCode::No` fits `SIMPLE_LINE`, whose comparison covers only the
+/// line number of the first diagnostic, so its check runs on every test. `SIMPLE_LINE` does not
+/// support the `diag=` option: `runSimpleLineTest`, unlike `runSimpleTest`, never passes
+/// `-enable-machine-readable-diagnostics`, so the diagnostic annotations cannot be checked
+/// against the extracted line number. A test that checks diagnostic annotations uses `SIMPLE`.
 ///
 /// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
 /// exit code is not the expected one, after it reports the mismatch.
@@ -5201,7 +5208,7 @@ TestResult runComputeComparisonImpl(
             exitCodeMismatch,
             TextComparisonCoversExitCode::Yes))
         return TestResult::Fail;
-    auto compileResult = _validateOutput(
+    auto outputResult = _validateOutput(
         context,
         input,
         actualOutput,
@@ -5233,7 +5240,7 @@ TestResult runComputeComparisonImpl(
                       return SLANG_SUCCEEDED(
                           _compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
                   });
-    return TestReporter::combine(compileResult, bufferResult);
+    return TestReporter::combine(outputResult, bufferResult);
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
