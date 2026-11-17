@@ -11,6 +11,8 @@ class InterfaceDecl;
 class FunctionDeclBase;
 class AggTypeDecl;
 class Decl;
+class ExtensionDecl;
+class InheritanceDecl;
 class Type;
 class ASTBuilder;
 class MagicTypeModifier;
@@ -28,7 +30,20 @@ void checkStageRestrictions(
     SemanticsVisitor* visitor,
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable,
-    SourceLoc conformanceLoc);
+    InheritanceDecl* inheritanceDecl);
+
+/// Checks the stage-implementation rule that a generic extension defers for each concrete type
+/// the extension applies to.
+///
+/// A generic extension whose target is its own parameter cannot validate its clause at
+/// conformance-check time, because the implementation is not concrete yet. This entry point
+/// runs the same user-defined-struct rule against `selfType` when the extension's facet is
+/// built for that type, which covers every consumption surface that discovers extension-derived
+/// conformances (entry selection, schema lists, subtype queries, specializations, imports).
+void checkStageRestrictionsForExtensionApplication(
+    SemanticsVisitor* visitor,
+    ExtensionDecl* extDecl,
+    Type* selfType);
 
 /// Diagnoses repeated program types in a checked schema section.
 void diagnoseDuplicateSchemaEntries(

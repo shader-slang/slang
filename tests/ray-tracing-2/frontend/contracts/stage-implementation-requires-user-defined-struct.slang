@@ -1,8 +1,7 @@
 // Stage implementations must be ordinary structs, so classes and built-in types are rejected.
 // An interface may add stage requirements without itself defining an executable stage.
-// Generic extension targets are also rejected for now: the check sees T before it can validate
-// the concrete implementations. Supporting them is tracked in
-// https://github.com/shader-slang/slang/issues/13618.
+// A generic extension that names its own parameter as the target is accepted; the
+// user-defined-struct rule is then applied to each concrete type the extension applies to.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature -no-codegen
 
 import slang.raytracing.portable;
@@ -50,10 +49,35 @@ extension float : rt::IClosestHitShader
 
 interface IGenericStageTarget {}
 
-__generic<T : IGenericStageTarget> extension T : rt::IClosestHitShader
-//CHECK:                                             ^^^^^^^^^^^^^^^^^ invalid structural ray-tracing stage implementation
-//CHECK:                                             ^^^^^^^^^^^^^^^^^ structural ray-tracing stage implementation 'T' must be declared as a struct
+// The generic extension itself is accepted while its target is still the parameter T. The
+// annotations below it are for the concrete builtin application `extension float : ...`
+// further down: the deferred rule reports on the clause that declared the conformance,
+// because a builtin type has no source declaration to point at.
+__generic<T : IGenericStageTarget>
+extension T : rt::IClosestHitShader
+//CHECK:          ^^^^^^^^^^^^^^^^^ invalid structural ray-tracing stage implementation
+//CHECK:          ^^^^^^^^^^^^^^^^^ structural ray-tracing stage implementation 'float' must be declared as a struct
 {
     typealias Context = HitContext;
-    static void invoke(rt::ClosestHitInput<Context> input) {}
+    static void invoke(in rt::ClosestHitInput<Context> input) {}
+}
+
+// Concrete applications of the generic extension are checked when the extension applies to the
+// type, so a builtin and a class reached through it still receive the user-defined-struct rule.
+extension float : IGenericStageTarget {}
+class InvalidGenericTarget : IGenericStageTarget {}
+/*CHECK:
+      ^^^^^^^^^^^^^^^^^^^^ invalid structural ray-tracing stage implementation
+      ^^^^^^^^^^^^^^^^^^^^ structural ray-tracing stage implementation 'InvalidGenericTarget' must be declared as a struct
+*/
+
+// Selecting a type as a stage computes its inheritance information, which applies the generic
+// extension and runs the deferred rule.
+void useStage<T : rt::IClosestHitShader>() {}
+
+[numthreads(1, 1, 1)]
+void main()
+{
+    useStage<float>();
+    useStage<InvalidGenericTarget>();
 }
