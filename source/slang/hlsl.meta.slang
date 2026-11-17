@@ -25308,11 +25308,15 @@ struct HitObject
         }
     }
 
-    // The DXR-native capability requirement lives on `Invoke`, the only caller, whose
-    // `[require(hlsl, ser_dxr_raygen_closesthit_miss)]` already implies everything this
-    // helper needs. Declaring a requirement here again would make `Invoke`'s
-    // `case hlsl:` capability set incomparable with its `case hlsl_nvapi:` arm, which
-    // the target_switch capability merge rejects.
+    // This helper deliberately carries no [require]: the DXR-native requirement
+    // belongs on its callers (currently only `Invoke`, whose
+    // `[require(hlsl, ser_dxr_raygen_closesthit_miss)]` implies everything the
+    // helper needs), and any future caller must declare the same. Re-declaring
+    // ser_dxr here would break callers that also serve the nvapi SER target:
+    // `case hlsl:` and `case hlsl_nvapi:` both feed the same hlsl target-family
+    // entry in the target_switch capability merge, where {ser_hlsl_native}
+    // beside {hlsl_nvapi} fails the subset-or-reject rule
+    // (TargetSwitchCapCasesConflict).
     __generic<payload_t>
     static void __InvokeHLSL_DXR(
         HitObject HitOrMiss,
@@ -25410,6 +25414,11 @@ struct HitObject
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    // Declares the nvapi SER target like the 3-argument Invoke above: an
+    // NVAPI-SER entry point passes the capability check and reaches the
+    // hlsl_nvapi arm's deliberate static_assert below, which explains that
+    // the 2-argument form has no NVAPI spelling, instead of failing with a
+    // capability error that gives no hint what to call instead.
     [require(nvapi, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
@@ -34482,6 +34491,11 @@ extension RWByteAddressBuffer : IRWPhysicalBuffer
 /// @param byteOffset16ByteAligned The byte offset from the start of the buffer. Must be 16-byte aligned.
 /// @return A new cooperative vector containing the loaded values.
 [ForceInline]
+// These three overloads (ByteAddressBuffer here, RWByteAddressBuffer and the
+// groupshared form below) declare the same alternatives as the
+// CoopVec<T, N>.load callees they wrap: those load forms have an OptiX arm,
+// so they carry optix_coopvec in addition to cooperative_vector. Plain CUDA
+// remains available through the cooperative_vector alternative.
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)

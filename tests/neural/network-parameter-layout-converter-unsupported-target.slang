@@ -21,5 +21,8 @@ void computeMain(uint tid : SV_GroupIndex)
         1);
 }
 
+// toOptimalLayout's [require]s (cuda/metal/spirv compute) fire at the entry
+// point before the lowered body's own static_assert is reached, so the
+// diagnostic names the call site rather than the converter's internals.
 // CHECK: error[E36107]: unavailable features in entry point
 // CHECK: see using of 'toOptimalLayout'
