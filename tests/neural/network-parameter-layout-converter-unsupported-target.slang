@@ -21,5 +21,5 @@ void computeMain(uint tid : SV_GroupIndex)
         1);
 }
 
-// CHECK: static assertion failed
-// CHECK: NetworkParameterLayoutConverter.toOptimalLayout
+// CHECK: error[E36107]: unavailable features in entry point
+// CHECK: see using of 'toOptimalLayout'
