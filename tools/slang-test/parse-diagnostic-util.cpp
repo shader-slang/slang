@@ -180,9 +180,10 @@ slang-rich-diagnostics-render.cpp — renders as a block:
       |               ^^^^^^^^^^^^^^^ undefined identifier 'undefined_thing'
 
 The header line carries the severity, an optional code in brackets, and the message; the
-location line that follows carries the path and position. A note repeats the same shape
-with `note:` and a `---` location marker, except that a note header carries no code
-bracket. This is slangc's default rendering for its diagnostics.
+location line that follows carries the path and position. An attached note repeats the same
+shape with `note:` and a `---` location marker, and its header carries no code bracket; a
+note rendered as a primary record (the standalone notes) carries one when its diagnostic
+defines a non-negative code. This is slangc's default rendering for its diagnostics.
 */
 // Matches the header line of a rich record: a severity word, an optional `[E<digits>]` code,
 // then `: message`. The out-parameters are meaningful only on a match. When requireCode is
@@ -331,9 +332,10 @@ static void _setSlangRichLocation(
     outDiagnostic.filePath = allocator.allocate(path);
 }
 
-// True if any line of inText is a rich header. Used to decide, after identifyCompiler has
-// named Slang, whether the text is rich-rendered; requires the coded header form (see
-// _matchSlangRichDiagnosticHeader for why that is the identifying shape).
+// True if any line of inText is a rich header in the identifying form — a coded header, or
+// a codeless note header (see _matchSlangRichDiagnosticHeader's requireCode contract for
+// why those are the identifying shapes). Used to decide, after identifyCompiler has named
+// Slang, whether the text is rich-rendered.
 static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
 {
     UnownedStringSlice text(inText), line;
@@ -383,12 +385,15 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
             if (code.getLength() > 0)
             {
                 // The matcher validated the code slice is non-empty and all digits, so the
-                // parse cannot fail except on absurd overflow; assert rather than silently
-                // dropping the code. Store the result normalized through Int, as the
-                // classic parse does, so both renderings produce the same code string (the
-                // renderer zero-pads the bracket).
+                // parse cannot fail except on absurd overflow; assert that rather than
+                // silently dropping the code. The call itself stays outside the assert —
+                // SLANG_ASSERT compiles to an unevaluated assumption in release builds.
+                // Store the result normalized through Int, as the classic parse does, so
+                // both renderings produce the same code string (the renderer zero-pads
+                // the bracket).
                 Int codeNumber = 0;
-                SLANG_ASSERT(SLANG_SUCCEEDED(StringUtil::parseInt(code, codeNumber)));
+                const SlangResult codeParse = StringUtil::parseInt(code, codeNumber);
+                SLANG_ASSERT(SLANG_SUCCEEDED(codeParse));
                 StringBuilder buf;
                 buf << codeNumber;
                 pending.code = allocator.allocate(buf);
