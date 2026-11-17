@@ -10,7 +10,7 @@
 // call, and the checker cannot see that (the removed E30709 warnings fired on such valid
 // code, which is why they were retired).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -entry computeMain -stage compute -Wall -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=-1): -target hlsl -entry computeMain -stage compute -Wall -experimental-feature
 
 struct S { int f; }
 
@@ -83,6 +83,16 @@ void viaIn(int v) { innerInout(v); }
 // An `inout` parameter already carries the caller's exclusivity guarantee, which covers
 // the nested call.
 void viaInOut(inout int v) { innerInout(v); }
+
+// A `__ref_readonly` parameter names storage the callee cannot write, so forwarding it to
+// an `inout` parameter is rejected by the existing l-value rule; the exclusivity warning
+// does not pile onto that error.
+void viaReadonly(__ref_readonly int r)
+{
+    innerInout(r);
+//CHECK:       ^ argument must be l-value
+//CHECK:       ^ argument passed to parameter '0' must be l-value
+}
 
 [numthreads(4, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
