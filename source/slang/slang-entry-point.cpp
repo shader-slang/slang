@@ -142,17 +142,23 @@ void EntryPoint::acceptVisitor(
 
 void EntryPoint::buildHash(DigestBuilder<SHA1>& builder)
 {
-    // Hash the entry point's identity: its name, name override, profile (which carries
-    // the stage), and mangled name. An entry point's parameters take part in program
-    // layout — an earlier entry point's `ParameterBlock` shifts later entry points'
-    // descriptor sets — so two linked programs that differ only in a sibling entry
-    // point generate different code for their shared entry point, and a cache key
-    // that omits the sibling's identity (as `getEntryPointHash` does, since it names
-    // only the requested entry point) collides. Only value-like fields are hashed:
-    // the entry point's parameter *types* are part of the module source, which
-    // `Module::buildHash` already digests, and name plus stage uniquely identify an
-    // entry point within a module; pointer-bearing state must stay out so the same
-    // program hashes identically across processes.
+    // Hash the entry point's identity: its name, name override, profile, and mangled
+    // name. An earlier entry point's `ParameterBlock` shifts later entry points'
+    // descriptor sets, so two linked programs that differ only in a sibling entry point
+    // generate different code for their shared entry point; the composite cache key
+    // distinguishes them only if every entry-point child contributes its identity here.
+    //
+    // Only process-stable values are hashed, never addresses, so the same program
+    // hashes identically across processes. Parameter *types* are part of the module
+    // source, which `Module::buildHash` digests once the module is a child of the
+    // linked composite (`fillRequirements` adds it); for an entry point hashed on its
+    // own, the mangled name — which encodes the qualified path and the full parameter
+    // signature — carries that disambiguation instead. The full profile word is hashed
+    // deliberately (stage in the low half, profile version in the high half): the
+    // version is conservative to include, since extra bytes can only turn a cache hit
+    // into a miss. A null name maps to the empty string, the same fallback
+    // `getEntryPointNameOverride` uses for the dummy entry points that pass-through
+    // compilation creates.
     builder.append(m_name ? m_name->text : String());
     builder.append(m_entryPointNameOverride);
     builder.append(m_profile.raw);
