@@ -541,9 +541,9 @@ enum class MemoryEffectMode
 
 // `calleeSideEffectCache` memoizes the `WritesOnly` callee classification and may be null; see
 // `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h for the authoritative
-// sharing/staleness contract this function depends on. The `ReadsOrWrites` classification is a
-// shallow decoration lookup (`isReadNoneCallee`) and is not cached. Turns the `kIROp_Call`
-// case's callee query O(1) after the first lookup per callee.
+// sharing/staleness contract this function depends on. The cache turns the `WritesOnly` query
+// O(1) after the first lookup per callee. The `ReadsOrWrites` classification is a shallow
+// decoration lookup (`isReadNoneCallee`) and is not cached.
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,

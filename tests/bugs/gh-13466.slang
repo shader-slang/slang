@@ -3,8 +3,8 @@
 // is inferred NoSideEffect (it only loads), and it reads `*q` without receiving `q`, so the
 // first store is not dead: `rd` must observe 1, and the expected result is 1.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -g0
-//TEST(compute, cuda):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type -g0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type -Xslang -g0
+//TEST(compute, cuda):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type -Xslang -g0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-directly -Xslang -g0
 
 struct P { uint* p; }
