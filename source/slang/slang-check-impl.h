@@ -4219,7 +4219,9 @@ public:
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,
-        List<DeclRef<ParamDecl>> const& paramDeclRefs);
+        List<DeclRef<ParamDecl>> const& paramDeclRefs,
+        Expr* receiverExpr,
+        std::optional<ParamPassingMode> receiverMode);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
 
     /// Diagnose `invoke`, a call whose callee may throw, unless a `try` covers it. While its

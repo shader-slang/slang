@@ -66,11 +66,11 @@ void computeMain()
     // path names storage contained in it, so the arguments alias even without a
     // receiver (`s` and `s.v`, `arrS[0]` and `arrS[0].v`).
     inoutAndInoutPrefix(s, s.v);
-//CHECK:                 ^ potentially aliased argument to a parameter that may be written
-//CHECK:                 ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:                ^ potentially aliased argument to a parameter that may be written
+//CHECK:                ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
     inoutAndInoutPrefix(arrS[0], arrS[0].v);
-//CHECK:                 ^ potentially aliased argument to a parameter that may be written
-//CHECK:                 ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
+//CHECK:                    ^ potentially aliased argument to a parameter that may be written
+//CHECK:                    ^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce undefined behavior
 
     // Negative: an `in` parameter is a copy taken before the call, so a
     // prefix-aliased argument never warns. Exhaustive mode fails the test if a

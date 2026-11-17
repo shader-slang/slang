@@ -1540,6 +1540,13 @@ warning(
     span { loc = "firstArg:Expr", message = "argument for '~direction1:ParamPassingMode' parameter '~param1:Name' may alias argument for '~direction2:ParamPassingMode' parameter '~param2:Name'; passing the same value to both may produce undefined behavior" }
 )
 
+warning(
+    "potentially-aliased-receiver-parameter",
+    30134,
+    "potentially aliased argument to a method receiver that may be written",
+    span { loc = "receiver:Expr", message = "argument for '~direction:ParamPassingMode' parameter '~param:Name' may alias the receiver of the call, passed '~receiverDirection:ParamPassingMode'; passing the same value to both may produce undefined behavior" }
+)
+
 err(
     "mutating-method-on-immutable-value",
     30050,
