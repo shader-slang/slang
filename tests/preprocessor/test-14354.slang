@@ -18,6 +18,18 @@ __LINE__
 
 __LINE__
 
+#define __LINE__ "Again"
+//diag: ^^^^^^^^ builtin macro redefined
+//diag: ^^^^^^^^ Redefinition of builtin macro '__LINE__'
+
+__LINE__
+
+#undef __LINE__
+
+__LINE__
+
 // CHECK: 9
 // CHECK: "Shadow"
 // CHECK: 19
+// CHECK: "Again"
+// CHECK: 29
