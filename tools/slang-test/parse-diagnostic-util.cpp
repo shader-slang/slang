@@ -179,9 +179,12 @@ location line that follows carries the path and position. A note repeats the sam
 */
 // Matches the header line of a rich record: a severity word, an optional `[E<digits>]` code,
 // then `: message`. The out-parameters are meaningful only on a match. When requireCode is
-// set, a header without a code bracket does not match — every slang error/warning diagnostic
-// carries a code, while the codeless form (`note: message`) only occurs inside a record
-// stream, never leading one.
+// set, a header without a code bracket matches only if its severity is note: every slang
+// error/warning diagnostic carries a code, while the codeless standalone notes (the
+// checkpoint-reporting family, code -1) can legitimately lead a stream — so a downstream
+// tool's bare `error:` or `warning:` line still cannot claim Slang identity, and a bare
+// downstream `note:` line that did would parse as an Info record, the same content the
+// generic parser keeps as a note.
 static bool _matchSlangRichDiagnosticHeader(
     const UnownedStringSlice& inLine,
     ArtifactDiagnostic::Severity& outSeverity,
@@ -230,7 +233,7 @@ static bool _matchSlangRichDiagnosticHeader(
         outCode = code;
         text = text.tail(closeIndex + 1);
     }
-    else if (requireCode)
+    else if (requireCode && outSeverity != ArtifactDiagnostic::Severity::Info)
     {
         return false;
     }
@@ -336,9 +339,12 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
     SliceAllocator allocator;
 
     // The header line starts a record and holds its severity, code and message; the
-    // location line that immediately follows completes it. A header with no location line
-    // after it is a record without a source position, emitted as soon as the next line
-    // shows it has none.
+    // location line completes it. The renderer writes the header message verbatim and the
+    // catalog has newline-bearing formats (the internal-error family), so a record's
+    // message can span lines: continuation lines are buffered into the pending record's
+    // text until its location line, the next header, or the end of the text shows the
+    // record is complete. A header that never receives a location line is a record
+    // without a source position, emitted with the accumulated text.
     ArtifactDiagnostic pending;
     bool hasPending = false;
 
@@ -359,15 +365,16 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
             pending.stage = ArtifactDiagnostic::Stage::Compile;
             if (code.getLength() > 0)
             {
-                // Store the code normalized through Int, as the classic parse does, so both
-                // renderings produce the same code string (the renderer zero-pads the bracket).
-                Int codeNumber;
-                if (SLANG_SUCCEEDED(StringUtil::parseInt(code, codeNumber)))
-                {
-                    StringBuilder buf;
-                    buf << codeNumber;
-                    pending.code = allocator.allocate(buf);
-                }
+                // The matcher validated the code slice is non-empty and all digits, so the
+                // parse cannot fail except on absurd overflow; assert rather than silently
+                // dropping the code. Store the result normalized through Int, as the
+                // classic parse does, so both renderings produce the same code string (the
+                // renderer zero-pads the bracket).
+                Int codeNumber = 0;
+                SLANG_ASSERT(SLANG_SUCCEEDED(StringUtil::parseInt(code, codeNumber)));
+                StringBuilder buf;
+                buf << codeNumber;
+                pending.code = allocator.allocate(buf);
             }
             pending.text = allocator.allocate(message);
             hasPending = true;
@@ -385,7 +392,10 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
             }
             else
             {
-                // A location line with no preceding header carries no diagnostic of its own.
+                // A location line with no pending header carries no diagnostic of its own
+                // (renderer output always sends a header first; this branch only sees
+                // malformed or hand-crafted text). Keep the raw line as a note rather than
+                // dropping it.
                 ArtifactDiagnosticUtil::maybeAddNote(line, diagnostics);
             }
             continue;
@@ -393,8 +403,19 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
 
         if (hasPending)
         {
-            diagnostics->add(pending);
-            hasPending = false;
+            // A continuation of the pending record's (possibly multi-line) message. Blank
+            // lines carry no text — records are separated by an empty line before notes —
+            // and snippet lines cannot collide: the renderer only draws them under a
+            // location line, which completes the record first.
+            if (line.trim().getLength() > 0)
+            {
+                StringBuilder buf;
+                buf.append(asStringSlice(pending.text));
+                buf.append("\n");
+                buf.append(line);
+                pending.text = allocator.allocate(buf);
+            }
+            continue;
         }
 
         // Gutter, snippet and underline lines of a rendered block are kept as notes.
@@ -489,13 +510,13 @@ static SlangResult _findDownstreamCompiler(
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))
     {
-        // A rich header with an `[E<code>]` identifies Slang: the classic check below does
-        // not match one (`error[E30015]` before the first colon is not a severity word),
-        // and no downstream-compiler name prefixes it, so without this check pure rich
-        // output would not identify at all. The code is required here — every slang
-        // error/warning diagnostic carries one, and the codeless `note:` headers never lead
-        // a stream — so a downstream tool's bare `error: message` line cannot claim Slang
-        // identity.
+        // A rich header identifies Slang: the classic check below cannot match one (the
+        // severity word and code bracket are glued together inside the first
+        // colon-separated slice, so no slice carries the bare `error <code>` shape that
+        // check needs), and no downstream-compiler name prefixes it, so without this
+        // check pure rich output would not identify at all. Which codeless headers still
+        // identify — notes, but not bare error/warning lines — and why that is safe is the
+        // contract of _matchSlangRichDiagnosticHeader's requireCode.
         ArtifactDiagnostic::Severity richSeverity;
         UnownedStringSlice richCode, richMessage;
         if (_matchSlangRichDiagnosticHeader(line, richSeverity, richCode, richMessage, true))
@@ -569,11 +590,10 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
     // location line reaches its diagnostic. identifyCompiler only decides which compiler
     // produced the output — which of Slang's two renderings is in use is decided here, by
     // scanning again for a rich header. A stream that mixes rich blocks with
-    // downstream-prefixed lines identifies by line order (the first line matching either
-    // check wins) and the minority rendering's lines degrade to notes — the same demotion
-    // such mixed streams received before this change; hybrid parsing is out of scope.
-    // Before the rich parser, a pure rich block did not parse at all: identifyCompiler
-    // failed and callers saw the raw text.
+    // downstream-prefixed lines identifies by line order: whichever rendering's line
+    // matches first wins, and the other rendering's lines degrade in the winning parser —
+    // to notes, or to positionless records for codeless headers in the rich parser.
+    // Hybrid parsing is out of scope.
     if (compilerIdentity.m_type == CompilerIdentity::Slang && _isSlangRichDiagnostics(inText))
     {
         return parseSlangRichDiagnostics(inText, diagnostics);
