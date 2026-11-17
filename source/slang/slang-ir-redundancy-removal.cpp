@@ -637,8 +637,9 @@ bool tryRemoveRedundantStore(
         return true;
     }
 
-    // A store can be removed if it is a store into the same var, and there are
-    // no side effects between the load of the var and the store of the var.
+    // A store can be removed if it is a store into the same var, and no write to the var
+    // happens between the load of the var and the store of the var: the stored value is the
+    // one just loaded, so only a write can invalidate it.
     if (auto load = as<IRLoad>(store->getVal()))
     {
         if (load->getPtr() == store->getPtr())

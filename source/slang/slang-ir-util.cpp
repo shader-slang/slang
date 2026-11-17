@@ -1750,6 +1750,12 @@ bool canInstHaveSideEffectAtAddress(
                 // as a global or groupshared variable. Any other callee, or an unknown one,
                 // may change or read `addr`.
                 //
+                // The `ReadsOrWrites` classification inspects only the callee this call
+                // executes: functions associated with it by annotation, such as a
+                // user-supplied derivative, are not executed by this call (`doesCalleeHaveSideEffect`
+                // consults them to decide whether to keep a callee alive, not to classify one
+                // of its call sites).
+                //
                 auto callee = call->getCallee();
                 switch (mode)
                 {

@@ -528,17 +528,27 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 bool isPtrLikeOrHandleType(IRInst* type);
 
 // What `canInstHaveSideEffectAtAddress` asks about a call in its `kIROp_Call` case: whether
-// the call may write the memory at `addr`, or whether it may also read it.
+// the call may change the memory at `addr`, or whether it may also observe (read) it.
 enum class MemoryEffectMode
 {
-    // A pass that moves or forwards a value only needs to know whether a call may change the
-    // memory at `addr`; a read does not disturb the value it computes with.
+    // The caller computes with a value that only a change to the memory at `addr` can
+    // invalidate. This covers moving or forwarding a value, and also re-storing a value the
+    // same address just loaded: a read of `addr` leaves what they compute with untouched.
     WritesOnly,
-    // A pass that eliminates a store also needs to know whether a call may read the memory at
-    // `addr`: a read makes the stored value observable before an overwriting store arrives.
+    // The caller removes a store whose value could still be observed by a later read before
+    // an overwriting store arrives, so a callee that may read `addr` blocks it as well.
     ReadsOrWrites,
 };
 
+// Returns true when `inst` may change the memory at `addr` — or, in
+// `MemoryEffectMode::ReadsOrWrites`, may also read it — and false when a scan may run past
+// `inst`. `func` is the function the scan runs in, and roots the exclusivity decision for a
+// call's root address. The mode only refines the callee classification in the `kIROp_Call`
+// case: stores, swizzled stores and the `mightHaveSideEffects` fallback classify identically
+// in both modes, and the check that a pointer-typed argument of the call may alias `addr`
+// runs in both modes. A plain `IRLoad` of `addr` is not an effect in either mode; a caller
+// that must notice reads does its own alias check for loads.
+//
 // `calleeSideEffectCache` memoizes the `WritesOnly` callee classification and may be null; see
 // `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h for the authoritative
 // sharing/staleness contract this function depends on. The cache turns the `WritesOnly` query
