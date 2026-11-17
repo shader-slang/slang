@@ -113,9 +113,8 @@ void computeMain()
     // word that keeps it or as a neighbour that it overwrites. Words 0-17 hold the `double` values,
     // words 18-26 the `float` values, and words 27-31 the `half` values, two to a word; the upper
     // half of word 31 and all of word 32 are never written. The `-0.0` words are checked bit for
-    // bit, so they check the sign bit. The `float` and `double` NaNs are checked as the default quiet
-    // NaN of either sign. The `half` NaN accepts any NaN, because its sign and payload differ between
-    // targets.
+    // bit, so they check the sign bit. The `float`, `double` and `half` NaNs are checked as the
+    // canonical quiet NaN of either sign.
     // BUF: FFFFFFFF
     // BUF-NEXT: 7FEFFFFF
     // BUF-NEXT: FFFFFFFF
@@ -147,6 +146,6 @@ void computeMain()
     // BUF-NEXT: 80010001
     // BUF-NEXT: 80000000
     // BUF-NEXT: FC007C00
-    // BUF-NEXT: AAAA{{[7F](C0[1-9A-F]|C[1-9A-F][0-9A-F]|[D-F][0-9A-F][0-9A-F])}}
+    // BUF-NEXT: AAAA{{7|F}}E00
     // BUF-NEXT: AAAAAAAA
 }
