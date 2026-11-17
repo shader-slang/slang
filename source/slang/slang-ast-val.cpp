@@ -1771,8 +1771,7 @@ struct PolynomialIntValBuilder
         }
         else if (auto poly = as<PolynomialIntVal>(operand))
         {
-            constantTerm =
-                wrapAdd(constantTerm, wrapMul(poly->getConstantTerm(), multiplier));
+            constantTerm = wrapAdd(constantTerm, wrapMul(poly->getConstantTerm(), multiplier));
             for (auto term : poly->getTerms())
             {
                 auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
@@ -2022,8 +2021,7 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
         {
             PolynomialIntValBuilder builder(astBuilder);
             // add poly0.constant * poly1.constant
-            builder.constantTerm =
-                wrapMul(poly0->getConstantTerm(), poly1->getConstantTerm());
+            builder.constantTerm = wrapMul(poly0->getConstantTerm(), poly1->getConstantTerm());
             // add poly0.constant * poly1.terms
             if (poly0->getConstantTerm() != 0)
             {
@@ -2632,8 +2630,7 @@ Val* BuiltinOperationIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*
     }
     if (!diff)
         return this;
-    if (auto newVal =
-            tryFoldImpl(getCurrentASTBuilder(), getType(), getOp(), newArgs, nullptr))
+    if (auto newVal = tryFoldImpl(getCurrentASTBuilder(), getType(), getOp(), newArgs, nullptr))
         return newVal;
     return getCurrentASTBuilder()->getOrCreate<BuiltinOperationIntVal>(
         getType(),
@@ -3426,7 +3423,7 @@ Val* PolynomialIntVal::_resolveImplOverride()
 // twin of the substitution walk, with exactly two differences, so a future edit to one
 // can be checked against the other: (1) how a factor's parameter is resolved —
 // `linkTimeResolve(map)` here versus `substituteImpl` there; (2) the policy when a
-// factor's resolution is not an `IntVal`: under the contract above no override produces
+// factor's resolution is not an `IntVal`: under the header contract no override produces
 // one, but where substitution silently drops such a factor from the rebuilt term, this
 // walk asserts and — release-mode robustness — returns the whole polynomial unresolved,
 // so a contract violation is surfaced rather than silently losing factors. Everything

@@ -1170,10 +1170,9 @@ static void _resolveGLSLBindingAttribute(
             outBinding = bindingVal->getValue();
             if (outBinding < 0 || outBinding > 0xFFFFFFFF)
             {
-                getSink(context)->diagnose(
-                    Diagnostics::BindingAttributeValueOutOfRange{
-                        .value = outBinding,
-                        .location = attr->loc});
+                getSink(context)->diagnose(Diagnostics::BindingAttributeValueOutOfRange{
+                    .value = outBinding,
+                    .location = attr->loc});
                 outBinding = 0;
             }
         }
@@ -1187,10 +1186,9 @@ static void _resolveGLSLBindingAttribute(
             outSet = setVal->getValue();
             if (outSet < 0 || outSet > 0xFFFFFFFF)
             {
-                getSink(context)->diagnose(
-                    Diagnostics::BindingAttributeValueOutOfRange{
-                        .value = outSet,
-                        .location = attr->loc});
+                getSink(context)->diagnose(Diagnostics::BindingAttributeValueOutOfRange{
+                    .value = outSet,
+                    .location = attr->loc});
                 outSet = 0;
             }
         }

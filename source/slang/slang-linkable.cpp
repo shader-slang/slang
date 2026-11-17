@@ -1326,7 +1326,7 @@ ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
     static constexpr Index kMaxLinkTimeResolvePasses = 64;
     Val* result = intVal;
     for (Index i = 0,
-              iterationLimit = Math::Min((Index)(map.getCount() + 1), kMaxLinkTimeResolvePasses);
+               iterationLimit = Math::Min((Index)(map.getCount() + 1), kMaxLinkTimeResolvePasses);
          i < iterationLimit;
          i++)
     {

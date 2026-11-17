@@ -751,9 +751,8 @@ Modifier* SemanticsVisitor::validateAttribute(
                 // checked-but-non-constant expression gets the "not a compile-time
                 // constant" error.
                 if (!IsErrorExpr(attr->args[0]))
-                    getSink()->diagnose(
-                        Diagnostics::ExpectedIntegerConstantNotConstant{
-                            .location = attr->args[0]->loc});
+                    getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                        .location = attr->args[0]->loc});
                 anyInvalidArgument = true;
             }
         }
@@ -765,9 +764,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             if (!set)
             {
                 if (!IsErrorExpr(attr->args[1]))
-                    getSink()->diagnose(
-                        Diagnostics::ExpectedIntegerConstantNotConstant{
-                            .location = attr->args[1]->loc});
+                    getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                        .location = attr->args[1]->loc});
                 anyInvalidArgument = true;
             }
         }
@@ -2693,9 +2691,8 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
             else if (glslBindingAttribute->binding)
             {
                 canTrackOffsets = false;
-                getSink()->diagnose(
-                    Diagnostics::GlslOffsetRequiresConcreteBinding{
-                        .location = glslBindingAttribute->loc});
+                getSink()->diagnose(Diagnostics::GlslOffsetRequiresConcreteBinding{
+                    .location = glslBindingAttribute->loc});
             }
             // The tracker keys offsets on a 32-bit `int` binding index, so a concrete
             // binding above INT32_MAX (representable in the `IntVal` field since this

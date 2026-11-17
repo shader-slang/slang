@@ -3946,8 +3946,8 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // accepted here and surfaces as an unresolved value at layout — unless its
             // initializer is lowered, which can still trip IR lowering's pre-existing
             // unguarded recursion over self-referential initializers (issue #14556).
-            if (varDecl->hasModifier<ExternModifier>() &&
-                varDecl->hasModifier<ConstModifier>() && isScalarIntegerType(varDecl->type))
+            if (varDecl->hasModifier<ExternModifier>() && varDecl->hasModifier<ConstModifier>() &&
+                isScalarIntegerType(varDecl->type))
             {
                 varDecl->val =
                     tryConstantFoldExpr(initExpr, ConstantFoldingKind::LinkTime, nullptr);
