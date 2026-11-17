@@ -1174,7 +1174,10 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 // the scalar operand rather than the CoopMatMulAdd recovery's
                 // `(Type{})` because constructing a value of the result type
                 // could re-enter the emitWMMAFragmentType call that just
-                // failed.
+                // failed.  An invalid-typed MakeCoopMatrixFromScalar is
+                // folded away before emission by the frontend, so this
+                // recovery is defensive: it keeps emission correct for any
+                // path that does emit the instruction.
                 emitOperand(scalarValue, getInfo(EmitOp::General));
                 return true;
             }

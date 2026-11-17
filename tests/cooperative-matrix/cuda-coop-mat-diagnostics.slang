@@ -9,9 +9,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SHAPE, non-exhaustive): -target cuda -entry testInvalidShape -stage compute
 
 // Test 2b: same unsupported element type as Test 1, but constructed from a
-// runtime (buffer-loaded) value, so the MakeCoopMatrixFromScalar recovery in
-// the emitter is exercised (a constant-splat constructor folds away before
-// emission and never reaches it).
+// runtime (buffer-loaded) value — a second, non-constant-folding
+// diagnosed-compile case for the unsupported-element-type diagnostic.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedTypeLiveValue -stage compute
 
 // Test 3a: invalid (A, B, C, D) type combination — AType != BType
