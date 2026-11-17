@@ -1,8 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -experimental-feature
 
-// Test that the potential-aliasing warning (W30051) covers an argument that
-// aliases the receiver of a `[mutating]` or `[__ref]` method, and arguments
-// whose access path is a prefix of another argument's access path (issue
+// Test that the potential-aliasing warnings cover an argument that
+// aliases the receiver of a `[mutating]` or `[__ref]` method, reported
+// as W30134, and arguments whose access path is a prefix of another
+// argument's access path, reported as W30051 (issue
 // #13758). The receiver is `inout` storage for `[mutating]` and `__ref`
 // storage for `[__ref]`, so the same mode rules as for explicit arguments
 // apply: an `in` receiver (`[nonmutating]` or the plain default) never warns,
