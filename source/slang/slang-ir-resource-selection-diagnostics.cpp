@@ -60,22 +60,18 @@ static ResourceOperationControlFlowDependence calculateResourceOperationControlF
     CodeGenContext* codeGenContext,
     IRInst* originalConsumer);
 
-/// Return the location to report for an operation that resource selection moves into
-/// conditional branches. A consumer synthesized by an earlier pass, such as a call rebuilt
-/// by type legalization, may carry no source location; we fall back to its first located
-/// use so the warning still points at relevant user code, and only report without a
-/// location when nothing better exists.
-static SourceLoc getOriginalConsumerSourceLoc(IRInst* originalConsumer)
-{
-    return originalConsumer->sourceLoc.isValid() ? originalConsumer->sourceLoc
-                                                 : findFirstUseLoc(originalConsumer);
-}
-
 void diagnoseResourceSelectionDispatch(CodeGenContext* codeGenContext, IRInst* originalConsumer)
 {
     // We choose the diagnostic before `specializeResourceSelections` copies the original operation
     // into branches. We identify participation requirements without proving that every required
     // invocation takes the same branch, so both warnings describe a possible change in behavior.
+    //
+    // The consumer's own location is the producer-side guarantee (the legalizer copies it onto
+    // every instruction it rebuilds); getDiagnosticSourceLoc is the diagnostics-side defense for
+    // the consumers that still reach this pass without one — instructions synthesized with no
+    // location to copy, such as a combined texture-sampler or a call whose original was itself
+    // synthesized location-less. Those report the first located use instead of the exact
+    // operation, which still points at relevant user code.
     auto dependence =
         calculateResourceOperationControlFlowDependence(codeGenContext, originalConsumer);
     switch (dependence)
@@ -85,13 +81,13 @@ void diagnoseResourceSelectionDispatch(CodeGenContext* codeGenContext, IRInst* o
     case ResourceOperationControlFlowDependence::Derivative:
         codeGenContext->getSink()->diagnose(
             Diagnostics::ResourceSelectionIntroducesConditionalDerivative{
-                .location = getOriginalConsumerSourceLoc(originalConsumer),
+                .location = getDiagnosticSourceLoc(originalConsumer),
             });
         return;
     case ResourceOperationControlFlowDependence::Unknown:
         codeGenContext->getSink()->diagnose(
             Diagnostics::ResourceSelectionIntroducesConditionalUnknownOperation{
-                .location = getOriginalConsumerSourceLoc(originalConsumer),
+                .location = getDiagnosticSourceLoc(originalConsumer),
             });
         return;
     }
