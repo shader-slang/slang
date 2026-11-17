@@ -3348,6 +3348,79 @@ Val* PolynomialIntVal::_resolveImplOverride()
     return this;
 }
 
+// Resolve a polynomial against the linked program's exported link-time constant values,
+// mirroring `_substituteImplOverride`: a factor whose parameter resolves to a constant
+// folds into its term's constant factor (repeated `power` times), and a factor that stays
+// symbolic is kept as a factor of the rebuilt polynomial. When every factor resolves to a
+// constant the builder canonicalizes the result down to a single `ConstantIntVal`, which
+// lets consumers such as `Program::tryFoldIntVal` fold expressions like
+// `(V == 3 ? 7 : 9) - 6` once the linked value of `V` is known.
+Val* PolynomialIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+{
+    auto astBuilder = getCurrentASTBuilder();
+
+    bool diff = false;
+    PolynomialIntValBuilder builder(astBuilder);
+    builder.constantTerm = getConstantTerm();
+    for (auto& term : getTerms())
+    {
+        IntegerLiteralValue evaluatedTermConstFactor;
+        List<PolynomialIntValFactor*> evaluatedTermParamFactors;
+        evaluatedTermConstFactor = term->getConstFactor();
+        for (auto& factor : term->getParamFactors())
+        {
+            auto resolvedResult = as<IntVal>(factor->getParam()->linkTimeResolve(map));
+            if (!resolvedResult)
+                return this;
+
+            if (resolvedResult != factor->getParam())
+                diff = true;
+
+            if (auto constantVal = as<ConstantIntVal>(resolvedResult))
+            {
+                auto power = factor->getPower();
+                for (IntegerLiteralValue i = 0; i < power; i++)
+                    evaluatedTermConstFactor *= constantVal->getValue();
+            }
+            else
+            {
+                auto newFactor = astBuilder->getOrCreate<PolynomialIntValFactor>(
+                    resolvedResult,
+                    factor->getPower());
+                evaluatedTermParamFactors.add(newFactor);
+            }
+        }
+        if (evaluatedTermParamFactors.getCount() == 0)
+        {
+            builder.constantTerm += evaluatedTermConstFactor;
+        }
+        else
+        {
+            if (evaluatedTermParamFactors.getCount() == 1 &&
+                evaluatedTermParamFactors[0]->getPower() == 1)
+            {
+                if (auto polyTerm = as<PolynomialIntVal>(evaluatedTermParamFactors[0]->getParam()))
+                {
+                    builder.addToPolynomialTerm(polyTerm, evaluatedTermConstFactor);
+                    continue;
+                }
+            }
+            auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
+                evaluatedTermConstFactor,
+                evaluatedTermParamFactors.getArrayView());
+            builder.terms.add(newTerm);
+        }
+    }
+
+    if (builder.terms.getCount() == 0)
+        return astBuilder->getIntVal(getType(), builder.constantTerm);
+    if (diff)
+    {
+        return builder.getIntVal(getType());
+    }
+    return this;
+}
+
 bool IntVal::isLinkTimeVal()
 {
     SLANG_AST_NODE_VIRTUAL_CALL(IntVal, isLinkTimeVal, ());

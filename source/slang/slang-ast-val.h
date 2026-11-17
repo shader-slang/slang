@@ -682,6 +682,7 @@ public:
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
+    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 
     static IntVal* neg(ASTBuilder* astBuilder, IntVal* base);
     static IntVal* add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);
