@@ -407,8 +407,12 @@ DeclRef<FuncDecl> findEntryPointByName(
         // A generic stage selected by its bare name resolves to the generic declaration that
         // wraps the struct. Enter the inner struct with default substitutions, the same way
         // ordinary function lookup enters a generic function, so conformance selection below
-        // sees the stage type with its generic parameters still unbound and records them as
-        // the entry point's specialization parameters.
+        // sees the stage type with its generic parameters still unbound and the resulting
+        // entry point stays specializable through `-specialize` / `specialize()` instead of
+        // being born specialized. An inner declaration that is not an aggregate type — a bare
+        // generic *function* name — narrows to null here and falls through to the
+        // `Stage.invoke` handling below, which returns empty for it so the caller keeps the
+        // ordinary function-lookup result.
         if (auto genDeclRef = declRefExpr->declRef.as<GenericDecl>())
         {
             auto astBuilder = linkage->getASTBuilder();
@@ -462,14 +466,10 @@ DeclRef<FuncDecl> findEntryPointByName(
 }
 
 // Selects the checked `invoke` implementation for an already-resolved stage type, through its
-// stage-interface conformance. The selected witness preserves the stage type's generic
-// substitutions, so a specialized stage type yields the specialized `invoke` with its context,
-// payload, and record types carrying the concrete arguments. `ioProfile` supplies the requested
-// stage; when no stage is requested and the type implements exactly one executable stage, that
-// stage is selected and written back. Sets `*outFoundStage` when the type implements any
-// executable stage, even when selection then fails on a stage mismatch or ambiguity.
-// `diagnoseNotStage` distinguishes a name that must select a stage (`-entry Stage`) from one that
-// merely may (`Stage.invoke`): only the former reports the not-a-stage diagnostic.
+// stage-interface conformance. The header documents the caller-visible contract; this copy notes
+// the implementation shape: the function builds its own checking context here and seeds it from
+// the module's dependency closure, the same seeding the entry-point lookup performed before the
+// extraction split the two phases.
 DeclRef<FuncDecl> findStageImplementation(
     Linkage* linkage,
     Module* module,
@@ -532,7 +532,10 @@ DeclRef<FuncDecl> findStageImplementation(
 
     if (implementedStageCount == 0)
     {
-        // An ordinary struct may also have a static method named invoke.
+        // When the selection is allowed to be something other than a stage — the
+        // `Stage.invoke` spelling, which ordinary lookup can already resolve to a function —
+        // an ordinary struct with a static method named invoke is legal, so return without
+        // diagnosing. Only a name that must select a stage reports the not-a-stage diagnostic.
         if (!diagnoseNotStage)
             return DeclRef<FuncDecl>();
         sink->diagnose(Diagnostics::StructuralRayTracingEntryPointNotStage{

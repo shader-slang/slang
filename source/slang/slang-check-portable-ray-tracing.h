@@ -92,12 +92,17 @@ DeclRef<FuncDecl> findEntryPointByName(
 /// Selects the checked `invoke` implementation for an already-resolved stage type, through its
 /// stage-interface conformance. The selected witness preserves the stage type's generic
 /// substitutions, so a specialized stage type yields the specialized `invoke` with its contract
-/// types carrying the concrete arguments. `ioProfile` supplies the requested stage; when no
-/// stage is requested and the type implements exactly one executable stage, that stage is
-/// selected and written back. Sets `*outFoundStage` when the type implements any executable
-/// stage, even when selection then fails on a stage mismatch or ambiguity. `diagnoseNotStage`
-/// distinguishes a name that must select a stage (`-entry Stage`) from one that merely may
-/// (`Stage.invoke`): only the former reports the not-a-stage diagnostic.
+/// types carrying the concrete arguments. Builds its own checking context, seeded from the
+/// module's dependency closure, so callers need not seed any extension-visible module set.
+/// `ioProfile` supplies the requested stage; when no stage is requested and the type implements
+/// exactly one executable stage, that stage is selected and written back. Never clears
+/// `*outFoundStage`: it is set when the type implements any executable stage, even when
+/// selection then fails on a stage mismatch or ambiguity, and a caller's pre-set value survives
+/// when the type implements none (that pre-set is what makes a plain `-entry Stage` selection
+/// report the structural not-a-stage diagnostic while a `Stage.invoke` selection falls back to
+/// ordinary function lookup). `diagnoseNotStage` distinguishes a name that must select a stage
+/// (`-entry Stage`) from one that merely may (`Stage.invoke`): only the former reports the
+/// not-a-stage diagnostic.
 DeclRef<FuncDecl> findStageImplementation(
     Linkage* linkage,
     Module* module,

@@ -16429,7 +16429,13 @@ IREntryPointLayout* lowerEntryPointLayout(
 /// concretely specialized. The enclosing generic may wrap the function
 /// directly (an ordinary generic function) or an outer declaration such as
 /// its stage struct (a structural ray-tracing entry point), so this walks to
-/// the nearest enclosing generic. Returns false for non-FuncDecl refs.
+/// the nearest enclosing generic. A decl-ref whose substitutions carry only
+/// an *outer* generic's application classifies as unspecialized here, since
+/// the function's own generic was never applied — the same semantics
+/// `Linkage::isSpecialized` uses. The walk is over plain declarations rather
+/// than the substituted decl-ref `getGenericParentDeclRef` builds, because
+/// classification needs no substitutions and no checking visitor. Returns
+/// false for non-FuncDecl refs.
 bool isUnspecializedGenericFuncDeclRef(DeclRef<Decl> declRef)
 {
     auto funcDecl = as<FuncDecl>(declRef.getDecl());
