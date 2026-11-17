@@ -25312,11 +25312,12 @@ struct HitObject
     // belongs on its callers (currently only `Invoke`, whose
     // `[require(hlsl, ser_dxr_raygen_closesthit_miss)]` implies everything the
     // helper needs), and any future caller must declare the same. Re-declaring
-    // ser_dxr here would break callers that also serve the nvapi SER target:
-    // `case hlsl:` and `case hlsl_nvapi:` both feed the same hlsl target-family
-    // entry in the target_switch capability merge, where {ser_hlsl_native}
-    // beside {hlsl_nvapi} fails the subset-or-reject rule
-    // (TargetSwitchCapCasesConflict).
+    // ser_dxr here would break callers that also serve the nvapi SER target: a
+    // callee's [require]s now join into the caller's inferred capability
+    // requirements, so `Invoke`'s `case hlsl:` arm would pick up
+    // {ser_hlsl_native} and, in the same hlsl target-family entry, fail
+    // `CapabilityTargetSet::compatibleMerge`'s subset-or-reject rule beside the
+    // `case hlsl_nvapi:` arm's {hlsl_nvapi} (TargetSwitchCapCasesConflict).
     __generic<payload_t>
     static void __InvokeHLSL_DXR(
         HitObject HitOrMiss,
@@ -34495,7 +34496,10 @@ extension RWByteAddressBuffer : IRWPhysicalBuffer
 // groupshared form below) declare the same alternatives as the
 // CoopVec<T, N>.load callees they wrap: those load forms have an OptiX arm,
 // so they carry optix_coopvec in addition to cooperative_vector. Plain CUDA
-// remains available through the cooperative_vector alternative.
+// remains available through the cooperative_vector alternative. Without the
+// second alternative the wrapper's declared set no longer covers its inferred
+// usage — the callee's requirements now propagate into the wrapper — and the
+// wrapper itself fails capability checking.
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
@@ -34541,6 +34545,8 @@ CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* b
 
 // Groupshared
 [ForceInline]
+// Mirrors the groupshared CoopVec<T, N>.load callee's alternatives (see the
+// coopVecLoad comment above for the rule).
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(const groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)

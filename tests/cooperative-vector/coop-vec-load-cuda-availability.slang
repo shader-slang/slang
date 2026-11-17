@@ -1,15 +1,18 @@
-// The coopVecLoad wrappers declare the union of the alternatives their
-// CoopVec<T, N>.load callees declare: plain CUDA stays available through the
-// cooperative_vector alternative, and the optix_coopvec alternative only adds
-// the OptiX path. This pins the plain-CUDA compile so the union is not later
-// narrowed into a conjunction.
+// Compile-smoke of the three buffer overloads whose declared [require]s gained
+// the optix_coopvec alternative: plain CUDA still compiles them through the
+// cooperative_vector alternative, and each overload is exercised so a future
+// narrowing of the union into a conjunction shows up here.
 //TEST:SIMPLE: -target cuda -stage compute -entry computeMain -o coop-vec-load-cuda-availability.cuda.cpp
 
-RWByteAddressBuffer bab;
+RWByteAddressBuffer rwbab;
+ByteAddressBuffer bab;
+groupshared float gsData[16];
 
 [numthreads(1, 1, 1)]
 [shader("compute")]
 void computeMain()
 {
-    CoopVec<float, 16> v = coopVecLoad<16, float>(bab, 0);
+    CoopVec<float, 16> v0 = coopVecLoad<16, float>(rwbab, 0);
+    CoopVec<float, 16> v1 = coopVecLoad<16, float>(bab, 0);
+    CoopVec<float, 16> v2 = coopVecLoadGroupshared<16, float, 16>(gsData, 0);
 }
