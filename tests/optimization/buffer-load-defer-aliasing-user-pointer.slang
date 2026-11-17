@@ -2,9 +2,8 @@
 
 // Test that a write into a bound resource conservatively prevents deferring a
 // load through a user pointer: a user pointer can refer to the contents of a
-// bound resource (for example `__getAddress(buf[i])`), so the write may
-// clobber the memory the deferred load reads. The deferral must not observe a
-// stale value in that case, so the whole-struct load stays.
+// bound resource (for example `__getAddress(buf[i])`), so deferring the load
+// would read the stale pre-write contents. The whole-struct load stays.
 
 struct Bottom
 {

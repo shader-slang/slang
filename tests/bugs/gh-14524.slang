@@ -2,8 +2,13 @@
 // `RWStructuredBuffer` must not be removed as dead just because a later store
 // overwrites it and the read in between goes through the buffer itself —
 // `buf[0]` loads the same element the first store wrote. Expected `buf[3]` is
-// 5, the value the intervening read observes; with the dead-store bug it is
-// the stale buffer content 2.
+// 5 and `buf[2]` is 7, the values the intervening reads observe; with the
+// dead-store bug they are the stale buffer content 2.
+//
+// All three lanes pin `-g0`: at higher debug-info levels the store is kept
+// alive by debug-variable materialization, which would make this test pass
+// vacuously. The vk/cuda rows forward the flag to the inner slang invocation
+// with `-Xslang`; the cpu row talks to slangc directly.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -g0 -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -g0
@@ -12,8 +17,9 @@
 //TEST_INPUT:ubuffer(data=[2 0 0 0], stride=4):out,name=buf
 RWStructuredBuffer<float> buf;
 
-// The first store is read by the intervening `buf[0]` load before the second
-// store overwrites it, so it must stay.
+// The intervening `buf[0]` is a plain load of a resource-content address, so
+// this function pins the class-level rule in `canAddrClassesAlias`: a user
+// pointer may alias a bound resource.
 [noinline]
 float storeLoadOverwrite(float* p, float v)
 {
@@ -24,8 +30,9 @@ float storeLoadOverwrite(float* p, float v)
 }
 
 // Same scenario with the read spelled `.Load(0)`, which lowers to a dedicated
-// `RWStructuredBufferLoad` instruction instead of a plain load, so the dead
-// store scan must treat it as a read of the buffer contents.
+// `RWStructuredBufferLoad` instruction instead of a plain load, so this
+// function pins the resource-content read check in
+// `canInstHaveSideEffectAtAddress`'s default arm.
 [noinline]
 float storeLoadOverwriteLoadOp(float* p, float v)
 {

@@ -15,7 +15,6 @@ struct Bottom
         // pointer can refer to the contents of a bound resource, so that write
         // conservatively does prevent the deferral.
         gSharedVar = 1;
-        // this write should not prevent deferring loading bigArray.
         gStaticVar = 2;
 
         // We should return the value from bigArray from a previously loaded value of `this`.

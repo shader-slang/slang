@@ -531,6 +531,11 @@ bool isPtrLikeOrHandleType(IRInst* type);
 // in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
 // Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per
 // callee.
+// True if `inst` may change or observe the value at `addr`: either through a side effect that
+// affects that memory, or by being a read (a dedicated resource-content load op, or a plain
+// load of a resource-content address) that can read it. A "true" answer therefore does not
+// imply a write; a caller that only cares about writes must supply its own narrower check
+// rather than assume this predicate reports side effects alone.
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
