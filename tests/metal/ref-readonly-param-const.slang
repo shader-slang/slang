@@ -1,8 +1,8 @@
 // A `__constref` parameter that keeps its call boundary is emitted as a pointer to `const`, so
 // the Metal compiler enforces the read-only access. `inout` parameters stay pointers to mutable
 // storage. The aliasing reference modes (`__ref` and its readonly/writeonly forms) are always
-// inlined into their callers on ordinary functions, so only the borrow modes have an emitted
-// parameter shape to check.
+// inlined into their callers on ordinary functions, so the modes that keep an emitted parameter
+// shape are the non-aliasing ones: `__constref` and `inout`.
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry main -experimental-feature
 

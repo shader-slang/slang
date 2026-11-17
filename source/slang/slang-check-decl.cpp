@@ -14016,13 +14016,10 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
     return newContext;
 }
 
-// An intrinsic declaration defines its behavior for each target with intrinsic
-// assembly rather than ordinary Slang statements, so it never lowers to a
-// target function definition that would have to spell out a `__ref` parameter.
-// This covers the `__intrinsic_op` and `__target_intrinsic` modifier forms, a
-// body that is only `__intrinsic_asm` statements, and a `__target_switch`
-// body whose every case is an `__intrinsic_asm` statement or a
-// `return spirv_asm {…}`. Consider the core module's mesh-shading intrinsics:
+// A statement that may appear in an intrinsic body: intrinsic assembly text for a target
+// (`__intrinsic_asm`), or a `spirv_asm` block, whether written as a statement or as the
+// expression of a `return` (with or without redundant parentheses around the block).
+// Consider the core module's mesh-shading intrinsics, whose arms use both spellings:
 //
 //     [noRefInline]
 //     void DispatchMesh(uint3 grid, __ref Payload meshPayload)
@@ -14034,14 +14031,17 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
 //         }
 //     }
 //
-// The switch arms are statements inside the function body, not modifiers on
-// the declaration, so the test inspects the body structure and not only the
-// modifier list.
+// The switch arms are statements inside the function body, not modifiers on the
+// declaration, so the check inspects the body structure and not only the modifier list.
 //
 static bool isIntrinsicFuncBodyStmt(Stmt* stmt)
 {
     if (as<IntrinsicAsmStmt>(stmt))
         return true;
+    // An empty body is not a definition to emit, so an empty block or sequence
+    // is not an intrinsic definition either, mirroring the empty target switch
+    // below: an unimplemented arm means the function is defined by ordinary
+    // statements somewhere or nowhere at all.
     if (auto blockStmt = as<BlockStmt>(stmt))
         return blockStmt->body != nullptr && isIntrinsicFuncBodyStmt(blockStmt->body);
     if (auto seqStmt = as<SeqStmt>(stmt))
@@ -14070,15 +14070,37 @@ static bool isIntrinsicFuncBodyStmt(Stmt* stmt)
         }
         return true;
     }
+    if (auto exprStmt = as<ExpressionStmt>(stmt))
+    {
+        auto expr = exprStmt->expression;
+        while (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        return as<SPIRVAsmExpr>(expr) != nullptr;
+    }
     if (auto returnStmt = as<ReturnStmt>(stmt))
-        return as<SPIRVAsmExpr>(returnStmt->expression) != nullptr;
+    {
+        auto expr = returnStmt->expression;
+        while (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        return as<SPIRVAsmExpr>(expr) != nullptr;
+    }
     return false;
 }
 
+// A function is an intrinsic declaration, for the purposes of `[noRefInline]`, when
+// no target function definition is ever emitted for it, so a `__ref` parameter can
+// never reach a target. An `__intrinsic_op` modifier names one IR operation used
+// by every target. A `__target_intrinsic` modifier provides per-target text, but
+// a body would still serve as the catch-all definition on the targets the modifier
+// does not cover, so the body, when present, must be intrinsic assembly throughout.
+// A function without either modifier is an intrinsic only when its body is, and a
+// bodyless declaration is not an intrinsic: the attribute belongs on the definition.
 static bool isIntrinsicFuncDecl(FunctionDeclBase* decl)
 {
-    if (decl->hasModifier<IntrinsicOpModifier>() || decl->hasModifier<TargetIntrinsicModifier>())
+    if (decl->hasModifier<IntrinsicOpModifier>())
         return true;
+    if (decl->hasModifier<TargetIntrinsicModifier>())
+        return decl->body == nullptr || isIntrinsicFuncBodyStmt(decl->body);
     return decl->body != nullptr && isIntrinsicFuncBodyStmt(decl->body);
 }
 
@@ -14156,6 +14178,11 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
             getSink()->diagnose(Diagnostics::AttributeNotApplicable{
                 .attrName = noRefInlineAttr->getKeywordName(),
                 .attr = noRefInlineAttr});
+            // Checking continues after the error, so the rejected attribute is
+            // removed rather than kept unchecked: without it the reference
+            // parameter takes the default force-inlining path and no
+            // `IRNoRefInlineDecoration` is lowered, leaving the rest of the
+            // compile as if the attribute had not been written.
             removeModifier(decl, noRefInlineAttr);
         }
     }
