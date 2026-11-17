@@ -623,22 +623,27 @@ struct FunctionParameterSpecializationContext
 
             ioInfo.newArgs.add(oldIndex);
         }
-        else if (oldArg->getOp() == kIROp_ByteAddressBufferLoad)
+        else if (auto load = as<IRByteAddressBufferLoad>(oldArg))
         {
-            // Like the element-access case above, but `alignment` is a `constexpr`
-            // operand and must stay an `IRIntLit` for byte-address legalization,
-            // so it is baked into the specialization key instead of passed as an
-            // argument.
-            auto ops = unpackByteAddressBufferLoad(oldArg);
+            // Consider `consume(buffer.LoadAligned<Frame>(offset, 16))`. To move the load
+            // into the specialized callee, we capture how to obtain `buffer` and pass the byte
+            // offset as an argument. Byte-address legalization needs the alignment as a literal
+            // to check the promise and choose the width of the resulting loads. Calls with
+            // different alignment promises therefore get distinct specializations.
+            auto alignment = getByteAddressLoadAlignment(load);
+            getCallInfoForArg(ioInfo, load->getBuffer());
 
-            getCallInfoForArg(ioInfo, ops.buffer);
+            // The byte offset addresses data within one buffer. When the buffer is selected
+            // from a descriptor array, the recursive call handles its resource index separately.
+            auto offset = load->getOffset();
+            ioInfo.key.vals.add(offset->getFullType());
+            ioInfo.newArgs.add(offset);
 
-            // Byte offset is a plain scalar (not a resource-array index), so it goes
-            // in the key as its bare data type; no `NonUniformAttr` handling needed.
-            ioInfo.key.vals.add(ops.offset->getDataType());
-            ioInfo.newArgs.add(ops.offset);
-
-            ioInfo.key.vals.add(ops.alignment);
+            // In `consume(buffer.Load<Frame[2]>(offset)[i])`, the callee takes a `Frame`
+            // but reconstructs a `Frame[2]` load. A call using `Frame[3]` in the same expression
+            // needs its own specialization so the reconstructed load has the right type.
+            ioInfo.key.vals.add(load->getFullType());
+            ioInfo.key.vals.add(alignment);
         }
         else if (isFieldAccessInst(oldArg))
         {
@@ -858,8 +863,7 @@ struct FunctionParameterSpecializationContext
         }
     }
 
-    // Returns true if `inst` is an instruction that accesses an element from an array or a buffer.
-    //
+    // Returns true if `inst` accesses an element using only a base and an element index.
     static bool isElementAccessInst(IRInst* inst)
     {
         switch (inst->getOp())
@@ -887,28 +891,24 @@ struct FunctionParameterSpecializationContext
         return false;
     }
 
-    struct ByteAddressBufferLoadOperands
+    /// Return the alignment literal of a byte-address buffer load in its original IR form.
+    ///
+    /// The load has exactly three operands. `Load` supplies zero, and `LoadAligned` supplies
+    /// a compile-time alignment promise.
+    ///
+    /// The second buffer-load specialization runs only for direct SPIR-V, where byte-address
+    /// legalization must already have converted these loads to structured-buffer accesses.
+    static IRIntLit* getByteAddressLoadAlignment(IRByteAddressBufferLoad* load)
     {
-        IRInst* buffer;
-        IRInst* offset;
-        IRIntLit* alignment;
-    };
-
-    // Split a `byteAddressBufferLoad` into its (buffer, offset, alignment) operands.
-    // `alignment` is `constexpr` at the front end and must remain an `IRIntLit` for
-    // byte-address legalization; assert that invariant here so a violation surfaces at
-    // the specialization boundary rather than downstream.
-    static ByteAddressBufferLoadOperands unpackByteAddressBufferLoad(IRInst* load)
-    {
-        SLANG_RELEASE_ASSERT(load->getOperandCount() >= 3);
-        auto alignment = as<IRIntLit>(load->getOperand(2));
+        SLANG_RELEASE_ASSERT(load->getOperandCount() == 3);
+        auto alignment = as<IRIntLit>(load->getAlignment());
         SLANG_RELEASE_ASSERT(alignment);
-        return {load->getOperand(0), load->getOperand(1), alignment};
+        return alignment;
     }
 
     IRInst* getSpecializedValueForArg(FuncSpecializationInfo& ioInfo, IRInst* oldArg)
     {
-        // The logic here parallels `gatherCallInfoForArg`,
+        // The logic here parallels `getCallInfoForArg`,
         // and only differs in what information it is gathering.
         //
         // As before, the base case is when we have a global
@@ -948,7 +948,7 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             auto oldIndex = oldArg->getOperand(1);
 
-            // In `gatherCallInfoForArg` this case was
+            // In `getCallInfoForArg` this case was
             // handled by acting as if `oldBase` and
             // `oldIndex` were being passed as two
             // separate arguments.
@@ -994,26 +994,22 @@ struct FunctionParameterSpecializationContext
 
             return newVal;
         }
-        else if (oldArg->getOp() == kIROp_ByteAddressBufferLoad)
+        else if (auto load = as<IRByteAddressBufferLoad>(oldArg))
         {
-            // Parallel to the element-access case above. `gatherCallInfoForArg` bakes
-            // the `alignment` literal into the specialization key, so here we reuse
-            // it directly in the reconstructed load rather than turning it into a
-            // runtime param -- downstream legalization still sees an `IRIntLit`.
-            auto ops = unpackByteAddressBufferLoad(oldArg);
+            auto alignment = getByteAddressLoadAlignment(load);
+            auto buffer = getSpecializedValueForArg(ioInfo, load->getBuffer());
 
-            auto newBuffer = getSpecializedValueForArg(ioInfo, ops.buffer);
-
+            // We add the offset parameter after the parameters needed to reconstruct the buffer.
+            // This matches the argument order in `getCallInfoForArg`.
             auto builder = getBuilder();
-            auto newOffset = builder->createParam(ops.offset->getFullType());
-            ioInfo.newParams.add(newOffset);
+            auto offset = builder->createParam(load->getOffset()->getFullType());
+            ioInfo.newParams.add(offset);
 
+            // The specialization key includes the alignment, so every call to this callee can
+            // use the same literal in the reconstructed load.
             builder->setInsertInto(ioInfo.newBodyInsts);
-            IRInst* newOperands[] = {newBuffer, newOffset, ops.alignment};
-            auto newVal =
-                builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 3, newOperands);
-
-            return newVal;
+            IRInst* operands[] = {buffer, offset, alignment};
+            return builder->emitIntrinsicInst(load->getFullType(), load->getOp(), 3, operands);
         }
         else if (isFieldAccessInst(oldArg))
         {
