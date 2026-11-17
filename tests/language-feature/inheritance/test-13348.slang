@@ -5,6 +5,8 @@
 // members, rejecting the InheritanceDecl of a struct base.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -vk
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -cuda
 
 #pragma warning(disable:30816)
 
