@@ -12930,6 +12930,7 @@ $}
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[require(cpp)]
 void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T dest,  T value)
 {
     __atomic_$(atomicOp.internalCallSuffix)(dest, value);
@@ -12938,6 +12939,7 @@ void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T des
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[require(cpp)]
 void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T dest, T value, out T original_value)
 {
     original_value = __atomic_$(atomicOp.internalCallSuffix)(dest, value);
@@ -12946,6 +12948,7 @@ void Interlocked$(atomicOp.slangCallSuffix)<T:$(atomicOp.interface)>(__ref T des
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[require(cpp)]
 void Interlocked$(atomicOp.slangCallSuffix)(__ref uint dest, int value)
 {
     __atomic_$(atomicOp.internalCallSuffix)(dest, (uint)value);
@@ -12975,6 +12978,7 @@ $}
 /// @category atomic
 [ForceInline]
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[require(cpp)]
 void InterlockedCompareExchange<T:IAtomicable>(__ref T dest, T compare_value, T value, out T original_value)
 {
     original_value = __atomic_compare_exchange(dest, compare_value, value);
@@ -13029,6 +13033,7 @@ void InterlockedCompareExchangeFloatBitwise(__ref  float dest, float compare_val
 [ForceInline]
 __glsl_version(430)
 [require(cuda_glsl_hlsl_metal_spirv, atomic_glsl_hlsl_cuda_metal)]
+[require(cpp)]
 void InterlockedCompareStore<T:IAtomicable>(__ref T dest,  T compare_value,  T value)
 {
     __target_switch

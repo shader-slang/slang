@@ -65,6 +65,7 @@ protected:
         SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    void _emitAtomicInst(IRInst* inst);
     virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
     virtual void emitPreModuleImpl() SLANG_OVERRIDE;

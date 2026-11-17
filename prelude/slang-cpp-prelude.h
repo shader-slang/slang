@@ -321,116 +321,340 @@ public:                                                                         
 #include "slang-cpp-scalar-intrinsics.h"
 #include "slang-cpp-types.h"
 
-// Atomic helpers for the CPU target. Needed so kIROp_AtomicAdd and
-// friends can lower to native atomic operations on the host - matching
-// the semantics of HLSL `InterlockedAdd`, SPIR-V `OpAtomicIAdd`, etc.
-// Uses compiler builtins so no <atomic> header is required.
+// Atomic helpers for the CPU target. The C++ emitter lowers every atomic IR
+// instruction (from `Interlocked*`, `Atomic<T>` and the compiler's own
+// counters, such as shader coverage) to a call of
+// `_slang_atomic_<op>_<type>(ptr, ...)`:
 //
-// Contract for every `_slang_atomic_add_*` helper below (u32/i32/u64/
-// i64): atomically add `val` to `*ptr` and return the PRIOR value (the
-// value before the add), matching HLSL `InterlockedAdd` and GLSL
-// `atomicAdd`. The 64-bit MSVC variants reinterpret the pointer as
-// `volatile long long*` for `_InterlockedExchangeAdd64`, which is sound
-// because `sizeof(long long) == 8` (asserted below).
+//   - ops: load, store, exchange, compare_exchange, add, sub, and, or, xor,
+//     min, max;
+//   - types: u32, i32, u64, i64 (all ops), f32, f64 (all but the bitwise
+//     ones).
+//
+// Each helper except `store` returns the PRIOR value (the value before the
+// operation), as HLSL `Interlocked*` and GLSL `atomic*` do. The last
+// parameter is the memory order, as the `MemoryOrder` values (0 relaxed,
+// 1 acquire, 2 release, 3 acquire-release, 4 sequentially consistent).
+// `compare_exchange` compares bit patterns, as `InterlockedCompareExchange`
+// does for floats on the GPU targets. Integer operations wrap around. Float
+// add/sub and all min/max are compare-and-swap loops.
 //
 // Compiler coverage:
-//   - MSVC:            `_InterlockedExchangeAdd`
-//   - GCC / Clang:     `__atomic_fetch_add`
-//   - SNC / GHS etc.:  falls back to a non-atomic load/add/store.
-//     These are console / embedded toolchains not known to ship
-//     `__atomic_*` builtins; the fallback is racy under concurrency
-//     but keeps the prelude buildable there. Platforms that need
-//     real atomics on those compilers can add a bespoke branch.
-// === MSVC implementations ===
-//
-// Use the `_Interlocked*` intrinsics. The 32-bit overload operates on
-// `long`; the 64-bit overload operates on `long long`. The static
-// asserts above pin the expected widths.
+//   - MSVC:        `_Interlocked*` intrinsics. They are full barriers, so any
+//                  memory order is met.
+//   - GCC / Clang: the `__atomic` builtins, with the requested order.
+//   - Others (Sony SNC, Green Hills MULTI, ...): a non-atomic fallback. It is
+//     racy if the groups of a dispatch run concurrently, but keeps the prelude
+//     buildable there.
 #if SLANG_VC
 #include <intrin.h>
-static_assert(
-    sizeof(long) == 4,
-    "_InterlockedExchangeAdd uses `long`; MSVC LLP64 requires sizeof(long)==4");
-static_assert(
-    sizeof(long long) == 8,
-    "_InterlockedExchangeAdd64 uses `long long`; expected 8-byte width");
-static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
+static_assert(sizeof(long) == 4, "the 32-bit _Interlocked* intrinsics operate on `long`");
+static_assert(sizeof(long long) == 8, "the 64-bit _Interlocked* intrinsics operate on `long long`");
+template<int SIZE>
+struct _SlangAtomicWord;
+template<>
+struct _SlangAtomicWord<4>
 {
-    // Returns the PRIOR value, matching HLSL InterlockedAdd and GLSL atomicAdd.
-    return static_cast<uint32_t>(
-        _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val)));
-}
-static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
-{
-    return static_cast<int32_t>(
-        _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val)));
-}
-static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
-{
-    return static_cast<uint64_t>(_InterlockedExchangeAdd64(
-        reinterpret_cast<volatile long long*>(ptr),
-        static_cast<long long>(val)));
-}
-static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
-{
-    return static_cast<int64_t>(_InterlockedExchangeAdd64(
-        reinterpret_cast<volatile long long*>(ptr),
-        static_cast<long long>(val)));
-}
-// === GCC / Clang implementations ===
-//
-// Use the `__atomic_fetch_add` built-in with relaxed ordering; the
-// IR-side AtomicAdd emit ignores the memory-order operand and lets
-// each toolchain pick its native default.
-#elif SLANG_GCC || SLANG_CLANG
-static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
-{
-    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
-}
-static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
-{
-    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
-}
-static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
-{
-    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
-}
-static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
-{
-    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
-}
-// === Non-atomic fallback implementations ===
-//
-// For compilers without a known atomic builtin (Sony SNC, Green Hills
-// MULTI, etc.). Racy under concurrent invocation but keeps the
-// prelude compilable; CPU-target coverage on these platforms is
-// single-threaded in practice.
+    typedef long W;
+    static W load(volatile W* p)
+    {
+#if defined(_M_IX86) || defined(_M_X64)
+        // An aligned load is atomic, and x86 does not reorder it with later
+        // memory operations; the barrier keeps the compiler from doing so.
+        W v = *p;
+        _ReadWriteBarrier();
+        return v;
 #else
-static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
-{
-    uint32_t old = *ptr;
-    *ptr = old + val;
-    return old;
-}
-static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
-{
-    int32_t old = *ptr;
-    *ptr = old + val;
-    return old;
-}
-static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
-{
-    uint64_t old = *ptr;
-    *ptr = old + val;
-    return old;
-}
-static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
-{
-    int64_t old = *ptr;
-    *ptr = old + val;
-    return old;
-}
+        return _InterlockedOr(p, 0);
 #endif
+    }
+    static W exchange(volatile W* p, W v) { return _InterlockedExchange(p, v); }
+    static W compareExchange(volatile W* p, W cmp, W v)
+    {
+        return _InterlockedCompareExchange(p, v, cmp);
+    }
+    static W add(volatile W* p, W v) { return _InterlockedExchangeAdd(p, v); }
+    static W bitAnd(volatile W* p, W v) { return _InterlockedAnd(p, v); }
+    static W bitOr(volatile W* p, W v) { return _InterlockedOr(p, v); }
+    static W bitXor(volatile W* p, W v) { return _InterlockedXor(p, v); }
+};
+template<>
+struct _SlangAtomicWord<8>
+{
+    typedef long long W;
+    static W load(volatile W* p)
+    {
+#if defined(_M_X64)
+        W v = *p;
+        _ReadWriteBarrier();
+        return v;
+#else
+        return _InterlockedCompareExchange64(p, 0, 0);
+#endif
+    }
+    static W exchange(volatile W* p, W v) { return _InterlockedExchange64(p, v); }
+    static W compareExchange(volatile W* p, W cmp, W v)
+    {
+        return _InterlockedCompareExchange64(p, v, cmp);
+    }
+    static W add(volatile W* p, W v) { return _InterlockedExchangeAdd64(p, v); }
+    static W bitAnd(volatile W* p, W v) { return _InterlockedAnd64(p, v); }
+    static W bitOr(volatile W* p, W v) { return _InterlockedOr64(p, v); }
+    static W bitXor(volatile W* p, W v) { return _InterlockedXor64(p, v); }
+};
+template<typename T>
+struct _SlangAtomic
+{
+    typedef _SlangAtomicWord<sizeof(T)> Op;
+    typedef typename Op::W W;
+    static volatile W* word(T* p) { return reinterpret_cast<volatile W*>(p); }
+    static W bits(T v)
+    {
+        W w;
+        memcpy(&w, &v, sizeof(T));
+        return w;
+    }
+    static T value(W w)
+    {
+        T v;
+        memcpy(&v, &w, sizeof(T));
+        return v;
+    }
+    static T load(T* p, int) { return value(Op::load(word(p))); }
+    static void store(T* p, T v, int) { Op::exchange(word(p), bits(v)); }
+    static T exchange(T* p, T v, int) { return value(Op::exchange(word(p), bits(v))); }
+    static T compareExchange(T* p, T cmp, T v, int)
+    {
+        return value(Op::compareExchange(word(p), bits(cmp), bits(v)));
+    }
+    static bool sameBits(T a, T b) { return bits(a) == bits(b); }
+    static T add(T* p, T v, int) { return value(Op::add(word(p), bits(v))); }
+    static T sub(T* p, T v, int) { return value(Op::add(word(p), bits(T(T(0) - v)))); }
+    static T bitAnd(T* p, T v, int) { return value(Op::bitAnd(word(p), bits(v))); }
+    static T bitOr(T* p, T v, int) { return value(Op::bitOr(word(p), bits(v))); }
+    static T bitXor(T* p, T v, int) { return value(Op::bitXor(word(p), bits(v))); }
+};
+#elif SLANG_GCC || SLANG_CLANG
+static inline int _slang_atomic_order(int order)
+{
+    switch (order)
+    {
+    case 0:
+        return __ATOMIC_RELAXED;
+    case 1:
+        return __ATOMIC_ACQUIRE;
+    case 2:
+        return __ATOMIC_RELEASE;
+    case 3:
+        return __ATOMIC_ACQ_REL;
+    default:
+        return __ATOMIC_SEQ_CST;
+    }
+}
+// The order of a failed compare-exchange, which is only a load: no release.
+static inline int _slang_atomic_failure_order(int order)
+{
+    return order == 2   ? __ATOMIC_RELAXED
+           : order == 3 ? __ATOMIC_ACQUIRE
+                        : _slang_atomic_order(order);
+}
+template<typename T>
+struct _SlangAtomic
+{
+    static T load(T* p, int o)
+    {
+        T r;
+        __atomic_load(p, &r, _slang_atomic_order(o));
+        return r;
+    }
+    static void store(T* p, T v, int o) { __atomic_store(p, &v, _slang_atomic_order(o)); }
+    static T exchange(T* p, T v, int o)
+    {
+        T r;
+        __atomic_exchange(p, &v, &r, _slang_atomic_order(o));
+        return r;
+    }
+    static T compareExchange(T* p, T cmp, T v, int o)
+    {
+        // On failure `cmp` receives the current value, so either way it ends
+        // up holding the prior value.
+        __atomic_compare_exchange(
+            p,
+            &cmp,
+            &v,
+            false,
+            _slang_atomic_order(o),
+            _slang_atomic_failure_order(o));
+        return cmp;
+    }
+    static bool sameBits(T a, T b) { return __builtin_memcmp(&a, &b, sizeof(T)) == 0; }
+    static T add(T* p, T v, int o) { return __atomic_fetch_add(p, v, _slang_atomic_order(o)); }
+    static T sub(T* p, T v, int o) { return __atomic_fetch_sub(p, v, _slang_atomic_order(o)); }
+    static T bitAnd(T* p, T v, int o) { return __atomic_fetch_and(p, v, _slang_atomic_order(o)); }
+    static T bitOr(T* p, T v, int o) { return __atomic_fetch_or(p, v, _slang_atomic_order(o)); }
+    static T bitXor(T* p, T v, int o) { return __atomic_fetch_xor(p, v, _slang_atomic_order(o)); }
+};
+#else
+template<typename T>
+struct _SlangAtomic
+{
+    static T load(T* p, int) { return *p; }
+    static void store(T* p, T v, int) { *p = v; }
+    static T exchange(T* p, T v, int)
+    {
+        T old = *p;
+        *p = v;
+        return old;
+    }
+    static T compareExchange(T* p, T cmp, T v, int)
+    {
+        T old = *p;
+        if (memcmp(&old, &cmp, sizeof(T)) == 0)
+            *p = v;
+        return old;
+    }
+    static bool sameBits(T a, T b) { return memcmp(&a, &b, sizeof(T)) == 0; }
+    static T add(T* p, T v, int)
+    {
+        T old = *p;
+        *p = T(old + v);
+        return old;
+    }
+    static T sub(T* p, T v, int)
+    {
+        T old = *p;
+        *p = T(old - v);
+        return old;
+    }
+    static T bitAnd(T* p, T v, int)
+    {
+        T old = *p;
+        *p = T(old & v);
+        return old;
+    }
+    static T bitOr(T* p, T v, int)
+    {
+        T old = *p;
+        *p = T(old | v);
+        return old;
+    }
+    static T bitXor(T* p, T v, int)
+    {
+        T old = *p;
+        *p = T(old ^ v);
+        return old;
+    }
+};
+#endif
+
+// A read-modify-write without a native instruction, as a compare-and-swap
+// loop: `f` computes the new value from the current one. The loop compares
+// bit patterns, so a NaN in memory cannot make it spin.
+template<typename T, typename F>
+static inline T _slang_atomic_cas_loop(T* p, F f, int order)
+{
+    T old = _SlangAtomic<T>::load(p, 0);
+    for (;;)
+    {
+        T prior = _SlangAtomic<T>::compareExchange(p, old, f(old), order);
+        if (_SlangAtomic<T>::sameBits(prior, old))
+            return old;
+        old = prior;
+    }
+}
+template<typename T>
+struct _SlangAtomicMinOp
+{
+    T v;
+    T operator()(T old) const { return v < old ? v : old; }
+};
+template<typename T>
+struct _SlangAtomicMaxOp
+{
+    T v;
+    T operator()(T old) const { return old < v ? v : old; }
+};
+template<typename T>
+struct _SlangAtomicAddOp
+{
+    T v;
+    T operator()(T old) const { return old + v; }
+};
+
+#define SLANG_CPP_ATOMIC_COMMON(SUFFIX, T)                                                   \
+    static inline T _slang_atomic_load_##SUFFIX(T* p, int order = 0)                         \
+    {                                                                                        \
+        return _SlangAtomic<T>::load(p, order);                                              \
+    }                                                                                        \
+    static inline void _slang_atomic_store_##SUFFIX(T* p, T v, int order = 0)                \
+    {                                                                                        \
+        _SlangAtomic<T>::store(p, v, order);                                                 \
+    }                                                                                        \
+    static inline T _slang_atomic_exchange_##SUFFIX(T* p, T v, int order = 0)                \
+    {                                                                                        \
+        return _SlangAtomic<T>::exchange(p, v, order);                                       \
+    }                                                                                        \
+    static inline T _slang_atomic_compare_exchange_##SUFFIX(T* p, T cmp, T v, int order = 0) \
+    {                                                                                        \
+        return _SlangAtomic<T>::compareExchange(p, cmp, v, order);                           \
+    }                                                                                        \
+    static inline T _slang_atomic_min_##SUFFIX(T* p, T v, int order = 0)                     \
+    {                                                                                        \
+        _SlangAtomicMinOp<T> f = {v};                                                        \
+        return _slang_atomic_cas_loop(p, f, order);                                          \
+    }                                                                                        \
+    static inline T _slang_atomic_max_##SUFFIX(T* p, T v, int order = 0)                     \
+    {                                                                                        \
+        _SlangAtomicMaxOp<T> f = {v};                                                        \
+        return _slang_atomic_cas_loop(p, f, order);                                          \
+    }
+
+#define SLANG_CPP_ATOMIC_INTEGER(SUFFIX, T)                              \
+    SLANG_CPP_ATOMIC_COMMON(SUFFIX, T)                                   \
+    static inline T _slang_atomic_add_##SUFFIX(T* p, T v, int order = 0) \
+    {                                                                    \
+        return _SlangAtomic<T>::add(p, v, order);                        \
+    }                                                                    \
+    static inline T _slang_atomic_sub_##SUFFIX(T* p, T v, int order = 0) \
+    {                                                                    \
+        return _SlangAtomic<T>::sub(p, v, order);                        \
+    }                                                                    \
+    static inline T _slang_atomic_and_##SUFFIX(T* p, T v, int order = 0) \
+    {                                                                    \
+        return _SlangAtomic<T>::bitAnd(p, v, order);                     \
+    }                                                                    \
+    static inline T _slang_atomic_or_##SUFFIX(T* p, T v, int order = 0)  \
+    {                                                                    \
+        return _SlangAtomic<T>::bitOr(p, v, order);                      \
+    }                                                                    \
+    static inline T _slang_atomic_xor_##SUFFIX(T* p, T v, int order = 0) \
+    {                                                                    \
+        return _SlangAtomic<T>::bitXor(p, v, order);                     \
+    }
+
+#define SLANG_CPP_ATOMIC_FLOAT(SUFFIX, T)                                \
+    SLANG_CPP_ATOMIC_COMMON(SUFFIX, T)                                   \
+    static inline T _slang_atomic_add_##SUFFIX(T* p, T v, int order = 0) \
+    {                                                                    \
+        _SlangAtomicAddOp<T> f = {v};                                    \
+        return _slang_atomic_cas_loop(p, f, order);                      \
+    }                                                                    \
+    static inline T _slang_atomic_sub_##SUFFIX(T* p, T v, int order = 0) \
+    {                                                                    \
+        _SlangAtomicAddOp<T> f = {-v};                                   \
+        return _slang_atomic_cas_loop(p, f, order);                      \
+    }
+
+SLANG_CPP_ATOMIC_INTEGER(u32, uint32_t)
+SLANG_CPP_ATOMIC_INTEGER(i32, int32_t)
+SLANG_CPP_ATOMIC_INTEGER(u64, uint64_t)
+SLANG_CPP_ATOMIC_INTEGER(i64, int64_t)
+SLANG_CPP_ATOMIC_FLOAT(f32, float)
+SLANG_CPP_ATOMIC_FLOAT(f64, double)
+
+#undef SLANG_CPP_ATOMIC_COMMON
+#undef SLANG_CPP_ATOMIC_INTEGER
+#undef SLANG_CPP_ATOMIC_FLOAT
 
 // TODO(JS): Hack! Output C++ code from slang can copy uninitialized variables.
 #if defined(_MSC_VER)
