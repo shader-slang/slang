@@ -25299,7 +25299,11 @@ struct HitObject
         }
     }
 
-    [require(hlsl, ser_dxr)]
+    // The DXR-native capability requirement lives on `Invoke`, the only caller, whose
+    // `[require(hlsl, ser_dxr_raygen_closesthit_miss)]` already implies everything this
+    // helper needs. Declaring a requirement here again would make `Invoke`'s
+    // `case hlsl:` capability set incomparable with its `case hlsl_nvapi:` arm, which
+    // the target_switch capability merge rejects.
     __generic<payload_t>
     static void __InvokeHLSL_DXR(
         HitObject HitOrMiss,
@@ -25397,6 +25401,7 @@ struct HitObject
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
         inout payload_t Payload)
@@ -34469,6 +34474,7 @@ extension RWByteAddressBuffer : IRWPhysicalBuffer
 /// @return A new cooperative vector containing the loaded values.
 [ForceInline]
 [require(cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
@@ -34476,6 +34482,7 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(ByteAddressB
 
 [ForceInline]
 [require(cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
@@ -34512,6 +34519,7 @@ CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* b
 // Groupshared
 [ForceInline]
 [require(cooperative_vector)]
+[require(optix_coopvec)]
 CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(const groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(data, byteOffset16ByteAligned);
