@@ -1,5 +1,6 @@
 #include "../../lib/api/spvdb.h"
 #include "../../lib/api/spvdb_session.h"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstdint>
@@ -15,7 +16,7 @@ static const std::string k_add_src = std::string(SLANG_TEST_SRC_DIR) + "/add_buf
 static const std::string k_inl_src = std::string(SLANG_TEST_SRC_DIR) + "/inlined_func.slang";
 
 // Read first N uint32_t values back from a descriptor binding.
-static std::vector<uint32_t> read_u32s(Session &sess, uint32_t set, uint32_t binding, size_t count)
+static std::vector<uint32_t> read_u32s(Session& sess, uint32_t set, uint32_t binding, size_t count)
 {
     auto r = read_descriptor(sess, set, binding);
     REQUIRE(r);
@@ -68,10 +69,12 @@ TEST_CASE("slang add_buffers: local_variables shows a and b")
     REQUIRE(set_descriptor_json(**sess, 0, 2, "[0]"));
 
     bool saw_a = false, saw_b = false;
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 2000; ++i)
+    {
         auto stop = step_instruction(**sess);
         auto locals = local_variables(**sess);
-        for (auto &lv : locals) {
+        for (auto& lv : locals)
+        {
             if (lv.name == "a" && lv.value.kind == Value::Kind::UInt32 && lv.value.scalar.u32 == 7u)
                 saw_a = true;
             if (lv.name == "b" && lv.value.kind == Value::Kind::UInt32 && lv.value.scalar.u32 == 5u)
@@ -102,7 +105,8 @@ TEST_CASE("slang add_buffers: source locations are valid")
     REQUIRE(set_descriptor_json(**sess, 0, 2, "[0]"));
 
     bool saw_valid_loc = false;
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 2000; ++i)
+    {
         auto loc = current_location(**sess);
         if (loc.line != 0)
             saw_valid_loc = true;
@@ -131,7 +135,8 @@ TEST_CASE("slang add_buffers: step visits lines 9 10 11")
     REQUIRE(set_descriptor_json(**sess, 0, 2, "[0]"));
 
     bool saw9 = false, saw10 = false, saw11 = false;
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 2000; ++i)
+    {
         auto loc = current_location(**sess);
         if (loc.line == 9)
             saw9 = true;
@@ -171,10 +176,13 @@ TEST_CASE("slang add_buffers: breakpoint by file and line")
 
     auto stop = run(**sess);
     // Should stop at the breakpoint or finish if the breakpoint was missed.
-    if (stop == StopReason::Breakpoint) {
+    if (stop == StopReason::Breakpoint)
+    {
         auto loc = current_location(**sess);
         CHECK(loc.line == 10);
-    } else {
+    }
+    else
+    {
         // Breakpoint missed — still acceptable if it finished without panic.
         CHECK(stop == StopReason::EntryFinished);
     }
@@ -224,17 +232,21 @@ TEST_CASE("slang inlined_func: backtrace shows add_values inlined into main")
     // Step until we reach a source line inside add_values (line 2 in
     // inlined_func.slang: "return x + y").
     bool saw_inlined = false;
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 2000; ++i)
+    {
         auto stop = step_instruction(**sess);
         auto loc = current_location(**sess);
-        if (loc.line == 2) {
+        if (loc.line == 2)
+        {
             // We should now be in the inlined scope.
             auto bt = backtrace(**sess);
-            if (bt.size() >= 2) {
+            if (bt.size() >= 2)
+            {
                 bool frame0_is_add = bt[0].function_name == "add_values";
                 bool frame1_is_main = bt[1].function_name == "main";
                 bool frame1_line13 = bt[1].loc.line == 13;
-                if (frame0_is_add && frame1_is_main && frame1_line13) {
+                if (frame0_is_add && frame1_is_main && frame1_line13)
+                {
                     saw_inlined = true;
                     break;
                 }
@@ -264,10 +276,12 @@ TEST_CASE("slang inlined_func: local_variables shows x and y inside inlined scop
     REQUIRE(set_descriptor_json(**sess, 0, 2, "[0]"));
 
     bool saw_x = false, saw_y = false;
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 2000; ++i)
+    {
         auto stop = step_instruction(**sess);
         auto locals = local_variables(**sess);
-        for (auto &lv : locals) {
+        for (auto& lv : locals)
+        {
             if (lv.name == "x" && lv.value.kind == Value::Kind::UInt32 && lv.value.scalar.u32 == 7u)
                 saw_x = true;
             if (lv.name == "y" && lv.value.kind == Value::Kind::UInt32 && lv.value.scalar.u32 == 5u)

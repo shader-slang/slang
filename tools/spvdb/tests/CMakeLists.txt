@@ -24,7 +24,7 @@ foreach(SPVASM_FILE ${SPVASM_SOURCES})
     set(SPV_FILE ${SPIRV_BIN_DIR}/${STEM}.spv)
     list(APPEND SPV_BINARIES ${SPV_FILE})
     add_custom_command(
-        OUTPUT  ${SPV_FILE}
+        OUTPUT ${SPV_FILE}
         COMMAND ${SPIRV_AS} --target-env vulkan1.1 ${SPVASM_FILE} -o ${SPV_FILE}
         DEPENDS ${SPVASM_FILE}
         COMMENT "Assembling ${STEM}.spvasm"
@@ -35,7 +35,8 @@ add_custom_target(spvdb_test_spirv ALL DEPENDS ${SPV_BINARIES})
 
 # ---- Test executable --------------------------------------------------------
 
-add_executable(spvdb_tests
+add_executable(
+    spvdb_tests
     unit/test_parser.cpp
     unit/test_module.cpp
     unit/test_interpreter.cpp
@@ -46,9 +47,11 @@ add_dependencies(spvdb_tests spvdb_test_spirv)
 target_link_libraries(spvdb_tests PRIVATE spvdb Catch2::Catch2WithMain)
 
 # Pass the directory containing assembled .spv files and a writable temp dir.
-target_compile_definitions(spvdb_tests PRIVATE
-    SPIRV_TEST_DIR="${SPIRV_BIN_DIR}"
-    SPVDB_TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}/tmp"
+target_compile_definitions(
+    spvdb_tests
+    PRIVATE
+        SPIRV_TEST_DIR="${SPIRV_BIN_DIR}"
+        SPVDB_TEST_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}/tmp"
 )
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tmp")
 

@@ -14,21 +14,20 @@ struct Session
     bool started = false;
 
     Session(std::shared_ptr<const SpvModule> m, std::string name, SessionOptions opts)
-        : module(m)
-        , entry_name(std::move(name))
-        , interp(m, opts)
+        : module(m), entry_name(std::move(name)), interp(m, opts)
     {
     }
 
     Result<void> ensure_started()
     {
-        if (!started) {
+        if (!started)
+        {
             auto r = interp.begin(entry_name);
             if (!r)
                 return r;
             started = true;
         }
-        return Result<void> {};
+        return Result<void>{};
     }
 };
 

@@ -18,6 +18,7 @@
 #endif
 
 #include "image_sampler.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -31,7 +32,7 @@ ImageData load_image(std::string_view path)
     std::string p(path);
     int w = 0, h = 0, c = 0;
     // Always load as 4 channels (RGBA), always as float [0,1].
-    float *data = stbi_loadf(p.c_str(), &w, &h, &c, 4);
+    float* data = stbi_loadf(p.c_str(), &w, &h, &c, 4);
     if (!data)
         return {};
     ImageData img;
@@ -46,7 +47,7 @@ void ImageData::fetch_texel(int x, int y, float out[4]) const
 {
     x = std::max(0, std::min(x, width - 1));
     y = std::max(0, std::min(y, height - 1));
-    const float *p = pixels.data() + (static_cast<size_t>(y) * width + x) * 4;
+    const float* p = pixels.data() + (static_cast<size_t>(y) * width + x) * 4;
     out[0] = p[0];
     out[1] = p[1];
     out[2] = p[2];
@@ -55,7 +56,8 @@ void ImageData::fetch_texel(int x, int y, float out[4]) const
 
 void ImageData::sample_bilinear(float u, float v, float out[4]) const
 {
-    if (!valid()) {
+    if (!valid())
+    {
         out[0] = out[1] = out[2] = out[3] = 0.0f;
         return;
     }
@@ -73,9 +75,10 @@ void ImageData::sample_bilinear(float u, float v, float out[4]) const
     fetch_texel(x0 + 1, y0, c10);
     fetch_texel(x0, y0 + 1, c01);
     fetch_texel(x0 + 1, y0 + 1, c11);
-    for (int i = 0; i < 4; ++i) {
-        out[i] = (1.0f - tx) * (1.0f - ty) * c00[i] + tx * (1.0f - ty) * c10[i]
-               + (1.0f - tx) * ty * c01[i] + tx * ty * c11[i];
+    for (int i = 0; i < 4; ++i)
+    {
+        out[i] = (1.0f - tx) * (1.0f - ty) * c00[i] + tx * (1.0f - ty) * c10[i] +
+                 (1.0f - tx) * ty * c01[i] + tx * ty * c11[i];
     }
 }
 

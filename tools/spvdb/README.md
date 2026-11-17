@@ -26,11 +26,11 @@ Supported execution models: **GLCompute**, **Vertex**, **Fragment**.
 
 ### Prerequisites
 
-| Tool | Minimum version |
-|------|----------------|
-| CMake | 3.20 |
-| C++ compiler with C++20 support | GCC 11 / Clang 14 / MSVC 19.29 |
-| `spirv-as` (for assembling `.spvasm` test fixtures) | any recent SPIRV-Tools |
+| Tool                                                | Minimum version                |
+| --------------------------------------------------- | ------------------------------ |
+| CMake                                               | 3.20                           |
+| C++ compiler with C++20 support                     | GCC 11 / Clang 14 / MSVC 19.29 |
+| `spirv-as` (for assembling `.spvasm` test fixtures) | any recent SPIRV-Tools         |
 
 ### Cloning
 
@@ -53,6 +53,7 @@ cmake --build build
 ```
 
 This produces:
+
 - `build/cli/spvdb` — interactive debugger
 - `build/tools/spvdb-test/spvdb-test` — scriptable test front-end
 - `build/tests/` — Catch2 unit and integration tests
@@ -88,49 +89,49 @@ spvdb [<path.spv> [<entry_point>]]
 
 ### File and session setup
 
-| Command | Description |
-|---------|-------------|
-| `file <path.spv>` | Load a SPIR-V module |
-| `info entries` | List available entry points |
-| `entry <name>` | Select an entry point |
-| `set input <set> <binding> <json>` | Bind a descriptor-set buffer (JSON array) |
-| `set input loc <location> <json>` | Bind a vertex/fragment input by `Location` decoration |
-| `set builtin <name> <value>` | Set a built-in value (e.g. `GlobalInvocationId`, `FragCoord`) |
-| `set specconst <id> <value>` | Override a specialization constant by `SpecId` |
+| Command                            | Description                                                   |
+| ---------------------------------- | ------------------------------------------------------------- |
+| `file <path.spv>`                  | Load a SPIR-V module                                          |
+| `info entries`                     | List available entry points                                   |
+| `entry <name>`                     | Select an entry point                                         |
+| `set input <set> <binding> <json>` | Bind a descriptor-set buffer (JSON array)                     |
+| `set input loc <location> <json>`  | Bind a vertex/fragment input by `Location` decoration         |
+| `set builtin <name> <value>`       | Set a built-in value (e.g. `GlobalInvocationId`, `FragCoord`) |
+| `set specconst <id> <value>`       | Override a specialization constant by `SpecId`                |
 
 ### Execution
 
-| Command | Aliases | Description |
-|---------|---------|-------------|
-| `run` | `r` | Start execution from the entry point |
-| `continue` | `c` | Continue until the next breakpoint or exit |
-| `step` | `s` | Step one source line (steps *into* calls) |
-| `next` | `n` | Step one source line (steps *over* calls) |
-| `finish` | | Run until the current function returns |
-| `stepi` | `si` | Step one SPIR-V instruction |
+| Command    | Aliases | Description                                |
+| ---------- | ------- | ------------------------------------------ |
+| `run`      | `r`     | Start execution from the entry point       |
+| `continue` | `c`     | Continue until the next breakpoint or exit |
+| `step`     | `s`     | Step one source line (steps _into_ calls)  |
+| `next`     | `n`     | Step one source line (steps _over_ calls)  |
+| `finish`   |         | Run until the current function returns     |
+| `stepi`    | `si`    | Step one SPIR-V instruction                |
 
 ### Breakpoints
 
-| Command | Description |
-|---------|-------------|
-| `break <file>:<line>` | Set a source breakpoint |
-| `break %<id>` | Set a result-id breakpoint |
-| `info breakpoints` | List all breakpoints |
-| `delete <bp-id>` | Remove a breakpoint |
+| Command               | Description                |
+| --------------------- | -------------------------- |
+| `break <file>:<line>` | Set a source breakpoint    |
+| `break %<id>`         | Set a result-id breakpoint |
+| `info breakpoints`    | List all breakpoints       |
+| `delete <bp-id>`      | Remove a breakpoint        |
 
 File paths are matched as suffixes, so `break main.slang:42` matches
 `/any/path/to/main.slang:42`.
 
 ### Inspection
 
-| Command | Aliases | Description |
-|---------|---------|-------------|
-| `info locals` | | Print local variables at the current location |
-| `info outputs` | | Print output and storage-buffer variables |
-| `print <name>` | `p` | Evaluate and print a single variable |
-| `backtrace` | `bt`, `where` | Print the current call stack |
-| `list [line]` | `l` | Show source lines around the current location |
-| `disassemble` | `dis` | Show SPIR-V instructions near the current PC |
+| Command        | Aliases       | Description                                   |
+| -------------- | ------------- | --------------------------------------------- |
+| `info locals`  |               | Print local variables at the current location |
+| `info outputs` |               | Print output and storage-buffer variables     |
+| `print <name>` | `p`           | Evaluate and print a single variable          |
+| `backtrace`    | `bt`, `where` | Print the current call stack                  |
+| `list [line]`  | `l`           | Show source lines around the current location |
+| `disassemble`  | `dis`         | Show SPIR-V instructions near the current PC  |
 
 ### Example session
 
@@ -194,15 +195,15 @@ auto result = spvdb::read_descriptor(*sess, 0, 2);
 
 ### Key types
 
-| Type | Description |
-|------|-------------|
-| `spvdb::Module` | Loaded SPIR-V module (immutable, shareable) |
-| `spvdb::Session` | Mutable execution state for one invocation |
-| `spvdb::SessionOptions` | Memory initialisation (`init_pattern`, `init_value`) |
-| `spvdb::Value` | Tagged union: Bool, Int32/64, UInt32/64, Float32/64, Composite, Pointer |
-| `spvdb::StopReason` | `Breakpoint`, `Step`, `EntryReached`, `EntryFinished`, `Panic` |
-| `spvdb::SourceLocation` | `file`, `line`, `column` |
-| `spvdb::Result<T>` | Success/error wrapper; check with `if (r)` or `r.error()` |
+| Type                    | Description                                                             |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `spvdb::Module`         | Loaded SPIR-V module (immutable, shareable)                             |
+| `spvdb::Session`        | Mutable execution state for one invocation                              |
+| `spvdb::SessionOptions` | Memory initialisation (`init_pattern`, `init_value`)                    |
+| `spvdb::Value`          | Tagged union: Bool, Int32/64, UInt32/64, Float32/64, Composite, Pointer |
+| `spvdb::StopReason`     | `Breakpoint`, `Step`, `EntryReached`, `EntryFinished`, `Panic`          |
+| `spvdb::SourceLocation` | `file`, `line`, `column`                                                |
+| `spvdb::Result<T>`      | Success/error wrapper; check with `if (r)` or `r.error()`               |
 
 ### API reference (selected functions)
 
@@ -277,7 +278,7 @@ spvdb/
 ## Code style
 
 All C++ sources are formatted with **clang-format** using the `.clang-format`
-file at the repository root.  The easiest way to reformat or verify is via the
+file at the repository root. The easiest way to reformat or verify is via the
 CMake targets added by the standalone build:
 
 ```bash

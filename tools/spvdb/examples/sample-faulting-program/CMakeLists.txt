@@ -16,12 +16,12 @@ find_program(SLANGC slangc HINTS $ENV{SLANG_DIR}/bin REQUIRED)
 message(STATUS "slangc: ${SLANGC}")
 
 set(SHADER ${CMAKE_CURRENT_SOURCE_DIR}/signal_smooth.slang)
-set(SPV    ${CMAKE_CURRENT_BINARY_DIR}/signal_smooth.spv)
+set(SPV ${CMAKE_CURRENT_BINARY_DIR}/signal_smooth.spv)
 
 # -g3: maximal debug info (full source locations in every frame)
 # -O0: no inlining, so apply_kernel and fetch_clamped appear as distinct frames
 add_custom_command(
-    OUTPUT  ${SPV}
+    OUTPUT ${SPV}
     COMMAND ${SLANGC} -target spirv -g3 -O0 -o ${SPV} ${SHADER}
     DEPENDS ${SHADER}
     COMMENT "Compiling signal_smooth.slang → signal_smooth.spv"

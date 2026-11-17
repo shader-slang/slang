@@ -21,7 +21,7 @@ struct Value
         UInt64,
         Float64,
         Composite, // vector, matrix, array, struct
-        Pointer, // logical SPIR-V pointer
+        Pointer,   // logical SPIR-V pointer
     };
 
     Kind kind = Kind::UInt32;
@@ -129,10 +129,7 @@ struct Value
             return is_signed ? make_i32(0) : make_u32(0);
         return is_signed ? make_i64(0) : make_u64(0);
     }
-    static Value zero_float(uint32_t width)
-    {
-        return width <= 32 ? make_f32(0.0f) : make_f64(0.0);
-    }
+    static Value zero_float(uint32_t width) { return width <= 32 ? make_f32(0.0f) : make_f64(0.0); }
 };
 
 } // namespace spvdb

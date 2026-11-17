@@ -11,7 +11,8 @@ struct Error
 };
 
 // Minimal std::expected<T, Error> equivalent for C++20.
-template<typename T> struct Result
+template<typename T>
+struct Result
 {
     Result(T val)
         : ok_(true)
@@ -19,77 +20,44 @@ template<typename T> struct Result
         new (&storage_) T(std::move(val));
     }
     Result(Error e)
-        : ok_(false)
-        , error_(std::move(e))
+        : ok_(false), error_(std::move(e))
     {
     }
 
-    static Result err(std::string msg)
-    {
-        return Result(Error {std::move(msg)});
-    }
+    static Result err(std::string msg) { return Result(Error{std::move(msg)}); }
 
-    bool ok() const
-    {
-        return ok_;
-    }
-    explicit operator bool() const
-    {
-        return ok_;
-    }
+    bool ok() const { return ok_; }
+    explicit operator bool() const { return ok_; }
 
-    T &value()
-    {
-        return *reinterpret_cast<T *>(&storage_);
-    }
-    const T &value() const
-    {
-        return *reinterpret_cast<const T *>(&storage_);
-    }
+    T& value() { return *reinterpret_cast<T*>(&storage_); }
+    const T& value() const { return *reinterpret_cast<const T*>(&storage_); }
 
-    T &operator*()
-    {
-        return value();
-    }
-    T *operator->()
-    {
-        return &value();
-    }
-    const T &operator*() const
-    {
-        return value();
-    }
-    const T *operator->() const
-    {
-        return &value();
-    }
+    T& operator*() { return value(); }
+    T* operator->() { return &value(); }
+    const T& operator*() const { return value(); }
+    const T* operator->() const { return &value(); }
 
-    const Error &error() const
-    {
-        return error_;
-    }
+    const Error& error() const { return error_; }
 
     ~Result()
     {
         if (ok_)
-            reinterpret_cast<T *>(&storage_)->~T();
+            reinterpret_cast<T*>(&storage_)->~T();
     }
 
-    Result(const Result &o)
-        : ok_(o.ok_)
-        , error_(o.error_)
+    Result(const Result& o)
+        : ok_(o.ok_), error_(o.error_)
     {
         if (ok_)
-            new (&storage_) T(*reinterpret_cast<const T *>(&o.storage_));
+            new (&storage_) T(*reinterpret_cast<const T*>(&o.storage_));
     }
-    Result(Result &&o)
-        : ok_(o.ok_)
-        , error_(std::move(o.error_))
+    Result(Result&& o)
+        : ok_(o.ok_), error_(std::move(o.error_))
     {
         if (ok_)
-            new (&storage_) T(std::move(*reinterpret_cast<T *>(&o.storage_)));
+            new (&storage_) T(std::move(*reinterpret_cast<T*>(&o.storage_)));
     }
-    Result &operator=(Result o)
+    Result& operator=(Result o)
     {
         this->~Result();
         new (this) Result(std::move(o));
@@ -102,35 +70,23 @@ private:
     alignas(T) unsigned char storage_[sizeof(T)];
 };
 
-template<> struct Result<void>
+template<>
+struct Result<void>
 {
     Result()
         : ok_(true)
     {
     }
     Result(Error e)
-        : ok_(false)
-        , error_(std::move(e))
+        : ok_(false), error_(std::move(e))
     {
     }
 
-    static Result err(std::string msg)
-    {
-        return Result(Error {std::move(msg)});
-    }
+    static Result err(std::string msg) { return Result(Error{std::move(msg)}); }
 
-    bool ok() const
-    {
-        return ok_;
-    }
-    explicit operator bool() const
-    {
-        return ok_;
-    }
-    const Error &error() const
-    {
-        return error_;
-    }
+    bool ok() const { return ok_; }
+    explicit operator bool() const { return ok_; }
+    const Error& error() const { return error_; }
 
 private:
     bool ok_;

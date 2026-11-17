@@ -3,6 +3,7 @@
 #include "../core/value.h"
 #include "../parser/parser.h"
 #include "spv_types.h"
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -19,10 +20,7 @@ struct SourceLoc
     std::string file;
     uint32_t line = 0;
     uint32_t column = 0;
-    bool valid() const
-    {
-        return !file.empty() && line != 0;
-    }
+    bool valid() const { return !file.empty() && line != 0; }
 };
 
 // A SPIR-V decoration and its literal operands.
@@ -39,14 +37,14 @@ struct DecorationSet
 
     bool has(SpvDecoration d) const
     {
-        for (auto &x : decorations)
+        for (auto& x : decorations)
             if (x.kind == d)
                 return true;
         return false;
     }
     uint32_t get(SpvDecoration d, uint32_t default_val = 0) const
     {
-        for (auto &x : decorations)
+        for (auto& x : decorations)
             if (x.kind == d && !x.operands.empty())
                 return x.operands[0];
         return default_val;
@@ -92,7 +90,7 @@ struct Function
 
     std::string name;
 
-    const BasicBlock *find_block(uint32_t label_id) const
+    const BasicBlock* find_block(uint32_t label_id) const
     {
         auto it = block_index.find(label_id);
         if (it == block_index.end())
@@ -200,8 +198,8 @@ struct SpvModule
     // NonSemantic.Shader.DebugInfo.100 DebugInlinedAt result-id → call-site info.
     struct DebugInlinedAtInfo
     {
-        uint32_t line = 0; // line number at the call site
-        uint32_t scope_id = 0; // DebugFunction result-id of the containing scope
+        uint32_t line = 0;          // line number at the call site
+        uint32_t scope_id = 0;      // DebugFunction result-id of the containing scope
         uint32_t inlined_at_id = 0; // parent DebugInlinedAt for nested inlining (0 if none)
     };
     std::unordered_map<uint32_t, DebugInlinedAtInfo> debug_inlined_at;
@@ -210,20 +208,20 @@ struct SpvModule
     std::vector<SpvCapability> capabilities;
 
     // Helper: look up a type by result-id.
-    const SpvType *type_of(uint32_t id) const
+    const SpvType* type_of(uint32_t id) const
     {
         auto it = types.find(id);
         return it == types.end() ? nullptr : it->second.get();
     }
 
-    const DecorationSet &decorations_of(uint32_t id) const
+    const DecorationSet& decorations_of(uint32_t id) const
     {
         static const DecorationSet empty;
         auto it = decorations.find(id);
         return it == decorations.end() ? empty : it->second;
     }
 
-    const DecorationSet &member_decorations_of(uint32_t type_id, uint32_t member) const
+    const DecorationSet& member_decorations_of(uint32_t type_id, uint32_t member) const
     {
         static const DecorationSet empty;
         uint64_t key = (static_cast<uint64_t>(type_id) << 32) | member;
@@ -231,14 +229,14 @@ struct SpvModule
         return it == member_decorations.end() ? empty : it->second;
     }
 
-    const std::string &name_of(uint32_t id) const
+    const std::string& name_of(uint32_t id) const
     {
         static const std::string empty;
         auto it = names.find(id);
         return it == names.end() ? empty : it->second;
     }
 
-    const std::string &member_name_of(uint32_t type_id, uint32_t member) const
+    const std::string& member_name_of(uint32_t type_id, uint32_t member) const
     {
         static const std::string empty;
         uint64_t key = (static_cast<uint64_t>(type_id) << 32) | member;
@@ -248,6 +246,6 @@ struct SpvModule
 };
 
 // Build a Module from a ParsedModule.
-Result<std::shared_ptr<SpvModule>> build_module(const ParsedModule &parsed);
+Result<std::shared_ptr<SpvModule>> build_module(const ParsedModule& parsed);
 
 } // namespace spvdb

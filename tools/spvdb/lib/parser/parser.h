@@ -1,5 +1,6 @@
 #pragma once
 #include "../core/result.h"
+
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -20,7 +21,7 @@ namespace spvdb
 struct Instruction
 {
     SpvOp opcode = SpvOpNop;
-    uint32_t type_id = 0; // 0 if the opcode has no type operand
+    uint32_t type_id = 0;   // 0 if the opcode has no type operand
     uint32_t result_id = 0; // 0 if the opcode produces no result
 
     // All operand words (after the opcode word).

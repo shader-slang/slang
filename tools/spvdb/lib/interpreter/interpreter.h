@@ -1,6 +1,7 @@
 #pragma once
 #include "../module/module.h"
 #include "image_sampler.h"
+
 #include <functional>
 #include <optional>
 #include <string>
@@ -52,10 +53,7 @@ struct PC
     uint32_t block_label = 0;
     uint32_t instr_index = 0;
 
-    bool valid() const
-    {
-        return function_id != 0;
-    }
+    bool valid() const { return function_id != 0; }
 };
 
 // One frame on the call stack.
@@ -72,7 +70,7 @@ public:
     explicit Interpreter(std::shared_ptr<const SpvModule> mod, SessionOptions opts = {});
 
     // Select entry point and initialize memory. Must be called before step/run.
-    Result<void> begin(const std::string &entry_name);
+    Result<void> begin(const std::string& entry_name);
 
     // Execute one SPIR-V instruction.  May return Breakpoint if the new PC
     // matches an active breakpoint (result-id or source location).
@@ -95,7 +93,7 @@ public:
     Result<void> restart();
 
     // --- Inputs ---
-    Result<void> set_descriptor(uint32_t set, uint32_t binding, const Value &value);
+    Result<void> set_descriptor(uint32_t set, uint32_t binding, const Value& value);
     // Bind a sampled-image or storage-image descriptor from an on-disk file.
     Result<void> set_image(uint32_t set, uint32_t binding, std::string_view path);
     // Bind a vertex/fragment Input variable by its Location decoration.
@@ -104,22 +102,10 @@ public:
     Result<void> set_spec_constant(uint32_t spec_id, Value value);
 
     // --- Inspection ---
-    const PC &current_pc() const
-    {
-        return pc_;
-    }
-    bool is_finished() const
-    {
-        return finished_;
-    }
-    bool is_panicked() const
-    {
-        return panicked_;
-    }
-    const std::string &panic_message() const
-    {
-        return panic_msg_;
-    }
+    const PC& current_pc() const { return pc_; }
+    bool is_finished() const { return finished_; }
+    bool is_panicked() const { return panicked_; }
+    const std::string& panic_message() const { return panic_msg_; }
 
     // Source location of the instruction at the current PC.
     // Returns an invalid SourceLoc (line==0) when no debug info is available.
@@ -127,14 +113,8 @@ public:
 
     // NonSemantic debug scope tracking.
     // Returns 0 when no DebugScope has been seen yet or after DebugNoScope.
-    uint32_t current_debug_scope_id() const
-    {
-        return current_scope_id_;
-    }
-    uint32_t current_debug_inlined_at_id() const
-    {
-        return current_inlined_at_id_;
-    }
+    uint32_t current_debug_scope_id() const { return current_scope_id_; }
+    uint32_t current_debug_inlined_at_id() const { return current_inlined_at_id_; }
 
     // All variables currently live in the id_map.
     std::vector<std::pair<std::string, Value>> local_variables() const;
@@ -146,10 +126,7 @@ public:
     Result<Value> read_descriptor(uint32_t set, uint32_t binding) const;
 
     // Call stack (most recent first).
-    std::vector<CallFrame> call_stack() const
-    {
-        return call_stack_;
-    }
+    std::vector<CallFrame> call_stack() const { return call_stack_; }
 
     // --- Breakpoints ---
     uint32_t add_breakpoint(std::string file, uint32_t line);
@@ -207,7 +184,7 @@ private:
     std::unordered_map<uint32_t, Value> debug_var_values_;
 
     // Current NonSemantic DebugScope state.
-    uint32_t current_scope_id_ = 0; // DebugFunction result-id
+    uint32_t current_scope_id_ = 0;      // DebugFunction result-id
     uint32_t current_inlined_at_id_ = 0; // DebugInlinedAt result-id (0 = not inlined)
 
     // Call stack.
@@ -223,13 +200,13 @@ private:
     std::string entry_name_;
 
     // ---- helpers -----------------------------------------------------------
-    void panic(const std::string &msg);
+    void panic(const std::string& msg);
 
     // Returns true if the current PC matches any active breakpoint.
     bool check_breakpoint_at_pc() const;
 
     // Get or produce the Value for a result-id (checks id_map_ then constants).
-    const Value &lookup(uint32_t id) const;
+    const Value& lookup(uint32_t id) const;
 
     // Initialize memory for all global variables to init_pattern.
     void init_memory();
@@ -238,27 +215,27 @@ private:
     void eval_spec_constants();
 
     // Resolve a pointer to the Value it points at (read).
-    Result<Value> load_ptr(const Value &ptr) const;
+    Result<Value> load_ptr(const Value& ptr) const;
 
     // Resolve a pointer and store a value through it.
-    Result<void> store_ptr(const Value &ptr, Value val);
+    Result<void> store_ptr(const Value& ptr, Value val);
 
     // Index into a composite value (for access-chain resolution).
-    static Result<Value *> index_into(Value &root, const std::vector<uint32_t> &chain);
-    static Result<const Value *> index_into(const Value &root, const std::vector<uint32_t> &chain);
+    static Result<Value*> index_into(Value& root, const std::vector<uint32_t>& chain);
+    static Result<const Value*> index_into(const Value& root, const std::vector<uint32_t>& chain);
 
     // Execute a single instruction; returns true if execution should stop.
-    StopReason execute_one(const Instruction &inst);
+    StopReason execute_one(const Instruction& inst);
 
     // ---- opcode handlers ---------------------------------------------------
-    StopReason exec_arith_logic(const Instruction &inst);
-    StopReason exec_convert(const Instruction &inst);
-    StopReason exec_memory(const Instruction &inst);
-    StopReason exec_composite(const Instruction &inst);
-    StopReason exec_control_flow(const Instruction &inst);
-    StopReason exec_ext_inst(const Instruction &inst);
-    StopReason exec_derivative(const Instruction &inst);
-    StopReason exec_image(const Instruction &inst);
+    StopReason exec_arith_logic(const Instruction& inst);
+    StopReason exec_convert(const Instruction& inst);
+    StopReason exec_memory(const Instruction& inst);
+    StopReason exec_composite(const Instruction& inst);
+    StopReason exec_control_flow(const Instruction& inst);
+    StopReason exec_ext_inst(const Instruction& inst);
+    StopReason exec_derivative(const Instruction& inst);
+    StopReason exec_image(const Instruction& inst);
 
     // Move PC forward to the next instruction in the current block.
     // Returns false if the block is exhausted (should not happen mid-block).

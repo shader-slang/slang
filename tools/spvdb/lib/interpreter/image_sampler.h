@@ -13,10 +13,7 @@ struct ImageData
     int32_t height = 0;
     std::vector<float> pixels; // 4 floats per pixel (RGBA)
 
-    bool valid() const
-    {
-        return width > 0 && height > 0;
-    }
+    bool valid() const { return width > 0 && height > 0; }
 
     // Read one texel, clamping coords to [0, width/height-1].
     void fetch_texel(int x, int y, float out[4]) const;

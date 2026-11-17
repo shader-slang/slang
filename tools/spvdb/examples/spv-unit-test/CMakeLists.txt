@@ -30,10 +30,10 @@ message(STATUS "spvdb:  ${SPVDB}")
 # ---- Compile the test shader to SPIR-V at build time -----------------------
 
 set(TEST_SHADER ${CMAKE_CURRENT_SOURCE_DIR}/test_shader.slang)
-set(TEST_SPV    ${CMAKE_CURRENT_BINARY_DIR}/test_shader.spv)
+set(TEST_SPV ${CMAKE_CURRENT_BINARY_DIR}/test_shader.spv)
 
 add_custom_command(
-    OUTPUT  ${TEST_SPV}
+    OUTPUT ${TEST_SPV}
     COMMAND ${SLANGC} -target spirv -g3 -O0 -o ${TEST_SPV} ${TEST_SHADER}
     DEPENDS ${TEST_SHADER}
     COMMENT "Compiling test_shader.slang → test_shader.spv"
@@ -56,12 +56,12 @@ add_custom_target(test_shader_spv ALL DEPENDS ${TEST_SPV})
 set(TEST_ENTRYPOINTS
     test_arithmetic
     test_bitwise
-    test_bad_assumption     # intentionally fails — demonstrates failure output
+    test_bad_assumption # intentionally fails — demonstrates failure output
 )
 
 foreach(EP ${TEST_ENTRYPOINTS})
     add_test(
-        NAME    ${EP}
+        NAME ${EP}
         COMMAND ${SPVDB} ${TEST_SPV} --entry ${EP} --run
     )
 endforeach()

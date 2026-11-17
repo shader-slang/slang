@@ -1,5 +1,6 @@
 #include "../../lib/api/spvdb.h"
 #include "../../lib/api/spvdb_session.h"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstdint>
@@ -14,14 +15,14 @@ using namespace spvdb;
 // Helpers
 // ---------------------------------------------------------------------------
 
-static std::string spv(const char *name)
+static std::string spv(const char* name)
 {
     return std::string(SPIRV_TEST_DIR) + "/" + name + ".spv";
 }
 
 // Write a minimal 1×1 24-bit BMP with the given RGB values.
 // Returns the file path on success, empty string on failure.
-static std::string write_test_bmp_1x1(const char *filename, uint8_t r, uint8_t g, uint8_t b)
+static std::string write_test_bmp_1x1(const char* filename, uint8_t r, uint8_t g, uint8_t b)
 {
     std::string path = std::string(SPVDB_TEST_TMP_DIR) + "/" + filename;
     // BMP format: file header (14) + info header (40) + pixel data (4) = 58 bytes.
@@ -30,15 +31,15 @@ static std::string write_test_bmp_1x1(const char *filename, uint8_t r, uint8_t g
     // File header
     bmp[0] = 'B';
     bmp[1] = 'M';
-    bmp[2] = 58; // file size (little-endian)
+    bmp[2] = 58;  // file size (little-endian)
     bmp[10] = 54; // pixel data offset
     // Info header (BITMAPINFOHEADER)
     bmp[14] = 40; // header size
-    bmp[18] = 1; // width = 1
-    bmp[22] = 1; // height = 1 (positive = bottom-up)
-    bmp[26] = 1; // planes
+    bmp[18] = 1;  // width = 1
+    bmp[22] = 1;  // height = 1 (positive = bottom-up)
+    bmp[26] = 1;  // planes
     bmp[28] = 24; // bits per pixel
-    bmp[34] = 4; // image size (1 pixel + 1 padding byte × 2, rounded to 4)
+    bmp[34] = 4;  // image size (1 pixel + 1 padding byte × 2, rounded to 4)
     // Pixel data: BGR order + 1 padding byte
     bmp[54] = b;
     bmp[55] = g;
@@ -47,7 +48,7 @@ static std::string write_test_bmp_1x1(const char *filename, uint8_t r, uint8_t g
     std::ofstream f(path, std::ios::binary);
     if (!f)
         return {};
-    f.write(reinterpret_cast<const char *>(bmp), sizeof(bmp));
+    f.write(reinterpret_cast<const char*>(bmp), sizeof(bmp));
     return path;
 }
 
@@ -56,7 +57,8 @@ static std::string json_u32(std::initializer_list<uint32_t> vals)
 {
     std::string s = "[";
     bool first = true;
-    for (auto v : vals) {
+    for (auto v : vals)
+    {
         if (!first)
             s += ", ";
         s += std::to_string(v);
@@ -66,7 +68,7 @@ static std::string json_u32(std::initializer_list<uint32_t> vals)
 }
 
 // Read the first N uint32 values back from a descriptor binding.
-static std::vector<uint32_t> read_u32s(Session &sess, uint32_t set, uint32_t binding, size_t count)
+static std::vector<uint32_t> read_u32s(Session& sess, uint32_t set, uint32_t binding, size_t count)
 {
     auto r = read_descriptor(sess, set, binding);
     REQUIRE(r);
@@ -149,7 +151,8 @@ TEST_CASE("interpreter: add_uint - multiple invocations produce independent resu
     auto mod = load_module_from_file(spv("add_uint"));
     REQUIRE(mod);
 
-    for (uint32_t a : {0u, 1u, 100u, 0xFFFF0000u}) {
+    for (uint32_t a : {0u, 1u, 100u, 0xFFFF0000u})
+    {
         uint32_t b = 5;
         auto sess = create_session(*mod, "main");
         REQUIRE(sess);
@@ -259,7 +262,8 @@ TEST_CASE("interpreter: step_instruction advances through copy_uint")
     // Step until done; should never panic.
     StopReason reason = StopReason::Step;
     int steps = 0;
-    while (reason != StopReason::EntryFinished && reason != StopReason::Panic) {
+    while (reason != StopReason::EntryFinished && reason != StopReason::Panic)
+    {
         reason = step_instruction(**sess);
         REQUIRE(steps++ < 1000); // Guard against infinite loops.
     }
@@ -302,10 +306,11 @@ TEST_CASE("interpreter: fragment passthrough - input location 0 copied to output
     REQUIRE(sess);
 
     // Bind a vec4 (1.0, 0.5, 0.25, 1.0) to input location 0.
-    Value color = Value::make_composite({Value::make_f32(1.0f),
-                                         Value::make_f32(0.5f),
-                                         Value::make_f32(0.25f),
-                                         Value::make_f32(1.0f)});
+    Value color = Value::make_composite(
+        {Value::make_f32(1.0f),
+         Value::make_f32(0.5f),
+         Value::make_f32(0.25f),
+         Value::make_f32(1.0f)});
     REQUIRE(set_input_location(**sess, 0, color));
 
     auto reason = run(**sess);
@@ -394,10 +399,11 @@ TEST_CASE("interpreter: fragment derivative - OpDPdx returns zero (single invoca
     REQUIRE(sess);
 
     // Set input color to something non-zero; derivative should still be zero.
-    Value color = Value::make_composite({Value::make_f32(1.0f),
-                                         Value::make_f32(2.0f),
-                                         Value::make_f32(3.0f),
-                                         Value::make_f32(4.0f)});
+    Value color = Value::make_composite(
+        {Value::make_f32(1.0f),
+         Value::make_f32(2.0f),
+         Value::make_f32(3.0f),
+         Value::make_f32(4.0f)});
     REQUIRE(set_input_location(**sess, 0, color));
 
     auto reason = run(**sess);
