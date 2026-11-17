@@ -178,6 +178,59 @@ struct PeepholeContext : InstPassBase
         }
     }
 
+    // Rewrites a numeric cast of a vector or matrix built from scalar literals into the same
+    // vector or matrix built from casted literals, and returns whether it rewrote `inst`.
+    //
+    // Consider this module-scope constant, compiled with the default column-major layout:
+    //
+    //     static const row_major float2x2 m = float2x2(0, 1, 2, 3);
+    //
+    // Lowering produces `floatCast(makeMatrix(0.0f, 1.0f, 2.0f, 3.0f))`, because the initializer
+    // has the default layout and the declaration does not. Scalar casts of literals are folded by
+    // SCCP, but SCCP does not look through `makeVector` and `makeMatrix`, so the cast survives.
+    // The CPP and CUDA emitters then keep both instructions as separate globals, and the
+    // `__device__` initializer of the cast is dynamic, which NVRTC rejects.
+    //
+    // We rewrite the cast as `makeMatrix(floatCast(0.0f), ...)` of the destination type. SCCP
+    // folds the scalar casts, so the result is one constant that every target can emit in place.
+    // We handle only operands that are all scalar literals, in which case each operand is one
+    // element and the cast applies to each element independently.
+    bool tryFoldCastOfConstantVectorOrMatrix(IRInst* inst)
+    {
+        auto source = inst->getOperand(0);
+        if (source->getOp() != kIROp_MakeVector && source->getOp() != kIROp_MakeMatrix)
+            return false;
+        if (!as<IRVectorType>(inst->getDataType()) && !as<IRMatrixType>(inst->getDataType()))
+            return false;
+        auto destType = inst->getDataType();
+        auto destElementType = as<IRMatrixType>(destType) ? getMatrixElementType(destType)
+                                                          : getVectorElementType(destType);
+
+        for (UInt i = 0; i < source->getOperandCount(); i++)
+        {
+            if (!as<IRConstant>(source->getOperand(i)))
+                return false;
+        }
+
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+        builder.setInsertBefore(inst);
+        List<IRInst*> elements;
+        for (UInt i = 0; i < source->getOperandCount(); i++)
+        {
+            auto element = source->getOperand(i);
+            elements.add(builder.emitIntrinsicInst(destElementType, inst->getOp(), 1, &element));
+        }
+        auto result = builder.emitIntrinsicInst(
+            inst->getDataType(),
+            source->getOp(),
+            elements.getCount(),
+            elements.getBuffer());
+        inst->replaceUsesWith(result);
+        maybeRemoveOldInst(inst);
+        return true;
+    }
+
     bool tryOptimizeArithmeticInst(IRInst* inst)
     {
         bool allowUnsafeOptimizations =
@@ -1239,7 +1292,15 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+                else if (inst->getOp() == kIROp_IntCast || inst->getOp() == kIROp_FloatCast)
+                {
+                    changed |= tryFoldCastOfConstantVectorOrMatrix(inst);
+                }
             }
+            break;
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+            changed |= tryFoldCastOfConstantVectorOrMatrix(inst);
             break;
         case kIROp_CastUntypedResourceHandleToUInt:
             {
