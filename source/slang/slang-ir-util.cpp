@@ -1669,6 +1669,7 @@ static bool isCallerExclusiveRoot(IRGlobalValueWithCode* func, IRInst* root)
         case kIROp_OutParamType:
         case kIROp_BorrowInOutParamType:
         case kIROp_BorrowInParamType:
+        case kIROp_ByValueBorrowInParamType:
             return true;
         }
 
