@@ -2,7 +2,7 @@
 // parameter: a `__ref_readonly` parameter, or a field, array element, vector element, matrix
 // element, tuple element, or swizzle of one. A `__constref` parameter is a read-only value in
 // the body rather than a memory location, so it cannot be passed to a `__ref_readonly`
-// parameter.
+// parameter; tests/bugs/13833/13833-borrow-param-write.slang pins that rejection.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -experimental-feature
