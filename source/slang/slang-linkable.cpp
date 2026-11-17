@@ -1307,14 +1307,24 @@ ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
     // A single `linkTimeResolve` pass substitutes one level of exported constants: an
     // exported constant defined in terms of another extern, e.g.
     // `export extern static const int B = A + 1;`, still holds a symbolic factor after
-    // the first pass replaces `B` with its initializer's value. Iterate to a fixpoint,
-    // bounded by the number of exported constants: every non-final pass must resolve at
-    // least one more extern reference (each `_linkTimeResolveOverride` returns its
-    // receiver unchanged when nothing resolved), so no expression can need more passes
-    // than the map has entries, and a self-referential cycle — or an intermediate that
-    // stops being an `IntVal` — simply ends as an unresolved, non-constant value.
+    // the first pass replaces `B` with its initializer's value. Iterate to a fixpoint:
+    // every non-final pass must resolve at least one more extern reference (each
+    // `_linkTimeResolveOverride` returns its receiver unchanged when nothing resolved),
+    // so a self-referential cycle — or an intermediate that stops being an `IntVal` —
+    // simply ends as an unresolved, non-constant value. The pass budget is the smaller
+    // of the map size and a fixed constant (`kMaxLinkTimeResolvePasses`): taking it from
+    // the map size alone would let thousands of padding `export const` declarations
+    // inflate the work bound, and each pass of a multiplicative chain can wrap the
+    // previous pass's polynomial into one more nesting level, so the constant cap also
+    // bounds that nesting — and the per-pass recursion through it — for adversarial
+    // input. A chain deeper than the cap ends unresolved (the caller diagnoses it as a
+    // non-constant value) instead of exhausting stack or time.
+    static constexpr Index kMaxLinkTimeResolvePasses = 64;
     Val* result = intVal;
-    for (Index i = 0, iterationLimit = map.getCount() + 1; i < iterationLimit; i++)
+    for (Index i = 0,
+              iterationLimit = Math::Min((Index)(map.getCount() + 1), kMaxLinkTimeResolvePasses);
+         i < iterationLimit;
+         i++)
     {
         auto intValResult = as<IntVal>(result);
         if (!intValResult)
