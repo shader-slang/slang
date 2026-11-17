@@ -50,9 +50,9 @@ extension float : rt::IClosestHitShader
 interface IGenericStageTarget {}
 
 // The generic extension itself is accepted while its target is still the parameter T. The
-// annotations below it are for the concrete builtin application `extension float : ...`
-// further down: the deferred rule reports on the clause that declared the conformance,
-// because a builtin type has no source declaration to point at.
+// annotations below it are the diagnostic for float: main's useStage<float>() applies this
+// extension to float, and the location is this clause because a builtin type has no source
+// declaration of its own to point at.
 __generic<T : IGenericStageTarget>
 extension T : rt::IClosestHitShader
 //CHECK:          ^^^^^^^^^^^^^^^^^ invalid structural ray-tracing stage implementation

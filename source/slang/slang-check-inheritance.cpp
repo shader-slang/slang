@@ -860,7 +860,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
             // Applying the extension makes its declared conformances part of this type. A
             // generic extension defers its structural ray-tracing stage clause to exactly
-            // this point, so each concrete application is checked once as it materializes.
+            // this point, so each concrete application is checked as it materializes;
+            // repeated facet computations are deduplicated by diagnoseOnce within a
+            // checking session.
             PortableRT::checkStageRestrictionsForExtensionApplication(&visitor, extDecl, selfType);
 
             // In the case where we *do* find an extension that

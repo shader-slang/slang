@@ -26,6 +26,9 @@ namespace PortableRT
 // a visitor use its existing diagnoseOnce state to avoid reporting the same error twice.
 
 /// Checks the additional stage-implementation restrictions after ordinary conformance checking.
+///
+/// `inheritanceDecl` is the conformance clause being validated; its location is reported when
+/// the witnessed stage type has no source declaration of its own (a builtin type).
 void checkStageRestrictions(
     SemanticsVisitor* visitor,
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
@@ -36,10 +39,11 @@ void checkStageRestrictions(
 /// the extension applies to.
 ///
 /// A generic extension whose target is its own parameter cannot validate its clause at
-/// conformance-check time, because the implementation is not concrete yet. This entry point
-/// runs the same user-defined-struct rule against `selfType` when the extension's facet is
+/// conformance-check time, because the implementation is not concrete yet. This function runs
+/// the same user-defined-struct rule against `selfType` when the extension's facet is
 /// built for that type, which covers every consumption surface that discovers extension-derived
-/// conformances (entry selection, schema lists, subtype queries, specializations, imports).
+/// conformances through facet lookup: entry selection, schema lists including hit groups,
+/// subtype queries, generic specializations, and imports.
 void checkStageRestrictionsForExtensionApplication(
     SemanticsVisitor* visitor,
     ExtensionDecl* extDecl,
