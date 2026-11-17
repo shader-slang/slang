@@ -2439,14 +2439,25 @@ MathIntType expressionTypeToMathIntType(Type *type)
     }
 }
 
-MathIntValue createMathIntValue(ConstantIntVal* c)
+/// Return the builtin scalar type whose values represent the values of `type` in integer
+/// folding: `type` itself for a builtin scalar type, or the tag type of an enum type. For
+/// example, the cases of `enum Flags : uint8_t` fold as `uint8_t` values. Return null for any
+/// other type, which integer folding does not support.
+static BasicExpressionType* getIntegerFoldingType(ASTBuilder* astBuilder, Type* type)
 {
-    auto basicExprType = as<BasicExpressionType>(c->getType());
-    SLANG_RELEASE_ASSERT(basicExprType);
+    if (auto basicType = as<BasicExpressionType>(type))
+        return basicType;
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
+            return as<BasicExpressionType>(getTagType(astBuilder, enumDeclRef));
+    }
+    return nullptr;
+}
 
-    MathIntType intType{expressionTypeToMathIntType(basicExprType)};
-
-    return MathIntValue::constructFromValue(intType, c->getValue());
+MathIntValue createMathIntValue(BasicExpressionType* type, ConstantIntVal* c)
+{
+    return MathIntValue::constructFromValue(expressionTypeToMathIntType(type), c->getValue());
 }
 
 IntVal* BuiltinOperationIntVal::tryFoldImpl(
@@ -2461,7 +2472,8 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
     std::array<MathIntValue, 3> constArgs{};
 
     // we need a concrete result type for folding
-    auto resultBasicExprType = as<BasicExpressionType>(resultType);
+    SLANG_RELEASE_ASSERT(resultType);
+    auto resultBasicExprType = getIntegerFoldingType(astBuilder, resultType);
     if (!resultBasicExprType)
         return nullptr;
 
@@ -2474,16 +2486,16 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
         if (!c)
             return nullptr; // still symbolic
 
-        if (!as<BasicExpressionType>(c->getType()))
-            return nullptr; // argument without a concrete type can't be folded
+        auto argBasicExprType = getIntegerFoldingType(astBuilder, c->getType());
+        if (!argBasicExprType)
+            return nullptr; // integer folding does not support the argument's type
 
-        MathIntValue v = createMathIntValue(c);
+        MathIntValue v = createMathIntValue(argBasicExprType, c);
         SLANG_RELEASE_ASSERT(v.hasValue());
 
         constArgs.at(numArgs) = v;
         ++numArgs;
     }
-
 
     // Reject a malformed node whose argument count does not match the operation's arity, so a
     // unary op never reads a missing second operand and a binary op never folds with a
