@@ -5330,7 +5330,7 @@ err(
     "binding-attribute-requires-concrete-value",
     39034,
     "binding attribute requires a concrete value",
-    span { loc = "location", message = "an argument of '[[vk::binding(...)]]' is a link-time constant that is not a concrete value here; provide a default or link a module that defines it" }
+    span { loc = "location", message = "an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a default or link a module that defines it" }
 )
 
 err(

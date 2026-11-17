@@ -1,14 +1,16 @@
-// An `extern` link-time constant with no default initializer and no linked module that
-// defines it cannot resolve to a concrete descriptor index at layout time.
+// `extern` link-time constants with no default initializer and no linked module that
+// defines them cannot resolve to concrete descriptor indices at layout time. When both
+// arguments of one attribute are unresolvable, the resolver diagnoses the attribute once.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv-asm -entry main -stage compute
 
 extern static const int Slot;
+extern static const int SetSlot;
 
-[[vk::binding(Slot, 1)]]
+[[vk::binding(Slot, SetSlot)]]
 /*CHECK:
       ^^^^^^^ binding attribute requires a concrete value
-      ^^^^^^^ an argument of '[[vk::binding(...)]]' is a link-time constant that is not a concrete value here; provide a default or link a module that defines it
+      ^^^^^^^ an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a default or link a module that defines it
 */
 RWStructuredBuffer<uint> result;
 

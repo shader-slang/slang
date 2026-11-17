@@ -1144,9 +1144,11 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
 // An argument that was never specified (`layout(binding = N)` alone, or the defaulted
 // `set`) means index 0. A specified value that is a link-time constant which cannot be
 // resolved — e.g. an `extern` constant with no default initializer and no linked
-// definition — is diagnosed here and reads as index 0, so the caller's layout continues
-// (best-effort) after the error.
-static void _tryResolveGLSLBindingAttribute(
+// definition — is diagnosed here, once per attribute (the message cannot say which
+// argument failed, so a second identical error at the same location would only repeat
+// it), and both outputs read as index 0, so the caller's layout continues (best-effort)
+// after the error.
+static void _resolveGLSLBindingAttribute(
     ParameterBindingContext* context,
     GLSLBindingAttribute* attr,
     IntegerLiteralValue& outBinding,
@@ -1155,21 +1157,25 @@ static void _tryResolveGLSLBindingAttribute(
     outBinding = 0;
     outSet = 0;
     auto program = context->getTargetProgram()->getProgram();
+    bool anyUnresolved = false;
     if (attr->binding)
     {
         if (auto bindingVal = program->tryFoldIntVal(attr->binding))
             outBinding = bindingVal->getValue();
         else
-            getSink(context)->diagnose(
-                Diagnostics::BindingAttributeRequiresConcreteValue{.location = attr->loc});
+            anyUnresolved = true;
     }
     if (attr->set)
     {
         if (auto setVal = program->tryFoldIntVal(attr->set))
             outSet = setVal->getValue();
         else
-            getSink(context)->diagnose(
-                Diagnostics::BindingAttributeRequiresConcreteValue{.location = attr->loc});
+            anyUnresolved = true;
+    }
+    if (anyUnresolved)
+    {
+        getSink(context)->diagnose(
+            Diagnostics::BindingAttributeRequiresConcreteValue{.location = attr->loc});
     }
 }
 
@@ -1289,7 +1295,7 @@ static void addExplicitParameterBindings_GLSL(
             {
                 IntegerLiteralValue binding = 0;
                 IntegerLiteralValue set = 0;
-                _tryResolveGLSLBindingAttribute(context, glslBindingAttr, binding, set);
+                _resolveGLSLBindingAttribute(context, glslBindingAttr, binding, set);
                 info[kResInfo].resInfo = foundResInfo;
                 info[kResInfo].semanticInfo.index = binding;
                 info[kResInfo].semanticInfo.space = set;
@@ -1305,7 +1311,7 @@ static void addExplicitParameterBindings_GLSL(
             {
                 IntegerLiteralValue binding = 0;
                 IntegerLiteralValue set = 0;
-                _tryResolveGLSLBindingAttribute(context, attr, binding, set);
+                _resolveGLSLBindingAttribute(context, attr, binding, set);
                 info[kResInfo].resInfo = foundResInfo;
                 if (binding != 0)
                 {
@@ -1565,7 +1571,7 @@ static bool addExplicitVkBindingForEntryPointParameter(
         {
             IntegerLiteralValue binding = 0;
             IntegerLiteralValue set = 0;
-            _tryResolveGLSLBindingAttribute(context, attr, binding, set);
+            _resolveGLSLBindingAttribute(context, attr, binding, set);
             LayoutSemanticInfo semanticInfo;
             LayoutSize count = explicitResourceInfo->count;
             if (explicitResourceInfo->kind == LayoutResourceKind::DescriptorTableSlot)
