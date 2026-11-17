@@ -4240,9 +4240,12 @@ static bool _exprsHaveIdenticalAccessPath(Expr* a, Expr* b)
 // argument names `s.v`, a member of that same storage. A member or element names
 // storage inside its base's storage, so the two locations overlap no matter
 // which member or index the extra steps select — `s` and `s.v` alias just as
-// `arr[0]` and `arr[0].x` do. Only member and constant-index steps extend a
-// path; anything else (a call, a swizzle, a dynamic index) makes the rest of the
-// path opaque, and the function returns false for what it can't prove.
+// `arr[0]` and `arr[0].x` do. Only member and index steps extend a path;
+// anything else (a call, a swizzle) makes the rest of the path opaque. An
+// extension step's index is unconstrained — any element of `prefix`'s storage
+// overlaps `prefix`, so `arr` aliases `arr[i]` even at runtime — while a
+// dynamic index inside the shared path is never provable, because the
+// identical-path check compares constant indices only.
 static bool _exprIsAccessPathPrefix(Expr* prefix, Expr* path)
 {
     prefix = _peelCastsAndParens(prefix);
