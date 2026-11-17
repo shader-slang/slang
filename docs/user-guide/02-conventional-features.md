@@ -339,6 +339,28 @@ where:
 
 Not all combinations of these options are supported, and some combinations may be unsupported on some targets.
 
+#### Partial Texel Writes
+
+A shader can write to some components of a texel and leave the rest untouched:
+
+```hlsl
+RWTexture2D<float4> tex;
+tex[coord].w  = 1.0;                  // one component
+tex[coord].xy = float2(1.0, 2.0);     // several components
+```
+
+The target language defines how such a write can be expressed, so Slang lowers it per target:
+
+* **D3D (HLSL)**: the write is passed through to the generated HLSL unchanged, and its semantics are those of the downstream HLSL compiler.
+* **Metal, Vulkan (SPIR-V), GLSL**: these backends have no component-masked texture store, so Slang lowers the write into a non-atomic read-modify-write of the whole texel: the texel is loaded, the written components are updated in an intermediate value, and the whole texel is stored back.
+* **CUDA**: the same read-modify-write lowering, built from CUDA surface reads and writes (`surf*Dread`/`surf*Dwrite`). Because CUDA surfaces do not guarantee that a read returns data written earlier in the same kernel launch, Slang also emits warning `E56116` for every partial write on CUDA.
+* **CPU**: the write is passed through to the generated C++: the texture subscript yields a reference to the texel, so a single-component write assigns the member directly and a multi-component swizzle is spelled per element (`texel.x = v.x; texel.y = v.y;`) — no read-modify-write is involved.
+* **WGSL**: partial texel writes are not supported on this target yet.
+
+In the CUDA lowering, whose vector types are plain structs with no swizzle assignment, the intermediate swizzle assignment is spelled out per element (`tmp.x = v.x; tmp.y = v.y;`); on Metal, SPIR-V and GLSL it keeps the single-statement form (`tmp.xy = v;`).
+
+Because every lowered form is a plain load-modify-store, partial writes to the same texel from different invocations race with each other, and one invocation's write can be lost — even when the invocations write different components. On CUDA there is an additional hazard within a single thread: writing `tex[coord].x = 1;` and later `tex[coord].y = 2;` in the same kernel launch can lose the first write, because the read inside the second write is not guaranteed to observe it. Prefer whole-texel writes when the value is available up front.
+
 #### Sampler
 
 Sampler types encapsulate parameters that control addressing and filtering for texture-sampling operations.
