@@ -55,9 +55,11 @@ using namespace Slang;
     return SLANG_OK;
 }
 
-// Matches a severity word at the start of inText, shared by both Slang diagnostic renderings:
-// the classic single-line form `path(11): error 31101: ...` and the rust-style header
-// `error[E30015]: ...`. Sets outPrefix to the matched word and outSeverity to its class.
+// Matches a severity word at the start of inText and sets outPrefix to the matched word and
+// outSeverity to its class. Shared by both Slang diagnostic renderings: the rich-header
+// matcher passes a full header line (`error[E30015]: ...`), while the classic callers pass
+// only the severity-and-code slice between the path and the message (`error 31101` in
+// `path(11): error 31101: ...`).
 static SlangResult _matchSlangSeverityPrefix(
     const UnownedStringSlice& inText,
     ArtifactDiagnostic::Severity& outSeverity,
@@ -65,22 +67,25 @@ static SlangResult _matchSlangSeverityPrefix(
 {
     UnownedStringSlice text(inText.trim());
 
-    static const UnownedStringSlice prefixes[] = {
-        UnownedStringSlice::fromLiteral("note"),
-        UnownedStringSlice::fromLiteral("warning"),
-        UnownedStringSlice::fromLiteral("error"),
-        UnownedStringSlice::fromLiteral("fatal error"),
-        UnownedStringSlice::fromLiteral("internal error"),
-        UnownedStringSlice::fromLiteral("unknown error")};
-
-    for (Index i = 0; i < SLANG_COUNT_OF(prefixes); ++i)
+    struct SeverityPrefix
     {
-        if (text.startsWith(prefixes[i]))
+        UnownedStringSlice prefix;
+        ArtifactDiagnostic::Severity severity;
+    };
+    static const SeverityPrefix prefixes[] = {
+        {UnownedStringSlice::fromLiteral("note"), ArtifactDiagnostic::Severity::Info},
+        {UnownedStringSlice::fromLiteral("warning"), ArtifactDiagnostic::Severity::Warning},
+        {UnownedStringSlice::fromLiteral("error"), ArtifactDiagnostic::Severity::Error},
+        {UnownedStringSlice::fromLiteral("fatal error"), ArtifactDiagnostic::Severity::Error},
+        {UnownedStringSlice::fromLiteral("internal error"), ArtifactDiagnostic::Severity::Error},
+        {UnownedStringSlice::fromLiteral("unknown error"), ArtifactDiagnostic::Severity::Error}};
+
+    for (const auto& entry : prefixes)
+    {
+        if (text.startsWith(entry.prefix))
         {
-            outPrefix = prefixes[i];
-            outSeverity = (i == 0)   ? ArtifactDiagnostic::Severity::Info
-                          : (i == 1) ? ArtifactDiagnostic::Severity::Warning
-                                     : ArtifactDiagnostic::Severity::Error;
+            outPrefix = entry.prefix;
+            outSeverity = entry.severity;
             return SLANG_OK;
         }
     }
@@ -159,7 +164,8 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
 }
 
 /*
-A rust-style Slang diagnostic renders as a block:
+A rich Slang diagnostic — the rust-style layout rendered by
+slang-rich-diagnostics-render.cpp — renders as a block:
 
     error[E30015]: undefined identifier
      --> tests/foo.slang:4:15
@@ -171,7 +177,7 @@ The header line carries the severity, an optional code in brackets, and the mess
 location line that follows carries the path and position. A note repeats the same shape with
 `note:` and a `---` location marker. This is slangc's default rendering for its diagnostics.
 */
-static bool _isSlangRichDiagnosticHeader(
+static bool _matchSlangRichDiagnosticHeader(
     const UnownedStringSlice& inLine,
     ArtifactDiagnostic::Severity& outSeverity,
     UnownedStringSlice& outCode,
@@ -227,12 +233,16 @@ static bool _isSlangRichDiagnosticHeader(
     return true;
 }
 
-// The location line of a rust-style block. The ascii glyphs are `-->` for the primary
-// diagnostic and `---` for notes; the unicode glyph set uses the same marker for both.
-// The ascii `---` also prefixes the closing gutter line of a snippet (`---'`), which is
-// harmless: a location line always immediately follows its header, so no pending header
-// can attach to a gutter close, and it degrades to a note.
-static bool _isSlangRichLocationLine(
+// The location line of a rich record. The markers mirror the renderer's glyph tables
+// (s_asciiGlyphs / s_unicodeGlyphs in source/compiler-core/slang-rich-diagnostics-render.cpp):
+// ascii `-->` for a primary location and `---` for a note location; the unicode set uses the
+// `╭╼` glyph for both (the line is trimmed first, so the glyph's leading space is gone). Two
+// other renderer lines also begin with dashes after trimming — the snippet gutter close
+// (`---'`) and a three-dash secondary underline — but they are harmless: a location line
+// always immediately follows its header, because the renderer only draws a snippet under a
+// location line (a positionless record renders no snippet), so no pending header can attach
+// to them; they degrade to notes.
+static bool _matchSlangRichLocationLine(
     const UnownedStringSlice& inLine,
     UnownedStringSlice& outLocation)
 {
@@ -253,9 +263,12 @@ static bool _isSlangRichLocationLine(
     return false;
 }
 
-// Splits the `path:line:col` text of a rust-style location line into the diagnostic's
-// location. A location without a line and column (a command-line source) keeps the whole
-// text as the path and leaves the position unset.
+// Sets the diagnostic's location from the `path:line:col` text of a rich location line. The
+// renderer emits exactly two shapes — `path:line:col`, or a bare path for a command-line
+// source — so the split requires both the line and the column to parse as integers. Anything
+// else (including a `path:line` without a column, which the renderer never emits) keeps the
+// whole text as the filePath with the position left unset, matching the harness convention
+// that an unset position is line and column 0.
 static void _setSlangRichLocation(
     SliceAllocator& allocator,
     const UnownedStringSlice& inLocation,
@@ -287,7 +300,9 @@ static void _setSlangRichLocation(
     outDiagnostic.filePath = allocator.allocate(path);
 }
 
-// True if any line of inText is a rust-style diagnostic header.
+// True if any line of inText is a rich header. Used to decide, after identifyCompiler has
+// named Slang, whether the text is rich-rendered; requires the coded header form (see
+// _matchSlangRichDiagnosticHeader for why that is the identifying shape).
 static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
 {
     UnownedStringSlice text(inText), line;
@@ -295,7 +310,7 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
     {
         ArtifactDiagnostic::Severity severity;
         UnownedStringSlice code, message;
-        if (_isSlangRichDiagnosticHeader(line, severity, code, message))
+        if (_matchSlangRichDiagnosticHeader(line, severity, code, message))
         {
             return true;
         }
@@ -321,7 +336,7 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
     {
         ArtifactDiagnostic::Severity severity;
         UnownedStringSlice code, message;
-        if (_isSlangRichDiagnosticHeader(line, severity, code, message))
+        if (_matchSlangRichDiagnosticHeader(line, severity, code, message))
         {
             if (hasPending)
             {
@@ -341,7 +356,7 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
         }
 
         UnownedStringSlice location;
-        if (_isSlangRichLocationLine(line, location))
+        if (_matchSlangRichLocationLine(line, location))
         {
             if (hasPending)
             {
@@ -352,7 +367,7 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
             else
             {
                 // A location line with no preceding header carries no diagnostic of its own.
-                diagnostics->maybeAddNote(asCharSlice(line));
+                ArtifactDiagnosticUtil::maybeAddNote(line, diagnostics);
             }
             continue;
         }
@@ -364,7 +379,7 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
         }
 
         // Gutter, snippet and underline lines of a rendered block are kept as notes.
-        diagnostics->maybeAddNote(asCharSlice(line));
+        ArtifactDiagnosticUtil::maybeAddNote(line, diagnostics);
     }
 
     if (hasPending)
@@ -455,12 +470,16 @@ static SlangResult _findDownstreamCompiler(
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))
     {
-        // A rust-style header identifies Slang. Checking it before the classic form means a
-        // header whose message resembles a classic diagnostic (e.g. `error[E30015]: error
-        // 30015: ...`) is not mistaken for one.
+        // A rich header with an `[E<code>]` identifies Slang: the classic check below does
+        // not match one (`error[E30015]` before the first colon is not a severity word),
+        // and no downstream-compiler name prefixes it, so without this check pure rich
+        // output would not identify at all. The code is required here — every slang
+        // error/warning diagnostic carries one, and the codeless `note:` headers never lead
+        // a stream — so a downstream tool's bare `error: message` line cannot claim Slang
+        // identity.
         ArtifactDiagnostic::Severity richSeverity;
         UnownedStringSlice richCode, richMessage;
-        if (_isSlangRichDiagnosticHeader(line, richSeverity, richCode, richMessage))
+        if (_matchSlangRichDiagnosticHeader(line, richSeverity, richCode, richMessage))
         {
             outIdentity = CompilerIdentity::makeSlang();
             return SLANG_OK;
@@ -527,8 +546,15 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
     CompilerIdentity compilerIdentity;
     SLANG_RETURN_ON_FAIL(ParseDiagnosticUtil::identifyCompiler(inText, compilerIdentity));
 
-    // Frontend diagnostics render as rust-style blocks; parse them as records so a block's
-    // location line reaches the diagnostic instead of being dropped as an unparsed note.
+    // Frontend diagnostics render as rich blocks; parse them as records so a block's
+    // location line reaches its diagnostic. identifyCompiler only decides which compiler
+    // produced the output — which of Slang's two renderings is in use is decided here, by
+    // scanning again for a rich header. A stream that mixes rich blocks with
+    // downstream-prefixed lines identifies by line order (the first line matching either
+    // check wins) and the minority rendering's lines degrade to notes — the same demotion
+    // such mixed streams received before this change; hybrid parsing is out of scope.
+    // Before the rich parser, a pure rich block did not parse at all: identifyCompiler
+    // failed and callers saw the raw text.
     if (compilerIdentity.m_type == CompilerIdentity::Slang && _isSlangRichDiagnostics(inText))
     {
         return parseSlangRichDiagnostics(inText, diagnostics);

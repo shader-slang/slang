@@ -89,8 +89,13 @@ struct ParseDiagnosticUtil
         Slang::List<Slang::UnownedStringSlice>& lineSlices,
         Slang::ArtifactDiagnostic& outDiagnostic);
 
-    /// For parsing rust-style Slang diagnostics: a header line `severity[E<code>]: message`
-    /// followed by a location line ` --> path:line:col` and a rendered snippet
+    /// For parsing rich Slang diagnostics — the rust-style blocks rendered by
+    /// slang-rich-diagnostics-render.cpp. A record is a `severity[E<code>]: message` header
+    /// line (the code is optional; note headers carry none), optionally followed by a
+    /// location line ` --> path:line:col` (or ` --- path:line:col` for a note, or no
+    /// location line at all for a positionless diagnostic). Snippet and gutter lines of the
+    /// rendered block are kept as notes. Always returns SLANG_OK; whether the text held any
+    /// diagnostic is observable through the diagnostics list.
     static SlangResult parseSlangRichDiagnostics(
         const Slang::UnownedStringSlice& inText,
         Slang::IArtifactDiagnostics* diagnostics);
