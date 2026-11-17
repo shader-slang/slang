@@ -205,6 +205,7 @@ void computeMain()
     triCtxInput.attributes.barycentricCoord = float2(0.75, 0.25);
 
     PrimInput<TriangleContext> primInput;
+    primInput.prim.kind = 3;
 
     Input3<Context2> input3;
     input3.data.payload = 21;
