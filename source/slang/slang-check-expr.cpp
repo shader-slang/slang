@@ -4237,15 +4237,21 @@ static bool _exprsHaveIdenticalAccessPath(Expr* a, Expr* b)
 // Check whether the storage `path` names is inside the storage `prefix` names:
 // the two access paths agree on every step of `prefix`, and `path` may continue
 // below it. Consider `s.mutInoutField(s.v)`: the receiver names `s` while the
-// argument names `s.v`, a member of that same storage. A member or element names
-// storage inside its base's storage, so the two locations overlap no matter
-// which member or index the extra steps select — `s` and `s.v` alias just as
-// `arr[0]` and `arr[0].x` do. Only member and index steps extend a path;
+// argument names `s.v`, a member of that same storage. A plain field or an
+// element of an array, vector, or matrix names storage inside its base's
+// storage, so the two locations overlap no matter which member or index the
+// extra steps select — `s` and `s.v` alias just as `arr[0]` and `arr[0].x` do.
+// Other member or index shapes do *not* name storage inside the base, so they
+// end the proof: a property is mediated by accessors (lowering binds an
+// argument naming it through a temporary, not a subobject of the base), a
+// deref member or pointer/buffer index names storage *pointed to*, and
 // anything else (a call, a swizzle) makes the rest of the path opaque. An
 // extension step's index is unconstrained — any element of `prefix`'s storage
 // overlaps `prefix`, so `arr` aliases `arr[i]` even at runtime — while a
 // dynamic index inside the shared path is never provable, because the
-// identical-path check compares constant indices only.
+// identical-path check compares constant indices only. Re-peeling at each
+// level is safe because `_peelCastsAndParens` is idempotent: a peeled
+// expression has no cast or parenthesis at its root.
 static bool _exprIsAccessPathPrefix(Expr* prefix, Expr* path)
 {
     prefix = _peelCastsAndParens(prefix);
@@ -4259,9 +4265,21 @@ static bool _exprIsAccessPathPrefix(Expr* prefix, Expr* path)
             return true;
 
         if (auto pathMember = as<MemberExpr>(path))
+        {
+            auto memberDecl = pathMember->declRef.getDecl();
+            if (as<DerefMemberExpr>(pathMember) || as<PropertyDecl>(memberDecl) ||
+                as<CallableDecl>(memberDecl))
+                return false;
             path = pathMember->baseExpression;
+        }
         else if (auto pathIndex = as<IndexExpr>(path))
+        {
+            auto baseType = pathIndex->baseExpression->type.type;
+            if (!(as<ArrayExpressionType>(baseType) || as<VectorExpressionType>(baseType) ||
+                  as<MatrixExpressionType>(baseType)))
+                return false;
             path = pathIndex->baseExpression;
+        }
         else
             return false;
     }
@@ -4342,7 +4360,7 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     Index paramCount = funcType->getParamCount();
     Index checkCount = Math::Min(argCount, paramCount);
 
-    // For each pair of arguments, check if they refer to the same storage
+    // For each pair of arguments, check if they refer to overlapping storage
     // and their parameters' modes let the aliasing interfere. We compare
     // expressions structurally: bare variables (a == a), member accesses
     // (s.x == s.x but not s.x == s.y), and constant-index subscripts
@@ -4361,7 +4379,7 @@ void SemanticsVisitor::_checkAliasedOutArguments(
             if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
                 continue;
 
-            // Both arguments refer to the same variable. Put a parameter that
+            // Both arguments refer to overlapping storage. Put a parameter that
             // may be written first in the diagnostic for clarity.
             const bool iMayBeWritten = doesParamPassingModeIndicateWritableStorage(iMode);
             Index first = iMayBeWritten ? i : j;
@@ -4388,9 +4406,13 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     // write through, exactly like an `inout` or `__ref` parameter, but it is
     // the base of the callee expression rather than an entry of
     // `invoke->arguments`, so compare it against each argument here. The mode
-    // rules are the ones for explicit arguments: an `in` receiver never warns,
-    // and a `__ref` receiver paired with a `__ref` argument has opted into
-    // reference semantics.
+    // rules are the ones for explicit arguments, applied to the receiver's
+    // *effective* mode: a receiver whose effective mode is `in` (a
+    // `[nonmutating]` method, or a plain method on a copyable type) never
+    // warns, while a plain method on a non-copyable type is effectively
+    // borrowed (`BorrowIn`) and follows the borrow rules like a `__borrow`
+    // parameter. A `__ref` receiver paired with a `__ref` argument has opted
+    // into reference semantics.
     if (!receiverExpr || !receiverMode)
         return;
 
@@ -4699,17 +4721,28 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // Warn when the same storage is passed to two parameters that may both be
             // references to it, and at least one may write it (issue #10699). The
             // receiver of a method call joins the comparison as one more storage the
-            // call may write: it is the base of the callee expression, never an entry
+            // call may write: it is the base of a plain member callee, never an entry
             // of `invoke->arguments`, and its passing mode comes from the method
-            // declaration rather than the `FuncType` (issue #13758).
+            // declaration rather than the `FuncType` (issue #13758). Both are set
+            // together or not at all: a deref callee (`p->method()`) names the
+            // pointee as its receiver while its base expression names the pointer,
+            // and other receiver-bearing callee shapes (a bare reference, a
+            // partially applied generic) have no base expression, so those calls
+            // skip the receiver pair — a missed warning, never a wrong one.
             Expr* receiverExpr = nullptr;
             std::optional<ParamPassingMode> receiverMode;
             if (callableDeclRef)
             {
                 if (auto thisParamInfo = findEffectiveThisParamInfo(callableDeclRef))
                 {
-                    receiverMode = thisParamInfo->mode;
-                    receiverExpr = GetBaseExpr(invoke->functionExpr);
+                    if (!as<DerefMemberExpr>(invoke->functionExpr))
+                    {
+                        if (Expr* baseExpr = GetBaseExpr(invoke->functionExpr))
+                        {
+                            receiverMode = thisParamInfo->mode;
+                            receiverExpr = baseExpr;
+                        }
+                    }
                 }
             }
             _checkAliasedOutArguments(

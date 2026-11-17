@@ -4216,6 +4216,12 @@ public:
         FuncType* funcType,
         DeclRef<CallableDecl> calleeDeclRef,
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
+    /// Diagnose potential-argument-aliasing on `invoke`: pairs of explicit arguments whose
+    /// storage provably overlaps (identical or prefix access paths), and each argument against
+    /// `receiverExpr`, the method call's receiver, when both `receiverExpr` and `receiverMode`
+    /// are set (the caller sets them as a pair, or neither). All pairs are judged by
+    /// `_mayAliasedArgumentsInterfere` on the parameters' passing modes, and each comparison
+    /// emits at most one warning (W30051 for argument pairs, W30134 for the receiver pair).
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

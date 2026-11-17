@@ -1543,7 +1543,7 @@ warning(
 warning(
     "potentially-aliased-receiver-parameter",
     30134,
-    "potentially aliased argument to a method receiver that may be written",
+    "argument may alias the receiver of a method that may write it",
     span { loc = "receiver:Expr", message = "argument for '~direction:ParamPassingMode' parameter '~param:Name' may alias the receiver of the call, passed '~receiverDirection:ParamPassingMode'; passing the same value to both may produce undefined behavior" }
 )
 
