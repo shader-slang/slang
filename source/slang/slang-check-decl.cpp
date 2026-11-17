@@ -3116,8 +3116,19 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
                  varDecl->findModifier<HLSLStaticModifier>()))
             {
+                // A variable whose type is inferred has its initializer checked above, so we
+                // fold it as usual. Otherwise the initializer is checked only in the body phase,
+                // and folding an unchecked expression would produce untyped values, so we fold
+                // only a literal initializer, which needs no checking.
                 varDecl->val =
-                    tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
+                    varDecl->isChecked(DeclCheckState::DefinitionChecked)
+                        ? tryConstantFoldExpr(
+                              varDecl->initExpr,
+                              ConstantFoldingKind::LinkTime,
+                              nullptr)
+                        : tryFoldUncheckedLiteralInitializer(
+                              varDecl->type.type,
+                              varDecl->initExpr);
             }
         }
     }

@@ -2433,7 +2433,7 @@ Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     //
     if (!expr->type.type)
     {
-        expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
+        expr->type = getIntegerLiteralType(expr);
 
         // Check if we have an overflow diagnostics pending
         if (expr->signedMinimumIntException &&
@@ -2464,6 +2464,27 @@ Expr* SemanticsExprVisitor::visitStringLiteralExpr(StringLiteralExpr* expr)
 IntVal* SemanticsVisitor::getIntVal(IntegerLiteralExpr* expr)
 {
     return m_astBuilder->getIntVal(expr->type.type, expr->value);
+}
+
+Type* SemanticsVisitor::getIntegerLiteralType(IntegerLiteralExpr* expr)
+{
+    return m_astBuilder->getBuiltinType(expr->suffixType);
+}
+
+IntVal* SemanticsVisitor::tryFoldUncheckedLiteralInitializer(Type* type, Expr* initExpr)
+{
+    while (auto parenExpr = as<ParenExpr>(initExpr))
+        initExpr = parenExpr->base;
+
+    IntVal* literalVal = nullptr;
+    if (auto intLitExpr = as<IntegerLiteralExpr>(initExpr))
+        literalVal = m_astBuilder->getIntVal(getIntegerLiteralType(intLitExpr), intLitExpr->value);
+    else if (auto boolLitExpr = as<BoolLiteralExpr>(initExpr))
+        literalVal = m_astBuilder->getIntVal(m_astBuilder->getBoolType(), boolLitExpr->value);
+    if (!literalVal)
+        return nullptr;
+
+    return as<IntVal>(TypeCastIntVal::tryFoldImpl(m_astBuilder, type, literalVal, nullptr));
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -2757,6 +2778,14 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         return nullptr;
 
     ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
+
+    // Checking the declaration folds its initializer and stores the result in `decl->val`. We
+    // reuse a stored concrete constant instead of folding the initializer again, because a
+    // `ConstantIntVal` does not depend on generic arguments, so it is the value of every
+    // reference to the declaration.
+    if (auto constantVal = as<ConstantIntVal>(decl->val))
+        return constantVal;
+
     ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
     return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
 }

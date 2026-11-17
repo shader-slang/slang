@@ -3163,6 +3163,17 @@ public:
 
     IntVal* getIntVal(IntegerLiteralExpr* expr);
 
+    /// Return the type of the integer literal `expr`, which its suffix determines. Checking a
+    /// literal assigns this type, and the declaration-header phase uses it to fold a literal
+    /// initializer before the initializer is checked.
+    Type* getIntegerLiteralType(IntegerLiteralExpr* expr);
+
+    /// Return the value of the not-yet-checked initializer `initExpr` converted to `type` when
+    /// `initExpr` is an integer or `bool` literal, and null otherwise. For example, the
+    /// initializer of `static const int8_t x = 300;` folds to the `int8_t` value 44, which is
+    /// what folding the initializer after it has been checked and coerced to `int8_t` produces.
+    IntVal* tryFoldUncheckedLiteralInitializer(Type* type, Expr* initExpr);
+
     inline IntVal* getIntVal(SubstExpr<IntegerLiteralExpr> expr)
     {
         return getIntVal(expr.getExpr());
