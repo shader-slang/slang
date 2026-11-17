@@ -2,6 +2,8 @@
 
 // Regression test for the generic-constraint path-resolution table in
 // https://github.com/shader-slang/slang/issues/13996.
+// This shape already compiled before the fix; it guards the
+// specialized-enumeration invariant of the path-resolution table.
 // `checkGenericConstraintConformances` builds canonical inheritance paths for
 // constraints, reusing the same path classifier. Here the shared inheritance
 // declaration has a *generic* base (`IBase<T> : IRoot<T>`), so the path table

@@ -16,7 +16,18 @@ interface IBase<T> : IRoot {}
 interface IDerived : IBase<int>, IBase<float> {}
 struct S : IDerived {}
 
+// The same diamond with the applications listed in the opposite order: the
+// canonical path is whichever application is processed first, so both orderings
+// must classify their own path as canonical and the other as a stored proof.
+interface IDerivedR : IBase<float>, IBase<int> {}
+struct SR : IDerivedR {}
+
 int test(S value)
+{
+    return 1;
+}
+
+int testR(SR value)
 {
     return 1;
 }

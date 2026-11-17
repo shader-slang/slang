@@ -10767,9 +10767,7 @@ bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
     if (!isOnCanonicalPath)
     {
         if (!witnessTable->containsRequirement(requirementKey))
-        {
             witnessTable->add(requirementKey, RequirementWitness(subIsReqWitness));
-        }
         return true;
     }
 
