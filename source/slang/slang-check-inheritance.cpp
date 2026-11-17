@@ -1052,7 +1052,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // The constraints are discovered purely from the interfaces each conforming type
     // conforms to (via `getInheritanceInfo(conformingType).facets`); the relocation
     // pass guarantees an `associatedtype`'s trailing bound and `where` clauses
-    // also appear as such interface-member `GenericTypeConstraintDecl`s.
+    // also appear as such interface-member `GenericTypeConstraintDecl`s. The same
+    // facet loop additionally projects the lookup sources' own equality
+    // constraints onto the accessed requirement
+    // (`tryAddEqualityCongruenceBase` below) — a second discovery path that
+    // feeds the shared equality-base machinery.
     //
     if (SubstitutionSet(declRef).findLookupDeclRef())
     {
@@ -1101,6 +1105,82 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         List<Type*> conformingTypes;
         enumerateLookupSources(selfType, [&](Type* source) { conformingTypes.add(source); });
 
+        // Frame data for the access being computed, independent of any facet:
+        // the innermost lookup of `declRef` identifies the accessed requirement
+        // `A` and the interface its lookup goes through (the enclosing
+        // `findLookupDeclRef()` branch guard established the lookup is present).
+        // `tryLookUpRequirementWitness` matches a requirement by declaration
+        // identity and re-substitutes the entry through the conformance witness,
+        // so the requirement's own substitution context is intentionally not
+        // carried here.
+        auto selfLookupDeclRef = SubstitutionSet(declRef).findLookupDeclRef();
+        Decl* requirementDecl = selfLookupDeclRef->getDecl();
+        auto interfaceType = as<DeclRefType>(selfLookupDeclRef->getWitness()->getSup());
+
+        // Add `baseType` as a constraint-derived base of `selfType`, evidenced by
+        // `evidenceDeclRef`, under the guards every such base must obey. All
+        // discovery paths — a constraint whose endpoint names `selfType`
+        // (`tryAddConstraintBase` below, directed or equality) and the congruence
+        // projection of a source equality (`tryAddEqualityCongruenceBase` below)
+        // — route through here so the guard set cannot diverge between them.
+        auto tryAddEqualityDerivedBase = [&](Type* baseType, DeclRef<Decl> evidenceDeclRef)
+        {
+            // Skip a trivial self-base. Differential idempotence makes
+            // `T.Differential.Differential` canonically equal to
+            // `T.Differential`, so the equality `Differential.Differential ==
+            // Differential` matches `selfType == T.Differential` on its deeper
+            // endpoint and would try to add `T.Differential` as its own base.
+            if (baseType->getCanonicalType()->equals(selfType->getCanonicalType()))
+                return;
+
+            // Never introduce a base that is a deeper lookup access than
+            // `selfType`; that is the non-terminating direction of a
+            // self-referential equality constraint.
+            if (lookupChainDepth(baseType) > selfChainDepth)
+                return;
+
+            // Break *benevolent* equality cycles. An equality such as
+            // `__constraint A == B` makes `T.A` and `T.B` each a base of the
+            // other. While computing one of them, the other is still in progress
+            // (an ancestor on the stack); adding it as a base here would put the
+            // in-progress type back into the linearization and surface as a
+            // "cyclic inheritance" error.
+            //
+            // Instead we skip the constraint and record the skipped in-progress
+            // ancestor. The frame that *is* that ancestor already contains
+            // itself, so it ends up complete (and cached); this contextual frame
+            // is reported partial (and not cached) so a later root-level query --
+            // by which point the ancestor is cached -- recomputes the full list.
+            // See `_getInheritanceInfo`.
+            //
+            // This skip is deliberately scoped to constraint-derived bases (not
+            // the shared `addDirectBaseType` used for ordinary `interface`
+            // inheritance), so genuinely circular interface inheritance
+            // (`interface IFoo : IBar {} interface IBar : IFoo {}`) is still
+            // diagnosed rather than silently accepted.
+            if (_isInheritanceInfoBeingComputed(baseType))
+            {
+                if (ioSkippedIncompleteFacet)
+                    if (auto baseDeclRefType = as<DeclRefType>(baseType))
+                        ioSkippedIncompleteFacet->add(baseDeclRefType->getDeclRef());
+                return;
+            }
+
+            // The witness records the constraint that evidences the equality;
+            // its `declRef` is the *evidence*, not a statement of the witnessed
+            // relation, so consumers must read the witness's own sub/sup operands
+            // and never re-derive the relation from the recorded constraint's
+            // endpoints: for a projected congruence those endpoints are one level
+            // shallower (`X == Y`, not `X.A == Y.A`). The constraint's
+            // `isEqualityConstraint` flag is what `isEquality()` reads, so every
+            // consumer treats the base as an equality — including cast lowering,
+            // which short-circuits such a witness to a no-op before any path that
+            // reads the declRef.
+            auto satisfyingWitness =
+                astBuilder->getDeclaredSubtypeWitness(selfType, baseType, evidenceDeclRef);
+            addDirectBaseType(baseType, satisfyingWitness);
+        };
+
         // Consider this example:
         //
         //     interface IPrimitive { associatedtype Attributes; }
@@ -1127,8 +1207,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // base. For the example, `TriangleAttributes` becomes a base of
         // `C.Primitive.Attributes` and `barycentricCoord` resolves, exactly as it does
         // for a freshly spelled `C.Primitive.Attributes`. The projection is restricted
-        // to the access's direct source; an equality on a deeper source is consumed by
-        // the shallower access's own frame, so the chain resolves level by level.
+        // to the access's direct source; a root-ward ancestor's equality is consumed
+        // by the shallower access's own frame, so the chain resolves level by level.
         auto tryAddEqualityCongruenceBase = [&](Facet facet)
         {
             // Only an equality facet projects. The facet's witness is the declared
@@ -1138,20 +1218,20 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             if (!declaredWitness || !declaredWitness->isEquality())
                 return;
 
-            // The requirement `A` of `selfType == X.A`, and the interface its lookup
-            // goes through. The lookup's witness points at that interface, whose
-            // conformance on `Y` carries the answer for the projection.
-            auto selfLookupDeclRef = SubstitutionSet(declRef).findLookupDeclRef();
-            Decl* requirementDecl = selfLookupDeclRef->getDecl();
-            auto interfaceType = as<DeclRefType>(selfLookupDeclRef->getWitness()->getSup());
             if (!interfaceType)
                 return;
 
             // The congruence applies only at the access's direct source: `X == Y`
-            // projects onto `selfType == X.A` as `X.A == Y.A`. An equality on a deeper
-            // source (for a self type `X.B.A`) would have to project through the whole
-            // access path (`Y.B.A`), never onto `Y.A` alone, so it is consumed by the
-            // shallower frame of `X.B` instead and must be skipped here.
+            // projects onto this access as `X.A == Y.A`. Checking the witness's sub
+            // endpoint alone is complete because a facet's witness records, as its
+            // sub, the type whose frame declared that base — so a root-ward
+            // ancestor's equality (the `X` of a self type `X.B.A`) is skipped here
+            // (it must project through the whole access path, `Y.B.A`, and is
+            // consumed by the shallower frame of `X.B`), and so is an equality facet
+            // inherited transitively from a base's linearization, whose witness sub
+            // is that base type rather than this source. `findLookupDeclRef()` yields
+            // the innermost lookup of the chain, so `getLookupSource()` is the
+            // access's direct source, never a shallower ancestor.
             if (!declaredWitness->getSub()->getCanonicalType()->equals(
                     selfLookupDeclRef->getLookupSource()->getCanonicalType()))
                 return;
@@ -1161,51 +1241,37 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             if (!conformanceWitness)
                 return;
 
-            // Resolve `Y.A` the way `LookupDeclRef::tryResolve` would: as the
-            // requirement's entry in `Y`'s conformance of the interface.
-            RequirementWitness projected =
+            // Resolve `Y.A` as the plain requirement-witness entry in `Y`'s
+            // conformance of the interface — the lookup half of
+            // `LookupDeclRef::tryResolve`. The built-in special-case rules that
+            // follow there (e.g. the `Differential` collapse) are deliberately not
+            // projected.
+            RequirementWitness projectedWitness =
                 tryLookUpRequirementWitness(astBuilder, conformanceWitness, requirementDecl);
             Type* baseType = nullptr;
-            switch (projected.getFlavor())
+            switch (projectedWitness.getFlavor())
             {
             case RequirementWitness::Flavor::declRef:
-                baseType = DeclRefType::create(astBuilder, projected.getDeclRef());
+                baseType = DeclRefType::create(astBuilder, projectedWitness.getDeclRef());
                 break;
             case RequirementWitness::Flavor::val:
-                baseType = as<Type>(projected.getVal());
+                // A `val`-flavored answer can be a non-type (e.g. a witness for a
+                // constraint requirement); there is then no base to add — an
+                // expected skip, not an error.
+                baseType = as<Type>(projectedWitness.getVal());
                 break;
             default:
+                // `none` means the far endpoint has no entry (it is itself
+                // abstract, and an abstract conformance has no witness table to
+                // read); `witnessTable` cannot appear because the accessed
+                // requirement is type-valued. Either way there is nothing to
+                // project.
                 return;
             }
             if (!baseType)
                 return;
 
-            // A projected base obeys the same guards as a constraint-derived base:
-            // skip a trivial self-base, never claim a deeper lookup access (the
-            // non-terminating direction of a self-referential equality), and break a
-            // benevolent equality cycle by skipping an in-progress ancestor so this
-            // frame is reported partial and recomputed later.
-            if (baseType->getCanonicalType()->equals(selfType->getCanonicalType()))
-                return;
-            if (lookupChainDepth(baseType) > selfChainDepth)
-                return;
-            if (_isInheritanceInfoBeingComputed(baseType))
-            {
-                if (ioSkippedIncompleteFacet)
-                    if (auto baseDeclRefType = as<DeclRefType>(baseType))
-                        ioSkippedIncompleteFacet->add(baseDeclRefType->getDeclRef());
-                return;
-            }
-
-            // The witness records the source constraint: the equality of `X.A` and
-            // `Y.A` holds by congruence from the recorded `X == Y`, and that
-            // constraint's flag makes `isEquality()` treat this base as an equality
-            // for every consumer.
-            auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                selfType,
-                baseType,
-                declaredWitness->getDeclRef());
-            addDirectBaseType(baseType, satisfyingWitness);
+            tryAddEqualityDerivedBase(baseType, declaredWitness->getDeclRef());
         };
 
         for (auto conformingType : conformingTypes)
@@ -1214,6 +1280,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 getInheritanceInfo(conformingType, circularityInfo, ioSkippedIncompleteFacet);
             for (auto facet : conformingTypeInheritanceInfo.facets)
             {
+                // Runs before the interface filter below: an equality base's facet
+                // records the *other endpoint's* declaration as its origin, not an
+                // interface, so the filter would discard exactly the facets this
+                // projection exists to process.
                 tryAddEqualityCongruenceBase(facet);
 
                 auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
@@ -1355,53 +1425,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         SLANG_RELEASE_ASSERT(baseType);
                     }
 
-                    // Skip a trivial self-base. Differential idempotence makes
-                    // `T.Differential.Differential` canonically equal to
-                    // `T.Differential`, so the equality `Differential.Differential ==
-                    // Differential` matches `selfType == T.Differential` on its deeper
-                    // endpoint and would try to add `T.Differential` as its own base.
-                    if (baseType->getCanonicalType()->equals(selfCanonical))
-                        return;
-
-                    // Never introduce a base that is a deeper lookup access than
-                    // `selfType`; that is the non-terminating direction of a
-                    // self-referential equality constraint.
-                    if (lookupChainDepth(baseType) > selfChainDepth)
-                        return;
-
-                    // Break *benevolent* equality cycles. An equality such as
-                    // `__constraint A == B` makes `T.A` and `T.B` each a base of
-                    // the other. While computing one of them, the other is still
-                    // in progress (an ancestor on the stack); adding it as a base
-                    // here would put the in-progress type back into the
-                    // linearization and surface as a "cyclic inheritance" error.
-                    //
-                    // Instead we skip the constraint and record the skipped
-                    // in-progress ancestor. The frame that *is* that ancestor
-                    // already contains itself, so it ends up complete (and
-                    // cached); this contextual frame is reported partial (and not
-                    // cached) so a later root-level query -- by which point the
-                    // ancestor is cached -- recomputes the full list. See
-                    // `_getInheritanceInfo`.
-                    //
-                    // This skip is deliberately scoped to constraint-derived
-                    // bases (not the shared `addDirectBaseType` used for ordinary
-                    // `interface` inheritance), so genuinely circular interface
-                    // inheritance (`interface IFoo : IBar {} interface IBar :
-                    // IFoo {}`) is still diagnosed rather than silently accepted.
-                    if (_isInheritanceInfoBeingComputed(baseType))
-                    {
-                        if (ioSkippedIncompleteFacet)
-                            if (auto baseDeclRefType = as<DeclRefType>(baseType))
-                                ioSkippedIncompleteFacet->add(baseDeclRefType->getDeclRef());
-                        return;
-                    }
-
-                    auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                        selfType,
-                        baseType,
-                        lookedUpConstraint);
-                    addDirectBaseType(baseType, satisfyingWitness);
+                    // Skip a trivial self-base, never claim a deeper lookup access,
+                    // break a benevolent equality cycle, and record the witness —
+                    // the shared guards and tail for every equality-derived base
+                    // (see `tryAddEqualityDerivedBase`).
+                    tryAddEqualityDerivedBase(baseType, lookedUpConstraint);
                 };
 
                 for (auto constraintDeclRef :
