@@ -4,7 +4,7 @@
 // Disabled: reads of a `__ref_writeonly` parameter are not yet diagnosed. A follow-up change adds
 // that check and re-enables this test.
 
-//DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
 void takeIn(int v) {}
 void takeInOut(inout int v) {}
