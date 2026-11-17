@@ -213,8 +213,11 @@ struct ReconstructShortCircuitContext : public InstPassBase
     // `CLikeSourceEmitter::getFoldPolicy` that can appear inside an
     // expression chain. `Var`/`Alloca`/undefined-value ops carry no value
     // operands, so they can never sit on the fold path, and a non-folding
-    // declaration hoisted before the `if` is harmless. The two undefined
-    // forms below mirror the emitter's undefined-value veto
+    // declaration hoisted before the `if` is harmless. The `Make*` entries
+    // are unconditional here while the emitter classifies module-scope
+    // aggregates `Always` (`isInnerGlobalAggregate`) — sound because chain
+    // instructions are always function-local. The two undefined forms
+    // below mirror the emitter's undefined-value veto
     // (`shouldFoldInstIntoUseSites`) defensively even though both are leaf
     // ops today.
     bool isNeverFoldedOnCLikeTargets(IRInst* inst)
