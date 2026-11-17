@@ -1088,10 +1088,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
 
             // A legacy (C-style) `in` parameter is a mutable local copy, so calling a
             // `[mutating]` method on one is legal but typically indicates an error on the
-            // programmer's part, since the changes will not be visible to the caller. A
-            // non-copyable `in` parameter is a borrow rather than a copy, so it is a
-            // read-only value in the body and a mutating call on it is rejected above; only a
-            // copyable `in` parameter reaches here.
+            // programmer's part, since the changes will not be visible to the caller. Only a
+            // parameter the body can write reaches here: a non-copyable `in` parameter is a
+            // borrow rather than a copy, and a parameter made immutable by `const` is equally
+            // a read-only value, so both are rejected above as immutable values.
             //
             if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
             {
@@ -1671,7 +1671,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             // then the call is an l-value if base is l-value.
                             //
                             // If Ptr<T, Access> we only need to check for ReadWrite
-                            // Access (if ReadWrite result is an LValue. By default a
+                            // Access (if ReadWrite result is an LValue). By default a
                             // Ptr<...> is Read-only (unresolved generic argument & Access::Read).
                             if (auto base = GetBaseExpr(baseExpr))
                             {
@@ -1679,7 +1679,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                                 {
                                     auto accessQualifier =
                                         as<ConstantIntVal>(ptrTypeBase->getAccessQualifier());
-                                    if (!accessQualifier ||
+                                    if (accessQualifier &&
                                         AccessQualifier(accessQualifier->getValue()) ==
                                             AccessQualifier::ReadWrite)
                                     {
