@@ -137,7 +137,9 @@ The `.expected` file of test line N is `foo.slang.N.expected`. For line 0 it is 
 
 ### Exit code of tests
 
-A `SIMPLE`, `INTERPRET` or `REFLECTION` test with the `filecheck=PREFIX` or `diag=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines or the diagnostic annotations. The test fails if the exit code is not the expected one. The expected exit code is 0 by default. A test that compares the output with an `.expected` file does not need this check, because the file contains the line `result code = N`.
+A `SIMPLE`, `SIMPLE_EX`, `COMMAND_LINE_SIMPLE`, `INTERPRET`, `REFLECTION`, `CPU_REFLECTION`, `DISPATCHER`, `COMPARE_COMPUTE`, `COMPARE_COMPUTE_EX`, `HLSL_COMPUTE` or `COMPARE_RENDER_COMPUTE` test with the `filecheck=PREFIX` or `diag=PREFIX` option checks the exit code of the tool, in addition to the FileCheck lines or the diagnostic annotations. The test fails if the exit code is not the expected one. The expected exit code is 0 by default. A test that compares the output with an `.expected` file does not need this check, because the file contains the line `result code = N`.
+
+A `SIMPLE_LINE` test checks the exit code of `slangc` even without one of those options, because its comparison covers only the line number of the first diagnostic. The other test types that run a tool already fail on an unexpected exit code in their own runner, for example `COMPILE` checks the result code directly and the `COMPARE_HLSL` family forces a failure when the compilation failed. `LANG_SERVER` has no exit code to check, because it talks to a server over JSON-RPC.
 
 A test that must fail sets the expected exit code with the `exit-code=N` option. N must be `-1`, `0` or `1`. The test fails for another value. A test must never expect `-2`, because it reports an internal compiler error, which is a bug in the compiler:
 
