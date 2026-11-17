@@ -377,9 +377,10 @@ void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sin
 // For example, a struct implementing both IMissShader and ICallableShader needs `-stage miss`
 // or `-stage callable`; a struct implementing only IMissShader can omit the explicit stage.
 // The selected witness supplies the exact invoke implementation and preserves dependent types.
-// Generic stages currently need arguments in the entry name, for example `-entry "M<P>"`.
-// TODO(#13800): Support separate CLI/API specialization while keeping invoke, its stage contract,
-// and target validation consistent with the concrete arguments.
+// A generic stage is selected either with arguments bound in the entry name (`-entry "M<P>"`)
+// or as the bare name (`-entry M`) with the arguments supplied separately, like any other
+// generic entry point; the later specialization re-derives `invoke` through the same
+// conformance selection with the concrete arguments.
 DeclRef<FuncDecl> findEntryPointByName(
     Linkage* linkage,
     Module* module,
@@ -401,6 +402,24 @@ DeclRef<FuncDecl> findEntryPointByName(
     auto declRefExpr = as<DeclRefExpr>(expr);
     auto stageTypeDeclRef =
         declRefExpr ? declRefExpr->declRef.as<AggTypeDecl>() : DeclRef<AggTypeDecl>();
+    if (!stageTypeDeclRef && declRefExpr)
+    {
+        // A generic stage selected by its bare name resolves to the generic declaration that
+        // wraps the struct. Enter the inner struct with default substitutions, the same way
+        // ordinary function lookup enters a generic function, so conformance selection below
+        // sees the stage type with its generic parameters still unbound and records them as
+        // the entry point's specialization parameters.
+        if (auto genDeclRef = declRefExpr->declRef.as<GenericDecl>())
+        {
+            auto astBuilder = linkage->getASTBuilder();
+            stageTypeDeclRef =
+                createDefaultSubstitutionsIfNeeded(
+                    astBuilder,
+                    &visitor,
+                    astBuilder->getMemberDeclRef(genDeclRef, genDeclRef.getDecl()->inner))
+                    .as<AggTypeDecl>();
+        }
+    }
     bool selectedInvoke = false;
     if (!stageTypeDeclRef)
     {
@@ -431,6 +450,38 @@ DeclRef<FuncDecl> findEntryPointByName(
         return DeclRef<FuncDecl>();
 
     *outFoundStruct = !selectedInvoke;
+    return findStageImplementation(
+        linkage,
+        module,
+        stageTypeDeclRef,
+        ioProfile,
+        sink,
+        !selectedInvoke,
+        outFoundStruct,
+        outStageType);
+}
+
+// Selects the checked `invoke` implementation for an already-resolved stage type, through its
+// stage-interface conformance. The selected witness preserves the stage type's generic
+// substitutions, so a specialized stage type yields the specialized `invoke` with its context,
+// payload, and record types carrying the concrete arguments. `ioProfile` supplies the requested
+// stage; when no stage is requested and the type implements exactly one executable stage, that
+// stage is selected and written back. Sets `*outFoundStage` when the type implements any
+// executable stage, even when selection then fails on a stage mismatch or ambiguity.
+// `diagnoseNotStage` distinguishes a name that must select a stage (`-entry Stage`) from one that
+// merely may (`Stage.invoke`): only the former reports the not-a-stage diagnostic.
+DeclRef<FuncDecl> findStageImplementation(
+    Linkage* linkage,
+    Module* module,
+    DeclRef<AggTypeDecl> stageTypeDeclRef,
+    Profile& ioProfile,
+    DiagnosticSink* sink,
+    bool diagnoseNotStage,
+    bool* outFoundStage,
+    Type** outStageType)
+{
+    SharedSemanticsContext sharedContext(linkage, module, sink);
+    SemanticsVisitor visitor(&sharedContext);
     for (auto dependency : module->getModuleDependencies())
     {
         auto moduleDecl = dependency->getModuleDecl();
@@ -482,13 +533,13 @@ DeclRef<FuncDecl> findEntryPointByName(
     if (implementedStageCount == 0)
     {
         // An ordinary struct may also have a static method named invoke.
-        if (selectedInvoke)
+        if (!diagnoseNotStage)
             return DeclRef<FuncDecl>();
         sink->diagnose(Diagnostics::StructuralRayTracingEntryPointNotStage{
             .stageType = stageTypeDeclRef.getDecl()});
         return DeclRef<FuncDecl>();
     }
-    *outFoundStruct = true;
+    *outFoundStage = true;
 
     auto requestedStage = ioProfile.getStage();
     auto selectedStage = requestedStage;

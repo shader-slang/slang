@@ -89,6 +89,25 @@ DeclRef<FuncDecl> findEntryPointByName(
     bool* outFoundStruct,
     Type** outStageType);
 
+/// Selects the checked `invoke` implementation for an already-resolved stage type, through its
+/// stage-interface conformance. The selected witness preserves the stage type's generic
+/// substitutions, so a specialized stage type yields the specialized `invoke` with its contract
+/// types carrying the concrete arguments. `ioProfile` supplies the requested stage; when no
+/// stage is requested and the type implements exactly one executable stage, that stage is
+/// selected and written back. Sets `*outFoundStage` when the type implements any executable
+/// stage, even when selection then fails on a stage mismatch or ambiguity. `diagnoseNotStage`
+/// distinguishes a name that must select a stage (`-entry Stage`) from one that merely may
+/// (`Stage.invoke`): only the former reports the not-a-stage diagnostic.
+DeclRef<FuncDecl> findStageImplementation(
+    Linkage* linkage,
+    Module* module,
+    DeclRef<AggTypeDecl> stageTypeDeclRef,
+    Profile& ioProfile,
+    DiagnosticSink* sink,
+    bool diagnoseNotStage,
+    bool* outFoundStage,
+    Type** outStageType);
+
 /// Diagnoses stage inputs exposed by a selected native entry-point signature.
 void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
 
