@@ -1142,10 +1142,11 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
 // link-time constants (e.g. derived from `extern` constants) can select their value via a
 // linked override; here is where they must become the concrete indices the layout consumes.
 // An argument that was never specified (`layout(binding = N)` alone, or the defaulted
-// `set`) means index 0. Returns false (after diagnosing) when a specified value is a
-// link-time constant that cannot be resolved, e.g. an `extern` constant with no default
-// initializer and no linked definition; the outputs are set to 0 in that case.
-static bool _tryResolveGLSLBindingAttribute(
+// `set`) means index 0. A specified value that is a link-time constant which cannot be
+// resolved — e.g. an `extern` constant with no default initializer and no linked
+// definition — is diagnosed here and reads as index 0, so the caller's layout continues
+// (best-effort) after the error.
+static void _tryResolveGLSLBindingAttribute(
     ParameterBindingContext* context,
     GLSLBindingAttribute* attr,
     IntegerLiteralValue& outBinding,
@@ -1153,29 +1154,23 @@ static bool _tryResolveGLSLBindingAttribute(
 {
     outBinding = 0;
     outSet = 0;
-    bool resolved = true;
     auto program = context->getTargetProgram()->getProgram();
     if (attr->binding)
     {
         if (auto bindingVal = program->tryFoldIntVal(attr->binding))
             outBinding = bindingVal->getValue();
         else
-            resolved = false;
+            getSink(context)->diagnose(
+                Diagnostics::BindingAttributeRequiresConcreteValue{.location = attr->loc});
     }
     if (attr->set)
     {
         if (auto setVal = program->tryFoldIntVal(attr->set))
             outSet = setVal->getValue();
         else
-            resolved = false;
+            getSink(context)->diagnose(
+                Diagnostics::BindingAttributeRequiresConcreteValue{.location = attr->loc});
     }
-    if (!resolved)
-    {
-        getSink(context)->diagnose(
-            Diagnostics::BindingAttributeRequiresConcreteValue{.location = attr->loc});
-        return false;
-    }
-    return true;
 }
 
 static void addExplicitParameterBindings_GLSL(
@@ -1316,7 +1311,7 @@ static void addExplicitParameterBindings_GLSL(
                 {
                     getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
                         .paramName = varDecl.getName(),
-                        .binding = (int64_t)binding,
+                        .binding = binding,
                         .location = attr->loc});
                 }
                 info[kResInfo].semanticInfo.index = set;
@@ -1586,7 +1581,7 @@ static bool addExplicitVkBindingForEntryPointParameter(
                 {
                     getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
                         .paramName = varDecl.getName(),
-                        .binding = (int64_t)binding,
+                        .binding = binding,
                         .location = attr->loc});
                 }
                 semanticInfo.index = set;
