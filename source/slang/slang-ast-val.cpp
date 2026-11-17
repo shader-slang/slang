@@ -3403,11 +3403,16 @@ Val* PolynomialIntVal::_resolveImplOverride()
 // symbolic is kept as a factor of the rebuilt polynomial. When every factor resolves to a
 // constant the builder canonicalizes the result down to a single `ConstantIntVal`, which
 // lets consumers such as `ComponentType::tryFoldIntVal` fold expressions like
-// `(V == 3 ? 7 : 9) - 6` once the linked value of `V` is known. One deliberate difference
-// from `substitute`: a factor whose resolution is not an `IntVal` (e.g. a `TypeCastIntVal`
-// over a still-symbolic base resolves to null) returns the whole polynomial unresolved,
-// rather than dropping the factor from the rebuilt term — an unresolved value must stay
-// visibly non-constant instead of silently losing factors.
+// `(V == 3 ? 7 : 9) - 6` once the linked value of `V` is known. The walk is a deliberate
+// twin of the substitution walk, with exactly two differences, so a future edit to one
+// can be checked against the other: (1) how a factor's parameter is resolved —
+// `linkTimeResolve(map)` here versus `substituteImpl` there; (2) the policy when a
+// factor resolves to a non-`IntVal` (e.g. a `TypeCastIntVal` over a still-symbolic base
+// resolves to null): this walk returns the whole polynomial unresolved rather than
+// dropping the factor from the rebuilt term, so an unresolved value stays visibly
+// non-constant instead of silently losing factors. Everything else — the power loop, the
+// power-1 polynomial absorption, the wrapping arithmetic, the builder tail — must stay
+// in step between the two.
 Val* PolynomialIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
 {
     auto astBuilder = getCurrentASTBuilder();

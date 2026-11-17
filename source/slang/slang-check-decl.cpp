@@ -3941,7 +3941,12 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // override, and a self-referential entry would make every resolution of `B`
             // come back as `B`. The header-check fold only handles literals, because it
             // runs on the not-yet-checked initializer; here the initializer is checked,
-            // so fold it first.
+            // so fold it first. Check-time circularity detection stays unavailable for
+            // extern constants — the extern branch of the constant folder returns the
+            // symbolic reference without walking the initializer — so a self-referential
+            // or mutually-cyclic extern default is accepted here and only surfaces at
+            // layout, where the bounded link-time resolution ends with the
+            // binding-attribute diagnostic.
             if (varDecl->hasModifier<ExternModifier>() && varDecl->findModifier<ConstModifier>() &&
                 isScalarIntegerType(varDecl->type))
             {

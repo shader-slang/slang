@@ -1132,7 +1132,10 @@ FIDDLE()
 class GLSLOffsetLayoutAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() int64_t offset;
+    // Defaults to zero so the symbolic-binding skip path in the checker (which cannot
+    // assign an offset and stops compilation with an error anyway) leaves a defined
+    // value behind for any reader.
+    FIDDLE() int64_t offset = 0;
 };
 
 // Implicitly added offset qualifier when no offset is specified.

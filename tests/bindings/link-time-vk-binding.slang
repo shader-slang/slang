@@ -10,6 +10,9 @@
 //TEST:SIMPLE(filecheck=OVERRIDE): -r tests/bindings/link-time-vk-binding.slang-module -r tests/bindings/link-time-vk-binding-lib.slang-module -target spirv-asm -o out.spvasm -stage compute -entry main
 
 export extern static const int LayoutVariant = 3;
+// Deliberately NOT extern: as a plain `static const`, OutputSlot's value comes from the
+// pre-existing check-time fold (a symbolic conditional over LayoutVariant), so this test
+// also pins that the old fold path feeds the layout-time resolution — not a typo.
 static const int OutputSlot = LayoutVariant == 3 ? 7 : 9;
 
 [[vk::binding(OutputSlot, OutputSlot - 6)]]
