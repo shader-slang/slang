@@ -78,6 +78,13 @@ String getSourceTypeName(ASTBuilder* astBuilder, Type* stageType);
 /// source-level lookup name.
 String getEntryPointName(UnownedStringSlice sourceTypeName, Stage stage);
 
+/// Returns the target symbol name for a structural stage selection: the source type name
+/// (ordinary type mangling for generic specializations, so each specialization names itself
+/// from its concrete stage type) followed by the selected stage. Direct specialized-name
+/// selection and separate-argument specialization both derive their symbol through this one
+/// helper, so the two spellings of one selection cannot drift apart.
+String getStageTargetName(ASTBuilder* astBuilder, Type* stageType, Stage stage);
+
 
 /// Selects the checked stage implementation named by a stage type or its invoke member.
 DeclRef<FuncDecl> findEntryPointByName(
@@ -102,7 +109,8 @@ DeclRef<FuncDecl> findEntryPointByName(
 /// report the structural not-a-stage diagnostic while a `Stage.invoke` selection falls back to
 /// ordinary function lookup). `diagnoseNotStage` distinguishes a name that must select a stage
 /// (`-entry Stage`) from one that merely may (`Stage.invoke`): only the former reports the
-/// not-a-stage diagnostic.
+/// not-a-stage diagnostic. `*outStageType` is written only on the single success path and is
+/// never cleared; callers must initialize it before the call.
 DeclRef<FuncDecl> findStageImplementation(
     Linkage* linkage,
     Module* module,

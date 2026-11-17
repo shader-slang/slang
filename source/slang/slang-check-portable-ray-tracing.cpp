@@ -252,6 +252,11 @@ String getEntryPointName(UnownedStringSlice sourceTypeName, Stage stage)
     return result.produceString();
 }
 
+String getStageTargetName(ASTBuilder* astBuilder, Type* stageType, Stage stage)
+{
+    return getEntryPointName(getSourceTypeName(astBuilder, stageType).getUnownedSlice(), stage);
+}
+
 Stage getStageKind(InterfaceDecl* interfaceDecl)
 {
     switch (_getMagicTypeClass(interfaceDecl))
@@ -453,14 +458,18 @@ DeclRef<FuncDecl> findEntryPointByName(
     if (!stageTypeDeclRef || getModule(stageTypeDeclRef.getDecl()) != module)
         return DeclRef<FuncDecl>();
 
-    *outFoundStruct = !selectedInvoke;
+    // A name that must select a stage reports the structural not-a-stage diagnostic when the
+    // type implements none, while a `Stage.invoke` selection falls back to ordinary function
+    // lookup; the same fact pre-sets the found flag and picks the diagnostic behavior.
+    const bool mustSelectStage = !selectedInvoke;
+    *outFoundStruct = mustSelectStage;
     return findStageImplementation(
         linkage,
         module,
         stageTypeDeclRef,
         ioProfile,
         sink,
-        !selectedInvoke,
+        mustSelectStage,
         outFoundStruct,
         outStageType);
 }
@@ -594,9 +603,10 @@ void initializeEntryPoint(EntryPoint* entryPoint, Name* entryPointName, Type* st
 {
     entryPoint->markAsStructuralRayTracingEntryPoint();
     entryPoint->setNameOverride(entryPointName);
-    auto sourceTypeName = getSourceTypeName(entryPoint->getLinkage()->getASTBuilder(), stageType);
-    entryPoint->setEntryPointNameOverride(
-        getEntryPointName(sourceTypeName.getUnownedSlice(), entryPoint->getStage()));
+    entryPoint->setEntryPointNameOverride(getStageTargetName(
+        entryPoint->getLinkage()->getASTBuilder(),
+        stageType,
+        entryPoint->getStage()));
 }
 
 // =============================================================================
