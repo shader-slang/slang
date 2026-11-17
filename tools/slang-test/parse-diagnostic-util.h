@@ -93,9 +93,11 @@ struct ParseDiagnosticUtil
     /// slang-rich-diagnostics-render.cpp. A record is a `severity[E<code>]: message` header
     /// line (the code is optional; note headers carry none), optionally followed by a
     /// location line ` --> path:line:col` (or ` --- path:line:col` for a note, or no
-    /// location line at all for a positionless diagnostic). Snippet and gutter lines of the
-    /// rendered block are kept as notes. Always returns SLANG_OK; whether the text held any
-    /// diagnostic is observable through the diagnostics list.
+    /// location line at all for a positionless diagnostic). A record's message can span
+    /// lines. Snippet and gutter lines of the rendered block are kept as notes. Requires:
+    /// the text must already be known to be rich-rendered (see the dispatch in
+    /// parseDiagnostics). Always returns SLANG_OK; whether the text held any diagnostic is
+    /// observable through the diagnostics list.
     static SlangResult parseSlangRichDiagnostics(
         const Slang::UnownedStringSlice& inText,
         Slang::IArtifactDiagnostics* diagnostics);

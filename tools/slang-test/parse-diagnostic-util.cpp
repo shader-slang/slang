@@ -59,7 +59,8 @@ using namespace Slang;
 // outSeverity to its class. Shared by both Slang diagnostic renderings: the rich-header
 // matcher passes a full header line (`error[E30015]: ...`), while the classic callers pass
 // only the severity-and-code slice between the path and the message (`error 31101` in
-// `path(11): error 31101: ...`).
+// `path(11): error 31101: ...`). Returns SlangResult rather than bool so the classic path
+// can chain it with SLANG_RETURN_ON_FAIL.
 static SlangResult _matchSlangSeverityPrefix(
     const UnownedStringSlice& inText,
     ArtifactDiagnostic::Severity& outSeverity,
@@ -92,6 +93,11 @@ static SlangResult _matchSlangSeverityPrefix(
     return SLANG_FAIL;
 }
 
+// Parses the classic severity-and-code slice `error 31101`. The severity word is matched by
+// _matchSlangSeverityPrefix; outCode stays 0 when nothing follows the word, and any
+// non-numeric tail (e.g. `error E30015:`) fails the call — the mechanism that keeps
+// bracketed and E-prefixed spellings from claiming classic Slang identity. Success here is
+// what identifies a line as a classic Slang diagnostic (_isSlangDiagnostic).
 static SlangResult _getSlangDiagnosticSeverity(
     const UnownedStringSlice& inText,
     ArtifactDiagnostic::Severity& outSeverity,
@@ -174,8 +180,9 @@ slang-rich-diagnostics-render.cpp — renders as a block:
       |               ^^^^^^^^^^^^^^^ undefined identifier 'undefined_thing'
 
 The header line carries the severity, an optional code in brackets, and the message; the
-location line that follows carries the path and position. A note repeats the same shape with
-`note:` and a `---` location marker. This is slangc's default rendering for its diagnostics.
+location line that follows carries the path and position. A note repeats the same shape
+with `note:` and a `---` location marker, except that a note header carries no code
+bracket. This is slangc's default rendering for its diagnostics.
 */
 // Matches the header line of a rich record: a severity word, an optional `[E<digits>]` code,
 // then `: message`. The out-parameters are meaningful only on a match. When requireCode is
@@ -204,13 +211,16 @@ static bool _matchSlangRichDiagnosticHeader(
     outCode = UnownedStringSlice();
     if (text.startsWith(UnownedStringSlice::fromLiteral("[")))
     {
+        // The renderer decorates the code as `[E#####]`; the digits after the `E` are the
+        // code. Anything in the brackets other than `E<digits>` makes the whole line a
+        // non-header (in the record parser that flushes a pending record and demotes the
+        // line to a note).
         const Index closeIndex = text.indexOf(']');
         if (closeIndex <= 0)
         {
             return false;
         }
 
-        // The renderer decorates the code as `[E#####]`; the digits after the `E` are the code.
         UnownedStringSlice code = text.subString(1, closeIndex - 1);
         if (!code.startsWith(UnownedStringSlice::fromLiteral("E")))
         {
@@ -247,15 +257,17 @@ static bool _matchSlangRichDiagnosticHeader(
     return true;
 }
 
-// The location line of a rich record. The markers mirror the renderer's glyph tables
+// The location line of a rich record; sets outLocation to its `path:line:col` text, which
+// is meaningful only on a match. The markers mirror the renderer's glyph tables
 // (s_asciiGlyphs / s_unicodeGlyphs in source/compiler-core/slang-rich-diagnostics-render.cpp):
 // ascii `-->` for a primary location and `---` for a note location; the unicode set uses the
-// `╭╼` glyph for both (the line is trimmed first, so the glyph's leading space is gone). Two
-// other renderer lines also begin with dashes after trimming — the snippet gutter close
-// (`---'`) and a three-dash secondary underline — but they are harmless: a location line
-// always immediately follows its header, because the renderer only draws a snippet under a
-// location line (a positionless record renders no snippet), so no pending header can attach
-// to them; they degrade to notes.
+// `╭╼` glyph for both (reachable only from hand-crafted input under this harness — slang-test
+// pipes stderr, so unicode glyphs never auto-enable; kept so hand-written expected files in
+// the unicode spelling parse too). Two other renderer lines also begin with dashes after
+// trimming — the snippet gutter close (`---'`) and a three-dash secondary underline — but
+// they are harmless: a location line always immediately follows its header, because the
+// renderer only draws a snippet under a location line (a positionless record renders no
+// snippet), so no pending header can attach to them; they degrade to notes.
 static bool _matchSlangRichLocationLine(
     const UnownedStringSlice& inLine,
     UnownedStringSlice& outLocation)
@@ -263,7 +275,7 @@ static bool _matchSlangRichLocationLine(
     static const UnownedStringSlice markers[] = {
         UnownedStringSlice::fromLiteral("-->"),
         UnownedStringSlice::fromLiteral("---"),
-        UnownedStringSlice::fromLiteral("\xe2\x95\xad\xe2\x95\xbc")};
+        UnownedStringSlice::fromLiteral("\xe2\x95\xad\xe2\x95\xbc")}; // UTF-8 for ╭╼ (U+256D U+257C)
 
     UnownedStringSlice text(inLine.trim());
     for (const auto& marker : markers)
@@ -277,12 +289,16 @@ static bool _matchSlangRichLocationLine(
     return false;
 }
 
-// Sets the diagnostic's location from the `path:line:col` text of a rich location line. The
-// renderer emits exactly two shapes — `path:line:col`, or a bare path for a command-line
-// source — so the split requires both the line and the column to parse as integers. Anything
-// else (including a `path:line` without a column, which the renderer never emits) keeps the
-// whole text as the filePath with the position left unset, matching the harness convention
-// that an unset position is line and column 0.
+// Sets the diagnostic's location from the `path:line:col` text of a rich location line.
+// The renderer emits two shapes — `path:line:col`, or a bare path for a command-line
+// source — and the split takes the last two colon-separated parts only when both parse as
+// integers (StringUtil::parseInt also accepts a sign or hex prefix, which is harmless
+// here: the renderer writes plain decimal positions). A colon-bearing path therefore
+// cannot be mis-split: a located `e:\x\f.slang:4:15` splits on its last two parts, and a
+// bare drive-letter path fails the column parse so the whole text stays the path. Any
+// other tail (including a `path:line` without a column, which the renderer never emits)
+// likewise keeps the whole text as the filePath with the position left unset, matching
+// the harness convention that an unset position is line and column 0.
 static void _setSlangRichLocation(
     SliceAllocator& allocator,
     const UnownedStringSlice& inLocation,
