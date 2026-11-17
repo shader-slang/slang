@@ -1209,11 +1209,16 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     {
         // Delegate to visitDeclRefExpr so a static-member reference gets full
         // parity with every other member reference: the referenced member's
-        // [require]s and any requirements carried by the member's type both
-        // propagate. The declRefBase walk alone never reaches the inner member
-        // decl of the MemberDeclRef that a generic parent builds (its Decl
-        // operand is ASTNode-kind, not a ValNode), so without this delegation
-        // the member's requirements are silently dropped.
+        // [require]s, any requirements carried by the member's type, and any
+        // requirements carried by the base expression all propagate, exactly
+        // as visitMemberExpr delivers them for instance members. The declRefBase
+        // walk alone never reaches the inner member decl of the MemberDeclRef
+        // or LookupDeclRef that a generic parent or witness builds (its Decl
+        // operand is ValNodeOperandKind::ASTNode, not ValNodeOperandKind::ValNode),
+        // so without this delegation the member's requirements are silently
+        // dropped. Static-member references therefore now contribute their type
+        // and base decls to collectReferencedDecls too, matching MemberExpr.
+        dispatchIfNotNull(expr->baseExpression);
         visitDeclRefExpr(expr);
     }
     void visitInitializerListExpr(InitializerListExpr* expr)
