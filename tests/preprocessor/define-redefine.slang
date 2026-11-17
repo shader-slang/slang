@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):
 
 // Confirm that we handle redefinition
 // of an existing define (with a diagnostic)

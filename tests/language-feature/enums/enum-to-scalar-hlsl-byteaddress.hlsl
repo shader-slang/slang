@@ -24,7 +24,7 @@ uint main() : SV_Target
 {
     // enum -> uint (the declared tag) at the `Load` argument site.
     return inputBuffer.Load(PayloadOffset);
-    //HLSL: Load(int(12))
+    //HLSL: Load(12L)
 }
 
 // CHECK: OpEntryPoint

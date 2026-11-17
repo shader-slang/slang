@@ -1,9 +1,9 @@
 //META: generated=true
 //META: model=claude-opus-5[1m]
 //META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: source_commit=ae4e57957a0adad3061b069b0e0eec8217779338
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#option-set-toggles
-//META: doc_section_digest=fbeeea07809c9805840949444c53383bbc2008651cf6d8186e90c648ffe29510
+//META: doc_section_digest=fc10010221d82ad48ab46ee6a1d371b1f30fc27227f92e2615d9f87ed2c7dc24
 //META: purpose=The Vulkan-cross-API option flag -fvk-invert-y enables invertYOfPositionOutput; the IR pass negates the y component of the SV_Position output before the writeback in the emitted target text.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

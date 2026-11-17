@@ -4,10 +4,10 @@
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute -DUSE_CONST -DUSE_STATIC
 //CHECK_PASS-NOT: error[E31223]
 
-//TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_EXTERN -DUSE_CONST
-//TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_CONST
-//TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_EXTERN -DUSE_STATIC
-//TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_STATIC
+//TEST:SIMPLE(filecheck=CHECK_FAIL,exit-code=-1): -target spirv -entry computeMain -stage compute -DUSE_EXTERN -DUSE_CONST
+//TEST:SIMPLE(filecheck=CHECK_FAIL,exit-code=-1): -target spirv -entry computeMain -stage compute -DUSE_CONST
+//TEST:SIMPLE(filecheck=CHECK_FAIL,exit-code=-1): -target spirv -entry computeMain -stage compute -DUSE_EXTERN -DUSE_STATIC
+//TEST:SIMPLE(filecheck=CHECK_FAIL,exit-code=-1): -target spirv -entry computeMain -stage compute -DUSE_STATIC
 //CHECK_FAIL: error[E31223]
 
 
@@ -18,7 +18,8 @@ const
 static
 #endif
 #ifdef USE_EXTERN
-extern int num;
+// A default value makes the link-time constant resolvable without another module.
+extern int num = 10;
 #else
 export int num = 10;
 #endif

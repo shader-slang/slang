@@ -18,6 +18,62 @@ static String getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
+// Lookup on the importing module must find static methods supplied by an imported extension.
+// This uses the same findDeclFromString path as entry-name lookup, without requiring the method
+// to be an entry point declared in the importing module.
+SLANG_UNIT_TEST(functionReflectionImportedExtension)
+{
+    const char* librarySource = R"(
+        namespace Pixel
+        {
+            public struct MyType {}
+
+            public extension MyType
+            {
+                public static float4 Main(float4 color : COLOR) : SV_Target
+                {
+                    return color;
+                }
+            }
+        }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto library = session->loadModuleFromSourceString(
+        "extensionLibrary",
+        "extensionLibrary.slang",
+        librarySource,
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(library != nullptr);
+
+    auto consumer = session->loadModuleFromSourceString(
+        "consumer",
+        "consumer.slang",
+        "import extensionLibrary;",
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(consumer != nullptr);
+
+    auto layout = consumer->getLayout();
+    SLANG_CHECK_ABORT(layout != nullptr);
+    auto function = layout->findFunctionByName("Pixel.MyType.Main");
+    SLANG_CHECK_ABORT(function != nullptr);
+    SLANG_CHECK(UnownedStringSlice(function->getName()) == "Main");
+    SLANG_CHECK(function->getParameterCount() == 1);
+    SLANG_CHECK(getTypeFullName(function->getReturnType()) == "vector<float,4>");
+}
+
 static const char* kLanguageVersionOverloadSource = R"(
     module reflectionVersion;
 
@@ -461,6 +517,51 @@ SLANG_UNIT_TEST(functionReflectionNoDiffSpecializedReturn)
     SLANG_CHECK(snormField->getKind() == slang::TypeReflection::Kind::Scalar);
     SLANG_CHECK(snormField->getScalarType() == slang::TypeReflection::ScalarType::Float32);
     SLANG_CHECK(getTypeFullName(snormField) == "float");
+}
+
+SLANG_UNIT_TEST(functionReflectionSpecializeGroupSharedAndOutParams)
+{
+    const char* source = R"(
+        public T readShared<T>(groupshared T x) { return x; }
+        public T readSharedConst<T>(const groupshared T x) { return x; }
+        public T writeBack<T>(T x, out T y) { y = x; return x; }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diag;
+    auto module = session->loadModuleFromSourceString("m", "m.slang", source, diag.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto layout = module->getLayout();
+    auto floatType = layout->findTypeByName("float");
+    SLANG_CHECK_ABORT(floatType != nullptr);
+    slang::TypeReflection* argTypes[2] = {floatType, floatType};
+
+    const char* groupSharedFuncNames[] = {"readShared", "readSharedConst"};
+    for (auto name : groupSharedFuncNames)
+    {
+        auto func = layout->findFunctionByName(name);
+        SLANG_CHECK_ABORT(func != nullptr);
+        auto specFunc = func->specializeWithArgTypes(1, argTypes);
+        SLANG_CHECK_ABORT(specFunc != nullptr);
+        SLANG_CHECK(getTypeFullName(specFunc->getReturnType()) == "float");
+    }
+
+    auto writeBack = layout->findFunctionByName("writeBack");
+    SLANG_CHECK_ABORT(writeBack != nullptr);
+    auto specWriteBack = writeBack->specializeWithArgTypes(2, argTypes);
+    SLANG_CHECK_ABORT(specWriteBack != nullptr);
+    SLANG_CHECK(getTypeFullName(specWriteBack->getReturnType()) == "float");
 }
 
 // Test that findFunctionByNameInType finds all functions with the same name but different

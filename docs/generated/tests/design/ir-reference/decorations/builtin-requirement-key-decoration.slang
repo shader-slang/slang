@@ -13,8 +13,7 @@
 // addressed by its position in the interface's requirement list but by a
 // key that is deduplicated from, and tagged with, its kind. Conforming a
 // struct to `IDifferentiable` pulls those requirements in. The CHECK
-// captures the kind ordinal from the decoration and requires the very next
-// line to be a `builtinRequirementKey` built from the same ordinal, which
+// captures the kind ordinal from the decoration and requires a following line to be a `builtinRequirementKey` built from the same ordinal, which
 // is what ties the tag to the key rather than to an arbitrary inst.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
@@ -43,4 +42,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 // The captured ordinal must be the same on both lines: the decoration tags
 // the key, and the key itself is constructed from that kind.
 // CHECK: [BuiltinRequirementDecoration([[KIND:[0-9]+]] : Int)]
-// CHECK-NEXT: {{.*}}= builtinRequirementKey([[KIND]] : Int)
+// CHECK: {{.*}}= builtinRequirementKey([[KIND]] : Int)

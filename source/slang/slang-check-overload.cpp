@@ -3483,6 +3483,93 @@ String SemanticsVisitor::getCallSignatureString(OverloadResolveContext& context)
     return argsListBuilder.produceString();
 }
 
+// Returns the binary operator that the compound assignment operator `name` is written in terms
+// of (`-` for `-=`), or an empty slice when `name` is not a compound assignment operator.
+static UnownedStringSlice getBinaryOperatorOfCompoundAssignment(UnownedStringSlice name)
+{
+    static const char* const kCompoundAssignmentOperators[][2] = {
+        {"+=", "+"},
+        {"-=", "-"},
+        {"*=", "*"},
+        {"/=", "/"},
+        {"%=", "%"},
+        {"&=", "&"},
+        {"|=", "|"},
+        {"^=", "^"},
+        {"<<=", "<<"},
+        {">>=", ">>"},
+    };
+    for (const auto& entry : kCompoundAssignmentOperators)
+    {
+        if (name == UnownedStringSlice(entry[0]))
+            return UnownedStringSlice(entry[1]);
+    }
+    return UnownedStringSlice();
+}
+
+bool SemanticsVisitor::findBinaryOperatorForCompoundAssignment(
+    InvokeExpr* expr,
+    UnownedStringSlice& outCompoundOp,
+    UnownedStringSlice& outBinaryOp)
+{
+    // The parser builds `x op= y` as an `InfixExpr` that calls the operator by name.
+    if (!as<InfixExpr>(expr) || expr->arguments.getCount() != 2)
+        return false;
+    auto opExpr = as<VarExpr>(expr->originalFunctionExpr);
+    if (!opExpr || !opExpr->name)
+        return false;
+    UnownedStringSlice compoundOp = opExpr->name->text.getUnownedSlice();
+    UnownedStringSlice binaryOp = getBinaryOperatorOfCompoundAssignment(compoundOp);
+    if (binaryOp.getLength() == 0)
+        return false;
+
+    Expr* left = expr->arguments[0];
+    Expr* right = expr->arguments[1];
+    if (!left || !right || IsErrorExpr(left) || IsErrorExpr(right) || !left->type.type ||
+        !right->type.type)
+        return false;
+
+    // `x = x op y` needs `x` to be assignable; when it is not, that is the problem to fix.
+    if (!left->type.isLeftValue)
+        return false;
+
+    // Build `x op y` from the checked operands, looking `op` up in the scope where `x op= y`
+    // was written, so it sees the same declarations that `x = x op y` would see there.
+    auto binaryOpExpr = m_astBuilder->create<VarExpr>();
+    binaryOpExpr->name = getName(binaryOp);
+    binaryOpExpr->scope = opExpr->scope ? opExpr->scope : m_outerScope;
+    binaryOpExpr->loc = expr->loc;
+
+    auto binaryExpr = m_astBuilder->create<InfixExpr>();
+    binaryExpr->loc = expr->loc;
+    binaryExpr->functionExpr = binaryOpExpr;
+    binaryExpr->originalFunctionExpr = binaryOpExpr;
+    binaryExpr->arguments.add(left);
+    binaryExpr->arguments.add(right);
+
+    // Check it against a temporary sink: it is only a probe, and any error (no applicable
+    // overload, an ambiguous call, an argument that an `out` or `inout` parameter cannot take)
+    // means no note.
+    DiagnosticSink tempSink(getSourceManager(), nullptr);
+    SemanticsVisitor subVisitor(withSink(&tempSink));
+    binaryExpr->functionExpr = subVisitor.CheckTerm(binaryOpExpr);
+    if (tempSink.getErrorCount() != 0 || IsErrorExpr(binaryExpr->functionExpr))
+        return false;
+    Expr* resolved = subVisitor.CheckInvokeExprWithCheckedOperands(binaryExpr);
+    if (tempSink.getErrorCount() != 0 || !resolved || IsErrorExpr(resolved) || !resolved->type.type)
+        return false;
+
+    // Only suggest `x = x op y` when `x op y` has the type of `x`: that is the operator a
+    // user-written `operator op=` would wrap, and it rules out suggesting a rewrite that
+    // compiles only through an implicit (possibly truncating) conversion.
+    if (!resolved->type.type->equals(left->type.type))
+        return false;
+
+    outCompoundOp = compoundOp;
+    outBinaryOp = binaryOp;
+    return true;
+}
+
 Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 {
     OverloadResolveContext context;
@@ -3646,6 +3733,16 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 getSink()->diagnose(
                     Diagnostics::NoApplicableWithArgs{.args = argsList, .expr = expr});
+            }
+
+            UnownedStringSlice compoundOp;
+            UnownedStringSlice binaryOp;
+            if (findBinaryOperatorForCompoundAssignment(expr, compoundOp, binaryOp))
+            {
+                getSink()->diagnose(Diagnostics::CompoundAssignmentBinaryOperatorApplies{
+                    .binaryOp = binaryOp,
+                    .compoundOp = compoundOp,
+                    .location = expr->loc});
             }
 
             // For each candidate, show its signature and, when we recorded one,
@@ -3925,7 +4022,26 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             if (auto extractExistentialExpr = as<ExtractExistentialValueExpr>(arg))
                 arg = extractExistentialExpr->originalExpr;
         }
-        return CompleteOverloadCandidate(context, *context.bestCandidate);
+        // A single candidate that does not fit the arguments reports its own errors: for
+        // `S3 *= float` the closest candidate is the builtin `vector<float,1> *= float`, and the
+        // error is a type mismatch. Probe the binary operator before completing the candidate
+        // coerces the operands, and add the note after its errors. (A candidate that fails only
+        // on visibility is left alone: the operator exists there.)
+        UnownedStringSlice compoundOp;
+        UnownedStringSlice binaryOp;
+        bool addCompoundAssignmentNote =
+            context.bestCandidate->status < OverloadCandidate::Status::VisibilityChecked &&
+            findBinaryOperatorForCompoundAssignment(expr, compoundOp, binaryOp);
+        SourceLoc noteLoc = expr->loc;
+        Expr* result = CompleteOverloadCandidate(context, *context.bestCandidate);
+        if (addCompoundAssignmentNote)
+        {
+            getSink()->diagnose(Diagnostics::CompoundAssignmentBinaryOperatorApplies{
+                .binaryOp = binaryOp,
+                .compoundOp = compoundOp,
+                .location = noteLoc});
+        }
+        return result;
     }
 
     // If absolutely no viable candidates were extracted from the overloaded expression,

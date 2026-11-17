@@ -1,7 +1,7 @@
 // GH Issue #7412: Valid extension capability patterns that must NOT produce errors.
 // This is the negative counterpart to gh-7412.slang.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0):
 
 // Case 1: Extension with no [require] on a type with [require(glsl)].
 // Neither the extension nor its members add any cap constraint.
