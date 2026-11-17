@@ -3962,16 +3962,31 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         }
         else if (auto stageTypeDeclRef = specializedInnerDeclRef.as<AggTypeDecl>())
         {
-            // Applying the enclosing generic produced the specialized stage struct of a
-            // structural ray-tracing entry point. Re-derive its `invoke` through the checked
-            // conformance witness — the same selection that resolved the unspecialized entry
-            // point — so the stage contract types (context, payload, record) carry these
-            // concrete arguments, and give this specialization the target name derived from
-            // the concrete stage type, matching direct specialized-name selection.
+            // Applying the enclosing generic produced a struct rather than a function. Only a
+            // structural ray-tracing entry point takes that shape: its function is the stage
+            // struct's `invoke` method, so the struct is what the generic application yields.
+            // Re-derive its `invoke` through the checked conformance witness — the same
+            // selection that resolved the unspecialized entry point — so the stage contract
+            // types (context, payload, record) carry these concrete arguments, and give this
+            // specialization the target name derived from the concrete stage type, matching
+            // direct specialized-name selection.
+            //
+            // A non-structural entry point cannot reach this branch: an ordinary entry
+            // function's enclosing generic wraps the function itself, so the immediate-parent
+            // fast path above applies. A struct result here is therefore out of contract for
+            // anything but a structural entry point; fail rather than re-derive through a
+            // conformance that was never selected.
+            if (!isStructuralRayTracingEntryPoint())
+                return nullptr;
             // The module can be null only for pass-through or deserialized dummies, which
             // never reach specialization; every structural entry point is selected from a
             // module's declarations, so it always owns one here.
             SLANG_RELEASE_ASSERT(entryPointModule);
+            // The requested stage is always resolved by specialization time (structural
+            // selection writes the inferred stage into the profile), so this call cannot
+            // update the profile; the local copy keeps that write-back away from the entry
+            // point's own profile, and `foundStage` is not consumed because this selection
+            // already proved the type is a stage.
             Profile stageProfile = m_profile;
             bool foundStage = false;
             Type* stageType = nullptr;
@@ -3984,11 +3999,20 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
                 true,
                 &foundStage,
                 &stageType);
-            if (!specializedFuncDeclRef)
-                return nullptr;
             info->entryPointNameOverride = PortableRT::getEntryPointName(
                 PortableRT::getSourceTypeName(astBuilder, stageType).getUnownedSlice(),
                 getStage());
+        }
+        else
+        {
+            // The generic application or the solver failed without diagnosing: an applied
+            // generic that stays partially applied and whose remaining parameter the solver
+            // cannot complete yields an empty decl-ref here (for example a defaulted
+            // parameter whose default fails its own constraint). Without this check the
+            // unspecialized initializer above would survive and the specialization would
+            // report success with generic placeholder types; fail it here instead so the
+            // ordinary argument-count mismatch diagnostic surfaces.
+            return nullptr;
         }
 
         if (!specializedFuncDeclRef)
