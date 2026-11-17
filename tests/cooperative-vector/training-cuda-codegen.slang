@@ -1,4 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec -entry computeMain -stage compute
+// TODO(#8556): Remove `no-downstream-validation` when #8556 is fixed.
+// The OptiX 9.0 headers turn off cooperative vectors under NVRTC, so `OptixCoopVec` is undefined.
+//TEST:SIMPLE(filecheck=CHECK,no-downstream-validation): -target cuda -capability optix_coopvec -entry computeMain -stage compute
 
 // CHECK: optixCoopVecOuterProductAccumulate({{.*}}, {{.*}}, (CUdeviceptr)(&({{.*}})), int(0), 32U)
 // CHECK: optixCoopVecReduceSumAccumulate({{.*}}, (CUdeviceptr)(&({{.*}})), int(0))
