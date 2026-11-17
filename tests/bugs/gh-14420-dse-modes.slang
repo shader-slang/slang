@@ -63,6 +63,7 @@ float storePureCall(Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p, 
 // CUDA: *[[PF:p_[0-9]+]] = 1.0f;
 // CUDA-NOT: *[[PF]]
 // CUDA: {{.*\+ 1\.0f;}}
+// METAL-LABEL: float forwardAfterRead_0(
 // METAL: *[[PF:p_[0-9]+]] = 1.0f;
 // METAL-NOT: *[[PF]]
 // METAL: {{.*\+ 1\.0f;}}
