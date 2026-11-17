@@ -16,4 +16,4 @@ __FILE__(There)
 
 __FILE__
 
-// CHECK: "Is" "Anybody" "Is" There __FILE__
+// CHECK: "Is" "Anybody" "Is" There "tests/preprocessor/special-macro-redefine-function.slang"
