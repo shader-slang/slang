@@ -12,6 +12,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage compute -entry computeMain -DTEST_GENERIC_METHOD
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage compute -entry computeMain -DTEST_TYPE_NON_GENERIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage compute -entry computeMain -DTEST_TYPE_GENERIC
+// The static-through-value spelling: the base expression's own [require]
+// must reach the checker exactly as the instance spelling delivers it.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage compute -entry computeMain -DTEST_VALUE_BASE
 // The satisfied-capability direction must stay clean too.
 //TEST:SIMPLE: -target spirv -stage compute -entry computeMain -DTEST_GENERIC_FUNCTION -o capability-static-member-generic.spvasm
 
@@ -53,6 +56,18 @@ struct P
     static uint GM<T>() { return 1; }
 }
 
+// The static-through-value spelling reaches the same members through a base
+// value whose producer carries the requirement.
+struct V
+{
+    [require(spirv)]
+    static uint x;
+    uint y;
+}
+
+[require(spirv)]
+V makeV();
+
 [numthreads(1, 1, 1)]
 [shader("compute")]
 void computeMain()
@@ -77,7 +92,8 @@ void computeMain()
     // CHECK: error 36107
     outputBuffer[0] = S<float>.field.x;
 #endif
-#ifdef TEST_GENERIC_FUNCTION
-    // spirv satisfies SF's [require]; the compile must be clean.
+#ifdef TEST_VALUE_BASE
+    // CHECK: error 36107
+    outputBuffer[0] = makeV().x;
 #endif
 }
