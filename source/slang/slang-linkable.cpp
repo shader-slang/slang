@@ -1303,7 +1303,28 @@ ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 {
     auto astBuilder = getLinkage()->getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
-    return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
+    auto& map = getMangledNameToIntValMap();
+    // A single `linkTimeResolve` pass substitutes one level of exported constants: an
+    // exported constant defined in terms of another extern, e.g.
+    // `export extern static const int B = A + 1;`, still holds a symbolic factor after
+    // the first pass replaces `B` with its initializer's value. Iterate to a fixpoint,
+    // bounded by the number of exported constants: every non-final pass must resolve at
+    // least one more extern reference (each `_linkTimeResolveOverride` returns its
+    // receiver unchanged when nothing resolved), so no expression can need more passes
+    // than the map has entries, and a self-referential cycle — or an intermediate that
+    // stops being an `IntVal` — simply ends as an unresolved, non-constant value.
+    Val* result = intVal;
+    for (Index i = 0, iterationLimit = map.getCount() + 1; i < iterationLimit; i++)
+    {
+        auto intValResult = as<IntVal>(result);
+        if (!intValResult)
+            break;
+        auto resolved = intValResult->linkTimeResolve(map);
+        if (resolved == result)
+            break;
+        result = resolved;
+    }
+    return as<ConstantIntVal>(result);
 }
 
 TargetProgram* ComponentType::getTargetProgram(TargetRequest* target)
