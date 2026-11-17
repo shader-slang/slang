@@ -30,7 +30,8 @@ void replaceResource(__constref Texture2D<float4> value) { value = g_input; }
 //diag:                                                          ^ left of '=' is not an l-value
 //diag:                                                          ^ left of '=' is not an l-value.
 
-// Taking a borrow's address, through either spelling, is an error.
+// Taking a borrow's address with `&` is an error; `__getAddress` yields a
+// read-only pointer, and writing through it is an error.
 int takeAddress(__constref S s) { return (&s).a[0]; }
 //diag:                                    ^ cannot take address of immutable object
 //diag:                                    ^ Not allowed to take the address of an immutable object
