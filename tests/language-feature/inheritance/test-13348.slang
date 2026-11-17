@@ -9,7 +9,7 @@
 // than fields, so interface conformance stays untouched by the field-like
 // path. The Counting scenarios at the end pin the accessor call counts of a
 // deferred inherited-field write (two gets: the temporary materialization
-// and the write-back merge) against the one-get direct-field analog.
+// and the write-back merge) against the one-get own-field analog.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -vk
@@ -119,7 +119,7 @@ struct Counting
 //TEST_INPUT:ubuffer(data=[0 0], stride=8):name=buf
 RWStructuredBuffer<Payload> buf;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -179,4 +179,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     counting.counted.extra = 9.0;
     outputBuffer[12] = float(gGets); // CHECK: 4
     outputBuffer[13] = float(gSets); // CHECK: 2
+
+    // The deferred write-back merges the modified base subobject with the
+    // sibling fields of the property value: `extra` survives the write.
+    Holder s = {};
+    s.payload.extra = 5.0;
+    s.payload.value = 8.0;
+    outputBuffer[14] = s.payload.extra; // CHECK: 5.0
+    outputBuffer[15] = s.payload.value; // CHECK: 8.0
 }
