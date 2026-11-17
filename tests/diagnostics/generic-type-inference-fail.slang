@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
 
 interface IAssoc
 {
@@ -62,7 +62,7 @@ int test()
 {
     var obj = CreateT<Impl>(2);
     var obj2 = CreateT_Assoc<Impl>(1);
-    
+
     // CHECK: could not specialize generic for arguments of type
     var obj3 = CreateT_Assoc_Inner(1); // ERROR.
 

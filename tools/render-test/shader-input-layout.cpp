@@ -1044,9 +1044,18 @@ struct ShaderInputLayoutParser
         for (auto& line : lines)
         {
             lineNum++;
-            if (!line.startsWith("//"))
+            // A directive line is optional spaces or tabs, `//`, any further `/`, then
+            // `TEST_INPUT:` after optional spaces or tabs. This is the prefix rule of the
+            // `//TEST` scan in slang-test's `_gatherTestsForFile`; a line the two scans
+            // disagree on is skipped here without a diagnostic. Slashes are skipped only
+            // before the spaces, so `// //TEST_INPUT:` stays an ordinary comment.
+            UnownedStringSlice commentText = line.getUnownedSlice().trimStart();
+            if (!commentText.startsWith("//"))
                 continue;
-            line = line.getUnownedSlice().tail(2).trim();
+            commentText = commentText.tail(2);
+            while (commentText.startsWith("/"))
+                commentText = commentText.tail(1);
+            line = commentText.trim();
             if (line.startsWith("TEST_INPUT:"))
             {
                 auto lineContent = line.subString(11, line.getLength() - 11);
@@ -1474,6 +1483,16 @@ void _iteratePixels(int dimension, int size, unsigned int* buffer, F f)
                     buffer[i * size * size + j * size + k] = f(k, j, i);
 };
 
+// Returns how far `coord` is along an axis of `size` texels, from 0 at the first texel to 1 at the
+// last texel. A texture with the full mip chain ends in a one-texel level (for example, size=4 has
+// levels of 4, 2 and 1 texels). That level has no distance between its first and last texel, so we
+// return 0 for it instead of dividing by `size - 1 == 0`, which gives NaN; converting NaN to an
+// integer type is undefined behavior.
+static float _gradientFraction(int coord, int size)
+{
+    return size > 1 ? coord / (float)(size - 1) : 0.0f;
+}
+
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputDesc)
 {
     int arrLen = inputDesc.arrayLength;
@@ -1561,9 +1580,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
                         }
                         else if (inputDesc.content == InputTextureContent::Gradient)
                         {
-                            unsigned char r = (unsigned char)(x / (float)(size - 1) * 255.0f);
-                            unsigned char g = (unsigned char)(y / (float)(size - 1) * 255.0f);
-                            unsigned char b = (unsigned char)(z / (float)(size - 1) * 255.0f);
+                            unsigned char r = (unsigned char)(_gradientFraction(x, size) * 255.0f);
+                            unsigned char g = (unsigned char)(_gradientFraction(y, size) * 255.0f);
+                            unsigned char b = (unsigned char)(_gradientFraction(z, size) * 255.0f);
                             return 0xFF000000 + r + (g << 8) + (b << 16);
                         }
                         else if (inputDesc.content == InputTextureContent::ChessBoard)
@@ -1596,9 +1615,9 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
                         }
                         else if (inputDesc.content == InputTextureContent::Gradient)
                         {
-                            unsigned char r = (unsigned char)(x / (float)(size - 1));
-                            unsigned char g = (unsigned char)(y / (float)(size - 1));
-                            unsigned char b = (unsigned char)(z / (float)(size - 1));
+                            unsigned char r = (unsigned char)(_gradientFraction(x, size));
+                            unsigned char g = (unsigned char)(_gradientFraction(y, size));
+                            unsigned char b = (unsigned char)(_gradientFraction(z, size));
                             return 0x01000000 + r + (g << 8) + (b << 16);
                         }
                         else if (inputDesc.content == InputTextureContent::ChessBoard)

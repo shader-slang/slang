@@ -808,6 +808,10 @@ protected:
     UInt m_uniqueIDCounter = 1;
     Dictionary<IRInst*, UInt> m_mapIRValueToID;
 
+    // Memoised doesCalleeHaveSideEffect: emit does not change callees' associations, and without
+    // the cache every fold query walks the callee's whole use list (quadratic in call sites).
+    Dictionary<IRInst*, bool> m_calleeSideEffectCache;
+
     HashSet<String> m_irDeclsVisited;
 
     HashSet<String> m_irTupleTypes;

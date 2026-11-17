@@ -312,13 +312,13 @@ jobs:
   # configuration no other CI job builds, so they get their own workflow. They
   # build only the slang-static-unit-test target and run on GitHub-hosted runners
   # (no GPU needed), so they add no load to the self-hosted Windows pool.
-  static-unit-test-linux-debug-gcc-aarch64:
+  static-linux-debug-gcc-aarch64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     with:
       os: linux
       compiler: gcc
@@ -326,13 +326,29 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
 
-  static-unit-test-macos-debug-clang-aarch64:
+  # Release coverage for the same tests. A release build compiles out SLANG_ASSERT and enables
+  # optimizations, which a debug build cannot check.
+  static-linux-release-gcc-aarch64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+
+  static-macos-debug-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
     with:
       os: macos
       compiler: clang
@@ -340,18 +356,46 @@ jobs:
       config: debug
       runs-on: '["macos-latest"]'
 
-  static-unit-test-windows-debug-cl-x86_64:
+  static-windows-debug-cl-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     with:
       os: windows
       compiler: cl
       platform: x86_64
       config: debug
+      runs-on: '["windows-2022"]'
+
+  static-macos-release-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+
+  static-windows-release-cl-x86_64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
       runs-on: '["windows-2022"]'
 
   # Windows builds (self-hosted)
@@ -691,13 +735,8 @@ jobs:
       cpu-only: true
       run-via-glsl: false
 
-  # Windows GPU tests (self-hosted).
-  # Each config is split into three parallel jobs to reduce wall-clock time:
-  #   -gpu-dx:   dx11+dx12+wgpu
-  #   -gpu-vk:   vk+cpu+llvm + no-API tests
-  #   -gpu-cuda: cuda
-  # The three jobs run concurrently on separate runners.
-  test-windows-debug-cl-x86_64-gpu-dx:
+  # Windows GPU tests (self-hosted)
+  test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -708,42 +747,8 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
       gpu-tier: t4
-
-  test-windows-debug-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-      # Only this job runs the via-glsl pass (-api vk); the dx and cuda jobs would repeat it.
       run-via-glsl: true
-
-  test-windows-debug-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
-      gpu-tier: t4
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
 
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
@@ -756,7 +761,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu-dx:
+  test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -767,42 +772,8 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      api: dx11+dx12+wgpu
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
       gpu-tier: t4
-
-  test-windows-release-cl-x86_64-gpu-vk:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: vk+cpu+llvm
-      gpu-tier: t4
-      # Only this job runs the via-glsl pass (-api vk); the dx and cuda jobs would repeat it.
       run-via-glsl: true
-
-  test-windows-release-cl-x86_64-gpu-cuda:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
-      api: cuda
-      # The gpu-vk job already runs the via-glsl pass (-api vk); running it here would repeat it.
-      run-via-glsl: false
-      gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -858,7 +829,7 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
           mkdir -p temp
           # Capture stdout+stderr to match how the golden file is produced by
-          # regenerate-cmdline-ref.yml; otherwise stray stderr output would be
+          # slash-regenerate-cmdline-ref.yml; otherwise stray stderr output would be
           # baked into the reference but missing here, causing a spurious diff.
           artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
 
@@ -992,16 +963,15 @@ jobs:
         build-macos-27-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
-        static-unit-test-linux-debug-gcc-aarch64,
-        static-unit-test-macos-debug-clang-aarch64,
-        static-unit-test-windows-debug-cl-x86_64,
-        test-windows-release-cl-x86_64-gpu-dx,
-        test-windows-release-cl-x86_64-gpu-vk,
-        test-windows-release-cl-x86_64-gpu-cuda,
+        static-linux-debug-gcc-aarch64,
+        static-linux-release-gcc-aarch64,
+        static-macos-release-clang-aarch64,
+        static-windows-release-cl-x86_64,
+        static-macos-debug-clang-aarch64,
+        static-windows-debug-cl-x86_64,
+        test-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu-dx,
-        test-windows-debug-cl-x86_64-gpu-vk,
-        test-windows-debug-cl-x86_64-gpu-cuda,
+        test-windows-debug-cl-x86_64-gpu,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,

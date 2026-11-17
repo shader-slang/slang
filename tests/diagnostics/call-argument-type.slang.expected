@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/call-argument-type.slang(10): error 30019: expected an expression of type 'A', got 'B'
-    f(b);
-      ^
-}
-standard output = {
-}

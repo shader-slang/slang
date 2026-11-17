@@ -1,14 +1,16 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv
 
-//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
 
-// SPIRV: OpCapability VariablePointers
+// Check that a buffer chosen in a branch is read correctly per thread.
+// SPIRV-NOT: VariablePointers
+// SPIRV: OpEntryPoint
 
 //TEST_INPUT:set buffer1 = ubuffer(data=[1.0], stride=4)
 StructuredBuffer<float> buffer1;
 //TEST_INPUT:set buffer2 = ubuffer(data=[2.0], stride=4)
 StructuredBuffer<float> buffer2;
-//TEST_INPUT:set output = out ubuffer(data=[0.0], stride=4)
+//TEST_INPUT:set output = out ubuffer(data=[0.0 0.0], stride=4)
 RWStructuredBuffer<float> output;
 
 [numthreads(2,1,1)]

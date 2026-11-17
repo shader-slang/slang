@@ -15,7 +15,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     output[tid.x] = x + y;
 }
 
-// CHECK: result code = 0
 // CHECK: warning[E39019]
 // CHECK: 'x' is implicitly a global shader parameter
 // CHECK-NOT: $uniformParameter_

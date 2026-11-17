@@ -5,7 +5,7 @@
 // lookup inside the body therefore sees the members that this module declares in every
 // enclosing namespace, including the enclosing namespaces that already existed before
 // the qualified declaration reopened them. Imported members of an existing enclosing
-// namespace are not covered here; see #13714.
+// namespace are covered by namespace-import-reopen/qualified-reopen.slang.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

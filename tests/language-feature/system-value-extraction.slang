@@ -3,7 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cpu -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cuda -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -wgsl -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mtl -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mtl -compute
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
 
