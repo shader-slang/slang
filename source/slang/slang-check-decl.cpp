@@ -3944,9 +3944,12 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // so fold it first. Check-time circularity detection stays unavailable for
             // extern constants — the extern branch of the constant folder returns the
             // symbolic reference without walking the initializer — so a self-referential
-            // or mutually-cyclic extern default is accepted here and only surfaces at
-            // layout, where the bounded link-time resolution ends with the
-            // binding-attribute diagnostic.
+            // or mutually-cyclic extern default is accepted here. A cyclic constant that
+            // is only consumed in layout-resolvable positions surfaces there as an
+            // unresolved value (the binding-attribute diagnostic); one whose initializer
+            // is lowered (any constant declaration is) can still trip IR lowering's own
+            // unguarded recursion over self-referential initializers, a pre-existing
+            // lowering limitation tracked separately.
             if (varDecl->hasModifier<ExternModifier>() && varDecl->findModifier<ConstModifier>() &&
                 isScalarIntegerType(varDecl->type))
             {

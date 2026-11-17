@@ -1146,8 +1146,8 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
 // resolved — e.g. an `extern` constant with no default initializer and no linked
 // definition — is diagnosed here, once per attribute (the message cannot say which
 // argument failed, so a second identical error at the same location would only repeat
-// it), and both outputs read as index 0, so the caller's layout continues (best-effort)
-// after the error.
+// it), and each unresolvable output reads as index 0, so the caller's layout continues
+// (best-effort) after the error.
 static void _resolveGLSLBindingAttribute(
     ParameterBindingContext* context,
     GLSLBindingAttribute* attr,

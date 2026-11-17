@@ -1105,9 +1105,11 @@ class GLSLBindingAttribute : public Attribute
     FIDDLE(...)
     // The Vulkan descriptor `binding` and `set` indices. Both are stored as `IntVal`s so
     // that expressions over link-time constants (e.g. derived from `extern` constants)
-    // can be used; a null field means the argument was never specified and reads as
-    // descriptor index 0 (the defaulted `set` of `[[vk::binding(x)]]`, or a GLSL layout
-    // qualifier that named only the other argument). Parameter binding resolves both
+    // can be used. A null field means the argument was never specified — on any
+    // validating pass — and reads as descriptor index 0. That happens in two cases:
+    // the defaulted `set` of `[[vk::binding(x)]]`, and a GLSL layout qualifier that
+    // named only the other argument (`layout(set = N)` leaves `binding` null, and the
+    // merge path can later fill either one). Parameter binding resolves both
     // against the linked program via `ComponentType::tryFoldIntVal`
     // (source/slang/slang-linkable.h); the one consumer that cannot resolve them is the
     // GLSL `offset` layout path in the checker, which needs a concrete index at check
