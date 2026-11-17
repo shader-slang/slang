@@ -3356,8 +3356,8 @@ Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, 
     // A value viewed at a super type is part of the same memory location as the
     // original expression, so the original's write-only restriction travels with
     // the view.
-    expr->type.isWriteOnly = fromExpr->type.isWriteOnly;
-    expr->type.isWriteOnlyRefParam = fromExpr->type.isWriteOnlyRefParam;
+    expr->type.isWriteOnly |= fromExpr->type.isWriteOnly;
+    expr->type.isWriteOnlyRefParam |= fromExpr->type.isWriteOnlyRefParam;
     expr->valueArg = fromExpr;
     expr->witnessArg = witness;
     return expr;

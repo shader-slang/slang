@@ -208,8 +208,8 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             // Opening an existential does not copy or move any storage: the opened value
             // names the same memory location as the original, so a write-only original
             // keeps restricting the opened value.
-            openedValue->type.isWriteOnly = expr->type.isWriteOnly;
-            openedValue->type.isWriteOnlyRefParam = expr->type.isWriteOnlyRefParam;
+            openedValue->type.isWriteOnly |= expr->type.isWriteOnly;
+            openedValue->type.isWriteOnlyRefParam |= expr->type.isWriteOnlyRefParam;
             openedValue->originalExpr = expr;
             openedValue->checked = true;
             // The result of opening an existential is an l-value
@@ -720,8 +720,8 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         derefExpr->type.isLeftValue = true;
         // Reading through the pointer first reads the pointer itself, so a write-only
         // pointer location restricts the pointed-to expression the same way.
-        derefExpr->type.isWriteOnly = base->type.isWriteOnly;
-        derefExpr->type.isWriteOnlyRefParam = base->type.isWriteOnlyRefParam;
+        derefExpr->type.isWriteOnly |= base->type.isWriteOnly;
+        derefExpr->type.isWriteOnlyRefParam |= base->type.isWriteOnlyRefParam;
     }
     else if (as<ExplicitRefType>(base->type))
     {
@@ -747,8 +747,8 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         derefExpr->type.isLeftValue = base->type.isLeftValue;
         derefExpr->type.isReadOnlyMemoryLocation = base->type.isReadOnlyMemoryLocation;
         derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
-        derefExpr->type.isWriteOnly = base->type.isWriteOnly;
-        derefExpr->type.isWriteOnlyRefParam = base->type.isWriteOnlyRefParam;
+        derefExpr->type.isWriteOnly |= base->type.isWriteOnly;
+        derefExpr->type.isWriteOnlyRefParam |= base->type.isWriteOnlyRefParam;
     }
 
     return derefExpr;
@@ -3518,8 +3518,8 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     // a read-only base is read-only.
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
     subscriptExpr->type.isReadOnlyMemoryLocation = baseExpr->type.isReadOnlyMemoryLocation;
-    subscriptExpr->type.isWriteOnly = baseExpr->type.isWriteOnly;
-    subscriptExpr->type.isWriteOnlyRefParam = baseExpr->type.isWriteOnlyRefParam;
+    subscriptExpr->type.isWriteOnly |= baseExpr->type.isWriteOnly;
+    subscriptExpr->type.isWriteOnlyRefParam |= baseExpr->type.isWriteOnlyRefParam;
 
     return subscriptExpr;
 }
@@ -3771,8 +3771,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     if (as<InvokeExpr>(checkedCallExpr))
     {
         auto checkedInvokeExpr = static_cast<InvokeExpr*>(checkedCallExpr);
-        checkedInvokeExpr->type.isWriteOnly = baseExpr->type.isWriteOnly;
-        checkedInvokeExpr->type.isWriteOnlyRefParam = baseExpr->type.isWriteOnlyRefParam;
+        checkedInvokeExpr->type.isWriteOnly |= baseExpr->type.isWriteOnly;
+        checkedInvokeExpr->type.isWriteOnlyRefParam |= baseExpr->type.isWriteOnlyRefParam;
     }
 
     if (m_parentDifferentiableAttr)
@@ -4870,14 +4870,6 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     outLeftArg = leftArg;
     outRightArg = rightArg;
 
-    // Both operands are read, whether the pair below keeps them verbatim (same type) or coerces
-    // them. The coercion happens at `CoercionSite::Argument`, which the write-only read check
-    // skips because an argument may bind storage, so report the reads here either way.
-    if (leftArg->type.isWriteOnly || leftArg->type.isWriteOnlyRefParam)
-        diagnoseReadOfWriteOnlyStorage(leftArg);
-    if (rightArg->type.isWriteOnly || rightArg->type.isWriteOnlyRefParam)
-        diagnoseReadOfWriteOnlyStorage(rightArg);
-
     // Same builtin type on both sides: nothing to coerce.
     if (leftArg->type.type->equals(rightArg->type.type))
         return leftArg->type.type;
@@ -5016,11 +5008,6 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (!arg->type.type)
             return nullptr;
 
-        // The builtin unary operators take their operand verbatim, so no coercion marks the
-        // lvalue-to-rvalue step where the operand is read. Report that read here.
-        if (arg->type.isWriteOnly || arg->type.isWriteOnlyRefParam)
-            diagnoseReadOfWriteOnlyStorage(arg);
-
         Type* uOperandType = arg->type.type;
         // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
         // matrix operands to normal resolution (see the binary case for the full rationale).
@@ -5059,6 +5046,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             }
             return nullptr;
         }
+
+        // The fast path is committed to reading its verbatim operand, and no coercion marks the
+        // lvalue-to-rvalue step. Reporting here, after every bail-out, keeps a declined fast
+        // path from diagnosing a read that normal resolution then binds as storage.
+        if (arg->type.isWriteOnly || arg->type.isWriteOnlyRefParam)
+            diagnoseReadOfWriteOnlyStorage(arg);
 
         auto node = m_astBuilder->create<BuiltinOperatorExpr>();
         node->op = uKind;
@@ -5149,6 +5142,11 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // common-type rule, so leave mixed-type shifts to overload resolution.
     if (isShift && !leftArg->type.type->equals(rightArg->type.type))
         return nullptr;
+    // The operands before the common-type coercion carries them back; reads of write-only
+    // storage are reported on these, at the point below where the fast path is committed.
+    Expr* originalLeftArg = leftArg;
+    Expr* originalRightArg = rightArg;
+
     // Promote mixed-type operands to the common operand type (and carry the coerced operands
     // back onto the expression). Null => not a fast-pathable pair of builtin numeric operands.
     Type* operandType = coerceOperandsOfBuiltinBinaryExpr(leftArg, rightArg, leftArg, rightArg);
@@ -5212,6 +5210,15 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         eligible = isIntegerBase || isFloatBase;
     if (!eligible)
         return nullptr;
+
+    // The fast path is committed to reading both operands: it either kept them verbatim (same
+    // type) or coerced them at `CoercionSite::Argument`, which the write-only read check skips
+    // because an argument may bind storage. Reporting here, after every bail-out, keeps a
+    // declined fast path from diagnosing a read that normal resolution then binds as storage.
+    if (originalLeftArg->type.isWriteOnly || originalLeftArg->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(originalLeftArg);
+    if (originalRightArg->type.isWriteOnly || originalRightArg->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(originalRightArg);
 
     // Result type: arithmetic/bitwise preserve the operand type; comparison yields a
     // boolean of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>,
@@ -9167,8 +9174,8 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     swizExpr->type.isReadOnlyMemoryLocation =
         elementCount == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
     // Reading any component of a write-only base reads that base.
-    swizExpr->type.isWriteOnly = swizExpr->base->type.isWriteOnly;
-    swizExpr->type.isWriteOnlyRefParam = swizExpr->base->type.isWriteOnlyRefParam;
+    swizExpr->type.isWriteOnly |= swizExpr->base->type.isWriteOnly;
+    swizExpr->type.isWriteOnlyRefParam |= swizExpr->base->type.isWriteOnlyRefParam;
 
     return swizExpr;
 }
@@ -9287,8 +9294,8 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     swizExpr->type.isReadOnlyMemoryLocation =
         swizExpr->elementIndices.getCount() == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
     // Reading any component of a write-only base reads that base.
-    swizExpr->type.isWriteOnly = swizExpr->base->type.isWriteOnly;
-    swizExpr->type.isWriteOnlyRefParam = swizExpr->base->type.isWriteOnlyRefParam;
+    swizExpr->type.isWriteOnly |= swizExpr->base->type.isWriteOnly;
+    swizExpr->type.isWriteOnlyRefParam |= swizExpr->base->type.isWriteOnlyRefParam;
     return swizExpr;
 }
 
@@ -9415,8 +9422,8 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
         areSwizzleComponentsContiguous(swizExpr->elementIndices) &&
         swizExpr->base->type.isReadOnlyMemoryLocation;
     // Reading any component of a write-only base reads that base.
-    swizExpr->type.isWriteOnly = swizExpr->base->type.isWriteOnly;
-    swizExpr->type.isWriteOnlyRefParam = swizExpr->base->type.isWriteOnlyRefParam;
+    swizExpr->type.isWriteOnly |= swizExpr->base->type.isWriteOnly;
+    swizExpr->type.isWriteOnlyRefParam |= swizExpr->base->type.isWriteOnlyRefParam;
 
     return swizExpr;
 }
