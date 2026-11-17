@@ -4433,15 +4433,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 if (paramDecl && argExpr && paramDecl->hasModifier<HLSLGroupSharedModifier>())
                     checkArgumentOfGroupSharedParam(paramDecl, argExpr);
 
-                // Operator expressions (compound assignment like `r += 1`, prefix/postfix
-                // `++r`, etc.) desugar into calls to operators whose `left` parameter is
-                // `inout`, but writing through a reference parameter that way is well defined
-                // and is the normal way to use one, so they are exempt. `_checkAliasedOutArguments`
-                // skips them for the same reason.
-                if (paramDecl && argExpr && as<OutParamTypeBase>(paramType) &&
-                    !as<OperatorExpr>(invoke))
-                    checkArgumentOfExclusiveParam(callableDeclRef, paramDecl, argExpr);
-
                 if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
@@ -4633,6 +4624,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
             checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
+            checkNonExclusiveArguments(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7952,58 +7944,28 @@ void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr*
             .arg = argIn});
 }
 
-// Return the by-reference parameter that `arg` forwards, if the storage it names is one. A
-// reference parameter (`__ref`, `__ref_readonly`, `__ref_writeonly`, or `groupshared`, which
-// implies `__ref`) is a name in the callee for storage the caller may also access through
-// aliases, so whatever storage the caller passed, the callee has no guarantee that the
-// parameter is exclusive. Projections such as `a[0]` or `s.f` name a part of that storage, so
-// `getSubExpressionDeterminingAddressSpace` walks them to the parameter.
+// Return the by-reference parameter of the enclosing function that `arg` names, or null if
+// `arg` names anything else. A reference parameter (`__ref`, `__ref_readonly`,
+// `__ref_writeonly`, or `groupshared`, which implies `__ref`) is a name in the callee for
+// storage the caller may also access through aliases, so whatever storage the caller passed,
+// the callee has no guarantee that the parameter is exclusive. The other parameter kinds that
+// name caller storage are correctly not reference parameters: an `inout` parameter's caller
+// guarantees it exclusive access (which covers a nested call), a `__borrow` parameter's
+// caller guarantees it is unmodified for the duration, and an `in` parameter is a copy.
+// Projections such as `a[0]` or `s.f` name a part of that storage, so
+// `getSubExpressionDeterminingAddressSpace` walks them to the parameter; the caller peels any
+// l-value-coercion wrapper first, so the walk never needs to look through a cast. The walk
+// resolves the declaration, dropping any substitution on the declaration reference; only the
+// parameter's name and passing mode are read from it, and neither depends on the substitution.
 static ParamDecl* getForwardedReferenceParamDecl(Expr* arg)
 {
     auto varExpr = as<VarExpr>(getSubExpressionDeterminingAddressSpace(arg));
     if (!varExpr)
         return nullptr;
-    auto paramDecl = varExpr->declRef.as<ParamDecl>().getDecl();
+    auto paramDecl = as<ParamDecl>(varExpr->declRef.getDecl());
     if (!paramDecl)
         return nullptr;
     return isByReferenceParamPassingMode(getParamPassingMode(paramDecl)) ? paramDecl : nullptr;
-}
-
-// Report a warning if `argIn`, passed to the `out`/`inout` parameter `paramIn` of `callee`,
-// names storage the enclosing function does not have exclusive access to. An `out` or `inout`
-// parameter requires exclusivity: the callee may copy out of the argument's storage when it
-// returns, discarding writes made through other aliases during the call. A by-reference
-// parameter of the enclosing function does not guarantee exclusivity, so forwarding one is a
-// mismatch the signatures alone reveal. Consider this example:
-//
-//     void inner(inout int x) { x += 1; }
-//     void viaRef(__ref int y) { inner(y); }
-//
-// `inner` may copy in and out of `y`'s storage, so a write that another alias of `y` makes
-// during the call is lost, and a bounce through a local temporary restores the guarantee.
-// This check is scoped to by-reference parameters only: an argument that names `groupshared`
-// storage directly is left alone, because barriers may legitimately synchronize its aliases,
-// which the checker cannot see. An argument that is not an l-value is left to the
-// `ArgumentExpectedLvalue` diagnostic, and one that already failed to check is skipped so
-// this warning does not pile onto the reported error.
-void SemanticsVisitor::checkArgumentOfExclusiveParam(
-    DeclRef<CallableDecl> callee,
-    ParamDecl* paramIn,
-    Expr* argIn)
-{
-    SLANG_ASSERT(paramIn && argIn);
-    if (isErrorTypedOrCastFromErrorTyped(argIn) || !argIn->type.isLeftValue)
-        return;
-
-    auto forwardedParam = getForwardedReferenceParamDecl(argIn);
-    if (!forwardedParam)
-        return;
-
-    getSink()->diagnose(Diagnostics::PassingNonExclusiveMemoryToExclusiveParameter{
-        .refParam = forwardedParam->getName(),
-        .callee = callee.getName(),
-        .param = paramIn->getName(),
-        .arg = argIn});
 }
 
 // An argument of a call that the call writes back to the caller's storage when it returns: the
@@ -8240,6 +8202,76 @@ Decl* SemanticsVisitor::findGroupSharedVariablePartlyWrittenInDifferentiatedBody
     if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
         return nullptr;
     return baseDeclRefExpr->declRef.getDecl();
+}
+
+// Report W30712 for each argument that `invoke` writes back to storage the enclosing function
+// does not have exclusive access to. An `out` or `inout` parameter, and the implicit `this`
+// of a `[mutating]` method, require exclusivity: the callee may copy out of the argument's
+// storage when it returns, discarding writes made through other aliases during the call. A
+// by-reference parameter of the enclosing function does not guarantee exclusivity, so
+// forwarding one is a mismatch the signatures alone reveal. Consider this example:
+//
+//     void inner(inout int x) { x += 1; }
+//     void viaRef(__ref int y) { inner(y); }
+//
+// `inner` may copy in and out of `y`'s storage, so a write that another alias of `y` makes
+// during the call is lost, and a bounce through a local temporary restores the guarantee.
+//
+// `forEachWrittenBackArgument` enumerates exactly the arguments the call writes back — the
+// `out`/`inout` parameters (with an l-value-coerced argument judged by the storage it writes
+// back to, not the conversion wrapper) and the receiver of a `[mutating]` method — so the
+// check reuses it rather than re-deriving that inventory. Two call forms are deliberately
+// outside the check: operator expressions (`r += 1`, `++r`), which desugar into calls whose
+// mutating operand parameter is `inout` but which are the normal, well-defined way to write
+// through a reference, and a call through a value of function type, which has no parameter
+// declarations to name in the diagnostic. `_checkAliasedOutArguments` skips operator
+// expressions for the same reason.
+//
+// A `groupshared` *variable* passed directly (`inner(g[i])`) stays silent while a
+// `groupshared` *parameter* forwarded on warns: the variable's aliases may be legitimately
+// synchronized by barriers the checker cannot see, while the parameter is by signature
+// possibly-aliased whatever the caller passed. An argument that already failed to check is
+// skipped, and one that is not an l-value is left to the `ArgumentExpectedLvalue` diagnostic,
+// so this warning does not pile onto a reported error. `calleeDeclRef` names the invoked
+// function and is valid whenever the visitor below diagnoses: a named argument reaches it
+// only with a parameter declaration, which comes from the callee's declaration, and the
+// receiver branch of `forEachWrittenBackArgument` requires the callee declaration itself.
+void SemanticsVisitor::checkNonExclusiveArguments(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    if (as<OperatorExpr>(invoke))
+        return;
+
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        {
+            // A receiver has no parameter declaration to name; the implicit `this` is what
+            // carries the `inout` mode. A call through a value of function type has no
+            // parameter declarations at all, and nothing to name in the diagnostic.
+            if (!written.isReceiver && !written.param)
+                return;
+
+            if (!written.storage->type.isLeftValue)
+                return;
+
+            auto forwardedParam = getForwardedReferenceParamDecl(written.storage);
+            if (!forwardedParam)
+                return;
+
+            getSink()->diagnose(Diagnostics::PassingNonExclusiveMemoryToExclusiveParameter{
+                .refParam = forwardedParam->getName(),
+                .callee = calleeDeclRef.getName(),
+                .param = written.isReceiver ? getName("this") : written.param->getName(),
+                .arg = written.arg});
+        });
 }
 
 // Report each argument of `invoke` that the call writes back to part of thread-group-shared

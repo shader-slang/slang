@@ -535,7 +535,8 @@ While the call is in progress, nothing else should read or write the argument's 
 > #### Note ####
 > The `out` and `inout` directions are superficially similar to non-`const` reference parameters in C++.
 > In cases that do not involve aliasing of mutable memory, the semantics should be equivalent.
-> Slang does not check that a program gives an `out` or `inout` parameter exclusive access to its argument; if other code accesses the argument's memory during the call, the program has undefined behavior.
+> Slang does not check this contract in general; if other code accesses the argument's memory during the call, the program has undefined behavior.
+> One statically knowable mismatch does carry an opt-in warning: with `-Wall`, Slang warns when a reference parameter of the enclosing function is forwarded to an `out` or `inout` parameter at a call inside the callee (or given to a `[mutating]` method as its receiver), since the signatures alone show the exclusivity contract cannot be upheld; a local temporary restores it.
 
 #### Borrow and Reference Parameters ####
 
