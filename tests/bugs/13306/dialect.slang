@@ -1,5 +1,5 @@
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang hlsl tests/bugs/13306/dialect.slang -target hlsl -entry main
-//TEST:SIMPLE_EX(filecheck=CHECK): -lang slang tests/bugs/13306/dialect.slang -Gec -target hlsl -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): -lang hlsl tests/bugs/13306/dialect.slang -target hlsl -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1): -lang slang tests/bugs/13306/dialect.slang -Gec -target hlsl -entry main
 
 // The option changes only HLSL inputs, and HLSL inputs remain immutable without the option.
 uniform uint x;

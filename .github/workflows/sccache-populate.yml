@@ -55,12 +55,15 @@ jobs:
               {"os": "linux", "compiler": "gcc", "platform": "aarch64", "runner": "ubuntu-24.04-arm"},
               {"os": "macos", "compiler": "clang", "platform": "aarch64", "runner": "macos-latest"},
               {"os": "windows", "compiler": "cl", "platform": "x86_64", "runner": ["Windows", "self-hosted", "build"]},
-              {"os": "windows", "compiler": "cl", "platform": "aarch64", "runner": "windows-11-vs2026-arm"},
+              # The toolset is the MSVC toolset that common-setup selects on Windows ARM64. The prebuilt key includes it.
+              {"os": "windows", "compiler": "cl", "platform": "aarch64", "runner": "windows-11-vs2026-arm", "toolset": "msvc14.44"},
           ]
           recipe_hash = os.environ["LLVM_HASH"]
           missing = []
           for config in configurations:
               key = f"llvm-{config['os']}-{config['compiler']}-{config['platform']}-{recipe_hash}"
+              if config.get("toolset"):
+                  key += f"-{config['toolset']}"
               url = f"https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/{key}.tar.gz"
               try:
                   with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=30):
@@ -94,9 +97,12 @@ jobs:
             "sccache-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
             "sccache-windows-cl-x86_64-release-${CURRENT_COMMIT}"
             "sccache-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-static-unit-test-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
+            "sccache-static-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-static-linux-gcc-aarch64-release-${CURRENT_COMMIT}"
+            "sccache-static-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-static-macos-clang-aarch64-release-${CURRENT_COMMIT}"
+            "sccache-static-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
+            "sccache-static-windows-cl-x86_64-release-${CURRENT_COMMIT}"
           )
 
           MISSING=0
@@ -167,6 +173,16 @@ jobs:
           }
           Write-Output "LLVM producer MSVC: $env:VCToolsVersion"
 
+      # The Windows ARM64 prebuilt key names MSVC 14.44, which common-setup selects.
+      - name: Verify Windows ARM64 producer toolset
+        if: matrix.os == 'windows' && matrix.platform == 'aarch64'
+        shell: pwsh
+        run: |
+          if ($env:VCToolsVersion -notlike '14.44.*') {
+            throw "Expected MSVC 14.44, found $env:VCToolsVersion"
+          }
+          Write-Output "LLVM producer MSVC: $env:VCToolsVersion"
+
       - name: Restore or build LLVM
         id: llvm
         uses: ./.github/actions/setup-llvm-from-gcs
@@ -175,6 +191,7 @@ jobs:
           compiler: ${{ matrix.compiler }}
           platform: ${{ matrix.platform }}
           llvm-hash: ${{ needs.check-changes.outputs.llvm-hash }}
+          toolset: ${{ matrix.toolset }}
           upload-if-missing: "false"
 
       - name: Validate installed LLVM and Clang packages
@@ -239,7 +256,7 @@ jobs:
         id: archive
         shell: bash
         env:
-          LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ needs.check-changes.outputs.llvm-hash }}
+          LLVM_KEY: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ needs.check-changes.outputs.llvm-hash }}${{ matrix.toolset && format('-{0}', matrix.toolset) || '' }}
         run: |
           # Match setup-llvm-from-gcs's key and restore layout: archive the
           # install contents directly, without an enclosing directory.
@@ -539,10 +556,10 @@ jobs:
   # Populate the separate cache namespace used by the statically linked unit tests. A
   # static build shares no objects with the shared builds above, so these need
   # their own entries.
-  populate-static-unit-test-linux-aarch64:
+  populate-static-linux-debug-aarch64:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     permissions:
       contents: read
     with:
@@ -553,10 +570,24 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       save-sccache: true
 
-  populate-static-unit-test-macos:
+  populate-static-linux-release-aarch64:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
+    permissions:
+      contents: read
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+      save-sccache: true
+
+  populate-static-macos-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-static.yml
     permissions:
       contents: read
     with:
@@ -567,10 +598,10 @@ jobs:
       runs-on: '["macos-latest"]'
       save-sccache: true
 
-  populate-static-unit-test-windows:
+  populate-static-windows-debug:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    uses: ./.github/workflows/ci-slang-static.yml
     permissions:
       contents: read
     with:
@@ -578,5 +609,33 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
+      runs-on: '["windows-2022"]'
+      save-sccache: true
+
+  populate-static-macos-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-static.yml
+    permissions:
+      contents: read
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+      save-sccache: true
+
+  populate-static-windows-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-static.yml
+    permissions:
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
       runs-on: '["windows-2022"]'
       save-sccache: true

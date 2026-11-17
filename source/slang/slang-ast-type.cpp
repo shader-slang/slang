@@ -278,7 +278,17 @@ BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 void MatrixExpressionType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("matrix<") << getElementType() << toSlice(",") << getRowCount() << toSlice(",")
-        << getColumnCount() << toSlice(">");
+        << getColumnCount();
+    if (hasSpecifiedLayout())
+        out << toSlice(",") << getLayout();
+    out << toSlice(">");
+}
+
+bool MatrixExpressionType::hasSpecifiedLayout()
+{
+    SLANG_ASSERT(getLayout());
+    auto layout = as<ConstantIntVal>(getLayout());
+    return !layout || layout->getValue() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 }
 
 BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
@@ -474,7 +484,9 @@ static std::optional<ParamPassingMode> _getBackwardCallableParamMode(ParamPassin
     case ParamPassingMode::BorrowInOut:
         return ParamPassingMode::BorrowInOut;
     case ParamPassingMode::BorrowIn:
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         return std::nullopt;
     default:
         SLANG_UNEXPECTED("unhandled parameter-passing mode");
@@ -656,27 +668,8 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
                 auto ptrPairType =
                     astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
             }
             else
             {
@@ -755,27 +748,8 @@ Val* RematFuncType::_resolveImplOverride()
                 auto ptrPairType =
                     astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.mode)
-                {
-                case ParamPassingMode::Out:
-                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::In:
-                    newParamTypes.add(ptrPairType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
-                    break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
-                    break;
-                default:
-                    SLANG_ASSERT(!"Unknown parameter direction");
-                    break;
-                }
+                newParamTypes.add(
+                    getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
             }
             else
             {
@@ -929,10 +903,21 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     }
                     break;
                 }
-            case ParamPassingMode::Ref:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefReadOnly:
+            case ParamPassingMode::RefWriteOnly:
                 {
-                    // Ref parameters not allowed in backward diff.
-                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    // We pass a reference parameter through unchanged and treat its storage as
+                    // non-differentiable. That is not a correct derivative, but no function with a
+                    // reference parameter is ever differentiated; semantic checking only needs this
+                    // signature to resolve expressions like `bwd_diff(f)`.
+                    //
+                    // TODO: Differentiate the storage that a reference parameter refers to.
+                    //
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        astBuilder,
+                        _getNoDiffType(astBuilder, paramInfo.type),
+                        paramInfo.mode));
                     break;
                 }
             default:
@@ -1050,10 +1035,15 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     break;
                 }
-            case ParamPassingMode::Ref:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefReadOnly:
+            case ParamPassingMode::RefWriteOnly:
                 {
                     // do not differentiate ref params
-                    newParamTypes.add(getCurrentASTBuilder()->getRefParamType(paramInfo.type));
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        getCurrentASTBuilder(),
+                        paramInfo.type,
+                        paramInfo.mode));
                     break;
                 }
             case ParamPassingMode::BorrowIn:
@@ -1381,22 +1371,38 @@ void ExplicitRefType::_toTextOverride(StringBuilder& out)
 
 void OutParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("out ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::Out);
+    out << getValueType();
 }
 
 void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("inout ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::BorrowInOut);
+    out << getValueType();
 }
 
 void RefParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("ref ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::RefReadWrite);
+    out << getValueType();
+}
+
+void RefReadOnlyParamType::_toTextOverride(StringBuilder& out)
+{
+    printParamPassingModePrefix(out, ParamPassingMode::RefReadOnly);
+    out << getValueType();
+}
+
+void RefWriteOnlyParamType::_toTextOverride(StringBuilder& out)
+{
+    printParamPassingModePrefix(out, ParamPassingMode::RefWriteOnly);
+    out << getValueType();
 }
 
 void BorrowInParamType::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("borrow ") << getValueType();
+    printParamPassingModePrefix(out, ParamPassingMode::BorrowIn);
+    out << getValueType();
 }
 
 
@@ -1456,7 +1462,7 @@ ParamPassingMode getDifferentiatedThisParamMode(ParamPassingMode effectiveMode)
     {
     case ParamPassingMode::BorrowIn:
         return ParamPassingMode::In;
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
         return ParamPassingMode::BorrowInOut;
     default:
         return effectiveMode;
@@ -1469,7 +1475,15 @@ ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType
 {
     if (as<RefParamType>(paramType))
     {
-        return ParamPassingMode::Ref;
+        return ParamPassingMode::RefReadWrite;
+    }
+    else if (as<RefReadOnlyParamType>(paramType))
+    {
+        return ParamPassingMode::RefReadOnly;
+    }
+    else if (as<RefWriteOnlyParamType>(paramType))
+    {
+        return ParamPassingMode::RefWriteOnly;
     }
     else if (as<BorrowInParamType>(paramType))
     {

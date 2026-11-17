@@ -7,7 +7,7 @@ void main(uint id: SV_DispatchThreadID)
     let i = int64_t.maxValue;
     let m = int64_t.minValue;
     // CHECK: 9223372036854775807LL
-    // CHECK: -9223372036854775808LL
+    // CHECK: (-9223372036854775807LL - 1LL)
     outputBuffer[0] = i;
     outputBuffer[1] = m;
 

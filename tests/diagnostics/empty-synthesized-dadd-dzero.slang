@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0,non-exhaustive):
 
 // Test that the compiler warns when the user explicitly assigns a custom
 // `Differential` type whose own fields are all non-differentiable.  In that

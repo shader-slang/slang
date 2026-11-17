@@ -125,14 +125,14 @@ void myVertexShader(
 ## Behavior of `discard` after SPIR-V 1.6
 
 `discard` is translated to OpKill in SPIR-V 1.5 and earlier. But it is translated to OpDemoteToHelperInvocation in SPIR-V 1.6.
-You can use OpDemoteToHelperInvocation by explicitly specifying the capability, "SPV_EXT_demote_to_helper_invocation".
+You can use OpDemoteToHelperInvocation by explicitly specifying the capability, "spvDemoteToHelperInvocationEXT".
 
 As an example, the following command-line arguments can control the behavior of `discard` when targeting SPIR-V.
 
 ```
 slangc.exe test.slang -target spirv -profile spirv_1_5 # emits OpKill
 slangc.exe test.slang -target spirv -profile spirv_1_6 # emits OpDemoteToHelperInvocation
-slangc.exe test.slang -target spirv -capability SPV_EXT_demote_to_helper_invocation -profile spirv_1_5 # emits OpDemoteToHelperInvocation
+slangc.exe test.slang -target spirv -capability spvDemoteToHelperInvocationEXT -profile spirv_1_5 # emits OpDemoteToHelperInvocation
 ```
 
 ## Supported HLSL features when targeting SPIR-V

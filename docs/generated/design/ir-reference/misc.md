@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: a452c0dade10ef1734ad52663b2e6f24e80a2184494ce358bc1509cd0070821f
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T00:00:00Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 1155790e3696c9cddf4f2405223ad2c7acc6846e935a3f2e3b8e67beb91416f3
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -16,7 +16,6 @@ compile-time size/align/count queries, storage-type and descriptor-heap
 casts, generic annotation infrastructure, liveness markers, string
 hashing, work-graph record access and barrier-flag conversion, the
 compiler-internal memoization dictionary, and CPU-side kernel launches.
-
 The intended reader is a compiler engineer who needs to look up one of
 these opcodes and could not find it in [types.md](types.md),
 [values.md](values.md), [control-flow.md](control-flow.md),
@@ -36,9 +35,9 @@ than living in one named group. The infrastructure they rely on
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp). Lowering in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 produces most of them, either from a dedicated `visit*` (for example
-`visitIsTypeExpr` at line 7457, `visitPackQueryExpr` at 6052,
-`visitShapePackTransformExpr` at 6074, `visitDispatchKernelExpr` at
-5972, `visitRequireCapabilityStmt` at 9629) or from a call to a
+`visitIsTypeExpr` at line 6991, `visitPackQueryExpr` at 5509,
+`visitShapePackTransformExpr` at 5531, `visitDispatchKernelExpr` at
+5423, `visitRequireCapabilityStmt` at 9263) or from a call to a
 core-module function declared with `__intrinsic_op($(kIROp_...))`. The
 remainder are introduced by IR passes, and the `AST origin` column names
 the specific pass for each rather than using the retired catch-all
@@ -63,13 +62,13 @@ generated into it from its four Lua operand names.
 A dozen of these wrappers are nevertheless spelled out by hand in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h), and each
 of those twelve rows carries a trailing `‡` in the **C++ wrapper**
-column below: `IRAnnotation` (line 740), `IRDispatchKernel` (749),
-`IRTorchTensorGetView` (761), `IRDifferentiableTypeDictionaryItem`
-(770), `IRAlignOf` (1788), `IRExpand` (2378), `IREach` (2388),
-`IRLiveRangeStart` / `IRLiveRangeEnd` (2629, 2649), `IRIsType` (2635),
+column below: `IRAnnotation` (line 767), `IRDispatchKernel` (776),
+`IRTorchTensorGetView` (788), `IRDifferentiableTypeDictionaryItem`
+(797), `IRAlignOf` (1815), `IRExpand` (2405), `IREach` (2415),
+`IRLiveRangeStart` / `IRLiveRangeEnd` (2656, 2676), `IRIsType` (2662),
 and `IRCompilerDictionaryValue` / `IRCompilerDictionaryEntry`
-(3084, 3090). Their abstract parents `IRLiveRangeMarker` (2609) and
-`IRCastStorageToLogicalBase` (2701) are hand-written too, but appear
+(3127, 3133). Their abstract parents `IRLiveRangeMarker` (2636) and
+`IRCastStorageToLogicalBase` (2728) are hand-written too, but appear
 only in `## Family hierarchy`, never as a table row.
 Some are hand-written to add behavior the operand list cannot express —
 `IRExpand::getBlocks()` reaches the inst's children,
@@ -92,14 +91,14 @@ and the emitters
 and
 [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp).
 
-One residual gap is deliberate. The `slang-ir-*.cpp` passes cited per
-opcode below are *not* watched, because that glob changes on nearly
-every IR commit and would leave this page permanently stale, which
-would make the staleness signal useless rather than useful. The
-practical consequence is that a pass newly constructing an opcode this
-page currently records as having **no producer at HEAD** will not mark
-the page stale, so treat those particular claims as the ones most
-worth re-verifying.
+One residual gap is deliberate. The `slang-ir-*.cpp` glob is not
+watched as a whole, because it changes on nearly every IR commit and
+would leave this page permanently stale; only a selected subset
+(peephole, PyTorch binding, buffer-element lowering, liveness, phi
+elimination, translate) is watched. The practical consequence is that a
+pass outside that subset newly constructing an opcode this page records
+as having **no producer at HEAD** will not mark the page stale, so treat
+those claims as the ones most worth re-verifying.
 
 ## Family hierarchy
 
@@ -140,7 +139,7 @@ key *operand*.
 ### Capability sets
 
 Concrete children of the top-level `CapabilitySet` group, built by
-`IRBuilder::getCapabilityValue` (`slang-ir.cpp` line 2670) to encode a
+`IRBuilder::getCapabilityValue` (`slang-ir.cpp` line 2680) to encode a
 *compacted* capability set — the minimal atom list that
 re-expands to the same set — in disjunction-of-conjunctions form. One
 `capabilityConjunction` is built per atom set — so the number of
@@ -163,8 +162,8 @@ line is likely to produce. This group is distinct from the
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `capabilityConjunction` | `IRCapabilityConjunction` | (variadic) | H | `RequireCapabilityStmt` via `visitRequireCapabilityStmt` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 9713), which calls `IRBuilder::getCapabilityValue` (`slang-ir.cpp` line 2670) | An AND of capability atoms, each operand an `int` capability-atom value. |
-| `capabilityDisjunction` | `IRCapabilityDisjunction` | (variadic) | H | `IRBuilder::getCapabilityValue` (`slang-ir.cpp` line 2706), reached from `visitRequireCapabilityStmt` | An OR of `capabilityConjunction` operands; the outer level of the normal form. |
+| `capabilityConjunction` | `IRCapabilityConjunction` | (variadic) | H | `RequireCapabilityStmt` via `visitRequireCapabilityStmt` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 9282), which calls `IRBuilder::getCapabilityValue` (`slang-ir.cpp` line 2680) | An AND of capability atoms, each operand an `int` capability-atom value. |
+| `capabilityDisjunction` | `IRCapabilityDisjunction` | (variadic) | H | `IRBuilder::getCapabilityValue` (`slang-ir.cpp` line 2716), reached from `visitRequireCapabilityStmt` | An OR of `capabilityConjunction` operands; the outer level of the normal form. |
 
 ### Tensor and runtime helpers
 
@@ -180,7 +179,7 @@ comes from lowering a call to a core-module declaration carrying
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `makeArrayList` | `IRMakeArrayList` | (variadic) | | **no producer at HEAD** | Builds an array-list value; `IRBuilder::emitMakeArrayList` is the only producer and has no callers at HEAD. |
-| `makeTensorView` | `IRMakeTensorView` | — | | The PyTorch binding pass ([slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) lines 480 and 595) | Wraps a Torch tensor as a `TensorView`; the Lua entry names no operand, and `emitMakeTensorView` passes exactly one, the tensor. |
+| `makeTensorView` | `IRMakeTensorView` | — | | The PyTorch binding pass ([slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) lines 480 and 603) | Wraps a Torch tensor as a `TensorView`; the Lua entry names no operand, and `emitMakeTensorView` passes exactly one, the tensor. |
 | `allocTorchTensor` | `IRAllocateTorchTensor` | (variadic) | | core-module `TorchTensor<T>::alloc` / `emptyLike` | Allocates a Torch tensor host-side; operands are the extents (or the tensor to imitate). |
 | `TorchGetCudaStream` | `IRTorchGetCudaStream` | — | | `generateCppBindingForFunc` in the PyTorch binding pass ([slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) line 473) | Returns the current Torch CUDA stream, typed `Ptr<void>`. |
 | `TorchTensorGetView` | `IRTorchTensorGetView`‡ | (variadic) | | core-module `TorchTensor<T>::getView`, `TensorView<T>` converting `__init` | Produces a `TensorView` over the Torch tensor in its single operand. |
@@ -190,16 +189,16 @@ comes from lowering a call to a core-module declaration carrying
 `-dump-ir` snapshot. Because `RayQuery` and `HitObject` are
 `[__NonCopyableType]`, `maybeAddReturnDestinationParam`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-lines 4251-4251) gives their `__init` a trailing return-destination
-parameter, which sets `returnViaLastRefParam` (line 4797); the call
-site then passes that destination as the inst's single operand and
-retypes the result `void` (lines 5727-5741). A `void` result can have
-no users, and `kIROp_AllocateOpaqueHandle` is on the no-side-effects
-list in `IRInst::mightHaveSideEffects`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9732), so
+lines 3975-3987, called at 4053) gives their `__init` a trailing
+return-destination parameter, which sets `returnViaLastRefParam` (line
+4236); the call site then passes that destination as the inst's single
+operand and retypes the result `void` (lines 5159-5185). A `void`
+result can have no users, and `kIROp_AllocateOpaqueHandle` is on the
+no-side-effects list in `IRInst::mightHaveSideEffects`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9757), so
 the mandatory `eliminateDeadCode` that `generateIRForTranslationUnit`
-runs over every function (lines 15949-15953) — ahead of the
-`LOWER-TO-IR` dump at line 16125 — always deletes it. Both
+runs over every function (lines 15654-15658) — ahead of the
+`LOWER-TO-IR` dump at line 15853 — always deletes it. Both
 `RayQuery<0> q;` and `RayQuery<0> q = RayQuery<0>();` build the inst
 during lowering, and neither shows it in any dumped pass.
 
@@ -212,46 +211,50 @@ packs: the `MakeWitnessPack` constructor — its value-pack counterpart
 manipulation, while the `ExtractFirst` / `ExtractLast` / `Trim*` /
 `Shape*` helpers manipulate pack shapes for tensor-style indexing.
 Almost all come from AST lowering: the `Val` visitors in
-`slang-lower-to-ir.cpp` lines 2055-2380 lower the `*IntVal` / `*Type` /
-`*SubtypeWitness` forms, and `visitPackQueryExpr` (line 6065) and
-`visitShapePackTransformExpr` (line 6087) lower the surface syntax.
+`slang-lower-to-ir.cpp` lines 2091-2415 lower the `*IntVal` / `*Type` /
+`*SubtypeWitness` forms, and `visitPackQueryExpr` (line 5509) and
+`visitShapePackTransformExpr` (line 5531) lower the surface syntax.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `Expand` | `IRExpand`‡ | `value` | | `ExpandExpr`, `ExpandType`, `ExpandIntValPack` | Expands a pattern over its captured-pack operands; the Lua entry names one operand while the builder supplies a variadic capture list (see the callout below), and the pattern body lives in child blocks. |
-| `Each` | `IREach`‡ | `value` | H | `EachType`, `EachIntVal`, per-element witness (line 2331) | Projects one slot of a pack; only these `Val`-level forms produce it, never an `each` written in a value position (see the callout below). |
-| `MakeWitnessPack` | `IRMakeWitnessPack` | (variadic) | H | `TypePackSubtypeWitness` | Bundles witness tables into one witness-pack value typed as the matching `TypePack`. |
-| `PackBranch` | `IRPackBranch` | `pack, emptyValue, nonEmptyValue` | H | `PackBranchType` (line 2239), `PackBranchSubtypeWitness` (2363) | Selects between two values by whether the pack is statically empty, so no run-time length test survives. |
-| `ExtractFirstFromPack` | `IRExtractFirstFromPack` | `pack, witness` | H | `FirstExpr`, `FirstIntVal` | Returns the first slot of a non-empty pack. |
-| `ExtractLastFromPack` | `IRExtractLastFromPack` | `pack, witness` | H | `LastExpr`, `LastIntVal` | Returns the last slot of a non-empty pack. |
-| `TrimFirstOfPack` | `IRTrimFirstOfPack` | `pack, witness` | H | `TrimFirstExpr`, `TrimFirstIntValPack`, `TrimFirstTypePack`, `TrimFirstSubtypeWitness` | Returns a pack with the first slot removed. |
-| `TrimLastOfPack` | `IRTrimLastOfPack` | `pack, witness` | H | `TrimLastExpr`, `TrimLastIntValPack`, `TrimLastTypePack`, `TrimLastSubtypeWitness` | Returns a pack with the last slot removed. |
-| `ShapeConcat` | `IRShapeConcat` | `leftPack, rightPack, axis` | H | `ShapeConcatExpr`, `ShapeConcatIntValPack` | Concatenates two pack shapes along an axis. |
-| `ShapePermute` | `IRShapePermute` | `pack, order` | H | `ShapePermuteExpr`, `ShapePermuteIntValPack` | Permutes a pack shape's dimensions; operand 1 is the order pack. |
-| `ShapeSwap` | `IRShapeSwap` | `pack, dim0, dim1` | H | `ShapeSwapExpr`, `ShapeSwapIntValPack` | Swaps two dimensions of a pack shape. |
-| `ShapeReduce` | `IRShapeReduce` | `pack, axis` | H | `ShapeReduceExpr`, `ShapeReduceIntValPack` | Drops one axis from a pack shape. |
-| `NonEmptyPackWitness` | `IRNonEmptyPackWitness` | `pack` | H | Pack lowering via `emitNonEmptyPackWitness` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 2069) | Witness that a pack is non-empty; `emitNonEmptyPackWitness` (line 2069) builds one per pack query above. |
+| `Expand` | `IRExpand`‡ | `value` | | `ExpandExpr` (`visitExpandExpr`, direct); `ExpandType`, `ExpandIntValPack` (`visitExpandType`, `visitExpandIntValPack`, which build `ExpandTypeOrVal` that `lowerExpandTypeImpl` converts) | Expands a pattern over its captured-pack operands; the Lua entry names one operand while the builder supplies a variadic capture list (see the callout below), and the pattern body lives in child blocks. |
+| `Each` | `IREach`‡ | `value` | H | `EachType`, `EachIntVal`, `EachSubtypeWitness` (`visitEachType`, `visitEachIntVal`, `visitEachSubtypeWitness`) | Projects one slot of a pack; only these `Val`-level forms produce it, never an `each` written in a value position (see the callout below). |
+| `MakeWitnessPack` | `IRMakeWitnessPack` | (variadic) | H | `TypePackSubtypeWitness` (`visitTypePackSubtypeWitness`) | Bundles witness tables into one witness-pack value typed as the matching `TypePack`. |
+| `PackBranch` | `IRPackBranch` | `pack, emptyValue, nonEmptyValue` | H | `PackBranchType` (`visitPackBranchType`, line 2269), `PackBranchSubtypeWitness` (`visitPackBranchSubtypeWitness`, 2409) | Selects between two values by whether the pack is statically empty, so no run-time length test survives. |
+| `ExtractFirstFromPack` | `IRExtractFirstFromPack` | `pack, witness` | H | `FirstExpr` (`visitPackQueryExpr`), `FirstIntVal` (`visitFirstIntVal`) | Returns the first slot of a non-empty pack. |
+| `ExtractLastFromPack` | `IRExtractLastFromPack` | `pack, witness` | H | `LastExpr` (`visitPackQueryExpr`), `LastIntVal` (`visitLastIntVal`) | Returns the last slot of a non-empty pack. |
+| `TrimFirstOfPack` | `IRTrimFirstOfPack` | `pack, witness` | H | `TrimFirstExpr` (`visitPackQueryExpr`); `TrimFirstIntValPack`, `TrimFirstTypePack`, `TrimFirstSubtypeWitness` (`visitTrimFirstIntValPack`, `visitTrimFirstTypePack`, `visitTrimFirstSubtypeWitness`) | Returns a pack with the first slot removed. |
+| `TrimLastOfPack` | `IRTrimLastOfPack` | `pack, witness` | H | `TrimLastExpr` (`visitPackQueryExpr`); `TrimLastIntValPack`, `TrimLastTypePack`, `TrimLastSubtypeWitness` (`visitTrimLastIntValPack`, `visitTrimLastTypePack`, `visitTrimLastSubtypeWitness`) | Returns a pack with the last slot removed. |
+| `ShapeConcat` | `IRShapeConcat` | `leftPack, rightPack, axis` | H | `ShapeConcatExpr` (`visitShapePackTransformExpr`), `ShapeConcatIntValPack` (`visitShapeConcatIntValPack`) | Concatenates two pack shapes along an axis. |
+| `ShapePermute` | `IRShapePermute` | `pack, order` | H | `ShapePermuteExpr` (`visitShapePackTransformExpr`), `ShapePermuteIntValPack` (`visitShapePermuteIntValPack`) | Permutes a pack shape's dimensions; operand 1 is the order pack. |
+| `ShapeSwap` | `IRShapeSwap` | `pack, dim0, dim1` | H | `ShapeSwapExpr` (`visitShapePackTransformExpr`), `ShapeSwapIntValPack` (`visitShapeSwapIntValPack`) | Swaps two dimensions of a pack shape. |
+| `ShapeReduce` | `IRShapeReduce` | `pack, axis` | H | `ShapeReduceExpr` (`visitShapePackTransformExpr`), `ShapeReduceIntValPack` (`visitShapeReduceIntValPack`) | Drops one axis from a pack shape. |
+| `NonEmptyPackWitness` | `IRNonEmptyPackWitness` | `pack` | H | `NonEmptyPackWitness` (`visitNonEmptyPackWitness`, line 2663) via `emitNonEmptyPackWitness` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 2091) | Witness that a pack is non-empty; `emitNonEmptyPackWitness` (line 2091) builds one per pack query above. |
 
 ### Type queries and predicates
 
 Compile-time inspection of an IR value's type. Apart from `IsType`,
 these come from generic `__intrinsic_op` declarations in
 [core.meta.slang](../../../../source/slang/core.meta.slang) (lines
-3882-3986): each `__isX_impl<T>(T t)` intrinsic is wrapped by an
+3975-4080; `IsBindlessTextureNVEncodable` is declared in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line
+28934): each `__isX_impl<T>(T t)` intrinsic is wrapped by an
 `[__unsafeForceInlineEarly]` `__isX<T>()` helper passing
 `__declVal<T>()`, so the emitted inst carries the queried type in its
-operand's type, and `slang-ir-peephole.cpp` (lines 1877-1948) folds it
-to a boolean constant once that type is concrete. That fold first
-unwraps a vector or matrix operand type to its element type (lines
-1879-1882 and 1923-1926) and only then applies the predicate, so at
-this commit the scalar predicates below answer for the element type of
-a vector or matrix, and `IsVector` folds to `false` for every concrete
-type because the value it tests has already been replaced by the
-element type.
+operand's type, and `slang-ir-peephole.cpp` (lines 1913-2005) folds it
+to a boolean constant once that type is concrete. For `IsInt`,
+`IsFloat`, `IsHalf`, `IsUnsignedInt`, `IsSignedInt`, `IsBool` and
+`IsBindlessTextureNVEncodable` the fold first unwraps one vector layer
+and one matrix layer (lines 1926-1931) and classifies the element
+type, so those predicates answer for the element type of a vector or
+matrix; `IsVector` is the exception and classifies the operand type
+itself (line 1960), so it folds to `true` only for a builtin
+`vector<E, N>` and to `false` for a scalar or a matrix. `IsCoopFloat`
+has its own branch (line 1972) with the same unwrapping.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `IsType` | `IRIsType`‡ | `value, valueWitness, typeOperand, targetWitness?` | | `IsTypeExpr` (the `is` operator), line 7457 | Tests whether a value's runtime type is (or conforms to) a target type. |
+| `IsType` | `IRIsType`‡ | `value, valueWitness, typeOperand, targetWitness?` | | `IsTypeExpr` (the `is` operator) via `visitIsTypeExpr`, line 6991 | Tests whether a value's runtime type is (or conforms to) a target type. |
 | `TypeEquals` | `IRTypeEquals` | `type1, type2` | | core-module `__type_equals_impl` | Boolean test of type equality. |
 | `IsInt` | `IRIsInt` | `value` | | core-module `__isInt_impl` | True for an integer, or for a vector/matrix of integers. |
 | `IsBool` | `IRIsBool` | `value` | | core-module `__isBool_impl` | True for `bool`, or for a vector/matrix of `bool`. |
@@ -260,22 +263,27 @@ element type.
 | `IsHalf` | `IRIsHalf` | `value` | | core-module `__isHalf_impl` | True for `half`, or for a vector/matrix of `half`. |
 | `IsUnsignedInt` | `IRIsUnsignedInt` | `value` | | core-module `__isUnsignedInt_impl` | True for an unsigned integer, or for a vector/matrix of them. |
 | `IsSignedInt` | `IRIsSignedInt` | `value` | | core-module `__isSignedInt_impl` | True for a signed integer, or for a vector/matrix of them. |
-| `IsVector` | `IRIsVector` | `value` | | core-module `__isVector_impl` | Folds to `false` for every concrete type at this commit, because the fold unwraps a vector to its element type before testing. |
+| `IsVector` | `IRIsVector` | `value` | | core-module `__isVector_impl` | True for a builtin vector type; false for a scalar or a matrix. Unlike the predicates above, the fold does not test the element type. |
+| `IsBindlessTextureNVEncodable` | `IRIsBindlessTextureNVEncodable` | `value` | | core-module `__isBindlessTextureNVEncodable_impl` ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 28934) | True for a texture or sampler type (or a vector/matrix of them), whose `DescriptorHandle` is a native `uint64` under `spvBindlessTextureNV`; the fold calls `isBindlessTextureNVEncodableResourceType` in [slang-ir-util.cpp](../../../../source/slang/slang-ir-util.cpp). |
 
 ### Size, alignment, count
 
 Compile-time queries on a type or array. `visitSizeOfLikeExpr`
-(`slang-lower-to-ir.cpp` line 6010) handles all three
-`SizeOfLikeExpr` subclasses and emits an
+(`slang-lower-to-ir.cpp` line 5448) handles all three
+`SizeOfLikeExpr` subclasses. For `sizeOf` and `alignOf` it emits an
 inst only when the AST-side natural-layout computation cannot already
 produce a constant; otherwise it folds to an integer literal during
-lowering.
+lowering. `countOf` never takes that shortcut: the lowering always
+emits `CountOf`, and `maybeSpecializeCountOf`
+([slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp)
+line 1114) folds it once the operand is a fixed-size array with an
+`IRIntLit` count, a type pack, or a tuple type.
 
 The `dataLayout` operand is optional in the Lua entry but not in the
 dump: when the surface call names only a type, the checker fills the
 operand in with `ScalarDataLayout`
 ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
-line 6692), so `sizeof(T)` on a still-generic `T` prints as
+line 6913), so `sizeof(T)` on a still-generic `T` prints as
 `sizeOf(%T, ScalarLayout)` — and the same choice is what lets the
 natural-layout fold above apply to the one-argument form, since the
 test at the top of `visitSizeOfLikeExpr` treats a null layout and
@@ -285,16 +293,16 @@ takes any implementation of `IBufferDataLayout`:
 `Std140DataLayout`, `Std430DataLayout`, `ScalarDataLayout`, and
 `CDataLayout`
 ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
-28-71, several of them `[require]`-gated). Each is `__intrinsic_type`d
+33-73, several of them `[require]`-gated). Each is `__intrinsic_type`d
 to the matching layout *type* opcode, so `sizeof(T, Std140DataLayout)`
 prints as `sizeOf(%T, Std140Layout)`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `sizeOf` | `IRSizeOf` | `type, dataLayout?` | H | `SizeOfExpr` | Compile-time byte size of the operand type under the given data layout. |
-| `alignOf` | `IRAlignOf`‡ | `baseOp, dataLayout?` | H | `AlignOfExpr` | Compile-time alignment of the operand type under the given data layout. |
-| `countOf` | `IRCountOf` | `type` | | `CountOfExpr`, `CountOfIntVal` | Element count of a fixed-size array, vector, or type pack; for a value pack the operand is the pack value. |
-| `GetArrayLength` | `IRGetArrayLength` | `array` | | **no lowering producer** — see note | Length of an array. Reading the AST-origin column as "call `Array<T>::getCount` and you get this opcode" is wrong: `visitGetArrayLengthExpr` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 6002) is three lines long and returns `arrayType->getElementCount()` directly, so the call folds to the extent during lowering and no `GetArrayLength` inst is created — for a fixed `Array<int, 4>` and for a generic `Array<int, N>` alike, which is why the `LOWER-TO-IR` dump shows the extent itself. The opcode nevertheless exists and is *consumed* in several places — `slang-ir-peephole.cpp`, `slang-ir-translate.cpp`, `slang-ir-autodiff-fwd.cpp` and `slang-ir-check-unsupported-inst.cpp` all switch on it — so treat the row as describing an opcode the IR can carry rather than one this lowering path emits. |
+| `sizeOf` | `IRSizeOf` | `type, dataLayout?` | H | `SizeOfExpr` (`visitSizeOfLikeExpr`, line 5448) | Compile-time byte size of the operand type under the given data layout. |
+| `alignOf` | `IRAlignOf`‡ | `baseOp, dataLayout?` | H | `AlignOfExpr` (`visitSizeOfLikeExpr`) | Compile-time alignment of the operand type under the given data layout. |
+| `countOf` | `IRCountOf` | `type` | | `CountOfExpr` (`visitSizeOfLikeExpr`), `CountOfIntVal` (`visitCountOfIntVal`) | Element count of a fixed-size array, a type pack, or a tuple type; for a value pack the operand is the pack value. The checker (`_isTypeOrValValidForCountOf`, [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) line 6586) rejects every other operand, including a vector and an unsized array, with `E30083`. |
+| `GetArrayLength` | `IRGetArrayLength` | `array` | | `Array<T,N>::getCount`, declared with `__intrinsic_op($(kIROp_GetArrayLength))` (`core.meta.slang` line 2330), emitted by the ordinary intrinsic-call path through `emitCallToDeclRef` (`slang-lower-to-ir.cpp` lines 991-1019) | Length of an array. A separate AST node, `GetArrayLengthExpr`, does not produce this opcode: `visitGetArrayLengthExpr` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 5440) returns `arrayType->getElementCount()` directly. The intrinsic path does emit the inst, and `slang-ir-peephole.cpp` (lines 411-416) later replaces it with the array extent when the operand's type is an `IRArrayType`; `slang-ir-translate.cpp`, `slang-ir-autodiff-fwd.cpp` and `slang-ir-check-unsupported-inst.cpp` also switch on it. |
 
 ### Storage-type legalization casts
 
@@ -318,37 +326,49 @@ subscript) and are documented here.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `CastStorageToLogical` | `IRCastStorageToLogical` | (variadic, `min=2`) | | The buffer-element-type lowering pass ([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp), e.g. line 1091) | Retypes a `Ptr<StorageType>` as a `Ptr<LogicalType>` at a buffer boundary. |
-| `CastStorageToLogicalDeref` | `IRCastStorageToLogicalDeref` | (variadic, `min=2`) | | The buffer-element-type lowering pass ([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) lines 1470 and 1712) | The same conversion fused with a load: equivalent to `load(CastStorageToLogical(addr))`. |
-| `MakeStorageTypeLoweringConfig` | `IRMakeStorageTypeLoweringConfig` | `addressSpace, layoutRule, lowerToPhysicalType` | H | `emitTypeLoweringConfigToIR` in the buffer-element-type lowering pass ([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) line 1174) | The lowering policy the two casts above take; hoistable, so identical policies dedupe. |
+| `CastStorageToLogical` | `IRCastStorageToLogical` | (2 unnamed) | | The buffer-element-type lowering pass ([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp), e.g. line 1092) | Retypes a `Ptr<StorageType>` as a `Ptr<LogicalType>` at a buffer boundary. |
+| `CastStorageToLogicalDeref` | `IRCastStorageToLogicalDeref` | (2 unnamed) | | The buffer-element-type lowering pass ([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) lines 1471 and 1713) | The same conversion fused with a load: equivalent to `load(CastStorageToLogical(addr))`. |
+| `MakeStorageTypeLoweringConfig` | `IRMakeStorageTypeLoweringConfig` | `addressSpace, layoutRule, lowerToPhysicalType` | H | `emitTypeLoweringConfigToIR` in the buffer-element-type lowering pass ([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) line 1175) | The lowering policy the two casts above take; hoistable, so identical policies dedupe. |
 | `CastUIntToUntypedResourceHandle` | `IRCastUIntToUntypedResourceHandle` | `index` | | core-module `UntypedResourceHandle::__init(uint)` | Wraps a `uint` heap index as an untyped resource handle; from `ResourceDescriptorHeap[i]`. |
 | `CastUntypedResourceHandleToUInt` | `IRCastUntypedResourceHandleToUInt` | `handle` | | core-module `__getUntypedResourceHandleIndex` | Recovers the `uint` index in an untyped resource handle. |
 | `CastUIntToUntypedSamplerHandle` | `IRCastUIntToUntypedSamplerHandle` | `index` | | core-module `UntypedSamplerHandle::__init(uint)` | Wraps a `uint` heap index as an untyped sampler handle; from `SamplerDescriptorHeap[j]`. |
 | `CastUntypedSamplerHandleToUInt` | `IRCastUntypedSamplerHandleToUInt` | `handle` | | core-module `__getUntypedSamplerHandleIndex` | Recovers the `uint` index in an untyped sampler handle. |
 | `TreatAsDynamicUniform` | `IRTreatAsDynamicUniform` | `value` | | core-module `asDynamicUniform<T>` | Marks a value dynamically uniform; read by `slang-ir-uniformity.cpp`. |
-| `GetLegalizedSPIRVGlobalParamAddr` | `IRGetLegalizedSPIRVGlobalParamAddr` | (variadic, `min=1`) | | core-module `__getLegalizedSPIRVGlobalParamAddr` | Legalized address of the global parameter in its single operand, for SPIR-V. |
+| `GetLegalizedSPIRVGlobalParamAddr` | `IRGetLegalizedSPIRVGlobalParamAddr` | (1 unnamed) | | `internal` GLSL-module helper `__getLegalizedSPIRVGlobalParamAddr` (`glsl.meta.slang` line 4514), called by the image-atomic snippets there | Legalized address of the global parameter in its single operand, for SPIR-V. |
 
 ### Variable struct-wrapping legalization
 
 Concrete children of the `ForceVarIntoStructTemporarilyBase` parent,
-wrapping a variable so a callee expecting a struct receives one. The
-`slang-ir-hlsl-legalize.cpp` pass either unwraps the argument, when its
-base type is already a `StructType`, or materializes a temporary
-single-field struct and copies the value back for `out`/`inout`
-parameters.
+wrapping a variable so a callee expecting a struct receives one. On
+D3D targets the `legalizeRayTracingPayloads` pass
+([slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp),
+`legalizeD3DCall` at line 416, run from
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1989)
+rewrites each wrapper that is an argument of a `Call`. When the
+wrapped variable's value type is already a `StructType` the call
+receives the variable itself (a ray-payload wrapper also decorates the
+struct with `RayPayload`); when the ray-payload wrapper's value type is
+empty it receives a dummy payload local; otherwise the pass
+materializes a single-field struct temporary, copies the value in
+before the call and copies it back after it. The same pass later adds
+default payload access qualifiers to every `RayPayload`-decorated
+struct on DX-family targets.
 
 Both opcodes come from core-module helpers written for the core
 module's own use:
 `Ref<T> __forceVarIntoStructTemporarily(inout T maybeStruct)` and
 `Ref<T> __forceVarIntoRayPayloadStructTemporarily(inout T maybeStruct)`
 ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
-19654-19663). Every call site is the payload argument of an HLSL
-ray-tracing intrinsic — `__traceRayHLSL` (line 19938) and the
-`HitObject` trace / invoke wrappers (22802, 23739, 23815) — and that
+21106 and 21113). Every call site is the payload argument of an HLSL
+ray-tracing intrinsic, and only the ray-payload spelling is used —
+`__traceRayHLSL` (line 21191), the `HitObject` trace wrapper
+`__hlslTraceRay` (24263) and the invoke wrappers
+`__InvokeHLSL_NVAPI` (25209) and `__InvokeHLSL_DXR` (25289) — and that
 argument position is also the only one the legalizer rewrites, since
-it walks the arguments of each `Call`
-(`slang-ir-hlsl-legalize.cpp` line 150). A wrapper reached any other
-way is left in place and survives to emit.
+it loops over the arguments of each `Call` (`slang-ir-ray-tracing-legalize.cpp`
+lines 456-495). A wrapper reached any other way is not rewritten by
+this pass, and on non-D3D targets the pass does not run
+`legalizeD3DCall` at all (line 666).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -364,10 +384,10 @@ is general.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `Annotation` | `IRAnnotation`‡ | (variadic, `min=2`) | H | decl lowering for a decl's associated value ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 4954), plus the forward-mode autodiff pass for the `DifferentialType` / `DifferentialZero` / `DifferentialAdd` / `DifferentialPairType` annotations ([slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) lines 34-51) | Generic annotation; `addAnnotation` builds target, `AnnotationKind` as a `uint` literal, and value. |
-| `WitnessTableAnnotation` | `IRWitnessTableAnnotation` | (variadic, `min=2`) | H | **no producer at HEAD** | Attaches a witness table to another inst; marked TODO in the Lua file. Nothing in `source/` constructs it — the opcode appears only in the Lua definition and the stable-name table. |
+| `Annotation` | `IRAnnotation`‡ | (2 unnamed) | H | decl lowering for a decl's associated value ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 4399), plus the forward-mode autodiff pass for the `DifferentialType` / `DifferentialZero` / `DifferentialAdd` / `DifferentialPairType` annotations ([slang-ir-autodiff-fwd.cpp](../../../../source/slang/slang-ir-autodiff-fwd.cpp) lines 34-51) | Generic annotation; `addAnnotation` builds target, `AnnotationKind` as a `uint` literal, and value. |
+| `WitnessTableAnnotation` | `IRWitnessTableAnnotation` | (2 unnamed) | H | **no producer at HEAD** | Attaches a witness table to another inst; marked TODO in the Lua file. Nothing in `source/` constructs it — the opcode appears only in the Lua definition and the stable-name table. |
 | `DifferentiableTypeAnnotation` | `IRDifferentiableTypeAnnotation` | `baseType, witness` | H | **no producer at HEAD** | Would annotate a type with an `IDifferentiable` witness for run-time differentiable types, but nothing constructs it. |
-| `DifferentiableTypeDictionaryItem` | `IRDifferentiableTypeDictionaryItem`‡ | `concreteType, witness` | | **no producer at HEAD**; its builders `IRBuilder::addDifferentiableTypeDictionaryDecoration` and `addDifferentiableTypeEntry` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines 5196 and 5192) have no callers anywhere, and the only other reference is a validator case in [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) line 280 | One entry in autodiff's differentiable-type dictionary. |
+| `DifferentiableTypeDictionaryItem` | `IRDifferentiableTypeDictionaryItem`‡ | `concreteType, witness` | | **no producer at HEAD**; its builders `IRBuilder::addDifferentiableTypeDictionaryDecoration` and `addDifferentiableTypeEntry` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines 5233 and 5228) have no callers anywhere, and the only other reference is a validator case in [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) line 280 | One entry in autodiff's differentiable-type dictionary. |
 
 ### Liveness markers
 
@@ -377,13 +397,15 @@ reason about lifetimes. Both concrete children of the `LiveRangeMarker`
 grouping parent carry the marked value in operand 0, read through
 `IRLiveRangeMarker::getReferenced()`. Note that `liveRangeStart` declares
 `min_operands = 2` in the Lua file while `IRBuilder::emitLiveRangeStart`
-(`slang-ir.cpp` line 3691) constructs the inst with that one operand;
-the builder shape is the one actually produced.
+(`slang-ir.cpp` line 3723) constructs the inst with that one operand;
+the builder shape is the one actually produced. The `†` on `referenced`
+marks a name taken from the `getReferenced()` accessor
+(`slang-ir-insts.h` line 2651), not from the Lua entry, which is empty.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `liveRangeStart` | `IRLiveRangeStart`‡ | (variadic, `min=2`) | | The liveness pass ([slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) line 1663) and phi elimination ([slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) line 1029) | Marks the beginning of a value's live range. |
-| `liveRangeEnd` | `IRLiveRangeEnd`‡ | `referenced` | | The liveness pass ([slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) lines 632 and 643) | Marks the end of a value's live range; there may be several ends per start. |
+| `liveRangeStart` | `IRLiveRangeStart`‡ | (2 unnamed) | | The liveness pass ([slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) line 1663) and phi elimination ([slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) line 1029) | Marks the beginning of a value's live range. |
+| `liveRangeEnd` | `IRLiveRangeEnd`‡ | `referenced`† | | The liveness pass ([slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) lines 632 and 643) | Marks the end of a value's live range; there may be several ends per start. |
 
 ### String hashing
 
@@ -397,8 +419,8 @@ CPU-side launch opcodes produced by the host-shader / CUDA backends.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `DispatchKernel` | `IRDispatchKernel`‡ | `baseFn, threadGroupSize, dispatchSize` | | `DispatchKernelExpr` via `visitDispatchKernelExpr` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 5985); also the PyTorch binding pass ([slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) lines 1095 and 1217) | Host-side kernel dispatch; the Lua entry names only the first three, and `IRDispatchKernel::getArgsList()` slices the trailing call arguments off. |
-| `CudaKernelLaunch` | `IRCudaKernelLaunch` | `kernel, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY` | | PyTorch binding pass: `IRBuilder::emitCudaKernelLaunch` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3787) called from [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) line 468, consumed in [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp) line 70 | CUDA kernel launch consumed by the Torch emitter; see the callout for the builder-vs-Lua operand discrepancy. |
+| `DispatchKernel` | `IRDispatchKernel`‡ | `baseFn, threadGroupSize, dispatchSize` | | `DispatchKernelExpr` via `visitDispatchKernelExpr` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 5423); also the PyTorch binding pass ([slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) lines 1095 and 1248) | Host-side kernel dispatch; the Lua entry names only the first three, and `IRDispatchKernel::getArgsList()` slices the trailing call arguments off. |
+| `CudaKernelLaunch` | `IRCudaKernelLaunch` | `kernel, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY` | | PyTorch binding pass: `IRBuilder::emitCudaKernelLaunch` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3819) called from [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) line 468, consumed in [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp) line 70 | CUDA kernel launch consumed by the Torch emitter; see the callout for the builder-vs-Lua operand discrepancy. |
 
 ### Work-graph records and barrier flags
 
@@ -425,23 +447,24 @@ and reached through `IRModule::getTranslationDict()`
 `IRBuilder` entry points are `fetchCompilerDictionaryEntry`,
 `addCompilerDictionaryEntry`, `setCompilerDictionaryEntryValue`, and
 `tryLookupCompilerDictionaryValue` (`slang-ir-insts.h` lines
-3603-3616). `LateRequireCapability` is unrelated but shares the
+3655-3667). `LateRequireCapability` is unrelated but shares the
 after-everything-else timing; its checker lives in
 [slang-ir-late-require-capability.cpp](../../../../source/slang/slang-ir-late-require-capability.cpp).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `CompilerDictionary` | `IRCompilerDictionary` | — | P | `initializeTranslationDictionary` ([slang-ir-translate.cpp](../../../../source/slang/slang-ir-translate.cpp) line 27) | One memoization table; parents a single `CompilerDictionaryScope`. |
-| `CompilerDictionaryScope` | `IRCompilerDictionaryScope` | — | P | `initializeTranslationDictionary` ([slang-ir-translate.cpp](../../../../source/slang/slang-ir-translate.cpp) line 16) | Scopes a dictionary's entries so entries of different scopes cannot alias after hoisting. |
-| `CompilerDictionaryEntry` | `IRCompilerDictionaryEntry`‡ | (variadic) | HP | `IRBuilder::_getCompilerDictionaryEntry` (`slang-ir.cpp` line 3372), reached from `fetchCompilerDictionaryEntry` and `addCompilerDictionaryEntry` | One cache row whose operands are the key: scope, the memoized inst's opcode as an integer, then its operands. |
-| `CompilerDictionaryValue` | `IRCompilerDictionaryValue`‡ | `value` | | `IRBuilder::setCompilerDictionaryEntryValue` and `addCompilerDictionaryEntry` (`slang-ir.cpp` lines 3437 and 3461) | Child of an entry holding the cached result *weakly*; DCE may rewrite it to `Poison`, which `IRCompilerDictionaryEntry::getValue()` skips. |
-| `LateRequireCapability` | `IRLateRequireCapability` | `capabilitySet: IRCapabilitySet` | | `RequireCapabilityStmt` (line 9691) | Capability requirement checked after linking, specialization, and DCE by `processLateRequireCapabilityInsts`. |
+| `CompilerDictionary` | `IRCompilerDictionary` | — | P | `initializeTranslationDictionary` ([slang-ir-translate.cpp](../../../../source/slang/slang-ir-translate.cpp) line 23) | One memoization table; parents a single `CompilerDictionaryScope`. |
+| `CompilerDictionaryScope` | `IRCompilerDictionaryScope` | — | P | `initializeTranslationDictionary` ([slang-ir-translate.cpp](../../../../source/slang/slang-ir-translate.cpp) line 27) | Scopes a dictionary's entries so entries of different scopes cannot alias after hoisting. |
+| `CompilerDictionaryEntry` | `IRCompilerDictionaryEntry`‡ | (variadic) | HP | `IRBuilder::_getCompilerDictionaryEntry` (`slang-ir.cpp` line 3390), reached from `fetchCompilerDictionaryEntry` and `addCompilerDictionaryEntry` | One cache row whose operands are the key: scope, the memoized inst's opcode as an integer, then its operands. |
+| `CompilerDictionaryValue` | `IRCompilerDictionaryValue`‡ | `value` | | `IRBuilder::setCompilerDictionaryEntryValue` and `addCompilerDictionaryEntry` (`slang-ir.cpp` lines 3455 and 3480) | Child of an entry holding the cached result weakly; DCE may rewrite it to `Poison`, which `IRCompilerDictionaryEntry::getValue()` skips. |
+| `LateRequireCapability` | `IRLateRequireCapability` | `capabilitySet: IRCapabilitySet` | | `RequireCapabilityStmt` via `visitRequireCapabilityStmt` (line 9286) | Capability requirement checked after linking, specialization, and DCE by `processLateRequireCapabilityInsts`. |
 
 ### Coverage gaps against sibling pages
 
 Every concrete Lua entry no other `ir-reference/` page claims is listed
-above. One ownership note remains, so this page is not mistaken for
-complete coverage:
+above, with one known exception: `reportOptiXIntersection` (Lua line 1670)
+appears in no family table and awaits an owner. One ownership note also
+remains, so this page is not mistaken for complete coverage:
 `nodeOutputRecordGetElementPtr` sits in the Lua file beside
 `meshOutputRef`, which
 [resources-and-atomics.md](resources-and-atomics.md) owns, but no
@@ -457,8 +480,8 @@ the tables above because
 
 `Expand` is not the one-operand projection its Lua entry
 (`operands = { { "value" } }`) suggests: `IRBuilder::emitExpandInst`
-(`slang-ir.cpp` line 3972) builds it with a *variadic* list of captured
-packs, and `IRExpand` (`slang-ir-insts.h` line 2378) exposes
+(`slang-ir.cpp` line 4004) builds it with a *variadic* list of captured
+packs, and `IRExpand` (`slang-ir-insts.h` line 2405) exposes
 `getCaptureCount()` / `getCapture(i)` for those operands plus
 `getBlocks()` for the pattern body it owns as children, so an
 `Expand` is closer to a small nested region than to an ordinary value
@@ -467,14 +490,18 @@ inst. `Each` is the dual, projecting one slot out of a captured pack
 an optional explicit index as a second operand and passes one operand
 when that index is null. Both come out of lowering and are consumed by
 [slang-ir-lower-expand-type.cpp](../../../../source/slang/slang-ir-lower-expand-type.cpp),
-which re-emits the pattern once per slot once the pack length is known.
+which turns `ExpandTypeOrVal` into an indexed `IRExpand` region
+(`lowerExpandTypeImpl`) and rewrites `Each` into tuple-element access
+(`clonePatternValImpl`). Per-slot expansion happens later, in
+`maybeSpecializeExpand` ([slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp)
+line 3317), once the pack cardinality is known.
 
 `Each` is that dual at the `Val` level only. Its three producers are
-`visitEachIntVal` (`slang-lower-to-ir.cpp` line 2211), `visitEachType`
-(2206), and `visitEachSubtypeWitness` (2316); an `each` written in a
-*value* position reaches none of them. `visitExpandExpr` (line 6584)
+`visitEachIntVal` (`slang-lower-to-ir.cpp` line 2227), `visitEachType`
+(2235), and `visitEachSubtypeWitness` (2345); an `each` written in a
+*value* position reaches none of them. `visitExpandExpr` (line 6022)
 gives the `Expand` region's block an `int` parameter and records it as
-the current expansion index, and `visitEachExpr` (line 6573) then
+the current expansion index, and `visitEachExpr` (line 6011) then
 projects the captured pack with `getTupleElement(pack, index)` against
 that parameter — which is the form a dump of an expansion body shows.
 
@@ -484,18 +511,18 @@ that parameter — which is the form a dump of an expansion body shows.
 empty: the value is `emptyValue` when the pack length is statically zero
 and `nonEmptyValue` otherwise. Lowering emits it from two different
 places with two different result types, both through
-`IRBuilder::emitPackBranchInst` (`slang-ir.cpp` line 3992) and both with
+`IRBuilder::emitPackBranchInst` (`slang-ir.cpp` line 4024) and both with
 exactly three operands: `visitPackBranchType`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 2239) types the inst as `TypeKind`, so the *type* differs between
-the two cases, while `visitPackBranchSubtypeWitness` (line 2376) types it
+line 2261) types the inst as `TypeKind`, so the *type* differs between
+the two cases, while `visitPackBranchSubtypeWitness` (line 2398) types it
 as a `WitnessTableType`, so the *conformance witness* differs. The
 `pack` operand may itself be a type pack or a value pack.
 
 `maybeSpecializePackBranch`
 ([slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp)
-line 990) resolves the branch by asking `getPackBranchCardinality` (line
-946) about operand 0: an `Empty` verdict replaces the inst with operand
+line 1086) resolves the branch by asking `getPackBranchCardinality` (line
+1042) about operand 0: an `Empty` verdict replaces the inst with operand
 1, `NonEmpty` with operand 2, and `Unknown` — a pack that still contains
 a generic parameter or an unexpanded pack — leaves the inst alone for a
 later round of the fixpoint. This is what lets a generic behave
@@ -507,16 +534,16 @@ pack length at run time.
 The witness-table analogue of `makeValuePack`, built by the inline
 `IRBuilder::emitMakeWitnessPack`
 ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line
-3900) from a variadic list of witness operands. The one thing worth
+3954) from a variadic list of witness operands. The one thing worth
 knowing is its result type: `visitTypePackSubtypeWitness`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 2282) lowers each element witness, collects each lowered witness's
+line 2304) lowers each element witness, collects each lowered witness's
 own `getFullType()`, and types the pack as a `TypePack` of those witness
 table types — so a witness pack is a pack *of* witness tables, not a
 witness table over a pack.
 
 Downstream code treats it as a pack constructor alongside `makeValuePack`
-and `MakeTuple`: `emitGetTupleElement` (`slang-ir.cpp` line 4769) folds
+and `MakeTuple`: `emitGetTupleElement` (`slang-ir.cpp` line 4795) folds
 an in-range element access straight to the corresponding operand, and
 peephole does the same for `ExtractFirstFromPack` / `ExtractLastFromPack`
 and rebuilds a narrower pack for the `Trim*` forms through
@@ -528,9 +555,9 @@ when several conformance witnesses must travel together.
 ### `IsType`
 
 The IR encoding of the user-level `is` operator on existentials and
-dynamic interfaces. `IRBuilder::emitIsType` (`slang-ir.cpp` line 5718)
+dynamic interfaces. `IRBuilder::emitIsType` (`slang-ir.cpp` line 5750)
 always passes all four operands and types the result `bool`. `IRIsType`
-([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 2635)
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 2662)
 is a good illustration of the wrapper-column note above: it is
 hand-written, yet it declares no accessors of its own — `getValue()`,
 `getValueWitness()`, `getTypeOperand()`, and `getTargetWitness()` are
@@ -539,11 +566,11 @@ generated from the Lua operand names and injected into it.
 The reason the inst carries witnesses in addition to the type is that
 the two consumers need different information. Peephole
 ([slang-ir-peephole.cpp](../../../../source/slang/slang-ir-peephole.cpp)
-line 1193) folds the test to `true` when the value's data type already
+line 1200) folds the test to `true` when the value's data type already
 equals `typeOperand`. Everything that survives is rewritten by
 `lowerIsTypeInsts`
 ([slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp)
-line 1620) into an equality between `getSequentialID` of the value
+line 1658) into an equality between `getSequentialID` of the value
 witness and `getSequentialID` of the target witness — a witness
 comparison, not a type comparison — and insts whose witness conforms to
 a COM interface type are left for the COM path instead.
@@ -552,7 +579,7 @@ a COM interface type are left for the COM path instead.
 
 These two are *pseudo* instructions that exist only inside
 [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp),
-whose header comment (lines 119-127) gives their contract: for
+whose header comment (lines 120-127) gives their contract: for
 `Ptr<StorageType> addr`, `CastStorageToLogical(addr)` has type
 `Ptr<LogicalType>`, and `CastStorageToLogicalDeref(addr)` is equivalent
 to `load(CastStorageToLogical(addr))`. The fused deref form is not a
@@ -561,16 +588,16 @@ Consider a buffer element that is loaded and then has a single field
 extracted from it: rather than translating the whole struct from storage
 layout to logical layout, the pass rewrites the `load` into a
 `CastStorageToLogicalDeref`, then pushes that through the `fieldExtract`
-so only the one member is translated (worked example at lines 128-152 of
+so only the one member is translated (worked example beginning at line 128 of
 the same file).
 
 Both children take a `MakeStorageTypeLoweringConfig` operand pinning down
 the address space, the layout rule, and whether the logical type should
 be lowered to its physical form; `IRCastStorageToLogicalBase`
-([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 2701)
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 2728)
 reads the two operands as `getVal()` and `getLayoutConfig()`. The
-builders `emitCastStorageToLogical` (`slang-ir.cpp` line 6696) and
-`emitCastStorageToLogicalDeref` (line 6707) short-circuit to the original
+builders `emitCastStorageToLogical` (`slang-ir.cpp` line 6728) and
+`emitCastStorageToLogicalDeref` (line 6739) short-circuit to the original
 value, or to a plain `load`, when the storage and logical types already
 agree.
 
@@ -584,7 +611,7 @@ surviving cast into a call to a synthesized `unpackStorage` or
 There is no dedicated `Expr` node: the AST origin is a call to the
 core-module `int getStringHash(String string)` declared with
 `__intrinsic_op($(kIROp_GetStringHash))` in
-[core.meta.slang](../../../../source/slang/core.meta.slang) line 3436,
+[core.meta.slang](../../../../source/slang/core.meta.slang) line 3520,
 and the Lua entry declares exactly one operand typed `IRStringLit`.
 `checkGetStringHashInsts`
 ([slang-ir-string-hash.cpp](../../../../source/slang/slang-ir-string-hash.cpp))
@@ -597,15 +624,16 @@ not fold to a literal.
 That check does not run everywhere. `linkAndOptimizeIR` guards it with
 `!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
 targetProgram->getOptionSet().shouldRunNonEssentialValidation()`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1779),
-so CPU-like targets skip it entirely and a non-literal operand instead
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1807),
+after a dead-code pass that removes callee bodies left behind by
+type inlining, so CPU-like targets skip it entirely and a non-literal operand instead
 reaches the backend: the LLVM emitter re-tests the operand itself —
 its comment calls that test "the only thing between a non-literal
 operand and reading another instruction's storage as string data" —
 and reports `Diagnostics::Unimplemented` for *"unexpected string hash
 for non-literal string"*
 ([slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp)
-line 2216) rather than E41023.
+line 2217) rather than E41023.
 
 Holding the operand to a literal is what makes the result a stable
 compile-time hash of the literal's bytes, so reflection and capability
@@ -615,7 +643,7 @@ backend.
 ### `CudaKernelLaunch`
 
 Produced by `IRBuilder::emitCudaKernelLaunch` (`slang-ir.cpp` line
-3778), whose only caller is the PyTorch host-binding pass
+3819), whose only caller is the PyTorch host-binding pass
 (`slang-ir-pytorch-cpp-binding.cpp` line 468) — the same pass that
 supplies the stream operand from a `TorchGetCudaStream` inst. The Lua
 entry names six operands (`kernel,
@@ -632,15 +660,15 @@ no IR pass introspects it.
 
 The useful shape of `Annotation` is not visible from the Lua entry's
 bare `min_operands = 2`. `IRBuilder::addAnnotation` (`slang-ir.cpp` line
-3484) always builds three operands, matching the accessors on the
-hand-written `IRAnnotation` wrapper (`slang-ir-insts.h` line 740):
+3503) always builds three operands, matching the accessors on the
+hand-written `IRAnnotation` wrapper (`slang-ir-insts.h` line 767):
 `getTarget()` is the annotated inst, `getConformanceID()` is an
 `AnnotationKind` stored as a `uint` literal, and `getInst()` is the
 annotation value. That middle operand lets one target carry several
 unrelated annotations, and `tryLookupAnnotation(target, kind)` retrieves
 one by that key rather than by operand position, through a module-level
 cache that `addAnnotation` invalidates. Every `AnnotationKind`
-(`slang-type-system-shared.h` line 216) is differentiability-related, and
+(`slang-type-system-shared.h` line 222) is differentiability-related, and
 a note on the enum records that `cloneAnnotations` in the IR linker relies
 on that, skipping module-scope annotations entirely for a program that
 does not use auto-diff. `DifferentiableTypeAnnotation` and
@@ -667,7 +695,7 @@ numeric values are written out in both places by hand and must be kept
 in sync manually, as the doc comments at `workgraph.slang` lines
 275-276 and `slang-type-system-shared.h` lines 10-11 both say. The
 `static_assert`s in the C++ header (lines 23-37 for the memory-type
-flags, 52-61 for the semantic flags) pin only the C++ side: each one
+flags, 52-63 for the semantic flags) pin only the C++ side: each one
 compares a C++ enumerator against a literal in the same file, so
 editing the Slang values alone does not trip them and the divergence
 would show up as wrong HLSL output rather than a compile error. Beside
@@ -680,7 +708,9 @@ parameters.
 
 At emit, `tryEmitInstExprImpl`
 ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
-lines 1176-1193) requires the operand to have folded to an `IRIntLit`
+lines 1176-1193) requires the operand, once `getBarrierFlagValueInst`
+([slang-ir-util-hlsl.cpp](../../../../source/slang/slang-ir-util-hlsl.cpp)
+line 22) has stripped any implicit in/out casts, to be an `IRIntLit`
 and hands the value to `emitNamedMemoryTypeFlagSet` or
 `emitNamedSemanticFlagSet`, which are declared in
 [slang-emit-hlsl.h](../../../../source/slang/slang-emit-hlsl.h) (lines 93
@@ -704,7 +734,7 @@ concrete resource type is recovered later from the conversion target.
 `lowerUntypedResourceHandleToUInt`
 ([slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp)
 line 96, run from
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2093)
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2144)
 forwards each cast to its `uint` operand and removes it, and
 `slang-ir-peephole.cpp` already folds a wrap immediately followed by an
 unwrap. Each emitter answers a surviving cast with `SLANG_UNEXPECTED`,
@@ -714,9 +744,9 @@ so these opcodes should never reach target code.
 
 The dictionary opcodes are worth a callout because they use hoisting
 as the hash function. `IRBuilder::_getCompilerDictionaryEntry`
-(`slang-ir.cpp` line 3372) emits a `CompilerDictionaryEntry` whose
+(`slang-ir.cpp` line 3390) emits a `CompilerDictionaryEntry` whose
 operands are the key list built
-by `addCompilerDictionaryEntryKeys` (line 3393): the dictionary's scope
+by `addCompilerDictionaryEntryKeys` (line 3411): the dictionary's scope
 inst, the memoized inst's opcode as a `uint` literal, then that inst's
 operands. Because the opcode is `hoistable`, emitting the same key
 twice returns the *same* entry inst, so a lookup is an emit plus a

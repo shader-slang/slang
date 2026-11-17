@@ -11,7 +11,7 @@
 // The Call-rule tightening only applies when the callee is `[__readNone]`;
 // for everything else we fall back to "differentiable call always carries".
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost

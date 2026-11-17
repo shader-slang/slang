@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#defaults-by-language-version
-//META: doc_section_digest=c379bb058f7b82877b61882f1b415d5c5814f8262a30cc7e4db473cf77aaab6e
+//META: doc_section_digest=f3a6042185df9067ba5bb4f98e85b57b0d4b871f2819527ab4a27a2cd9500936
 //META: purpose=A `public` modifier on the module declaration flips the module-wide default so unannotated decls are `public` instead of `internal`.
 //META: intent=functional
 //META: pipeline_stage=check

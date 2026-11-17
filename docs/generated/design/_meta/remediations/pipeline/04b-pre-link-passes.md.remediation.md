@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-5
-remediated_at: 2026-08-04T14:50:00Z
+remediator_model: claude-sonnet-5-5
+remediated_at: 2026-11-02T21:21:58Z
 target_doc: pipeline/04b-pre-link-passes.md
 review_report: ../../reviews/pipeline/04b-pre-link-passes.md.review.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_source_commit_after: 2518a942d59b1228fc8cc70a37739baab82b6002
 actions:
-  fixed: 2
+  fixed: 4
   rejected_bogus: 0
-  rejected_out_of_scope: 1
+  rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
 ---
@@ -18,12 +18,13 @@ actions:
 
 ## Summary
 
-Three findings were reviewed. The fabricated `Module::compile` caller and the overstated layout-module description were both verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and fixed. The front-matter digest finding was rejected as out of scope because that field belongs to the operator's `mark-fresh` run. The document was edited.
+All four findings were verified against the current source and found correct. All four were fixed with minimal edits to the target document; front-matter `generated_at` was refreshed and the digest is unchanged.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `rg -n "Module::compile" source/slang/` returns nothing at HEAD. The real callers are `FrontEndCompileRequest::generateIR` in `source/slang/slang-compile-request.cpp` (which calls `generateIRForTranslationUnit` at line 552) and the imported-module path in `source/slang/slang-session.cpp` (line 1130). `generateIRForTranslationUnit` itself is still at `source/slang/slang-lower-to-ir.cpp:15386`, matching the page. | `## Source`: replaced "from `Module::compile` and friends" with the two real callers, linked but deliberately without line numbers since neither file is in this page's `watched_paths`. |
-| F-002 | fixed | Confirmed at HEAD: `createIRModuleForLayout` at `source/slang/slang-lower-to-ir.cpp:16353` decorates the module instruction at `:16450` and adds `addRequireCapabilityAtomDecoration` on entry-point stubs at `:16491`, in addition to the stub globals and their layout instructions. | `### TargetProgram::createIRModuleForLayout`: "whose only contents are `IRLayoutDecoration`s" replaced with stubs, module-instruction and stub layout decorations plus their layout instructions, and entry-point capability decorations; the no-executable-bodies and no-mandatory-passes disclaimers are retained. |
-| F-003 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md` lines 97-100 reserve `generated_at`, `source_commit`, and `watched_paths_digest` for the operator's `regenerate.py mark-fresh` run: "Do not edit those three fields yourself." The digest is refreshed when the operator marks this page fresh after the edits above. | — |
+| F-001 | fixed | `source/slang/slang-ir-link.cpp` lines 2611-2651: `IRPrelinkContext::maybeCloneValue` creates witness tables without entries, bypassing `shouldDeepCloneWitnessTable` | Notable passes: replaced "always deep-clones" with the shared-predicate vs prelink-override distinction |
+| F-002 | fixed | `source/slang/slang-ir-inline.cpp` line 213 `canInline` gates sites; `source/slang/slang-ir-dce.cpp` ~541 keeps exports alive (`source/slang/slang-lower-to-ir.cpp` line 15650) | Early-inlining section: eligible call sites only; exported tagged definitions can survive |
+| F-003 | fixed | `source/slang/slang-ir-constexpr.cpp` lines 543-557 emit E40013 only when the argument cannot be marked constexpr; propagated demands give E40012 | Phase D table E40012 row: removed the absolute claim, cited the regression test |
+| F-004 | fixed | `source/slang/slang-compile-request.h` lines 318-333: register-space macro is optional, defaults to `space0` | Phase A: only `NV_SHADER_EXTN_SLOT` triggers; space macro optional |

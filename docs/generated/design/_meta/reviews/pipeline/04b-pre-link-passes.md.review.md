@@ -1,22 +1,22 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:07:46+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:20:01Z
 target_doc: pipeline/04b-pre-link-passes.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 0a827687878ad7390b1acdda49546f652c2eaf5da2d820809834f1faa2ed69cb
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: d9fbf98cc4d17c2b8019253e037a7e9366f0b2086a5feb13733c0efd78728ffe
+source_commit: be3c344414f6541ba6731813b36591a94cd05482
 checklist:
   factual_accuracy: partial
   cross_references: pass
   completeness: pass
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: partial
-finding_count: 3
+  front_matter_validity: pass
+finding_count: 4
 severity_breakdown:
-  critical: 0
-  major: 1
+  critical: 2
+  major: 0
   minor: 2
   nit: 0
 ---
@@ -25,28 +25,24 @@ severity_breakdown:
 
 ## Summary
 
-The document substantially matches the recorded source and satisfies the required four-phase contract. Three issues remain: it names a nonexistent `Module::compile` caller, overstates the contents of the layout IR module, and records a watched-path digest that does not match the watched files at its own `source_commit`. The fabricated caller is the most important finding because it directs readers to an API that is not present in the source tree.
+The document covers the required pipeline structure, and its ordering, gates, and line citations match the source. Four behavioral claims need correction. Most importantly, disabling final-link autodiff pruning does not mean prelink always deep-clones differentiable-interface witness tables: its cloning override can create declarations without entries.
 
 ## Items checked
 
-- Read the target document, `_common.md`, the per-doc prompt, and all four dependency documents.
-- Resolved all five watched files with `regenerate.py show` and verified source against commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Spot-checked more than 30 factual claims covering all four phases, pass ordering and gates, the early-inlining loop, prelink cloning, stripping, obfuscation, linker caches, and adjacent module constructors.
-- Verified every line-number citation across 65 citation-bearing lines; the cited definitions and ranges match the recorded commit.
-- Resolved all 49 distinct linked source, generated-document, and directory paths at the recorded commit; the two local heading anchors also exist.
-- Checked the mandatory sections, tables, diagrams, gate groups, notable-pass callouts, three adjacent constructs, size cap, front-matter keys, and review style rules.
+- Read `_review.md`, `_common.md`, the document-specific prompt, and the resolved watched paths from `regenerate.py show`.
+- Verified against the **current working tree**, which the operator identifies as identical to the document’s source commit throughout `source/`.
+- Checked all 112 explicit line-number citation occurrences, including ranges and repeated citations.
+- Spot-checked more than 20 behavioral claims: phase ordering, debug-source gates, coverage instrumentation, prelink registration and cloning, inlining termination, validation gates, diagnostics, stripping, obfuscation, module indexing, and adjacent IR-generation routines.
+- Resolved all 99 Markdown link occurrences in the working tree; checked generated-page references against the manifest. Historical Git-object verification did not complete; link verification uses the requested working-tree baseline.
+- Consulted dependency documents only for cross-reference checks.
+- Checked required sections, phase-table columns, Mermaid conventions, front-matter fields, and Liquid safety. The document is 48,193 bytes, below its 65,536-byte cap.
+- No files were written; diagnostic examples were checked against source and existing test expectations, without running compiler tests.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Source`, lines 31-35 | The document says `generateIRForTranslationUnit` is invoked from `Module::compile`, but no `Module::compile` symbol exists. The normal translation-unit driver is `FrontEndCompileRequest::generateIR`; imported modules use a separate linkage loading path. | `source/slang/slang-compile-request.cpp:526-570` defines `FrontEndCompileRequest::generateIR`, calls `generateIRForTranslationUnit` at line 552, and caches the result at line 570. `source/slang/slang-session.cpp:1123-1131` shows the imported-module call path. | Replace “from `Module::compile` and friends” with the two real callers: `FrontEndCompileRequest::generateIR` for request translation units and the imported-module generation path in `slang-session.cpp`. |
-| F-002 | minor | `### TargetProgram::createIRModuleForLayout`, lines 627-635 | The claim that the layout module's “only contents are `IRLayoutDecoration`s on stub globals and entry points” is too strong. The constructor also attaches a layout decoration to the module instruction, emits layout/type instructions, adds import linkage to entry-point stubs, and forwards SPIR-V/Metal capability decorations. | `source/slang/slang-lower-to-ir.cpp:16412-16450` builds variable and module-level layouts; lines 16470-16498 add import, capability, and layout decorations to entry-point stubs. | Say that the separate module carries target layout metadata on import stubs and the module instruction, with capability decorations on applicable entry points; retain that it contains no executable bodies and does not run the mandatory pass sequence. |
-| F-003 | minor | YAML front-matter, lines 1-7 | `watched_paths_digest` is valid hexadecimal but does not match the digest of the five resolved watched files at the recorded `source_commit`. The document records `0a827687...ed69cb`; recomputation from that commit yields `6b4337c0...1603b1`. | `docs/generated/design/_meta/regenerate.py:441-457` defines the digest over path, size, and contents. Running `regenerate.py digest pipeline/04b-pre-link-passes.md` at HEAD, which equals the recorded source commit, and independently hashing the five commit blobs both yield `6b4337c01022716f64c1f958ec59f2ab400c9c07e4d2646c5bea3a771e1603b1`. | Refresh the generated document's `watched_paths_digest` through the regeneration/remediation workflow so it records `6b4337c01022716f64c1f958ec59f2ab400c9c07e4d2646c5bea3a771e1603b1`; do not hand-edit the ledger. |
-
-## No-issues notes
-
-- The direct pre-link calls and all conditional gates match `generateIRForTranslationUnit`.
-- The loop section accurately captures the subtle overwrite of `changed` by `peepholeOptimizeGlobalScope`.
-- The revised `obfuscateModuleLocs` text correctly states that locations remain unchanged when obfuscation is enabled without a source map.
-- The `prelinkIR` cloning, auto-diff pruning, and stable-input linking-cache descriptions align with `slang-ir-link.cpp`.
+| F-001 | critical | `## Notable passes`, lines 579–588 | The claim that prelink “always deep-clones differentiable-interface witness tables” confuses the shared pruning predicate with the actual prelink cloning path. It also contradicts the earlier description of bodiless witness-table clones. | `source/slang/slang-ir-link.cpp:2611` handles `kIROp_WitnessTable` in `IRPrelinkContext::maybeCloneValue` by creating a table with cloned types; lines 2645–2651 register it and clone decorations without copying entries. This bypasses `cloneWitnessTableImpl` and its `shouldDeepCloneWitnessTable` decision at line 759. | State that prelink disables the shared final-codegen pruning policy, while retaining its separate shallow-import policy. Explain that witness tables reached through the override can remain declarations without entries; remove the unconditional deep-cloning guarantee. |
+| F-002 | critical | `### performMandatoryEarlyInlining and the surrounding loop`, lines 668–670 | “Functions tagged with it must not survive the pre-link pipeline” incorrectly promises removal of function definitions. The pass replaces eligible calls, and exported definitions can remain alive. “Inlines every call” also omits eligibility checks. | `source/slang/slang-ir-inline.cpp:148` first applies `canInline`; line 282 rejects generic-assembly bodies. Line 940 removes the original **call**. `source/slang/slang-ir-dce.cpp:542–559` retains exported definitions when `keepExportsAlive` is enabled, as it is at `source/slang/slang-lower-to-ir.cpp:15650`. | Describe mandatory early inlining as selecting eligible call sites without a profitability heuristic. Remove the guarantee that tagged definitions disappear, and mention that exported definitions can survive DCE. |
+| F-003 | minor | Phase D diagnostic table, line 336 | “A call argument does not reach” `E40012` is too broad. A constexpr demand originating at a call can propagate through an argument’s producer chain and produce the general diagnostic. | `source/slang/slang-ir-constexpr.cpp:543–557` emits `E40013` only if the argument cannot be marked constexpr during backward propagation; lines 610–671 subsequently validate propagated demands. `tests/diagnostics/constexpr-diagnostic-location.slang:36–37` expects “expected a compile-time constant” at the argument to `Load`. | Limit the `E40013` explanation to arguments that cannot be marked constexpr immediately. State that propagated demands on argument-producing instructions can instead produce `E40012`, and cite the existing regression example. |
+| F-004 | minor | `## Phase A`, lines 173–178 | The NVAPI explanation presents both macros together as the trigger without mentioning that the register-space macro is optional. | `source/slang/slang-compile-request.h:318–333` requires `NV_SHADER_EXTN_SLOT`, but explicitly permits omission of `NV_SHADER_EXTN_REGISTER_SPACE`, initializing its value to `"space0"`. | Say that defining `NV_SHADER_EXTN_SLOT` triggers the modifier; `NV_SHADER_EXTN_REGISTER_SPACE` optionally overrides the default `space0`. |

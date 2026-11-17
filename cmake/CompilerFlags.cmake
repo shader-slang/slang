@@ -93,7 +93,7 @@ endfunction()
 # Slang targets normally get these through set_default_compile_options, which
 # calls this function. It is exposed separately so that targets which must not
 # inherit the rest of Slang's flags can still be sanitized: a vendored library
-# such as spvdb (tests/spvdb) brings its own warning configuration, but it is
+# such as spvdb (tools/spvdb) brings its own warning configuration, but it is
 # linked into slang-test, and on MSVC every object in a binary must agree on
 # whether ASan is enabled. /fsanitize=address changes the ABI of the annotated
 # standard containers, so mixing a sanitized slang-test with an unsanitized
@@ -225,6 +225,11 @@ function(set_default_compile_options target)
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
             -Werror=return-local-addr
+            # GCC rejects designated initializers that are out of declaration order,
+            # while Clang only warns (and -Wno-reorder above silences that warning,
+            # since Clang's -Wreorder group includes -Wreorder-init-list). We make it
+            # an error on Clang so such code fails locally rather than only on GCC CI.
+            -Werror=reorder-init-list
             # Some warnings which are on by default in MSVC
             -Wnarrowing
         )
