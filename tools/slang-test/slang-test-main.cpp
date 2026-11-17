@@ -3589,10 +3589,11 @@ enum class TextComparisonCoversExitCode
 /// comparison family), which pass a fixed default text when the test has no `.expected` file,
 /// and `runReflectionTest`, which compares against an `.expected` file and passes no default
 /// text. `TextComparisonCoversExitCode::No` fits `SIMPLE_LINE`, whose comparison covers only the
-/// line number of the first diagnostic, so its check runs on every test. `SIMPLE_LINE` does not
-/// support the `diag=` option: `runSimpleLineTest`, unlike `runSimpleTest`, never passes
-/// `-enable-machine-readable-diagnostics`, so the diagnostic annotations cannot be checked
-/// against the extracted line number. A test that checks diagnostic annotations uses `SIMPLE`.
+/// line number of the first diagnostic, so its check runs on every test. A `diag=` option on a
+/// `SIMPLE_LINE` lane is accepted but fails confusingly: `runSimpleLineTest`, unlike
+/// `runSimpleTest`, never passes `-enable-machine-readable-diagnostics`, so the diagnostic
+/// annotations cannot be checked against the extracted line number. A test that checks
+/// diagnostic annotations uses `SIMPLE`.
 ///
 /// Returns false if the test options are invalid. Otherwise sets `outMismatch` to true when the
 /// exit code is not the expected one, after it reports the mismatch.
