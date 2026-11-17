@@ -34,23 +34,37 @@ struct EntryPointParamDirections
     bool isOutput = false;
 };
 
-/// Check the passing mode of entry-point parameter `param`, and return whether the parameter is a
-/// stage input, a stage output, or both.
+/// Enforce the passing modes an entry-point parameter may declare, and return whether the
+/// parameter is a stage input, a stage output, or both. A varying parameter may be `in`, `out`,
+/// or `inout`; a uniform parameter may only be `in`; every other declared mode is rejected, and
+/// the `allowedModes` strings below render that policy for the diagnostic.
 static EntryPointParamDirections checkEntryPointParamPassingMode(
     ParamDecl* param,
     DiagnosticSink* sink)
 {
     EntryPointParamDirections directions;
-    // The declared mode distinguishes a written `__borrow`/`__constref` from the implicit borrows
-    // the compiler derives: the payload keyword also declares BorrowIn, and a non-copyable type
-    // such as a mesh-shader output turns a plain `in` into an effective BorrowIn. Those implicit
-    // borrows stay valid, so the borrow rejection tests the written modifier, not the mode value.
+    // Switching on the declared mode keeps the type-derived borrows valid: a non-copyable type
+    // such as a mesh-shader output turns a plain `in` into an effective BorrowIn, and this
+    // switch never sees that adjustment. The payload keyword, by contrast, folds into declared
+    // BorrowIn together with a written `__borrow`/`__constref`
+    // (`getExplicitlyDeclaredParamPassingMode`), so the BorrowIn case below separates the two
+    // by testing the written modifier, not the mode value. A written borrow combined with
+    // `inout` also resolves to BorrowIn (the borrow modifier is checked first), so the only
+    // written spelling of BorrowInOut is a plain `inout`, valid on a varying parameter.
     const auto declaredMode = getExplicitlyDeclaredParamPassingMode(param);
     // A uniform parameter's value comes from a constant buffer or a resource binding rather than
     // from a caller. The `uniform` modifier is auto-added to resource-type parameters only after
-    // this check, so the parameter is classified by its written modifier and its type here.
+    // this check, so the parameter is classified by its written modifier and its type here. The
+    // classification only decides which modes are diagnosed; it never changes the direction a
+    // mode assigns. (A parameter that a non-varying stage auto-converts to `uniform` later in
+    // validateEntryPoint is not classified here — see that pass for the known gap.)
     const bool isUniform =
         param->hasModifier<HLSLUniformModifier>() || isUniformParameterType(param->getType());
+    // The full user-visible sentence is assembled from the span message in
+    // slang-diagnostics.lua (entry-point-param-has-invalid-mode) and one of these clauses.
+    // The varying clause names the passing-mode keywords only: a `payload` parameter reaches
+    // the BorrowIn case without a borrow modifier and stays valid, which the mode list does
+    // not describe.
     const char* allowedModes = isUniform
                                    ? "a uniform entry-point parameter can only use 'in', because "
                                      "its value comes from a constant buffer or a resource "
@@ -58,6 +72,8 @@ static EntryPointParamDirections checkEntryPointParamPassingMode(
                                    : "a varying entry-point parameter can only use 'in', 'out', "
                                      "or 'inout', because an entry point exchanges values with "
                                      "the pipeline rather than with a caller's memory location";
+    // A rejected parameter still gets the direction its access implies, in every case below, so
+    // that the remaining entry-point checks report their own problems with the parameter.
     switch (declaredMode)
     {
     case ParamPassingMode::In:
@@ -73,6 +89,10 @@ static EntryPointParamDirections checkEntryPointParamPassingMode(
         }
         directions.isOutput = true;
         break;
+    // No target has an entry-point borrow mode: a written borrow is silently treated as `in`,
+    // and on a uniform resource parameter it even changes the binding layout, so the written
+    // spelling is rejected while the compiler's own borrows (payload keyword, non-copyable
+    // inputs) stay valid.
     case ParamPassingMode::BorrowIn:
         if (param->hasModifier<BorrowModifier>())
         {
@@ -97,8 +117,6 @@ static EntryPointParamDirections checkEntryPointParamPassingMode(
 
     // An entry point receives values from the previous pipeline stage and passes values to the
     // next one, so there is no caller's memory location for a reference parameter to bind to.
-    // We still give each one the direction its access implies, so that the remaining entry-point
-    // checks report their own problems with the parameter.
     case ParamPassingMode::RefReadWrite:
         sink->diagnose(Diagnostics::EntryPointParamHasInvalidMode{
             .mode = declaredMode,

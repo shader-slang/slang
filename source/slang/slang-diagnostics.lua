@@ -4985,7 +4985,9 @@ warning(
 err(
     "entry-point-param-has-invalid-mode",
     38054,
-    "entry-point parameter cannot use a disallowed passing mode",
+    "entry-point parameter cannot use an invalid passing mode",
+    -- The `~allowedModes` clause is supplied by the caller in slang-check-shader.cpp
+    -- (checkEntryPointParamPassingMode), which selects the uniform or the varying wording.
     span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the '~mode:ParamPassingMode' passing mode; ~allowedModes:String" }
 )
 

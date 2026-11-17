@@ -1,9 +1,15 @@
 // An entry point exchanges values with the pipeline and its resource bindings rather than with a
 // caller's memory, so its parameters may only use the passing modes those sources support: a
 // varying parameter may be `in`, `out`, or `inout`, and a uniform parameter may only be `in`.
-// Every other mode is rejected, including the reference modes (`__ref`, `const __ref`,
+// Every other declared mode is rejected, including the reference modes (`__ref`, `const __ref`,
 // `__ref_readonly`, `__ref_writeonly`) and the explicit borrows (`__borrow` and its legacy alias
 // `__constref`). Each disallowed parameter is reported.
+//
+// Two non-`in`/`out`/`inout` spellings are deliberately still valid, because the compiler derives
+// their borrows itself rather than reading a mode keyword: the `payload` keyword and implicitly
+// borrowed non-copyable inputs such as mesh-shader outputs. They are pinned outside this file
+// (tests/pipeline/rasterization/mesh/, tests/vkray/, tests/cuda/lss-test.slang), so a regression
+// in that gate is caught there, not here.
 //
 // A rejected parameter still reaches the remaining entry-point checks, as an input for
 // `__ref_readonly`, an output for `__ref_writeonly`, and both for `__ref` and `inout`, so those
@@ -20,8 +26,10 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=BORROWV):-target spirv -entry borrowVaryingParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=BORROWRES):-target spirv -entry borrowResourceParam -stage compute -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=INOUTRES):-target spirv -entry inoutResourceParam -stage compute -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=OUTRES):-target spirv -entry outResourceParam -stage compute -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=OUTUNIF):-target spirv -entry outUniformParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=INOUTUNIF):-target spirv -entry inoutUniformParam -stage fragment -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=INUNIF,exit-code=0):-target spirv -entry inUniformParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=RODEPTH):-target spirv -entry readOnlyDepth -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=WODEPTH):-target spirv -entry writeOnlyTwoDepths -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=REFPOS):-target spirv -entry refPosition -stage vertex -experimental-feature
@@ -95,8 +103,6 @@ float4 borrowVaryingParam(__borrow float4 color : COLOR0) : SV_Target
     return color;
 }
 
-RWStructuredBuffer<float4> borrowResourceBuffer;
-
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void borrowResourceParam(__borrow RWStructuredBuffer<float4> buffer)
@@ -115,6 +121,20 @@ void inoutResourceParam(inout RWStructuredBuffer<float4> buffer)
     buffer[0] = float4(1.0);
 }
 
+RWStructuredBuffer<float4> outResourceSourceBuffer;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void outResourceParam(out RWStructuredBuffer<float4> buffer)
+//OUTRES:                                            ^^^^^^ E38054
+//OUTRES:                                            ^^^^^^ entry-point parameter 'buffer' cannot use the 'out' passing mode; a uniform entry-point parameter can only use 'in', because its value comes from a constant buffer or a resource binding rather than from a caller
+{
+    buffer = outResourceSourceBuffer;
+}
+
+// The written `uniform` modifier with a stage-output semantic is deliberate: the mode check
+// classifies by the written modifier and rejects `out` before any semantic reasoning runs,
+// which pins the written-modifier path of the uniform classification.
 [shader("fragment")]
 void outUniformParam(out uniform float4 value : SV_Target)
 //OUTUNIF:                              ^^^^^ E38054
@@ -135,6 +155,14 @@ float4 inoutUniformParam(inout uniform InoutUniformStruct u) : SV_Target
 {
     u.v += 1;
     return u.v;
+}
+
+// A written `in` on a uniform parameter is the one mode both categories allow, so it stays the
+// positive control for the rule.
+[shader("fragment")]
+float4 inUniformParam(in uniform float4 color) : SV_Target
+{
+    return color;
 }
 
 [shader("fragment")]
