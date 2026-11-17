@@ -45,7 +45,8 @@ static bool _blobContentEquals(ISlangBlob* left, ISlangBlob* right)
 {
     if (!left || !right || left->getBufferSize() != right->getBufferSize())
         return false;
-    return ::memcmp(left->getBufferPointer(), right->getBufferPointer(), left->getBufferSize()) == 0;
+    return ::memcmp(left->getBufferPointer(), right->getBufferPointer(), left->getBufferSize()) ==
+           0;
 }
 
 // Link {module, fragmentEPName, vsMain} and return vsMain's entry-point hash
