@@ -140,6 +140,8 @@ static slang::EntryPointReflection* _getEntryPointReflection(
     return entryPoint;
 }
 
+// Returns a type reflection's fully-qualified name as a String, for comparing the concrete
+// contract types of two entry-point selections.
 static String _getTypeFullName(slang::TypeReflection* type)
 {
     ComPtr<ISlangBlob> blob;
@@ -147,6 +149,7 @@ static String _getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
+// Renders a diagnostics blob as a String, empty for a null blob.
 static String _blobToString(slang::IBlob* blob)
 {
     if (!blob)
@@ -217,6 +220,8 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointSeparateSpecialization)
         SLANG_SUCCEEDED(bareMEntry->specialize(pArgs, 1, specializedP.writeRef(), nullptr)));
     SLANG_CHECK_ABORT(specializedP != nullptr);
     auto specializedPReflection = _getEntryPointReflection(specializedP);
+    // The public name stays the bare selection name even though the target name below becomes
+    // the specialized one; the two-name split is part of the tested contract.
     SLANG_CHECK(String(specializedPReflection->getName()) == "M");
     SLANG_CHECK(
         String(specializedPReflection->getNameOverride()) == String(directP->getNameOverride()));
@@ -252,6 +257,47 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointSeparateSpecialization)
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(overApplied == nullptr);
     SLANG_CHECK(_blobToString(diagnostics).indexOf(toSlice("specialization arguments")) != -1);
+
+    // An explicit rename takes precedence over the specialization's derived target name, in
+    // either order: renaming the bare entry before specializing, and renaming the specialized
+    // component afterwards.
+    ComPtr<slang::IComponentType> renamedBare;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(bareMEntry->renameEntryPoint("customMissP", renamedBare.writeRef())));
+    ComPtr<slang::IComponentType> specializedRenamedBare;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        renamedBare->specialize(pArgs, 1, specializedRenamedBare.writeRef(), nullptr)));
+    SLANG_CHECK_ABORT(specializedRenamedBare != nullptr);
+    SLANG_CHECK(
+        String(_getEntryPointReflection(specializedRenamedBare)->getNameOverride()) ==
+        "customMissP");
+
+    ComPtr<slang::IComponentType> renamedSpecialized;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        specializedP->renameEntryPoint("customMissQ", renamedSpecialized.writeRef())));
+    SLANG_CHECK_ABORT(renamedSpecialized != nullptr);
+    SLANG_CHECK(
+        String(_getEntryPointReflection(renamedSpecialized)->getNameOverride()) == "customMissQ");
+
+    // Both specializations of one stage coexist in one composed program, each carrying its own
+    // target name; that distinctness is what lets one linked program hold them both.
+    slang::IComponentType* specializations[] = {module, specializedP.get(), specializedR.get()};
+    ComPtr<slang::IComponentType> composedProgram;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+        specializations,
+        SLANG_COUNT_OF(specializations),
+        composedProgram.writeRef(),
+        diagnostics.writeRef())));
+    SLANG_CHECK_ABORT(composedProgram != nullptr);
+    auto composedLayout = composedProgram->getLayout(0, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(composedLayout != nullptr);
+    SLANG_CHECK(composedLayout->getEntryPointCount() == 2);
+    SLANG_CHECK(
+        String(_getEntryPointReflection(composedProgram, 0)->getNameOverride()) ==
+        String(specializedPReflection->getNameOverride()));
+    SLANG_CHECK(
+        String(_getEntryPointReflection(composedProgram, 1)->getNameOverride()) ==
+        String(specializedRReflection->getNameOverride()));
 }
 
 
