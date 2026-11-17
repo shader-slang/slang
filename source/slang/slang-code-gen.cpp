@@ -960,8 +960,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             // pipeline: the optix_coopvec capability makes the CUDA emitter emit
             // OptiX cooperative-vector types and calls even for a compute-stage
             // entry point. The capability test mirrors the emitter's own
-            // (CLikeSourceEmitter::init), so the emitter and the downstream
-            // compiler setup use the same fact.
+            // (the CLikeSourceEmitter constructor), so the emitter and the
+            // downstream compiler setup use the same fact.
             if (targetCaps.implies(CapabilityAtom::optix_coopvec))
             {
                 options.flags |= CompileOptions::Flag::RequireOptix;
