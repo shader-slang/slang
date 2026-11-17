@@ -213,8 +213,8 @@ static bool _matchSlangRichDiagnosticHeader(
     {
         // The renderer decorates the code as `[E#####]`; the digits after the `E` are the
         // code. Anything in the brackets other than `E<digits>` makes the whole line a
-        // non-header (in the record parser that flushes a pending record and demotes the
-        // line to a note).
+        // non-header (in the record parser such a line joins the pending record's text, or
+        // becomes a note when no record is pending).
         const Index closeIndex = text.indexOf(']');
         if (closeIndex <= 0)
         {
@@ -609,8 +609,8 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
     // scanning again for a rich header. A stream that mixes rich blocks with
     // downstream-prefixed lines identifies by line order: whichever rendering's line
     // matches first wins, and the other rendering's lines degrade in the winning parser —
-    // to notes, or to positionless records for codeless headers in the rich parser.
-    // Hybrid parsing is out of scope.
+    // to notes, to positionless records for codeless headers, or into a pending record's
+    // buffered text while a record is open. Hybrid parsing is out of scope.
     if (compilerIdentity.m_type == CompilerIdentity::Slang && _isSlangRichDiagnostics(inText))
     {
         return parseSlangRichDiagnostics(inText, diagnostics);
