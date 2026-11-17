@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // An equality constraint on a generic parameter (`where C == Evil`) carries
 // over to a nested associated-type access only through the access's direct
@@ -57,7 +57,11 @@ uint bad<C>(S<C> s)
     where C == Evil
 {
     return s.f.evil;
-    /*CHECK: 'evil' is not a member of 'C.H.Data'.
+    /*CHECK:
+    member not found
+    */
+    /*CHECK:
+    'evil' is not a member of 'C.H.Data'.
     */
 }
 

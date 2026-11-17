@@ -73,6 +73,8 @@ uint readViaLet<C>(Input<C> input)
     return uint(a.barycentricCoord.y * 100.0);
 }
 
+// Member access through a property whose type is the substituted abstract
+// lookup.
 uint readViaProperty<C>(PropertyInput<C> input)
     where C : IContext
     where C.Primitive == TrianglePrimitive
@@ -92,6 +94,8 @@ uint readViaInterfaceConstraint<C : ITriCtx>(Input<C> input)
     return uint(input.attributes.barycentricCoord.x * 100.0);
 }
 
+// The fresh-spelling control: the same type written out in the constrained
+// function's context resolves today, without the fix.
 uint readFresh<C>()
     where C : IContext
     where C.Primitive == TrianglePrimitive
@@ -102,6 +106,9 @@ uint readFresh<C>()
     return uint(b.barycentricCoord.x * 100.0);
 }
 
+// The user-level workaround from the issue: spelling the deeper equality
+// explicitly compiles on master, and must keep working alongside the new
+// projection.
 uint readWorkaround<C>(Input<C> input)
     where C : IContext
     where C.Primitive.Attributes == TriangleAttributes
@@ -109,6 +116,8 @@ uint readWorkaround<C>(Input<C> input)
     return uint(input.attributes.barycentricCoord.x * 100.0);
 }
 
+// The one-level control: the constraint applies to `C.Primitive` itself
+// today, in both directions.
 uint readOneLevel<C>(PrimInput<C> input)
     where C : IContext
     where C.Primitive == TrianglePrimitive
@@ -231,6 +240,10 @@ void computeMain()
     buf[9] = readReversedOrder(input);
 }
 
+// buf[5], buf[6] and buf[7] are the pre-fix controls (they compile on master
+// without the congruence projection); the other seven cases fail to compile
+// on master and need the fix.
+//
 // buf[0], buf[3], buf[4], buf[6], buf[9]: barycentricCoord.x * 100.
 // buf[1]: barycentricCoord.y * 100.
 // buf[2]: barycentricCoord.x * 100 through the property.
