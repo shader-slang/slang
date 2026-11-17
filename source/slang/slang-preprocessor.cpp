@@ -1283,13 +1283,15 @@ struct Preprocessor
     /// A stack of "active" input files
     InputFile* m_currentInputFile = nullptr;
 
-    // TODO: We could split the macro environment into a `globalEnv`
-    // and a `superGlobalEnv` such that built-in macros like `__FILE__`
-    // and `__LINE__` are defined in the super-global environment so
-    // that they can be shadowed by user-defined macros but will again
-    // be available after an `#undef`.
+    /// Definitions of built-in macros like `__FILE__` and `__LINE__`.
+    ///
+    /// Built-in macros live in their own environment, which `globalEnv` reaches
+    /// through `Environment::parent`, so a user `#define` shadows a built-in
+    /// inside `globalEnv` and a later `#undef` removes only the shadow, leaving
+    /// the built-in available again.
+    Environment superGlobalEnv;
 
-    /// Currently-defined macros
+    /// Currently-defined macros, including user-level shadows of built-in macros
     Environment globalEnv;
 
     /// A pre-allocated token that can be returned to represent end-of-input situations.
@@ -3868,12 +3870,15 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
         return;
     Name* name = nameToken.getName();
 
-    MacroDefinition* oldMacro = LookupMacro(&context->m_preprocessor->globalEnv, name);
-    if (oldMacro)
+    MacroDefinition* oldMacro = NULL;
+    bool oldMacroIsShadow = context->m_preprocessor->globalEnv.macros.tryGetValue(name, oldMacro);
+    MacroDefinition* visibleMacro =
+        oldMacroIsShadow ? oldMacro : LookupMacro(&context->m_preprocessor->superGlobalEnv, name);
+    if (visibleMacro)
     {
         auto sink = GetSink(context);
 
-        if (oldMacro->isBuiltin())
+        if (visibleMacro->isBuiltin())
         {
             sink->diagnose(Diagnostics::BuiltinMacroRedefinition{
                 .name = name->text,
@@ -3884,10 +3889,18 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             sink->diagnose(Diagnostics::MacroRedefinition{
                 .name = name,
                 .location = nameToken.loc,
-                .originalLocation = oldMacro->getLoc()});
+                .originalLocation = visibleMacro->getLoc()});
         }
 
-        delete oldMacro;
+        // A macro in `globalEnv` is a user-level definition (or a user-level
+        // shadow of a built-in), so it is replaced here. A built-in is owned
+        // by `superGlobalEnv`; the new definition simply shadows it, and a
+        // later `#undef` will make the built-in visible again.
+        if (oldMacroIsShadow)
+        {
+            context->m_preprocessor->globalEnv.macros.remove(name);
+            delete oldMacro;
+        }
     }
 
     MacroDefinition* macro = new MacroDefinition();
@@ -4080,17 +4093,20 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     Name* name = nameToken.getName();
 
     Environment* env = &context->m_preprocessor->globalEnv;
-    MacroDefinition* macro = LookupMacro(env, name);
-    if (macro != NULL)
+    MacroDefinition* macro = NULL;
+    if (env->macros.tryGetValue(name, macro))
     {
-        // name was defined, so remove it
+        // name was defined at user level, so remove that definition
         env->macros.remove(name);
 
         delete macro;
     }
-    else
+    else if (!LookupMacro(&context->m_preprocessor->superGlobalEnv, name))
     {
-        // name wasn't defined
+        // A built-in visible from `superGlobalEnv` counts as defined: removing
+        // a shadow that isn't there is a no-op, and the built-in keeps
+        // expanding afterwards, so no diagnostic applies. Only a name with
+        // no definition at any level gets reported.
         GetSink(context)->diagnose(
             Diagnostics::MacroNotDefined{.name = name->text, .location = nameToken.loc});
     }
@@ -5121,6 +5137,8 @@ TokenList preprocessSource(
 
     Preprocessor preprocessor;
 
+    preprocessor.globalEnv.parent = &preprocessor.superGlobalEnv;
+
     preprocessor.sink = desc.sink;
     preprocessor.includeSystem = desc.includeSystem;
     preprocessor.fileSystem = desc.fileSystem;
@@ -5172,7 +5190,7 @@ TokenList preprocessSource(
             macro->nameAndLoc = NameLoc(name);
             macro->ops.add(op);
 
-            preprocessor.globalEnv.macros[name] = macro;
+            preprocessor.superGlobalEnv.macros[name] = macro;
         }
     }
 
