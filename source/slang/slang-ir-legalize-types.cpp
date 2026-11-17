@@ -464,11 +464,17 @@ private:
         // been added up to this point, which includes those that were
         // added to represent legalized parts of the result type.
         //
-        return m_context->builder->emitCallInst(
+        auto newCall = m_context->builder->emitCallInst(
             resultType,
             m_call->getCallee(),
             m_args.getCount(),
             m_args.getArrayView().getBuffer());
+        // The rebuilt call replaces the original call in the IR, so it must keep the source
+        // location the user wrote. Diagnostics that fire on a call after legalization (for
+        // example, the resource-selection warnings) read that location; without this copy they
+        // would report no source position at all.
+        newCall->sourceLoc = m_call->sourceLoc;
+        return newCall;
     }
 };
 
