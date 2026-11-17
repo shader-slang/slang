@@ -150,6 +150,7 @@ UnownedStringSlice CPPSourceEmitter::_getTypeName(IRType* type)
 
     m_typeNameMap.add(type, handle);
 
+    SLANG_ASSERT(handle != StringSlicePool::kNullHandle);
     return m_slicePool.getSlice(handle);
 }
 

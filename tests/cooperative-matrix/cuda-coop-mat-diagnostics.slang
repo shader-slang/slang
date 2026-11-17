@@ -8,6 +8,12 @@
 // Test 2: invalid shape (8x16 instead of 16x16) for MatrixA on CUDA
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SHAPE, non-exhaustive): -target cuda -entry testInvalidShape -stage compute
 
+// Test 2b: same unsupported element type as Test 1, but constructed from a
+// runtime (buffer-loaded) value, so the MakeCoopMatrixFromScalar recovery in
+// the emitter is exercised (a constant-splat constructor folds away before
+// emission and never reaches it).
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedTypeLiveValue -stage compute
+
 // Test 3a: invalid (A, B, C, D) type combination — AType != BType
 // (A=int8 but B=half is not a valid pairing for CUDA mma).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_COMBO, non-exhaustive): -target cuda -capability cuda_sm_8_0 -entry testInvalidCombinationMismatchedAB -stage compute
@@ -50,6 +56,15 @@ void testInvalidShape()
 {
     var mat = CoopMat<half, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA>(half(1.0));
     outputBuffer[0] = int32_t(mat.GetLength());
+}
+
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void testUnsupportedTypeLiveValue()
+{
+    var mat = CoopMat<double, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>(
+        double(outputBuffer[0]));
+    outputBuffer[1] = int32_t(mat.GetLength());
 }
 
 [shader("compute")]

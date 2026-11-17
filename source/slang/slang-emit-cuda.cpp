@@ -1173,7 +1173,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 // and substituted its own placeholder for this type.  We emit
                 // the scalar operand rather than the CoopMatMulAdd recovery's
                 // `(Type{})` because constructing a value of the result type
-                // would re-enter the emitWMMAFragmentType call that just
+                // could re-enter the emitWMMAFragmentType call that just
                 // failed.
                 emitOperand(scalarValue, getInfo(EmitOp::General));
                 return true;
