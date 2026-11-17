@@ -19,6 +19,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=BORROW):-target spirv -entry constRefBorrowParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=BORROWV):-target spirv -entry borrowVaryingParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=BORROWRES):-target spirv -entry borrowResourceParam -stage compute -experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=INOUTRES):-target spirv -entry inoutResourceParam -stage compute -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=OUTUNIF):-target spirv -entry outUniformParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=INOUTUNIF):-target spirv -entry inoutUniformParam -stage fragment -experimental-feature
 //DIAGNOSTIC_TEST:SIMPLE(diag=RODEPTH):-target spirv -entry readOnlyDepth -stage fragment -experimental-feature
@@ -101,6 +102,15 @@ RWStructuredBuffer<float4> borrowResourceBuffer;
 void borrowResourceParam(__borrow RWStructuredBuffer<float4> buffer)
 //BORROWRES:                                                 ^^^^^^ E38054
 //BORROWRES:                                                 ^^^^^^ entry-point parameter 'buffer' cannot use the 'borrow' passing mode; a uniform entry-point parameter can only use 'in', because its value comes from a constant buffer or a resource binding rather than from a caller
+{
+    buffer[0] = float4(1.0);
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void inoutResourceParam(inout RWStructuredBuffer<float4> buffer)
+//INOUTRES:                                              ^^^^^^ E38054
+//INOUTRES:                                              ^^^^^^ entry-point parameter 'buffer' cannot use the 'inout' passing mode; a uniform entry-point parameter can only use 'in', because its value comes from a constant buffer or a resource binding rather than from a caller
 {
     buffer[0] = float4(1.0);
 }
