@@ -3792,11 +3792,17 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         context->stage = entryPoint->getStage();
         // Selecting SkyMiss supplies SkyMiss_miss even without renameEntryPoint(). An explicit
         // rename, including an empty one, takes precedence over that default target name.
+        // A specialization can also supply its own target name (a specialized structural
+        // ray-tracing stage names itself from its concrete stage type), taking precedence
+        // over the base name but not over an explicit rename.
+        String specializedNameOverride = entryPoint->getEntryPointNameOverride(0);
+        if (specializationInfo && specializationInfo->entryPointNameOverride.getLength())
+            specializedNameOverride = specializationInfo->entryPointNameOverride;
         collectEntryPointParameters(
             context,
             entryPoint,
             m_currentRenamedEntryPoint ? m_currentRenamedEntryPoint->getEntryPointNameOverride(0)
-                                       : entryPoint->getEntryPointNameOverride(0),
+                                       : specializedNameOverride,
             specializationInfo);
     }
 

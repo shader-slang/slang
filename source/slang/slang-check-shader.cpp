@@ -3853,6 +3853,17 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         // the rest of the arguments via inference...
 
         auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
+        if (!genericDeclRef)
+        {
+            // The generic parameters can also come from a generic that encloses the function,
+            // rather than one that wraps it directly. A structural ray-tracing entry point is
+            // the stage struct's `invoke` method, so its enclosing generic wraps the struct:
+            // applying that generic produces the specialized stage struct, not a function.
+            // Walk to the nearest enclosing generic the same way other declaration-ref
+            // consumers do, carrying the function's own substitutions.
+            genericDeclRef =
+                getGenericParentDeclRef(getLinkage()->getASTBuilder(), &visitor, m_funcDeclRef);
+        }
         SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
         bool isVariadic =
@@ -3921,6 +3932,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         genAppExpr->functionExpr = genExpr;
         genAppExpr->arguments = _Move(genericArgs);
         auto checkedExpr = visitor.CheckTerm(genAppExpr);
+        DeclRef<Decl> specializedInnerDeclRef;
         if (auto partiallyAppliedExpr = as<PartiallyAppliedGenericExpr>(checkedExpr))
         {
             // Entry-point specialization can leave a generic partially applied
@@ -3933,18 +3945,47 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             SemanticsVisitor::GenericInferenceContext inferenceContext;
             inferenceContext.genericDecl = genericDeclRef.getDecl();
             ConversionCost outCost;
-            specializedFuncDeclRef =
-                visitor
-                    .trySolveGenericArguments(
-                        _Move(inferenceContext),
-                        genericDeclRef,
-                        partiallyAppliedExpr->providedOrdinaryArgs.getArrayView(),
-                        outCost)
-                    .as<FuncDecl>();
+            specializedInnerDeclRef = visitor.trySolveGenericArguments(
+                _Move(inferenceContext),
+                genericDeclRef,
+                partiallyAppliedExpr->providedOrdinaryArgs.getArrayView(),
+                outCost);
         }
         else if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
         {
-            specializedFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
+            specializedInnerDeclRef = declRefExpr->declRef;
+        }
+
+        if (auto specializedFunc = specializedInnerDeclRef.as<FuncDecl>())
+        {
+            specializedFuncDeclRef = specializedFunc;
+        }
+        else if (auto stageTypeDeclRef = specializedInnerDeclRef.as<AggTypeDecl>())
+        {
+            // Applying the enclosing generic produced the specialized stage struct of a
+            // structural ray-tracing entry point. Re-derive its `invoke` through the checked
+            // conformance witness — the same selection that resolved the unspecialized entry
+            // point — so the stage contract types (context, payload, record) carry these
+            // concrete arguments, and give this specialization the target name derived from
+            // the concrete stage type, matching direct specialized-name selection.
+            SLANG_RELEASE_ASSERT(entryPointModule);
+            Profile stageProfile = m_profile;
+            bool foundStage = false;
+            Type* stageType = nullptr;
+            specializedFuncDeclRef = PortableRT::findStageImplementation(
+                getLinkage(),
+                entryPointModule,
+                stageTypeDeclRef,
+                stageProfile,
+                sink,
+                true,
+                &foundStage,
+                &stageType);
+            if (!specializedFuncDeclRef)
+                return nullptr;
+            info->entryPointNameOverride = PortableRT::getEntryPointName(
+                PortableRT::getSourceTypeName(astBuilder, stageType).getUnownedSlice(),
+                getStage());
         }
 
         if (!specializedFuncDeclRef)
@@ -4354,10 +4395,12 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
 /// `IRGeneric` rather than an `IRFunc` and crash IR linking (issue #10209).
 static void diagnoseGenericEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
-    auto funcDecl = entryPoint->getFuncDecl();
+    // Name the entry point as it was selected, not by its implementation function: a structural
+    // ray-tracing entry point is selected by its stage name while its checked function is the
+    // stage's `invoke` method.
     sink->diagnose(Diagnostics::EntryPointCannotBeGeneric{
-        .entryPoint = funcDecl->getName(),
-        .location = funcDecl->loc});
+        .entryPoint = entryPoint->getName(),
+        .location = entryPoint->getFuncDecl()->loc});
 }
 
 /// Create a specialized program based on the given compile request.

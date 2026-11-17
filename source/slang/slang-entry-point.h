@@ -320,6 +320,11 @@ public:
         // Requirements for this selection, including those introduced by specialization.
         CapabilitySetVal* inferredCapabilityRequirements = nullptr;
         List<ExpandedSpecializationArg> existentialSpecializationArgs;
+        // The target symbol name this specialization should use, replacing the base entry
+        // point's override. A structural ray-tracing entry point derives its target name from
+        // the specialized stage type, so each specialization of one generic stage gets its own
+        // name; ordinary entry points leave this empty and keep the base name.
+        String entryPointNameOverride;
     };
 
     SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() SLANG_OVERRIDE

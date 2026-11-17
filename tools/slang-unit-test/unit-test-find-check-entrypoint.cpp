@@ -140,6 +140,121 @@ static slang::EntryPointReflection* _getEntryPointReflection(
     return entryPoint;
 }
 
+static String _getTypeFullName(slang::TypeReflection* type)
+{
+    ComPtr<ISlangBlob> blob;
+    type->getFullName(blob.writeRef());
+    return String((const char*)blob->getBufferPointer());
+}
+
+static String _blobToString(slang::IBlob* blob)
+{
+    if (!blob)
+        return String();
+    return String(UnownedStringSlice((const char*)blob->getBufferPointer(), blob->getBufferSize()));
+}
+
+// Supplying a structural stage's generic arguments separately through specialize() must select
+// the same specialization as binding the arguments in the entry name: the same target name and
+// the same concrete contract types. Two specializations of one stage stay independent, and a
+// wrong argument count keeps the ordinary specialization diagnostic.
+SLANG_UNIT_TEST(structuralRayTracingEntryPointSeparateSpecialization)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalFeature = {};
+    experimentalFeature.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalFeature.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalFeature.value.intValue0 = 1;
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalFeature;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    const char* sourcePath = "tests/ray-tracing-2/frontend/entry-point/struct-entry-generic.slang";
+    String source;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(sourcePath, source)));
+    ComPtr<slang::IBlob> diagnostics;
+    auto module = session->loadModuleFromSourceString(
+        "SeparateSpecializationModule",
+        sourcePath,
+        source.getBuffer(),
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto pType = module->getLayout()->findTypeByName("P");
+    auto rType = module->getLayout()->findTypeByName("R");
+
+    // Direct specialized-name selection provides the reference target names and input types.
+    ComPtr<slang::IEntryPoint> directPEntry;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "M<P>",
+        SLANG_STAGE_MISS,
+        directPEntry.writeRef(),
+        diagnostics.writeRef())));
+    auto directP = _getEntryPointReflection(directPEntry);
+
+    // The bare stage name selects the generic stage like a bare generic function name does.
+    ComPtr<slang::IEntryPoint> bareMEntry;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+        "M",
+        SLANG_STAGE_MISS,
+        bareMEntry.writeRef(),
+        diagnostics.writeRef())));
+
+    slang::SpecializationArg pArgs[] = {slang::SpecializationArg::fromType(pType)};
+    ComPtr<slang::IComponentType> specializedP;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(bareMEntry->specialize(pArgs, 1, specializedP.writeRef(), nullptr)));
+    SLANG_CHECK_ABORT(specializedP != nullptr);
+    auto specializedPReflection = _getEntryPointReflection(specializedP);
+    SLANG_CHECK(String(specializedPReflection->getName()) == "M");
+    SLANG_CHECK(
+        String(specializedPReflection->getNameOverride()) == String(directP->getNameOverride()));
+
+    slang::SpecializationArg rArgs[] = {slang::SpecializationArg::fromType(rType)};
+    ComPtr<slang::IComponentType> specializedR;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(bareMEntry->specialize(rArgs, 1, specializedR.writeRef(), nullptr)));
+    SLANG_CHECK_ABORT(specializedR != nullptr);
+    auto specializedRReflection = _getEntryPointReflection(specializedR);
+    SLANG_CHECK(
+        String(specializedRReflection->getNameOverride()) !=
+        String(specializedPReflection->getNameOverride()));
+
+    // The specialized invoke receives the same concrete input type as direct-name selection,
+    // and a different specialization receives a different one.
+    auto directPInputType =
+        _getTypeFullName(directP->getFunction()->getParameterByIndex(0)->getType());
+    auto specializedPInputType =
+        _getTypeFullName(specializedPReflection->getFunction()->getParameterByIndex(0)->getType());
+    auto specializedRInputType =
+        _getTypeFullName(specializedRReflection->getFunction()->getParameterByIndex(0)->getType());
+    SLANG_CHECK(specializedPInputType == directPInputType);
+    SLANG_CHECK(specializedRInputType != directPInputType);
+
+    // A wrong argument count keeps the ordinary specialization diagnostic.
+    slang::SpecializationArg twoArgs[] = {
+        slang::SpecializationArg::fromType(pType),
+        slang::SpecializationArg::fromType(rType)};
+    ComPtr<slang::IComponentType> overApplied;
+    auto result =
+        bareMEntry->specialize(twoArgs, 2, overApplied.writeRef(), diagnostics.writeRef());
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(overApplied == nullptr);
+    SLANG_CHECK(_blobToString(diagnostics).indexOf(toSlice("specialization arguments")) != -1);
+}
+
+
 // Selecting two stages implemented by the same struct must give them distinct target names.
 // Qualified names should remain readable, with dots replaced by underscores. Generic types use
 // ordinary mangling to retain their arguments. Reflection exposes the overrides used by IR linking.
