@@ -158,6 +158,221 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     return SLANG_OK;
 }
 
+/*
+A rust-style Slang diagnostic renders as a block:
+
+    error[E30015]: undefined identifier
+     --> tests/foo.slang:4:15
+      |
+    4 | void main() { undefined_thing; }
+      |               ^^^^^^^^^^^^^^^ undefined identifier 'undefined_thing'
+
+The header line carries the severity, an optional code in brackets, and the message; the
+location line that follows carries the path and position. A note repeats the same shape with
+`note:` and a `---` location marker. This is slangc's default rendering for its diagnostics.
+*/
+static bool _isSlangRichDiagnosticHeader(
+    const UnownedStringSlice& inLine,
+    ArtifactDiagnostic::Severity& outSeverity,
+    UnownedStringSlice& outCode,
+    UnownedStringSlice& outMessage)
+{
+    UnownedStringSlice text(inLine.trim());
+
+    UnownedStringSlice severityPrefix;
+    if (SLANG_FAILED(_matchSlangSeverityPrefix(text, outSeverity, severityPrefix)))
+    {
+        return false;
+    }
+    text = text.tail(severityPrefix.getLength());
+
+    outCode = UnownedStringSlice();
+    if (text.startsWith(UnownedStringSlice::fromLiteral("[")))
+    {
+        const Index closeIndex = text.indexOf(']');
+        if (closeIndex <= 0)
+        {
+            return false;
+        }
+
+        UnownedStringSlice code = text.subString(1, closeIndex - 1);
+        if (!code.startsWith(UnownedStringSlice::fromLiteral("E")))
+        {
+            return false;
+        }
+        code = code.tail(1);
+
+        for (const char c : code)
+        {
+            if (!CharUtil::isDigit(c))
+            {
+                return false;
+            }
+        }
+        if (code.getLength() == 0)
+        {
+            return false;
+        }
+
+        outCode = code;
+        text = text.tail(closeIndex + 1);
+    }
+
+    if (!text.startsWith(UnownedStringSlice::fromLiteral(":")))
+    {
+        return false;
+    }
+
+    outMessage = text.tail(1).trim();
+    return true;
+}
+
+// The location line of a rust-style block. The ascii glyphs are `-->` for the primary
+// diagnostic and `---` for notes; the unicode glyph set uses the same marker for both.
+// The ascii `---` also prefixes the closing gutter line of a snippet (`---'`), which is
+// harmless: a location line always immediately follows its header, so no pending header
+// can attach to a gutter close, and it degrades to a note.
+static bool _isSlangRichLocationLine(const UnownedStringSlice& inLine, UnownedStringSlice& outLocation)
+{
+    static const UnownedStringSlice markers[] = {
+        UnownedStringSlice::fromLiteral("-->"),
+        UnownedStringSlice::fromLiteral("---"),
+        UnownedStringSlice::fromLiteral("\xe2\x95\xad\xe2\x95\xbc")};
+
+    UnownedStringSlice text(inLine.trim());
+    for (const auto& marker : markers)
+    {
+        if (text.startsWith(marker))
+        {
+            outLocation = text.tail(marker.getLength()).trim();
+            return true;
+        }
+    }
+    return false;
+}
+
+// Splits the `path:line:col` text of a rust-style location line into the diagnostic's
+// location. A location without a line and column (a command-line source) keeps the whole
+// text as the path and leaves the position unset.
+static void _setSlangRichLocation(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& inLocation,
+    ArtifactDiagnostic& outDiagnostic)
+{
+    UnownedStringSlice path(inLocation);
+
+    const Index colIndex = path.lastIndexOf(':');
+    if (colIndex > 0)
+    {
+        const UnownedStringSlice colSlice = path.tail(colIndex + 1);
+        const Index lineIndex = path.head(colIndex).lastIndexOf(':');
+        if (lineIndex >= 0)
+        {
+            const UnownedStringSlice lineSlice =
+                path.subString(lineIndex + 1, colIndex - lineIndex - 1);
+
+            Int lineNumber, colNumber;
+            if (SLANG_SUCCEEDED(StringUtil::parseInt(lineSlice, lineNumber)) &&
+                SLANG_SUCCEEDED(StringUtil::parseInt(colSlice, colNumber)))
+            {
+                outDiagnostic.location.line = lineNumber;
+                outDiagnostic.location.column = colNumber;
+                path = path.head(lineIndex);
+            }
+        }
+    }
+
+    outDiagnostic.filePath = allocator.allocate(path);
+}
+
+// True if any line of inText is a rust-style diagnostic header.
+static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
+{
+    UnownedStringSlice text(inText), line;
+    while (StringUtil::extractLine(text, line))
+    {
+        ArtifactDiagnostic::Severity severity;
+        UnownedStringSlice code, message;
+        if (_isSlangRichDiagnosticHeader(line, severity, code, message))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* static */ SlangResult ParseDiagnosticUtil::parseSlangRichDiagnostics(
+    const UnownedStringSlice& inText,
+    IArtifactDiagnostics* diagnostics)
+{
+    SliceAllocator allocator;
+
+    // The header line starts a record and holds its severity, code and message; the
+    // location line that immediately follows completes it. A header with no location line
+    // after it is a record without a source position, emitted as soon as the next line
+    // shows it has none.
+    ArtifactDiagnostic pending;
+    bool hasPending = false;
+
+    UnownedStringSlice text(inText), line;
+    while (StringUtil::extractLine(text, line))
+    {
+        ArtifactDiagnostic::Severity severity;
+        UnownedStringSlice code, message;
+        if (_isSlangRichDiagnosticHeader(line, severity, code, message))
+        {
+            if (hasPending)
+            {
+                diagnostics->add(pending);
+            }
+
+            pending = ArtifactDiagnostic();
+            pending.severity = severity;
+            pending.stage = ArtifactDiagnostic::Stage::Compile;
+            if (code.getLength() > 0)
+            {
+                pending.code = allocator.allocate(code);
+            }
+            pending.text = allocator.allocate(message);
+            hasPending = true;
+            continue;
+        }
+
+        UnownedStringSlice location;
+        if (_isSlangRichLocationLine(line, location))
+        {
+            if (hasPending)
+            {
+                _setSlangRichLocation(allocator, location, pending);
+                diagnostics->add(pending);
+                hasPending = false;
+            }
+            else
+            {
+                // A location line with no preceding header carries no diagnostic of its own.
+                diagnostics->maybeAddNote(asCharSlice(line));
+            }
+            continue;
+        }
+
+        if (hasPending)
+        {
+            diagnostics->add(pending);
+            hasPending = false;
+        }
+
+        // Gutter, snippet and underline lines of a rendered block are kept as notes.
+        diagnostics->maybeAddNote(asCharSlice(line));
+    }
+
+    if (hasPending)
+    {
+        diagnostics->add(pending);
+    }
+
+    return SLANG_OK;
+}
+
 /* static */ SlangResult ParseDiagnosticUtil::splitDiagnosticLine(
     const CompilerIdentity& compilerIdentity,
     const UnownedStringSlice& line,
@@ -238,6 +453,17 @@ static SlangResult _findDownstreamCompiler(
     UnownedStringSlice text(inText), line;
     while (StringUtil::extractLine(text, line))
     {
+        // A rust-style header identifies Slang. Checking it before the classic form means a
+        // header whose message resembles a classic diagnostic (e.g. `error[E30015]: error
+        // 30015: ...`) is not mistaken for one.
+        ArtifactDiagnostic::Severity richSeverity;
+        UnownedStringSlice richCode, richMessage;
+        if (_isSlangRichDiagnosticHeader(line, richSeverity, richCode, richMessage))
+        {
+            outIdentity = CompilerIdentity::makeSlang();
+            return SLANG_OK;
+        }
+
         UnownedStringSlice initial = StringUtil::getAtInSplit(line, ':', 0);
 
         if (_isSlangDiagnostic(line))
@@ -298,6 +524,13 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
 
     CompilerIdentity compilerIdentity;
     SLANG_RETURN_ON_FAIL(ParseDiagnosticUtil::identifyCompiler(inText, compilerIdentity));
+
+    // Frontend diagnostics render as rust-style blocks; parse them as records so a block's
+    // location line reaches the diagnostic instead of being dropped as an unparsed note.
+    if (compilerIdentity.m_type == CompilerIdentity::Slang && _isSlangRichDiagnostics(inText))
+    {
+        return parseSlangRichDiagnostics(inText, diagnostics);
+    }
 
     UnownedStringSlice linePrefix;
     if (compilerIdentity.m_type == CompilerIdentity::Type::DownstreamCompiler)
