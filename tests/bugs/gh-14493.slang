@@ -124,6 +124,8 @@ void mainMat()
 
 // SPVMIN: OpStore %{{[A-Za-z0-9_]+}} %uint_0
 // SPVMIN-NEXT: OpStore %{{[A-Za-z0-9_]+}} %float_0
+// (the first store is the loop-index init at the preheader; the one pinned
+// next is the per-entry concrete default into the hoisted result register)
 
 // SPV: %[[F0:[A-Za-z0-9_]+]] = OpConstant %float 0
 // SPV: OpStore %{{[A-Za-z0-9_]+}} %int_2
@@ -139,9 +141,11 @@ void mainMat()
 // SPVVEC-NEXT: OpStore %{{[A-Za-z0-9_]+}} %[[V0]]
 
 // HLSLVEC: _S{{[0-9]+}} = (float4)0.0f;
+// HLSLVEC: _S{{[0-9]+}} = 2L;
 
 // SPVMAT: %[[M0:[A-Za-z0-9_]+]] = OpConstantComposite %mat2v2float
 // SPVMAT: OpStore %{{[A-Za-z0-9_]+}} %int_2
 // SPVMAT-NEXT: OpStore %{{[A-Za-z0-9_]+}} %[[M0]]
 
 // HLSLMAT: _S{{[0-9]+}} = float2x2(0.0f, 0.0f, 0.0f, 0.0f);
+// HLSLMAT: _S{{[0-9]+}} = 2L;
