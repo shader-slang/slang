@@ -8277,9 +8277,10 @@ void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
 // calls whose mutating operand parameter is `inout`, but writing through a reference that
 // way is the normal, well-defined use of one (`_checkAliasedOutArguments` skips them for the
 // same reason). A call through a value of function type has no parameter declarations to name
-// in the diagnostic. And a reference parameter of an interface type never reaches the check,
-// because existing rules reject a `__ref` parameter whose type is dynamically dispatched; a
-// generic `__ref T` receiver keeps its parameter type and warns.
+// in the diagnostic. And a reference parameter of an interface type never reaches the check:
+// calling a method through one is dynamically dispatched, and existing rules reject a
+// dynamically dispatched call on a `__ref` parameter outright, so there is no valid call for
+// the check to see; a generic `__ref T` receiver keeps its parameter type and warns.
 //
 // A `groupshared` *variable* passed directly (`inner(g[i])`) stays silent while a
 // `groupshared` *parameter* forwarded on warns. The operative distinction is what each
