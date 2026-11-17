@@ -6,5 +6,6 @@
 
 //CHECK-NOT: include file
 //CHECK: newline in literal
+//CHECK-NOT: include file
 //CHECK: expected 'string literal' in 'include' directive
 //CHECK-NOT: include file

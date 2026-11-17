@@ -2476,6 +2476,8 @@ Lexeme Lexer::readLexeme()
         m_tokenFlags |= TokenFlag::AfterWhitespace;
         break;
     case TokenType::EscapedNewLine:
+        // A splice disappears from the logical input, so it changes neither
+        // line-start context nor the whitespace separating neighboring tokens.
         break;
     default:
         m_tokenFlags = 0;

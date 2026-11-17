@@ -8,7 +8,10 @@ namespace Slang
 {
 struct NamePool;
 
-//
+// This header defines atomic scanning, token reads with trivia, and stream readers.
+// The lexer borrows its selected pool; complete lexical lists retain that pool.
+// Every complete list includes EOF. Spans and readers borrow those lists,
+// or caller-supplied ranges with an explicit EOF.
 
 /// An EOF-terminated sequence allocated in one explicitly selected token pool.
 ///
@@ -227,7 +230,7 @@ private:
     const Lexeme* m_end = nullptr;
 };
 
-/// Selects recognition rules for the next raw token requested from a lexer.
+/// Recognition rules used by a lexer until another mode is selected.
 enum class LexerMode
 {
     Normal,
@@ -241,6 +244,7 @@ enum
                                      << 2, ///< Suppress errors about invalid/unsupported characters
 };
 
+/// A stateful scanner of atomic lexemes or tokens with trivia in a borrowed pool.
 struct Lexer
 {
     /// Initializes scanning over a source view using the supplied lexical pool.
@@ -279,6 +283,8 @@ struct Lexer
     Token readToken();
 
     /// Selects recognition rules before the next raw token is read.
+    ///
+    /// The selected mode remains in effect across reads until another mode is selected.
     void setMode(LexerMode mode) { m_mode = mode; }
 
     /// Reads all tokens with attached trivia, including the terminating EOF.

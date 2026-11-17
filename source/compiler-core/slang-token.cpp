@@ -109,7 +109,7 @@ Lexeme TokenPool::createLexeme(
     // and preprocessing context belong to the occurrence returned below.
     SLANG_RELEASE_ASSERT(isValidLexemeTypeTag(kind));
     // EOF and directive delimiters denote positions rather than source text.
-    // Enforcing both empty spellings here also covers replacement and import.
+    // Enforcing both empty spellings here also covers synthesis and deserialization.
     if (isZeroWidthTokenKind(kind))
     {
         SLANG_RELEASE_ASSERT(physicalSpelling.getLength() == 0);

@@ -2,6 +2,7 @@
 -- We resolve the declarations first, then visit the tree depth first so every class
 -- occupies one contiguous range of concrete leaf tags.
 
+-- Declares the lexeme hierarchy in the supplied schema environment.
 local function defineLexemeClasses(_ENV)
     Lexeme = LexemeClass{"lexeme", abstract = true}
     Trivia = LexemeClass{Lexeme, "trivia", abstract = true}
@@ -93,6 +94,7 @@ LexemeClass.__index = LexemeClass
 local classesByName = {}
 local specificationKeys = {[1] = true, [2] = true, abstract = true}
 
+-- Returns whether this class is `base` or derives from it.
 function LexemeClass:isSubclassOf(base)
     local current = self
     while current do
@@ -102,7 +104,9 @@ function LexemeClass:isSubclassOf(base)
     return false
 end
 
--- A constructor supplies the class's data; assignment supplies its name.
+-- Creates an unnamed class from a description, optional parent, and abstract flag.
+--
+-- The schema environment supplies the name when it registers the definition.
 local function createLexemeClass(specification)
     local base = specification[1]
     local description = specification[2]
@@ -127,6 +131,9 @@ local function createLexemeClass(specification)
     }, LexemeClass)
 end
 
+-- Returns the cached class for `name`, creating an undefined placeholder if needed.
+--
+-- `registerLexemeClass` fills that same object, preserving earlier parent references.
 local function getClass(name)
     local class = classesByName[name]
     if not class then
@@ -136,8 +143,10 @@ local function getClass(name)
     return class
 end
 
--- We fill a forward reference rather than replace it. Reusing a named class as a
--- definition would give it two identities, so aliases and duplicate names are errors.
+-- Registers `definition` under `name` by filling its cached forward reference.
+--
+-- Reusing a named class as a definition would give it two identities, so aliases
+-- and duplicate names are errors.
 local function registerLexemeClass(_, name, definition)
     assert(getmetatable(definition) == LexemeClass, "a definition must use LexemeClass")
     assert(not definition.name, "a class cannot be defined under another class's name")
@@ -151,6 +160,9 @@ local function registerLexemeClass(_, name, definition)
     class.isDefined = true
 end
 
+-- Returns the constructor for `LexemeClass`, or the cached class for another name.
+--
+-- Class lookup may create an undefined placeholder through `getClass`.
 local function findLexemeDefinition(_, name)
     if name == "LexemeClass" then return createLexemeClass end
     return getClass(name)

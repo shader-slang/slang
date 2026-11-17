@@ -50,6 +50,8 @@ struct LexemeType
 %     if tag == #lexeme_defs.concreteClasses then return "Count" end
 %     return lexeme_defs.concreteClasses[tag + 1].name
 % end
+// This fragment defines concrete tags, class ranges, and diagnostic lookup tables.
+// `slang-lexeme-defs.h` includes it inside `namespace Slang` after `LexemeType`.
 /// The tags of concrete lexeme types, in depth-first hierarchy order.
 enum class LexemeTypeTag : uint8_t
 {

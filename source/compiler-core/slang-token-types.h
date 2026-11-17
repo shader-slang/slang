@@ -11,6 +11,8 @@
 %     if class == lexeme_defs.token then return "Token" end
 %     return class.name .. "Token"
 % end
+// This fragment defines typed tokens with attached trivia and no additional stored state.
+// `slang-token.h` includes it inside `namespace Slang` after `Token` and the descriptors.
 % for _, class in ipairs(lexeme_defs.classes) do
 %     if class ~= lexeme_defs.token and class:isSubclassOf(lexeme_defs.token) then
 /// A token with attached trivia in the `$(class.name)` class.

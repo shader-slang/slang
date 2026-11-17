@@ -6,6 +6,8 @@
 #ifdef FIDDLE_GENERATED_OUTPUT_ID
 
 #if FIDDLE_GENERATED_OUTPUT_ID == 0
+// This fragment defines typed atomic lexemes without adding stored state.
+// `slang-token.h` includes it inside `namespace Slang` after `Lexeme` and the descriptors.
 /// An atomic lexeme in the `Token` class.
 struct RawToken : Lexeme
 {

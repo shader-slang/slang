@@ -17,6 +17,7 @@ struct MarkedValue
     bool isMarked = false;
 };
 
+/// The typed fossil layout of `MarkedValue`, with field order matching `serialize`.
 template<>
 struct FossilizedTypeTraits<MarkedValue>
 {
@@ -28,6 +29,9 @@ struct FossilizedTypeTraits<MarkedValue>
     };
 };
 
+/// Reads or writes `MarkedValue::value` followed by `MarkedValue::isMarked`.
+///
+/// The field order matches `FossilizedTypeTraits<MarkedValue>::FossilizedType`.
 template<typename S>
 void serialize(S const& serializer, MarkedValue& value)
 {

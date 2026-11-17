@@ -311,6 +311,7 @@ SLANG_UNIT_TEST(tokenRefRetainsPoolAndName)
     // Clients without an AST can retain a typed token after both the name pool and
     // the original pool reference go away. The token pool must retain its `Name` objects.
     bool wasPoolDestroyed = false;
+    bool wasReplacedPoolDestroyed = false;
     TokenRef<IdentifierToken> retained;
     {
         NamePool names;
@@ -324,6 +325,30 @@ SLANG_UNIT_TEST(tokenRefRetainsPoolAndName)
     SLANG_CHECK(retained->getLogicalSpelling() == UnownedStringSlice("retained"));
     SLANG_CHECK_ABORT(retained->getName() != nullptr);
     SLANG_CHECK(retained->getName()->text == "retained");
+
+    // Copying from an rvalue must keep both handles' tokens backed by their pools.
+    // We destroy each destination before checking that the original still owns its pool.
+    {
+        TokenRef<IdentifierToken> copied(_Move(retained));
+        SLANG_CHECK(copied->getObject() == retained->getObject());
+    }
+    SLANG_CHECK_ABORT(!wasPoolDestroyed);
+    SLANG_CHECK(retained->getLogicalSpelling() == UnownedStringSlice("retained"));
+    {
+        RefPtr<TokenPool> replacedPool = new TokenPoolWithDestructionFlag(wasReplacedPoolDestroyed);
+        TokenRef<IdentifierToken> assigned(
+            replacedPool->createToken(TokenType::Identifier, UnownedStringSlice("replaced"))
+                .as<IdentifierToken>());
+        replacedPool = nullptr;
+
+        // Assignment releases the destination's former pool instead of transferring
+        // that unrelated pool to the original handle.
+        assigned = _Move(retained);
+        SLANG_CHECK(wasReplacedPoolDestroyed);
+        SLANG_CHECK(assigned->getObject() == retained->getObject());
+    }
+    SLANG_CHECK_ABORT(!wasPoolDestroyed);
+    SLANG_CHECK(retained->getLogicalSpelling() == UnownedStringSlice("retained"));
     retained = TokenRef<IdentifierToken>();
     SLANG_CHECK(wasPoolDestroyed);
 }

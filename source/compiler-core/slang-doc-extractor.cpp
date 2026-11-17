@@ -92,6 +92,9 @@ ranges.
     return comment;
 }
 
+/// Reads raw tokens and comments through EOF in input-location order.
+///
+/// Returns a sequence that retains the lexer's token pool and includes EOF.
 static LexemeList _readMarkupLexemes(Lexer& lexer)
 {
     // We retain comments as searchable entries alongside raw tokens. We omit other trivia so
@@ -110,6 +113,7 @@ static LexemeList _readMarkupLexemes(Lexer& lexer)
     }
 }
 
+/// Searches ordered lexemes after index zero for an exact `loc`, returning its index or -1.
 static Index _findLexemeIndex(SourceLoc loc, const Lexeme* lexemes, Index lexemeCount)
 {
     // The lexemes are ordered by location, so we search for an exact declaration location

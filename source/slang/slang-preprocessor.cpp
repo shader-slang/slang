@@ -278,7 +278,7 @@ struct SingleUseInputStream : PretokenizedInputStream
         m_tokenReader = TokenReader(m_lexedTokens);
     }
 
-    /// A list of raw tokens that will provide input
+    /// The token sequence and retained lexical pool used by this stream.
     TokenList m_lexedTokens;
 };
 
@@ -817,7 +817,10 @@ private:
     /// Get a reader for the tokens that make up the macro argument at the given `paramIndex`
     TokenReader _getArgTokens(Index paramIndex);
 
-    // Forms a borrowed argument slice with an explicit EOF at its delimiter.
+    /// Returns a reader over `[beginIndex, endIndex)` in `m_argTokens`.
+    ///
+    /// Requires `endIndex` to identify a stored delimiter or EOF. The reader uses
+    /// that location for its explicit EOF and borrows the list until mutation or destruction.
     TokenReader _getArgTokenRange(Index beginIndex, Index endIndex);
 
     /// Push a stream onto `m_currentOpStreams` that consists of a single token
@@ -2415,9 +2418,9 @@ void MacroInvocation::_pushStreamForSourceLocBuiltin(TokenType tokenType, F cons
 
 TokenReader MacroInvocation::_getArgTokenRange(Index beginIndex, Index endIndex)
 {
-    // Argument storage includes separating commas and the final ')'. A parameter
-    // expansion reads only its selected slice. We supply a distinct zero-width
-    // EOF at the delimiter so the reader never reinterprets that punctuation.
+    // Argument storage includes separating commas and a closing `)` or EOF.
+    // A parameter expansion reads only its selected slice. We supply a distinct
+    // zero-width EOF at the stored endpoint so the reader never consumes the delimiter.
     SLANG_RELEASE_ASSERT(beginIndex >= 0);
     SLANG_RELEASE_ASSERT(beginIndex <= endIndex);
     SLANG_RELEASE_ASSERT(endIndex < m_argTokens.getCount());
@@ -4981,9 +4984,13 @@ void Preprocessor::popInputFile()
     }
     else
     {
+        // We resume the parent's location map at its next unexpanded token.
+        // If the header defined a macro used at that position, expanding it
+        // could return the definition's location in the header instead.
+        // The new segment must begin in the parent's physical `SourceView`.
         SourceView* sourceView = parentFile->getLexer()->m_sourceView;
         sourceView->addAbsoluteSegment(
-            parentFile->getExpansionStream()->peekLoc(),
+            parentFile->getExpansionStream()->peekRawToken().getLoc(),
             absoluteSourceLocCounter);
     }
 

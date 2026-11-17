@@ -6,6 +6,8 @@
 #ifdef FIDDLE_GENERATED_OUTPUT_ID
 
 #if FIDDLE_GENERATED_OUTPUT_ID == 0
+// This fragment defines typed tokens with attached trivia and no additional stored state.
+// `slang-token.h` includes it inside `namespace Slang` after `Token` and the descriptors.
 /// A token with attached trivia in the `AngleBracketHeaderName` class.
 struct AngleBracketHeaderNameToken : Token
 {

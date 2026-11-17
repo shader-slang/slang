@@ -591,6 +591,7 @@ public:
     //
 
     void handleName(ASTSerializer const& serializer, Name*& value);
+    /// Writes lexical values, trivia, and occurrence data without serializing pool addresses.
     void handleToken(ASTSerializer const& serializer, Token& value);
     void handleASTNode(ASTSerializer const& serializer, NodeBase*& node);
     void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node);
@@ -740,6 +741,7 @@ public:
     //
 
     void handleName(ASTSerializer const& serializer, Name*& value);
+    /// Replaces `value` with lexical state restored into the receiving builder's pool.
     void handleToken(ASTSerializer const& serializer, Token& value);
     void handleASTNode(ASTSerializer const& serializer, NodeBase*& outNode);
     void handleASTNodeContents(ASTSerializer const& serializer, NodeBase* node);
@@ -795,6 +797,11 @@ void ASTSerialReadContext::handleName(ASTSerializer const& serializer, Name*& va
 // Tokens serialize lexical values rather than pool addresses. The physical spelling,
 // logical spelling, and trivia order are preserved; deserialization interns them
 // into the receiving AST builder's pool. Locations remain occurrence data.
+/// The location-independent lexical data for one serialized atomic lexeme.
+///
+/// `Count` represents an absent optional raw token. Other raw-token records require a
+/// concrete token tag, and trivia records require a concrete trivia tag.
+/// `hasName` means that the name's text is `logicalSpelling`.
 struct SerializedLexeme
 {
     LexemeTypeTag kind = LexemeTypeTag::Count;
@@ -803,9 +810,11 @@ struct SerializedLexeme
     bool hasName = false;
 };
 
+/// The typed fossil layout for a serialized lexeme record.
 template<>
 struct FossilizedTypeTraits<SerializedLexeme>
 {
+    /// The typed field layout matching the lexical serializer.
     struct FossilizedType
     {
         Fossilized<LexemeTypeTag> kind;
@@ -815,6 +824,7 @@ struct FossilizedTypeTraits<SerializedLexeme>
     };
 };
 
+/// Reads or writes `value` in the field order of its typed fossil record.
 template<typename S>
 void serialize(S const& serializer, SerializedLexeme& value)
 {
@@ -825,9 +835,11 @@ void serialize(S const& serializer, SerializedLexeme& value)
     serialize(serializer, value.hasName);
 }
 
+/// The typed fossil layout for a token occurrence and its lexical records.
 template<>
 struct FossilizedTypeTraits<Token>
 {
+    /// The field layout shared by the token writer and reader.
     struct FossilizedType
     {
         Fossilized<SourceLoc> loc;
@@ -844,8 +856,9 @@ void serialize(S const& serializer, Token& value)
     serializer.getContext()->handleToken(serializer, value);
 }
 
-// We record the presence of a `Name` separately from its spelling because existing
-// clients can supply interned names for synthesized literals as well as identifiers.
+/// Copies recognized lexical data into a location-independent record.
+///
+/// Returns the absent-raw-token sentinel for an empty input.
 static SerializedLexeme getSerializedLexeme(Lexeme lexeme)
 {
     if (!lexeme)
@@ -854,6 +867,8 @@ static SerializedLexeme getSerializedLexeme(Lexeme lexeme)
     result.kind = lexeme.getTypeTag();
     result.physicalSpelling = lexeme.getPhysicalSpelling();
     result.logicalSpelling = lexeme.getLogicalSpelling();
+    // We record name presence separately because clients can supply interned names
+    // for synthesized literals as well as identifiers.
     result.hasName = lexeme.getName() != nullptr;
     return result;
 }
@@ -890,8 +905,10 @@ void ASTSerialWriteContext::handleToken(ASTSerializer const& serializer, Token& 
     serialize(serializer, trailing);
 }
 
-// Deserialization constructs lexical objects directly. Re-lexing their
-// text would depend on a preprocessing mode that is not part of serialized ASTs.
+/// Restores a concrete lexical record into `tokenPool` at `loc` with `flags`.
+///
+/// Requires a concrete tag; `Count` is handled by the token reader.
+/// Uses `astBuilder` to intern names. The returned occurrence borrows `tokenPool`.
 static Lexeme createDeserializedLexeme(
     ASTBuilder* astBuilder,
     TokenPool* tokenPool,
@@ -899,6 +916,8 @@ static Lexeme createDeserializedLexeme(
     SourceLoc loc = SourceLoc(),
     TokenFlags flags = 0)
 {
+    // We construct lexical objects directly because re-lexing would depend on a
+    // preprocessing mode that is not part of serialized ASTs.
     Name* name = nullptr;
     if (value.hasName)
         name = astBuilder->getNamePool()->getName(value.logicalSpelling);

@@ -1434,6 +1434,10 @@ bool AggTypeDecl::isSubTypeOf(char const* name)
     return false;
 }
 
+/// Wraps a complete token sequence, including EOF, in shared mutable bookkeeping nodes.
+///
+/// Copies of the returned handles share those nodes. Lexical storage remains borrowed
+/// from the input's pool, which must outlive the result and any copied handles.
 List<TokenWithTrivia> createParserTokens(TokenList const& tokens)
 {
     // We add shared bookkeeping nodes around the lexer's grouped tokens. The parser needs

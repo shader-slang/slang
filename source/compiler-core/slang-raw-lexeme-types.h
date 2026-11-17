@@ -13,6 +13,8 @@
 %     if class:isSubclassOf(lexeme_defs.trivia) then return class.name .. "Trivia" end
 %     return "Raw" .. class.name
 % end
+// This fragment defines typed atomic lexemes without adding stored state.
+// `slang-token.h` includes it inside `namespace Slang` after `Lexeme` and the descriptors.
 % for _, class in ipairs(lexeme_defs.classes) do
 %     if class ~= lexeme_defs.root then
 /// An atomic lexeme in the `$(class.name)` class.

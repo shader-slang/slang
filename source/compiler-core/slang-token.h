@@ -318,7 +318,7 @@ private:
     SourceLoc m_loc;
 };
 
-/// Owns and interns immutable lexeme and token objects, their text, and trivia arrays.
+/// A pool that owns and interns immutable lexeme and token objects, text, and trivia arrays.
 ///
 /// Creation copies spelling text and retains `Name` references. Every raw token
 /// and trivia object supplied to this pool must have been created by this pool.
@@ -399,6 +399,11 @@ public:
         : m_pool(token.getPool()), m_token(token)
     {
     }
+
+    // Rvalues also copy so both handles retain the pool backing their token.
+    // A memberwise move would leave the original token without its owning pool.
+    TokenRef(const TokenRef&) = default;
+    TokenRef& operator=(const TokenRef&) = default;
 
     explicit operator bool() const { return bool(m_token); }
     T get() const { return m_token; }
