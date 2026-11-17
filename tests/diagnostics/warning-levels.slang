@@ -7,18 +7,18 @@
 // The independent `pedantic` group (off by default) is covered in vertex-missing-sv-position.slang.
 
 // 1. Default: the extra group is on, so the warning is emitted.
-//DIAGNOSTIC_TEST:SIMPLE(diag=WARN): -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=WARN,exit-code=0): -target hlsl -entry computeMain -stage compute
 
 // 2. -Wextra is redundant with the default (extra already on); still emitted.
-//DIAGNOSTIC_TEST:SIMPLE(diag=WARN): -Wextra -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=WARN,exit-code=0): -Wextra -target hlsl -entry computeMain -stage compute
 
 // 3. -Wall / -Wpedantic enable *other* groups; the independent extra group stays on, so the warning
 // is still emitted (the groups are not nested).
-//DIAGNOSTIC_TEST:SIMPLE(diag=WARN): -Wall -target hlsl -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=WARN): -Wpedantic -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=WARN,exit-code=0): -Wall -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=WARN,exit-code=0): -Wpedantic -target hlsl -entry computeMain -stage compute
 
 // 4. An explicit per-id disable suppresses it even though its group is on.
-//DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wno-keyword-used-as-name -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF,exit-code=0): -Wno-keyword-used-as-name -target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 

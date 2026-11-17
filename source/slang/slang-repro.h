@@ -190,6 +190,12 @@ struct ReproUtil
         Offset32Array<EntryPointState> entryPoints;
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode;
+
+        // Unannotated HLSL methods use `inout` receivers when this setting is true.
+        //
+        // We append the setting so `sizeof(RequestState)` and the type hash change.
+        // `_loadStateToList` rejects stored repros whose type hash does not match.
+        bool areHLSLMethodsMutatingByDefault = false;
     };
 
     // Cross-DLL entry points.

@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 from lib.buckets import TREE, SOURCE_TREE, API_TREE, buckets, tree_for
+from lib.manifest import BY_NAME
 
 
 def metric(metric_id, name, unit, stats):
@@ -72,15 +73,26 @@ def observation(record, observed, runner, os_name):
     if len(metrics) > 64:
         raise ValueError("Memory metrics exceed BenchView's per-observation limit")
     selected = names[:64 - len(metrics)]
+    primary_name = "apiTotal" if record["mode"] == "api" else "compileInner"
+    test = {"id": "compile-perf/" + record["workload"], "name": record["workload"]}
+    # Keep test metadata stable across failures; passed records must carry the named metric.
+    if not record["ok"] or primary_name in selected:
+        test["metadata"] = {"primaryMetric": "compile.timer." + primary_name.lower()}
+    else:
+        print(f"Warning: {record['workload']}: omitted primaryMetric; "
+              f"{primary_name} is not exported", file=sys.stderr)
     # Validate distributions before selecting a tree or aligning samples. The
     # median selects the same source-emission hierarchy as the existing reports.
     timer_metrics = {name: metric("timer." + name.lower(), name, "ms", timers[name])
                      for name in names}
     compiler_tree = tree_for({name: statistics.median(entry["distribution"]["samples"])
                               for name, entry in timer_metrics.items()})
+    # Labels follow the timer itself, including non-primary totals in mixed records.
+    total_labels = {"compileInner": "Total compile time", "apiTotal": "Total API time"}
     for name in selected:
         entry = timer_metrics[name]
-        if name in ("compileInner", "apiTotal"):
+        if name in total_labels:
+            entry["name"] = total_labels[name]
             tree = compiler_tree if name == "compileInner" else API_TREE
             if any(len(timers[n]["samples"]) != len(timers[name]["samples"])
                    for n in tree_names(tree) if n in timers):
@@ -100,7 +112,7 @@ def observation(record, observed, runner, os_name):
     if len(source.encode()) > 262144:
         raise ValueError("Source record exceeds BenchView's inline artifact limit")
     result = {
-        "test": {"id": "compile-perf/" + record["workload"], "name": record["workload"]},
+        "test": test,
         "case": {"dimensions": {"size": record["size"], "mode": record["mode"]}},
         "observedAt": observed, "status": "passed" if record["ok"] else "failed",
         "environment": {"identity": {"machine": runner, "os": {"name": os_name}}},
@@ -147,6 +159,8 @@ def submissions(records, meta, os_name, observed, execution, release=None, branc
            "dimensions": dimensions}
     if meta.get("commit_time"):
         run["vcs"]["commitTime"] = meta["commit_time"]
+    # Branch is verified revision provenance, not just a display grouping; callers
+    # omit it for detached daily checkouts or unverified release targets.
     if branch:
         run["vcs"]["branch"] = branch
     if release:
@@ -201,11 +215,8 @@ def write_atomic(path, content):
             temporary.unlink(missing_ok=True)
 
 
-def export(payloads, output):
-    """Publish a bounded host-collector bundle, then its ready marker; never send credentials."""
-    output.mkdir(parents=True, exist_ok=True)
-    ready = output / "submissions.ready"
-    ready.unlink(missing_ok=True)
+def export_content(payloads):
+    """Validate collector limits before publishing or adding an optional release."""
     if not 1 <= len(payloads) <= 64:
         raise ValueError("An export requires 1 to 64 submission batches")
     wrapper = {"schemaVersion": 1, "kind": "slang-compile-perf-benchview-export",
@@ -213,8 +224,58 @@ def export(payloads, output):
     content = encode(wrapper) + b"\n"
     if len(content) > 8 * 1024 * 1024:
         raise ValueError("Collector export exceeds the 8 MiB limit")
-    write_atomic(output / "submissions.json", content)
+    return content
+
+
+def export(payloads, output):
+    """Publish a bounded host-collector bundle, then its ready marker; never send credentials."""
+    output.mkdir(parents=True, exist_ok=True)
+    ready = output / "submissions.ready"
+    ready.unlink(missing_ok=True)
+    write_atomic(output / "submissions.json", export_content(payloads))
     write_atomic(ready, b"ready\n")
+
+
+def is_current_default_case(record):
+    """Keep release cases comparable with daily runs, excluding retired tests and sweep sizes."""
+    spec = BY_NAME.get(record["workload"])
+    # Match sweep.workload_complete's typed-size convention: False and 0.0 are not 0.
+    return (spec is not None and type(record["size"]) is type(spec.default_size)
+            and record["size"] == spec.default_size)
+
+
+def release_submissions(completed, results_dir, daily_meta, os_name, execution, existing=()):
+    """Build payloads from new_release_check.py --completed and <results_dir>/<tag>/results.json.
+
+    Each manifest entry requires tag, commit, commit_time, released_at and observed_at;
+    branch is optional. Invalid releases are warned about and skipped independently.
+    Existing payloads reserve collector capacity for the daily results.
+    """
+    if not isinstance(completed, list):
+        raise ValueError("Completed releases must be a list")
+    payloads = []
+    for info in completed:
+        tag = "<unknown>"
+        try:
+            tag = info["tag"]
+            if not isinstance(tag, str) or not re.fullmatch(r"v\d{4}\.\d+(?:\.\d+)?", tag):
+                raise ValueError("Invalid completed release tag")
+            records = json.loads((results_dir / tag / "results.json").read_text(encoding="utf-8"))
+            selected = [r for r in records if is_current_default_case(r)]
+            # Daily and release measurements share this job's host and corpus checkout.
+            # Do not inherit daily labels, dates or compiler paths as release provenance.
+            meta = {key: daily_meta[key] for key in ("runner", "corpus_sha") if key in daily_meta}
+            meta.update(commit=info["commit"], commit_time=info["commit_time"])
+            candidate = submissions(selected, meta, os_name, info["observed_at"],
+                                    execution + "-" + tag,
+                                    {"label": tag, "releasedAt": info["released_at"]},
+                                    branch=info.get("branch"))
+            export_content(list(existing) + payloads + candidate)
+            payloads.extend(candidate)
+        except (ValueError, KeyError, TypeError, AttributeError, RuntimeError, OSError) as error:
+            print(f"Warning: skipped BenchView release {tag}: {error}; "
+                  "export its archived results separately to retry", file=sys.stderr)
+    return payloads
 
 
 def main():
@@ -228,6 +289,10 @@ def main():
     parser.add_argument("--branch")
     parser.add_argument("--release", help="Slang version tested, e.g. v2026.19")
     parser.add_argument("--released-at", help="Actual release timestamp, if known")
+    parser.add_argument("--completed-releases", type=Path,
+                        help="Metadata written by new_release_check.py for this invocation")
+    parser.add_argument("--release-results", type=Path,
+                        help="Directory containing the completed releases' results")
     parser.add_argument("--output", required=True, type=Path,
                         help="Directory for submissions.json and its submissions.ready marker")
     args = parser.parse_args()
@@ -235,12 +300,25 @@ def main():
     (args.output / "submissions.ready").unlink(missing_ok=True)
     if args.released_at and not args.release:
         parser.error("--released-at requires --release")
+    if bool(args.completed_releases) != bool(args.release_results):
+        parser.error("--completed-releases and --release-results must be used together")
+    if args.completed_releases and args.release:
+        parser.error("--completed-releases cannot be combined with --release")
     release = {"label": args.release} if args.release else None
     if args.released_at:
         release["releasedAt"] = args.released_at
+    meta = json.loads(args.meta.read_text(encoding="utf-8"))
     payloads = submissions(json.loads(args.results.read_text(encoding="utf-8")),
-                           json.loads(args.meta.read_text(encoding="utf-8")), args.os,
+                           meta, args.os,
                            args.observed_at, args.execution_id, release, args.branch)
+    if args.completed_releases:
+        try:
+            payloads.extend(release_submissions(
+                json.loads(args.completed_releases.read_text(encoding="utf-8")),
+                args.release_results, meta, args.os, args.execution_id, existing=payloads))
+        except (ValueError, OSError) as error:
+            print(f"Warning: skipped BenchView release manifest: {error}; "
+                  "export its archived results separately to retry", file=sys.stderr)
     export(payloads, args.output)
     print(f"Exported {sum(len(p['observations']) for p in payloads)} observations")
 

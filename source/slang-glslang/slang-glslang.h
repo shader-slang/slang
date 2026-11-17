@@ -194,7 +194,7 @@ typedef struct glslang_LinkRequest_t
     const uint32_t** modules;    // Input: array of pointers to SPIR-V modules
     const uint32_t* moduleSizes; // Input: array of sizes of SPIR-V modules in 32-bit words
     int moduleCount;             // Input: number of modules in the array
-    const uint32_t* linkResult;  // Output: pointer to linked SPIR-V module
+    const uint32_t* linkResult;  // Output: linked SPIR-V module; free with glslang_freeLinkResult
     size_t linkResultSize;       // Output: size of the linked SPIR-V module in 32-bit words
 } glslang_LinkRequest;
 
@@ -210,4 +210,5 @@ typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(
     char** outString);
 typedef void (*glslang_FreeDisassemblyFunc)(char* disassembly);
 typedef int (*glslang_LinkSPIRVFunc)(glslang_LinkRequest* request);
+typedef void (*glslang_FreeLinkResultFunc)(const uint32_t* linkResult);
 #endif

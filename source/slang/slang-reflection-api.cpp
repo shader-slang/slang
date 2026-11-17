@@ -986,7 +986,12 @@ spReflectionType_GetFullName(SlangReflectionType* inType, ISlangBlob** outNameBl
         return SLANG_FAIL;
 
     StringBuilder sb;
-    type->toText(sb);
+    {
+        // Printing a type can create decl-refs (for example `DeclRefBase::getParent()`), which
+        // needs the current AST builder. Reflection calls can run on a thread that has not set one.
+        SLANG_AST_BUILDER_RAII(type->getASTBuilderForReflection());
+        type->toText(sb);
+    }
     *outNameBlob = StringUtil::createStringBlob(sb.produceString()).detach();
     return SLANG_OK;
 }

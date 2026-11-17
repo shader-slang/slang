@@ -1,0 +1,87 @@
+name: Update submodules with retry
+
+description: >-
+  Initializes and updates all submodules of the current checkout, retrying on
+  transient network failures. Use it after an `actions/checkout` step that sets
+  `submodules: false`.
+
+# We run the submodule update here instead of through `submodules: recursive`
+# on `actions/checkout` because that action retries `git fetch` but calls
+# `git submodule update` exactly once. A single dropped connection to
+# github.com while cloning any of the ~20 submodules then fails the whole job
+# (see https://github.com/shader-slang/slang/issues/13722).
+
+inputs:
+  fetch-depth:
+    description: >-
+      Number of commits to fetch for each submodule. Pass the same value as the
+      `fetch-depth` of the preceding `actions/checkout` step, as that action
+      derives the submodule depth from it. Zero fetches the full history.
+    required: false
+    default: "1"
+  max-attempts:
+    description: Maximum number of `git submodule update` attempts.
+    required: false
+    default: "3"
+  retry-delay-seconds:
+    description: Seconds to wait before the first retry. The wait doubles after each failure.
+    required: false
+    default: "15"
+  low-speed-seconds:
+    description: >-
+      Seconds a transfer may stay below one kilobyte per second before git
+      aborts it. This bounds a stalled clone, which would otherwise hang until
+      the job times out, and lets the next attempt start.
+    required: false
+    default: "60"
+
+runs:
+  using: composite
+  steps:
+    # The self-hosted Windows runners have no `bash` on PATH until a later
+    # setup step adds it, but this action runs right after the checkout.
+    - name: Add bash to PATH (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+
+    - name: Update submodules
+      shell: bash
+      env:
+        FETCH_DEPTH: ${{ inputs.fetch-depth }}
+        MAX_ATTEMPTS: ${{ inputs.max-attempts }}
+        RETRY_DELAY_SECONDS: ${{ inputs.retry-delay-seconds }}
+        # Git passes these to every `git-remote-https` it starts, including
+        # the ones started by `git submodule update` for each clone.
+        GIT_HTTP_LOW_SPEED_LIMIT: "1000"
+        GIT_HTTP_LOW_SPEED_TIME: ${{ inputs.low-speed-seconds }}
+      run: |
+        depth_args=()
+        if [[ "$FETCH_DEPTH" != "0" ]]; then
+          depth_args=("--depth=$FETCH_DEPTH")
+        fi
+
+        delay="$RETRY_DELAY_SECONDS"
+        for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
+          echo "::group::git submodule update (attempt $attempt of $MAX_ATTEMPTS)"
+          # `submodule sync` is part of the attempt so that it also repairs a
+          # configuration left half-written by an interrupted earlier attempt.
+          if git submodule sync --recursive &&
+            git submodule update --init --force --recursive "${depth_args[@]}"; then
+            echo "::endgroup::"
+            # `actions/checkout` does the same after its own submodule update.
+            git submodule foreach --recursive git config --local gc.auto 0
+            exit 0
+          fi
+          echo "::endgroup::"
+
+          if ((attempt == MAX_ATTEMPTS)); then
+            break
+          fi
+          echo "::warning::git submodule update failed (attempt $attempt of $MAX_ATTEMPTS). Retrying in ${delay}s."
+          sleep "$delay"
+          delay=$((delay * 2))
+        done
+
+        echo "::error::git submodule update failed after $MAX_ATTEMPTS attempts."
+        exit 1

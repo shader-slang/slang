@@ -219,6 +219,13 @@ static void _lookUpDirectAndTransparentMembers(
         // For example, we might be filtering so that we only consider
         // type declarations.
         //
+        // Consider `for (int2 v = 0; v.x < 2; ++v.x) {}` repeated in the same HLSL block.
+        // The parser checks `v.x` to disambiguate `<`, before statement checking reaches either
+        // loop. Same-name members are enumerated from newest to oldest, so we remember the first
+        // visible initializer and omit earlier locals that it is allowed to shadow.
+        // A variable excluded by `request.declToExclude` must not hide the earlier binding that its
+        // initializer expression can still reference.
+        Decl* shadowingInitializer = nullptr;
         for (auto m : containerDecl->getDirectMemberDeclsOfName(name))
         {
             // Skip this declaration if we are checking and this hasn't been
@@ -233,12 +240,21 @@ static void _lookUpDirectAndTransparentMembers(
             if (!DeclPassesLookupMask(m, request.mask))
                 continue;
 
+            if (shadowingInitializer)
+            {
+                if (isHLSLForLoopInitializerRedeclaration(shadowingInitializer, m))
+                    continue;
+            }
+
             // The declaration passed the test, so add it!
             AddToLookupResult(
                 result,
                 CreateLookupResultItem(
                     astBuilder->getMemberDeclRef<Decl>(parentDeclRef, m),
                     inBreadcrumbs));
+
+            if (m->findModifier<HLSLForLoopInitializerAttribute>())
+                shadowingInitializer = m;
         }
     }
 

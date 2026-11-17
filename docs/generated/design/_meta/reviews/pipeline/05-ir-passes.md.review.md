@@ -1,23 +1,23 @@
 ---
 review_report: true
-reviewer_model: gpt-5.6-sol
-reviewed_at: 2026-08-04T12:10:09+00:00
+reviewer_model: gpt-6
+reviewed_at: 2026-11-02T21:19:34Z
 target_doc: pipeline/05-ir-passes.md
-target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_watched_paths_digest: 66d53e154eb63196d1c2ca1ee3a1c040e363e14dfbc86e6fad3f9c19cd0f9d21
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+target_doc_watched_paths_digest: 434c98b6b03bec03448f6e6a2edb7332984d1006ddfb79bd35d3933b4f25bc49
+source_commit: be3c344414f6541ba6731813b36591a94cd05482
 checklist:
   factual_accuracy: fail
   cross_references: pass
-  completeness: pass
-  style_consistency: pass
+  completeness: partial
+  style_consistency: partial
   source_alignment: fail
   front_matter_validity: pass
-finding_count: 3
+finding_count: 5
 severity_breakdown:
-  critical: 0
-  major: 2
-  minor: 1
+  critical: 2
+  major: 1
+  minor: 2
   nit: 0
 ---
 
@@ -25,21 +25,25 @@ severity_breakdown:
 
 ## Summary
 
-The document satisfies its structure and style contracts, all 27 explicit line-number citations are accurate, and its links and front matter validate at the recorded commit. Three factual issues remain: one watched-path note was not updated after the manifest changed, and four pass-table purpose cells misdescribe their implementations. The most important errors label call specialization as array-generic specialization or tagged-union defunctionalization.
+The inventory and pipeline citations are largely accurate, but two behavioral claims need correction. Most importantly, the copy-logical row incorrectly excludes GLSL, contradicting both the source and the document’s own phase table. The description of `-dump-ir`, AnyValue marshalling granularity, target-specific table coverage, and document length also need adjustment.
 
 ## Items checked
 
-- Read `_review.md`, `_common.md`, the per-document prompt, the target document, dependency `pipeline/04-ast-to-ir.md`, and the resolved watched-file list from `regenerate.py show`.
-- Verified all 27 explicit line-number and line-range citations against `source/slang/slang-emit.cpp` at `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
-- Confirmed 162 `slang-ir-*.cpp` files and 180 `SLANG_PASS(...)` call sites in `linkAndOptimizeIR` (181 textual macro occurrences including the macro definition).
-- Spot-checked more than 18 factual claims, including all four orchestrator callers, both lowering-set scans, HostVM's early return, SPIR-V legalization order, layout-module linking, specialization options, autodiff cleanup, non-uniform-index modes, coverage counter behavior, metadata collection, SSA simplification, register allocation, DLL wrappers, and representative table purposes.
-- Ran the generated-doc linter, resolved the relative links at the recorded commit, and verified the generated peer targets exist in the manifest.
-- Verified the required sections, 65,536-byte cap (document size 44,836 bytes), universal style rules, mandatory front matter, and the historical 325-file watched-path digest (`66d53e154eb63196d1c2ca1ee3a1c040e363e14dfbc86e6fad3f9c19cd0f9d21`).
+- Read `_review.md`, `_common.md`, the document-specific prompt, and the resolved watched paths from `regenerate.py show pipeline/05-ir-passes.md`.
+- Verified against the **current working tree**. Its `source/` contents match the document’s recorded source commit; `git diff 2518a942d59b1228fc8cc70a37739baab82b6002 --stat -- source/` returned no differences.
+- Checked every explicit line-number citation, including all 15 phase ranges, orchestrator definitions and callers, plain calls, SPIR-V legalization, metadata interfaces, and the coverage option.
+- Spot-checked more than 10 behavioral and structural claims: the 184 wrapped calls, accumulating lowering flags, HostVM early return, uniformity gate and error exit, witness-lookup option, autodiff-context target gate, pre-link bit-field synthesis and loop inversion, SPIR-V legalization order, active-mask handling, copy-logical target gates, and AnyValue marshalling keys.
+- Resolved all 208 relative-link occurrences (191 distinct targets); all 11 linked generated pages have manifest entries. Read the dependency page only for cross-reference checks.
+- Confirmed all 167 `slang-ir-*.cpp` files appear in category tables.
+- Checked required sections, table columns, front-matter fields, size limits, and Liquid safety. The document is 67,257 UTF-8 bytes and contains no raw Liquid openers.
+- No files were written.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## How the passes are ordered`, lines 101-107 | The note says `source/slang/slang-emit-spirv.cpp` falls outside this page's watched paths and “should be added,” but the current manifest entry already watches that file. It also says SPIR-V legalization has no category row, although the `SPIR-V legalize` row appears at line 356. | `docs/generated/design/_meta/manifest.yaml:196-207` includes `source/slang/slang-emit-spirv.cpp`; the target document's `SPIR-V legalize` row links `source/slang/slang-ir-spirv-legalize.cpp`. | Remove the SPIR-V half of this stale note. Retain only the actionable gap for `source/slang/slang-check-out-of-bound-access.cpp`, or add that source path to the manifest and remove the note entirely. |
-| F-002 | major | `### Specialization and generics`, `Specialize arrays` and `Defunctionalization` rows (lines 203 and 209) | Both purpose cells describe transformations these files do not implement. `slang-ir-specialize-arrays` specializes calls whose struct parameters contain array fields; it does not specialize “array-typed generic parameters.” The explicitly aspirational `slang-ir-defunctionalization` filename currently contains `specializeHigherOrderParameters`, which specializes calls receiving global functions; it does not convert function values to tagged unions. | `source/slang/slang-ir-specialize-arrays.h:9-20`; `source/slang/slang-ir-defunctionalization.h:1-16`; `source/slang/slang-ir-defunctionalization.cpp:22-33`. | Rename the first purpose to call specialization for struct parameters with array fields. Rename the second pass/purpose to `Specialize higher-order parameters` and describe specializing calls that pass global functions; delete the tagged-union claim. |
-| F-003 | major | `### Layout and binding`, `Late require capability` and `String hash` rows (lines 328 and 331) | These purpose cells also contradict their APIs. `processLateRequireCapabilityInsts` processes and eliminates late-require instructions while diagnosing unavailable capabilities; it does not add requirements. `slang-ir-string-hash` manages the global hashed-string-literal pool and verifies that `getStringHash` operands are string literals; it does not perform stable hashing “for symbols.” | `source/slang/slang-ir-late-require-capability.h:12-18`; `source/slang/slang-ir-string-hash.h:13-25`; `source/slang/slang-ir-string-hash.cpp:99-121`. | Describe late capability processing as eliminating deferred checks and diagnosing missing capabilities. Describe string-hash handling as pooling hashed string literals and validating `getStringHash` operands. |
+| F-001 | critical | `## Pass categories`, “Lower copy logical” row, line 356 | The claim `Its only call site is inside SPIR-V legalization, so it never runs for the source-language targets` is false. GLSL explicitly runs this pass; the phase table already records that correctly. | `source/slang/slang-emit.cpp:2653-2657` explains that GLSL lacks `OpCopyLogical` and calls `SLANG_PASS(lowerCopyLogical)` under `target == CodeGenTarget::GLSL`. `source/slang/slang-ir-spirv-legalize.cpp:2985-2994` also calls it for SPIR-V versions earlier than 1.4. | Replace the exclusivity claim with both call sites: GLSL post-link lowering and SPIR-V legalization when targeting versions below 1.4. |
+| F-002 | critical | `## How the passes are ordered`, lines 65-70 | The assertion that `-dump-ir` shows `exactly the SLANG_PASS call sites of linkAndOptimizeIR and nothing else` incorrectly excludes the pre-link result snapshot. This misdirects readers debugging lowering. | `source/slang/slang-lower-to-ir.cpp:15846-15855` checks `shouldDumpIR()` and calls `dumpIR` with the label `"LOWER-TO-IR"` after the pre-link passes. | State that individual plain pre-link calls lack wrapped before/after headers, but their combined result appears in the `LOWER-TO-IR` snapshot. Retain the separate observation that the surrounding SPIR-V legalization dumps are disabled. |
+| F-003 | minor | `### Specialization and generics`, “AnyValue marshalling” row, line 250 | `one ... function per size` gives the wrong generation granularity. Distinct concrete types sharing an AnyValue size can require separate pack/unpack pairs. | `source/slang/slang-ir-any-value-marshalling.cpp:78-89` keys functions by both `originalType` and `anyValueSize`; `:1325-1336` constructs that key before generating the pair. `:878` constructs a size-based name hint, not a unique per-size function identity. | Describe one pair per concrete-type/AnyValue-size combination. Clarify that size-based name hints can repeat and do not establish one shared pair per size. |
+| F-004 | major | `### Target-specific lowering`, lines 473-486 | This category replaces the required `Purpose` column with `Target`. Several rows contain only a target name, leaving their transformation purpose undocumented. | `docs/generated/design/_meta/prompts/pipeline-05-ir-passes.md:44-49` requires a `Pass / File / Purpose` table for each category. Rows such as GLSL liveness, CUDA immutable load, and Vulkan invert Y provide only targets. | Restore a `Purpose` column and add a short behavioral description for every row. Preserve target information in an additional column or within each purpose cell. |
+| F-005 | minor | Whole document | At 67,257 UTF-8 bytes, the document exceeds the per-document prompt’s `under 64 KB` limit, even interpreting KB as 65,536 bytes. It remains below the manifest’s separate 81,920-byte cap. | `docs/generated/design/_meta/prompts/pipeline-05-ir-passes.md:72-74` sets the stricter limit and directs the author to summarize when necessary. | Shorten repetitive explanations and long table cells until the document is below 64,000 bytes, satisfying either interpretation without removing required sections. |

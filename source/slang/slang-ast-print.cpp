@@ -59,7 +59,7 @@ void ASTPrinter::addType(Type* type)
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
             auto elementType = matrixType->getElementType();
-            if (as<BasicExpressionType>(elementType))
+            if (as<BasicExpressionType>(elementType) && !matrixType->hasSpecifiedLayout())
             {
                 matrixType->getElementType()->toText(m_builder);
                 if (as<ConstantIntVal>(matrixType->getRowCount()) &&
@@ -1086,7 +1086,10 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto spirvAsmExpr = as<SPIRVAsmExpr>(expr))
     {
-        sb << "spirv_asm {";
+        sb << "spirv_asm ";
+        if (spirvAsmExpr->assumeValidResourceOperands)
+            sb << "[__assumeValidResourceOperands] ";
+        sb << "{";
         bool first = true;
         for (auto& inst : spirvAsmExpr->insts)
         {
@@ -1563,27 +1566,9 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef, List<Range<Index>>*
                 {
                     ScopePart scopePart(this, Part::Type::ParamType);
 
-                    // Seems these apply to parameters/VarDeclBase and are not part of the 'type'
-                    // but seems more appropriate to put in the Type Part
-
-                    if (paramDecl->hasModifier<InOutModifier>())
-                    {
-                        sb << toSlice("inout ");
-                    }
-                    else if (paramDecl->hasModifier<OutModifier>())
-                    {
-                        sb << toSlice("out ");
-                    }
-                    else if (paramDecl->hasModifier<InModifier>())
-                    {
-                        sb << toSlice("in ");
-                    }
-
-                    // And this to params/variables (not the type)
-                    if (paramDecl->hasModifier<ConstModifier>())
-                    {
-                        sb << toSlice("const ");
-                    }
+                    // The passing mode belongs to the parameter declaration rather than its type,
+                    // but we print it in the type part so that it stays next to the type.
+                    printParamPassingModePrefix(sb, getParamPassingMode(paramDecl));
 
                     addType(type);
                 }

@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
-//TEST:SIMPLE(filecheck=CHECK_NOABORT):-target spirv
+//TEST:SIMPLE(filecheck=CHECK_NOABORT,exit-code=-1):-target spirv
 
 RWStructuredBuffer<float> buf;
 
