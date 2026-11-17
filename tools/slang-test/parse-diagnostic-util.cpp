@@ -177,11 +177,17 @@ The header line carries the severity, an optional code in brackets, and the mess
 location line that follows carries the path and position. A note repeats the same shape with
 `note:` and a `---` location marker. This is slangc's default rendering for its diagnostics.
 */
+// Matches the header line of a rich record: a severity word, an optional `[E<digits>]` code,
+// then `: message`. The out-parameters are meaningful only on a match. When requireCode is
+// set, a header without a code bracket does not match — every slang error/warning diagnostic
+// carries a code, while the codeless form (`note: message`) only occurs inside a record
+// stream, never leading one.
 static bool _matchSlangRichDiagnosticHeader(
     const UnownedStringSlice& inLine,
     ArtifactDiagnostic::Severity& outSeverity,
     UnownedStringSlice& outCode,
-    UnownedStringSlice& outMessage)
+    UnownedStringSlice& outMessage,
+    bool requireCode)
 {
     UnownedStringSlice text(inLine.trim());
 
@@ -201,6 +207,7 @@ static bool _matchSlangRichDiagnosticHeader(
             return false;
         }
 
+        // The renderer decorates the code as `[E#####]`; the digits after the `E` are the code.
         UnownedStringSlice code = text.subString(1, closeIndex - 1);
         if (!code.startsWith(UnownedStringSlice::fromLiteral("E")))
         {
@@ -208,6 +215,10 @@ static bool _matchSlangRichDiagnosticHeader(
         }
         code = code.tail(1);
 
+        if (code.getLength() == 0)
+        {
+            return false;
+        }
         for (const char c : code)
         {
             if (!CharUtil::isDigit(c))
@@ -215,13 +226,13 @@ static bool _matchSlangRichDiagnosticHeader(
                 return false;
             }
         }
-        if (code.getLength() == 0)
-        {
-            return false;
-        }
 
         outCode = code;
         text = text.tail(closeIndex + 1);
+    }
+    else if (requireCode)
+    {
+        return false;
     }
 
     if (!text.startsWith(UnownedStringSlice::fromLiteral(":")))
@@ -310,7 +321,7 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
     {
         ArtifactDiagnostic::Severity severity;
         UnownedStringSlice code, message;
-        if (_matchSlangRichDiagnosticHeader(line, severity, code, message))
+        if (_matchSlangRichDiagnosticHeader(line, severity, code, message, true))
         {
             return true;
         }
@@ -336,7 +347,7 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
     {
         ArtifactDiagnostic::Severity severity;
         UnownedStringSlice code, message;
-        if (_matchSlangRichDiagnosticHeader(line, severity, code, message))
+        if (_matchSlangRichDiagnosticHeader(line, severity, code, message, false))
         {
             if (hasPending)
             {
@@ -348,7 +359,15 @@ static bool _isSlangRichDiagnostics(const UnownedStringSlice& inText)
             pending.stage = ArtifactDiagnostic::Stage::Compile;
             if (code.getLength() > 0)
             {
-                pending.code = allocator.allocate(code);
+                // Store the code normalized through Int, as the classic parse does, so both
+                // renderings produce the same code string (the renderer zero-pads the bracket).
+                Int codeNumber;
+                if (SLANG_SUCCEEDED(StringUtil::parseInt(code, codeNumber)))
+                {
+                    StringBuilder buf;
+                    buf << codeNumber;
+                    pending.code = allocator.allocate(buf);
+                }
             }
             pending.text = allocator.allocate(message);
             hasPending = true;
@@ -479,7 +498,7 @@ static SlangResult _findDownstreamCompiler(
         // identity.
         ArtifactDiagnostic::Severity richSeverity;
         UnownedStringSlice richCode, richMessage;
-        if (_matchSlangRichDiagnosticHeader(line, richSeverity, richCode, richMessage))
+        if (_matchSlangRichDiagnosticHeader(line, richSeverity, richCode, richMessage, true))
         {
             outIdentity = CompilerIdentity::makeSlang();
             return SLANG_OK;
