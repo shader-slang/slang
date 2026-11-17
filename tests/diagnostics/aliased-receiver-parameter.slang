@@ -23,6 +23,7 @@ struct S
     [mutating] int mutBorrow(__borrow S other) { v = 5; return other.v; }
     [__ref] int refBorrow(__borrow S other) { v = 5; return other.v; }
     [mutating] void mutInoutField(inout int other) { v = 5; other = 7; }
+    [mutating] void setPtr(inout S* other) { v = 5; }
     [__ref] void refInOut(inout S other) { v = 5; other.v = 7; }
     [__ref] void refRef(__ref S other) { v = 5; other.v = 7; }
     [nonmutating] void nonmutInout(inout S other) { other.v = 7; }
@@ -194,13 +195,15 @@ void computeMain()
     // element paired with its own field does not warn.
     inoutAndInoutPrefix(arrS[gIdx], arrS[gIdx].v);
 
-    // Negative: a deref callee (`p->method()`) skips the receiver pair —
-    // its base expression names the pointer while the receiver storage is
-    // the pointee — so no warning fires for the aliasing argument either way.
+    // Negative: a deref callee (`p->method()`) carries a `DerefExpr`-wrapped
+    // pointer as its receiver, which the structural proof cannot see through,
+    // so the receiver pair never fires for it — including when the argument is
+    // the pointer itself (`p->setPtr(p)`) or the pointee (`p->mutInout(*p)`).
     {
         S* p = &s;
         p->mutInout(s);
         p->mutInout(*p);
+        p->setPtr(p);
     }
 
     // Negative: a property is mediated by accessors, so an argument naming it

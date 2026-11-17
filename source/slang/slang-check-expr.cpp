@@ -4726,22 +4726,26 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // declaration rather than the `FuncType` (issue #13758). Both are set
             // together or not at all: a deref callee (`p->method()`) names the
             // pointee as its receiver while its base expression names the pointer,
-            // and other receiver-bearing callee shapes (a bare reference, a
-            // partially applied generic) have no base expression, so those calls
-            // skip the receiver pair — a missed warning, never a wrong one.
+            // and a callee with no base expression (a bare function reference)
+            // has none to compare, so those calls skip the receiver pair —
+            // a missed warning, never a wrong one.
             Expr* receiverExpr = nullptr;
             std::optional<ParamPassingMode> receiverMode;
             if (callableDeclRef)
             {
                 if (auto thisParamInfo = findEffectiveThisParamInfo(callableDeclRef))
                 {
-                    if (!as<DerefMemberExpr>(invoke->functionExpr))
+                    // The receiver is the base of the callee expression. A deref
+                    // callee (`p->method()`) carries a `DerefExpr`-wrapped pointer
+                    // as its base, which the structural alias proof cannot see
+                    // through, so such calls skip the receiver pair — a missed
+                    // warning, never a wrong one. A bare function reference has
+                    // no base expression at all, so it skips the pair too. Both
+                    // variables are set together or not at all.
+                    if (Expr* baseExpr = GetBaseExpr(invoke->functionExpr))
                     {
-                        if (Expr* baseExpr = GetBaseExpr(invoke->functionExpr))
-                        {
-                            receiverMode = thisParamInfo->mode;
-                            receiverExpr = baseExpr;
-                        }
+                        receiverMode = thisParamInfo->mode;
+                        receiverExpr = baseExpr;
                     }
                 }
             }
