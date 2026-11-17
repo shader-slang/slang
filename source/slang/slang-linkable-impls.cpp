@@ -517,7 +517,10 @@ SpecializedComponentType::SpecializedComponentType(
                 funcDeclRef = specializationInfo->specializedFuncDeclRef;
 
             (*mangledEntryPointNames).add(getMangledName(m_astBuilder, funcDeclRef));
-            (*entryPointNameOverrides).add(entryPoint->getEntryPointNameOverride(0));
+            // A specialization can replace the target name; renaming the entry point
+            // afterwards still takes precedence, via visitRenamedEntryPoint.
+            (*entryPointNameOverrides)
+                .add(entryPoint->getEffectiveEntryPointNameOverride(specializationInfo));
         }
 
         void visitRenamedEntryPoint(

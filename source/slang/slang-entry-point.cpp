@@ -68,6 +68,15 @@ Module* EntryPoint::getModule()
     return Slang::getModule(getFuncDecl());
 }
 
+String EntryPoint::getEffectiveEntryPointNameOverride(
+    EntryPointSpecializationInfo* specializationInfo)
+{
+    String nameOverride = getEntryPointNameOverride(0);
+    if (specializationInfo && specializationInfo->entryPointNameOverride.getLength())
+        nameOverride = specializationInfo->entryPointNameOverride;
+    return nameOverride;
+}
+
 Index EntryPoint::getSpecializationParamCount()
 {
     return m_genericSpecializationParams.getCount() + m_existentialSpecializationParams.getCount();

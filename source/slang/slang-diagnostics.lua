@@ -4886,6 +4886,13 @@ err(
     span { loc = "location", message = "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'" }
 )
 
+err(
+    "unable-to-specialize-entry-point",
+    38030,
+    "unable to specialize the entry point with the provided arguments",
+    span { loc = "location", message = "unable to specialize the entry point '~entryPoint:Name' with the provided arguments" }
+)
+
 --
 -- 380xx: differentiation modifiers
 --

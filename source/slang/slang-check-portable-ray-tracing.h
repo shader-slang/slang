@@ -78,6 +78,13 @@ String getSourceTypeName(ASTBuilder* astBuilder, Type* stageType);
 /// source-level lookup name.
 String getEntryPointName(UnownedStringSlice sourceTypeName, Stage stage);
 
+/// Returns the target symbol name for a structural stage selection: the source type name
+/// (ordinary type mangling for generic specializations, so each specialization names itself
+/// from its concrete stage type) followed by the selected stage. Direct specialized-name
+/// selection and separate-argument specialization both derive their symbol through this one
+/// helper, so the two spellings of one selection cannot drift apart.
+String getStageTargetName(ASTBuilder* astBuilder, Type* stageType, Stage stage);
+
 
 /// Selects the checked stage implementation named by a stage type or its invoke member.
 DeclRef<FuncDecl> findEntryPointByName(
@@ -87,6 +94,31 @@ DeclRef<FuncDecl> findEntryPointByName(
     Profile& ioProfile,
     DiagnosticSink* sink,
     bool* outFoundStruct,
+    Type** outStageType);
+
+/// Selects the checked `invoke` implementation for an already-resolved stage type, through its
+/// stage-interface conformance. The selected witness preserves the stage type's generic
+/// substitutions, so a specialized stage type yields the specialized `invoke` with its contract
+/// types carrying the concrete arguments. Builds its own checking context, seeded from the
+/// module's dependency closure, so callers need not seed any extension-visible module set.
+/// `ioProfile` supplies the requested stage; when no stage is requested and the type implements
+/// exactly one executable stage, that stage is selected and written back. Never clears
+/// `*outFoundStage`: it is set when the type implements any executable stage, even when
+/// selection then fails on a stage mismatch or ambiguity, and a caller's pre-set value survives
+/// when the type implements none (that pre-set is what makes a plain `-entry Stage` selection
+/// report the structural not-a-stage diagnostic while a `Stage.invoke` selection falls back to
+/// ordinary function lookup). `diagnoseNotStage` distinguishes a name that must select a stage
+/// (`-entry Stage`) from one that merely may (`Stage.invoke`): only the former reports the
+/// not-a-stage diagnostic. `*outStageType` is written only on the single success path and is
+/// never cleared; callers must initialize it before the call.
+DeclRef<FuncDecl> findStageImplementation(
+    Linkage* linkage,
+    Module* module,
+    DeclRef<AggTypeDecl> stageTypeDeclRef,
+    Profile& ioProfile,
+    DiagnosticSink* sink,
+    bool diagnoseNotStage,
+    bool* outFoundStage,
     Type** outStageType);
 
 /// Diagnoses stage inputs exposed by a selected native entry-point signature.

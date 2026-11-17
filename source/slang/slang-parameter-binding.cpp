@@ -3795,8 +3795,9 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         collectEntryPointParameters(
             context,
             entryPoint,
-            m_currentRenamedEntryPoint ? m_currentRenamedEntryPoint->getEntryPointNameOverride(0)
-                                       : entryPoint->getEntryPointNameOverride(0),
+            m_currentRenamedEntryPoint
+                ? m_currentRenamedEntryPoint->getEntryPointNameOverride(0)
+                : entryPoint->getEffectiveEntryPointNameOverride(specializationInfo),
             specializationInfo);
     }
 

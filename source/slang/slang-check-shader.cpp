@@ -3916,6 +3916,24 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         // the rest of the arguments via inference...
 
         auto genericDeclRef = m_funcDeclRef.getParent().as<GenericDecl>();
+        if (!genericDeclRef)
+        {
+            // The generic parameters can also come from a generic that encloses the function,
+            // rather than one that wraps it directly. A structural ray-tracing entry point is
+            // the stage struct's `invoke` method, so its enclosing generic wraps the struct:
+            // applying that generic produces the specialized stage struct, not a function.
+            // Walk to the nearest enclosing generic the same way other declaration-ref
+            // consumers do, carrying the function's own substitutions. This targets the
+            // nearest generic while parameter collection gathers every enclosing generic's
+            // parameters, so a stage struct nested inside a further generic (say
+            // `Outer<T>` containing `M<P>` selected as `Outer.M`) advertises parameters this
+            // application cannot yet bind: the arguments go to `M`'s generic first, and the
+            // outer one needs a follow-up application that no current spelling performs. The
+            // assert below holds because both walks descend the same parent-decl chain: a
+            // nonzero collected count implies the enclosing generic exists.
+            genericDeclRef =
+                getGenericParentDeclRef(getLinkage()->getASTBuilder(), &visitor, m_funcDeclRef);
+        }
         SLANG_ASSERT(genericDeclRef); // otherwise we wouldn't have generic parameters
 
         bool isVariadic =
@@ -3928,7 +3946,11 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         if (isVariadic)
             genericArgCount = argCount - existentialSpecializationParamCount;
 
-        if (genericArgCount < 0)
+        // The command-line path only ever forwards an argument count equal to the declared
+        // specialization parameters, but the public specialize() API forwards any count, so
+        // an under-application must be rejected here: the collection loop below would
+        // otherwise read specialization arguments past the caller's buffer.
+        if (genericArgCount < 0 || genericArgCount > argCount)
         {
             sink->diagnose(Diagnostics::MismatchSpecializationArguments{
                 .expected = (int64_t)(genericSpecializationParamCount +
@@ -3984,6 +4006,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         genAppExpr->functionExpr = genExpr;
         genAppExpr->arguments = _Move(genericArgs);
         auto checkedExpr = visitor.CheckTerm(genAppExpr);
+        DeclRef<Decl> specializedInnerDeclRef;
         if (auto partiallyAppliedExpr = as<PartiallyAppliedGenericExpr>(checkedExpr))
         {
             // Entry-point specialization can leave a generic partially applied
@@ -3996,18 +4019,77 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             SemanticsVisitor::GenericInferenceContext inferenceContext;
             inferenceContext.genericDecl = genericDeclRef.getDecl();
             ConversionCost outCost;
-            specializedFuncDeclRef =
-                visitor
-                    .trySolveGenericArguments(
-                        _Move(inferenceContext),
-                        genericDeclRef,
-                        partiallyAppliedExpr->providedOrdinaryArgs.getArrayView(),
-                        outCost)
-                    .as<FuncDecl>();
+            specializedInnerDeclRef = visitor.trySolveGenericArguments(
+                _Move(inferenceContext),
+                genericDeclRef,
+                partiallyAppliedExpr->providedOrdinaryArgs.getArrayView(),
+                outCost);
         }
         else if (auto declRefExpr = as<DeclRefExpr>(checkedExpr))
         {
-            specializedFuncDeclRef = declRefExpr->declRef.as<FuncDecl>();
+            specializedInnerDeclRef = declRefExpr->declRef;
+        }
+
+        if (auto specializedFunc = specializedInnerDeclRef.as<FuncDecl>())
+        {
+            specializedFuncDeclRef = specializedFunc;
+        }
+        else if (auto stageTypeDeclRef = specializedInnerDeclRef.as<AggTypeDecl>())
+        {
+            // Applying the enclosing generic produced a struct rather than a function. Only a
+            // structural ray-tracing entry point takes that shape: its function is the stage
+            // struct's `invoke` method, so the struct is what the generic application yields.
+            // Re-derive its `invoke` through the checked conformance witness — the same
+            // selection that resolved the unspecialized entry point — so the stage contract
+            // types (context, payload, record) carry these concrete arguments, and give this
+            // specialization the target name derived from the concrete stage type, matching
+            // direct specialized-name selection.
+            //
+            // A non-structural entry point cannot reach this branch: an ordinary entry
+            // function's enclosing generic wraps the function itself, so the immediate-parent
+            // fast path above applies. A struct result here is therefore out of contract for
+            // anything but a structural entry point; fail rather than re-derive through a
+            // conformance that was never selected.
+            if (!isStructuralRayTracingEntryPoint())
+                return nullptr;
+            // The module can be null only for pass-through or deserialized dummies, which
+            // never reach specialization; every structural entry point is selected from a
+            // module's declarations, so it always owns one here.
+            SLANG_RELEASE_ASSERT(entryPointModule);
+            // The requested stage is always resolved by specialization time (structural
+            // selection writes the inferred stage into the profile), so this call cannot
+            // update the profile; the local copy keeps that write-back away from the entry
+            // point's own profile, and `foundStage` is not consumed because this selection
+            // already proved the type is a stage.
+            Profile stageProfile = m_profile;
+            bool foundStage = false;
+            Type* stageType = nullptr;
+            specializedFuncDeclRef = PortableRT::findStageImplementation(
+                getLinkage(),
+                entryPointModule,
+                stageTypeDeclRef,
+                stageProfile,
+                sink,
+                true,
+                &foundStage,
+                &stageType);
+            info->entryPointNameOverride =
+                PortableRT::getStageTargetName(astBuilder, stageType, getStage());
+        }
+        else
+        {
+            // The generic application or the solver failed without diagnosing: an applied
+            // generic that stays partially applied and whose remaining parameter the solver
+            // cannot complete yields an empty decl-ref here. Without this check the
+            // unspecialized initializer above would survive and the specialization would
+            // report success with generic placeholder types. This is a satisfiability
+            // failure, not a count failure — the counts here already match — so report it
+            // directly rather than letting the outer consumed-count check emit a
+            // self-contradictory "wrong number" message.
+            sink->diagnose(Diagnostics::UnableToSpecializeEntryPoint{
+                .entryPoint = getName(),
+                .location = m_funcDeclRef.getDecl()->loc});
+            return nullptr;
         }
 
         if (!specializedFuncDeclRef)
@@ -4417,10 +4499,12 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
 /// `IRGeneric` rather than an `IRFunc` and crash IR linking (issue #10209).
 static void diagnoseGenericEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
-    auto funcDecl = entryPoint->getFuncDecl();
+    // Name the entry point as it was selected, not by its implementation function: a structural
+    // ray-tracing entry point is selected by its stage name while its checked function is the
+    // stage's `invoke` method.
     sink->diagnose(Diagnostics::EntryPointCannotBeGeneric{
-        .entryPoint = funcDecl->getName(),
-        .location = funcDecl->loc});
+        .entryPoint = entryPoint->getName(),
+        .location = entryPoint->getFuncDecl()->loc});
 }
 
 /// Create a specialized program based on the given compile request.

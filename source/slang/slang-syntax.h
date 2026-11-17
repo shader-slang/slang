@@ -585,6 +585,15 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
     SemanticsVisitor* semantics,
     DeclRef<Decl> declRef);
 
+/// Returns the nearest enclosing generic of `declRef`, with `declRef`'s own substitutions
+/// applied, or an empty reference when no generic encloses it. A declaration nested inside a
+/// generic container (a stage struct's method, an outer generic's member) reaches its generic
+/// parameters through this reference rather than through its immediate parent.
+DeclRef<GenericDecl> getGenericParentDeclRef(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semantics,
+    DeclRef<Decl> declRef);
+
 List<Val*> getDefaultSubstitutionArgs(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,

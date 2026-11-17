@@ -252,6 +252,11 @@ String getEntryPointName(UnownedStringSlice sourceTypeName, Stage stage)
     return result.produceString();
 }
 
+String getStageTargetName(ASTBuilder* astBuilder, Type* stageType, Stage stage)
+{
+    return getEntryPointName(getSourceTypeName(astBuilder, stageType).getUnownedSlice(), stage);
+}
+
 Stage getStageKind(InterfaceDecl* interfaceDecl)
 {
     switch (_getMagicTypeClass(interfaceDecl))
@@ -377,9 +382,10 @@ void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sin
 // For example, a struct implementing both IMissShader and ICallableShader needs `-stage miss`
 // or `-stage callable`; a struct implementing only IMissShader can omit the explicit stage.
 // The selected witness supplies the exact invoke implementation and preserves dependent types.
-// Generic stages currently need arguments in the entry name, for example `-entry "M<P>"`.
-// TODO(#13800): Support separate CLI/API specialization while keeping invoke, its stage contract,
-// and target validation consistent with the concrete arguments.
+// A generic stage is selected either with arguments bound in the entry name (`-entry "M<P>"`)
+// or as the bare name (`-entry M`) with the arguments supplied separately, like any other
+// generic entry point; the later specialization re-derives `invoke` through the same
+// conformance selection with the concrete arguments.
 DeclRef<FuncDecl> findEntryPointByName(
     Linkage* linkage,
     Module* module,
@@ -401,6 +407,28 @@ DeclRef<FuncDecl> findEntryPointByName(
     auto declRefExpr = as<DeclRefExpr>(expr);
     auto stageTypeDeclRef =
         declRefExpr ? declRefExpr->declRef.as<AggTypeDecl>() : DeclRef<AggTypeDecl>();
+    if (!stageTypeDeclRef && declRefExpr)
+    {
+        // A generic stage selected by its bare name resolves to the generic declaration that
+        // wraps the struct. Enter the inner struct with default substitutions, the same way
+        // ordinary function lookup enters a generic function, so conformance selection below
+        // sees the stage type with its generic parameters still unbound and the resulting
+        // entry point stays specializable through `-specialize` / `specialize()` instead of
+        // being born specialized. An inner declaration that is not an aggregate type — a bare
+        // generic *function* name — narrows to null here and falls through to the
+        // `Stage.invoke` handling below, which returns empty for it so the caller keeps the
+        // ordinary function-lookup result.
+        if (auto genDeclRef = declRefExpr->declRef.as<GenericDecl>())
+        {
+            auto astBuilder = linkage->getASTBuilder();
+            stageTypeDeclRef =
+                createDefaultSubstitutionsIfNeeded(
+                    astBuilder,
+                    &visitor,
+                    astBuilder->getMemberDeclRef(genDeclRef, genDeclRef.getDecl()->inner))
+                    .as<AggTypeDecl>();
+        }
+    }
     bool selectedInvoke = false;
     if (!stageTypeDeclRef)
     {
@@ -430,7 +458,39 @@ DeclRef<FuncDecl> findEntryPointByName(
     if (!stageTypeDeclRef || getModule(stageTypeDeclRef.getDecl()) != module)
         return DeclRef<FuncDecl>();
 
-    *outFoundStruct = !selectedInvoke;
+    // A name that must select a stage reports the structural not-a-stage diagnostic when the
+    // type implements none, while a `Stage.invoke` selection falls back to ordinary function
+    // lookup; the same fact pre-sets the found flag and picks the diagnostic behavior.
+    const bool mustSelectStage = !selectedInvoke;
+    *outFoundStruct = mustSelectStage;
+    return findStageImplementation(
+        linkage,
+        module,
+        stageTypeDeclRef,
+        ioProfile,
+        sink,
+        mustSelectStage,
+        outFoundStruct,
+        outStageType);
+}
+
+// Selects the checked `invoke` implementation for an already-resolved stage type, through its
+// stage-interface conformance. The header documents the caller-visible contract; this copy notes
+// the implementation shape: the function builds its own checking context here and seeds it from
+// the module's dependency closure, the same seeding the entry-point lookup performed before the
+// extraction split the two phases.
+DeclRef<FuncDecl> findStageImplementation(
+    Linkage* linkage,
+    Module* module,
+    DeclRef<AggTypeDecl> stageTypeDeclRef,
+    Profile& ioProfile,
+    DiagnosticSink* sink,
+    bool diagnoseNotStage,
+    bool* outFoundStage,
+    Type** outStageType)
+{
+    SharedSemanticsContext sharedContext(linkage, module, sink);
+    SemanticsVisitor visitor(&sharedContext);
     for (auto dependency : module->getModuleDependencies())
     {
         auto moduleDecl = dependency->getModuleDecl();
@@ -481,14 +541,17 @@ DeclRef<FuncDecl> findEntryPointByName(
 
     if (implementedStageCount == 0)
     {
-        // An ordinary struct may also have a static method named invoke.
-        if (selectedInvoke)
+        // When the selection is allowed to be something other than a stage — the
+        // `Stage.invoke` spelling, which ordinary lookup can already resolve to a function —
+        // an ordinary struct with a static method named invoke is legal, so return without
+        // diagnosing. Only a name that must select a stage reports the not-a-stage diagnostic.
+        if (!diagnoseNotStage)
             return DeclRef<FuncDecl>();
         sink->diagnose(Diagnostics::StructuralRayTracingEntryPointNotStage{
             .stageType = stageTypeDeclRef.getDecl()});
         return DeclRef<FuncDecl>();
     }
-    *outFoundStruct = true;
+    *outFoundStage = true;
 
     auto requestedStage = ioProfile.getStage();
     auto selectedStage = requestedStage;
@@ -540,9 +603,10 @@ void initializeEntryPoint(EntryPoint* entryPoint, Name* entryPointName, Type* st
 {
     entryPoint->markAsStructuralRayTracingEntryPoint();
     entryPoint->setNameOverride(entryPointName);
-    auto sourceTypeName = getSourceTypeName(entryPoint->getLinkage()->getASTBuilder(), stageType);
-    entryPoint->setEntryPointNameOverride(
-        getEntryPointName(sourceTypeName.getUnownedSlice(), entryPoint->getStage()));
+    entryPoint->setEntryPointNameOverride(getStageTargetName(
+        entryPoint->getLinkage()->getASTBuilder(),
+        stageType,
+        entryPoint->getStage()));
 }
 
 // =============================================================================
