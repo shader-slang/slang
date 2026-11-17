@@ -891,6 +891,8 @@ public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
+// The GLSL_400 version-equivalence alias has no wgsl arm, so wgsl is admitted
+// by its own attribute; spirv is admitted at all SPIR-V versions.
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, GLSL_400)]
 [require(spirv)]
 [require(wgsl)]
