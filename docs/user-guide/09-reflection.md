@@ -891,6 +891,85 @@ In a later section we will discuss how to easily sum up the various relative off
 It is a common mistake for users to apply `getElementTypeLayout()` on a single-element container, instead of using `getElementVarLayout()` as we advise here.
 The implementation of the reflection API makes an effort to ensure that the type layout returned by `getElementTypeLayout()` automatically bakes in the additional offsets that are needed, but the results can still be unintuitive.
 
+#### Binding Ranges and Descriptor Sets
+
+The variable-layout offsets described above tell you where each parameter is.
+Some applications need a different view. Examples are an application that builds a D3D12 root signature, a Vulkan descriptor-set layout, or a WebGPU bind-group layout.
+These applications need the list of descriptors that a type uses, grouped by the set that holds them.
+A `TypeLayoutReflection` provides this view with *binding ranges*, *descriptor ranges* and *descriptor sets*.
+
+A binding range is one field, or one array of fields, of the type that the application binds as a unit.
+The number of binding ranges is `getBindingRangeCount()`.
+For each binding range, `getBindingRangeType()` returns the kind of resource, such as a texture, a sampler, or a constant buffer.
+
+A descriptor set is a group of descriptors that the target binds together.
+The number of descriptor sets of a type layout is `getDescriptorSetCount()`.
+A descriptor range is a run of consecutive descriptors inside one descriptor set.
+`getDescriptorSetDescriptorRangeCount()` returns the number of descriptor ranges in a descriptor set.
+
+A binding range does not store a descriptor set or a descriptor range directly. It stores indices into the lists of its own type layout. Use these functions to follow the indices:
+
+| Function | Result |
+| --- | --- |
+| `getBindingRangeDescriptorSetIndex(r)` | The index of the descriptor set that holds binding range `r`. |
+| `getBindingRangeFirstDescriptorRangeIndex(r)` | The index of the first descriptor range of binding range `r`, inside that descriptor set. |
+| `getBindingRangeDescriptorRangeCount(r)` | The number of consecutive descriptor ranges that binding range `r` uses. |
+| `getDescriptorSetSpaceOffset(s)` | The space offset of descriptor set `s`. |
+| `getDescriptorSetDescriptorRangeIndexOffset(s, d)` | The binding offset of descriptor range `d` in descriptor set `s`. |
+
+Two points are easy to get wrong:
+
+- The descriptor set index is not a set number on the target.
+  It is only an index into the descriptor sets of this type layout.
+  To get the Vulkan descriptor set, D3D12 register space, or WebGPU bind group, pass the index to `getDescriptorSetSpaceOffset()`.
+  The space offset can differ from the index.
+- The first descriptor range index is not a binding number.
+  To get the binding, pass the descriptor set index and the descriptor range index to `getDescriptorSetDescriptorRangeIndexOffset()`.
+
+A binding range can have no descriptors. For example, a binding range of a sub-object that the target does not bind as a descriptor has none.
+For such a binding range, `getBindingRangeDescriptorRangeCount()` returns zero, and `getBindingRangeDescriptorSetIndex()` does not return a usable index.
+Always check the descriptor range count before you use the descriptor set index.
+
+The following code finds the space and the binding of each binding range:
+
+```c++
+void printBindingRanges(slang::TypeLayoutReflection* typeLayout)
+{
+    int bindingRangeCount = typeLayout->getBindingRangeCount();
+    for (int r = 0; r < bindingRangeCount; ++r)
+    {
+        // A binding range without descriptor ranges has no
+        // descriptor set. Skip it.
+        int rangeCount = typeLayout->getBindingRangeDescriptorRangeCount(r);
+        if (rangeCount == 0)
+            continue;
+
+        int setIndex = typeLayout->getBindingRangeDescriptorSetIndex(r);
+        int firstRangeIndex = typeLayout->getBindingRangeFirstDescriptorRangeIndex(r);
+
+        // The space offset is the Vulkan descriptor set, the D3D12
+        // register space, or the WebGPU bind group.
+        size_t space = typeLayout->getDescriptorSetSpaceOffset(setIndex);
+
+        for (int i = 0; i < rangeCount; ++i)
+        {
+            size_t binding = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
+                setIndex,
+                firstRangeIndex + i);
+
+            print("binding range "); print(r);
+            print(": space "); print(space);
+            print(", binding "); print(binding);
+        }
+    }
+}
+```
+
+Both offsets are relative to the type layout, in the same way as the offsets of a variable layout.
+To get the cumulative space and binding, add the offsets of the enclosing variable layouts.
+The section "Accumulating Offsets Along An Access Path" explains how to do this.
+For example, if the type layout is the element type of a `ParameterBlock<>`, add the `SubElementRegisterSpace` offset of the variable layout of the parameter block. Get it with `getOffset(slang::ParameterCategory::SubElementRegisterSpace)`.
+
 Programs and Scopes
 -------------------
 
