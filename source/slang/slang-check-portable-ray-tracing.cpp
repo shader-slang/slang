@@ -179,7 +179,10 @@ static RestrictedTypeKind _getDirectRestrictedTypeKind(Type* type)
 // 2. The concrete member may be a typealias (Carrier.Item is one), so follow `typealias`
 //    declarations to the type they name, the same as an ordinary source type.
 // Each step can expose another lookup (for example an alias to a nested associated type), so
-// the loop applies the same treatment to each result.
+// the loop applies the same treatment to each result. The step bound keeps a pathological
+// alias chain from cycling: a chain deeper than any real declaration flattens to the last
+// type it reached, which classifies as ordinary — the same answer the declaration-time checks
+// gave while the chain's target was still abstract.
 static Type* _resolveSubstitutedFieldType(SemanticsVisitor* visitor, Type* type)
 {
     for (Index step = 0; type && step < 4; ++step)

@@ -135,6 +135,18 @@ uint makeFresh<T>()
     return 1;
 }
 
+// A method of a specialized generic struct is a plain call whose callee reference already
+// carries the enclosing application, so the same check runs on it.
+struct Factory<T>
+{
+    static void makeStatic()
+    {
+        T fresh = T();
+//CHECK:           ^ fresh construction of a structural ray-tracing stage input
+//CHECK:           ^ ray-tracing stage input type 'rt.MissInput<MissContext>' cannot be constructed here; it must come from the current invocation
+    }
+}
+
 // Passing and copying an existing input through generic helpers remains legal.
 T copyInput<T>(T value) { return value; }
 void passInput<T>(T value) {}
@@ -152,6 +164,8 @@ struct Miss : rt::IMissShader
         input.payload.value += hopOne<rt::MissInput<Context>>();
         makeFresh<rt::MissInput<Context>>();
 //CHECK:^^^^^^^^^ in the instantiation of 'makeFresh'
+        Factory<rt::MissInput<Context>>::makeStatic();
+//CHECK:                                           ^ in the instantiation of 'makeStatic'
 
         let copied = copyInput(input);
         passInput(copied);
