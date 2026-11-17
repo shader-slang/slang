@@ -2568,11 +2568,9 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
 
     SLANG_RELEASE_ASSERT(res.value.hasValue());
 
-    // TODO: Investigate how to eliminate duplicate diagnostics. A `static const` whose
-    // initializer triggers one of the diagnostics below reports it once when the declaration is
-    // checked and again at every use folded through `tryConstantFoldDeclRef`, because that
-    // function folds the initializer expression again instead of reusing the value stored in
-    // `varDecl->val`. See tests/diagnostics/int-fold-*-diagnostics.slang.
+    // A null `sink` means the caller suppresses these diagnostics, either because nothing
+    // reports them (substitution and resolution) or because another fold of the same
+    // expression already did (see `SemanticsVisitor::getFoldDiagnosticSink`).
     if (res.flags & MathIntResult::Undefined)
     {
         if (sink)

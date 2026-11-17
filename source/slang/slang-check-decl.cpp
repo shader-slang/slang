@@ -2313,12 +2313,18 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
     // in case it crosses module boundaries.
     //
     //
-    if (!isScalarIntegerType(varDecl->type))
+    if (!isInitializerFoldedByDeclarationCheck(varDecl))
         return nullptr;
     return tryConstantFoldDeclRef(
         DeclRef<VarDeclBase>(varDecl),
         ConstantFoldingKind::SpecializationConstant,
-        nullptr);
+        nullptr,
+        /*isDeclarationCheck*/ true);
+}
+
+bool SemanticsVisitor::isInitializerFoldedByDeclarationCheck(VarDeclBase* varDecl)
+{
+    return isScalarIntegerType(varDecl->type);
 }
 
 void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceDecl)

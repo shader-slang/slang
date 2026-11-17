@@ -3198,7 +3198,33 @@ public:
 
         /// Current recursion depth of constant folding/evaluation.
         UInt depth = 0;
+
+        /// Whether folding the initializer of `declRef` reports fold diagnostics, such as a
+        /// division by zero. The innermost link of the chain decides; see
+        /// `getFoldDiagnosticSink`.
+        bool reportsFoldDiagnostics = true;
     };
+
+    /// Return the sink for the diagnostics that folding a single operation reports, such as
+    /// division by zero, or null when these diagnostics are suppressed.
+    ///
+    /// We report each such diagnostic once, from the fold that first sees the operand values.
+    /// Consider this example:
+    ///
+    ///     static const int a = 1 / 0;
+    ///     void f() { switch (0) { case 0: case a: break; } }
+    ///
+    /// Checking the declaration of `a` folds its initializer and reports the division by zero.
+    /// The `case` label folds the same initializer with the same operand values again through
+    /// `tryConstantFoldDeclRef`, so it reports nothing. If `a` were a member of a generic type
+    /// and the use supplied the generic arguments, the use would see operand values that the
+    /// declaration check could not, so it reports.
+    DiagnosticSink* getFoldDiagnosticSink(ConstantFoldingCircularityInfo* circularityInfo);
+
+    /// Return whether checking `varDecl` folds its initializer and reports the fold diagnostics.
+    /// `_validateCircularVarDefinition` performs this fold, and folds of the same initializer
+    /// through uses of `varDecl` rely on it to suppress duplicate diagnostics.
+    bool isInitializerFoldedByDeclarationCheck(VarDeclBase* varDecl);
     /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<InvokeExpr> invokeExpr,
@@ -3224,10 +3250,13 @@ public:
         ConstantFoldingCircularityInfo* circularityInfo);
 
     /// Try to resolve a compile-time constant `IntVal` from the given `declRef`.
+    /// `isDeclarationCheck` is true when checking the declaration itself requests the fold, and
+    /// false when a use of the declaration does; see `getFoldDiagnosticSink`.
     IntVal* tryConstantFoldDeclRef(
         DeclRef<VarDeclBase> const& declRef,
         ConstantFoldingKind kind,
-        ConstantFoldingCircularityInfo* circularityInfo);
+        ConstantFoldingCircularityInfo* circularityInfo,
+        bool isDeclarationCheck = false);
 
     /// Try to extract the value of an integer constant expression, either
     /// returning the `IntVal` value, or null if the expression isn't recognized

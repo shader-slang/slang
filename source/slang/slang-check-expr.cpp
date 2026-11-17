@@ -2661,7 +2661,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             invokeExpr.getExpr()->type.type,
             opKind,
             newArgs,
-            getSink(),
+            getFoldDiagnosticSink(circularityInfo),
             funcDeclRefExpr.getExpr()->loc);
     }
 }
@@ -2695,7 +2695,8 @@ bool SemanticsVisitor::_checkForCircularityInConstantFolding(
 IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     DeclRef<VarDeclBase> const& declRef,
     ConstantFoldingKind kind,
-    ConstantFoldingCircularityInfo* circularityInfo)
+    ConstantFoldingCircularityInfo* circularityInfo,
+    bool isDeclarationCheck)
 {
     auto decl = declRef.getDecl();
 
@@ -2786,8 +2787,24 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     if (auto constantVal = as<ConstantIntVal>(decl->val))
         return constantVal;
 
+    // A use of the declaration folds the same initializer that checking the declaration folded,
+    // unless the use supplies generic arguments or the type through which the member was looked
+    // up. Only in those cases can the use see operand values that the declaration check could
+    // not, so only then does it report fold diagnostics again.
+    SubstitutionSet substitutions(declRef);
     ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
+    newCircularityInfo.reportsFoldDiagnostics =
+        isDeclarationCheck || !isInitializerFoldedByDeclarationCheck(decl) ||
+        substitutions.findGenericAppDeclRef() || substitutions.findLookupDeclRef();
     return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
+}
+
+DiagnosticSink* SemanticsVisitor::getFoldDiagnosticSink(
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    if (circularityInfo && !circularityInfo->reportsFoldDiagnostics)
+        return nullptr;
+    return getSink();
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
@@ -2819,7 +2836,7 @@ IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
             resultType,
             op,
             argVals,
-            getSink(),
+            getFoldDiagnosticSink(circularityInfo),
             e->loc)))
         return folded;
 
