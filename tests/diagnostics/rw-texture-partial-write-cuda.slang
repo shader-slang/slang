@@ -4,7 +4,7 @@
 // prelude converts on read only from half-based formats, and has no converting read for
 // layered surfaces, so a write that reads the texel through any other conversion is rejected.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target cuda -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSUPPORTED, non-exhaustive): -target cuda -entry computeMain -stage compute -DUNSUPPORTED
 
 RWTexture2D<float4> gTex;

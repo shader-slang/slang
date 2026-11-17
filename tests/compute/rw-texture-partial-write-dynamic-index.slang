@@ -41,7 +41,8 @@ void computeMain()
 // BUF-NEXT: 4
 
 // METAL: [[T:_S[0-9]+]] = {{.*}}.read(
-// METAL: .write(float4(select([[T]][int(0)], 7.0f, {{.*}} == 0U), select([[T]][int(1)], 7.0f, {{.*}} == 1U), select([[T]][int(2)], 7.0f, {{.*}} == 2U), select([[T]][int(3)], 7.0f, {{.*}} == 3U)),
+// METAL: [[S:_S[0-9]+]] = float4(select([[T]][int(0)], 7.0f, {{.*}} == 0U), select([[T]][int(1)], 7.0f, {{.*}} == 1U), select([[T]][int(2)], 7.0f, {{.*}} == 2U), select([[T]][int(3)], 7.0f, {{.*}} == 3U)
+// METAL: .write([[S]]
 
 // GLSL: vec4 [[T:_S[0-9]+]] = imageLoad(
 // GLSL: imageStore({{.*}}vec4({{.*}} == 0U ? 7.0 : [[T]][0], {{.*}} == 1U ? 7.0 : [[T]][1], {{.*}} == 2U ? 7.0 : [[T]][2], {{.*}} == 3U ? 7.0 : [[T]][3]))

@@ -32,7 +32,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // GLSL-NOT: imageLoad(gWide
     // GLSL: imageStore(gWide_{{[0-9]+}},{{.*}}.wxyz);
     // METAL-NOT: gWide_{{[0-9]+}}.read(
-    // METAL: gWide_{{[0-9]+}}.write({{.*}}.wxyz,
+    // METAL: float4 [[W:_S[0-9]+]] = {{.*}}.wxyz
+    // METAL: gWide_{{[0-9]+}}.write([[W]],
     // SPIRV-NOT: OpImageRead
     // SPIRV: OpImageWrite
     gWide[tid.xy].yzwx = values[1];

@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv
-//TEST:SIMPLE(filecheck=CHECK-CUDA): -entry computeMain -stage compute -target cuda
+//TEST:SIMPLE(filecheck=CHECK-CUDA,exit-code=-1): -entry computeMain -stage compute -target cuda
 
 layout(rgba8)
 RWTexture2D<float4> texture;
