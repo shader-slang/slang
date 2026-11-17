@@ -4457,19 +4457,21 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // A method call reads its receiver, whatever the receiver's passing mode: every
-            // mode copies the receiver, borrows it, or names its storage for the callee to
-            // access. A callee marked `[__readNone]` accesses no memory, so calling it on
-            // write-only storage reads nothing (texture `GetDimensions` on a
+            // A method call on a `__ref_writeonly` receiver reads it, whatever the receiver's
+            // passing mode: every mode copies the receiver, borrows it, or names its storage
+            // for the callee to access. A callee marked `[__readNone]` accesses no memory, so
+            // calling it on such a receiver reads nothing (texture `GetDimensions` on a
             // `__ref_writeonly` parameter stays clean). A subscript or property access is
             // different: it names storage, and whether that storage is read or written is
             // decided by the use of the expression, which the write-only flag travels with,
-            // so such a callee is not a receiver read.
+            // so such a callee is not a receiver read. Like the argument binding rule below,
+            // this applies only to write-only-ness originating from a `__ref_writeonly`
+            // parameter: a method is also the legal way to operate on GLSL `writeonly`
+            // storage (an image's `Store`), which the checker does not restrict.
             if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
             {
                 auto receiverExpr = memberExpr->baseExpression;
-                if (receiverExpr &&
-                    (receiverExpr->type.isWriteOnly || receiverExpr->type.isWriteOnlyRefParam))
+                if (receiverExpr && receiverExpr->type.isWriteOnlyRefParam)
                 {
                     auto calleeDecl = memberExpr->declRef.getDecl();
                     if (!as<SubscriptDecl>(calleeDecl) && !as<PropertyDecl>(calleeDecl) &&
