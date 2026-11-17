@@ -1725,10 +1725,10 @@ ExprInfo getTypeForDeclRef(
             info.valueCategory = paramInfo.valueCategory;
             info.access = paramInfo.access;
 
-            // A legacy (C-style) `in` parameter is a mutable local copy. A borrow is not: it is
-            // an immutable borrow of its argument, so the body sees it as a read-only value in
-            // either parameter style, and writing it is an error rather than a silent change to
-            // the caller's storage.
+            // A legacy (C-style) `in` parameter is a mutable local copy. A borrow is not, in
+            // either the legacy or the modern parameter style: it is an immutable borrow of its
+            // argument, so the body sees it as a read-only value, and writing it is an error
+            // rather than a silent change to the caller's storage.
             const bool isModernParam = as<ModernParamDecl>(paramDecl) != nullptr;
             if (!isModernParam && mode == ParamPassingMode::In)
             {

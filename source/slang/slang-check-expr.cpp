@@ -7584,6 +7584,19 @@ static PtrType* getValidTypeForAddressOf(
         {
             auto variableType = varDeclRef.substitute(m_astBuilder, targetType);
             auto varDecl = varDeclRef.getDecl();
+
+            // Taking the address of a function parameter must not grant more access than its
+            // passing mode gives the body: the address of a read-only parameter, such as a
+            // borrow, is a read-only pointer, so a write through it is an error rather than a
+            // silent change to the caller's storage. The access of other variables' addresses
+            // is left unchanged for now.
+            AccessQualifier ptrAccess = AccessQualifier::ReadWrite;
+            if (as<ParamDecl>(varDecl))
+            {
+                ptrAccess =
+                    baseExpr->type.canWrite() ? AccessQualifier::ReadWrite : AccessQualifier::Read;
+            }
+
             bool hasVulkanHitObjectAttributesAttribute = false;
             bool hasHLSLGroupSharedModifier = false;
             for (auto modifier : varDecl->modifiers)
@@ -7604,7 +7617,7 @@ static PtrType* getValidTypeForAddressOf(
             {
                 return m_astBuilder->getPtrType(
                     variableType,
-                    AccessQualifier::ReadWrite,
+                    ptrAccess,
                     AddressSpace::Generic,
                     m_astBuilder->getDefaultLayoutType());
             }
@@ -7613,7 +7626,7 @@ static PtrType* getValidTypeForAddressOf(
             {
                 return m_astBuilder->getPtrType(
                     variableType,
-                    AccessQualifier::ReadWrite,
+                    ptrAccess,
                     AddressSpace::GroupShared,
                     m_astBuilder->getDefaultLayoutType());
             }
@@ -7632,7 +7645,7 @@ static PtrType* getValidTypeForAddressOf(
                 //   etc.) handle it conservatively/correctly.
                 return m_astBuilder->getPtrType(
                     variableType,
-                    AccessQualifier::ReadWrite,
+                    ptrAccess,
                     AddressSpace::UserPointer,
                     m_astBuilder->getDefaultLayoutType());
             }

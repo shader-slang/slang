@@ -1,5 +1,8 @@
-// A borrow parameter is read-only in the body, but reads still see the caller's argument,
-// and a legacy (C-style) `in` parameter remains a mutable local copy.
+// A read through a borrow parameter yields the argument's value, and the callee cannot
+// disturb the caller's storage: `readBorrow` returns 1 and `s.a[0]` stays 1 afterwards. These
+// values pin the observable contract; they cannot by themselves distinguish a borrow from a
+// copy of the argument. A legacy (C-style) `in` parameter remains a mutable local copy:
+// `bumpLegacyIn` returns 15 while the caller's `y` stays 5.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
