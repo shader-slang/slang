@@ -5330,14 +5330,21 @@ err(
     "binding-attribute-requires-concrete-value",
     39034,
     "binding attribute requires a concrete value",
-    span { loc = "location", message = "an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a default or link a module that defines it" }
+    span { loc = "location", message = "an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a resolvable default, link a module that defines it, or shorten a chain of definitions that is too deep to resolve" }
 )
 
 err(
     "glsl-offset-requires-concrete-binding",
     39035,
     "GLSL offset layout qualifier requires a concrete binding index",
-    span { loc = "location", message = "the GLSL 'offset' layout qualifier requires a concrete 'binding' index at compile time to track per-binding offsets; link-time constant expressions are not supported on this legacy GLSL path" }
+    span { loc = "location", message = "the GLSL 'offset' layout qualifier requires a concrete 'binding' index at compile time to track per-binding offsets; link-time constant expressions are not supported on this check-time path" }
+)
+
+err(
+    "binding-attribute-value-out-of-range",
+    39036,
+    "binding attribute resolved to an out-of-range descriptor index",
+    span { loc = "location", message = "an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier resolved to '~value:Int', outside the valid descriptor index range [0, 4294967295]" }
 )
 
 warning(

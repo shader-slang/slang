@@ -1144,10 +1144,15 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
 // An argument that was never specified (`layout(binding = N)` alone, or the defaulted
 // `set`) means index 0. A specified value that is a link-time constant which cannot be
 // resolved — e.g. an `extern` constant with no default initializer and no linked
-// definition — is diagnosed here, once per attribute (the message cannot say which
+// definition — is diagnosed here, once per invocation (the message cannot say which
 // argument failed, so a second identical error at the same location would only repeat
 // it), and each unresolvable output reads as index 0, so the caller's layout continues
-// (best-effort) after the error.
+// (best-effort) after the error. At the whole-space call sites that read-as-0 also
+// suppresses the zero-binding constraint — intended, since the concrete-value error is
+// the root cause and is reported first. A resolved value must land in the descriptor-
+// index domain a Vulkan literal can carry; a negative or > uint32 result (a hostile
+// linked override, or a link-time expression whose wrapping fold overflowed) would
+// otherwise silently emit garbage decorations, so it is diagnosed and reads as 0.
 static void _resolveGLSLBindingAttribute(
     ParameterBindingContext* context,
     GLSLBindingAttribute* attr,
@@ -1161,14 +1166,34 @@ static void _resolveGLSLBindingAttribute(
     if (attr->binding)
     {
         if (auto bindingVal = program->tryFoldIntVal(attr->binding))
+        {
             outBinding = bindingVal->getValue();
+            if (outBinding < 0 || outBinding > 0xFFFFFFFF)
+            {
+                getSink(context)->diagnose(
+                    Diagnostics::BindingAttributeValueOutOfRange{
+                        .value = outBinding,
+                        .location = attr->loc});
+                outBinding = 0;
+            }
+        }
         else
             anyUnresolved = true;
     }
     if (attr->set)
     {
         if (auto setVal = program->tryFoldIntVal(attr->set))
+        {
             outSet = setVal->getValue();
+            if (outSet < 0 || outSet > 0xFFFFFFFF)
+            {
+                getSink(context)->diagnose(
+                    Diagnostics::BindingAttributeValueOutOfRange{
+                        .value = outSet,
+                        .location = attr->loc});
+                outSet = 0;
+            }
+        }
         else
             anyUnresolved = true;
     }
@@ -1293,8 +1318,8 @@ static void addExplicitParameterBindings_GLSL(
             // Try to find `binding` and `set`
             if (auto glslBindingAttr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
             {
-                IntegerLiteralValue binding = 0;
-                IntegerLiteralValue set = 0;
+                IntegerLiteralValue binding;
+                IntegerLiteralValue set;
                 _resolveGLSLBindingAttribute(context, glslBindingAttr, binding, set);
                 info[kResInfo].resInfo = foundResInfo;
                 info[kResInfo].semanticInfo.index = binding;
@@ -1309,8 +1334,8 @@ static void addExplicitParameterBindings_GLSL(
             // Try to find `set`
             if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
             {
-                IntegerLiteralValue binding = 0;
-                IntegerLiteralValue set = 0;
+                IntegerLiteralValue binding;
+                IntegerLiteralValue set;
                 _resolveGLSLBindingAttribute(context, attr, binding, set);
                 info[kResInfo].resInfo = foundResInfo;
                 if (binding != 0)
@@ -1569,8 +1594,8 @@ static bool addExplicitVkBindingForEntryPointParameter(
     {
         if (auto explicitResourceInfo = findVkBindingEntryPointParameterResourceInfo(varLayout))
         {
-            IntegerLiteralValue binding = 0;
-            IntegerLiteralValue set = 0;
+            IntegerLiteralValue binding;
+            IntegerLiteralValue set;
             _resolveGLSLBindingAttribute(context, attr, binding, set);
             LayoutSemanticInfo semanticInfo;
             LayoutSize count = explicitResourceInfo->count;
