@@ -275,7 +275,8 @@ static bool _matchSlangRichLocationLine(
     static const UnownedStringSlice markers[] = {
         UnownedStringSlice::fromLiteral("-->"),
         UnownedStringSlice::fromLiteral("---"),
-        UnownedStringSlice::fromLiteral("\xe2\x95\xad\xe2\x95\xbc")}; // UTF-8 for ╭╼ (U+256D U+257C)
+        UnownedStringSlice::fromLiteral(
+            "\xe2\x95\xad\xe2\x95\xbc")}; // UTF-8 for ╭╼ (U+256D U+257C)
 
     UnownedStringSlice text(inLine.trim());
     for (const auto& marker : markers)
