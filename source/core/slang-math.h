@@ -221,9 +221,13 @@ inline unsigned short FloatToHalf(float val)
     const unsigned int fraction = bits & 0x007fffffu;
     if (exponent == 255)
     {
-        // Preserve the NaN-vs-infinity distinction and sign. As before, narrowing does not
-        // preserve the NaN payload or distinguish quiet NaNs from signaling NaNs.
-        return (unsigned short)(sign | 0x7c00u | (fraction != 0));
+        // A NaN narrows to a quiet NaN: the sign, the top payload bits and the half quiet
+        // bit carry over, silencing a signaling NaN as an IEEE 754 narrowing operation does.
+        // A zero fraction narrows to the infinity encoding, so the NaN-vs-infinity
+        // distinction survives.
+        if (fraction == 0)
+            return (unsigned short)(sign | 0x7c00u);
+        return (unsigned short)(sign | 0x7c00u | 0x0200u | (fraction >> 13));
     }
     // Float32 uses bias 127; Half uses bias 15. Exponents above 127 + 15 overflow.
     if (exponent > 142)

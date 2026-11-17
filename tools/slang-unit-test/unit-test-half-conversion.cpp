@@ -58,6 +58,7 @@ SLANG_UNIT_TEST(mathHalfPreservesSpecialValueClassification)
             const unsigned short result = FloatToHalf(IntAsFloat(bits | sign));
             SLANG_CHECK((result & 0xfc00u) == (halfSign | 0x7c00u));
             SLANG_CHECK((result & 0x03ffu) != 0);
+            SLANG_CHECK((result & 0x0200u) != 0);
         }
     }
 }
