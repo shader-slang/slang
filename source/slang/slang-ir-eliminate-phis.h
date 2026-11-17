@@ -11,9 +11,10 @@ struct IRModule;
 // Controls which block parameters are lowered to mutable temporary variables.
 struct PhiEliminationOptions
 {
-    // Direct SPIR-V can emit ordinary scalar/vector parameters as OpPhi. Keep other types
-    // in memory, including pointers that would otherwise require VariablePointers support.
-    bool preserveScalarAndVectorPhis = false;
+    // Direct SPIR-V can emit scalar, vector, matrix, struct, and array parameters as OpPhi.
+    // Keep other types in memory, including pointer parameters that would otherwise require
+    // VariablePointers support. Resource members have already been handled by type legalization.
+    bool preserveScalarAndCompositePhis = false;
     bool useRegisterAllocation = true;
     // Returns whether a block parameter of this type needs a temporary. The register allocator
     // uses the same decision so that retained parameters never acquire mutable storage.

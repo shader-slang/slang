@@ -2848,7 +2848,8 @@ Result linkAndOptimizeIR(
     SLANG_PASS(cleanUpVoidType);
 
     // Most targets need block parameters lowered to explicit temporary variables before emission.
-    // Direct SPIR-V retains scalar/vector parameters so their incoming values remain explicit.
+    // Direct SPIR-V retains scalar and composite parameters so their incoming values remain
+    // explicit.
     //
     {
         // Get the liveness mode.
@@ -2892,8 +2893,10 @@ Result linkAndOptimizeIR(
             // incoming value on an exhausted-search path where it is unused. Demoting that phi
             // skips the undefined store. SPIR-V function-scope storage then keeps the previous
             // iteration's contents, creating a false dependency across TraceRay when a downstream
-            // optimizer reconstructs SSA. Emit the existing scalar/vector phis directly instead.
-            phiEliminationOptions.preserveScalarAndVectorPhis = true;
+            // optimizer reconstructs SSA. The same problem affects structs, arrays, and matrices:
+            // demoting an undefined aggregate also leaves its scalar fields carrying old values.
+            // Emit the existing scalar and composite phis directly instead.
+            phiEliminationOptions.preserveScalarAndCompositePhis = true;
         }
         SLANG_PASS(eliminatePhis, livenessMode, phiEliminationOptions);
         // If liveness is enabled add liveness ranges based on the accumulated liveness

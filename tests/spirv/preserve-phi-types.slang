@@ -25,10 +25,10 @@ void attributedVector(uint3 tid : SV_DispatchThreadID)
     }
 }
 
-// The same control flow with a struct continues to use the existing temporary-variable
-// lowering. Retaining vector parameters must not accidentally retain aggregate parameters.
-// AGGREGATE: OpVariable %_ptr_Function_State Function
-// AGGREGATE-NOT: OpPhi %State
+// Struct values also retain native phis, including the initial value and conditional update
+// that really must survive to the next iteration.
+// AGGREGATE: OpPhi %State
+// AGGREGATE: OpPhi %State
 
 struct State
 {

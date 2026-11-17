@@ -61,7 +61,9 @@ namespace Slang
 
 bool PhiEliminationOptions::shouldEliminatePhiForType(IRType* type) const
 {
-    return !preserveScalarAndVectorPhis || !isScalarOrVectorType(unwrapAttributedType(type));
+    type = (IRType*)unwrapAttributedType(type);
+    return !preserveScalarAndCompositePhis ||
+           !(isScalarOrVectorType(type) || isCompositeType(type) || as<IRMatrixType>(type));
 }
 
 
