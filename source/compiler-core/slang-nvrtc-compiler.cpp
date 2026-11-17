@@ -1118,8 +1118,8 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
     String includePath;
     if (SLANG_FAILED(_getOptixIncludePath(includePath)))
     {
-        String msg = "Failed to locate OptiX headers (optix.h) required for OptiX ray tracing "
-                     "support. Please install OptiX SDK.";
+        String msg = "Failed to locate OptiX headers (optix.h) required for OptiX support "
+                     "(ray tracing or cooperative vectors). Please install OptiX SDK.";
         diagnostics->setRaw(SliceUtil::asCharSlice(msg));
         diagnostics->requireErrorDiagnostic();
         return SLANG_E_NOT_FOUND;
@@ -1428,21 +1428,27 @@ SlangResult NVRTCDownstreamCompiler::compile(
     List<const char*> headers;
     List<const char*> headerIncludeNames;
 
-    // If compiling for OptiX, we need to add the appropriate search paths to the
-    // command line.
+    // If the code depends on OptiX, we need to add the appropriate search paths to the
+    // command line. This happens for ray-tracing pipelines, but also whenever the
+    // emitted source references OptiX constructs (such as cooperative vectors).
     //
-    if (options.pipelineType == PipelineType::RayTracing)
+    if (options.flags & DownstreamCompileOptions::Flag::RequireOptix)
     {
-        // OptiX requires this flag (OptiX Programming Guide, section 6.1). It prevents the compiler
-        // from removing callables as dead code.
-        cmdLine.addArg("--relocatable-device-code=true");
-
         if (SLANG_FAILED(_maybeAddOptixSupport(options, cmdLine, diagnostics)))
         {
             diagnostics->setResult(SLANG_FAIL);
             *outArtifact = artifact.detach();
             return SLANG_FAIL;
         }
+    }
+
+    // OptiX requires this flag for ray-tracing pipelines (OptiX Programming Guide, section
+    // 6.1). It prevents the compiler from removing callables as dead code. Other pipelines
+    // that only use OptiX device-side constructs (e.g. cooperative vectors from a compute
+    // shader) don't need it.
+    if (options.pipelineType == PipelineType::RayTracing)
+    {
+        cmdLine.addArg("--relocatable-device-code=true");
     }
 
     // Add any compiler specific options
