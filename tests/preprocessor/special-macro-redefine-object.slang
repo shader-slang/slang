@@ -13,6 +13,7 @@ __LINE__
 
 __LINE__
 
+// CHECK: standard output = {
 // CHECK: 4
 // CHECK: "Hello"
 // CHECK: 14
