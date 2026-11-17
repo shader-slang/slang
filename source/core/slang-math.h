@@ -212,7 +212,9 @@ SLANG_FORCE_INLINE double Int64AsDouble(int64_t value)
 // Rounds a Float32 value to the nearest Half, choosing the even encoding on ties. Constant
 // folding must agree with runtime narrowing: for example, 1.00048828125 is halfway between
 // Half 1.0 and its successor, so it rounds to 1.0. Retain every discarded bit until rounding,
-// including when a normal Float32 becomes a Half subnormal.
+// including when a normal Float32 becomes a Half subnormal. A narrowed NaN is the one
+// divergence from the runtime path: it is always quieted below, while the CPU runtime
+// conversion (f32tof16 in the prelude) preserves a signaling NaN's quiet/signaling bit.
 inline unsigned short FloatToHalf(float val)
 {
     const unsigned int bits = unsigned(FloatAsInt(val));
