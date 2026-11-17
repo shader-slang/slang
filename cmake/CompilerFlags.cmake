@@ -93,7 +93,7 @@ endfunction()
 # Slang targets normally get these through set_default_compile_options, which
 # calls this function. It is exposed separately so that targets which must not
 # inherit the rest of Slang's flags can still be sanitized: a vendored library
-# such as spvdb (source/tools/spvdb) brings its own warning configuration, but it is
+# such as spvdb (tools/spvdb) brings its own warning configuration, but it is
 # linked into slang-test, and on MSVC every object in a binary must agree on
 # whether ASan is enabled. /fsanitize=address changes the ABI of the annotated
 # standard containers, so mixing a sanitized slang-test with an unsanitized
