@@ -102,6 +102,12 @@ void writeGeneric<let acc:Access>(Ptr<int, acc> p)
 //diag:  ^ left of '=' is not an l-value
 //diag:  ^ left of '=' is not an l-value.
 }
+void writeGenericMember<let acc:Access>(Ptr<S, acc> p)
+{
+    p.a[0] = 7;
+//diag:    ^ left of '=' is not an l-value
+//diag:    ^ left of '=' is not an l-value.
+}
 
 // A borrow is a read-only value rather than a memory location, so it cannot be forwarded to
 // reference or writable-storage parameters, through any of its parts.
