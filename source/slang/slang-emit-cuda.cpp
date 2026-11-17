@@ -1166,11 +1166,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             {
                 // emitWMMAFragmentType has already diagnosed the error, and the
                 // sink error-count check at the end of emission fails the
-                // compile, so nothing emitted here reaches NVRTC.  Default
-                // construction of a CoopMat lowers to this instruction
-                // (IRBuilder::emitDefaultConstruct), so an invalid-typed
-                // instance reaches emission — for example the prelude's
-                // GetLength, which default-constructs a local.  We emit the
+                // compile, so nothing emitted here reaches NVRTC.  We emit the
                 // scalar operand so the initializer slot of
                 // `Type _Sname = <expr>;` stays syntactically valid; it does
                 // not depend on the result type's name, which has already

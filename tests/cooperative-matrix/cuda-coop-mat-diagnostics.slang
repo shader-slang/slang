@@ -5,11 +5,11 @@
 // int8 / uint8 / FloatE4M3 / FloatE5M2 are valid for MatrixA / MatrixB).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedType -stage compute
 
-// Test 1b: the same unsupported element type, constructed from a buffer-loaded
-// value.  After GetLength is inlined, this exercises the same emitter path as
-// Test 1 (the prelude's GetLength default-constructs its local), so it is a
-// second regression guard for the E50000 recovery rather than a distinct
-// lowering path.
+// Test 1b: the same unsupported element type as Test 1, constructed from a
+// buffer-loaded value.  After GetLength is inlined, this exercises the same
+// emitter path as Test 1 (the prelude's GetLength default-constructs its
+// local), so it is a second regression guard for the E50000 diagnostic
+// rather than a distinct lowering path.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedTypeFromBuffer -stage compute
 
 // Test 2: invalid shape (8x16 instead of 16x16) for MatrixA on CUDA
