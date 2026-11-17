@@ -1,7 +1,8 @@
 // param-mutation.slang
 
-// When a copyable parameter is passed to `in`, it is mutable but generates a warning as it
-// probably (?) isn't what the programmer intended.
+// When a copyable parameter is passed to `in`, it is mutable but generates a warning: a write
+// changes only the callee's local copy, which the caller cannot observe, so the write is
+// likely a mistake.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 

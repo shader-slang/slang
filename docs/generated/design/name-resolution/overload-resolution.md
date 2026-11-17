@@ -315,7 +315,7 @@ The individual steps:
    1077-1107](../../../../source/slang/slang-check-overload.cpp)).
 5. **`TryCheckOverloadCandidateConstraints`**
    ([slang-check-overload.cpp line
-   1145](../../../../source/slang/slang-check-overload.cpp)) — for an
+   1113](../../../../source/slang/slang-check-overload.cpp)) — for an
    explicit generic application `G<A, B>`, this step validates the
    `where`-clauses on `G`'s parameters against the inferred
    substitutions and fills in any generic arguments left to defaults.
@@ -325,7 +325,7 @@ The individual steps:
    ([slang-check-impl.h line
    3751](../../../../source/slang/slang-check-impl.h), called at
    [slang-check-overload.cpp line
-   1221](../../../../source/slang/slang-check-overload.cpp)) — the same
+   1189](../../../../source/slang/slang-check-overload.cpp)) — the same
    fixpoint loop used for inferred generic arguments — rather than a
    per-constraint linear pass. It passes only the explicitly-provided
    ordinary prefix (`candidate.explicitGenericArgCount` arguments) via
