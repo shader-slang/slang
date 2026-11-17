@@ -4531,8 +4531,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 boundStorageExpr = implicitCast->arguments[0];
                         }
                         if (boundStorageExpr->type.isWriteOnlyRefParam &&
-                            !(as<OutParamType>(paramType) ||
-                              as<RefWriteOnlyParamType>(paramType)))
+                            !(as<OutParamType>(paramType) || as<RefWriteOnlyParamType>(paramType)))
                         {
                             diagnoseReadOfWriteOnlyStorage(boundStorageExpr);
                         }

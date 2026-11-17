@@ -1,8 +1,5 @@
 // Every read of a `__ref_writeonly` parameter is an error, while binding its memory location to an
 // `out` or `__ref_writeonly` parameter, or assigning to it, is not.
-//
-// Disabled: reads of a `__ref_writeonly` parameter are not yet diagnosed. A follow-up change adds
-// that check and re-enables this test.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 

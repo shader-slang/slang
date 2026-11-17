@@ -3288,13 +3288,10 @@ public:
     void maybeDiagnoseConstVariableAssignment(Expr* expr);
 
     /// Report that `expr` reads storage marked write-only (a `__ref_writeonly` parameter or
-    /// GLSL `writeonly` storage), and clear the flag on that expression so a nested or retried
-    /// check of the same expression node — a coercion that completes a constructor call on the
-    /// same argument, an overload resolution completing candidate after candidate — reports the
-    /// read once, not once per pass.
+    /// GLSL `writeonly` storage), once per expression node: the diagnostic goes to the session
+    /// sink and the node is recorded in `writeOnlyReadsReported`, so retried or nested checking
+    /// passes (constructor attempts, candidate completions) neither drop nor duplicate it.
     void diagnoseReadOfWriteOnlyStorage(Expr* expr);
-
-
 
     // Figure out what type an initializer/constructor declaration
     // is supposed to return. In most cases this is just the type

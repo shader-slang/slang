@@ -1,9 +1,6 @@
 // An argument is read unless its parameter is `out` or `__ref_writeonly`, so the memory location
 // of a `__ref_writeonly` parameter may only be forwarded to those two modes, and a receiver,
 // atomic operation, or address-of that reads it is reported.
-//
-// Disabled: reads of a `__ref_writeonly` parameter are not yet diagnosed. A follow-up change adds
-// that check and re-enables this test.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute -experimental-feature
 
