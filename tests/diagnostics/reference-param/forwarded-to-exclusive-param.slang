@@ -10,7 +10,7 @@
 // call, and the checker cannot see that (the removed E30709 warnings fired on such valid
 // code, which is why they were retired).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -entry computeMain -stage compute -Wall
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,exit-code=0): -target hlsl -entry computeMain -stage compute -Wall -experimental-feature
 
 struct S { int f; }
 
@@ -56,6 +56,14 @@ void viaGroupsharedParam(groupshared int p)
 //CHECK:       ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'p' does not guarantee that
 }
 
+// A `__ref_writeonly` parameter is the same kind of reference, so forwarding it warns too.
+void viaWriteonly(__ref_writeonly int w)
+{
+    innerInout(w);
+//CHECK:       ^ passing non-exclusive memory ('w') to a function ('innerInout') that requires exclusive access
+//CHECK:       ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'w' does not guarantee that
+}
+
 // --- Silent: the argument guarantees exclusivity, or the callee does not require it ---
 
 // A bounce through a local temporary is exclusive by construction.
@@ -88,6 +96,7 @@ void computeMain(uint i : SV_GroupIndex)
     viaRefStruct(sLocal);
     viaRefArray(g);
     viaGroupsharedParam(g[i]);
+    viaWriteonly(g[i]);
     viaIn(1);
     viaInOut(g[i]);
 }
