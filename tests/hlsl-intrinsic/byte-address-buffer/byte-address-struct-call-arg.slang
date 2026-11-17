@@ -8,6 +8,9 @@
 // loaded structs, when the argument is a field or an element of a field of the loaded struct,
 // and when the loaded value is an array.
 //
+// Check that a struct loaded from a writable buffer keeps the value that the buffer held when
+// the struct was loaded, when the buffer is written between the load and the call.
+//
 // Check that the shader compiles for SPIR-V, GLSL, Metal and WGSL.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
@@ -24,9 +27,10 @@ ByteAddressBuffer pool;
 //TEST_INPUT:set rwpool = ubuffer(data=[10 20 30 40 50], stride=4)
 RWByteAddressBuffer rwpool;
 
-//TEST_INPUT:set outb = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT:set outb = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outb;
 
+// The interface through which `useGeneric` and `useInterface` read a loaded struct.
 interface ISum
 {
     uint sum();
@@ -75,12 +79,15 @@ struct Pair<T>
     M payload;
 }
 
+// A struct with an array of `M`, so that the argument of a call can be one element of a field.
 struct Container
 {
     uint header;
     M items[2];
 }
 
+// Each function combines the first and the last word of its arguments, so that a load at a wrong
+// offset or of a wrong size changes its result.
 uint useFree(M m) { return m.a + m.y[3]; }
 uint useGeneric<T : ISum>(T v) { return v.sum(); }
 uint useInterface(ISum v) { return v.sum(); }
@@ -126,6 +133,12 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     // A loaded array.
     outb[15] = useArray(pool.Load<uint[5]>(id.x + 8));
 
+    // A write to the buffer between the load and the call.
+    M saved = rwpool.Load<M>(0);
+    rwpool.Store<uint>(0, 1000);
+    outb[16] = useNoInline(saved);
+    outb[17] = rwpool.Load<uint>(0);
+
     // CHECK: 6
     // CHECK-NEXT: 8
     // CHECK-NEXT: 10
@@ -142,4 +155,6 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     // CHECK-NEXT: 16
     // CHECK-NEXT: 22
     // CHECK-NEXT: 307
+    // CHECK-NEXT: 60
+    // CHECK-NEXT: 1000
 }

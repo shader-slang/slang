@@ -26,13 +26,16 @@ struct S
 
 static const uint kAlignment = 8;
 
+// Returns `get()` of the `S` loaded at `offset`, which is a multiple of `A`.
 float loadWithAlignment<let A : uint>(uint offset)
 {
     return input.LoadAligned<S>(offset, A).get();
 }
 
+// The interface through which `loadWithNaturalAlignment` reads a loaded value.
 interface IValue
 {
+    // Returns a value computed from the fields of `v`.
     static float getValue(This v);
 }
 
@@ -41,7 +44,8 @@ extension S : IValue
     static float getValue(S v) { return v.get(); }
 }
 
-// The alignment of the load depends on `T`.
+// Returns `getValue` of the `T` loaded at `offset`, which is a multiple of the natural alignment
+// of `T`.
 float loadWithNaturalAlignment<T : IValue>(uint offset)
 {
     return T.getValue(input.LoadAligned<T>(offset));
