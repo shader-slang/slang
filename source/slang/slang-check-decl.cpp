@@ -1208,6 +1208,9 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
         dispatchIfNotNull(expr->declRef.declRefBase);
+
+        // Pass down the callee location
+        processDeclModifiers(expr->declRef.getDecl(), expr->loc);
     }
     void visitInitializerListExpr(InitializerListExpr* expr)
     {
