@@ -27,10 +27,16 @@ RWStructuredBuffer<uint> multiResult;
 [[vk::binding(DerivedSlot / 2, DerivedSlot == 5 ? 1 : 2)]]
 RWStructuredBuffer<uint> divResult;
 
+// A cast over the chained extern: pass 1 resolves the base to a still-symbolic
+// polynomial (the TypeCastIntVal resolve takes its rebuild branch), pass 2 folds.
+[[vk::binding(int64_t(DerivedSlot) / 3, 1)]]
+RWStructuredBuffer<uint> castResult;
+
 // CHECK: OpName %[[CHAIN:[A-Za-z_][A-Za-z_0-9]*]] "chainResult"
 // CHECK: OpName %[[POWER:[A-Za-z_][A-Za-z_0-9]*]] "powerResult"
 // CHECK: OpName %[[MULTI:[A-Za-z_][A-Za-z_0-9]*]] "multiResult"
 // CHECK: OpName %[[DIV:[A-Za-z_][A-Za-z_0-9]*]] "divResult"
+// CHECK: OpName %[[CAST:[A-Za-z_][A-Za-z_0-9]*]] "castResult"
 // CHECK: OpDecorate %[[CHAIN]] Binding 5
 // CHECK: OpDecorate %[[CHAIN]] DescriptorSet 3
 // CHECK: OpDecorate %[[POWER]] Binding 4
@@ -39,10 +45,13 @@ RWStructuredBuffer<uint> divResult;
 // CHECK: OpDecorate %[[MULTI]] DescriptorSet 7
 // CHECK: OpDecorate %[[DIV]] Binding 2
 // CHECK: OpDecorate %[[DIV]] DescriptorSet 1
+// CHECK: OpDecorate %[[CAST]] Binding 1
+// CHECK: OpDecorate %[[CAST]] DescriptorSet 1
 // OVERRIDE: OpName %[[CHAIN2:[A-Za-z_][A-Za-z_0-9]*]] "chainResult"
 // OVERRIDE: OpName %[[POWER2:[A-Za-z_][A-Za-z_0-9]*]] "powerResult"
 // OVERRIDE: OpName %[[MULTI2:[A-Za-z_][A-Za-z_0-9]*]] "multiResult"
 // OVERRIDE: OpName %[[DIV2:[A-Za-z_][A-Za-z_0-9]*]] "divResult"
+// OVERRIDE: OpName %[[CAST2:[A-Za-z_][A-Za-z_0-9]*]] "castResult"
 // OVERRIDE: OpDecorate %[[CHAIN2]] Binding 13
 // OVERRIDE: OpDecorate %[[CHAIN2]] DescriptorSet 11
 // OVERRIDE: OpDecorate %[[POWER2]] Binding 100
@@ -51,6 +60,8 @@ RWStructuredBuffer<uint> divResult;
 // OVERRIDE: OpDecorate %[[MULTI2]] DescriptorSet 23
 // OVERRIDE: OpDecorate %[[DIV2]] Binding 6
 // OVERRIDE: OpDecorate %[[DIV2]] DescriptorSet 2
+// OVERRIDE: OpDecorate %[[CAST2]] Binding 4
+// OVERRIDE: OpDecorate %[[CAST2]] DescriptorSet 1
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -60,4 +71,5 @@ void main(uint3 threadID : SV_DispatchThreadID)
     powerResult[threadID.x] = threadID.x;
     multiResult[threadID.x] = threadID.x;
     divResult[threadID.x] = threadID.x;
+    castResult[threadID.x] = threadID.x;
 }
