@@ -2510,7 +2510,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     // Before checking the operation name, let's look at the arguments
     List<IntVal*> newArgs;
     IntVal* argVals[kMaxArgs];
-    IntegerLiteralValue constArgVals[kMaxArgs];
     bool allConst = true;
     for (Index a = 0; a < argCount; ++a)
     {
@@ -2523,7 +2522,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (auto constArgVal = as<ConstantIntVal>(argVal))
         {
-            constArgVals[a] = constArgVal->getValue();
             newArgs.add(constArgVal);
         }
         else
@@ -2606,8 +2604,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         return nullptr;
     }
 
-    // At this point, all the operands had simple integer values, so we are golden.
-    IntegerLiteralValue resultValue = 0;
+    // At this point, all the operands have simple integer values.
+
     // If this is an implicit cast, we can try to fold.
     if (implicitCast)
     {
@@ -2625,69 +2623,26 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         auto opName = funcDeclRef.getName();
 
-        struct BuiltinOperationMapEntry
-        {
-            const char* opName;
-            int argNum;
-            BuiltinOperationKind opKind;
-        };
+        BuiltinOperationKind opKind = getBuiltinOperationKindFromString(
+            getText(opName).getUnownedSlice(),
+            argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
 
-        // TODO: switch to getBuiltinOperationKindFromString()
-        static const BuiltinOperationMapEntry builtinOpMap[] = {
-            { "-", 1, BuiltinOperationKind::Neg },
-            { "~", 1, BuiltinOperationKind::BitNot },
-            { "!", 1, BuiltinOperationKind::Not },
-            { "==", 2, BuiltinOperationKind::Eql },
-            { "!=", 2, BuiltinOperationKind::Neq },
-            { "<", 2, BuiltinOperationKind::Less },
-            { ">", 2, BuiltinOperationKind::Greater },
-            { "<=", 2, BuiltinOperationKind::Leq },
-            { ">=", 2, BuiltinOperationKind::Geq },
-            { "&", 2, BuiltinOperationKind::BitAnd },
-            { "|", 2, BuiltinOperationKind::BitOr },
-            { "^", 2, BuiltinOperationKind::BitXor },
-            { "+", 2, BuiltinOperationKind::Add },
-            { "-", 2, BuiltinOperationKind::Sub },
-            { "*", 2, BuiltinOperationKind::Mul },
-            { "/", 2, BuiltinOperationKind::Div },
-            { "%", 2, BuiltinOperationKind::Mod },
-            { "<<", 2, BuiltinOperationKind::Lsh },
-            { ">>", 2, BuiltinOperationKind::Rsh },
-            { "&&", 2, BuiltinOperationKind::And },
-            { "||", 2, BuiltinOperationKind::Or },
-            { "?:", 3, BuiltinOperationKind::Conditional },
-        };
-
-        for (const auto &entry : builtinOpMap)
-        {
-            if (argCount == entry.argNum && opName->text == entry.opName)
-            {
-                return BuiltinOperationIntVal::tryFoldImpl(
-                    m_astBuilder,
-                    invokeExpr.getExpr()->type.type,
-                    entry.opKind,
-                    newArgs,
-                    getSink(),
-                    funcDeclRefExpr.getExpr()->loc);
-            }
-        }
-
-        // special case for unary +
-        if (opName == getName("+"))
-        {
-            if (argCount == 1)
-            {
-                resultValue = constArgVals[0];
-            }
-        }
-        else
-        {
+        if (opKind == BuiltinOperationKind::Unknown)
             return nullptr;
-        }
-    }
 
-    IntVal* result = m_astBuilder->getIntVal(invokeExpr.getExpr()->type.type, resultValue);
-    return result;
+        // special case for unary +, which returns identity
+        if (opKind == BuiltinOperationKind::Add && argCount == 1)
+            return argVals[0];
+
+        // delegate to builtin ops folder
+        return BuiltinOperationIntVal::tryFoldImpl(
+            m_astBuilder,
+            invokeExpr.getExpr()->type.type,
+            opKind,
+            newArgs,
+            getSink(),
+            funcDeclRefExpr.getExpr()->loc);
+    }
 }
 
 bool SemanticsVisitor::_checkForCircularityInConstantFolding(
