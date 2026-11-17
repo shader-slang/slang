@@ -232,7 +232,9 @@ static bool _isSlangRichDiagnosticHeader(
 // The ascii `---` also prefixes the closing gutter line of a snippet (`---'`), which is
 // harmless: a location line always immediately follows its header, so no pending header
 // can attach to a gutter close, and it degrades to a note.
-static bool _isSlangRichLocationLine(const UnownedStringSlice& inLine, UnownedStringSlice& outLocation)
+static bool _isSlangRichLocationLine(
+    const UnownedStringSlice& inLine,
+    UnownedStringSlice& outLocation)
 {
     static const UnownedStringSlice markers[] = {
         UnownedStringSlice::fromLiteral("-->"),
