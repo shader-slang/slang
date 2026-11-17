@@ -240,6 +240,7 @@ static Type* _resolveSubstitutedFieldType(SemanticsVisitor* visitor, Type* type)
 // type is not checked yet — for example while the struct's own declaration is still being
 // formed — is skipped: the declaration-time checks own it once the declaration completes.
 static const int kRestrictedTypeWalkDepthLimit = 32;
+static const Index kSpecializationWalkDepthLimit = 32;
 
 static RestrictedTypeKind _getRestrictedTypeKindImpl(
     SemanticsVisitor* visitor,
@@ -1150,6 +1151,16 @@ void checkSpecializedCallableBody(
         state->checkedSpecializationDeclRefs.remove(specializedCallableDeclRef);
         return;
     }
+
+    // A chain of distinct specializations nests one walker frame per link; the dedup set
+    // stops cycles but not depth. Bound in-flight walks, dropping the dedup record so a
+    // later, shallower completion of the same specialization can still run the walk.
+    if (state->currentWalkDepth >= kSpecializationWalkDepthLimit)
+    {
+        state->checkedSpecializationDeclRefs.remove(specializedCallableDeclRef);
+        return;
+    }
+    state->currentWalkDepth++;
 
     // The walk reads the checked body; the declaration's own checking finishes it if the call
     // site appears before the body's checks have run.
