@@ -1825,6 +1825,23 @@ bool SemanticsVisitor::_coerce(
         return false;
     }
 
+    // Coercion is the step where the checker turns an expression that names storage into its
+    // value, so it is where reading storage marked write-only, such as a `__ref_writeonly`
+    // parameter or GLSL `writeonly` storage, is reported: an initializer, a `return` value, a
+    // condition, and the right side of an assignment all coerce, including when the types match
+    // and the conversion is the identity. Two sites are exceptions because the expression may be
+    // binding storage rather than being read: an `Argument` for an `out`/`inout`/`ref`
+    // parameter, and an `ExplicitCoercion` — a cast or a call on a type — whose constructor or
+    // conversion parameter may be `out` or `__ref_writeonly`. The call-site argument checks
+    // decide those bindings and report the reads, so this step does not. `canCoerce` probes
+    // reach this code with `outToExpr` null but a live sink, so diagnose only when reifying the
+    // result.
+    if (site != CoercionSite::Argument && site != CoercionSite::ExplicitCoercion && outToExpr &&
+        fromExpr && (fromExpr->type.isWriteOnly || fromExpr->type.isWriteOnlyRefParam))
+    {
+        diagnoseReadOfWriteOnlyStorage(fromExpr);
+    }
+
     if (outToExpr)
     {
         // Before falling back to generic type equality, check for fully-known invalid
@@ -3336,6 +3353,11 @@ Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, 
     CastToSuperTypeExpr* expr = m_astBuilder->create<CastToSuperTypeExpr>();
     expr->loc = fromExpr->loc;
     expr->type = QualType(toType);
+    // A value viewed at a super type is part of the same memory location as the
+    // original expression, so the original's write-only restriction travels with
+    // the view.
+    expr->type.isWriteOnly = fromExpr->type.isWriteOnly;
+    expr->type.isWriteOnlyRefParam = fromExpr->type.isWriteOnlyRefParam;
     expr->valueArg = fromExpr;
     expr->witnessArg = witness;
     return expr;

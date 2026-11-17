@@ -1705,6 +1705,9 @@ QualType getTypeForDeclRef(
             isLValue = false;
 
         bool isReadOnlyMemoryLocation = false;
+        // A `__ref_writeonly` parameter denotes storage that the body may only write, the
+        // parameter-side counterpart of the GLSL `writeonly` memory qualifier below.
+        bool isWriteOnlyParam = false;
         if (auto paramDecl = as<ParamDecl>(varDeclRef.getDecl()))
         {
             // Function parameters declared in the "modern" style
@@ -1730,8 +1733,11 @@ QualType getTypeForDeclRef(
             case ParamPassingMode::Out:
             case ParamPassingMode::BorrowInOut:
             case ParamPassingMode::RefReadWrite:
-            case ParamPassingMode::RefWriteOnly:
                 // These parameters are meant to be written.
+                break;
+            case ParamPassingMode::RefWriteOnly:
+                // This parameter is meant to be written, and the body may not read it.
+                isWriteOnlyParam = true;
                 break;
             case ParamPassingMode::RefReadOnly:
                 isLValue = false;
@@ -1766,7 +1772,7 @@ QualType getTypeForDeclRef(
         if (auto shadow = as<UniformParameterShadowVarDecl>(declForMemoryQualifier))
             declForMemoryQualifier = shadow->uniformParameter;
 
-        bool isWriteOnly = false;
+        bool isWriteOnly = isWriteOnlyParam;
         if (auto collection = declForMemoryQualifier->findModifier<MemoryQualifierSetModifier>())
         {
             if (collection->getMemoryQualifierBit() & MemoryQualifierSetModifier::Flags::kReadOnly)
@@ -1781,6 +1787,7 @@ QualType getTypeForDeclRef(
         qualType.isLeftValue = isLValue;
         qualType.isReadOnlyMemoryLocation = isReadOnlyMemoryLocation;
         qualType.isWriteOnly = isWriteOnly;
+        qualType.isWriteOnlyRefParam = isWriteOnlyParam;
         return qualType;
     }
     else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -2706,6 +2713,11 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     SemanticsVisitor subVisitor(contextToUse);
     initExpr = subVisitor.CheckExpr(initExpr);
     initExpr = maybeOpenRef(initExpr);
+
+    // The initializer is read to produce the value, and because the variable's type is
+    // inferred, no coercion follows that would report the read, so check it here.
+    if (initExpr->type.isWriteOnly || initExpr->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(initExpr);
 
     // TODO: We might need some additional steps here to ensure
     // that the type of the expression is one we are okay with
@@ -3915,9 +3927,6 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // CheckTerm or coerce (e.g. undefined identifier) suppress downstream diagnostics.
         auto errorCountBeforeInitCheck = getSink()->getErrorCount();
         initExpr = subVisitor.CheckTerm(initExpr);
-
-        if (initExpr->type.isWriteOnly)
-            getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;

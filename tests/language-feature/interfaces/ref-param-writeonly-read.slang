@@ -311,8 +311,8 @@ int viewedReceivers<T : IGet>(
 int pointerMember(__ref_writeonly P* p)
 {
     return p.a;
-//CHECK:   ^ E30119
-//CHECK:   ^ cannot read from writeonly, check modifiers.
+//CHECK:     ^ E30119
+//CHECK:     ^ cannot read from writeonly, check modifiers.
 }
 
 float textureRead(__ref_writeonly RWTexture2D<float> t)

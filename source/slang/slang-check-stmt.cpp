@@ -419,6 +419,11 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
 
     stmt->condition = CheckExpr(stmt->condition);
 
+    // The selector is read even though it is not coerced, so the write-only read check has no
+    // coercion to ride on here.
+    if (stmt->condition->type.isWriteOnly || stmt->condition->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(stmt->condition);
+
     // Reject a non-integer/enum selector here so no inconsistent `switch` reaches IR
     // lowering; skip when the condition already failed to check to avoid a cascade.
     auto conditionType = stmt->condition->type.type;

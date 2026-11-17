@@ -920,6 +920,17 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         }
         else
         {
+            // A parameter without a passing-mode wrapper takes its argument's value, so the
+            // call reads the argument's storage. The coercion below runs at
+            // `CoercionSite::Argument`, which the write-only read check skips because an
+            // argument for an `out`/`inout`/`ref` parameter binds storage instead, so report
+            // the read here, where the value-taking parameter is known. This branch is the
+            // real (non-probing) completion of a candidate, so a candidate is diagnosed once.
+            if (!paramType.isLeftValue && arg.argExpr && arg.argExpr->type.isWriteOnlyRefParam)
+            {
+                diagnoseReadOfWriteOnlyStorage(arg.argExpr);
+            }
+
             Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
             // Check if concrete-to-interface coercion caused loss of l-valueness.

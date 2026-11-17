@@ -645,6 +645,16 @@ FIDDLE() namespace Slang
         /// The expression denotes storage declared with the GLSL `writeonly` memory qualifier.
         FIDDLE() bool isWriteOnly = false;
 
+        /// The expression denotes storage that is part of a `__ref_writeonly` parameter, or a
+        /// field, element, swizzle, or view of one. The GLSL `writeonly` qualifier does not set
+        /// this flag: reading GLSL `writeonly` storage through a metadata query such as
+        /// `imageSize` is ordinary GLSL, while reading a `__ref_writeonly` parameter through a
+        /// call argument is always a read. Every read of such storage is reported (E30119),
+        /// and an argument naming it may only bind to an `out` or `__ref_writeonly` parameter.
+        /// Set together with `isWriteOnly`, which carries the GLSL compatibility rules for
+        /// initializers and the right side of an assignment.
+        FIDDLE() bool isWriteOnlyRefParam = false;
+
         /// The expression denotes a memory location that it cannot write, such as a
         /// `__ref_readonly` parameter, or a field or element of one. A `__constref` parameter is
         /// not one, because a borrow may be a temporary holding the argument's value. It is never

@@ -203,7 +203,13 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             ExtractExistentialValueExpr* openedValue =
                 m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
+            openedValue->loc = expr->loc;
             openedValue->type = QualType(openedType);
+            // Opening an existential does not copy or move any storage: the opened value
+            // names the same memory location as the original, so a write-only original
+            // keeps restricting the opened value.
+            openedValue->type.isWriteOnly = expr->type.isWriteOnly;
+            openedValue->type.isWriteOnlyRefParam = expr->type.isWriteOnlyRefParam;
             openedValue->originalExpr = expr;
             openedValue->checked = true;
             // The result of opening an existential is an l-value
@@ -586,6 +592,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // Reading a member of a write-only value would also read that base value. We
             // propagate the base's write-only restriction to the resulting member expression.
             expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
+            expr->type.isWriteOnlyRefParam =
+                baseExpr->type.isWriteOnlyRefParam || expr->type.isWriteOnlyRefParam;
 
             // It's not valid to reference a non-static member with a static
             // func using 'this'.
@@ -710,6 +718,10 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         // `AccessQualifier` parameter that can be used to form a read-only pointer.
         //
         derefExpr->type.isLeftValue = true;
+        // Reading through the pointer first reads the pointer itself, so a write-only
+        // pointer location restricts the pointed-to expression the same way.
+        derefExpr->type.isWriteOnly = base->type.isWriteOnly;
+        derefExpr->type.isWriteOnlyRefParam = base->type.isWriteOnlyRefParam;
     }
     else if (as<ExplicitRefType>(base->type))
     {
@@ -736,6 +748,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         derefExpr->type.isReadOnlyMemoryLocation = base->type.isReadOnlyMemoryLocation;
         derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
         derefExpr->type.isWriteOnly = base->type.isWriteOnly;
+        derefExpr->type.isWriteOnlyRefParam = base->type.isWriteOnlyRefParam;
     }
 
     return derefExpr;
@@ -3489,14 +3502,24 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     }
     auto& indexExpr = subscriptExpr->indexExprs[0];
 
+    // Reading the index expression reads its storage. The coercion below runs at
+    // `CoercionSite::Argument`, which the write-only read check skips because an argument may
+    // bind storage, so report the read here.
+    if (indexExpr->type.isWriteOnly || indexExpr->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(indexExpr);
+
+
     auto intTargetType = getMatchingIntType(indexExpr->type.type);
     indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
     subscriptExpr->type = QualType(elementType);
 
-    // TODO(tfoley): need to be more careful about this stuff
+    // An element of a write-only base is itself write-only storage, the same way an element of
+    // a read-only base is read-only.
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
     subscriptExpr->type.isReadOnlyMemoryLocation = baseExpr->type.isReadOnlyMemoryLocation;
+    subscriptExpr->type.isWriteOnly = baseExpr->type.isWriteOnly;
+    subscriptExpr->type.isWriteOnlyRefParam = baseExpr->type.isWriteOnlyRefParam;
 
     return subscriptExpr;
 }
@@ -3741,6 +3764,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
     auto checkedCallExpr = CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
 
+    // A `__subscript` access names an element of its base's storage, and the checked call
+    // expression is what downstream code sees as that storage. Whether the access reads or
+    // writes is decided by the use of the expression, so the base's write-only restriction
+    // travels with the storage rather than being diagnosed here.
+    if (as<InvokeExpr>(checkedCallExpr))
+    {
+        auto checkedInvokeExpr = static_cast<InvokeExpr*>(checkedCallExpr);
+        checkedInvokeExpr->type.isWriteOnly = baseExpr->type.isWriteOnly;
+        checkedInvokeExpr->type.isWriteOnlyRefParam = baseExpr->type.isWriteOnlyRefParam;
+    }
+
     if (m_parentDifferentiableAttr)
     {
         if (auto checkedInvokeExpr = as<InvokeExpr>(checkedCallExpr))
@@ -3793,6 +3827,21 @@ Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
     return expr;
 }
 
+void SemanticsVisitor::diagnoseReadOfWriteOnlyStorage(Expr* expr)
+{
+    // A read of write-only storage is a fact about the source expression, not about the
+    // checking pass that observes it, so it is reported on the session's sink even when a probe
+    // (a constructor attempt, a cast coercion, a candidate completion) is running against a
+    // temporary sink whose own diagnostics may be dropped. Recording the expression keeps the
+    // retried and nested passes from reporting the same read again.
+    if (!expr || !(expr->type.isWriteOnly || expr->type.isWriteOnlyRefParam))
+        return;
+    auto shared = getShared();
+    if (!shared->writeOnlyReadsReported.add(expr))
+        return;
+    shared->getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr});
+}
+
 void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 {
     // We will try to handle expressions of the form:
@@ -3832,9 +3881,6 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 
 Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
 {
-    if (expr->right->type.isWriteOnly)
-        getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
-
     expr->left = maybeOpenRef(expr->left);
     auto type = expr->left->type;
     if (auto atomicType = as<AtomicType>(type))
@@ -4411,6 +4457,29 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
+            // A method call reads its receiver, whatever the receiver's passing mode: every
+            // mode copies the receiver, borrows it, or names its storage for the callee to
+            // access. A callee marked `[__readNone]` accesses no memory, so calling it on
+            // write-only storage reads nothing (texture `GetDimensions` on a
+            // `__ref_writeonly` parameter stays clean). A subscript or property access is
+            // different: it names storage, and whether that storage is read or written is
+            // decided by the use of the expression, which the write-only flag travels with,
+            // so such a callee is not a receiver read.
+            if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
+            {
+                auto receiverExpr = memberExpr->baseExpression;
+                if (receiverExpr &&
+                    (receiverExpr->type.isWriteOnly || receiverExpr->type.isWriteOnlyRefParam))
+                {
+                    auto calleeDecl = memberExpr->declRef.getDecl();
+                    if (!as<SubscriptDecl>(calleeDecl) && !as<PropertyDecl>(calleeDecl) &&
+                        !(calleeDecl && calleeDecl->findModifier<ReadNoneAttribute>()))
+                    {
+                        diagnoseReadOfWriteOnlyStorage(receiverExpr);
+                    }
+                }
+            }
+
             Index paramCount = funcType->getParamCount();
 
             for (Index pp = 0; pp < paramCount; ++pp)
@@ -4448,6 +4517,26 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         as<RefReadOnlyParamType>(paramType) != nullptr;
                     if (argExpr)
                     {
+                        // An argument that binds write-only storage, such as a `__ref_writeonly`
+                        // parameter being forwarded, may only be given to a parameter that does
+                        // not read it: `out` writes without reading, and `__ref_writeonly` only
+                        // writes. Every other storage-binding mode — `inout`, `__ref`,
+                        // `__ref_readonly` — reads the argument. A converted argument is wrapped
+                        // in an implicit cast, so look through one level to recover the
+                        // write-only flag of the storage being bound.
+                        Expr* boundStorageExpr = argExpr;
+                        if (auto implicitCast = as<TypeCastExpr>(boundStorageExpr))
+                        {
+                            if (implicitCast->arguments.getCount() >= 1)
+                                boundStorageExpr = implicitCast->arguments[0];
+                        }
+                        if (boundStorageExpr->type.isWriteOnlyRefParam &&
+                            !(as<OutParamType>(paramType) ||
+                              as<RefWriteOnlyParamType>(paramType)))
+                        {
+                            diagnoseReadOfWriteOnlyStorage(boundStorageExpr);
+                        }
+
                         if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
                                                             argExpr->type.isReadOnlyMemoryLocation))
                         {
@@ -4782,6 +4871,14 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     outLeftArg = leftArg;
     outRightArg = rightArg;
 
+    // Both operands are read, whether the pair below keeps them verbatim (same type) or coerces
+    // them. The coercion happens at `CoercionSite::Argument`, which the write-only read check
+    // skips because an argument may bind storage, so report the reads here either way.
+    if (leftArg->type.isWriteOnly || leftArg->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(leftArg);
+    if (rightArg->type.isWriteOnly || rightArg->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(rightArg);
+
     // Same builtin type on both sides: nothing to coerce.
     if (leftArg->type.type->equals(rightArg->type.type))
         return leftArg->type.type;
@@ -4919,6 +5016,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         auto arg = expr->arguments[0];
         if (!arg->type.type)
             return nullptr;
+
+        // The builtin unary operators take their operand verbatim, so no coercion marks the
+        // lvalue-to-rvalue step where the operand is read. Report that read here.
+        if (arg->type.isWriteOnly || arg->type.isWriteOnlyRefParam)
+            diagnoseReadOfWriteOnlyStorage(arg);
+
         Type* uOperandType = arg->type.type;
         // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
         // matrix operands to normal resolution (see the binary case for the full rationale).
@@ -5266,9 +5369,14 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
             }
 
             // We do the cast in the 2nd pass because we want to leave it for 'visitInvokeExpr'
-            // to handle if this expression doesn't support short-circuiting.
+            // to handle if this expression doesn't support short-circuiting. The coercion runs
+            // at `CoercionSite::Argument`, which the write-only read check skips because an
+            // argument may bind storage, and a `&&`/`||` operand is always read, so report that
+            // read here.
             for (auto& arg : expr->arguments)
             {
+                if (arg->type.isWriteOnly || arg->type.isWriteOnlyRefParam)
+                    diagnoseReadOfWriteOnlyStorage(arg);
                 arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg, getSink());
             }
 
@@ -7802,6 +7910,12 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         return expr;
     }
 
+    // Taking the address of write-only storage turns it into a pointer that permits reads, so
+    // the address-of itself is the read being performed. `__getAddress(x)` is rewritten to this
+    // form, so the read is reported on its operand either way.
+    if (expr->arg->type.isWriteOnly || expr->arg->type.isWriteOnlyRefParam)
+        diagnoseReadOfWriteOnlyStorage(expr->arg);
+
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
     expr->type =
@@ -9053,6 +9167,9 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
     swizExpr->type.isReadOnlyMemoryLocation =
         elementCount == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
+    // Reading any component of a write-only base reads that base.
+    swizExpr->type.isWriteOnly = swizExpr->base->type.isWriteOnly;
+    swizExpr->type.isWriteOnlyRefParam = swizExpr->base->type.isWriteOnlyRefParam;
 
     return swizExpr;
 }
@@ -9170,6 +9287,9 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
     swizExpr->type.isReadOnlyMemoryLocation =
         swizExpr->elementIndices.getCount() == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
+    // Reading any component of a write-only base reads that base.
+    swizExpr->type.isWriteOnly = swizExpr->base->type.isWriteOnly;
+    swizExpr->type.isWriteOnlyRefParam = swizExpr->base->type.isWriteOnlyRefParam;
     return swizExpr;
 }
 
@@ -9295,6 +9415,9 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     swizExpr->type.isReadOnlyMemoryLocation =
         areSwizzleComponentsContiguous(swizExpr->elementIndices) &&
         swizExpr->base->type.isReadOnlyMemoryLocation;
+    // Reading any component of a write-only base reads that base.
+    swizExpr->type.isWriteOnly = swizExpr->base->type.isWriteOnly;
+    swizExpr->type.isWriteOnlyRefParam = swizExpr->base->type.isWriteOnlyRefParam;
 
     return swizExpr;
 }

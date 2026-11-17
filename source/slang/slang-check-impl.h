@@ -1009,6 +1009,13 @@ struct SharedSemanticsContext : public RefObject
     List<ModuleDecl*> importedModulesList;
     HashSet<ModuleDecl*> importedModulesSet;
 
+    // Expressions whose read of write-only storage has already been reported. Checking runs
+    // more than one pass over the same expression node (constructor attempts and candidate
+    // completions re-run coercion against temporary sinks), so this set makes the report a
+    // once-per-read fact. Lives here because sub-visitors share this context while carrying
+    // their own sinks.
+    HashSet<Expr*> writeOnlyReadsReported;
+
     /// Declaration roots synthesized and published during this semantic-checking session.
     ///
     /// Some synthesized declarations deliberately stay out of their parent's member list so that
@@ -3279,6 +3286,15 @@ public:
     /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived
     /// from `this`.
     void maybeDiagnoseConstVariableAssignment(Expr* expr);
+
+    /// Report that `expr` reads storage marked write-only (a `__ref_writeonly` parameter or
+    /// GLSL `writeonly` storage), and clear the flag on that expression so a nested or retried
+    /// check of the same expression node — a coercion that completes a constructor call on the
+    /// same argument, an overload resolution completing candidate after candidate — reports the
+    /// read once, not once per pass.
+    void diagnoseReadOfWriteOnlyStorage(Expr* expr);
+
+
 
     // Figure out what type an initializer/constructor declaration
     // is supposed to return. In most cases this is just the type
