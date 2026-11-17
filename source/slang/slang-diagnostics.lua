@@ -4983,10 +4983,10 @@ warning(
 )
 
 err(
-    "entry-point-param-has-reference-mode",
+    "entry-point-param-has-invalid-mode",
     38054,
-    "entry-point parameter cannot use a reference passing mode",
-    span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the reference passing mode '~mode:ParamPassingMode', because an entry point exchanges values with the pipeline rather than with a caller's memory location" }
+    "entry-point parameter cannot use a disallowed passing mode",
+    span { loc = "param:Decl", message = "entry-point parameter '~param' cannot use the '~mode:ParamPassingMode' passing mode; ~allowedModes:String" }
 )
 
 err(

@@ -41,37 +41,84 @@ static EntryPointParamDirections checkEntryPointParamPassingMode(
     DiagnosticSink* sink)
 {
     EntryPointParamDirections directions;
-    const auto mode = getParamPassingMode(param);
-    switch (mode)
+    // The declared mode distinguishes a written `__borrow`/`__constref` from the implicit borrows
+    // the compiler derives: the payload keyword also declares BorrowIn, and a non-copyable type
+    // such as a mesh-shader output turns a plain `in` into an effective BorrowIn. Those implicit
+    // borrows stay valid, so the borrow rejection tests the written modifier, not the mode value.
+    const auto declaredMode = getExplicitlyDeclaredParamPassingMode(param);
+    // A uniform parameter's value comes from a constant buffer or a resource binding rather than
+    // from a caller. The `uniform` modifier is auto-added to resource-type parameters only after
+    // this check, so the parameter is classified by its written modifier and its type here.
+    const bool isUniform =
+        param->hasModifier<HLSLUniformModifier>() || isUniformParameterType(param->getType());
+    const char* allowedModes = isUniform
+                                   ? "a uniform entry-point parameter can only use 'in', because "
+                                     "its value comes from a constant buffer or a resource "
+                                     "binding rather than from a caller"
+                                   : "a varying entry-point parameter can only use 'in', 'out', "
+                                     "or 'inout', because an entry point exchanges values with "
+                                     "the pipeline rather than with a caller's memory location";
+    switch (declaredMode)
     {
     case ParamPassingMode::In:
-    case ParamPassingMode::BorrowIn:
         directions.isInput = true;
         break;
     case ParamPassingMode::Out:
+        if (isUniform)
+        {
+            sink->diagnose(Diagnostics::EntryPointParamHasInvalidMode{
+                .mode = declaredMode,
+                .allowedModes = allowedModes,
+                .param = param});
+        }
         directions.isOutput = true;
         break;
+    case ParamPassingMode::BorrowIn:
+        if (param->hasModifier<BorrowModifier>())
+        {
+            sink->diagnose(Diagnostics::EntryPointParamHasInvalidMode{
+                .mode = declaredMode,
+                .allowedModes = allowedModes,
+                .param = param});
+        }
+        directions.isInput = true;
+        break;
     case ParamPassingMode::BorrowInOut:
+        if (isUniform)
+        {
+            sink->diagnose(Diagnostics::EntryPointParamHasInvalidMode{
+                .mode = declaredMode,
+                .allowedModes = allowedModes,
+                .param = param});
+        }
         directions.isInput = true;
         directions.isOutput = true;
         break;
 
     // An entry point receives values from the previous pipeline stage and passes values to the
-    // next one, so there is no caller's memory location for a reference parameter to bind to. A
-    // borrow such as `__constref` has value semantics and may be implemented by copying, so only
-    // the reference modes are rejected. We still give each one the direction its access implies,
-    // so that the remaining entry-point checks report their own problems with the parameter.
+    // next one, so there is no caller's memory location for a reference parameter to bind to.
+    // We still give each one the direction its access implies, so that the remaining entry-point
+    // checks report their own problems with the parameter.
     case ParamPassingMode::RefReadWrite:
-        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        sink->diagnose(Diagnostics::EntryPointParamHasInvalidMode{
+            .mode = declaredMode,
+            .allowedModes = allowedModes,
+            .param = param});
         directions.isInput = true;
         directions.isOutput = true;
         break;
     case ParamPassingMode::RefReadOnly:
-        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        sink->diagnose(Diagnostics::EntryPointParamHasInvalidMode{
+            .mode = declaredMode,
+            .allowedModes = allowedModes,
+            .param = param});
         directions.isInput = true;
         break;
     case ParamPassingMode::RefWriteOnly:
-        sink->diagnose(Diagnostics::EntryPointParamHasReferenceMode{.mode = mode, .param = param});
+        sink->diagnose(Diagnostics::EntryPointParamHasInvalidMode{
+            .mode = declaredMode,
+            .allowedModes = allowedModes,
+            .param = param});
         directions.isOutput = true;
         break;
     default:
