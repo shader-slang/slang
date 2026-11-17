@@ -783,8 +783,13 @@ public:
         if (!visitedVals.add(genericAppDeclRef))
             return;
         _checkInnerSpecialization(genericAppDeclRef);
+        // Operand zero holds the inner declaration itself, which is an AST-node operand rather
+        // than a Val; follow the same kind check the base's visitVal applies.
         for (Index i = 0; i < genericAppDeclRef->getOperandCount(); i++)
-            dispatchIfNotNull(genericAppDeclRef->getOperand(i));
+        {
+            if (genericAppDeclRef->m_operands[i].kind == ValNodeOperandKind::ValNode)
+                dispatchIfNotNull(genericAppDeclRef->getOperand(i));
+        }
     }
 
 private:
@@ -884,6 +889,37 @@ private:
     }
 };
 
+// Returns true when the declaration tree contains one of the ray-tracing stage-input
+// structures (MissInput, ClosestHitInput, and their siblings). Only a declaration with one of
+// these annotations classifies as a restricted type, so nothing in a compilation whose loaded
+// modules declare none can ever be diagnosed by these checks.
+static bool _declTreeDeclaresStageInputs(Decl* decl)
+{
+    if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+    {
+        if (getStageInputKind(aggTypeDecl) != Stage::Unknown)
+            return true;
+    }
+    if (auto containerDecl = as<ContainerDecl>(decl))
+    {
+        for (auto member : containerDecl->getDirectMemberDecls())
+        {
+            if (_declTreeDeclaresStageInputs(member))
+                return true;
+        }
+    }
+    return false;
+}
+
+// Returns the per-compilation check state, creating it on first use.
+static PortableRTSpecializationCheckState* _getCheckState(Linkage* linkage)
+{
+    auto& state = linkage->m_portableRTSpecializationCheckState;
+    if (!state)
+        state = new PortableRTSpecializationCheckState();
+    return state;
+}
+
 void checkSpecializedCallableBody(
     SemanticsVisitor* visitor,
     DeclRefBase* specializedCallableDeclRef,
@@ -892,12 +928,35 @@ void checkSpecializedCallableBody(
     if (!specializedCallableDeclRef)
         return;
 
-    // Every restricted declaration comes from the experimental ray-tracing module, which can
-    // only be loaded when the compilation opted into experimental features. Compiles without
-    // the opt-in cannot construct one of these types, so skip the walk and keep them at their
-    // existing speed.
     auto linkage = visitor->getShared()->m_linkage;
-    if (!linkage || !linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+    if (!linkage)
+        return;
+
+    // The stage-input module is experimental, so a compilation without the experimental opt-in
+    // cannot have loaded it and no walk can report anything.
+    if (!linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+        return;
+
+    // The opt-in is broader than this feature: every standard-module build passes it too. Scan
+    // the loaded modules once per load-count change for an actual stage-input declaration, and
+    // keep compiles that define none of them — the core module itself, numerics, and ordinary
+    // shaders — at their existing checking speed.
+    auto state = _getCheckState(linkage);
+    if (state->loadedModuleCountAtScan != linkage->loadedModulesList.getCount())
+    {
+        state->loadedModuleCountAtScan = linkage->loadedModulesList.getCount();
+        state->stageInputsLoaded = false;
+        for (auto loadedModule : linkage->loadedModulesList)
+        {
+            auto moduleDecl = loadedModule ? loadedModule->getModuleDecl() : nullptr;
+            if (moduleDecl && _declTreeDeclaresStageInputs(moduleDecl))
+            {
+                state->stageInputsLoaded = true;
+                break;
+            }
+        }
+    }
+    if (!state->stageInputsLoaded)
         return;
 
     SubstitutionSet subst(specializedCallableDeclRef);
@@ -911,9 +970,6 @@ void checkSpecializedCallableBody(
     // One instantiation is checked once per compilation, however many call sites complete it.
     // Recording the instantiation before walking also stops a recursive generic — a body that
     // calls another instantiation of itself — from cycling.
-    auto& state = linkage->m_portableRTSpecializationCheckState;
-    if (!state)
-        state = new PortableRTSpecializationCheckState();
     if (!state->checkedSpecializationDeclRefs.add(specializedCallableDeclRef))
         return;
 

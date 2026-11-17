@@ -18,12 +18,15 @@ struct SemanticsVisitor;
 class EntryPoint;
 
 // Per-compilation state for the post-specialization stage-input checks: the set of generic
-// instantiations whose bodies were already validated after substitution. Specialized decl-refs
-// are interned Vals, so pointer identity distinguishes instantiations.
+// instantiations whose bodies were already validated after substitution (specialized decl-refs
+// are interned Vals, so pointer identity distinguishes instantiations), and a cached scan of
+// the loaded modules for the stage-input declarations.
 class PortableRTSpecializationCheckState : public RefObject
 {
 public:
     HashSet<Val*> checkedSpecializationDeclRefs;
+    Index loadedModuleCountAtScan = -1;
+    bool stageInputsLoaded = false;
 };
 
 namespace PortableRT
