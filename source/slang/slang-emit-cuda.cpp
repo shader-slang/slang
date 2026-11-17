@@ -1160,7 +1160,18 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_MakeCoopMatrixFromScalar:
         {
             StringBuilder typeSB;
-            emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB);
+            if (SLANG_FAILED(
+                    emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB)))
+            {
+                // The DiagnosticSink has already recorded the error, but the
+                // surrounding statement-emit path expects an expression to
+                // follow `Type _Sname = ` (otherwise we'd emit the syntactically
+                // invalid `Type _Sname = ;`).  We emit the scalar operand as a
+                // placeholder; the recorded error makes the overall compile fail
+                // anyway, so the placeholder never reaches NVRTC.
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                return true;
+            }
             m_writer->emit(typeSB);
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -1786,7 +1797,6 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
             .matrixUse = matrixUse == SLANG_COOPERATIVE_MATRIX_USE_A
                              ? "A"
                              : (matrixUse == SLANG_COOPERATIVE_MATRIX_USE_B ? "B" : "C")});
-        SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
 
@@ -1801,7 +1811,6 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
             .matrixUse = matrixUse == SLANG_COOPERATIVE_MATRIX_USE_A
                              ? "A"
                              : (matrixUse == SLANG_COOPERATIVE_MATRIX_USE_B ? "B" : "C")});
-        SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
 
