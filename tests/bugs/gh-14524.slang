@@ -14,7 +14,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -g0
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -Xslang -g0
 
-//TEST_INPUT:ubuffer(data=[2 0 0 0], stride=4):out,name=buf
+//TEST_INPUT:ubuffer(data=[2.0 0 0 0 0], stride=4):out,name=buf
 RWStructuredBuffer<float> buf;
 
 // The intervening `buf[0]` is a plain load of a resource-content address, so
@@ -42,6 +42,19 @@ float storeLoadOverwriteLoadOp(float* p, float v)
     return s;
 }
 
+// The class rule that keeps the stores above also fixes load forwarding: a
+// store into the memory `p` points to must stop `*p` from being forwarded to
+// its earlier value, because `p` may alias the buffer element that was just
+// overwritten. Expected 3, the overwritten value; with the old class rule the
+// load forwarded to 5 and the stale value won.
+[noinline]
+float forwardAcrossBufferStore(float* p)
+{
+    *p = 5.0f;
+    buf[1] = 3.0f;
+    return *p;
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -50,10 +63,12 @@ void computeMain()
     buf[3] = r;
     float r2 = storeLoadOverwriteLoadOp(__getAddress(buf[0]), 7.0f);
     buf[2] = r2;
+    buf[4] = forwardAcrossBufferStore(__getAddress(buf[1]));
 }
 
 // CHECK: type: float
 // CHECK-NEXT: 2.000000
-// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 3.000000
 // CHECK-NEXT: 7.000000
 // CHECK-NEXT: 5.000000
+// CHECK-NEXT: 3.000000

@@ -1,4 +1,7 @@
 //TEST:SIMPLE(filecheck=SPV): -target spirv -g0 -entry computeMain -stage compute
+// `-g0` is load-bearing here in the opposite direction from the regression
+// test: with debug info, materialization keeps the first store alive, so the
+// `SPV-NOT: %float_11` check would fail even with the fix in.
 
 // Test that the resource-content read check does not over-reach: a store into
 // a function-local aggregate var is optimized away across a buffer load,

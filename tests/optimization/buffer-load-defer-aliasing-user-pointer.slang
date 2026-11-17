@@ -3,7 +3,8 @@
 // Test that a write into a bound resource conservatively prevents deferring a
 // load through a user pointer: a user pointer can refer to the contents of a
 // bound resource (for example `__getAddress(buf[i])`), so deferring the load
-// would read the stale pre-write contents. The whole-struct load stays.
+// past the write would read the post-write contents, while the program must
+// observe the pre-write snapshot of `this`. The whole-struct load stays.
 
 struct Bottom
 {
@@ -15,7 +16,7 @@ struct Bottom
         // prevent deferring loading bigArray.
         gOther[0] = 100;
 
-        // We should return the value from bigArray loaded after the write.
+        // We should return the value from bigArray from a previously loaded value of `this`.
         return bigArray[index];
     }
 }
