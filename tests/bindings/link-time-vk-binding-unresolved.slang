@@ -10,7 +10,7 @@ extern static const int SetSlot;
 [[vk::binding(Slot, SetSlot)]]
 /*CHECK:
       ^^^^^^^ binding attribute requires a concrete value
-      ^^^^^^^ an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a default or link a module that defines it
+      ^^^^^^^ an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a resolvable default, link a module that defines it, or shorten a chain of definitions that is too deep to resolve
 */
 RWStructuredBuffer<uint> result;
 

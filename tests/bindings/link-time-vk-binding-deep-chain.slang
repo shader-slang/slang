@@ -1,9 +1,9 @@
 // A chain of exported extern constants deeper than the fixed pass budget in
 // `ComponentType::tryFoldIntVal` must end unresolved — one layout-time binding
-// diagnostic — rather than looping. (A literal self-referential extern crashes
-// IR lowering in a pre-existing recursion that is out of scope for this change;
-// the deep chain here pins the same property the pass cap exists to guarantee:
-// bounded resolution, deterministic outcome.)
+// diagnostic — rather than looping. (A literal self-referential extern crashes IR
+// lowering in a pre-existing recursion tracked as issue #14556; the deep chain here
+// pins the same property the pass cap exists to guarantee: bounded resolution,
+// deterministic outcome.)
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv-asm -entry main -stage compute
 
@@ -111,7 +111,7 @@ export extern static const int E99 = E98 + 1;
 [[vk::binding(E99, 1)]]
 /*CHECK:
       ^^^^^^^ binding attribute requires a concrete value
-      ^^^^^^^ an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a default or link a module that defines it
+      ^^^^^^^ an argument of '[[vk::binding(...)]]' or the GLSL 'binding'/'set' layout qualifier is a link-time constant that is not a concrete value here; provide a resolvable default, link a module that defines it, or shorten a chain of definitions that is too deep to resolve
 */
 RWStructuredBuffer<uint> result;
 

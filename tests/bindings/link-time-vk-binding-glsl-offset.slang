@@ -11,7 +11,7 @@ extern static const int SLOT = 1;
 layout(binding = SLOT, offset = 4) uniform atomic_uint counter;
 /*CHECK:
        ^^^^^^^ GLSL offset layout qualifier requires a concrete binding index
-       ^^^^^^^ the GLSL 'offset' layout qualifier requires a concrete 'binding' index at compile time to track per-binding offsets; link-time constant expressions are not supported on this legacy GLSL path
+       ^^^^^^^ the GLSL 'offset' layout qualifier requires a concrete 'binding' index at compile time to track per-binding offsets; link-time constant expressions are not supported on this check-time path
 */
 
 void computeMain()
