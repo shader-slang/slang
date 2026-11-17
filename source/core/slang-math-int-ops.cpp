@@ -28,18 +28,6 @@ bool isNegative(const MathIntValue& v)
     return v.getType().isSigned && (v.getSignedValue() < 0);
 }
 
-unsigned getMinimumBitWidth(const MathIntValue& v)
-{
-    if (isNegative(v))
-    {
-        return std::bit_width(~v.getUnsignedValue()) + 1U;
-    }
-    else
-    {
-        return std::bit_width(v.getUnsignedValue());
-    }
-}
-
 int64_t getMinForType(const MathIntType& type)
 {
     SLANG_RELEASE_ASSERT(type.width <= 64U);

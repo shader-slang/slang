@@ -2222,27 +2222,6 @@ Val* TypeCastIntVal::_resolveImplOverride()
     return this;
 }
 
-// Fold a constant integer shift. Negative counts leave the value symbolic (returns false);
-// out-of-range counts are masked to the operand width, matching common hardware behavior and
-// avoiding C++ undefined behavior. Shared by every constant-folding path so `x << y` produces
-// the same constant regardless of which path reaches it.
-static bool _tryFoldConstantShift(
-    IntegerLiteralValue base,
-    IntegerLiteralValue count,
-    bool isLeftShift,
-    IntegerLiteralValue& out)
-{
-    if (count < 0)
-        return false;
-    const auto width = std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-    const auto shiftCount = static_cast<std::make_unsigned_t<IRIntegerValue>>(count) % width;
-    out = isLeftShift
-              ? static_cast<IntegerLiteralValue>(
-                    static_cast<std::make_unsigned_t<IntegerLiteralValue>>(base) << shiftCount)
-              : (base >> shiftCount);
-    return true;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
@@ -2606,12 +2585,9 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
     {
         if (sink)
         {
-            String arg0val;
-            String arg1val;
-
             sink->diagnose(Diagnostics::TargetDefinedValue{
                 .arg0Val = arg0.toString(),
-                .op =getBuiltinOperationOpText(op),
+                .op = getBuiltinOperationOpText(op),
                 .arg1Val = arg1.toString(),
                 .location = loc});
         }
@@ -2619,8 +2595,8 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
         return nullptr;
     }
 
-    // Note: we'll ignore integer overflows
-
+    // Note: we'll ignore integer overflows here even if MathIntResults reports
+    // it. Wrapping is intended.
     return astBuilder->getIntVal(resultType, res.value.getSignedValue());
 }
 
