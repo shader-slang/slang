@@ -502,16 +502,24 @@ void CLikeSourceEmitter::_emitSwizzleAssignmentPerElement(IRInst* inst)
 
     auto swizzledStore = as<IRSwizzledStore>(inst);
     auto swizzleSet = as<IRSwizzleSet>(inst);
-    SLANG_RELEASE_ASSERT(swizzledStore || swizzleSet);
-    IRInst* source = swizzledStore ? swizzledStore->getSource() : swizzleSet->getSource();
     ShortList<IRInst*, 4> elementIndices;
-    for (UInt ee = 0;
-         ee < (swizzledStore ? swizzledStore->getElementCount() : swizzleSet->getElementCount());
-         ++ee)
+    if (swizzledStore)
     {
-        elementIndices.add(
-            swizzledStore ? swizzledStore->getElementIndex(ee) : swizzleSet->getElementIndex(ee));
+        for (UInt ee = 0; ee < swizzledStore->getElementCount(); ++ee)
+        {
+            elementIndices.add(swizzledStore->getElementIndex(ee));
+        }
     }
+    else
+    {
+        SLANG_RELEASE_ASSERT(swizzleSet);
+        for (UInt ee = 0; ee < swizzleSet->getElementCount(); ++ee)
+        {
+            elementIndices.add(swizzleSet->getElementIndex(ee));
+        }
+    }
+
+    IRInst* source = swizzledStore ? swizzledStore->getSource() : swizzleSet->getSource();
 
     char const* kComponents[] = {"x", "y", "z", "w"};
     for (Index ee = 0; ee < elementIndices.getCount(); ++ee)
