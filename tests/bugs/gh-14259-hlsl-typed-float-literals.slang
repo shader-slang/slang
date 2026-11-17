@@ -114,7 +114,8 @@ void computeMain()
     // words 18-26 the `float` values, and words 27-31 the `half` values, two to a word; the upper
     // half of word 31 and all of word 32 are never written. The `-0.0` words are checked bit for
     // bit, so they check the sign bit. The `float`, `double` and `half` NaNs are checked as the
-    // canonical quiet NaN of either sign.
+    // canonical quiet NaN of either sign, because the sign the fold assigns to `0.0 / 0.0`
+    // differs between targets.
     // BUF: FFFFFFFF
     // BUF-NEXT: 7FEFFFFF
     // BUF-NEXT: FFFFFFFF
