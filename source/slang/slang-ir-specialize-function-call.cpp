@@ -57,7 +57,6 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         {
         case kIROp_GetElement:
         case kIROp_StructuredBufferLoad:
-        case kIROp_ByteAddressBufferLoad:
         case kIROp_GetElementPtr:
         case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_FieldAddress:
@@ -851,7 +850,6 @@ struct FunctionParameterSpecializationContext
         case kIROp_GetElement:
         case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_StructuredBufferLoad:
-        case kIROp_ByteAddressBufferLoad:
             return true;
         }
         return false;
