@@ -4210,6 +4210,10 @@ public:
 
     bool argumentNamesGroupSharedStorage(Expr* arg);
     void checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn);
+    void checkArgumentOfExclusiveParam(
+        DeclRef<CallableDecl> callee,
+        ParamDecl* paramIn,
+        Expr* argIn);
     Decl* findGroupSharedVariablePartlyWrittenInDifferentiatedBody(Expr* target, Expr* storage);
     void checkGroupSharedPartialWritesByCall(
         InvokeExpr* invoke,

@@ -28,8 +28,8 @@ void viaRef(__ref int y)
 //CHECK:       ^ passing non-exclusive memory ('y') to a function ('innerInout') that requires exclusive access
 //CHECK:       ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'y' does not guarantee that
     innerOut(y);
-//CHECK:       ^ passing non-exclusive memory ('y') to a function ('innerOut') that requires exclusive access
-//CHECK:       ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'y' does not guarantee that
+//CHECK:     ^ passing non-exclusive memory ('y') to a function ('innerOut') that requires exclusive access
+//CHECK:     ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'y' does not guarantee that
     takesRef(y);
 }
 
@@ -37,15 +37,15 @@ void viaRef(__ref int y)
 void viaRefStruct(__ref S s)
 {
     innerInout(s.f);
-//CHECK:        ^^^ passing non-exclusive memory ('s') to a function ('innerInout') that requires exclusive access
-//CHECK:        ^^^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 's' does not guarantee that
+//CHECK:         ^ passing non-exclusive memory ('s') to a function ('innerInout') that requires exclusive access
+//CHECK:         ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 's' does not guarantee that
 }
 
 void viaRefArray(__ref int a[4])
 {
     innerInout(a[0]);
-//CHECK:       ^^^^ passing non-exclusive memory ('a') to a function ('innerInout') that requires exclusive access
-//CHECK:       ^^^^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'a' does not guarantee that
+//CHECK:        ^ passing non-exclusive memory ('a') to a function ('innerInout') that requires exclusive access
+//CHECK:        ^ parameter 'x' requires exclusive access to its argument for the duration of the call, but reference parameter 'a' does not guarantee that
 }
 
 // A `groupshared` parameter is implicitly a `__ref` parameter, so forwarding it warns too.

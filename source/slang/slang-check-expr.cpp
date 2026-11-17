@@ -4433,6 +4433,15 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 if (paramDecl && argExpr && paramDecl->hasModifier<HLSLGroupSharedModifier>())
                     checkArgumentOfGroupSharedParam(paramDecl, argExpr);
 
+                // Operator expressions (compound assignment like `r += 1`, prefix/postfix
+                // `++r`, etc.) desugar into calls to operators whose `left` parameter is
+                // `inout`, but writing through a reference parameter that way is well defined
+                // and is the normal way to use one, so they are exempt. `_checkAliasedOutArguments`
+                // skips them for the same reason.
+                if (paramDecl && argExpr && as<OutParamTypeBase>(paramType) &&
+                    !as<OperatorExpr>(invoke))
+                    checkArgumentOfExclusiveParam(callableDeclRef, paramDecl, argExpr);
+
                 if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
@@ -7941,6 +7950,60 @@ void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr*
         getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
             .param = getText(paramIn->getName()),
             .arg = argIn});
+}
+
+// Return the by-reference parameter that `arg` forwards, if the storage it names is one. A
+// reference parameter (`__ref`, `__ref_readonly`, `__ref_writeonly`, or `groupshared`, which
+// implies `__ref`) is a name in the callee for storage the caller may also access through
+// aliases, so whatever storage the caller passed, the callee has no guarantee that the
+// parameter is exclusive. Projections such as `a[0]` or `s.f` name a part of that storage, so
+// `getSubExpressionDeterminingAddressSpace` walks them to the parameter.
+static ParamDecl* getForwardedReferenceParamDecl(Expr* arg)
+{
+    auto varExpr = as<VarExpr>(getSubExpressionDeterminingAddressSpace(arg));
+    if (!varExpr)
+        return nullptr;
+    auto paramDecl = varExpr->declRef.as<ParamDecl>().getDecl();
+    if (!paramDecl)
+        return nullptr;
+    return isByReferenceParamPassingMode(getParamPassingMode(paramDecl)) ? paramDecl : nullptr;
+}
+
+// Report a warning if `argIn`, passed to the `out`/`inout` parameter `paramIn` of `callee`,
+// names storage the enclosing function does not have exclusive access to. An `out` or `inout`
+// parameter requires exclusivity: the callee may copy out of the argument's storage when it
+// returns, discarding writes made through other aliases during the call. A by-reference
+// parameter of the enclosing function does not guarantee exclusivity, so forwarding one is a
+// mismatch the signatures alone reveal. Consider this example:
+//
+//     void inner(inout int x) { x += 1; }
+//     void viaRef(__ref int y) { inner(y); }
+//
+// `inner` may copy in and out of `y`'s storage, so a write that another alias of `y` makes
+// during the call is lost, and a bounce through a local temporary restores the guarantee.
+// This check is scoped to by-reference parameters only: an argument that names `groupshared`
+// storage directly is left alone, because barriers may legitimately synchronize its aliases,
+// which the checker cannot see. An argument that is not an l-value is left to the
+// `ArgumentExpectedLvalue` diagnostic, and one that already failed to check is skipped so
+// this warning does not pile onto the reported error.
+void SemanticsVisitor::checkArgumentOfExclusiveParam(
+    DeclRef<CallableDecl> callee,
+    ParamDecl* paramIn,
+    Expr* argIn)
+{
+    SLANG_ASSERT(paramIn && argIn);
+    if (isErrorTypedOrCastFromErrorTyped(argIn) || !argIn->type.isLeftValue)
+        return;
+
+    auto forwardedParam = getForwardedReferenceParamDecl(argIn);
+    if (!forwardedParam)
+        return;
+
+    getSink()->diagnose(Diagnostics::PassingNonExclusiveMemoryToExclusiveParameter{
+        .refParam = forwardedParam->getName(),
+        .callee = callee.getName(),
+        .param = paramIn->getName(),
+        .arg = argIn});
 }
 
 // An argument of a call that the call writes back to the caller's storage when it returns: the
