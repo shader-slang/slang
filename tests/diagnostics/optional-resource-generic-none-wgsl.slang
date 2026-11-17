@@ -6,9 +6,15 @@
 // just on SPIR-V/GLSL.
 //
 // The diagnostic points at the subscript call site, not at the `none` in the
-// getter: early inlining attributes cloned instructions to the call site when
-// the inlined call carries a source location, and the type legalizer preserves
-// that location when it rebuilds the call.
+// getter. On WGSL the getter call is rebuilt by type legalization, and once the
+// rebuilt call carries the source location the user wrote, the ordinary inlining
+// inside the post-legalization simplifyIR attributes the cloned instructions to
+// the call site (its documented call-site-first preference) instead of falling
+// back to each cloned instruction's own location. This is not the
+// MandatoryEarlyInliningPass, which runs before target legalization. The SPIR-V
+// and GLSL siblings still pin `none`: their getter call does not go through the
+// same rebuild, so the inliner keeps falling back to the cloned instruction's
+// own location there.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl
 
