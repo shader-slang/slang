@@ -3968,6 +3968,9 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             // point — so the stage contract types (context, payload, record) carry these
             // concrete arguments, and give this specialization the target name derived from
             // the concrete stage type, matching direct specialized-name selection.
+            // The module can be null only for pass-through or deserialized dummies, which
+            // never reach specialization; every structural entry point is selected from a
+            // module's declarations, so it always owns one here.
             SLANG_RELEASE_ASSERT(entryPointModule);
             Profile stageProfile = m_profile;
             bool foundStage = false;
