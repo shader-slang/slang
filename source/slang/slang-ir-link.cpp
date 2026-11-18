@@ -2449,9 +2449,14 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         // through dead-code elimination; the emitter for the target then decides how the
         // initializer runs (the LLVM emitter defers it into the module constructor registered
         // with `llvm.global_ctors`; the C++ source emitter emits a namespace-scope call to
-        // the initializer function). Kernel targets are excluded: `shouldExtractInitializer`
-        // moves the initializers of the globals each target uses into the entry points, where
-        // an unreferenced global can still be eliminated freely.
+        // the initializer function). The constructor runs initializers in module order, and
+        // that order is dependency-first by construction: cloning a global pulls its
+        // referenced globals in through the recursive operand clone inside `cloneInst`, and
+        // only then is the dependent itself moved to the end of the module
+        // (`cloneGlobalValueImpl`), so a preserved initializer's global dependencies always
+        // precede it in the linked module. Kernel targets are excluded:
+        // `shouldExtractInitializer` moves the initializers of the globals each target uses
+        // into the entry points, where an unreferenced global can still be eliminated freely.
         if (!isKernelTarget(target))
         {
             for (auto inst : linkingInfo->getGlobalVarsWithSideEffectingInit())
