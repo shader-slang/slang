@@ -730,7 +730,13 @@ struct LLVMEmitter
 
         auto builderFunc = (BuilderFuncV3)library->findFuncByName("createLLVMBuilder_V3");
         if (!builderFunc)
+        {
+            getSink()->diagnoseRaw(
+                Severity::Error,
+                UnownedStringSlice("the loaded slang-llvm shared library does not export "
+                                   "createLLVMBuilder_V3; it is too old for this compiler"));
             return SLANG_FAIL;
+        }
 
         auto targetTripleOption =
             getOptions().getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
@@ -776,10 +782,10 @@ struct LLVMEmitter
 
         if (errorArtifact)
         {
-            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
-                SLANG_FAIL,
-                errorArtifact,
-                getSink());
+            // The builder reports its own creation failures through this
+            // artifact; the call above succeeded, so the failure is signaled
+            // by the artifact alone.
+            ArtifactDiagnosticUtil::reportDiagnostics(errorArtifact, getSink());
             return SLANG_FAIL;
         }
 

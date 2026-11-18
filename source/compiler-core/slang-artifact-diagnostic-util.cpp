@@ -8,31 +8,27 @@
 namespace Slang
 {
 
-namespace
-{
-// Map an artifact diagnostic severity onto the DiagnosticSink scale, mirroring
-// how downstream-compiler diagnostics are reported (slang-pass-through.cpp):
-// Info becomes a note, anything unrecognized is reported as an error.
-Severity getSinkSeverity(ArtifactDiagnostic::Severity severity)
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */ Slang::Severity ArtifactDiagnosticUtil::getSinkSeverity(
+    ArtifactDiagnostic::Severity severity)
 {
     switch (severity)
     {
-    case ArtifactDiagnostic::Severity::Warning:
-        return Severity::Warning;
     case ArtifactDiagnostic::Severity::Info:
-        return Severity::Note;
+        return Slang::Severity::Note;
+    case ArtifactDiagnostic::Severity::Warning:
+        return Slang::Severity::Warning;
     default:
-        return Severity::Error;
+        return Slang::Severity::Error;
     }
 }
-} // namespace
 
-/* static */ void ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
-    SlangResult result,
+/* static */ void ArtifactDiagnosticUtil::reportDiagnostics(
     IArtifact* artifact,
     DiagnosticSink* sink)
 {
-    if (SLANG_FAILED(result) && artifact)
+    if (artifact)
     {
         auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
         if (diagnostics)
@@ -44,6 +40,15 @@ Severity getSinkSeverity(ArtifactDiagnostic::Severity severity)
             }
         }
     }
+}
+
+/* static */ void ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+    SlangResult result,
+    IArtifact* artifact,
+    DiagnosticSink* sink)
+{
+    if (SLANG_FAILED(result))
+        reportDiagnostics(artifact, sink);
 }
 
 /* static */ UnownedStringSlice ArtifactDiagnosticUtil::getSeverityText(Severity severity)
