@@ -61,6 +61,7 @@ public matrix<TDestination, R, C, L> convertBuiltinMatrix(matrix<TSource, R, C, 
 __generic<M : IBooleanMask>
 [__readNone]
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 public bool all(M value)
 {
     return value.all();
@@ -70,6 +71,7 @@ public bool all(M value)
 __generic<M : IBooleanMask>
 [__readNone]
 [__unsafeForceInlineEarly]
+[OverloadRank(-10)]
 public bool any(M value)
 {
     return value.any();
