@@ -28,6 +28,8 @@ struct CpuUInt3
     uint32_t z = 0;
 };
 
+// Mirrors `ComputeVaryingInput` in `prelude/slang-cpp-types.h`: the range of groups one call of
+// the group-range function runs. `endGroupID` is exclusive on each axis.
 struct CpuComputeVaryingInput
 {
     CpuUInt3 startGroupID;
@@ -94,6 +96,9 @@ void computeMain(
 }
 )";
 
+// Mirrors the entry-point parameter block of `kShaderSource`: one pointer per `uniform` parameter
+// of `computeMain`, in declaration order. An `Atomic<T>` is stored as a plain T, so `au`, `af` and
+// `ai64` point at uint32_t, float and int64_t storage.
 struct KernelParams
 {
     uint32_t* u;
