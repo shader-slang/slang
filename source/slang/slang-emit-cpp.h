@@ -99,6 +99,7 @@ protected:
     const UnownedStringSlice* getVectorElementNames(IRVectorType* vectorType);
 
     void _emitForwardDeclarations(const List<EmitAction>& actions);
+    void emitFuncStorageSpecifier(IRFunc* func);
 
     void _emitInOutParamType(IRType* type, String const& name, IRType* valueType);
 
