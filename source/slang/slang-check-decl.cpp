@@ -1722,7 +1722,7 @@ static IntVal* unwrapTypeCastIntVals(IntVal* val)
 /// reflection report), since covering those needs validation where specializations are created,
 /// not at a use site. The check is skipped when the caller supplies no sink or no valid
 /// location; the call site guards on exactly those conditions because some `getTypeForDeclRef`
-/// callers (the two-argument wrapper and the clone/lookup paths) pass no sink at all.
+/// callers (the three-argument wrapper and the clone/lookup paths) pass no sink at all.
 ///
 /// Substituting the cast wrapper itself would fold and wrap before the check could see the
 /// value, so we unwrap the wrappers and substitute the inner `IntVal`, which keeps the count

@@ -63,6 +63,9 @@ struct MethodBuffer<let N : uint64_t>
 // diagnosed; the check runs when a reference to the field is type-checked.
 uniform Buffer64<0x100000001ull> neverUsed;
 
+// 0x7FFFFFFF is the unsized-array sentinel: a uniform is used here rather than a local so
+// the sentinel case reports only the new upper-bound check, not the local-variable
+// unsized-storage rule.
 uniform Buffer64<0x7FFFFFFFull> sentinelUniform;
 
 void fill<let N : uint64_t>(float data[N])
