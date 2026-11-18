@@ -13,7 +13,7 @@
 // file(line,col) location prefix followed by the severity word and the code, and
 // CHECK-NOT asserts the boxed header form with brackets is not produced.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute -diagnostic-format vs
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -entry main -stage compute -diagnostic-format vs
 
 void f(int a) {}
 void f(float a, int b) {}

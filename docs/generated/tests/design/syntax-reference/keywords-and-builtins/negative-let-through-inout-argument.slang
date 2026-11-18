@@ -14,7 +14,7 @@
 // indirect (through an `inout` parameter modifier from the
 // simple-modifiers table) — the immutability check still fires.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):
 
 void inc(inout int x) { x = x + 1; }
 

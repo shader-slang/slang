@@ -14,8 +14,8 @@
 // linkAndOptimizeIR pass. Both targets must reject the two-block entry
 // point with the same diagnostic code.
 
-//TEST:SIMPLE(filecheck=SPIRV,exit-code=-1):-target spirv -stage compute -entry main
-//TEST:SIMPLE(filecheck=GLSL,exit-code=-1):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=SPIRV,exit-code=2):-target spirv -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL,exit-code=2):-target glsl -stage compute -entry main
 
 struct PC { float a; };
 [[vk::push_constant]] ConstantBuffer<PC> pc1;
