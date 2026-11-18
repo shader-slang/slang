@@ -13634,6 +13634,14 @@ static bool _incrementEnumerator(IntegerLiteralValue& value, BaseType baseType, 
             return true;
         }
 
+        // A signed tag type stores its top bit as a negative value. For example, the `int8_t`
+        // flag after 0x40 is 0x80, which is -128 in `int8_t`.
+        if (info.flags & BaseTypeInfo::Flag::Signed)
+        {
+            const unsigned excessBits = 64U - significantBits;
+            value = static_cast<int64_t>(static_cast<uint64_t>(value) << excessBits) >> excessBits;
+        }
+
         return false;
     }
     else
