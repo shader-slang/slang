@@ -2635,7 +2635,11 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderHostCallable:
         // The guard sits inside the group rather than on the Host case labels
         // above because CUDA falls through into this body and must not be
-        // filtered by the host-target condition.
+        // filtered by the host-target condition. The LLVM-CPU family sits
+        // below the [[fallthrough]] so it skips undoParameterCopy: that pass
+        // rewrites inout parameter copies for the pointer-style C-source
+        // targets, while this family's parameters are already legalized to
+        // the raw three-pointer ABI.
         if (target == CodeGenTarget::HostHostCallable && !isCPUTargetViaLLVM(targetRequest))
             break;
         SLANG_PASS(introduceExplicitGlobalContext, target);

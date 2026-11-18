@@ -610,6 +610,9 @@ SlangResult LLVMBuilder::returnModuleVerifyError(IArtifact** outArtifact)
     ArtifactDiagnostic diagnostic;
 
     diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+    // Stage::Link mirrors the other createErrorArtifact sites in this file,
+    // which all report late-stage builder failures; consumers filter by
+    // severity rather than by stage.
     diagnostic.stage = ArtifactDiagnostic::Stage::Link;
     // The slice only borrows `moduleVerifyErrors`, which does not outlive this
     // builder; `ArtifactDiagnostics::add` copies the text into the artifact's
