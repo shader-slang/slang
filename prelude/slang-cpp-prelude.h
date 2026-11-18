@@ -350,12 +350,20 @@ public:                                                                         
 #include <intrin.h>
 static_assert(sizeof(long) == 4, "the 32-bit _Interlocked* intrinsics operate on `long`");
 static_assert(sizeof(long long) == 8, "the 64-bit _Interlocked* intrinsics operate on `long long`");
+// `_SlangAtomicWord<SIZE>` is the atomic layer on MSVC: it wraps the
+// `_Interlocked*` intrinsics for a machine word of SIZE bytes (4 or 8). `W` is
+// the signed word type the intrinsics take, `U` the unsigned type of the same
+// size, used for wrap-around arithmetic. The address must be aligned to SIZE,
+// as for any `Interlocked*` operand. The word knows nothing of the element
+// type: it only moves bit patterns and does two's complement add and bitwise
+// operations.
 template<int SIZE>
 struct _SlangAtomicWord;
 template<>
 struct _SlangAtomicWord<4>
 {
     typedef long W;
+    typedef unsigned long U;
     static W load(volatile W* p)
     {
 #if defined(_M_IX86) || defined(_M_X64)
@@ -382,6 +390,7 @@ template<>
 struct _SlangAtomicWord<8>
 {
     typedef long long W;
+    typedef unsigned long long U;
     static W load(volatile W* p)
     {
 #if defined(_M_X64)
@@ -402,6 +411,12 @@ struct _SlangAtomicWord<8>
     static W bitOr(volatile W* p, W v) { return _InterlockedOr64(p, v); }
     static W bitXor(volatile W* p, W v) { return _InterlockedXor64(p, v); }
 };
+// `_SlangAtomic<T>` is the typed layer the `_slang_atomic_*` helpers call, for
+// a 4- or 8-byte T (u32, i32, u64, i64, f32, f64) at an address aligned to
+// sizeof(T). On MSVC it copies T's bits into the word of the same size and
+// lets `_SlangAtomicWord` do the atomic operation. `add`, `sub` and the
+// bitwise operations are only used for the integer types; float add/sub go
+// through `_slang_atomic_cas_loop`.
 template<typename T>
 struct _SlangAtomic
 {
@@ -429,7 +444,13 @@ struct _SlangAtomic
     }
     static bool sameBits(T a, T b) { return bits(a) == bits(b); }
     static T add(T* p, T v, int) { return value(Op::add(word(p), bits(v))); }
-    static T sub(T* p, T v, int) { return value(Op::add(word(p), bits(T(T(0) - v)))); }
+    // Subtract by adding the two's complement negation, computed unsigned so
+    // that negating the most negative value wraps instead of overflowing.
+    static T sub(T* p, T v, int)
+    {
+        typedef typename Op::U U;
+        return value(Op::add(word(p), W(U(0) - U(bits(v)))));
+    }
     static T bitAnd(T* p, T v, int) { return value(Op::bitAnd(word(p), bits(v))); }
     static T bitOr(T* p, T v, int) { return value(Op::bitOr(word(p), bits(v))); }
     static T bitXor(T* p, T v, int) { return value(Op::bitXor(word(p), bits(v))); }
@@ -458,6 +479,9 @@ static inline int _slang_atomic_failure_order(int order)
            : order == 3 ? __ATOMIC_ACQUIRE
                         : _slang_atomic_order(order);
 }
+// `_SlangAtomic<T>` on GCC and Clang: the `__atomic` builtins work on T
+// directly, with the requested memory order. Signed fetch-add/sub wrap
+// around (the builtins are defined as two's complement).
 template<typename T>
 struct _SlangAtomic
 {
@@ -495,9 +519,39 @@ struct _SlangAtomic
     static T bitXor(T* p, T v, int o) { return __atomic_fetch_xor(p, v, _slang_atomic_order(o)); }
 };
 #else
+// The unsigned integer type of a given size, for wrap-around arithmetic on a
+// signed T in the fallback below.
+template<int SIZE>
+struct _SlangAtomicUnsigned;
+template<>
+struct _SlangAtomicUnsigned<4>
+{
+    typedef uint32_t U;
+};
+template<>
+struct _SlangAtomicUnsigned<8>
+{
+    typedef uint64_t U;
+};
+// `_SlangAtomic<T>` without atomics: plain loads and stores, for compilers
+// with neither the `_Interlocked*` intrinsics nor the `__atomic` builtins.
+// Integer add/sub wrap around through the unsigned type of the same size.
 template<typename T>
 struct _SlangAtomic
 {
+    typedef typename _SlangAtomicUnsigned<sizeof(T)>::U U;
+    static U bits(T v)
+    {
+        U u;
+        memcpy(&u, &v, sizeof(T));
+        return u;
+    }
+    static T value(U u)
+    {
+        T v;
+        memcpy(&v, &u, sizeof(T));
+        return v;
+    }
     static T load(T* p, int) { return *p; }
     static void store(T* p, T v, int) { *p = v; }
     static T exchange(T* p, T v, int)
@@ -517,13 +571,13 @@ struct _SlangAtomic
     static T add(T* p, T v, int)
     {
         T old = *p;
-        *p = T(old + v);
+        *p = value(U(bits(old) + bits(v)));
         return old;
     }
     static T sub(T* p, T v, int)
     {
         T old = *p;
-        *p = T(old - v);
+        *p = value(U(bits(old) - bits(v)));
         return old;
     }
     static T bitAnd(T* p, T v, int)
@@ -562,6 +616,8 @@ static inline T _slang_atomic_cas_loop(T* p, F f, int order)
         old = prior;
     }
 }
+// The new-value functors for `_slang_atomic_cas_loop`: each holds the operand
+// `v` and maps the current value to the value to store.
 template<typename T>
 struct _SlangAtomicMinOp
 {

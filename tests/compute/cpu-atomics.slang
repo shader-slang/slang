@@ -17,6 +17,8 @@ RWStructuredBuffer<Atomic<uint>> au;
 RWStructuredBuffer<Atomic<float>> af;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=8):name=a64
 RWStructuredBuffer<Atomic<int64_t>> a64;
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):name=ai
+RWStructuredBuffer<Atomic<int>> ai;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -125,4 +127,20 @@ void computeMain()
     // BUF-NEXT: 5
     // BUF-NEXT: 4294967040
     // BUF-NEXT: 512
+
+    // Subtracting the most negative value wraps around.
+    // CPP-DAG: _slang_atomic_sub_i32(
+    ai[0].store(7);
+    int r0 = ai[0].sub(int(0x80000000u));
+    outputBuffer[27] = uint(r0) * 100 + uint(ai[0].load() - int(0x80000000u));
+    a64[1].store(5ll);
+    int64_t r1 = a64[1].sub(int64_t(1ull << 63));
+    int64_t r2 = a64[1].load();
+    outputBuffer[28] = uint(r1);
+    outputBuffer[29] = uint(r2 >> 32);
+    outputBuffer[30] = uint(r2);
+    // BUF-NEXT: 707
+    // BUF-NEXT: 5
+    // BUF-NEXT: 2147483648
+    // BUF-NEXT: 5
 }
