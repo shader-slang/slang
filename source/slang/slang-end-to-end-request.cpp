@@ -202,8 +202,8 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         const auto& compilerInfo = DownstreamCompilerInfo::getInfo(passThroughCompiler);
         // An entry with no source-language flags means the languages the compiler accepts are
         // not recorded in the table (metal, tint — there are no flag bits for Metal or WGSL
-        // source; the spirv-tools entries are simply unrecorded), so leave such compilers'
-        // behavior unchanged.
+        // source; the spirv-dis and spirv-link entries are simply unrecorded), so leave such
+        // compilers' behavior unchanged.
         if (compilerInfo.sourceLanguageFlags != 0)
         {
             bool languageRejected = false;
