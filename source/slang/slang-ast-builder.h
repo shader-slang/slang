@@ -456,18 +456,35 @@ public:
         // A constant without a type cannot be lowered to IR, and integer folding cannot know
         // its width, so every producer must know the type of the value it creates.
         SLANG_RELEASE_ASSERT(type);
+#if _DEBUG
+        // We check the range only in debug builds. In release builds, `SLANG_ASSERT` may turn
+        // the condition into an optimizer assumption, which would still evaluate this check and
+        // would make an out-of-range value undefined behavior instead of a stored value.
         SLANG_ASSERT(isValueInRangeOfConstantType(type, value));
+#endif
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    /// Return true when `value` is already in the canonical form for a constant of type `type`.
-    /// A `bool` constant is 0 or 1, and a builtin integer constant narrower than 64 bits is the
-    /// sign- or zero-extension of its low bits, as its signedness requires. For example, the
-    /// `uint` value `0xffffffff00000000` is not canonical. Every other type, such as an enum,
-    /// is accepted. The integer folder reads a constant's stored value directly, so a value that
-    /// is out of range would make two constants that are equal in the target type compare
+    /// Return `value` converted to the canonical form of a constant of type `type`, which
+    /// `getIntVal` requires. The conversion wraps `value` modulo 2^width of the type in which
+    /// integer folding represents `type` (see `getIntegerFoldingMathIntType`), keeping the low
+    /// bits and sign- or zero-extending them as its signedness requires. For example, the
+    /// `uint` canonical form of `0x200000001` is 1, the `int8_t` canonical form of 255 is -1,
+    /// and an enum is narrowed to its tag type. A `bool` is 1 bit wide, so its canonical form is
+    /// the low bit of `value`. Wrapping gives the result of `+`, `-` and `*` in `type` for
+    /// operands that were combined in 64 bits. A type that integer folding does not represent
+    /// keeps `value` unchanged.
+    IntegerLiteralValue narrowValueToConstantType(Type* type, IntegerLiteralValue value);
+
+    /// Return true when `value` is already in the canonical form for a constant of type `type`
+    /// (see `narrowValueToConstantType`). For example, the `uint` value `0xffffffff00000000` is
+    /// not canonical. The integer folder reads a constant's stored value directly, so a value
+    /// that is out of range would make two constants that are equal in the target type compare
     /// unequal.
-    static bool isValueInRangeOfConstantType(Type* type, IntegerLiteralValue value);
+    bool isValueInRangeOfConstantType(Type* type, IntegerLiteralValue value)
+    {
+        return narrowValueToConstantType(type, value) == value;
+    }
 
     IntVal* getTypeCastIntVal(Type* type, Val* base)
     {

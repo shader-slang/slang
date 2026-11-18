@@ -1885,8 +1885,13 @@ struct PolynomialIntValBuilder
         {
             return terms[0]->getParamFactors()[0]->getParam();
         }
+        // The terms and the constant term are combined in 64 bits, so a polynomial that folds
+        // to a constant is narrowed to its type here. For example, with `uint N = 0xFFFFFFFFu`,
+        // the bound `(N + 1u) * 2u + 1u` sums to 0x200000001 in 64 bits and to 1 in `uint`.
         if (terms.getCount() == 0)
-            return astBuilder->getIntVal(type, constantTerm);
+            return astBuilder->getIntVal(
+                type,
+                astBuilder->narrowValueToConstantType(type, constantTerm));
         return nullptr;
     }
 
@@ -1953,7 +1958,7 @@ Val* PolynomialIntVal::_substituteImplOverride(
     *ioDiff += diff;
 
     if (builder.terms.getCount() == 0)
-        return astBuilder->getIntVal(getType(), builder.constantTerm);
+        return builder.getIntVal(getType());
     if (diff != 0)
     {
         return builder.getIntVal(getType());
@@ -2379,13 +2384,11 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
-// Note: type must be BasicExpressionType
-static MathIntType expressionTypeToMathIntType(Type* type)
+/// Return the `MathIntType` of the builtin scalar type `baseType`, or `MathIntType::NullType` for
+/// a builtin type that is not an integer or `bool` type, such as `float`.
+static MathIntType baseTypeToMathIntType(BaseType baseType)
 {
-    auto exprType = as<BasicExpressionType>(type);
-    SLANG_RELEASE_ASSERT(exprType);
-
-    switch (exprType->getBaseType())
+    switch (baseType)
     {
     case BaseType::Int:
         return MathIntType::Int32Type;
@@ -2418,30 +2421,32 @@ static MathIntType expressionTypeToMathIntType(Type* type)
         return MathIntType::BoolType;
 
     default:
-        SLANG_RELEASE_ASSERT(!"Unhandled base type");
         return MathIntType::NullType;
     }
 }
 
-/// Return the builtin scalar type whose values represent the values of `type` in integer
-/// folding: `type` itself for a builtin scalar type, or the tag type of an enum type. For
-/// example, the cases of `enum Flags : uint8_t` fold as `uint8_t` values. Return null for any
-/// other type, which integer folding does not support.
-static BasicExpressionType* getIntegerFoldingType(ASTBuilder* astBuilder, Type* type)
+MathIntType getIntegerFoldingMathIntType(ASTBuilder* astBuilder, Type* type)
 {
-    if (auto basicType = as<BasicExpressionType>(type))
-        return basicType;
     if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
-            return as<BasicExpressionType>(getTagType(astBuilder, enumDeclRef));
+            type = getTagType(astBuilder, enumDeclRef);
     }
-    return nullptr;
+    if (auto basicType = as<BasicExpressionType>(type))
+        return baseTypeToMathIntType(basicType->getBaseType());
+    return MathIntType::NullType;
 }
 
-static MathIntValue createMathIntValue(BasicExpressionType* type, ConstantIntVal* c)
+/// Return `getIntegerFoldingMathIntType(astBuilder, type)` for the type of an operand or the
+/// result of a fold below. A builtin type that integer folding does not represent, such as
+/// `float`, is out of contract there, because an integer constant never has such a type, so it
+/// fails a release assertion. Any other such type, such as a struct type, yields
+/// `MathIntType::NullType`.
+static MathIntType getFoldOperandMathIntType(ASTBuilder* astBuilder, Type* type)
 {
-    return MathIntValue::constructFromValue(expressionTypeToMathIntType(type), c->getValue());
+    const MathIntType mathType = getIntegerFoldingMathIntType(astBuilder, type);
+    SLANG_RELEASE_ASSERT(mathType.width != 0 || !as<BasicExpressionType>(type));
+    return mathType;
 }
 
 /// Return decimal text that reads back as exactly `value` and reads as a floating-point value.
@@ -2480,11 +2485,10 @@ IntVal* TypeCastIntVal::tryFoldFromFloat(
     DiagnosticSink* sink,
     SourceLoc loc)
 {
-    auto resultBasicType = getIntegerFoldingType(astBuilder, resultType);
-    SLANG_RELEASE_ASSERT(resultBasicType);
+    const MathIntType resultMathType = getFoldOperandMathIntType(astBuilder, resultType);
+    SLANG_RELEASE_ASSERT(resultMathType.width != 0);
 
-    MathIntResult res =
-        MathIntOps::convertFloatValue(expressionTypeToMathIntType(resultBasicType), value);
+    MathIntResult res = MathIntOps::convertFloatValue(resultMathType, value);
 
     // A null `sink` means the caller suppresses these diagnostics.
     // See also SemanticsVisitor::getFoldDiagnosticSink.
@@ -2516,8 +2520,8 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
 
     // we need a concrete result type for folding
     SLANG_RELEASE_ASSERT(resultType);
-    auto resultBasicExprType = getIntegerFoldingType(astBuilder, resultType);
-    if (!resultBasicExprType)
+    const MathIntType resType = getFoldOperandMathIntType(astBuilder, resultType);
+    if (resType.width == 0)
         return nullptr;
 
     for (auto arg : newArgs)
@@ -2529,12 +2533,11 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
         if (!c)
             return nullptr; // still symbolic
 
-        auto argBasicExprType = getIntegerFoldingType(astBuilder, c->getType());
-        if (!argBasicExprType)
+        const MathIntType argType = getFoldOperandMathIntType(astBuilder, c->getType());
+        if (argType.width == 0)
             return nullptr; // integer folding does not support the argument's type
 
-        MathIntValue v = createMathIntValue(argBasicExprType, c);
-        SLANG_RELEASE_ASSERT(v.hasValue());
+        MathIntValue v = MathIntValue::constructFromValue(argType, c->getValue());
 
         constArgs.at(numArgs) = v;
         ++numArgs;
@@ -2549,8 +2552,6 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
     const size_t expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
     if (numArgs != expectedArgs)
         return nullptr;
-
-    MathIntType resType{expressionTypeToMathIntType(resultBasicExprType)};
 
     const MathIntValue& arg0 = constArgs.at(0);
     const MathIntValue& arg1 = constArgs.at(1);

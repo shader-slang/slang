@@ -1,6 +1,7 @@
 // slang-ast-val.h
 #pragma once
 
+#include "core/slang-math-int-ops.h"
 #include "slang-ast-base.h"
 #include "slang-ast-decl.h"
 
@@ -226,6 +227,13 @@ class TypeCastIntVal : public IntVal
 
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
+
+// Return the `MathIntType` in which integer folding represents the values of `type`: the type
+// itself for a builtin integer or `bool` type, or the tag type of an enum type. For example, the
+// cases of `enum Flags : uint8_t` fold as `MathIntType::UInt8Type` values. Return
+// `MathIntType::NullType`, whose width is 0, for any other type, such as `float` or a struct
+// type, because integer folding does not represent its values.
+MathIntType getIntegerFoldingMathIntType(ASTBuilder* astBuilder, Type* type);
 
 // `BuiltinOperationKind` and its helpers (`getBuiltinOperationOpText` /
 // `getBuiltinOperationKindFromString`) are declared in slang-ast-support-types.h, since they are

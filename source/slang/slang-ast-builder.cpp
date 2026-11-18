@@ -9,27 +9,12 @@
 namespace Slang
 {
 
-/* static */ bool ASTBuilder::isValueInRangeOfConstantType(Type* type, IntegerLiteralValue value)
+IntegerLiteralValue ASTBuilder::narrowValueToConstantType(Type* type, IntegerLiteralValue value)
 {
-    auto basicType = as<BasicExpressionType>(type);
-    if (!basicType)
-        return true;
-
-    const BaseType baseType = basicType->getBaseType();
-    if (baseType == BaseType::Bool)
-        return value == 0 || value == 1;
-
-    const BaseTypeInfo& info = BaseTypeInfo::getInfo(baseType);
-    if (!(info.flags & BaseTypeInfo::Flag::Integer) || info.sizeInBytes >= sizeof(value))
-        return true;
-
-    const unsigned bitCount = 8U * info.sizeInBytes;
-    const uint64_t lowBitsMask = (uint64_t(1) << bitCount) - 1U;
-    uint64_t canonical = uint64_t(value) & lowBitsMask;
-    const uint64_t signBit = uint64_t(1) << (bitCount - 1U);
-    if ((info.flags & BaseTypeInfo::Flag::Signed) && (canonical & signBit))
-        canonical |= ~lowBitsMask;
-    return canonical == uint64_t(value);
+    const MathIntType mathType = getIntegerFoldingMathIntType(this, type);
+    if (mathType.width == 0)
+        return value;
+    return MathIntValue::constructFromValue(mathType, value).getSignedValue();
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
