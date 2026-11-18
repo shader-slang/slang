@@ -2887,10 +2887,30 @@ static void UnwrapDeclarator(
 
                 auto arrayTypeExpr = astBuilder->create<IndexExpr>();
                 arrayTypeExpr->loc = arrayDeclarator->openBracketLoc;
-                arrayTypeExpr->baseExpression = ioInfo->typeSpec;
                 if (arrayDeclarator->elementCountExpr)
                     arrayTypeExpr->indexExprs.add(arrayDeclarator->elementCountExpr);
-                ioInfo->typeSpec = arrayTypeExpr;
+
+                // The chain of brackets must nest the first source bracket innermost, so that
+                // a declaration `int x[2][4]` denotes the same type as the type expression
+                // `int[2][4]` when it is checked (C and GLSL read a bracket chain left to
+                // right, first bracket outermost). The declarator chain is processed
+                // outermost-first, i.e. the LAST source bracket is folded first, so an
+                // earlier bracket folds below the brackets already folded instead of
+                // wrapping them. Wrapping on top stays correct when the type so far is not
+                // a bracket chain, e.g. `int* p[2]` folds to `int*[2]`, not `(int[2])*`.
+                if (auto existingArrayTypeExpr = as<IndexExpr>(ioInfo->typeSpec))
+                {
+                    while (auto lowerArrayTypeExpr =
+                               as<IndexExpr>(existingArrayTypeExpr->baseExpression))
+                        existingArrayTypeExpr = lowerArrayTypeExpr;
+                    arrayTypeExpr->baseExpression = existingArrayTypeExpr->baseExpression;
+                    existingArrayTypeExpr->baseExpression = arrayTypeExpr;
+                }
+                else
+                {
+                    arrayTypeExpr->baseExpression = ioInfo->typeSpec;
+                    ioInfo->typeSpec = arrayTypeExpr;
+                }
 
                 declarator = arrayDeclarator->inner;
             }

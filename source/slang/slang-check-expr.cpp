@@ -3606,6 +3606,55 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
     }
 }
 
+// Compute the array type that a chain of type-position brackets denotes, e.g.
+// `int[2][4]`. Every producer of such a chain (`UnwrapDeclarator` for
+// declarations, `parseBracketTypeSuffix` for type specs, `parsePostfixExpr` for
+// expressions) nests the brackets with the first source bracket innermost,
+// because that is the order the chain is built in. C and GLSL instead read a
+// bracket chain left to right, with the first bracket as the outermost
+// dimension: `int[2][4]` denotes an array of 2 elements of `int[4]`, i.e.
+// `Array<Array<int,4>,2>`, the same type a declaration `int x[2][4]` gives its
+// variable, so checking the chain cannot simply wrap each node's count around
+// the type below it (that would produce `Array<Array<int,2>,4>`).
+//
+// Consider `int[2][4]`: the checker reaches the `[4]` node last, after
+// `int[2]` has already resolved to `Array<int,2>`. Since every prefix of the
+// chain resolves through this same logic, that base type is a correctly nested
+// array built from the atom and the counts below, so we can recover those
+// counts by stripping exactly `bracketCount` array levels off it, outermost
+// first. We then re-fold the dimensions: this node's own count innermost,
+// followed by the stripped counts from innermost to outermost, which makes the
+// first source bracket the outermost dimension. The counts are reused
+// verbatim, so generic and specialization-constant sizes survive unchanged,
+// and an unsized bracket keeps meaning an unbounded (null-count) dimension:
+// `int[3][]` is an array of three unbounded arrays, the same type the
+// declaration `int x[3][]` denotes.
+//
+// Returns nullptr when the base type does not have that shape, e.g. because a
+// parenthesized or otherwise exotic sub-chain did not resolve as a plain
+// bracket prefix; the caller falls back to the legacy wrap.
+static Type* _getBracketChainArrayType(
+    ASTBuilder* astBuilder,
+    Type* baseElementType,
+    IntVal* elementCount,
+    UInt bracketCount)
+{
+    List<IntVal*> outerCounts;
+    auto elementType = baseElementType;
+    for (UInt ii = 0; ii < bracketCount; ++ii)
+    {
+        auto arrayType = as<ArrayExpressionType>(elementType);
+        if (!arrayType)
+            return nullptr;
+        outerCounts.add(arrayType->getElementCount());
+        elementType = arrayType->getElementType();
+    }
+    elementType = getArrayType(astBuilder, elementType, elementCount);
+    for (Index jj = outerCounts.getCount() - 1; jj >= 0; --jj)
+        elementType = getArrayType(astBuilder, elementType, outerCounts[jj]);
+    return elementType;
+}
+
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
     bool needDeref = false;
@@ -3676,7 +3725,41 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         }
 
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
-        auto arrayType = getArrayType(m_astBuilder, elementType, elementCount);
+
+        Type* arrayType = nullptr;
+        {
+            // A bracket sitting on further brackets, e.g. the `[4]` in
+            // `int[2][4]`, must re-nest the chain so the first source bracket is
+            // the outermost dimension (see `_getBracketChainArrayType`). Only a
+            // chain of single-size brackets was re-nested when its links were
+            // checked; a sub-chain with a multi-argument bracket like
+            // `int[2,3][4]` kept the legacy wrap, so it keeps it here too.
+            bool isPlainBracketChain = true;
+            UInt bracketCount = 0;
+            for (Expr* chainLink = subscriptExpr->baseExpression;;)
+            {
+                auto linkIndexExpr = as<IndexExpr>(chainLink);
+                if (!linkIndexExpr)
+                    break;
+                if (linkIndexExpr->indexExprs.getCount() > 1)
+                {
+                    isPlainBracketChain = false;
+                    break;
+                }
+                bracketCount++;
+                chainLink = linkIndexExpr->baseExpression;
+            }
+            if (isPlainBracketChain && bracketCount > 0)
+            {
+                arrayType = _getBracketChainArrayType(
+                    m_astBuilder,
+                    elementType,
+                    elementCount,
+                    bracketCount);
+            }
+        }
+        if (!arrayType)
+            arrayType = getArrayType(m_astBuilder, elementType, elementCount);
 
         subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
         return subscriptExpr;
