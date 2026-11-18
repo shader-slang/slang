@@ -3040,6 +3040,11 @@ Result linkAndOptimizeIR(
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (isD3DTarget(targetRequest))
         SLANG_PASS(validateGroupSharedParamsForHLSL, targetRequest->getTargetCaps(), sink);
+    // The CPU-via-LLVM atomic check shares that requirement: an atomic reaching the LLVM
+    // emitter aborts code generation inside the Slang process, so minimum-optimization mode
+    // must still reject it, after validateAtomicOperations has already run above.
+    if (isCPUTargetViaLLVM(targetRequest))
+        SLANG_PASS(checkUnsupportedLLVMCPUAtomics, sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 

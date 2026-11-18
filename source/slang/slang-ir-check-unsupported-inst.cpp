@@ -565,14 +565,18 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
     }
 }
 
-// Diagnose atomic operations for CPU targets compiled through LLVM. The LLVM
-// backend implements none of the IR atomic operations, so an atomic reaching
-// this pass would abort code generation with an internal "Unsupported
-// instruction for LLVM target!" error. Diagnosing it here reports the gap as
-// an ordinary error at the source location instead. Like the Metal checks
-// above, we visit only top-level functions, because those are the bodies the
-// emitter emits; a generic that remains at this point is not emitted.
-static void checkUnsupportedLLVMCPUAtomics(IRModule* module, DiagnosticSink* sink)
+// Diagnose atomic operations for CPU-via-LLVM targets. The LLVM backend implements no IR atomic
+// operation, so an atomic reaching the emitter aborts code generation inside the Slang process
+// with an internal "Unsupported instruction for LLVM target!" error. Diagnosing the gap here
+// reports an ordinary error at the source location instead, and — unlike the Metal checks in
+// this file, whose failures surface in the downstream Metal compiler — this one is invoked
+// unconditionally (see slang-emit.cpp): minimum-optimization mode must still reject it. Like
+// the Metal checks, we visit only top-level functions, because those are the bodies the emitter
+// emits; a generic that remains at this point is not emitted. The scan covers atomic operations
+// only; barrier ops also lack emitter support and still abort until the LLVM backend implements
+// them. A synthesized atomic may carry no source location of its own; findFirstUseLoc points
+// the diagnostic at the first user-code use.
+void checkUnsupportedLLVMCPUAtomics(IRModule* module, DiagnosticSink* sink)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -599,8 +603,6 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
 {
     if (isMetalTarget(target))
         checkUnsupportedMetalInsts(module, sink);
-    else if (isCPUTargetViaLLVM(target))
-        checkUnsupportedLLVMCPUAtomics(module, sink);
 
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
