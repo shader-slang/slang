@@ -313,11 +313,11 @@ bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType);
 /// Every other shape keeps the operand as lowered. The declared type may play a
 /// different role than the operand's type (`Ptr` to `Ref` for `operator*`, `Ref` to
 /// `Ptr` for `operator&`), where a bit-cast is not a bit-reinterpret at all. Pairs
-/// outside this fix's scope — vectors, size-mismatched scalars, `bool`, target-sized
+/// outside this contract — vectors, size-mismatched scalars, `bool`, target-sized
 /// integers, and types no layout rule can size — also keep the operand as lowered,
-/// preserving the historical pass-through. Vector re-typings remain a known remainder
-/// of the issue, reachable only through fully generic identity declarations such as
-/// `__slang_noop_cast` (`__intrinsic_type` names a scalar type).
+/// preserving the historical pass-through. Vector re-typings remain a known, unfixed
+/// case, reachable only through fully generic identity declarations such as
+/// `__slang_noop_cast` (`__intrinsic_type` never names a vector type).
 IRInst* retypeIdentityIntrinsicResult(IRBuilder* builder, IRInst* operand, IRType* declaredType);
 
 /// Test for opaque values or invalid recursion in the by-value storage of `type`.
