@@ -104,6 +104,7 @@
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-ray-tracing-legalize.h"
+#include "slang-ir-reconstruct-short-circuit.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-resolve-varying-input-ref.h"
@@ -2839,6 +2840,14 @@ Result linkAndOptimizeIR(
     // Legalization keeps a void placeholder for `differential` to preserve field positions.
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
+
+    // Rebuild short-circuit `&&`/`||` expressions from their diamond form while
+    // the block-parameter (phi) form still exists; `eliminatePhis` below would
+    // otherwise turn the merge parameters into `bool` temporaries that the
+    // downstream C++ compiler cannot turn back into branches. Runs only on
+    // CUDA and CPU/C++-source targets, whose emitters the pass's fold-veto
+    // mirrors cover.
+    SLANG_PASS(reconstructShortCircuit, targetRequest);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and

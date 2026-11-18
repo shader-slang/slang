@@ -72,14 +72,12 @@ void computeMain(uint tid : SV_GroupIndex)
 // CUDA: Vec_0 [[RET:_S[0-9]+]];
 // CUDA: for(;;)
 // CUDA: (&[[RET]])->data_0 = (&output_0)->data_0;
-// CUDA: if(((&[[RET]])->data_0[int(0)]) == 30.0f)
-// CUDA: passed_0 = ((&[[RET]])->data_0[int(1)]) == 70.0f;
+// CUDA: passed_0 = (((&[[RET]])->data_0[int(0)]) == 30.0f) && (((&[[RET]])->data_0[int(1)]) == 70.0f);
 
 // CPP: Vec_0 [[RET:_S[0-9]+]];
 // CPP: for(;;)
 // CPP: (&[[RET]])->data_0 = (&output_0)->data_0;
-// CPP: if(((&[[RET]])->data_0[int(0)]) == 30.0f)
-// CPP: passed_0 = ((&[[RET]])->data_0[int(1)]) == 70.0f;
+// CPP: passed_0 = (((&[[RET]])->data_0[int(0)]) == 30.0f) && (((&[[RET]])->data_0[int(1)]) == 70.0f);
 
 // WGSL: var [[RET:_S[0-9]+]] : Vec_0;
 // WGSL: loop

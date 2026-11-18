@@ -6,12 +6,11 @@
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
 
 // CHECK: float * [[LDG:[A-Za-z0-9_]+]](float * * {{.*}})
-// CHECK: ulonglong [[BITS:[A-Za-z0-9_]+]] = __ldg((slang_bit_cast<ulonglong *>(
-// CHECK: return (slang_bit_cast<float *>([[BITS]]));
+// CHECK: return (slang_bit_cast<float *>(__ldg((slang_bit_cast<ulonglong *>(ptr_0)))));
 // CHECK: void computeMain(
-// CHECK-DAG: = [[LDG]](&{{.*}}->data_0);
-// CHECK-DAG: = [[LDG]](tables_0 +
-// CHECK-DAG: = __ldg(&{{.*}}->scale_0);
+// CHECK-DAG: [[LDG]](&{{.*}}->data_0)
+// CHECK-DAG: [[LDG]](tables_0 +
+// CHECK-DAG: = __ldg(&{{.*}}->scale_0)
 
 // Three loads go through the read-only path: the two pointers and `scale`.
 // PTX-COUNT-3: ld.global.nc

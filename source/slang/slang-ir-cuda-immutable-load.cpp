@@ -94,12 +94,32 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     {
         auto func = builder.createFunc();
         builder.addNameHintDecoration(func, toSlice("slang_ldg"));
+        // The function only reads memory a kernel cannot write to on this
+        // path: the `kIROp_Load` lowering reaches here only after
+        // `isPointerToImmutableLocation` accepted the address, and the
+        // structured-buffer and `__ldg`-site paths lower reads of memory
+        // that is read-only by construction. Marking the function free of
+        // side effects — and its pointer parameter as one through which no
+        // side effect can take place — lets the emitter fold a single-use
+        // `__ldg` call into its use site; without the decorations every call
+        // is conservatively side-effecting and the load has to materialize
+        // as a `slang_ldg_N(...)` statement instead of appearing inside the
+        // expression that uses it. `NoSideEffect` (not `__readNone`) states
+        // exactly what the function guarantees when synthesized: it reads
+        // memory, and never writes. The later `propagateFuncProperties` pass
+        // may infer `__readNone` for wrappers of pure reads (enabled by the
+        // `kIROp_CUDALDG` purity classification) before the short-circuit
+        // pass runs, and its `isReadNoneCall` exemption then applies — sound,
+        // because a read-none callee's unconditional evaluation is
+        // unobservable by definition.
+        builder.addDecoration(func, kIROp_NoSideEffectDecoration);
         builder.setInsertInto(func);
         auto block = builder.emitBlock();
         auto ptrType = builder.getPtrType(valueType);
         builder.setInsertInto(block);
         outParam = builder.emitParam(ptrType);
         builder.addNameHintDecoration(outParam, toSlice("ptr"));
+        builder.addDecoration(outParam, kIROp_IgnoreSideEffectsDecoration);
         func->setFullType(builder.getFuncType(ptrType, valueType));
         return func;
     }
