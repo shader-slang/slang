@@ -67,6 +67,7 @@ protected:
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
+    virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
     virtual void emitPreModuleImpl() SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
