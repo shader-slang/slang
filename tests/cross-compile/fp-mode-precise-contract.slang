@@ -23,8 +23,11 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 // The pragma must appear in the front matter, ahead of the prelude's includes:
 // the STDC pragma is file-scope from its point onward, so emitting it before
-// the prelude covers all module code.
+// the prelude covers all module code. The guard lines are pinned too, so a
+// regression that drops or mangles the compiler guard cannot pass unnoticed.
+//CHECK_PRECISE: #if defined(__clang__)
 //CHECK_PRECISE: #pragma STDC FP_CONTRACT OFF
+//CHECK_PRECISE: #endif
 //CHECK_PRECISE: #include
 
 //CHECK_DEFAULT-NOT: FP_CONTRACT
