@@ -417,10 +417,7 @@ MathIntResult MathIntOps::rem(
 {
     if (b.getUnsignedValue() == 0)
     {
-        return MathIntOps::constructResult(
-            resultType,
-            0,
-            MathIntResult::Undefined);
+        return MathIntOps::constructResult(resultType, 0, MathIntResult::Undefined);
     }
 
     // we'll calculate the remainder using uint64_t and post-fix the sign
@@ -486,10 +483,7 @@ MathIntResult MathIntOps::bitwiseOr(
     const MathIntValue& a,
     const MathIntValue& b)
 {
-    return MathIntOps::constructResult(
-        resultType,
-        a.getUnsignedValue() | b.getUnsignedValue(),
-        0);
+    return MathIntOps::constructResult(resultType, a.getUnsignedValue() | b.getUnsignedValue(), 0);
 }
 
 MathIntResult MathIntOps::bitwiseXor(
@@ -497,10 +491,7 @@ MathIntResult MathIntOps::bitwiseXor(
     const MathIntValue& a,
     const MathIntValue& b)
 {
-    return MathIntOps::constructResult(
-        resultType,
-        a.getUnsignedValue() ^ b.getUnsignedValue(),
-        0);
+    return MathIntOps::constructResult(resultType, a.getUnsignedValue() ^ b.getUnsignedValue(), 0);
 }
 
 MathIntResult MathIntOps::bitwiseNot(const MathIntType& resultType, const MathIntValue& a)

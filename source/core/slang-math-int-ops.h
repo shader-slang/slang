@@ -190,10 +190,7 @@ class MathIntOps
 {
 public:
     template<typename T>
-    static MathIntResult constructResult(
-        MathIntType type,
-        T rawValue,
-        unsigned flags)
+    static MathIntResult constructResult(MathIntType type, T rawValue, unsigned flags)
     {
         MathIntResult res{};
         res.value.setValue(type, rawValue);
@@ -332,7 +329,10 @@ public:
     static MathIntResult logicalAnd(const MathIntValue& a, const MathIntValue& b);
 
     /// @brief Returns a != 0 ? b : c
-    static MathIntResult ternaryConditional(const MathIntValue& a, const MathIntValue& b, const MathIntValue& c);
+    static MathIntResult ternaryConditional(
+        const MathIntValue& a,
+        const MathIntValue& b,
+        const MathIntValue& c);
 };
 
 } // namespace Slang
