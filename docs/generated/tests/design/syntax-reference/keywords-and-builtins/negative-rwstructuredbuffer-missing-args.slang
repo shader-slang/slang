@@ -13,7 +13,7 @@
 // template-arg requirement. The bare name without `<T>` triggers a
 // type-checker error.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):
 
 RWStructuredBuffer outBuf;
 // CHECK-DAG: error

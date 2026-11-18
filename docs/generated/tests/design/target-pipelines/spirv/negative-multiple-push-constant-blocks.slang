@@ -13,7 +13,7 @@
 // PushConstant variable and diagnoses more than one. The CHECK pins the error code
 // E39033 so an unrelated failure cannot satisfy the test.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target spirv-asm -entry main -stage compute
 
 struct P { float4 a; };
 [[vk::push_constant]] ConstantBuffer<P> p1;

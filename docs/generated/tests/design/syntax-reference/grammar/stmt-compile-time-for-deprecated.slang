@@ -13,7 +13,7 @@
 // the E30525 deprecation warning; line 1 (-std 202c) is rejected with E30526.
 
 //TEST:SIMPLE(filecheck=DEPR):-lang slang -std 2025 -target hlsl -stage compute -entry main
-//TEST:SIMPLE(filecheck=REMOVED,exit-code=-1):-lang slang -std 202c -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=REMOVED,exit-code=2):-lang slang -std 202c -target hlsl -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 

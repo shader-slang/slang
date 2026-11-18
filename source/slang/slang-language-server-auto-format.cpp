@@ -282,8 +282,6 @@ List<Edit> formatSource(
 
     auto inStream = proc->getStream(StdStreamType::In);
     inStream->write(text.begin(), text.getLength());
-    char terminator = '\0';
-    inStream->write(&terminator, 1);
     inStream->flush();
     inStream->close();
     ExecuteResult result;

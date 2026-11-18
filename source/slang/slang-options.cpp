@@ -2424,13 +2424,11 @@ void OptionsParser::_appendUsageTitle(StringBuilder& out)
 void OptionsParser::_appendExitCodes(StringBuilder& out)
 {
     out << "Exit codes:\n";
-    out << "  0   Success.\n";
-    out << "  1   The command line was invalid, or the tool failed to run.\n";
-    out << "  -1  The compilation failed because of errors in the input.\n";
-    out << "  -2  The compiler hit an unexpected failure: an internal compiler error, an\n";
-    out << "      assertion, an exception or an abort. This is a bug in the compiler.\n";
-    out << "Where the exit status has only 8 bits (for example on Linux and macOS), -1 is\n";
-    out << "reported as 255 and -2 as 254.\n";
+    out << "  0  Success.\n";
+    out << "  1  The command line was invalid, or the tool failed to run.\n";
+    out << "  2  The compilation failed because of errors in the input.\n";
+    out << "  3  The compiler hit an unexpected failure: an internal compiler error, an\n";
+    out << "     assertion, an exception or an abort. This is a bug in the compiler.\n";
 }
 
 void OptionsParser::_outputMinimalUsage()

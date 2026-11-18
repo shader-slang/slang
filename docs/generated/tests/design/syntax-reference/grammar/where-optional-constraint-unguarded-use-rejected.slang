@@ -12,7 +12,7 @@
 // Verifies an optional conformance constraint must be tested with `is` before
 // use: calling `t.g()` unguarded is rejected, CHECK asserts E30403.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl
 
 interface IFoo { int g(); }
 
