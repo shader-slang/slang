@@ -75,7 +75,12 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
 
     const FormatInfo& formatInfo = getFormatInfo(format);
 
-    bool isArray = inputDesc.arrayLength > 1;
+    // An arrayLength of 0 means the test input did not name an array length, so the texture
+    // is not an array. Any named length means the test wants an array texture, even a
+    // single-element one: a TextureCubeArray bound to a one-cube input still needs an array
+    // resource so the view type matches the shader-declared type (a plain cube view fails
+    // Vulkan validation with VUID-vkCmdDispatch-viewType-07752).
+    bool isArray = inputDesc.arrayLength > 0;
     bool isMS = inputDesc.sampleCount > 1;
 
     textureDesc.sampleCount = inputDesc.sampleCount;
