@@ -3950,6 +3950,31 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
     return SLANG_OK;
 }
 
+// Report the diagnostics attached to an error `artifact` (for example the
+// LLVM verifier output stashed by the LLVM builder) in `codeGenContext`'s
+// sink when LLVM code generation returned a failure. The LLVM builder
+// packages its failures as artifacts rather than writing to the sink itself,
+// so without this step a failure would return without any visible message.
+static void reportLLVMArtifactDiagnosticsOnFailure(
+    CodeGenContext* codeGenContext,
+    SlangResult result,
+    IArtifact* artifact)
+{
+    if (SLANG_FAILED(result) && artifact)
+    {
+        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+        if (diagnostics)
+        {
+            auto sink = codeGenContext->getSink();
+            for (Int i = 0; i < diagnostics->getCount(); ++i)
+            {
+                auto diag = diagnostics->getAt(i);
+                sink->diagnoseRaw(Severity(diag->severity), diag->text);
+            }
+        }
+    }
+}
+
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
 {
     auto target = codeGenContext->getTargetFormat();
@@ -3983,24 +4008,30 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::ShaderObjectCode:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
+            auto result = emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
+            reportLLVMArtifactDiagnosticsOnFailure(codeGenContext, result, artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
+            SLANG_RETURN_ON_FAIL(result);
         }
         break;
     case CodeGenTarget::HostLLVMIR:
     case CodeGenTarget::ShaderLLVMIR:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
+            auto result = emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
+            reportLLVMArtifactDiagnosticsOnFailure(codeGenContext, result, artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
+            SLANG_RETURN_ON_FAIL(result);
         }
         break;
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
+            auto result = emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
+            reportLLVMArtifactDiagnosticsOnFailure(codeGenContext, result, artifact);
             outArtifact = ComPtr<IArtifact>(artifact);
+            SLANG_RETURN_ON_FAIL(result);
         }
         break;
     }

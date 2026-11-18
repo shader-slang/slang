@@ -132,6 +132,12 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
 
     llvm::DIScope* currentLocalScope = nullptr;
 
+    // Holds the LLVM verifier's output when `finalize()` finds the module
+    // invalid. The `generate*()` entry points package this as an error
+    // artifact, so that a verification failure fails the compilation
+    // instead of being silently dropped (and an invalid module written out).
+    std::string moduleVerifyErrors;
+
     struct VariableDebugInfo
     {
         // attached is true when the first related DebugValue has been
@@ -162,6 +168,11 @@ public:
     ~LLVMBuilder();
 
     IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
+
+    // Packages the verification failure stashed in `moduleVerifyErrors` by
+    // `finalize()` as an error artifact and returns a failing result, so the
+    // caller receives the verifier's output instead of an invalid module.
+    SlangResult returnModuleVerifyError(IArtifact** outArtifact);
 
     // FP mode flags are set per-instruction, and some of those instructions
     // may be coming from inline IR. This function does a pass over all relevant
@@ -587,6 +598,18 @@ IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic
     return artifact.detach();
 }
 
+SlangResult LLVMBuilder::returnModuleVerifyError(IArtifact** outArtifact)
+{
+    ArtifactDiagnostic diagnostic;
+
+    diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+    diagnostic.stage = ArtifactDiagnostic::Stage::Link;
+    diagnostic.text = TerminatedCharSlice(moduleVerifyErrors.c_str());
+
+    *outArtifact = createErrorArtifact(diagnostic);
+    return SLANG_FAIL;
+}
+
 void LLVMBuilder::addFPModeFlags()
 {
     llvm::FastMathFlags FMF;
@@ -728,7 +751,19 @@ void LLVMBuilder::finalize()
     if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
         llvmDebugBuilder->finalize();
 
-    llvm::verifyModule(*llvmModule, &llvm::errs());
+    // A module that fails verification must fail the compilation, so the
+    // verifier's output is captured here rather than printed to stderr and
+    // discarded; `generate*()` turns it into an error artifact. The
+    // optimization pass pipeline is also skipped for an invalid module,
+    // because running it can trip LLVM's own assertions.
+    std::string verifyErrors;
+    llvm::raw_string_ostream verifyStream(verifyErrors);
+    if (llvm::verifyModule(*llvmModule, &verifyStream))
+    {
+        verifyStream.flush();
+        moduleVerifyErrors = verifyErrors;
+        return;
+    }
 
     // O0 is separately handled inside `optimize()`; we need to call it in
     // any case to make sure that `ForceInline` functions get inlined.
@@ -2276,6 +2311,8 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, 
 SlangResult LLVMBuilder::generateAssembly(IArtifact** outArtifact)
 {
     finalize();
+    if (!moduleVerifyErrors.empty())
+        return returnModuleVerifyError(outArtifact);
 
     std::string out;
     llvm::raw_string_ostream rso(out);
@@ -2291,6 +2328,8 @@ SlangResult LLVMBuilder::generateAssembly(IArtifact** outArtifact)
 SlangResult LLVMBuilder::generateObjectCode(IArtifact** outArtifact)
 {
     finalize();
+    if (!moduleVerifyErrors.empty())
+        return returnModuleVerifyError(outArtifact);
 
     List<uint8_t> objectData;
     BinaryLLVMOutputStream output(objectData);
@@ -2322,6 +2361,8 @@ SlangResult LLVMBuilder::generateObjectCode(IArtifact** outArtifact)
 SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 {
     finalize();
+    if (!moduleVerifyErrors.empty())
+        return returnModuleVerifyError(outArtifact);
 
     std::unique_ptr<llvm::orc::LLJIT> jit;
     {
