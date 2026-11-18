@@ -4,6 +4,7 @@
 #include "compiler-core/slang-pretty-writer.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-type-text-util.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
@@ -182,6 +183,46 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     {
         getSink()->diagnose(Diagnostics::CoveragePassThroughIncompatible{});
         return SLANG_FAIL;
+    }
+
+    // `-pass-through` hands the original source of each translation unit to the selected
+    // downstream compiler, so that compiler must accept every unit's source language. Like the
+    // coverage check above, this lives here (not in `OptionsParser::_parse`) so that C++ API
+    // callers using `setPassThrough()` are also covered.
+    if (m_passThrough != PassThroughMode::None)
+    {
+        const auto passThroughCompiler = SlangPassThrough(m_passThrough);
+        const auto& compilerInfo = DownstreamCompilerInfo::getInfo(passThroughCompiler);
+        // An entry with no source-language flags means the languages the compiler accepts are
+        // not recorded in the table (metal, tint), so leave such compilers' behavior unchanged.
+        if (compilerInfo.sourceLanguageFlags != 0)
+        {
+            bool languageRejected = false;
+            for (const auto& translationUnit : getFrontEndReq()->translationUnits)
+            {
+                const auto sourceLanguage = translationUnit->sourceLanguage;
+                if (sourceLanguage == SourceLanguage::Unknown)
+                    continue;
+                // In pass-through mode Slang input is treated as HLSL, because no downstream
+                // compiler consumes Slang source directly; see
+                // `CodeGenContext::emitWithDownstreamForEntryPoints`.
+                const auto compileLanguage = (sourceLanguage == SourceLanguage::Slang)
+                                                 ? SourceLanguage::HLSL
+                                                 : sourceLanguage;
+                if (!DownstreamCompilerInfo::canCompile(
+                        passThroughCompiler,
+                        SlangSourceLanguage(compileLanguage)))
+                {
+                    getSink()->diagnose(Diagnostics::PassThroughCannotCompileSourceLanguage{
+                        .compiler = TypeTextUtil::getPassThroughName(passThroughCompiler),
+                        .language = TypeTextUtil::getSourceLanguageName(
+                            SlangSourceLanguage(sourceLanguage))});
+                    languageRejected = true;
+                }
+            }
+            if (languageRejected)
+                return SLANG_FAIL;
+        }
     }
 
     const bool hasExplicitCoverageManifestPath = _hasExplicitCoverageManifestPath();

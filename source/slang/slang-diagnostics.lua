@@ -6068,6 +6068,18 @@ err(
     "'-validate-with-downstream-compiler' cannot be used with target '~target', because no downstream compiler or validator is defined for this target"
 )
 
+err(
+    "pass-through-cannot-compile-source-language",
+    52016,
+    "the pass-through compiler '~compiler' cannot compile '~language' source; '-pass-through' hands the original source to the downstream compiler, so remove '-pass-through' or select a pass-through compiler that accepts the language"
+)
+
+err(
+    "pass-through-requires-entry-point",
+    52017,
+    "pass-through compilation requires an entry point to select the source handed to the downstream compiler; specify an entry point with '-entry' or remove '-pass-through'"
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
