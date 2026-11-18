@@ -41,8 +41,10 @@
 //     This pass itself doesn't deal with such function calls, they should
 //     eventually be fully handled in the core module and the LLVM emitter.
 //
-//     The `void*` lowering intentionally passes no address space: these values
-//     are opaque handles, never dereferenced.
+//     The `void*` lowering intentionally passes no address space: these values are opaque
+//     handles, never dereferenced, and an atomic destination reached through an image is
+//     accepted by instruction shape (IRImageSubscript) before any address space is consulted,
+//     so the handle's absent address space never gates anything.
 
 namespace Slang
 {
@@ -68,17 +70,18 @@ struct ResourceTypeLoweringContext : InstPassBase
             type->getOp() == kIROp_HLSLRWStructuredBufferType)
             access = AccessQualifier::ReadWrite;
 
-        // The three buffer-shaped cases below type their pointers UserPointer
-        // because CPU buffer memory is host memory — the address space a plain
-        // `T*` already gets on CPU targets, so nothing downstream observes the
-        // change: the LLVM emitter never reads pointer address spaces. The
-        // choice is still load-bearing: this pass runs immediately before
-        // validateAtomicOperations, whose isValidAtomicDest accepts
-        // UserPointer but not Generic, and no address-space specialization
-        // runs on the CPU-via-LLVM path to fix a Generic up later. The
-        // host-memory model applies uniformly to all three sites, including
-        // the read-only ConstantBuffer/ParameterBlock payload; the access
-        // qualifier stays carried by the pointer type.
+        // The payload pointer of ConstantBuffer/ParameterBlock and the data pointers of the
+        // StructuredBuffer and ByteAddressBuffer families below are typed UserPointer because
+        // CPU buffer memory is host memory — the address space a plain `T*` already gets on
+        // CPU targets, which is why code generation is unaffected by the change: the LLVM
+        // emitter maps every pointer to one opaque pointer, and the later
+        // lowerBufferElementTypeToStorageType run treats a UserPointer exactly like any other
+        // user pointer. The address space still matters to validation: this pass runs
+        // immediately before validateAtomicOperations, whose isValidAtomicDest accepts
+        // UserPointer but not Generic, and no address-space specialization runs on the
+        // CPU-via-LLVM path to fix a Generic up later. The same host-memory rationale covers
+        // all three sites uniformly, including the read-only ConstantBuffer/ParameterBlock
+        // payload; the access qualifier is still recorded in the pointer type.
         switch (type->getOp())
         {
         case kIROp_ConstantBufferType:
