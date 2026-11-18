@@ -1,13 +1,24 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -output-using-type
-//TEST:SIMPLE: -target glsl -entry computeMain
-//TEST:SIMPLE: -target spirv-asm -entry computeMain
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain
+//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain
 
 // Nested GLSL-style array constructors used to be rejected because a
 // type-expression bracket chain like `int[2][4]` nested its brackets in
 // the opposite order from a declaration `int x[2][4]`. Both spellings
 // must denote `Array<Array<int,4>, 2>` (issue #5870).
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
+// Generic and specialization-constant counts ride through the type-position
+// re-nesting verbatim: `int[NR][NC]` means the same as `int x[NR][NC]`.
+int sumGeneric<let NR : int, let NC : int>(int[NR][NC] a)
+{
+    int s = 0;
+    for (int r = 0; r < NR; r++)
+        for (int c = 0; c < NC; c++)
+            s += a[r][c];
+    return s;
+}
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 // Both nested-constructor spellings from the issue.
@@ -40,4 +51,12 @@ void computeMain()
     outputBuffer[5] = G[1];       // CHECK: 2
     outputBuffer[6] = E[1][0];    // CHECK: 15
     outputBuffer[7] = F[0][2];    // CHECK: 1
+    outputBuffer[8] = sumGeneric(A); // CHECK: 36
 }
+
+// The nested constructors must survive codegen with the right values:
+// 7 and 15 only reach the output through B and E.
+//SPV: %int_7 = OpConstant %int 7
+//SPV: %int_15 = OpConstant %int 15
+//GLSL: _data[uint(2)] = 7;
+//GLSL: _data[uint(6)] = 15;
