@@ -1,4 +1,5 @@
-// NOTE the vk target runs the direct SPIR-V emitter, which already expands
+// NOTE the vk target runs the direct SPIR-V emitter — the default emit
+// method, which this line relies on — and that emitter already expands
 // matrix arithmetic per row at emit time; the GLSL/via-GLSL spelling of
 // matrix `%` is covered by tests/glsl/test-14591.slang. WGSL stays disabled
 // below; float-matrix `%` is also unimplemented for WGSL.
