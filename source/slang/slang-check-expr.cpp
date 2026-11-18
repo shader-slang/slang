@@ -305,9 +305,17 @@ Scope* SemanticsVisitor::getScope(SyntaxNode* node)
     return nullptr;
 }
 
-/// Return whether `type` is a builtin unsigned integer type, such as `uint` or `uint64_t`.
-static bool _isUnsignedIntegerType(Type* type)
+/// Return whether the values of `type` are unsigned integers: `type` is a builtin unsigned
+/// integer type, such as `uint` or `uint64_t`, or an enum type whose tag type is one. For
+/// example, the cases of `enum E : uint64_t` are unsigned, so a case value with bit 63 set is
+/// large rather than negative.
+static bool _isUnsignedIntegerType(ASTBuilder* astBuilder, Type* type)
 {
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
+            type = getTagType(astBuilder, enumDeclRef);
+    }
     auto basicType = as<BasicExpressionType>(type);
     if (!basicType)
         return false;
@@ -3641,7 +3649,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
             {
                 const IntegerLiteralValue size = constElementCount->getValue();
-                if (size < 0 && !_isUnsignedIntegerType(constElementCount->getType()))
+                if (size < 0 && !_isUnsignedIntegerType(m_astBuilder, constElementCount->getType()))
                 {
                     getSink()->diagnose(Diagnostics::InvalidArraySize{
                         .location = subscriptExpr->indexExprs[0]->loc});

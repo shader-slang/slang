@@ -3211,9 +3211,10 @@ public:
     /// Return the sink for the diagnostics that folding a single operation reports, such as
     /// division by zero, or null when these diagnostics are suppressed.
     ///
-    /// We report each such diagnostic from the fold that first sees the operand values, so that
-    /// repeated folds of the same initializer do not report it again.
-    /// Consider this example:
+    /// The choice depends only on `reportsFoldDiagnostics` of the innermost circularity link; we
+    /// do not record which operand values earlier folds have seen. A use of a declaration does not
+    /// report again what checking the declaration already reported, but a use that supplies
+    /// generic arguments reports every time. Consider this example:
     ///
     ///     static const int a = 1 / 0;
     ///     void f() { switch (0) { case 0: case a: break; } }
