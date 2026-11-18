@@ -2670,7 +2670,10 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // because each use is wrapped in a `sign(...)`/`abs(...)` call.
             // A matrix-typed `FRem` never reaches this case for GLSL-family
             // targets: `legalizeMatrixFRemForGLSL` expands it per row
-            // upstream, so the operands here are always scalar or vector.
+            // upstream. Of the remaining shapes, a scalar divisor against
+            // scalar or vector operands is fine (`mod(genType, float)`
+            // exists), but a scalar dividend against a vector divisor is
+            // still open — GLSL has no `mod(float, genType)` overload.
             auto argPrec = getInfo(EmitOp::General);
 
             m_writer->emit("(sign(");

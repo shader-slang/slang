@@ -2489,10 +2489,12 @@ Result linkAndOptimizeIR(
 
             // GLSL has no matrix overloads for the builtins used to spell a floating-point
             // remainder, so a matrix-typed `FRem` must be expanded per row before emission.
-            // Direct SPIR-V is excluded because its emitter already expands matrix
-            // arithmetic per row at emit time and relies on the matrix-typed `FRem`.
-            if (target == CodeGenTarget::GLSL ||
-                (isSPIRV(target) && !targetProgram->shouldEmitSPIRVDirectly()))
+            // SPIR-V-via-GLSL reaches this switch as `CodeGenTarget::GLSL` (the downstream
+            // path remaps the source target), so the single emit-method check covers both
+            // target spellings; direct SPIR-V is excluded because its emitter reads
+            // `precise` off each matrix arithmetic instruction to attach per-row
+            // no-contraction, which the pass's wholesale decoration transfer would break.
+            if (!targetProgram->shouldEmitSPIRVDirectly())
                 SLANG_PASS(legalizeMatrixFRemForGLSL);
 
             validateIRModuleIfEnabled(codeGenContext, irModule);
