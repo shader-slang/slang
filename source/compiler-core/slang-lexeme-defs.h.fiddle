@@ -1,0 +1,500 @@
+// GENERATED CODE; DO NOT EDIT
+//
+// input file: slang-lexeme-defs.h
+
+// BEGIN FIDDLE TEMPLATE OUTPUT:
+#ifdef FIDDLE_GENERATED_OUTPUT_ID
+
+#if FIDDLE_GENERATED_OUTPUT_ID == 0
+// This fragment defines concrete tags, class ranges, and diagnostic lookup tables.
+// `slang-lexeme-defs.h` includes it inside `namespace Slang` after `LexemeType`.
+/// The tags of concrete lexeme types, in depth-first hierarchy order.
+enum class LexemeTypeTag : uint8_t
+{
+    AngleBracketHeaderName,
+    EndOfDirective,
+    EndOfFile,
+    Identifier,
+    Invalid,
+    CharLiteral,
+    FloatingPointLiteral,
+    IntegerLiteral,
+    StringLiteral,
+    At,
+    Colon,
+    Comma,
+    CompletionRequest,
+    Dollar,
+    DollarDollar,
+    Dot,
+    DotDot,
+    DoubleRightArrow,
+    Ellipsis,
+    LBrace,
+    LBracket,
+    LParent,
+    OpAdd,
+    OpAddAssign,
+    OpAnd,
+    OpAndAssign,
+    OpAssign,
+    OpBitAnd,
+    OpBitNot,
+    OpBitOr,
+    OpBitXor,
+    OpDec,
+    OpDiv,
+    OpDivAssign,
+    OpEql,
+    OpGeq,
+    OpGreater,
+    OpInc,
+    OpLeq,
+    OpLess,
+    OpLsh,
+    OpMod,
+    OpModAssign,
+    OpMul,
+    OpMulAssign,
+    OpNeq,
+    OpNot,
+    OpOr,
+    OpOrAssign,
+    OpRsh,
+    OpShlAssign,
+    OpShrAssign,
+    OpSub,
+    OpSubAssign,
+    OpXorAssign,
+    Pound,
+    PoundPound,
+    QuestionMark,
+    RBrace,
+    RBracket,
+    RParent,
+    RightArrow,
+    Scope,
+    Semicolon,
+    BlockComment,
+    LineComment,
+    EscapedNewLine,
+    NewLine,
+    WhiteSpace,
+    /// One past all valid tags; an empty lexical value returns this sentinel.
+    Count,
+};
+
+/// Compatibility name for the tag of a token.
+using TokenType = LexemeTypeTag;
+
+namespace LexemeTypes
+{
+inline constexpr LexemeType Lexeme{
+    LexemeTypeTag::AngleBracketHeaderName,
+    LexemeTypeTag::Count,
+    "lexeme"};
+inline constexpr LexemeType Token{
+    LexemeTypeTag::AngleBracketHeaderName,
+    LexemeTypeTag::BlockComment,
+    "token"};
+inline constexpr LexemeType AngleBracketHeaderName{
+    LexemeTypeTag::AngleBracketHeaderName,
+    LexemeTypeTag::EndOfDirective,
+    "angle-bracket-enclosed header name"};
+inline constexpr LexemeType EndOfDirective{
+    LexemeTypeTag::EndOfDirective,
+    LexemeTypeTag::EndOfFile,
+    "end of preprocessor directive"};
+inline constexpr LexemeType EndOfFile{
+    LexemeTypeTag::EndOfFile,
+    LexemeTypeTag::Identifier,
+    "end of file"};
+inline constexpr LexemeType Identifier{
+    LexemeTypeTag::Identifier,
+    LexemeTypeTag::Invalid,
+    "identifier"};
+inline constexpr LexemeType Invalid{
+    LexemeTypeTag::Invalid,
+    LexemeTypeTag::CharLiteral,
+    "invalid character"};
+inline constexpr LexemeType Literal{
+    LexemeTypeTag::CharLiteral,
+    LexemeTypeTag::At,
+    "literal"};
+inline constexpr LexemeType CharLiteral{
+    LexemeTypeTag::CharLiteral,
+    LexemeTypeTag::FloatingPointLiteral,
+    "character literal"};
+inline constexpr LexemeType NumericLiteral{
+    LexemeTypeTag::FloatingPointLiteral,
+    LexemeTypeTag::StringLiteral,
+    "numeric literal"};
+inline constexpr LexemeType FloatingPointLiteral{
+    LexemeTypeTag::FloatingPointLiteral,
+    LexemeTypeTag::IntegerLiteral,
+    "floating-point literal"};
+inline constexpr LexemeType IntegerLiteral{
+    LexemeTypeTag::IntegerLiteral,
+    LexemeTypeTag::StringLiteral,
+    "integer literal"};
+inline constexpr LexemeType StringLiteral{
+    LexemeTypeTag::StringLiteral,
+    LexemeTypeTag::At,
+    "string literal"};
+inline constexpr LexemeType Punctuation{
+    LexemeTypeTag::At,
+    LexemeTypeTag::BlockComment,
+    "punctuation"};
+inline constexpr LexemeType At{
+    LexemeTypeTag::At,
+    LexemeTypeTag::Colon,
+    "'@'"};
+inline constexpr LexemeType Colon{
+    LexemeTypeTag::Colon,
+    LexemeTypeTag::Comma,
+    "':'"};
+inline constexpr LexemeType Comma{
+    LexemeTypeTag::Comma,
+    LexemeTypeTag::CompletionRequest,
+    "','"};
+inline constexpr LexemeType CompletionRequest{
+    LexemeTypeTag::CompletionRequest,
+    LexemeTypeTag::Dollar,
+    "'#?'"};
+inline constexpr LexemeType Dollar{
+    LexemeTypeTag::Dollar,
+    LexemeTypeTag::DollarDollar,
+    "'$'"};
+inline constexpr LexemeType DollarDollar{
+    LexemeTypeTag::DollarDollar,
+    LexemeTypeTag::Dot,
+    "'$$'"};
+inline constexpr LexemeType Dot{
+    LexemeTypeTag::Dot,
+    LexemeTypeTag::DotDot,
+    "'.'"};
+inline constexpr LexemeType DotDot{
+    LexemeTypeTag::DotDot,
+    LexemeTypeTag::DoubleRightArrow,
+    "'..'"};
+inline constexpr LexemeType DoubleRightArrow{
+    LexemeTypeTag::DoubleRightArrow,
+    LexemeTypeTag::Ellipsis,
+    "'=>'"};
+inline constexpr LexemeType Ellipsis{
+    LexemeTypeTag::Ellipsis,
+    LexemeTypeTag::LBrace,
+    "'...'"};
+inline constexpr LexemeType LBrace{
+    LexemeTypeTag::LBrace,
+    LexemeTypeTag::LBracket,
+    "'{'"};
+inline constexpr LexemeType LBracket{
+    LexemeTypeTag::LBracket,
+    LexemeTypeTag::LParent,
+    "'['"};
+inline constexpr LexemeType LParent{
+    LexemeTypeTag::LParent,
+    LexemeTypeTag::OpAdd,
+    "'('"};
+inline constexpr LexemeType OpAdd{
+    LexemeTypeTag::OpAdd,
+    LexemeTypeTag::OpAddAssign,
+    "'+'"};
+inline constexpr LexemeType OpAddAssign{
+    LexemeTypeTag::OpAddAssign,
+    LexemeTypeTag::OpAnd,
+    "'+='"};
+inline constexpr LexemeType OpAnd{
+    LexemeTypeTag::OpAnd,
+    LexemeTypeTag::OpAndAssign,
+    "'&&'"};
+inline constexpr LexemeType OpAndAssign{
+    LexemeTypeTag::OpAndAssign,
+    LexemeTypeTag::OpAssign,
+    "'&='"};
+inline constexpr LexemeType OpAssign{
+    LexemeTypeTag::OpAssign,
+    LexemeTypeTag::OpBitAnd,
+    "'='"};
+inline constexpr LexemeType OpBitAnd{
+    LexemeTypeTag::OpBitAnd,
+    LexemeTypeTag::OpBitNot,
+    "'&'"};
+inline constexpr LexemeType OpBitNot{
+    LexemeTypeTag::OpBitNot,
+    LexemeTypeTag::OpBitOr,
+    "'~'"};
+inline constexpr LexemeType OpBitOr{
+    LexemeTypeTag::OpBitOr,
+    LexemeTypeTag::OpBitXor,
+    "'|'"};
+inline constexpr LexemeType OpBitXor{
+    LexemeTypeTag::OpBitXor,
+    LexemeTypeTag::OpDec,
+    "'^'"};
+inline constexpr LexemeType OpDec{
+    LexemeTypeTag::OpDec,
+    LexemeTypeTag::OpDiv,
+    "'--'"};
+inline constexpr LexemeType OpDiv{
+    LexemeTypeTag::OpDiv,
+    LexemeTypeTag::OpDivAssign,
+    "'/'"};
+inline constexpr LexemeType OpDivAssign{
+    LexemeTypeTag::OpDivAssign,
+    LexemeTypeTag::OpEql,
+    "'/='"};
+inline constexpr LexemeType OpEql{
+    LexemeTypeTag::OpEql,
+    LexemeTypeTag::OpGeq,
+    "'=='"};
+inline constexpr LexemeType OpGeq{
+    LexemeTypeTag::OpGeq,
+    LexemeTypeTag::OpGreater,
+    "'>='"};
+inline constexpr LexemeType OpGreater{
+    LexemeTypeTag::OpGreater,
+    LexemeTypeTag::OpInc,
+    "'>'"};
+inline constexpr LexemeType OpInc{
+    LexemeTypeTag::OpInc,
+    LexemeTypeTag::OpLeq,
+    "'++'"};
+inline constexpr LexemeType OpLeq{
+    LexemeTypeTag::OpLeq,
+    LexemeTypeTag::OpLess,
+    "'<='"};
+inline constexpr LexemeType OpLess{
+    LexemeTypeTag::OpLess,
+    LexemeTypeTag::OpLsh,
+    "'<'"};
+inline constexpr LexemeType OpLsh{
+    LexemeTypeTag::OpLsh,
+    LexemeTypeTag::OpMod,
+    "'<<'"};
+inline constexpr LexemeType OpMod{
+    LexemeTypeTag::OpMod,
+    LexemeTypeTag::OpModAssign,
+    "'%'"};
+inline constexpr LexemeType OpModAssign{
+    LexemeTypeTag::OpModAssign,
+    LexemeTypeTag::OpMul,
+    "'%='"};
+inline constexpr LexemeType OpMul{
+    LexemeTypeTag::OpMul,
+    LexemeTypeTag::OpMulAssign,
+    "'*'"};
+inline constexpr LexemeType OpMulAssign{
+    LexemeTypeTag::OpMulAssign,
+    LexemeTypeTag::OpNeq,
+    "'*='"};
+inline constexpr LexemeType OpNeq{
+    LexemeTypeTag::OpNeq,
+    LexemeTypeTag::OpNot,
+    "'!='"};
+inline constexpr LexemeType OpNot{
+    LexemeTypeTag::OpNot,
+    LexemeTypeTag::OpOr,
+    "'!'"};
+inline constexpr LexemeType OpOr{
+    LexemeTypeTag::OpOr,
+    LexemeTypeTag::OpOrAssign,
+    "'||'"};
+inline constexpr LexemeType OpOrAssign{
+    LexemeTypeTag::OpOrAssign,
+    LexemeTypeTag::OpRsh,
+    "'|='"};
+inline constexpr LexemeType OpRsh{
+    LexemeTypeTag::OpRsh,
+    LexemeTypeTag::OpShlAssign,
+    "'>>'"};
+inline constexpr LexemeType OpShlAssign{
+    LexemeTypeTag::OpShlAssign,
+    LexemeTypeTag::OpShrAssign,
+    "'<<='"};
+inline constexpr LexemeType OpShrAssign{
+    LexemeTypeTag::OpShrAssign,
+    LexemeTypeTag::OpSub,
+    "'>>='"};
+inline constexpr LexemeType OpSub{
+    LexemeTypeTag::OpSub,
+    LexemeTypeTag::OpSubAssign,
+    "'-'"};
+inline constexpr LexemeType OpSubAssign{
+    LexemeTypeTag::OpSubAssign,
+    LexemeTypeTag::OpXorAssign,
+    "'-='"};
+inline constexpr LexemeType OpXorAssign{
+    LexemeTypeTag::OpXorAssign,
+    LexemeTypeTag::Pound,
+    "'^='"};
+inline constexpr LexemeType Pound{
+    LexemeTypeTag::Pound,
+    LexemeTypeTag::PoundPound,
+    "'#'"};
+inline constexpr LexemeType PoundPound{
+    LexemeTypeTag::PoundPound,
+    LexemeTypeTag::QuestionMark,
+    "'##'"};
+inline constexpr LexemeType QuestionMark{
+    LexemeTypeTag::QuestionMark,
+    LexemeTypeTag::RBrace,
+    "'?'"};
+inline constexpr LexemeType RBrace{
+    LexemeTypeTag::RBrace,
+    LexemeTypeTag::RBracket,
+    "'}'"};
+inline constexpr LexemeType RBracket{
+    LexemeTypeTag::RBracket,
+    LexemeTypeTag::RParent,
+    "']'"};
+inline constexpr LexemeType RParent{
+    LexemeTypeTag::RParent,
+    LexemeTypeTag::RightArrow,
+    "')'"};
+inline constexpr LexemeType RightArrow{
+    LexemeTypeTag::RightArrow,
+    LexemeTypeTag::Scope,
+    "'->'"};
+inline constexpr LexemeType Scope{
+    LexemeTypeTag::Scope,
+    LexemeTypeTag::Semicolon,
+    "'::'"};
+inline constexpr LexemeType Semicolon{
+    LexemeTypeTag::Semicolon,
+    LexemeTypeTag::BlockComment,
+    "';'"};
+inline constexpr LexemeType Trivia{
+    LexemeTypeTag::BlockComment,
+    LexemeTypeTag::Count,
+    "trivia"};
+inline constexpr LexemeType Comment{
+    LexemeTypeTag::BlockComment,
+    LexemeTypeTag::EscapedNewLine,
+    "comment"};
+inline constexpr LexemeType BlockComment{
+    LexemeTypeTag::BlockComment,
+    LexemeTypeTag::LineComment,
+    "block comment"};
+inline constexpr LexemeType LineComment{
+    LexemeTypeTag::LineComment,
+    LexemeTypeTag::EscapedNewLine,
+    "line comment"};
+inline constexpr LexemeType EscapedNewLine{
+    LexemeTypeTag::EscapedNewLine,
+    LexemeTypeTag::NewLine,
+    "escaped end of line"};
+inline constexpr LexemeType NewLine{
+    LexemeTypeTag::NewLine,
+    LexemeTypeTag::WhiteSpace,
+    "end of line"};
+inline constexpr LexemeType WhiteSpace{
+    LexemeTypeTag::WhiteSpace,
+    LexemeTypeTag::Count,
+    "whitespace"};
+} // namespace LexemeTypes
+
+/// The concrete descriptors in tag order, shared by tag-to-description lookup.
+inline constexpr LexemeType kConcreteLexemeTypes[] = {
+    LexemeTypes::AngleBracketHeaderName,
+    LexemeTypes::EndOfDirective,
+    LexemeTypes::EndOfFile,
+    LexemeTypes::Identifier,
+    LexemeTypes::Invalid,
+    LexemeTypes::CharLiteral,
+    LexemeTypes::FloatingPointLiteral,
+    LexemeTypes::IntegerLiteral,
+    LexemeTypes::StringLiteral,
+    LexemeTypes::At,
+    LexemeTypes::Colon,
+    LexemeTypes::Comma,
+    LexemeTypes::CompletionRequest,
+    LexemeTypes::Dollar,
+    LexemeTypes::DollarDollar,
+    LexemeTypes::Dot,
+    LexemeTypes::DotDot,
+    LexemeTypes::DoubleRightArrow,
+    LexemeTypes::Ellipsis,
+    LexemeTypes::LBrace,
+    LexemeTypes::LBracket,
+    LexemeTypes::LParent,
+    LexemeTypes::OpAdd,
+    LexemeTypes::OpAddAssign,
+    LexemeTypes::OpAnd,
+    LexemeTypes::OpAndAssign,
+    LexemeTypes::OpAssign,
+    LexemeTypes::OpBitAnd,
+    LexemeTypes::OpBitNot,
+    LexemeTypes::OpBitOr,
+    LexemeTypes::OpBitXor,
+    LexemeTypes::OpDec,
+    LexemeTypes::OpDiv,
+    LexemeTypes::OpDivAssign,
+    LexemeTypes::OpEql,
+    LexemeTypes::OpGeq,
+    LexemeTypes::OpGreater,
+    LexemeTypes::OpInc,
+    LexemeTypes::OpLeq,
+    LexemeTypes::OpLess,
+    LexemeTypes::OpLsh,
+    LexemeTypes::OpMod,
+    LexemeTypes::OpModAssign,
+    LexemeTypes::OpMul,
+    LexemeTypes::OpMulAssign,
+    LexemeTypes::OpNeq,
+    LexemeTypes::OpNot,
+    LexemeTypes::OpOr,
+    LexemeTypes::OpOrAssign,
+    LexemeTypes::OpRsh,
+    LexemeTypes::OpShlAssign,
+    LexemeTypes::OpShrAssign,
+    LexemeTypes::OpSub,
+    LexemeTypes::OpSubAssign,
+    LexemeTypes::OpXorAssign,
+    LexemeTypes::Pound,
+    LexemeTypes::PoundPound,
+    LexemeTypes::QuestionMark,
+    LexemeTypes::RBrace,
+    LexemeTypes::RBracket,
+    LexemeTypes::RParent,
+    LexemeTypes::RightArrow,
+    LexemeTypes::Scope,
+    LexemeTypes::Semicolon,
+    LexemeTypes::BlockComment,
+    LexemeTypes::LineComment,
+    LexemeTypes::EscapedNewLine,
+    LexemeTypes::NewLine,
+    LexemeTypes::WhiteSpace,
+};
+
+/// Whether `tag` identifies a concrete lexeme type.
+constexpr bool isValidLexemeTypeTag(LexemeTypeTag tag)
+{
+    return uint8_t(tag) < uint8_t(LexemeTypeTag::Count);
+}
+
+/// Returns the descriptor for a concrete tag.
+///
+/// Requires a valid tag; `Count` is not a lexeme type.
+inline const LexemeType& getLexemeType(LexemeTypeTag tag)
+{
+    SLANG_RELEASE_ASSERT(isValidLexemeTypeTag(tag));
+    return kConcreteLexemeTypes[uint8_t(tag)];
+}
+
+/// Returns a concrete tag's diagnostic description, or `<unknown>` for an empty value.
+inline const char* TokenTypeToString(TokenType tag)
+{
+    if (tag == LexemeTypeTag::Count)
+        return "<unknown>";
+    return getLexemeType(tag).description;
+}
+
+#endif
+
+#undef FIDDLE_GENERATED_OUTPUT_ID
+#endif
+// END FIDDLE TEMPLATE OUTPUT
+
+// END OF FIDDLE-GENERATED FILE

@@ -692,8 +692,7 @@ protected:
 
     StringSlicePool m_slicePool;
 
-    // Memory arena that can be used for holding data to held in scope as long as the Source is
-    // Can be used for storing the decoded contents of Token. Content for example.
+    // Auxiliary allocations that share this source manager's lifetime.
     MemoryArena m_memoryArena;
 
     // Maps uniqueIdentities to source files

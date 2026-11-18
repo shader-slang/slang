@@ -29,8 +29,8 @@ public:
         {
             Before = 0x1,
             After = 0x2,
-            IsMultiToken = 0x4, ///< Can use more than one token
-            IsBlock = 0x8,      ///<
+            AllowsMultipleComments = 0x4, ///< Can combine comments from consecutive lines.
+            IsBlock = 0x8,                ///<
         };
     };
 
@@ -124,12 +124,13 @@ public:
         MarkupVisibility visibilty; ///< Visibility of the item
     };
 
+    /// A declaration position and its comment-search view of one input file.
     struct FindInfo
     {
-        SourceView* sourceView; ///< The source view the tokens were generated from
-        TokenList* tokenList;   ///< The token list
-        Index tokenIndex;       ///< The token index location (where searches start from)
-        Index lineIndex;        ///< The line number for the decl
+        SourceView* sourceView; ///< The source view containing the declaration and comments.
+        LexemeList* lexemeList; ///< Raw tokens and comments, without whitespace or newlines.
+        Index lexemeIndex;      ///< The declaration lexeme where the search starts.
+        Index lineIndex;        ///< The declaration's zero-based line index.
     };
 
     void setSearchInOrdinaryComments(bool val) { m_searchInOrindaryComments = val; }
@@ -148,7 +149,8 @@ public:
         List<SearchItemOutput>& out);
 
     static MarkupFlags getFlags(MarkupType type);
-    static MarkupType findMarkupType(const Token& tok);
+    /// Classifies a comment's markup style, or returns `None` for other lexemes.
+    static MarkupType findMarkupType(const Lexeme& lexeme);
     static UnownedStringSlice removeStart(MarkupType type, const UnownedStringSlice& comment);
 
 protected:
@@ -171,25 +173,23 @@ protected:
         Index locCount,
         FoundMarkup& out);
 
-    /// Given the decl, the token stream, and the decls tokenIndex, try to find some associated
-    /// markup
+    /// Finds markup associated with the declaration at `info.lexemeIndex`.
     SlangResult _findMarkup(const FindInfo& info, SearchStyle searchStyle, FoundMarkup& out);
 
-    /// Given a found markup location extracts the contents of the tokens into out
+    /// Extracts the text of the comment lexemes identified by `foundMarkup` into `out`.
     SlangResult _extractMarkup(
         const FindInfo& info,
         const FoundMarkup& foundMarkup,
         StringBuilder& out);
 
-    /// Given a location, try to find the first token index that could potentially be markup
-    /// Will return -1 if not found
+    /// Finds the first possible comment lexeme in the requested direction, or returns -1.
     Index _findStartIndex(const FindInfo& info, Location location);
 
-    /// True if the tok is 'on' lineIndex. Interpretation of 'on' depends on the markup type.
-    static bool _isTokenOnLineIndex(
+    /// Tests whether the comment touches `lineIndex` according to its markup type.
+    static bool _isLexemeOnLineIndex(
         SourceView* sourceView,
         MarkupType type,
-        const Token& tok,
+        const Lexeme& lexeme,
         Index lineIndex);
 
     DiagnosticSink* m_sink;

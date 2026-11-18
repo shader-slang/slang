@@ -67,10 +67,47 @@ String findClangFormatTool()
     return String();
 }
 
+/// Reads a braced body from `lexer`, with the `spirv_asm` keyword already consumed.
+///
+/// Returns whether both braces were found, filling `range` with their locations on success.
+/// Consumes one token if `{` is missing, or through the matching `}` or EOF otherwise.
+/// Leaves `range` unchanged on failure; `lexer` is never rewound.
+static bool _tryReadSpirvAsmBodyRange(Lexer& lexer, TextRange& range)
+{
+    // The `spirv_asm` keyword must be followed by a braced body. Token reads skip trivia,
+    // so comments and whitespace between the keyword and opening brace are allowed.
+    auto openingBrace = lexer.readToken().as<LBraceToken>();
+    if (!openingBrace)
+        return false;
+
+    // We count nested braces to find the body's closing brace. Braces inside comments or
+    // literals are not brace tokens, so they cannot affect this balance.
+    Index braceDepth = 1;
+    for (;;)
+    {
+        auto token = lexer.readToken();
+        if (token.is<EndOfFileToken>())
+            return false;
+        if (token.is<LBraceToken>())
+            ++braceDepth;
+        else if (token.is<RBraceToken>())
+            --braceDepth;
+
+        if (braceDepth == 0)
+        {
+            range.offsetStart = openingBrace.getLoc().getRaw();
+            range.offsetEnd = token.getLoc().getRaw();
+            return true;
+        }
+    }
+}
+
 List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
 {
     List<TextRange> resultRanges;
-    // Search the document and find all the spirv-asm blocks to exclude them from formatting.
+    // We exclude SPIR-V assembly bodies because clang-format does not parse their syntax.
+    // We find `spirv_asm` identifiers and balance the following brace tokens, so comment
+    // and literal contents cannot be mistaken for body delimiters.
     Lexer lexer;
     SourceManager manager;
     manager.initialize(nullptr, nullptr);
@@ -78,65 +115,22 @@ List<TextRange> extractFormattingExclusionRanges(UnownedStringSlice text)
     auto sourceView = manager.createSourceView(sourceFile, nullptr, SourceLoc());
     DiagnosticSink sink;
     NamePool namePool;
-    MemoryArena memory;
-    memory.init(1 << 16);
-    lexer.initialize(sourceView, &sink, &namePool, &memory);
+    RefPtr<TokenPool> tokenPool = new TokenPool();
+    lexer.initialize(sourceView, &sink, &namePool, tokenPool);
     for (;;)
     {
-        auto headerToken = lexer.lexToken();
-        if (headerToken.type == TokenType::EndOfFile)
+        auto token = lexer.readToken();
+        if (token.is<EndOfFileToken>())
             break;
-        if (headerToken.type != TokenType::Identifier ||
-            headerToken.getContent() != toSlice("spirv_asm"))
-        {
+        auto identifier = token.as<IdentifierToken>();
+        if (!identifier)
             continue;
-        }
+        if (identifier.getLogicalSpelling() != toSlice("spirv_asm"))
+            continue;
 
-        // We have found a spirv-asm block, now find the end of it.
-        int braceCounter = 0;
-        Token endToken;
-        Token startToken;
-        for (;;)
-        {
-            auto token = lexer.lexToken();
-            if (token.type == TokenType::EndOfFile)
-                break;
-            switch (token.type)
-            {
-            case TokenType::RBrace:
-                braceCounter--;
-                if (braceCounter == 0)
-                {
-                    endToken = token;
-                    goto breakLabel;
-                }
-                break;
-            case TokenType::LBrace:
-                {
-                    if (braceCounter == 0)
-                        startToken = token;
-                    braceCounter++;
-                }
-                break;
-            case TokenType::WhiteSpace:
-            case TokenType::LineComment:
-            case TokenType::BlockComment:
-            case TokenType::NewLine:
-                break;
-            default:
-                if (braceCounter == 0)
-                    goto breakLabel;
-                break;
-            }
-        }
-    breakLabel:;
-        if (endToken.type == TokenType::RBrace)
-        {
-            TextRange range;
-            range.offsetStart = startToken.getLoc().getRaw();
-            range.offsetEnd = endToken.getLoc().getRaw();
+        TextRange range;
+        if (_tryReadSpirvAsmBodyRange(lexer, range))
             resultRanges.add(range);
-        }
     }
     return resultRanges;
 }

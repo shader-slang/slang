@@ -2,6 +2,7 @@
 #ifndef SLANG_AST_BUILDER_H
 #define SLANG_AST_BUILDER_H
 
+#include "compiler-core/slang-token.h"
 #include "core/slang-memory-arena.h"
 #include "core/slang-type-traits.h"
 #include "slang-ast-all.h"
@@ -297,6 +298,12 @@ public:
     MemoryArena& getArena() { return m_arena; }
 
     NamePool* getNamePool() { return getSharedASTBuilder()->getNamePool(); }
+
+    /// Returns the lexical pool owned by this builder.
+    ///
+    /// Lexing, preprocessing, parsing, synthesis and deserialization for this AST use this
+    /// same pool. Its tokens remain valid until the builder is destroyed.
+    TokenPool* getTokenPool();
 
     template<typename T, typename... TArgs>
     SLANG_FORCE_INLINE T* getOrCreate(TArgs... args)
@@ -993,6 +1000,9 @@ protected:
 
     /// Cache for CapabilitySet::freeze() to avoid recreating identical CapabilitySetVal objects
     Dictionary<CapabilitySet, CapabilitySetVal*> m_capabilitySetCache;
+
+    /// The pool for lexemes and tokens allocated while constructing this builder's AST.
+    RefPtr<TokenPool> m_tokenPool;
 
     MemoryArena m_arena;
 };

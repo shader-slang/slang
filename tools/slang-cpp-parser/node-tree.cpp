@@ -92,7 +92,7 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
     {
         ClassLikeNode* classLikeNode = static_cast<ClassLikeNode*>(inScopeNode);
 
-        if (classLikeNode->m_super.hasContent())
+        if (classLikeNode->m_super.hasLogicalSpelling())
         {
             ScopeNode* parentScope = classLikeNode->m_parentScope;
             if (parentScope == nullptr)
@@ -103,7 +103,8 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
                 return SLANG_FAIL;
             }
 
-            Node* superNode = Node::lookup(parentScope, classLikeNode->m_super.getContent());
+            Node* superNode =
+                Node::lookup(parentScope, classLikeNode->m_super.getLogicalSpelling());
 
             if (!superNode)
             {
@@ -134,7 +135,7 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
                     sink->diagnose(
                         classLikeNode->m_name,
                         CPPDiagnostics::typeInDifferentTypeSet,
-                        classLikeNode->m_name.getContent(),
+                        classLikeNode->m_name.getLogicalSpelling(),
                         classLikeNode->m_typeSet->m_macroName,
                         superType->m_typeSet->m_macroName);
                     return SLANG_FAIL;

@@ -405,9 +405,10 @@ struct PreprocessedSegment
 /// Split a physical source file into the source segments represented by a literate input.
 List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager);
 
-/// Preprocess every segment while preserving their source-language directives and language version.
+/// Preprocess every segment into the selected pool, preserving directives and language version.
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
+    TokenPool* tokenPool,
     SlangLanguageVersion& ioLanguageVersion,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,
@@ -416,6 +417,8 @@ List<PreprocessedSegment> preprocessSourceSegments(
     PreprocessorHandler* preprocessorHandler);
 
 /// Parse all segments into one translation unit using its already-resolved effective language.
+///
+/// Requires every segment to use the lexical pool owned by `astBuilder`.
 void parsePreprocessedSegments(
     List<PreprocessedSegment> const& segments,
     ASTBuilder* astBuilder,

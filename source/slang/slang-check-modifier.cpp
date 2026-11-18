@@ -1302,7 +1302,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 getSink()->diagnose(Diagnostics::UnknownBuiltinName{
                     .name = nameExpr->value,
-                    .location = nameExpr->token.loc});
+                    .location = nameExpr->token.getLoc()});
                 return nullptr;
             }
 
@@ -1397,8 +1397,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
-            requirePreludeAttr->prelude =
-                getStringLiteralTokenValue(stringLitExpr->token, getSink());
+            requirePreludeAttr->prelude = stringLitExpr->value;
         }
         else
         {
@@ -2181,18 +2180,18 @@ Modifier* SemanticsVisitor::checkModifier(
 
     if (auto packOffsetModifier = as<HLSLPackOffsetSemantic>(m))
     {
-        if (!packOffsetModifier->registerName.getContent().startsWith("c"))
+        if (!packOffsetModifier->registerName.getLogicalSpelling().startsWith("c"))
         {
             getSink()->diagnose(Diagnostics::UnknownRegisterClass{
-                .className = packOffsetModifier->registerName.getContent(),
+                .className = packOffsetModifier->registerName.getLogicalSpelling(),
                 .location = packOffsetModifier->loc});
             return m;
         }
         auto uniformOffset =
-            stringToInt(packOffsetModifier->registerName.getContent().tail(1)) * 16;
-        if (packOffsetModifier->componentMask.getContentLength())
+            stringToInt(packOffsetModifier->registerName.getLogicalSpelling().tail(1)) * 16;
+        if (packOffsetModifier->componentMask.getLogicalSpellingLength())
         {
-            switch (packOffsetModifier->componentMask.getContent()[0])
+            switch (packOffsetModifier->componentMask.getLogicalSpelling()[0])
             {
             case 'x':
                 uniformOffset += 0;
@@ -2208,7 +2207,7 @@ Modifier* SemanticsVisitor::checkModifier(
                 break;
             default:
                 getSink()->diagnose(Diagnostics::InvalidComponentMask{
-                    .mask = packOffsetModifier->componentMask.getContent(),
+                    .mask = packOffsetModifier->componentMask.getLogicalSpelling(),
                     .location = packOffsetModifier->loc});
                 break;
             }
@@ -2696,12 +2695,12 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         {
             for (auto& stageToken : readModifier->stageNameTokens)
             {
-                String stageName = stageToken.getContent();
+                String stageName = stageToken.getLogicalSpelling();
                 if (!validStages.contains(stageName))
                 {
                     getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
                         .stageName = stageName,
-                        .location = stageToken.loc});
+                        .location = stageToken.getLoc()});
                 }
             }
         }
@@ -2711,12 +2710,12 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         {
             for (auto& stageToken : writeModifier->stageNameTokens)
             {
-                String stageName = stageToken.getContent();
+                String stageName = stageToken.getLogicalSpelling();
                 if (!validStages.contains(stageName))
                 {
                     getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
                         .stageName = stageName,
-                        .location = stageToken.loc});
+                        .location = stageToken.getLoc()});
                 }
             }
         }

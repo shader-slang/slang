@@ -277,9 +277,11 @@ List<SemanticToken> getSemanticTokens(
             {
                 if (attr->getKeywordName())
                 {
-                    SemanticToken token =
-                        _createSemanticToken(manager, attr->originalIdentifierToken.loc, nullptr);
-                    token.length = (int)attr->originalIdentifierToken.getContentLength();
+                    SemanticToken token = _createSemanticToken(
+                        manager,
+                        attr->originalIdentifierToken.getLoc(),
+                        nullptr);
+                    token.length = (int)attr->originalIdentifierToken.getLogicalSpellingLength();
                     token.type = SemanticTokenType::Type;
                     maybeInsertToken(token);
 
@@ -305,9 +307,12 @@ List<SemanticToken> getSemanticTokens(
             }
             else if (auto targetCase = as<TargetCaseStmt>(node))
             {
+                // A default label has no capability identifier to highlight.
+                if (!targetCase->capabilityToken)
+                    return;
                 SemanticToken token = _createSemanticToken(
                     manager,
-                    targetCase->capabilityToken.loc,
+                    targetCase->capabilityToken.getLoc(),
                     targetCase->capabilityToken.getName());
                 token.type = SemanticTokenType::EnumMember;
                 maybeInsertToken(token);
@@ -321,7 +326,7 @@ List<SemanticToken> getSemanticTokens(
                     {
                         SemanticToken token = _createSemanticToken(
                             manager,
-                            inst.opcode.token.loc,
+                            inst.opcode.token.getLoc(),
                             inst.opcode.token.getName());
                         token.type = SemanticTokenType::Function;
                         maybeInsertToken(token);
@@ -349,7 +354,7 @@ List<SemanticToken> getSemanticTokens(
                         {
                             SemanticToken token = _createSemanticToken(
                                 manager,
-                                operand.token.loc,
+                                operand.token.getLoc(),
                                 operand.token.getName());
                             token.type = operandTokenType;
                             maybeInsertToken(token);

@@ -657,7 +657,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitLabelStmt(LabelStmt* stmt)
     {
-        if (_isLocInRange(context, stmt->label.loc, stmt->label.getContent().getLength()))
+        if (_isLocInRange(context, stmt->label.getLoc(), stmt->label.getLogicalSpellingLength()))
             return true;
         return dispatchIfNotNull(stmt->innerStmt);
     }
@@ -865,7 +865,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                 if (_isLocInRange(
                         &context,
                         hlslSemantic->loc,
-                        hlslSemantic->name.getContentLength()))
+                        hlslSemantic->name.getLogicalSpellingLength()))
                 {
                     ASTLookupResult result;
                     result.path = context.nodePath;
@@ -879,8 +879,8 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
                 if (attribute->getKeywordName() &&
                     _isLocInRange(
                         &context,
-                        attribute->originalIdentifierToken.loc,
-                        attribute->originalIdentifierToken.getContentLength()))
+                        attribute->originalIdentifierToken.getLoc(),
+                        attribute->originalIdentifierToken.getLogicalSpellingLength()))
                 {
                     ASTLookupResult result;
                     result.path = context.nodePath;

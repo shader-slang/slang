@@ -21,3 +21,84 @@ if(NOT MSVC)
         DIRECTORY ${slang_SOURCE_DIR}
     )
 endif()
+
+# We compile the checked-in kind and type definitions because `slang-fiddle` links
+# `compiler-core`. The maintenance targets run after `slang-fiddle` is built; making either
+# target a prerequisite of `compiler-core` would introduce a dependency cycle.
+set(SLANG_LEXEME_DEFINITION_FILES
+    slang-lexeme-defs.h
+    slang-raw-lexeme-types.h
+    slang-token-types.h
+)
+list(
+    TRANSFORM SLANG_LEXEME_DEFINITION_FILES
+    PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/"
+    OUTPUT_VARIABLE SLANG_LEXEME_DEFINITION_HEADERS
+)
+list(
+    TRANSFORM SLANG_LEXEME_DEFINITION_HEADERS
+    APPEND ".fiddle"
+    OUTPUT_VARIABLE SLANG_LEXEME_DEFINITION_OUTPUTS
+)
+set(SLANG_LEXEME_DEFINITION_LUA "${CMAKE_CURRENT_SOURCE_DIR}/lexeme-defs.lua")
+
+add_custom_target(
+    regenerate-lexeme-definitions
+    COMMAND
+        $<TARGET_FILE:slang-fiddle> -i "${CMAKE_CURRENT_SOURCE_DIR}/" -o
+        "${CMAKE_CURRENT_SOURCE_DIR}/" ${SLANG_LEXEME_DEFINITION_FILES}
+    DEPENDS
+        slang-fiddle
+        ${SLANG_LEXEME_DEFINITION_HEADERS}
+        ${SLANG_LEXEME_DEFINITION_LUA}
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
+    COMMENT "Regenerating the checked-in lexeme definitions"
+    VERBATIM
+)
+
+# Fiddle can rewrite its input to update template markers. We give the check input copies
+# in the build directory so checking stale snapshots does not edit the checkout.
+set(SLANG_LEXEME_CHECK_DIRECTORY
+    "${CMAKE_CURRENT_BINARY_DIR}/lexeme-definitions-check/$<CONFIG>"
+)
+# We compare every template's output so extending the definition list also extends the check.
+set(SLANG_LEXEME_CHECK_COMMANDS)
+foreach(lexeme_definition_file IN LISTS SLANG_LEXEME_DEFINITION_FILES)
+    list(
+        APPEND
+        SLANG_LEXEME_CHECK_COMMANDS
+        COMMAND
+        ${CMAKE_COMMAND}
+        -E
+        compare_files
+        "${CMAKE_CURRENT_SOURCE_DIR}/${lexeme_definition_file}.fiddle"
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/${lexeme_definition_file}.fiddle"
+    )
+endforeach()
+add_custom_target(
+    check-lexeme-definitions
+    COMMAND
+        ${CMAKE_COMMAND} -E make_directory
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/input"
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output"
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different ${SLANG_LEXEME_DEFINITION_HEADERS}
+        ${SLANG_LEXEME_DEFINITION_LUA} "${SLANG_LEXEME_CHECK_DIRECTORY}/input/"
+    COMMAND
+        $<TARGET_FILE:slang-fiddle> -i "${SLANG_LEXEME_CHECK_DIRECTORY}/input/"
+        -o "${SLANG_LEXEME_CHECK_DIRECTORY}/output/"
+        ${SLANG_LEXEME_DEFINITION_FILES} ${SLANG_LEXEME_CHECK_COMMANDS}
+    DEPENDS
+        slang-fiddle
+        ${SLANG_LEXEME_DEFINITION_HEADERS}
+        ${SLANG_LEXEME_DEFINITION_LUA}
+        ${SLANG_LEXEME_DEFINITION_OUTPUTS}
+    WORKING_DIRECTORY ${slang_SOURCE_DIR}
+    COMMENT "Checking the checked-in lexeme definitions"
+    VERBATIM
+)
+set_target_properties(
+    regenerate-lexeme-definitions
+    check-lexeme-definitions
+    PROPERTIES FOLDER generated
+)

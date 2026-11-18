@@ -1099,10 +1099,9 @@ void ASTPrinter::addExpr(Expr* expr)
                 sb << " ";
 
             // Print opcode
-            if (inst.opcode.flavor == SPIRVAsmOperand::NamedValue &&
-                inst.opcode.token.type != TokenType::Unknown)
+            if (inst.opcode.flavor == SPIRVAsmOperand::NamedValue && inst.opcode.token)
             {
-                sb << inst.opcode.token.getContent();
+                sb << inst.opcode.token.getLogicalSpelling();
             }
             else
             {
@@ -1117,14 +1116,14 @@ void ASTPrinter::addExpr(Expr* expr)
                 switch (operand.flavor)
                 {
                 case SPIRVAsmOperand::Literal:
-                    if (operand.token.type != TokenType::Unknown)
-                        sb << operand.token.getContent();
+                    if (operand.token)
+                        sb << operand.token.getLogicalSpelling();
                     else
                         sb << operand.knownValue;
                     break;
 
                 case SPIRVAsmOperand::Id:
-                    sb << "%" << operand.token.getContent();
+                    sb << "%" << operand.token.getLogicalSpelling();
                     break;
 
                 case SPIRVAsmOperand::ResultMarker:
@@ -1132,7 +1131,7 @@ void ASTPrinter::addExpr(Expr* expr)
                     break;
 
                 case SPIRVAsmOperand::NamedValue:
-                    sb << operand.token.getContent();
+                    sb << operand.token.getLogicalSpelling();
                     break;
 
                 case SPIRVAsmOperand::SlangValue:

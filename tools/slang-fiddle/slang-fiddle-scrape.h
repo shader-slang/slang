@@ -23,19 +23,20 @@ class Node : public Val
 public:
 };
 
-// Grouping Tokens and Trivia
+// Fiddle shares token occurrences between its parser and syntax nodes. The mutable node adds
+// delimiter-skip information; `Token` represents the raw token and its attached trivia.
 
+/// A token occurrence with mutable bookkeeping shared by Fiddle's parser and syntax nodes.
 class TokenWithTriviaNode : public RefObject
 {
 public:
-    TokenType getType() const { return token.type; }
+    TokenType getTypeTag() const { return token.getTypeTag(); }
 
-    List<Token> leadingTrivia;
     Token token;
-    List<Token> trailingTrivia;
     Count skipCount = 0;
 };
 
+/// A shared handle to a token occurrence and Fiddle's delimiter-skip bookkeeping.
 struct TokenWithTrivia
 {
 public:
@@ -46,23 +47,35 @@ public:
     {
     }
 
-    SourceLoc const& getLoc() const { return node->token.loc; }
+    SourceLoc getLoc() const { return node->token.getLoc(); }
 
     Token const& getToken() const { return node->token; }
 
-    TokenType getType() const { return node ? node->getType() : TokenType::Unknown; }
+    TokenType getTypeTag() const { return node ? node->getTypeTag() : TokenType::Count; }
 
-    UnownedStringSlice getContent() const
+    UnownedStringSlice getLogicalSpelling() const
     {
-        return node ? node->token.getContent() : UnownedStringSlice();
+        return node ? node->token.getLogicalSpelling() : UnownedStringSlice();
     }
 
     Count getSkipCount() const { return node ? node->skipCount : 0; }
 
-    void setType(TokenType type) const { node->token.type = type; }
+    /// Consumes the first `>` of a `>>` token, leaving its second closer as lookahead.
+    ///
+    /// Requires a non-empty `OpRsh` value. Leading trivia is consumed with the first
+    /// closer; trailing trivia remains with the second closer at its original locations.
+    void consumeFirstGreater() const
+    {
+        SLANG_RELEASE_ASSERT(node);
+        SLANG_RELEASE_ASSERT(node->token);
+        auto token = node->token;
+        auto pool = token.getPool();
+        auto secondCloser = pool->createSecondGreaterToken(token.getRawToken().as<RawOpRsh>());
+        node->token = pool->createToken(secondCloser, {}, token.getTrailingTrivia().getObjects());
+    }
 
-    List<Token> const& getLeadingTrivia() const { return node->leadingTrivia; }
-    List<Token> const& getTrailingTrivia() const { return node->trailingTrivia; }
+    TriviaList getLeadingTrivia() const { return node->token.getLeadingTrivia(); }
+    TriviaList getTrailingTrivia() const { return node->token.getTrailingTrivia(); }
 
     operator TokenWithTriviaNode*() { return node; }
 
@@ -168,6 +181,11 @@ class LogicalNamespaceBase : public LogicalContainerDecl
 class LogicalModule : public LogicalNamespaceBase
 {
 public:
+    /// The pool for all files parsed into this module.
+    TokenPool* getTokenPool() const { return m_tokenPool; }
+
+private:
+    RefPtr<TokenPool> m_tokenPool = new TokenPool();
 };
 
 class LogicalNamespace : public LogicalNamespaceBase
@@ -351,12 +369,16 @@ T* findDecl(ContainerDecl* outerDecl, UnownedStringSlice const& name)
 }
 
 
+/// Parses one file's syntax and registers its declarations in `logicalModule`.
+///
+/// The returned tree borrows lexical storage from `logicalModule`'s pool, so the caller
+/// keeps that module alive while using the tree. Resolving the tree's source locations
+/// also requires the manager that owns `inputSourceView` to remain alive.
 RefPtr<SourceUnit> parseSourceUnit(
     SourceView* inputSourceView,
     LogicalModule* logicalModule,
     NamePool* namePool,
     DiagnosticSink* sink,
-    SourceManager* sourceManager,
     String outputFileName);
 
 bool hasAnyFiddleInvocations(SourceUnit* sourceUnit);

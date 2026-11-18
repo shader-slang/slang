@@ -140,6 +140,7 @@ class TargetCaseStmt : public ChildStmt
 {
     FIDDLE(...)
     FIDDLE() int32_t capability;
+    /// The named capability, or an empty token for a default label.
     FIDDLE() Token capabilityToken;
     FIDDLE() Stmt* body = nullptr;
 };

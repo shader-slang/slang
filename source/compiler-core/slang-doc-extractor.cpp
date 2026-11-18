@@ -6,6 +6,11 @@
 namespace Slang
 {
 
+// Documentation association searches backward or forward from a declaration through comments
+// and punctuation. We keep those atomic lexemes in one ordered sequence so the search can cross
+// token attachment boundaries without reconstructing a flattened view of tokens and their trivia.
+// Whitespace and newlines are omitted; line relationships come from the source file's line map.
+
 /* TODO(JS):
 
 * If Decls hand SourceRange, then we could use the range to simplify getting the Post markup, as
@@ -87,23 +92,46 @@ ranges.
     return comment;
 }
 
-static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
+/// Reads raw tokens and comments through EOF in input-location order.
+///
+/// Returns a sequence that retains the lexer's token pool and includes EOF.
+static LexemeList _readMarkupLexemes(Lexer& lexer)
 {
-    // Use a binary search to find the token
+    // We retain comments as searchable entries alongside raw tokens. We omit other trivia so
+    // comments on consecutive lines can occupy adjacent entries in the search sequence.
+    LexemeList lexemes(lexer.getTokenPool());
+    for (;;)
+    {
+        auto lexeme = lexer.readLexeme();
+        if (lexeme.is<RawToken>())
+            lexemes.add(lexeme);
+        else if (lexeme.is<CommentTrivia>())
+            lexemes.add(lexeme);
+
+        if (lexeme.is<RawEndOfFile>())
+            return lexemes;
+    }
+}
+
+/// Searches ordered lexemes after index zero for an exact `loc`, returning its index or -1.
+static Index _findLexemeIndex(SourceLoc loc, const Lexeme* lexemes, Index lexemeCount)
+{
+    // The lexemes are ordered by location, so we search for an exact declaration location
+    // without visiting every preceding comment and delimiter.
     Index lo = 0;
-    Index hi = numToks;
+    Index hi = lexemeCount;
 
     while (lo + 1 < hi)
     {
         const Index mid = (hi + lo) >> 1;
-        const Token& midToken = toks[mid];
+        const Lexeme& midLexeme = lexemes[mid];
 
-        if (midToken.loc == loc)
+        if (midLexeme.getLoc() == loc)
         {
             return mid;
         }
 
-        if (midToken.loc.getRaw() <= loc.getRaw())
+        if (midLexeme.getLoc().getRaw() <= loc.getRaw())
         {
             lo = mid;
         }
@@ -113,7 +141,6 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
         }
     }
 
-    // Not found
     return -1;
 }
 
@@ -132,28 +159,28 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
         return MarkupFlag::Before | MarkupFlag::IsBlock;
 
     case MarkupType::LineBangBefore:
-        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+        return MarkupFlag::Before | MarkupFlag::AllowsMultipleComments;
     case MarkupType::LineSlashBefore:
-        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+        return MarkupFlag::Before | MarkupFlag::AllowsMultipleComments;
     case MarkupType::OrdinaryLineBefore:
-        return MarkupFlag::Before | MarkupFlag::IsMultiToken;
+        return MarkupFlag::Before | MarkupFlag::AllowsMultipleComments;
 
     case MarkupType::LineBangAfter:
-        return MarkupFlag::After | MarkupFlag::IsMultiToken;
+        return MarkupFlag::After | MarkupFlag::AllowsMultipleComments;
     case MarkupType::LineSlashAfter:
-        return MarkupFlag::After | MarkupFlag::IsMultiToken;
+        return MarkupFlag::After | MarkupFlag::AllowsMultipleComments;
     case MarkupType::OrdinaryLineAfter:
-        return MarkupFlag::After | MarkupFlag::IsMultiToken;
+        return MarkupFlag::After | MarkupFlag::AllowsMultipleComments;
     }
 }
 
-/* static */ DocMarkupExtractor::MarkupType DocMarkupExtractor::findMarkupType(const Token& tok)
+/* static */ DocMarkupExtractor::MarkupType DocMarkupExtractor::findMarkupType(const Lexeme& lexeme)
 {
-    switch (tok.type)
+    switch (lexeme.getTypeTag())
     {
-    case TokenType::BlockComment:
+    case LexemeTypeTag::BlockComment:
         {
-            UnownedStringSlice slice = tok.getContent();
+            UnownedStringSlice slice = lexeme.getLogicalSpelling();
             if (slice.getLength() >= 3 && (slice[2] == '!' || slice[2] == '*'))
             {
                 return (slice.getLength() >= 4 && slice[3] == '<') ? MarkupType::BlockAfter
@@ -165,9 +192,9 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
             }
             break;
         }
-    case TokenType::LineComment:
+    case LexemeTypeTag::LineComment:
         {
-            UnownedStringSlice slice = tok.getContent();
+            UnownedStringSlice slice = lexeme.getLogicalSpelling();
             if (slice.getLength() >= 3)
             {
                 if (slice[2] == '!')
@@ -182,8 +209,9 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
                                : MarkupType::LineSlashBefore;
                 }
             }
-            return (tok.flags & TokenFlag::AtStartOfLine) != 0 ? MarkupType::OrdinaryLineBefore
-                                                               : MarkupType::OrdinaryLineAfter;
+            return (lexeme.getFlags() & TokenFlag::AtStartOfLine) != 0
+                       ? MarkupType::OrdinaryLineBefore
+                       : MarkupType::OrdinaryLineAfter;
             break;
         }
     default:
@@ -233,8 +261,8 @@ SlangResult DocMarkupExtractor::_extractMarkup(
     SourceView* sourceView = info.sourceView;
     SourceFile* sourceFile = sourceView->getSourceFile();
 
-    // Here we want to produce the text that is implied by the markup tokens.
-    // We want to removing surrounding markup, and to also keep appropriate indentation
+    // We assemble documentation text from the selected comment lexemes.
+    // We remove the comment delimiters and preserve indentation within the comment body.
 
     switch (foundMarkup.type)
     {
@@ -245,12 +273,12 @@ SlangResult DocMarkupExtractor::_extractMarkup(
             // We should only have a single line
             SLANG_ASSERT(foundMarkup.range.getCount() == 1);
 
-            const auto& tok = info.tokenList->m_tokens[foundMarkup.range.start];
-            uint32_t offset = sourceView->getRange().getOffset(tok.loc);
+            const auto& lexeme = info.lexemeList->getLexemes()[foundMarkup.range.start];
+            uint32_t offset = sourceView->getRange().getOffset(lexeme.getLoc());
 
             const UnownedStringSlice startLine = sourceFile->getLineContainingOffset(offset);
 
-            UnownedStringSlice content = tok.getContent();
+            UnownedStringSlice content = lexeme.getLogicalSpelling();
 
             // Split into lines
             List<UnownedStringSlice> lines;
@@ -269,16 +297,13 @@ SlangResult DocMarkupExtractor::_extractMarkup(
 
                 if (i == 0)
                 {
-                    if (startLine.isMemoryContained(line.begin()))
-                    {
-                        // For now we'll ignore tabs, and that the indent amount is, the amount of
-                        // *byte* NOTE! This is only appropriate for ASCII without tabs.
-                        maxIndent =
-                            _calcIndent(UnownedStringSlice(startLine.begin(), line.begin()));
-
-                        // Let's strip the start stuff
-                        line = removeStart(foundMarkup.type, line);
-                    }
+                    // The pool owns the logical spelling separately from the file bytes.
+                    // We measure indentation at the comment's physical position and remove
+                    // the opener from the logical text used for extraction.
+                    const char* commentBegin = sourceFile->getContent().begin() + offset;
+                    SLANG_RELEASE_ASSERT(startLine.isMemoryContained(commentBegin));
+                    maxIndent = _calcIndent(UnownedStringSlice(startLine.begin(), commentBegin));
+                    line = removeStart(foundMarkup.type, line);
                 }
 
                 if (i == linesCount - 1)
@@ -325,8 +350,8 @@ SlangResult DocMarkupExtractor::_extractMarkup(
             const auto& range = foundMarkup.range;
             for (Index i = range.start; i < range.end; ++i)
             {
-                const auto& tok = info.tokenList->m_tokens[i];
-                UnownedStringSlice line = tok.getContent();
+                const auto& lexeme = info.lexemeList->getLexemes()[i];
+                UnownedStringSlice line = lexeme.getLogicalSpelling();
                 line = removeStart(foundMarkup.type, line);
 
                 // If the first or last line are all white space, just ignore them
@@ -367,38 +392,41 @@ SlangResult DocMarkupExtractor::_extractMarkup(
 
 Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
 {
+    // We search in the direction selected by `location`, crossing balanced delimiters to
+    // avoid associating a declaration with comments inside a nested parameter or expression.
+    // At the declaration's delimiter depth, punctuation determines where a comment may begin.
     Index openCount = 0;
 
-    const TokenList& toks = *info.tokenList;
-    const Index tokIndex = info.tokenIndex;
+    const LexemeList& lexemes = *info.lexemeList;
+    const Index lexemeIndex = info.lexemeIndex;
 
     Index direction = isBefore(location) ? -1 : 1;
 
-    const Index count = toks.m_tokens.getCount();
-    for (Index i = tokIndex; i >= 0 && i < count; i += direction)
+    const Index count = lexemes.getLexemes().getCount();
+    for (Index i = lexemeIndex; i >= 0 && i < count; i += direction)
     {
-        const Token& tok = toks.m_tokens[i];
+        const Lexeme& lexeme = lexemes.getLexemes()[i];
 
-        switch (tok.type)
+        switch (lexeme.getTypeTag())
         {
-        case TokenType::LBrace:
-        case TokenType::LBracket:
-        case TokenType::LParent:
-        case TokenType::OpLess:
+        case LexemeTypeTag::LBrace:
+        case LexemeTypeTag::LBracket:
+        case LexemeTypeTag::LParent:
+        case LexemeTypeTag::OpLess:
             {
                 openCount += direction;
                 if (openCount < 0)
                     return -1;
                 break;
             }
-        case TokenType::RBracket:
+        case LexemeTypeTag::RBracket:
             {
                 openCount -= direction;
                 if (openCount < 0)
                     return -1;
                 break;
             }
-        case TokenType::OpGreater:
+        case LexemeTypeTag::OpGreater:
             {
                 if (location == Location::AfterGenericParam && openCount == 0)
                 {
@@ -411,7 +439,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
                 break;
             }
-        case TokenType::RParent:
+        case LexemeTypeTag::RParent:
             {
                 if (openCount == 0 && location == Location::AfterParam)
                 {
@@ -423,7 +451,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                     return -1;
                 break;
             }
-        case TokenType::RBrace:
+        case LexemeTypeTag::RBrace:
             {
                 // If we haven't hit a candidate yet before hitting } it's not going to work
                 if (location == Location::Before || location == Location::AfterEnumCase)
@@ -432,13 +460,13 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-        case TokenType::BlockComment:
-        case TokenType::LineComment:
+        case LexemeTypeTag::BlockComment:
+        case LexemeTypeTag::LineComment:
             {
                 if (openCount == 0)
                 {
                     // Determine the markup type
-                    const MarkupType markupType = findMarkupType(tok);
+                    const MarkupType markupType = findMarkupType(lexeme);
                     if (!m_searchInOrindaryComments &&
                         (markupType == MarkupType::OrdinaryBlockBefore ||
                          markupType == MarkupType::OrdinaryLineBefore))
@@ -457,7 +485,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
-        case TokenType::Comma:
+        case LexemeTypeTag::Comma:
             {
                 if (openCount == 0)
                 {
@@ -475,7 +503,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
                 break;
             }
-        case TokenType::Semicolon:
+        case LexemeTypeTag::Semicolon:
             {
                 // If we haven't hit a candidate yet it's not going to work
                 if (location == Location::Before)
@@ -496,22 +524,27 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     return -1;
 }
 
-/* static */ bool DocMarkupExtractor::_isTokenOnLineIndex(
+/* static */ bool DocMarkupExtractor::_isLexemeOnLineIndex(
     SourceView* sourceView,
     MarkupType type,
-    const Token& tok,
+    const Lexeme& lexeme,
     Index lineIndex)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
-    const int offset = sourceView->getRange().getOffset(tok.loc);
+    const int offset = sourceView->getRange().getOffset(lexeme.getLoc());
 
     auto const flags = getFlags(type);
 
     if (flags & MarkupFlag::IsBlock)
     {
-        // Either the start or the end of the block have to be on the specified line
+        // We accept a block comment when either end touches the requested line. The end
+        // location uses the physical spelling length: escaped newlines are absent from the
+        // logical spelling, but their bytes still separate the start and end in the input file.
+        const auto physicalLength = lexeme.getPhysicalSpellingLength();
+        SLANG_RELEASE_ASSERT(physicalLength <= UINT32_MAX - uint32_t(offset));
+        const auto endOffset = uint32_t(offset) + uint32_t(physicalLength);
         return sourceFile->isOffsetOnLine(offset, lineIndex) ||
-               sourceFile->isOffsetOnLine(offset + tok.charsCount, lineIndex);
+               sourceFile->isOffsetOnLine(endOffset, lineIndex);
     }
     else
     {
@@ -527,9 +560,9 @@ SlangResult DocMarkupExtractor::_findMarkup(
 {
     out.reset();
 
-    const auto& toks = info.tokenList->m_tokens;
+    const auto& lexemes = info.lexemeList->getLexemes();
 
-    // The starting token index
+    // We first locate a candidate comment by searching past balanced delimiters.
     Index startIndex = _findStartIndex(info, location);
     if (startIndex <= 0)
     {
@@ -540,7 +573,7 @@ SlangResult DocMarkupExtractor::_findMarkup(
     SourceFile* sourceFile = sourceView->getSourceFile();
 
     // Let's lookup the line index where this occurred
-    const int startOffset = sourceView->getRange().getOffset(toks[startIndex].loc);
+    const int startOffset = sourceView->getRange().getOffset(lexemes[startIndex].getLoc());
 
     // The line index that the markoff starts from
     Index lineIndex = sourceFile->calcLineIndexFromOffset(startOffset);
@@ -552,7 +585,7 @@ SlangResult DocMarkupExtractor::_findMarkup(
     const Index searchDirection = isBefore(location) ? -1 : 1;
 
     // Get the type and flags
-    const MarkupType type = findMarkupType(toks[startIndex]);
+    const MarkupType type = findMarkupType(lexemes[startIndex]);
     const MarkupFlags flags = getFlags(type);
 
     const MarkupFlag::Enum requiredFlag =
@@ -563,8 +596,8 @@ SlangResult DocMarkupExtractor::_findMarkup(
     }
 
 #if 0
-    // The token still isn't accepted, unless it's on the expected line
-    if (_isTokenOnLineIndex(info.sourceView, type, toks[startIndex], expectedLineIndex))
+    // The lexeme still isn't accepted, unless it's on the expected line.
+    if (_isLexemeOnLineIndex(info.sourceView, type, lexemes[startIndex], expectedLineIndex))
     {
         return SLANG_E_NOT_FOUND;
     }
@@ -573,7 +606,7 @@ SlangResult DocMarkupExtractor::_findMarkup(
     Index endIndex = startIndex;
 
     // If it's multiline, so look for the end index
-    if (flags & MarkupFlag::IsMultiToken)
+    if (flags & MarkupFlag::AllowsMultipleComments)
     {
         Index expectedLineIndex = lineIndex;
 
@@ -587,19 +620,19 @@ SlangResult DocMarkupExtractor::_findMarkup(
             expectedLineIndex += searchDirection;
             if (expectedLineIndex < 0)
                 break;
-            if (endIndex < 0 || endIndex >= toks.getCount())
+            if (endIndex < 0 || endIndex >= lexemes.getCount())
             {
                 break;
             }
 
-            // Do we find a token of the right type?
-            if (findMarkupType(toks[endIndex]) != type)
+            // Consecutive documentation lines must use the same comment style.
+            if (findMarkupType(lexemes[endIndex]) != type)
             {
                 break;
             }
 
             // Is it on the right line?
-            if (!_isTokenOnLineIndex(info.sourceView, type, toks[endIndex], expectedLineIndex))
+            if (!_isLexemeOnLineIndex(info.sourceView, type, lexemes[endIndex], expectedLineIndex))
             {
                 break;
             }
@@ -706,7 +739,7 @@ SlangResult DocMarkupExtractor::_findMarkup(
     case SearchStyle::Attribute:
         {
             FindInfo newInfo = info;
-            newInfo.tokenIndex -= 2;
+            newInfo.lexemeIndex -= 2;
             return _findMarkup(newInfo, Location::Before, out);
         }
     case SearchStyle::Variable:
@@ -724,7 +757,7 @@ SlangResult DocMarkupExtractor::_findMarkup(
 
 static void _calcLineVisibility(
     SourceView* sourceView,
-    const TokenList& toks,
+    const LexemeList& lexemes,
     List<MarkupVisibility>& outLineVisibility)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
@@ -735,11 +768,11 @@ static void _calcLineVisibility(
     MarkupVisibility lastVisibility = MarkupVisibility::Public;
     Index lastLine = 0;
 
-    for (const auto& tok : toks)
+    for (const auto& lexeme : lexemes)
     {
-        if (tok.type == TokenType::LineComment)
+        if (lexeme.getTypeTag() == LexemeTypeTag::LineComment)
         {
-            UnownedStringSlice contents = tok.getContent();
+            UnownedStringSlice contents = lexeme.getLogicalSpelling();
 
             MarkupVisibility newVisibility = lastVisibility;
 
@@ -764,7 +797,7 @@ static void _calcLineVisibility(
             if (newVisibility != lastVisibility)
             {
                 // Work up the line it's on
-                const int offset = sourceView->getRange().getOffset(tok.loc);
+                const int offset = sourceView->getRange().getOffset(lexeme.getLoc());
                 Index line = sourceFile->calcLineIndexFromOffset(offset);
 
                 // Fill in the span
@@ -880,10 +913,8 @@ SlangResult DocMarkupExtractor::extract(
     }
 
     {
-        TokenList tokens;
+        LexemeList lexemes;
         List<MarkupVisibility> lineVisibility;
-
-        MemoryArena memoryArena(4096);
 
         NamePool namePool;
 
@@ -914,19 +945,14 @@ SlangResult DocMarkupExtractor::extract(
                 viewIndex = entry.viewIndex;
                 sourceView = outViews[viewIndex];
 
-                // Make all memory free again
-                memoryArena.reset();
-
                 // Run the lexer
                 Lexer lexer;
-                lexer.initialize(sourceView, sink, &namePool, &memoryArena);
+                RefPtr<TokenPool> tokenPool = new TokenPool();
+                lexer.initialize(sourceView, sink, &namePool, tokenPool);
 
-                // Lex everything
-                tokens = lexer.lexAllMarkupTokens();
+                lexemes = _readMarkupLexemes(lexer);
 
-                // Let's work out the access
-
-                _calcLineVisibility(sourceView, tokens, lineVisibility);
+                _calcLineVisibility(sourceView, lexemes, lineVisibility);
             }
 
             dst.viewIndex = viewIndex;
@@ -934,8 +960,8 @@ SlangResult DocMarkupExtractor::extract(
             // Get the offset within the source file
             const uint32_t offset = entry.locOrOffset;
 
-            // We need to get the loc in the source views space, so we look up appropriately in the
-            // list of tokens (which uses the views loc range)
+            // We convert the file offset to a location in `sourceView`, matching the locations
+            // recorded by the lexer for the comment search.
             const SourceLoc loc = sourceView->getRange().getSourceLocFromOffset(offset);
 
             // Work out the line number
@@ -944,15 +970,17 @@ SlangResult DocMarkupExtractor::extract(
 
             dst.visibilty = lineVisibility[lineIndex];
 
-            // Okay, lets find the token index with a binary chop
-            Index tokenIndex =
-                _findTokenIndex(loc, tokens.m_tokens.getBuffer(), tokens.m_tokens.getCount());
-            if (tokenIndex >= 0 && lineIndex >= 0)
+            // We start the comment search at the declaration's exact lexeme location.
+            Index lexemeIndex = _findLexemeIndex(
+                loc,
+                lexemes.getLexemes().getBuffer(),
+                lexemes.getLexemes().getCount());
+            if (lexemeIndex >= 0 && lineIndex >= 0)
             {
                 FindInfo findInfo;
-                findInfo.tokenIndex = tokenIndex;
+                findInfo.lexemeIndex = lexemeIndex;
                 findInfo.lineIndex = lineIndex;
-                findInfo.tokenList = &tokens;
+                findInfo.lexemeList = &lexemes;
                 findInfo.sourceView = sourceView;
 
                 // Okay let's see if we extract some documentation then for this.

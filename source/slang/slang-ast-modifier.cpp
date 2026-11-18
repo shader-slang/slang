@@ -13,7 +13,7 @@ void printDiagnosticArg(StringBuilder& sb, Modifier* modifier)
     if (modifier->keywordName && modifier->keywordName->text.getLength())
         sb << modifier->keywordName->text;
     if (auto hlslSemantic = as<HLSLSemantic>(modifier))
-        sb << hlslSemantic->name.getContent();
+        sb << hlslSemantic->name.getLogicalSpelling();
     return;
 }
 

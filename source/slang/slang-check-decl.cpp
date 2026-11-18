@@ -15818,8 +15818,9 @@ Stmt* SemanticsVisitor::maybeParseStmt(Stmt* stmt, const SemanticsContext& conte
     {
         // Parse the statement now, and check it.
         SemanticsVisitor subVisitor(context);
-        TokenList tokenList;
-        tokenList.m_tokens = _Move(unparsedStmt->tokens);
+        TokenList tokenList(m_astBuilder->getTokenPool());
+        tokenList.setTokens(unparsedStmt->tokens);
+        unparsedStmt->tokens.clear();
         return parseUnparsedStmt(
             m_astBuilder,
             &subVisitor,
@@ -21850,7 +21851,7 @@ void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
     VarDeclBase* varDecl,
     HLSLRegisterSemantic* registerSemantic)
 {
-    auto registerName = registerSemantic->registerName.getContent();
+    auto registerName = registerSemantic->registerName.getLogicalSpelling();
     if (registerName.getLength() < 1)
     {
         getSink()->diagnose(Diagnostics::InvalidHlslRegisterName{

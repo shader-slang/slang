@@ -369,8 +369,8 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
 
             if (auto litExpr = as<LiteralExpr>(initExpr))
             {
-                if (litExpr->token.type != TokenType::Unknown)
-                    sb << " = " << litExpr->token.getContent();
+                if (litExpr->token)
+                    sb << " = " << litExpr->token.getLogicalSpelling();
                 else if (auto intLit = as<IntegerLiteralExpr>(litExpr))
                     sb << " = " << intLit->value;
             }
@@ -1060,8 +1060,8 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     else if (auto attr = as<Attribute>(leafNode))
     {
         fillDeclRefHoverInfo(makeDeclRef(attr->attributeDecl), nullptr);
-        hover.range.end.character =
-            hover.range.start.character + (int)attr->originalIdentifierToken.getContentLength();
+        hover.range.end.character = hover.range.start.character +
+                                    (int)attr->originalIdentifierToken.getLogicalSpellingLength();
     }
     if (sb.getLength() == 0)
     {
@@ -2757,7 +2757,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::tryGetMa
     for (auto& token : def->tokenList)
     {
         sb << " ";
-        sb << token.getContent();
+        sb << token.getLogicalSpelling();
     }
     sb << "\n```\n\n";
     auto humaneLoc =

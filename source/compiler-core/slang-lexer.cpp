@@ -21,79 +21,13 @@
 
 namespace Slang
 {
-Token TokenReader::getEndOfFileToken()
+Token TokenReader::readToken()
 {
-    return Token(TokenType::EndOfFile, UnownedStringSlice::fromLiteral(""), SourceLoc());
-}
-
-const Token* TokenList::begin() const
-{
-    SLANG_ASSERT(m_tokens.getCount());
-    return &m_tokens[0];
-}
-
-const Token* TokenList::end() const
-{
-    SLANG_ASSERT(m_tokens.getCount());
-    SLANG_ASSERT(m_tokens[m_tokens.getCount() - 1].type == TokenType::EndOfFile);
-    return &m_tokens[m_tokens.getCount() - 1];
-}
-
-TokenSpan::TokenSpan()
-    : m_begin(nullptr), m_end(nullptr)
-{
-}
-
-TokenReader::TokenReader()
-    : m_cursor(nullptr), m_end(nullptr)
-{
-    _updateLookaheadToken();
-}
-
-Token& TokenReader::peekToken()
-{
-    return m_nextToken;
-}
-
-TokenType TokenReader::peekTokenType() const
-{
-    return m_nextToken.type;
-}
-
-SourceLoc TokenReader::peekLoc() const
-{
-    return m_nextToken.loc;
-}
-
-Token TokenReader::advanceToken()
-{
-    Token result = m_nextToken;
+    Token result = peekToken();
     if (m_cursor != m_end)
-        m_cursor++;
+        ++m_cursor;
     _updateLookaheadToken();
     return result;
-}
-
-void TokenReader::_updateLookaheadToken()
-{
-    // We assume here that we can read a token from a non-null `m_cursor`
-    // *even* in the case where `m_cursor == m_end`, because the invariant
-    // for lists of tokens is that they should be terminated with and
-    // end-of-file token, so that there is always a token "one past the end."
-    //
-    m_nextToken = m_cursor ? *m_cursor : getEndOfFileToken();
-
-    // If the token we read came from the end of the sub-sequence we are
-    // reading, then we will change the token type to an end-of-file token
-    // so that code that reads from the sequence and expects a terminating
-    // EOF will find it.
-    //
-    // TODO: We might eventually want a way to look at the actual token type
-    // and not just use EOF in all cases: e.g., when emitting diagnostic
-    // messages that include the token that is seen.
-    //
-    if (m_cursor == m_end)
-        m_nextToken.type = TokenType::EndOfFile;
 }
 
 // Lexer
@@ -102,12 +36,14 @@ void Lexer::initialize(
     SourceView* sourceView,
     DiagnosticSink* sink,
     NamePool* namePool,
-    MemoryArena* memoryArena)
+    TokenPool* tokenPool)
 {
     m_sourceView = sourceView;
     m_sink = sink;
     m_namePool = namePool;
-    m_memoryArena = memoryArena;
+    SLANG_RELEASE_ASSERT(tokenPool);
+    m_tokenPool = tokenPool;
+    m_mode = LexerMode::Normal;
 
     auto content = sourceView->getContent();
 
@@ -151,28 +87,42 @@ static void diagnose(
     sink->diagnose(loc, info, args...);
 }
 
-// Get the next input byte, without any handling of
-// escaped newlines, non-ASCII code points, source locations, etc.
-static int _peekRaw(Lexer* lexer)
+// The byte cursor separates bounded input access from newline splicing and UTF-8
+// decoding. Peeking can copy this cursor without changing the lexer's state.
+struct RawByteCursor
 {
-    // If we are at the end of the input, return a designated end-of-file value
-    if (lexer->m_cursor == lexer->m_end)
-        return kEOF;
+    const char* position;
+    const char* end;
+};
 
-    // Otherwise, just look at the next byte
-    return *lexer->m_cursor;
+// Raw reads return an unsigned byte or EOF, including for a non-terminated buffer.
+static int _peekRawByte(const RawByteCursor& cursor, Index offset = 0)
+{
+    SLANG_RELEASE_ASSERT(offset >= 0);
+    if (offset >= cursor.end - cursor.position)
+        return kEOF;
+    return (unsigned char)cursor.position[offset];
 }
 
-// Read one input byte without any special handling (similar to `peekRaw`)
-static int _advanceRaw(Lexer* lexer)
+static int _readRawByte(RawByteCursor& cursor)
 {
-    // The logic here is basically the same as for `peekRaw()`,
-    // escape we advance `cursor` if we aren't at the end.
+    int result = _peekRawByte(cursor);
+    if (result != kEOF)
+        ++cursor.position;
+    return result;
+}
 
-    if (lexer->m_cursor == lexer->m_end)
-        return kEOF;
+static int _peekRawByte(const Lexer* lexer, Index offset = 0)
+{
+    return _peekRawByte(RawByteCursor{lexer->m_cursor, lexer->m_end}, offset);
+}
 
-    return *lexer->m_cursor++;
+static int _readRawByte(Lexer* lexer)
+{
+    RawByteCursor cursor{lexer->m_cursor, lexer->m_end};
+    int result = _readRawByte(cursor);
+    lexer->m_cursor = cursor.position;
+    return result;
 }
 
 static SourceLoc _getSourceLoc(const Lexer& lexer, const char* it)
@@ -214,186 +164,122 @@ static void _handleNewLineInner(Lexer* lexer, int c)
 {
     SLANG_ASSERT(c == '\n' || c == '\r');
 
-    int d = _peekRaw(lexer);
+    int d = _peekRawByte(lexer);
     if ((c ^ d) == ('\n' ^ '\r'))
     {
-        _advanceRaw(lexer);
+        _readRawByte(lexer);
     }
 }
 
-// Look ahead one code point, dealing with complications like
-// escaped newlines.
-static int _peek(Lexer* lexer, int offset = 0)
+// Reads a logical code point after removing backslash-newline pairs, using a space
+// for failed UTF-8 decoding so identifier and number scanning stop at the failed sequence.
+// Both lookahead and consumption use this procedure so they recognize identical input.
+// Only consumption supplies a diagnostic sink and commits the resulting cursor.
+static int _readCodePoint(
+    const Lexer* lexer,
+    RawByteCursor& cursor,
+    bool& hasLineSplice,
+    DiagnosticSink* sink)
 {
-    int pos = 0;
-    int c = kEOF;
-
-    do
+    // A backslash is ordinary input unless a newline immediately follows it.
+    // In particular, if it is the last byte, the raw peek returns EOF and we
+    // return the backslash without trying to inspect memory past the buffer.
+    int c;
+    for (;;)
     {
-        if (lexer->m_cursor + pos >= lexer->m_end)
-            return kEOF;
-
-        c = lexer->m_cursor[pos++];
-
-        while (c == '\\')
-        {
-            // We might have a backslash-escaped newline.
-            // Look at the next byte (if any) to see.
-            //
-            // Note(tfoley): We are assuming a null-terminated input here,
-            // so that we can safely look at the next byte without issue.
-            int d = lexer->m_cursor[pos++];
-            switch (d)
-            {
-            case '\r':
-            case '\n':
-                {
-                    // The newline was escaped, so return the code point after *that*
-                    int e = lexer->m_cursor[pos++];
-                    if ((d ^ e) == ('\r' ^ '\n'))
-                        c = lexer->m_cursor[pos++];
-                    else
-                        c = e;
-                    continue;
-                }
-            default:
-                break;
-            }
-
-            // Only continue this while loop in the case where we consumed
-            // some newlines
+        c = _readRawByte(cursor);
+        if (c != '\\')
             break;
-        }
-        if (isUtf8LeadingByte((Byte)c))
+        int next = _peekRawByte(cursor);
+        if (next != '\r' && next != '\n')
+            break;
+
+        // A splice removes one complete newline sequence, including CRLF or LFCR.
+        // We then try again because several splices can precede one code point.
+        _readRawByte(cursor);
+        if ((next ^ _peekRawByte(cursor)) == ('\r' ^ '\n'))
+            _readRawByte(cursor);
+        hasLineSplice = true;
+    }
+    if (c == kEOF)
+        return kEOF;
+
+    // UTF-8 decoding may request several bytes. A missing or non-continuation
+    // byte makes the sequence invalid; a non-continuation byte remains unread
+    // so that the next code point can still be recognized normally.
+    if (isUtf8LeadingByte((Byte)c))
+    {
+        --cursor.position;
+        const char* sequenceStart = cursor.position;
+        bool isInvalid = false;
+        auto codePoint = getUnicodePointFromUTF8(
+            [&]() -> unsigned char
+            {
+                int next = _peekRawByte(cursor);
+                if (next == kEOF)
+                    return 0;
+                if (cursor.position == sequenceStart)
+                    return (unsigned char)_readRawByte(cursor);
+                if (isUtf8ContinuationByte((Byte)next))
+                    return (unsigned char)_readRawByte(cursor);
+                return 0xFF;
+            },
+            &isInvalid);
+        // The shared decoder also accepts values outside Unicode. Lexical input
+        // requires Unicode scalar values; rejecting the wider range before an
+        // `int` conversion also keeps decoded input distinct from the EOF sentinel.
+        if (codePoint > 0x10FFFF)
+            isInvalid = true;
+        if (codePoint >= 0xD800 && codePoint <= 0xDFFF)
+            isInvalid = true;
+        if (isInvalid)
         {
-            // Consume all unicode characters.
-            pos--;
-            bool first{true};
-            bool invalid{};
-            c = getUnicodePointFromUTF8(
-                [&]() -> unsigned char
-                {
-                    if (lexer->m_cursor + pos >= lexer->m_end)
-                        return 0U;
-
-                    if (first || isUtf8ContinuationByte(lexer->m_cursor[pos]))
-                    {
-                        first = false;
-                        return static_cast<unsigned char>(lexer->m_cursor[pos++]);
-                    }
-
-                    // Current byte is not a continuation byte, so we don't
-                    // consume it. Instead, we'll just return a poison byte to
-                    // ensure that the current sequence is interpreted as
-                    // invalid.
-                    return 0xFFU; // always invalid UTF-8
-                },
-                &invalid);
-
-            // If the UTF-8 sequence is invalid, we'll return space,
-            // instead. This will be diagnosed in _advance().
-            if (invalid)
-                c = ' ';
+            // We have consumed the invalid bytes so the next read can make progress.
+            // The lexer still retains those bytes in the lexeme's physical spelling.
+            diagnose(
+                sink,
+                _getSourceLoc(*lexer, sequenceStart),
+                LexerDiagnostics::invalidUtf8ByteSequence,
+                _inputToByteSeq(sequenceStart, cursor.position).getBuffer());
+            return ' ';
         }
-        // Default case is to just hand along the byte we read as an ASCII code point.
-    } while (offset--);
+        c = int(codePoint);
+    }
 
-    // If we encounter a \0, return kEOF.
-    // if (c == 0)
-    //    return kEOF;
+    // A zero byte ends lexical input even when the containing view has more bytes.
+    if (c == 0)
+        cursor.position = cursor.end;
     return c;
 }
 
-// Get the next code point from the input, and advance the cursor.
+/// Returns the code point `offset` logical positions ahead, or `kEOF` at the view's end.
+///
+/// Requires `offset >= 0`. Lookahead leaves the cursor and diagnostics unchanged.
+static int _peek(Lexer* lexer, int offset = 0)
+{
+    RawByteCursor cursor{lexer->m_cursor, lexer->m_end};
+    bool hasLineSplice = false;
+    int result;
+    do
+    {
+        result = _readCodePoint(lexer, cursor, hasLineSplice, nullptr);
+    } while (offset--);
+    return result;
+}
+
+/// Reads a logical code point and advances the byte cursor, or returns `kEOF` at the view's end.
+///
+/// Failed UTF-8 decoding yields a recovery space. Diagnostics obey lexer suppression and limits.
+/// Removed line splices are recorded for the current lexeme's logical spelling.
 static int _advance(Lexer* lexer)
 {
-    // We are going to loop, but only as a way of handling
-    // escaped line endings.
-    for (;;)
-    {
-        // If we are at the end of the input, then the task is easy.
-        if (lexer->m_cursor >= lexer->m_end)
-            return kEOF;
-
-        // Look at the next raw byte, and decide what to do
-        int c = *lexer->m_cursor++;
-
-        if (c == '\\')
-        {
-            // We might have a backslash-escaped newline.
-            // Look at the next byte (if any) to see.
-            //
-            // Note(tfoley): We are assuming a null-terminated input here,
-            // so that we can safely look at the next byte without issue.
-            int d = *lexer->m_cursor;
-            switch (d)
-            {
-            case '\r':
-            case '\n':
-                // handle the end-of-line for our source location tracking
-                lexer->m_cursor++;
-                _handleNewLineInner(lexer, d);
-
-                lexer->m_tokenFlags |= TokenFlag::ScrubbingNeeded;
-
-                // Now try again, looking at the character after the
-                // escaped newline.
-                continue;
-
-            default:
-                break;
-            }
-        }
-
-        // Consume all unicode characters.
-        bool isInvalidStream = false;
-        if (isUtf8LeadingByte((Byte)c))
-        {
-            lexer->m_cursor--;
-            const char* seqStart = lexer->m_cursor;
-            bool invalid{};
-            c = getUnicodePointFromUTF8(
-                [&]() -> unsigned char
-                {
-                    if (lexer->m_cursor >= lexer->m_end)
-                    {
-                        isInvalidStream = true;
-                        return 0U;
-                    }
-
-                    if ((lexer->m_cursor == seqStart) || isUtf8ContinuationByte(*lexer->m_cursor))
-                        return static_cast<unsigned char>(*lexer->m_cursor++);
-
-                    // Current byte is not a continuation byte, so we don't
-                    // consume it. Instead, we'll just return a poison byte to
-                    // ensure that the current sequence is interpreted as
-                    // invalid.
-                    return 0xFFU; // always invalid UTF-8
-                },
-                &invalid);
-
-            // If the UTF-8 sequence is invalid, we'll interpret it as a space
-            // and diagnose.
-            if (invalid)
-            {
-                diagnose(
-                    lexer->m_sink,
-                    _getSourceLoc(*lexer, seqStart),
-                    LexerDiagnostics::invalidUtf8ByteSequence,
-                    _inputToByteSeq(seqStart, lexer->m_cursor).getBuffer());
-                c = ' ';
-            }
-        }
-
-        // If we encounter a \0, return kEOF, and move stream cursor to the end.
-        if (c == 0 || isInvalidStream)
-        {
-            lexer->m_cursor = lexer->m_end;
-        }
-
-        // Default case is to return the raw byte we saw.
-        return c;
-    }
+    RawByteCursor cursor{lexer->m_cursor, lexer->m_end};
+    bool hasLineSplice = false;
+    int result = _readCodePoint(lexer, cursor, hasLineSplice, lexer->getDiagnosticSink());
+    lexer->m_cursor = cursor.position;
+    if (hasLineSplice)
+        lexer->m_hasLineSpliceInCurrentLexeme = true;
+    return result;
 }
 
 static void _handleNewLine(Lexer* lexer)
@@ -795,7 +681,7 @@ IntegerLiteralValue getIntegerLiteralValue(
 {
     uint64_t value = 0;
 
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
 
     char const* cursor = content.begin();
     char const* end = content.end();
@@ -1141,7 +1027,7 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     bool& outPrecisionLost,
     UnownedStringSlice& outErrorContent)
 {
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
     const char* cursor = content.begin();
     const char* end = content.end();
 
@@ -1657,71 +1543,80 @@ static IntegerLiteralValue _decodeStringEscape(
     return value;
 }
 
-IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink)
+IntegerLiteralValue getCharLiteralValue(RawCharLiteral token, DiagnosticSink* sink)
 {
-    // See docs/language-reference/expressions-literal.md for the literal format.
+    SLANG_RELEASE_ASSERT(token);
+    UnownedStringSlice content = token.getLogicalSpelling();
 
-    UnownedStringSlice content = token.getContent();
-
-    // sanity check
+    // We require two quotes and at least one byte before decoding. The lexer can produce
+    // an incomplete character literal after diagnosing a newline or EOF inside it.
     if (content.getLength() < 3U)
     {
         diagnose(sink, token.getLoc(), LexerDiagnostics::illegalCharacterLiteral);
         return -1;
     }
+    SLANG_RELEASE_ASSERT(content[0] == '\'');
+    if (content.end()[-1] != '\'')
+    {
+        diagnose(sink, token.getLoc(), LexerDiagnostics::illegalCharacterLiteral);
+        return -1;
+    }
 
-    // unquoted begin/end pointers
-    const char* const b = content.begin() + 1;
-    const char* const e = content.end() - 1;
-    const char* cursor = b;
-    IntegerLiteralValue ret{};
+    // We decode exactly one escaped character or UTF-8 code point from the quoted body.
+    const char* const bodyBegin = content.begin() + 1;
+    const char* const bodyEnd = content.end() - 1;
+    const char* cursor = bodyBegin;
+    IntegerLiteralValue value{};
 
     if (*cursor == '\\')
     {
-        // handle escape
-        bool unicode{};
-        ret = _decodeStringEscape(cursor, e, sink, token.getLoc(), unicode);
+        bool isUnicodeEscape{};
+        value = _decodeStringEscape(cursor, bodyEnd, sink, token.getLoc(), isUnicodeEscape);
 
-        // note: unicode matters only with string literals
-        static_cast<void>(unicode);
+        // Both escape forms denote a code point in a character literal; only strings need
+        // to distinguish a single-byte escape from a Unicode escape when producing bytes.
+        static_cast<void>(isUnicodeEscape);
     }
     else
     {
-        bool invalid{};
-        ret = getUnicodePointFromUTF8(
-            [&cursor, e]() -> unsigned char
+        bool hasInvalidUtf8{};
+        value = getUnicodePointFromUTF8(
+            [&cursor, bodyEnd]() -> unsigned char
             {
-                if (cursor < e)
+                if (cursor < bodyEnd)
                     return static_cast<unsigned char>(*cursor++);
                 else
                 {
-                    // 0xFF is invalid byte anywhere in UTF-8, so this will
-                    // trigger an error in the decoder
+                    // We signal truncated UTF-8 to the decoder with an invalid UTF-8 byte
+                    // instead of reading beyond the literal's body.
                     return 0xFFU;
                 }
             },
-            &invalid);
+            &hasInvalidUtf8);
 
-        if (invalid)
+        if (hasInvalidUtf8)
         {
             diagnose(
                 sink,
                 token.getLoc(),
                 LexerDiagnostics::invalidUtf8ByteSequence,
-                _inputToByteSeq(b, cursor).getBuffer());
+                _inputToByteSeq(bodyBegin, cursor).getBuffer());
 
-            ret = -1;
+            value = -1;
         }
     }
 
-    // did we consume everything? (and we haven't diagnosed yet)
-    if ((cursor != e) && (ret != -1))
+    // A valid character literal contains no bytes after the first decoded character.
+    // An escape or UTF-8 diagnostic already accounts for a failed decode.
+    if (value == -1)
+        return value;
+    if (cursor != bodyEnd)
     {
         diagnose(sink, token.getLoc(), LexerDiagnostics::illegalCharacterLiteral);
-        ret = -1;
+        value = -1;
     }
 
-    return ret;
+    return value;
 }
 
 // We use string literals in places where we don't do string escaping other than
@@ -1828,53 +1723,73 @@ static void _lexRawStringLiteralBody(Lexer* lexer)
     }
 }
 
-UnownedStringSlice getRawStringLiteralTokenValue(Token const& token)
+/// Returns a raw string's body without decoding escapes, or an empty slice for missing or
+/// mismatched delimiters.
+///
+/// Requires a non-empty `token` whose logical spelling starts with `R"`.
+static UnownedStringSlice getRawStringLiteralTokenValue(RawStringLiteral token)
 {
-    auto content = token.getContent();
-    if (content.getLength() <= 5)
-        return UnownedStringSlice();
-    auto start = content.begin() + 2;
-    auto delimEnd = start;
-    while (delimEnd < content.end() && *delimEnd != '(')
-        delimEnd++;
-    auto delimLength = delimEnd - start;
-    auto contentEnd = content.end() - delimLength - 2;
-    auto contentBegin = start + delimLength + 1;
-    if (contentEnd <= contentBegin)
-        return UnownedStringSlice();
-    return UnownedStringSlice(contentBegin, contentEnd);
+    // We check both delimiters in a raw string such as `R"tag(body)tag"` before slicing its body.
+    // The lexer can also produce a string token for incomplete text.
+    SLANG_RELEASE_ASSERT(token);
+    auto content = token.getLogicalSpelling();
+    SLANG_RELEASE_ASSERT(content.startsWith("R\""));
+    auto delimiterBegin = content.begin() + 2;
+    auto openingParenthesis = delimiterBegin;
+    while (openingParenthesis != content.end())
+    {
+        if (*openingParenthesis == '(')
+            break;
+        ++openingParenthesis;
+    }
+    if (openingParenthesis == content.end())
+        return {};
+
+    // The closing spelling is ')' followed by the opening delimiter and a quote. We first
+    // require enough remaining bytes, then compare each part of that closing spelling.
+    auto delimiter = UnownedStringSlice(delimiterBegin, openingParenthesis);
+    auto bodyBegin = openingParenthesis + 1;
+    auto closingLength = delimiter.getLength() + 2;
+    if (content.end() - bodyBegin < closingLength)
+        return {};
+    auto closingBegin = content.end() - closingLength;
+    if (*closingBegin != ')')
+        return {};
+    if (content.end()[-1] != '"')
+        return {};
+    if (UnownedStringSlice(closingBegin + 1, content.end() - 1) != delimiter)
+        return {};
+    return UnownedStringSlice(bodyBegin, closingBegin);
 }
 
-String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
+String getStringLiteralTokenValue(RawStringLiteral token, DiagnosticSink* sink)
 {
-    SLANG_ASSERT(token.type == TokenType::StringLiteral || token.type == TokenType::CharLiteral);
-
-    if (token.getContent().startsWith("R"))
+    // We remove raw-string delimiters without interpreting the body. Ordinary strings
+    // instead decode each character or escape between their quotes.
+    SLANG_RELEASE_ASSERT(token);
+    if (token.getLogicalSpelling().startsWith("R\""))
         return getRawStringLiteralTokenValue(token);
 
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
 
     char const* cursor = content.begin();
     char const* end = content.end();
 
-    // The token's content slice is a precise view of the lexed source text.
-    // For an unterminated literal (newline / EOF inside a string), the lexer
-    // emits a diagnostic but still produces a token whose content slice ends
-    // before any closing quote. Every cursor advance below must therefore be
-    // gated on `cursor < end` to avoid an out-of-bounds read into the
-    // surrounding heap (#11278).
+    // The lexer returns a string token even when newline or EOF interrupts the literal.
+    // We stop at the end of its content when no closing quote exists, returning the decoded
+    // prefix without reading bytes from the following lexeme or beyond the input buffer.
     if (cursor == end)
         return String();
 
     auto quote = *cursor++;
-    SLANG_ASSERT(quote == '\'' || quote == '"');
+    SLANG_RELEASE_ASSERT(quote == '"');
 
     StringBuilder valueBuilder;
     while (cursor < end)
     {
         auto c = *cursor;
 
-        // If we see a closing quote, then we are at the end of the string literal
+        // The lexer ends the token at its closing quote, so no content may follow it.
         if (c == quote)
         {
             ++cursor;
@@ -1882,8 +1797,7 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
             return valueBuilder.produceString();
         }
 
-        // Characters that don't being escape sequences are easy;
-        // just append them to the buffer and move on.
+        // Ordinary characters already have their final byte spelling.
         if (c != '\\')
         {
             ++cursor;
@@ -1891,66 +1805,63 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
             continue;
         }
 
-        // decode escape sequence
-        bool unicode{};
-        IntegerLiteralValue charValue =
-            _decodeStringEscape(cursor, end, sink, token.getLoc(), unicode);
+        // Byte escapes contribute one code unit; Unicode escapes are encoded as UTF-8.
+        bool isUnicodeEscape{};
+        IntegerLiteralValue characterValue =
+            _decodeStringEscape(cursor, end, sink, token.getLoc(), isUnicodeEscape);
 
-        if (charValue >= 0)
+        if (characterValue >= 0)
         {
-            if (!unicode)
+            if (!isUnicodeEscape)
             {
-                // single byte
-                if (charValue <= 255)
+                if (characterValue <= 255)
                 {
-                    valueBuilder.append(static_cast<char>(charValue));
+                    valueBuilder.append(static_cast<char>(characterValue));
                 }
                 else
                 {
-                    String hexSB;
-                    hexSB.append(charValue, 16);
+                    String hexadecimalValue;
+                    hexadecimalValue.append(characterValue, 16);
                     diagnose(
                         sink,
                         token.getLoc(),
                         LexerDiagnostics::outOfRangeCodeUnit,
-                        charValue,
-                        hexSB.getBuffer());
+                        characterValue,
+                        hexadecimalValue.getBuffer());
                 }
             }
             else
             {
-                char buffer[4]{};
-                size_t numBytes = encodeUnicodePointToUTF8(static_cast<Char32>(charValue), buffer);
-                SLANG_ASSERT(numBytes <= 4);
+                char utf8Bytes[4]{};
+                size_t byteCount =
+                    encodeUnicodePointToUTF8(static_cast<Char32>(characterValue), utf8Bytes);
+                SLANG_ASSERT(byteCount <= 4);
 
-                if (numBytes >= 1)
+                if (byteCount >= 1)
                 {
-                    valueBuilder.append(buffer, numBytes);
+                    valueBuilder.append(utf8Bytes, byteCount);
                 }
                 else
                 {
-                    String hexSB;
-                    hexSB.append(charValue, 16);
+                    String hexadecimalValue;
+                    hexadecimalValue.append(characterValue, 16);
                     diagnose(
                         sink,
                         token.getLoc(),
                         LexerDiagnostics::outOfRangeCodePointForUtf8,
-                        charValue,
-                        hexSB.getBuffer());
+                        characterValue,
+                        hexadecimalValue.getBuffer());
                 }
             }
         }
     }
 
-    // Unterminated literal: return what we have built so far rather than
-    // continuing to read past `end`. The lexer has already emitted a
-    // diagnostic for the unterminated literal at this point.
     return valueBuilder.produceString();
 }
 
 String getFileNameTokenValue(Token const& token)
 {
-    const UnownedStringSlice content = token.getContent();
+    const UnownedStringSlice content = token.getLogicalSpelling();
 
     // A file name usually doesn't process escape sequences
     // (this is import on Windows, where `\\` is a valid
@@ -1963,9 +1874,48 @@ String getFileNameTokenValue(Token const& token)
     return String(content.begin() + 1, content.end() - 1);
 }
 
-static TokenType _lexTokenImpl(Lexer* lexer)
+// Angle-bracket-enclosed header names use preprocessing spelling rules: slashes and quotes inside
+// an angle-delimited name are ordinary path characters, and no physical newline may terminate a
+// valid name. The caller selects this context before reading '<'.
+static TokenType _readAngleBracketHeaderName(Lexer* lexer)
+{
+    _advance(lexer);
+    for (;;)
+    {
+        const auto next = _peek(lexer);
+        if (next == '>')
+        {
+            _advance(lexer);
+            return TokenType::AngleBracketHeaderName;
+        }
+        if (next == kEOF)
+        {
+            diagnose(
+                lexer->getDiagnosticSink(),
+                _getSourceLoc(lexer),
+                LexerDiagnostics::endOfFileInLiteral);
+            return TokenType::Invalid;
+        }
+        if (next == '\r' || next == '\n')
+        {
+            diagnose(
+                lexer->getDiagnosticSink(),
+                _getSourceLoc(lexer),
+                LexerDiagnostics::newlineInLiteral);
+            return TokenType::Invalid;
+        }
+        _advance(lexer);
+    }
+}
+
+static LexemeTypeTag _readLexemeTypeTag(Lexer* lexer)
 {
     int nextCodePoint = _peek(lexer);
+    if (lexer->m_mode == LexerMode::ExpectingAngleBracketHeaderName)
+    {
+        if (nextCodePoint == '<')
+            return _readAngleBracketHeaderName(lexer);
+    }
     switch (nextCodePoint)
     {
     default:
@@ -2470,187 +2420,175 @@ static TokenType _lexTokenImpl(Lexer* lexer)
     }
 }
 
-Token Lexer::lexToken()
+// A splice beginning at an atomic boundary is its own trivia lexeme. Looking
+// only at raw bytes distinguishes that boundary from the character after it.
+static bool _isAtStartOfEscapedNewLine(const Lexer* lexer)
 {
-    for (;;)
+    if (_peekRawByte(lexer) != '\\')
+        return false;
+    int next = _peekRawByte(lexer, 1);
+    return next == '\r' || next == '\n';
+}
+
+// We identify trivia without invoking the token recognizer. In particular,
+// looking for trivia after "include" must leave an adjacent '<' untouched so
+// the preprocessor can select angle-bracket header recognition before reading that operand.
+static bool _isAtStartOfTrivia(Lexer* lexer)
+{
+    if (_isAtStartOfEscapedNewLine(lexer))
+        return true;
+    const int c = _peek(lexer);
+    switch (c)
     {
-        Token token;
-        token.loc = _getSourceLoc(this);
-
-        char const* textBegin = m_cursor;
-
-        auto tokenType = _lexTokenImpl(this);
-
-        // The flags on the token we just lexed will be based
-        // on the current state of the lexer.
-        //
-        auto tokenFlags = m_tokenFlags;
-        //
-        // Depending on what kind of token we just lexed, the
-        // flags that will be used for the *next* token might
-        // need to be updated.
-        //
-        switch (tokenType)
+    case ' ':
+    case '\t':
+    case '\r':
+    case '\n':
+        return true;
+    case '/':
         {
-        case TokenType::NewLine:
-            {
-                // If we just reached the end of a line, then the next token
-                // should count as being at the start of a line, and also after
-                // whitespace.
-                //
-                m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
-                break;
-            }
-
-        case TokenType::WhiteSpace:
-        case TokenType::BlockComment:
-        case TokenType::LineComment:
-            {
-                // True horizontal whitespace and comments both count as whitespace.
-                //
-                // Note that a line comment does not include the terminating newline,
-                // we do not need to set `AtStartOfLine` here.
-                //
-                m_tokenFlags |= TokenFlag::AfterWhitespace;
-                break;
-            }
-
-        default:
-            {
-                // If we read some token other then the above cases, then we are
-                // neither after whitespace nor at the start of a line.
-                //
-                m_tokenFlags = 0;
-                break;
-            }
+            const int next = _peek(lexer, 1);
+            if (next == '/')
+                return true;
+            return next == '*';
         }
+    default:
+        break;
+    }
+    return false;
+}
 
-        token.type = tokenType;
-        token.flags = tokenFlags;
+Lexeme Lexer::readLexeme()
+{
+    // Recognition uses logical characters, but we retain the complete byte span
+    // consumed from the `SourceView`. A splice at a lexeme boundary is its own
+    // trivia item; splices inside a token remain part of that token's physical spelling.
+    m_hasLineSpliceInCurrentLexeme = false;
+    const auto loc = _getSourceLoc(this);
+    const auto textBegin = m_cursor;
+    auto kind = TokenType::Count;
+    if (_isAtStartOfEscapedNewLine(this))
+    {
+        _readRawByte(this);
+        int newline = _readRawByte(this);
+        _handleNewLineInner(this, newline);
+        kind = TokenType::EscapedNewLine;
+    }
+    if (kind == TokenType::Count)
+        kind = _readLexemeTypeTag(this);
 
-        char const* textEnd = m_cursor;
+    const auto flags = m_tokenFlags;
+    switch (kind)
+    {
+    case TokenType::NewLine:
+        m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+        break;
+    case TokenType::WhiteSpace:
+    case TokenType::BlockComment:
+    case TokenType::LineComment:
+        m_tokenFlags |= TokenFlag::AfterWhitespace;
+        break;
+    case TokenType::EscapedNewLine:
+        // A splice disappears from the logical input, so it changes neither
+        // line-start context nor the whitespace separating neighboring tokens.
+        break;
+    default:
+        m_tokenFlags = 0;
+        break;
+    }
 
-        // Note(tfoley): `StringBuilder::Append()` seems to crash when appending zero bytes
-        if (textEnd != textBegin)
+    // We only allocate a temporary logical spelling when recognition crossed a
+    // splice. The pool then stores a stable copy and interns the full lexical state.
+    const UnownedStringSlice physicalSpelling(textBegin, m_cursor);
+    auto logicalSpelling = physicalSpelling;
+    StringBuilder scrubbed;
+    if (kind == TokenType::EscapedNewLine)
+    {
+        logicalSpelling = UnownedStringSlice();
+    }
+    else if (m_hasLineSpliceInCurrentLexeme)
+    {
+        for (auto cursor = textBegin; cursor < m_cursor;)
         {
-            // "scrubbing" token value here to remove escaped newlines...
-            //
-            // Only perform this work if we encountered an escaped newline
-            // while lexing this token (e.g., keep a flag on the lexer), or
-            // do it on-demand when the actual value of the token is needed.
-            if (tokenFlags & TokenFlag::ScrubbingNeeded)
+            if (*cursor == '\\')
             {
-                // Allocate space that will always be more than enough for stripped contents
-                char* startDst = (char*)m_memoryArena->allocateUnaligned(textEnd - textBegin);
-                char* dst = startDst;
-
-                auto tt = textBegin;
-                while (tt != textEnd)
+                if (cursor + 1 < m_cursor)
                 {
-                    char c = *tt++;
-                    if (c == '\\')
+                    const auto next = cursor[1];
+                    if (next == '\r' || next == '\n')
                     {
-                        char d = *tt;
-                        switch (d)
+                        cursor += 2;
+                        if (cursor < m_cursor)
                         {
-                        case '\r':
-                        case '\n':
-                            {
-                                tt++;
-                                char e = *tt;
-                                if ((d ^ e) == ('\r' ^ '\n'))
-                                {
-                                    tt++;
-                                }
-                            }
-                            continue;
-
-                        default:
-                            break;
+                            if ((next ^ *cursor) == ('\r' ^ '\n'))
+                                ++cursor;
                         }
+                        continue;
                     }
-                    *dst++ = c;
                 }
-                token.setContent(UnownedStringSlice(startDst, dst));
             }
-            else
-            {
-                token.setContent(UnownedStringSlice(textBegin, textEnd));
-            }
+            scrubbed.appendChar(*cursor++);
         }
+        logicalSpelling = scrubbed.getUnownedSlice();
+    }
 
-        if (m_namePool)
+    Name* name = nullptr;
+    if (m_namePool)
+    {
+        if (kind == TokenType::Identifier || kind == TokenType::CompletionRequest)
+            name = m_namePool->getName(logicalSpelling);
+    }
+    return m_tokenPool->createLexeme(kind, physicalSpelling, logicalSpelling, loc, flags, name);
+}
+
+Token Lexer::readToken()
+{
+    // Each trivia item belongs to one cluster. Leading trivia includes blank
+    // lines left after the preceding token's first trailing newline; EOF is a
+    // normal zero-width token that can own that remaining trivia.
+    List<const LexemeObj*> leading;
+    while (_isAtStartOfTrivia(this))
+        leading.add(readLexeme().getObject());
+    const auto rawToken = readLexeme().as<RawToken>();
+    SLANG_RELEASE_ASSERT(rawToken);
+
+    // We stop immediately after the first explicit newline. Embedded newlines
+    // do not split a block comment, and escaped newlines do not end directives.
+    List<const LexemeObj*> trailing;
+    if (rawToken.getTypeTag() != TokenType::EndOfFile)
+    {
+        while (_isAtStartOfTrivia(this))
         {
-            if (tokenType == TokenType::Identifier || tokenType == TokenType::CompletionRequest)
-            {
-                token.setName(m_namePool->getName(token.getContent()));
-            }
+            auto trivia = readLexeme();
+            trailing.add(trivia.getObject());
+            if (trivia.getTypeTag() == TokenType::NewLine)
+                break;
         }
+    }
+    return m_tokenPool->createToken(rawToken, leading.getArrayView(), trailing.getArrayView());
+}
 
-        return token;
+TokenList Lexer::readAllTokens()
+{
+    TokenList tokens(m_tokenPool);
+    for (;;)
+    {
+        auto token = readToken();
+        tokens.add(token);
+        if (token.getTypeTag() == TokenType::EndOfFile)
+            return tokens;
     }
 }
 
-TokenList Lexer::lexAllSemanticTokens()
+LexemeList Lexer::readAllLexemes()
 {
-    TokenList tokenList;
+    LexemeList lexemes(m_tokenPool);
     for (;;)
     {
-        Token token = lexToken();
-
-        // We are only interested intokens that are semantically
-        // significant, so we will skip over forms of whitespace
-        // and comments.
-        //
-        switch (token.type)
-        {
-        default:
-            break;
-
-        case TokenType::WhiteSpace:
-        case TokenType::BlockComment:
-        case TokenType::LineComment:
-        case TokenType::NewLine:
-            continue;
-        }
-
-        tokenList.add(token);
-        if (token.type == TokenType::EndOfFile)
-            return tokenList;
-    }
-}
-
-TokenList Lexer::lexAllMarkupTokens()
-{
-    TokenList tokenList;
-    for (;;)
-    {
-        Token token = lexToken();
-        switch (token.type)
-        {
-        default:
-            break;
-
-        case TokenType::WhiteSpace:
-        case TokenType::NewLine:
-            continue;
-        }
-
-        tokenList.add(token);
-        if (token.type == TokenType::EndOfFile)
-            return tokenList;
-    }
-}
-
-TokenList Lexer::lexAllTokens()
-{
-    TokenList tokenList;
-    for (;;)
-    {
-        Token token = lexToken();
-        tokenList.add(token);
-        if (token.type == TokenType::EndOfFile)
-            return tokenList;
+        auto lexeme = readLexeme();
+        lexemes.add(lexeme);
+        if (lexeme.getTypeTag() == TokenType::EndOfFile)
+            return lexemes;
     }
 }
 
@@ -2666,27 +2604,28 @@ TokenList Lexer::lexAllTokens()
 
     DiagnosticSink sink(&sourceManager, nullptr);
 
-    MemoryArena arena;
-
     NamePool namePool;
 
-    lexer.initialize(sourceView, &sink, &namePool, &arena);
+    RefPtr<TokenPool> tokenPool = new TokenPool();
+    lexer.initialize(sourceView, &sink, &namePool, tokenPool);
 
-    Token tok = lexer.lexToken();
+    auto lexeme = lexer.readLexeme();
 
-    if (tok.type == TokenType::Invalid)
+    if (lexeme.getTypeTag() == TokenType::Invalid)
     {
         return UnownedStringSlice();
     }
 
-    const int offset = sourceView->getRange().getOffset(tok.loc);
+    const int offset = sourceView->getRange().getOffset(lexeme.getLoc());
 
     if (offset < 0 || offset >= in.getLength())
         return UnownedStringSlice();
-    if (Index(offset + tok.charsCount) > in.getLength())
+    if (Index(offset + lexeme.getPhysicalSpellingLength()) > in.getLength())
         return UnownedStringSlice();
 
-    return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
+    return UnownedStringSlice(
+        in.begin() + offset,
+        in.begin() + offset + lexeme.getPhysicalSpellingLength());
 }
 
 SourceLoc Lexer::findNextLineEnd(SourceLoc from, UInt& lineCount) const

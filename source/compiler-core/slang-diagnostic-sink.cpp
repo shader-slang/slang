@@ -67,12 +67,22 @@ void printDiagnosticArg(StringBuilder& sb, TokenType tokenType)
 
 void printDiagnosticArg(StringBuilder& sb, Token const& token)
 {
-    sb << token.getContent();
+    sb << token.getLogicalSpelling();
 }
 
 SourceLoc getDiagnosticPos(Token const& token)
 {
-    return token.loc;
+    return token.getLoc();
+}
+
+void printDiagnosticArg(StringBuilder& sb, Lexeme const& lexeme)
+{
+    sb << lexeme.getLogicalSpelling();
+}
+
+SourceLoc getDiagnosticPos(Lexeme const& lexeme)
+{
+    return lexeme.getLoc();
 }
 
 // Take the format string for a diagnostic message, along with its arguments, and turn it into a

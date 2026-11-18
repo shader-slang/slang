@@ -63,7 +63,6 @@ public:
             logicalModule,
             &namePool,
             &sink,
-            &sourceManager,
             outputFileName);
     }
 

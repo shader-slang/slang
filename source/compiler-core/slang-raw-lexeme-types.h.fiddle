@@ -1,0 +1,537 @@
+// GENERATED CODE; DO NOT EDIT
+//
+// input file: slang-raw-lexeme-types.h
+
+// BEGIN FIDDLE TEMPLATE OUTPUT:
+#ifdef FIDDLE_GENERATED_OUTPUT_ID
+
+#if FIDDLE_GENERATED_OUTPUT_ID == 0
+// This fragment defines typed atomic lexemes without adding stored state.
+// `slang-token.h` includes it inside `namespace Slang` after `Lexeme` and the descriptors.
+/// An atomic lexeme in the `Token` class.
+struct RawToken : Lexeme
+{
+    static constexpr LexemeType type = LexemeTypes::Token;
+};
+
+/// An atomic lexeme in the `AngleBracketHeaderName` class.
+struct RawAngleBracketHeaderName : RawToken
+{
+    static constexpr LexemeType type = LexemeTypes::AngleBracketHeaderName;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::AngleBracketHeaderName;
+};
+
+/// An atomic lexeme in the `EndOfDirective` class.
+struct RawEndOfDirective : RawToken
+{
+    static constexpr LexemeType type = LexemeTypes::EndOfDirective;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::EndOfDirective;
+};
+
+/// An atomic lexeme in the `EndOfFile` class.
+struct RawEndOfFile : RawToken
+{
+    static constexpr LexemeType type = LexemeTypes::EndOfFile;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::EndOfFile;
+};
+
+/// An atomic lexeme in the `Identifier` class.
+struct RawIdentifier : RawToken
+{
+    static constexpr LexemeType type = LexemeTypes::Identifier;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Identifier;
+};
+
+/// An atomic lexeme in the `Invalid` class.
+struct RawInvalid : RawToken
+{
+    static constexpr LexemeType type = LexemeTypes::Invalid;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Invalid;
+};
+
+/// An atomic lexeme in the `Literal` class.
+struct RawLiteral : RawToken
+{
+    static constexpr LexemeType type = LexemeTypes::Literal;
+};
+
+/// An atomic lexeme in the `CharLiteral` class.
+struct RawCharLiteral : RawLiteral
+{
+    static constexpr LexemeType type = LexemeTypes::CharLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::CharLiteral;
+};
+
+/// An atomic lexeme in the `NumericLiteral` class.
+struct RawNumericLiteral : RawLiteral
+{
+    static constexpr LexemeType type = LexemeTypes::NumericLiteral;
+};
+
+/// An atomic lexeme in the `FloatingPointLiteral` class.
+struct RawFloatingPointLiteral : RawNumericLiteral
+{
+    static constexpr LexemeType type = LexemeTypes::FloatingPointLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::FloatingPointLiteral;
+};
+
+/// An atomic lexeme in the `IntegerLiteral` class.
+struct RawIntegerLiteral : RawNumericLiteral
+{
+    static constexpr LexemeType type = LexemeTypes::IntegerLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::IntegerLiteral;
+};
+
+/// An atomic lexeme in the `StringLiteral` class.
+struct RawStringLiteral : RawLiteral
+{
+    static constexpr LexemeType type = LexemeTypes::StringLiteral;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::StringLiteral;
+};
+
+/// An atomic lexeme in the `Punctuation` class.
+struct RawPunctuation : RawToken
+{
+    static constexpr LexemeType type = LexemeTypes::Punctuation;
+};
+
+/// An atomic lexeme in the `At` class.
+struct RawAt : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::At;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::At;
+};
+
+/// An atomic lexeme in the `Colon` class.
+struct RawColon : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Colon;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Colon;
+};
+
+/// An atomic lexeme in the `Comma` class.
+struct RawComma : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Comma;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Comma;
+};
+
+/// An atomic lexeme in the `CompletionRequest` class.
+struct RawCompletionRequest : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::CompletionRequest;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::CompletionRequest;
+};
+
+/// An atomic lexeme in the `Dollar` class.
+struct RawDollar : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Dollar;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Dollar;
+};
+
+/// An atomic lexeme in the `DollarDollar` class.
+struct RawDollarDollar : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::DollarDollar;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::DollarDollar;
+};
+
+/// An atomic lexeme in the `Dot` class.
+struct RawDot : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Dot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Dot;
+};
+
+/// An atomic lexeme in the `DotDot` class.
+struct RawDotDot : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::DotDot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::DotDot;
+};
+
+/// An atomic lexeme in the `DoubleRightArrow` class.
+struct RawDoubleRightArrow : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::DoubleRightArrow;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::DoubleRightArrow;
+};
+
+/// An atomic lexeme in the `Ellipsis` class.
+struct RawEllipsis : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Ellipsis;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Ellipsis;
+};
+
+/// An atomic lexeme in the `LBrace` class.
+struct RawLBrace : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::LBrace;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::LBrace;
+};
+
+/// An atomic lexeme in the `LBracket` class.
+struct RawLBracket : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::LBracket;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::LBracket;
+};
+
+/// An atomic lexeme in the `LParent` class.
+struct RawLParent : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::LParent;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::LParent;
+};
+
+/// An atomic lexeme in the `OpAdd` class.
+struct RawOpAdd : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpAdd;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAdd;
+};
+
+/// An atomic lexeme in the `OpAddAssign` class.
+struct RawOpAddAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpAddAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAddAssign;
+};
+
+/// An atomic lexeme in the `OpAnd` class.
+struct RawOpAnd : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpAnd;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAnd;
+};
+
+/// An atomic lexeme in the `OpAndAssign` class.
+struct RawOpAndAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpAndAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAndAssign;
+};
+
+/// An atomic lexeme in the `OpAssign` class.
+struct RawOpAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpAssign;
+};
+
+/// An atomic lexeme in the `OpBitAnd` class.
+struct RawOpBitAnd : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitAnd;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitAnd;
+};
+
+/// An atomic lexeme in the `OpBitNot` class.
+struct RawOpBitNot : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitNot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitNot;
+};
+
+/// An atomic lexeme in the `OpBitOr` class.
+struct RawOpBitOr : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitOr;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitOr;
+};
+
+/// An atomic lexeme in the `OpBitXor` class.
+struct RawOpBitXor : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpBitXor;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpBitXor;
+};
+
+/// An atomic lexeme in the `OpDec` class.
+struct RawOpDec : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpDec;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpDec;
+};
+
+/// An atomic lexeme in the `OpDiv` class.
+struct RawOpDiv : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpDiv;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpDiv;
+};
+
+/// An atomic lexeme in the `OpDivAssign` class.
+struct RawOpDivAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpDivAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpDivAssign;
+};
+
+/// An atomic lexeme in the `OpEql` class.
+struct RawOpEql : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpEql;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpEql;
+};
+
+/// An atomic lexeme in the `OpGeq` class.
+struct RawOpGeq : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpGeq;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpGeq;
+};
+
+/// An atomic lexeme in the `OpGreater` class.
+struct RawOpGreater : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpGreater;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpGreater;
+};
+
+/// An atomic lexeme in the `OpInc` class.
+struct RawOpInc : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpInc;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpInc;
+};
+
+/// An atomic lexeme in the `OpLeq` class.
+struct RawOpLeq : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpLeq;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpLeq;
+};
+
+/// An atomic lexeme in the `OpLess` class.
+struct RawOpLess : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpLess;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpLess;
+};
+
+/// An atomic lexeme in the `OpLsh` class.
+struct RawOpLsh : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpLsh;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpLsh;
+};
+
+/// An atomic lexeme in the `OpMod` class.
+struct RawOpMod : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpMod;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpMod;
+};
+
+/// An atomic lexeme in the `OpModAssign` class.
+struct RawOpModAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpModAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpModAssign;
+};
+
+/// An atomic lexeme in the `OpMul` class.
+struct RawOpMul : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpMul;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpMul;
+};
+
+/// An atomic lexeme in the `OpMulAssign` class.
+struct RawOpMulAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpMulAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpMulAssign;
+};
+
+/// An atomic lexeme in the `OpNeq` class.
+struct RawOpNeq : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpNeq;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpNeq;
+};
+
+/// An atomic lexeme in the `OpNot` class.
+struct RawOpNot : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpNot;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpNot;
+};
+
+/// An atomic lexeme in the `OpOr` class.
+struct RawOpOr : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpOr;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpOr;
+};
+
+/// An atomic lexeme in the `OpOrAssign` class.
+struct RawOpOrAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpOrAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpOrAssign;
+};
+
+/// An atomic lexeme in the `OpRsh` class.
+struct RawOpRsh : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpRsh;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpRsh;
+};
+
+/// An atomic lexeme in the `OpShlAssign` class.
+struct RawOpShlAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpShlAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpShlAssign;
+};
+
+/// An atomic lexeme in the `OpShrAssign` class.
+struct RawOpShrAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpShrAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpShrAssign;
+};
+
+/// An atomic lexeme in the `OpSub` class.
+struct RawOpSub : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpSub;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpSub;
+};
+
+/// An atomic lexeme in the `OpSubAssign` class.
+struct RawOpSubAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpSubAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpSubAssign;
+};
+
+/// An atomic lexeme in the `OpXorAssign` class.
+struct RawOpXorAssign : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::OpXorAssign;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::OpXorAssign;
+};
+
+/// An atomic lexeme in the `Pound` class.
+struct RawPound : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Pound;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Pound;
+};
+
+/// An atomic lexeme in the `PoundPound` class.
+struct RawPoundPound : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::PoundPound;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::PoundPound;
+};
+
+/// An atomic lexeme in the `QuestionMark` class.
+struct RawQuestionMark : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::QuestionMark;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::QuestionMark;
+};
+
+/// An atomic lexeme in the `RBrace` class.
+struct RawRBrace : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::RBrace;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RBrace;
+};
+
+/// An atomic lexeme in the `RBracket` class.
+struct RawRBracket : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::RBracket;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RBracket;
+};
+
+/// An atomic lexeme in the `RParent` class.
+struct RawRParent : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::RParent;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RParent;
+};
+
+/// An atomic lexeme in the `RightArrow` class.
+struct RawRightArrow : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::RightArrow;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::RightArrow;
+};
+
+/// An atomic lexeme in the `Scope` class.
+struct RawScope : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Scope;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Scope;
+};
+
+/// An atomic lexeme in the `Semicolon` class.
+struct RawSemicolon : RawPunctuation
+{
+    static constexpr LexemeType type = LexemeTypes::Semicolon;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::Semicolon;
+};
+
+/// An atomic lexeme in the `Trivia` class.
+struct Trivia : Lexeme
+{
+    static constexpr LexemeType type = LexemeTypes::Trivia;
+};
+
+/// An atomic lexeme in the `Comment` class.
+struct CommentTrivia : Trivia
+{
+    static constexpr LexemeType type = LexemeTypes::Comment;
+};
+
+/// An atomic lexeme in the `BlockComment` class.
+struct BlockCommentTrivia : CommentTrivia
+{
+    static constexpr LexemeType type = LexemeTypes::BlockComment;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::BlockComment;
+};
+
+/// An atomic lexeme in the `LineComment` class.
+struct LineCommentTrivia : CommentTrivia
+{
+    static constexpr LexemeType type = LexemeTypes::LineComment;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::LineComment;
+};
+
+/// An atomic lexeme in the `EscapedNewLine` class.
+struct EscapedNewLineTrivia : Trivia
+{
+    static constexpr LexemeType type = LexemeTypes::EscapedNewLine;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::EscapedNewLine;
+};
+
+/// An atomic lexeme in the `NewLine` class.
+struct NewLineTrivia : Trivia
+{
+    static constexpr LexemeType type = LexemeTypes::NewLine;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::NewLine;
+};
+
+/// An atomic lexeme in the `WhiteSpace` class.
+struct WhiteSpaceTrivia : Trivia
+{
+    static constexpr LexemeType type = LexemeTypes::WhiteSpace;
+    static constexpr LexemeTypeTag tag = LexemeTypeTag::WhiteSpace;
+};
+
+
+#endif
+
+#undef FIDDLE_GENERATED_OUTPUT_ID
+#endif
+// END FIDDLE TEMPLATE OUTPUT
+
+// END OF FIDDLE-GENERATED FILE

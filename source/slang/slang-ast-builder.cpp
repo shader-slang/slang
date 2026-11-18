@@ -341,6 +341,13 @@ ASTBuilder::~ASTBuilder()
     incrementEpoch();
 }
 
+TokenPool* ASTBuilder::getTokenPool()
+{
+    if (!m_tokenPool)
+        m_tokenPool = new TokenPool();
+    return m_tokenPool;
+}
+
 Val* ASTBuilder::_getOrCreateImplSlowPath(ValNodeDesc&& desc)
 {
     // The most important thing we need to determine here

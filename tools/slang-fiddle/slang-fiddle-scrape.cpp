@@ -52,9 +52,9 @@ public:
 
     TokenWithTrivia const& peek() { return *_cursor; }
 
-    SourceLoc const& peekLoc() { return peek().getLoc(); }
+    SourceLoc peekLoc() { return peek().getLoc(); }
 
-    TokenType peekType() { return peek().getType(); }
+    TokenType peekType() { return peek().getTypeTag(); }
 
     TokenWithTrivia read()
     {
@@ -89,7 +89,7 @@ public:
     {
         if (peekType() == TokenType::Identifier)
         {
-            if (peek().getContent() == expected)
+            if (peek().getLogicalSpelling() == expected)
             {
                 return read();
             }
@@ -123,7 +123,7 @@ public:
     {
         if (peekType() == TokenType::Identifier)
         {
-            if (peek().getContent() == name)
+            if (peek().getLogicalSpelling() == name)
             {
                 read();
                 return true;
@@ -288,7 +288,7 @@ public:
 
         if (peekType() == TokenType::OpRsh)
         {
-            peek().setType(TokenType::OpGreater);
+            peek().consumeFirstGreater();
 
             return;
         }
@@ -414,7 +414,7 @@ public:
                 _sink.diagnose(
                     peekLoc(),
                     fiddle::Diagnostics::expectedFiddleEllipsisInvocation,
-                    decl->nameToken.getContent());
+                    decl->nameToken.getLogicalSpelling());
             }
         }
 
@@ -590,9 +590,9 @@ public:
                 {
                     const auto b = read();
                     StringBuilder sb;
-                    sb << b.getContent();
+                    sb << b.getLogicalSpelling();
                     for (int i = 0; i < b.getSkipCount(); ++i)
-                        sb << read().getContent() << " ";
+                        sb << read().getLogicalSpelling() << " ";
                     modifiers.add(new TableModifier(std::move(sb)));
                 }
                 break;
@@ -800,9 +800,9 @@ public:
                     StringBuilder sb;
                     const auto f = expect(TokenType::Identifier);
                     const auto b = read();
-                    sb << f.getContent() << b.getContent();
+                    sb << f.getLogicalSpelling() << b.getLogicalSpelling();
                     for (int i = 0; i < b.getSkipCount(); ++i)
-                        sb << read().getContent() << " ";
+                        sb << read().getLogicalSpelling() << " ";
                     auto fiddleLuaCall = RefPtr(new FiddleLuaCallInvocation());
                     fiddleLuaCall->fiddleToken = fiddleToken;
                     fiddleLuaCall->parentDecl = _currentParentDecl;
@@ -860,7 +860,7 @@ public:
 
         if (auto physicalNamespace = as<PhysicalNamespaceDecl>(memberDecl))
         {
-            auto namespaceName = physicalNamespace->nameToken.getContent();
+            auto namespaceName = physicalNamespace->nameToken.getLogicalSpelling();
             auto logicalNamespace = findDecl<LogicalNamespace>(logicalParent, namespaceName);
             if (!logicalNamespace)
             {
@@ -939,7 +939,7 @@ public:
                 // these lines, so we will read until the next end-of-line.
                 //
                 read();
-                while (!(peek().getToken().flags & TokenFlag::AtStartOfLine))
+                while (!(peek().getToken().getFlags() & TokenFlag::AtStartOfLine))
                 {
                     if (peekType() == TokenType::EndOfFile)
                         break;
@@ -952,7 +952,7 @@ public:
             // one that we want to pay attention to?
             //
             //
-            auto name = peek().getContent();
+            auto name = peek().getLogicalSpelling();
             if (name == "FIDDLE")
             {
                 // If the `FIDDLE` is the first token we are seeing, then we will
@@ -1102,7 +1102,7 @@ private:
     {
         if (auto nameExpr = as<NameExpr>(expr))
         {
-            return lookUp(nameExpr->nameToken.getContent());
+            return lookUp(nameExpr->nameToken.getLogicalSpelling());
         }
         else
         {
@@ -1119,7 +1119,7 @@ private:
             // TODO: accelerate lookup with a dictionary on the container...
             for (auto memberDecl : containerDecl->members)
             {
-                if (memberDecl->nameToken.getContent() == name)
+                if (memberDecl->nameToken.getLogicalSpelling() == name)
                 {
                     return new DirectDeclRef(memberDecl);
                 }
@@ -1267,7 +1267,7 @@ private:
                                 "kSyntaxClassInfo;" MACRO_LINE_ENDING);
 
                 _builder.append("public: static constexpr ASTNodeType kType = ASTNodeType::");
-                _builder.append(decl->nameToken.getContent());
+                _builder.append(decl->nameToken.getLogicalSpelling());
                 _builder.append(";" MACRO_LINE_ENDING);
 
                 if (decl->findModifier<AbstractModifier>())
@@ -1278,7 +1278,7 @@ private:
                 {
                     _builder.append("public: ");
                 }
-                _builder.append(decl->nameToken.getContent());
+                _builder.append(decl->nameToken.getLogicalSpelling());
                 _builder.append("() {}" MACRO_LINE_ENDING);
             }
             _builder.append("public:" MACRO_LINE_ENDING);
@@ -1290,14 +1290,14 @@ private:
     {
         if (auto declRef = as<DirectDeclRef>(expr))
         {
-            _builder.append(declRef->decl->nameToken.getContent());
+            _builder.append(declRef->decl->nameToken.getLogicalSpelling());
             _builder.append(" ");
             _builder.append(name);
         }
     }
 
 #if 0
-        void emitLineDirective(Token const& lexeme)
+        void emitLineDirective(Lexeme const& lexeme)
         {
             SourceLoc loc = lexeme.getLoc();
             auto humaneLoc = _sourceManager.getHumaneLoc(loc);
@@ -1326,10 +1326,10 @@ private:
         }
 
 
-        void emitTrivia(List<Token> const& trivia)
+        void emitTrivia(TriviaList trivia)
         {
             for (auto trivium : trivia)
-                _builder.append(trivium.getContent());
+                _builder.append(trivium.getLogicalSpelling());
         }
 
         void emitRawNode(RawNode* rawNode)
@@ -1337,7 +1337,7 @@ private:
             for (auto token : rawNode->tokens)
             {
                 emitTrivia(token.getLeadingTrivia());
-                _builder.append(token.getContent());
+                _builder.append(token.getLogicalSpelling());
                 emitTrivia(token.getTrailingTrivia());
             }
         }
@@ -1401,7 +1401,7 @@ Decl* findDecl_(ContainerDecl* outerDecl, UnownedStringSlice const& name)
 {
     for (auto memberDecl : outerDecl->members)
     {
-        if (memberDecl->nameToken.getContent() == name)
+        if (memberDecl->nameToken.getLogicalSpelling() == name)
             return memberDecl;
     }
     return nullptr;
@@ -1412,7 +1412,7 @@ bool AggTypeDecl::isSubTypeOf(char const* name)
     Decl* decl = this;
     while (decl)
     {
-        if (decl->nameToken.getContent() == UnownedTerminatedStringSlice(name))
+        if (decl->nameToken.getLogicalSpelling() == UnownedTerminatedStringSlice(name))
         {
             return true;
         }
@@ -1434,53 +1434,22 @@ bool AggTypeDecl::isSubTypeOf(char const* name)
     return false;
 }
 
-bool isTrivia(TokenType lexemeType)
+/// Wraps a complete token sequence, including EOF, in shared mutable bookkeeping nodes.
+///
+/// Copies of the returned handles share those nodes. Lexical storage remains borrowed
+/// from the input's pool, which must outlive the result and any copied handles.
+List<TokenWithTrivia> createParserTokens(TokenList const& tokens)
 {
-    switch (lexemeType)
+    // We add shared bookkeeping nodes around the lexer's grouped tokens. The parser needs
+    // to replace lookahead when splitting `>>` and to annotate opening delimiters with skips.
+    List<TokenWithTrivia> parserTokens;
+    for (auto token : tokens.getTokens())
     {
-    default:
-        return false;
-
-    case TokenType::LineComment:
-    case TokenType::BlockComment:
-    case TokenType::NewLine:
-    case TokenType::WhiteSpace:
-        return true;
+        RefPtr<TokenWithTriviaNode> node = new TokenWithTriviaNode();
+        node->token = token;
+        parserTokens.add(TokenWithTrivia(node));
     }
-}
-
-List<TokenWithTrivia> collectTokensWithTrivia(TokenList const& lexemes)
-{
-    TokenReader reader(lexemes);
-
-    List<TokenWithTrivia> allTokensWithTrivia;
-    for (;;)
-    {
-        RefPtr<TokenWithTriviaNode> currentTokenWithTriviaNode = new TokenWithTriviaNode();
-        TokenWithTrivia currentTokenWithTrivia = currentTokenWithTriviaNode;
-        allTokensWithTrivia.add(currentTokenWithTrivia);
-
-        while (isTrivia(reader.peekTokenType()))
-        {
-            auto trivia = reader.advanceToken();
-            currentTokenWithTriviaNode->leadingTrivia.add(trivia);
-        }
-
-        auto token = reader.advanceToken();
-        currentTokenWithTriviaNode->token = token;
-
-        if (token.type == TokenType::EndOfFile)
-            return allTokensWithTrivia;
-
-        while (isTrivia(reader.peekTokenType()))
-        {
-            auto trivia = reader.advanceToken();
-            currentTokenWithTriviaNode->trailingTrivia.add(trivia);
-
-            if (trivia.type == TokenType::NewLine)
-                break;
-        }
-    }
+    return parserTokens;
 }
 
 void readTokenTree(List<TokenWithTrivia> const& tokens, Index& ioIndex);
@@ -1494,13 +1463,13 @@ void readBalancedToken(List<TokenWithTrivia> const& tokens, Index& ioIndex, Toke
     for (;;)
     {
         auto token = tokens[ioIndex];
-        if (token.getType() == closeType)
+        if (token.getTypeTag() == closeType)
         {
             ioIndex++;
             break;
         }
 
-        switch (token.getType())
+        switch (token.getTypeTag())
         {
         default:
             readTokenTree(tokens, ioIndex);
@@ -1519,7 +1488,7 @@ void readBalancedToken(List<TokenWithTrivia> const& tokens, Index& ioIndex, Toke
 
 void readTokenTree(List<TokenWithTrivia> const& tokens, Index& ioIndex)
 {
-    switch (tokens[ioIndex].getType())
+    switch (tokens[ioIndex].getTypeTag())
     {
     default:
         ioIndex++;
@@ -1542,7 +1511,7 @@ void matchBalancedTokens(List<TokenWithTrivia> tokens)
     for (;;)
     {
         auto& token = tokens[index];
-        switch (token.getType())
+        switch (token.getTypeTag())
         {
         case TokenType::EndOfFile:
             return;
@@ -1568,21 +1537,22 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
 
     while (cursor != end)
     {
-        if (cursor->getType() != TokenType::Pound)
+        if (cursor->getTypeTag() != TokenType::Pound)
         {
             cursor++;
             continue;
         }
         cursor++;
 
-        if (cursor->getContent() != "include")
+        if (cursor->getLogicalSpelling() != "include")
             continue;
         cursor++;
 
-        if (cursor->getType() != TokenType::StringLiteral)
+        if (cursor->getTypeTag() != TokenType::StringLiteral)
             continue;
 
-        auto includedFileName = getStringLiteralTokenValue(cursor->getToken(), nullptr);
+        auto literal = cursor->getToken().getRawToken().as<RawStringLiteral>();
+        auto includedFileName = getStringLiteralTokenValue(literal, nullptr);
         if (includedFileName == outputFileName)
             return true;
     }
@@ -1594,7 +1564,6 @@ RefPtr<SourceUnit> parseSourceUnit(
     LogicalModule* logicalModule,
     NamePool* namePool,
     DiagnosticSink* sink,
-    SourceManager* sourceManager,
     String outputFileName)
 {
     Lexer lexer;
@@ -1603,10 +1572,10 @@ RefPtr<SourceUnit> parseSourceUnit(
     // so that we can ignore any files we don't understand.
     //
     DiagnosticSink lexerSink;
-    lexer.initialize(inputSourceView, &lexerSink, namePool, sourceManager->getMemoryArena());
+    lexer.initialize(inputSourceView, &lexerSink, namePool, logicalModule->getTokenPool());
 
-    auto inputTokens = lexer.lexAllTokens();
-    auto tokensWithTrivia = collectTokensWithTrivia(inputTokens);
+    auto inputTokens = lexer.readAllTokens();
+    auto tokensWithTrivia = createParserTokens(inputTokens);
     matchBalancedTokens(tokensWithTrivia);
 
     Parser parser(*sink, tokensWithTrivia, logicalModule);
@@ -1685,7 +1654,7 @@ int _toStringVal(lua_State* L)
 
     if (auto decl = as<Decl>(val))
     {
-        push(L, decl->nameToken.getContent());
+        push(L, decl->nameToken.getLogicalSpelling());
         return 1;
     }
 
@@ -1753,7 +1722,7 @@ int _indexVal(lua_State* L)
     {
         for (auto m : containerDecl->members)
         {
-            if (m->nameToken.getContent() == UnownedTerminatedStringSlice(name))
+            if (m->nameToken.getLogicalSpelling() == UnownedTerminatedStringSlice(name))
             {
                 push(L, m);
                 return 1;
@@ -1841,8 +1810,8 @@ int _indexVal(lua_State* L)
             {
                 lua_pushlstring(
                     L,
-                    literalExpr->token.getContent().begin(),
-                    literalExpr->token.getContent().getLength());
+                    literalExpr->token.getLogicalSpelling().begin(),
+                    literalExpr->token.getLogicalSpelling().getLength());
                 return 1;
             }
             return 0;
@@ -1888,7 +1857,7 @@ void registerScrapedStuffWithScript(LogicalModule* logicalModule)
         if (!decl->nameToken)
             continue;
 
-        registerValWithScript(decl->nameToken.getContent(), decl);
+        registerValWithScript(decl->nameToken.getLogicalSpelling(), decl);
     }
 }
 

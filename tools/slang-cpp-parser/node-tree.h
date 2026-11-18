@@ -59,6 +59,9 @@ class NodeTree
 {
 public:
     friend class Parser;
+
+    /// The one pool used for lexical values stored anywhere in this tree.
+    TokenPool* getTokenPool() const { return m_tokenPool; }
     /// Get all of the parsed source origins
     const List<RefPtr<SourceOrigin>>& getSourceOrigins() const { return m_sourceOrigins; }
 
@@ -92,6 +95,7 @@ protected:
     StringSlicePool* m_typePool; ///< Pool for just types
 
     NamePool* m_namePool;
+    RefPtr<TokenPool> m_tokenPool = new TokenPool();
 
     RefPtr<ScopeNode> m_rootNode; ///< The root scope
 

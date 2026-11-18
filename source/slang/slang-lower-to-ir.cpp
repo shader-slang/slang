@@ -3284,7 +3284,7 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
-            builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+            builder->addSemanticDecoration(inst, hlslSemantic->name.getLogicalSpelling());
         }
         else if (as<DynamicUniformModifier>(mod))
         {
@@ -5659,17 +5659,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
             case SPIRVAsmOperand::Literal:
                 {
-                    if (operand.token.type == TokenType::IntegerLiteral)
+                    if (operand.token.getTypeTag() == TokenType::IntegerLiteral)
                     {
                         // TODO: we should sign-extend these where appropriate,
                         // difficult because it requires information on usage...
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getIntValue(builder->getUIntType(), operand.knownValue));
                     }
-                    else if (operand.token.type == TokenType::StringLiteral)
+                    else if (auto literal = operand.token.as<StringLiteralToken>())
                     {
-                        const auto v =
-                            getStringLiteralTokenValue(operand.token, context->getSink());
+                        const auto v = getStringLiteralTokenValue(literal, context->getSink());
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getStringValue(v.getUnownedSlice()));
                     }
@@ -5677,7 +5676,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 }
             case SPIRVAsmOperand::Id:
                 {
-                    const auto id = operand.token.getContent();
+                    const auto id = operand.token.getLogicalSpelling();
                     return builder->emitSPIRVAsmOperandId(builder->getStringValue(id));
                 }
             case SPIRVAsmOperand::ResultMarker:
@@ -9318,7 +9317,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         List<CapabilityName> capNames;
         for (const Token& t : stmt->requiredCaps)
         {
-            CapabilityName capName = findCapabilityName(t.getContent());
+            CapabilityName capName = findCapabilityName(t.getLogicalSpelling());
 
             // Note: capability names have already been validated, so we'll
             // just do a quick assert here
@@ -12769,9 +12768,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         int registerOffset =
             stringToInt(semantic->registerName.getName()->text.getUnownedSlice().tail(1));
         int componentOffset = 0;
-        if (semantic->componentMask.getContentLength() != 0)
+        if (semantic->componentMask.getLogicalSpellingLength() != 0)
         {
-            switch (semantic->componentMask.getContent()[0])
+            switch (semantic->componentMask.getLogicalSpelling()[0])
             {
             case 'x':
                 componentOffset = 0;
@@ -12801,7 +12800,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         List<IRInst*> operands;
         for (auto stageNameToken : semantic->stageNameTokens)
         {
-            IRInst* stageName = builder->getStringValue(stageNameToken.getContent());
+            IRInst* stageName = builder->getStringValue(stageNameToken.getLogicalSpelling());
             operands.add(stageName);
         }
 
@@ -13465,7 +13464,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // a specialized definition of the particular function for the given
             // target, and we need to reflect that at the IR level.
 
-            auto targetName = targetMod->targetToken.getContent();
+            auto targetName = targetMod->targetToken.getLogicalSpelling();
             auto targetCap = findCapabilityName(targetName);
 
             getBuilder()->addTargetDecoration(inst, CapabilitySet(targetCap));
@@ -13485,9 +13484,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 definition = targetMod->definitionString;
             }
-            else if (targetMod->definitionIdent.type == TokenType::Identifier)
+            else if (targetMod->definitionIdent.getTypeTag() == TokenType::Identifier)
             {
-                definition = targetMod->definitionIdent.getContent();
+                definition = targetMod->definitionIdent.getLogicalSpelling();
             }
             else
             {
@@ -13504,9 +13503,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             UnownedStringSlice targetName;
             auto& targetToken = targetMod->targetToken;
-            if (targetToken.type != TokenType::Unknown)
+            if (targetToken)
             {
-                targetName = targetToken.getContent();
+                targetName = targetToken.getLogicalSpelling();
             }
 
             CapabilitySet targetCaps;
@@ -13529,7 +13528,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (s && s->flavor == LoweredValInfo::Flavor::Simple)
                 {
                     scrutinee = s->val;
-                    predicate = targetMod->predicateToken.getContent();
+                    predicate = targetMod->predicateToken.getLogicalSpelling();
                 }
             }
 
@@ -13566,7 +13565,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireGLSLExtensionDecoration(
                 inst,
-                extensionMod->extensionNameToken.getContent());
+                extensionMod->extensionNameToken.getLogicalSpelling());
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
         {
@@ -13582,7 +13581,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireWGSLExtensionDecoration(
                 inst,
-                extensionMod->extensionNameToken.getContent());
+                extensionMod->extensionNameToken.getLogicalSpelling());
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
         {
@@ -13655,9 +13654,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // If we find a catch-all case (marked as either *no* target
                 // token or an empty target name), then we should bail out.
                 //
-                if (targetMod->targetToken.type == TokenType::Unknown)
+                if (!targetMod->targetToken)
                     return;
-                else if (!targetMod->targetToken.hasContent())
+                else if (!targetMod->targetToken.hasLogicalSpelling())
                     return;
             }
         }
@@ -14724,7 +14723,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto extensionMod = as<RequiredGLSLExtensionModifier>(modifier))
                 getBuilder()->addRequireGLSLExtensionDecoration(
                     irFunc,
-                    extensionMod->extensionNameToken.getContent());
+                    extensionMod->extensionNameToken.getLogicalSpelling());
             else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
                 getBuilder()->addRequireGLSLVersionDecoration(
                     irFunc,
@@ -14734,7 +14733,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))
                 getBuilder()->addRequireWGSLExtensionDecoration(
                     irFunc,
-                    wgslExtensionMod->extensionNameToken.getContent());
+                    wgslExtensionMod->extensionNameToken.getLogicalSpelling());
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
             else if (as<NonDynamicUniformAttribute>(modifier))

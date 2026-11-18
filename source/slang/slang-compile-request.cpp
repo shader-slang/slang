@@ -208,7 +208,7 @@ static void _outputPreprocessorTokens(const TokenList& toks, ISlangWriter* write
     StringBuilder buf;
     for (const auto& tok : toks)
     {
-        buf << tok.getContent();
+        buf << tok.getLogicalSpelling();
         // We'll separate tokens with space for now
         buf.appendChar(' ');
     }
@@ -520,6 +520,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
         auto preprocessed = preprocessSourceSegments(
             segments,
+            astBuilder->getTokenPool(),
             slangLanguageVersion,
             getSink(),
             &includeSystem,
@@ -649,6 +650,7 @@ List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* s
 
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
+    TokenPool* tokenPool,
     SlangLanguageVersion& ioLanguageVersion,
     DiagnosticSink* sink,
     IncludeSystem* includeSystem,
@@ -664,6 +666,7 @@ List<PreprocessedSegment> preprocessSourceSegments(
 
         seg.tokens = preprocessSource(
             segmentFile,
+            tokenPool,
             sink,
             includeSystem,
             preprocessorDefinitions,

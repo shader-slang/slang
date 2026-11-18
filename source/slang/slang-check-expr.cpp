@@ -10603,8 +10603,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             // operands, so this is a definite error rather than a recovery guess.
             failed = true;
             getSink()->diagnose(Diagnostics::SpirvInstructionTakesNoOperands{
-                .opcode = inst.opcode.token.getContent(),
-                .location = inst.opcode.token.loc});
+                .opcode = inst.opcode.token.getLogicalSpelling(),
+                .location = inst.opcode.token.getLoc()});
             continue;
         }
         int resultIdIndex = -1;
@@ -10636,8 +10636,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             {
                 failed = true;
                 getSink()->diagnose(Diagnostics::SpirvInstructionWithNotEnoughOperands{
-                    .opcode = inst.opcode.token.getContent(),
-                    .location = inst.opcode.token.loc});
+                    .opcode = inst.opcode.token.getLogicalSpelling(),
+                    .location = inst.opcode.token.getLoc()});
                 continue;
             }
             auto& resultIdOperand = inst.operands[resultIdIndex];
@@ -10646,8 +10646,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             {
                 failed = true;
                 getSink()->diagnose(Diagnostics::SpirvIdRedefinition{
-                    .id = resultIdOperand.token.getContent(),
-                    .location = inst.opcode.token.loc});
+                    .id = resultIdOperand.token.getLogicalSpelling(),
+                    .location = inst.opcode.token.getLoc()});
                 continue;
             }
         }
@@ -10702,29 +10702,29 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     // does have forward references for decorations and such
                     if (!isLast)
                     {
-                        getSink()->diagnose(
-                            Diagnostics::MisplacedResultIdMarker{.location = operand.token.loc});
+                        getSink()->diagnose(Diagnostics::MisplacedResultIdMarker{
+                            .location = operand.token.getLoc()});
                         getSink()->diagnose(Diagnostics::ConsiderOpCopyObject{});
                     }
                 }
                 else if (operand.flavor == SPIRVAsmOperand::NamedValue)
                 {
                     // First try and look it up with the knowledge of this operand's type
-                    auto enumValue =
-                        spirvInfo->allEnums.lookup({baseOperandType, operand.token.getContent()});
+                    auto enumValue = spirvInfo->allEnums.lookup(
+                        {baseOperandType, operand.token.getLogicalSpelling()});
                     // Then fall back to with the type prefix
                     if (!enumValue)
-                        enumValue =
-                            spirvInfo->allEnumsWithTypePrefix.lookup(operand.token.getContent());
+                        enumValue = spirvInfo->allEnumsWithTypePrefix.lookup(
+                            operand.token.getLogicalSpelling());
                     // Then see if it's an opcode (for OpSpecialize)
                     if (!enumValue)
-                        enumValue = spirvInfo->opcodes.lookup(operand.token.getContent());
+                        enumValue = spirvInfo->opcodes.lookup(operand.token.getLogicalSpelling());
                     if (inst.opcode.knownValue == SpvOpExtInst)
                     {
                         if (!enumValue)
                         {
                             GLSLstd450 val;
-                            if (lookupGLSLstd450(operand.token.getContent(), val))
+                            if (lookupGLSLstd450(operand.token.getLogicalSpelling(), val))
                             {
                                 enumValue = (SpvWord)val;
                             }
@@ -10734,8 +10734,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     {
                         failed = true;
                         getSink()->diagnose(Diagnostics::SpirvUnableToResolveName{
-                            .name = operand.token.getContent(),
-                            .location = operand.token.loc});
+                            .name = operand.token.getLogicalSpelling(),
+                            .location = operand.token.getLoc()});
                         return;
                     }
 
@@ -10748,13 +10748,13 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     auto builtinVarKind =
                         spirvInfo->allEnums.lookup(SPIRVCoreGrammarInfo::QualifiedEnumName{
                             spirvInfo->operandKinds.lookup(UnownedStringSlice("BuiltIn")).value(),
-                            operand.token.getContent()});
+                            operand.token.getLogicalSpelling()});
                     if (!builtinVarKind)
                     {
                         failed = true;
                         getSink()->diagnose(Diagnostics::SpirvUnableToResolveName{
-                            .name = operand.token.getContent(),
-                            .location = operand.token.loc});
+                            .name = operand.token.getLogicalSpelling(),
+                            .location = operand.token.getLoc()});
                         return;
                     }
                     operand.knownValue = builtinVarKind.value();
@@ -10765,8 +10765,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     {
                         failed = true;
                         getSink()->diagnose(Diagnostics::SpirvUndefinedId{
-                            .id = operand.token.getContent(),
-                            .location = operand.token.loc});
+                            .id = operand.token.getLogicalSpelling(),
+                            .location = operand.token.getLoc()});
                         return;
                     }
                 }
@@ -10776,7 +10776,7 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 {
                     failed = true;
                     getSink()->diagnose(
-                        Diagnostics::SpirvNonConstantBitwiseOr{.location = operand.token.loc});
+                        Diagnostics::SpirvNonConstantBitwiseOr{.location = operand.token.getLoc()});
                 }
                 for (auto& o : operand.bitwiseOrWith)
                 {
@@ -10784,8 +10784,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                         o.flavor != SPIRVAsmOperand::NamedValue)
                     {
                         failed = true;
-                        getSink()->diagnose(
-                            Diagnostics::SpirvNonConstantBitwiseOr{.location = operand.token.loc});
+                        getSink()->diagnose(Diagnostics::SpirvNonConstantBitwiseOr{
+                            .location = operand.token.getLoc()});
                     }
                     go(go, o);
                     operand.knownValue |= o.knownValue;
@@ -10799,8 +10799,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             opcode == SpvOpTypePointer)
         {
             getSink()->diagnose(Diagnostics::SpirvLayoutSensitiveTypeInAsm{
-                .opcode = inst.opcode.token.getContent(),
-                .location = inst.opcode.token.loc});
+                .opcode = inst.opcode.token.getLogicalSpelling(),
+                .location = inst.opcode.token.getLoc()});
         }
     }
 

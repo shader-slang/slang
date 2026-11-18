@@ -8,99 +8,233 @@ namespace Slang
 {
 struct NamePool;
 
-//
+// This header defines atomic scanning, token reads with trivia, and stream readers.
+// The lexer borrows its selected pool; complete lexical lists retain that pool.
+// Every complete list includes EOF. Spans and readers borrow those lists,
+// or caller-supplied ranges with an explicit EOF.
 
-struct TokenList
+/// An EOF-terminated sequence allocated in one explicitly selected token pool.
+///
+/// The sequence retains that pool. `end()` points at the stored EOF, which ordinary
+/// iteration excludes. A default value is uninitialized storage; constructing a
+/// sequence with `add()` or `setValues()` requires selecting its pool first.
+template<typename T>
+struct LexicalList
 {
-    const Token* begin() const;
-    const Token* end() const;
+    LexicalList() = default;
+    explicit LexicalList(TokenPool* pool)
+        : m_pool(pool)
+    {
+        SLANG_RELEASE_ASSERT(pool);
+    }
+    const T* begin() const { return m_values.getBuffer(); }
+    const T* end() const
+    {
+        SLANG_RELEASE_ASSERT(m_values.getCount());
+        SLANG_RELEASE_ASSERT(m_values.getLast().getTypeTag() == TokenType::EndOfFile);
+        return m_values.getBuffer() + m_values.getCount() - 1;
+    }
+    void add(T value)
+    {
+        _validateValue(value);
+        m_values.add(value);
+    }
+    TokenPool* getTokenPool() const { return m_pool; }
+    const List<T>& getValues() const { return m_values; }
 
-    SLANG_FORCE_INLINE void add(const Token& token) { m_tokens.add(token); }
+    /// Replaces the values with occurrences from this sequence's pool.
+    void setValues(const List<T>& values)
+    {
+        SLANG_RELEASE_ASSERT(m_pool);
+        for (const auto& value : values)
+            _validateValue(value);
 
-    List<Token> m_tokens;
+        // We copy before replacing because callers may pass this sequence's `getValues()`.
+        List<T> replacement(values);
+        m_values = _Move(replacement);
+    }
+
+private:
+    void _validateValue(const T& value) const
+    {
+        SLANG_RELEASE_ASSERT(m_pool);
+        SLANG_RELEASE_ASSERT(value.getPool() == m_pool.get());
+    }
+    RefPtr<TokenPool> m_pool;
+    List<T> m_values;
 };
 
+/// An owning EOF-terminated sequence of tokens with attached trivia.
+struct TokenList : LexicalList<Token>
+{
+    using LexicalList<Token>::LexicalList;
+    const List<Token>& getTokens() const { return getValues(); }
+    void setTokens(const List<Token>& tokens) { setValues(tokens); }
+};
+
+/// An owning EOF-terminated sequence of atomic raw tokens and trivia.
+struct LexemeList : LexicalList<Lexeme>
+{
+    using LexicalList<Lexeme>::LexicalList;
+    const List<Lexeme>& getLexemes() const { return getValues(); }
+    void setLexemes(const List<Lexeme>& lexemes) { setValues(lexemes); }
+};
+
+/// A borrowed range ending immediately before its stored EOF token.
 struct TokenSpan
 {
-    TokenSpan();
-    TokenSpan(TokenList const& tokenList)
-        : m_begin(tokenList.begin()), m_end(tokenList.end())
+    TokenSpan(const TokenList& tokens)
+        : m_begin(tokens.begin()), m_end(tokens.end())
     {
+    }
+    TokenSpan(const Token* begin, const Token* end)
+        : m_begin(begin), m_end(end)
+    {
+        SLANG_RELEASE_ASSERT(begin);
+        SLANG_RELEASE_ASSERT(end->is<EndOfFileToken>());
     }
 
     const Token* begin() const { return m_begin; }
     const Token* end() const { return m_end; }
+    int getCount() const { return int(m_end - m_begin); }
 
-    int getCount() { return (int)(m_end - m_begin); }
-
-    const Token* m_begin;
-    const Token* m_end;
+private:
+    const Token* m_begin = nullptr;
+    const Token* m_end = nullptr;
 };
 
+/// A reader of borrowed tokens that repeats the supplied EOF at the range end.
+///
+/// Full sequences provide their stored EOF. A bounded subsequence must supply an
+/// EOF explicitly; the reader never allocates lexical storage or reinterprets a token.
+/// A default reader must be assigned an initialized reader before any token is read.
 struct TokenReader
 {
-    Token m_nextToken;
-    TokenReader();
-    explicit TokenReader(TokenSpan const& tokens)
-        : m_cursor(tokens.begin()), m_end(tokens.end())
+    TokenReader() = default;
+    explicit TokenReader(const TokenSpan& tokens)
+        : TokenReader(tokens.begin(), tokens.end(), tokens.end()->as<EndOfFileToken>())
     {
+    }
+    explicit TokenReader(const TokenList& tokens)
+        : TokenReader(TokenSpan(tokens))
+    {
+    }
+    TokenReader(const Token* begin, const Token* end, EndOfFileToken endOfFile)
+        : m_cursor(begin), m_end(end), m_endOfFile(endOfFile)
+    {
+        SLANG_RELEASE_ASSERT(endOfFile);
         _updateLookaheadToken();
     }
-    explicit TokenReader(TokenList const& tokens)
-        : m_cursor(tokens.begin()), m_end(tokens.end())
-    {
-        _updateLookaheadToken();
-    }
-    explicit TokenReader(Token const* begin, Token const* end)
-        : m_cursor(begin), m_end(end)
-    {
-        _updateLookaheadToken();
-    }
+
+    /// A saved position, including any unconsumed replacement for the current token.
     struct ParsingCursor
     {
         bool operator==(const ParsingCursor& rhs) const
         {
-            return tokenReaderCursor == rhs.tokenReaderCursor;
+            if (tokenReaderCursor != rhs.tokenReaderCursor)
+                return false;
+            if (nextToken.getObject() != rhs.nextToken.getObject())
+                return false;
+            if (nextToken.getLoc() != rhs.nextToken.getLoc())
+                return false;
+            return nextToken.getFlags() == rhs.nextToken.getFlags();
         }
         bool operator!=(const ParsingCursor& rhs) const { return !(*this == rhs); }
-
-        bool isValid() const { return tokenReaderCursor != nullptr; }
-
+        bool isValid() const { return bool(nextToken); }
         Token nextToken;
         const Token* tokenReaderCursor = nullptr;
     };
-    ParsingCursor getCursor()
-    {
-        ParsingCursor rs;
-        rs.nextToken = m_nextToken;
-        rs.tokenReaderCursor = m_cursor;
-        return rs;
-    }
+
+    ParsingCursor getCursor() const { return {m_nextToken, m_cursor}; }
+    /// Restores a cursor obtained from this reader or a copy of this reader.
     void setCursor(ParsingCursor cursor)
     {
+        SLANG_RELEASE_ASSERT(cursor.isValid());
         m_cursor = cursor.tokenReaderCursor;
         m_nextToken = cursor.nextToken;
     }
-    bool isAtCursor(const ParsingCursor& cursor) const
-    {
-        return cursor.tokenReaderCursor == m_cursor;
-    }
+    bool isAtCursor(const ParsingCursor& cursor) const { return getCursor() == cursor; }
     bool isAtEnd() const { return m_cursor == m_end; }
-    Token& peekToken();
-    TokenType peekTokenType() const;
-    SourceLoc peekLoc() const;
+    Token peekToken() const
+    {
+        SLANG_RELEASE_ASSERT(m_nextToken);
+        return m_nextToken;
+    }
+    TokenType peekTokenType() const { return peekToken().getTypeTag(); }
+    SourceLoc peekLoc() const { return peekToken().getLoc(); }
+    Token readToken();
 
-    Token advanceToken();
+    /// Replaces the unconsumed token, for example with the second closer of `>>`.
+    ///
+    /// Requires a non-EOF token at the current position. Advancing afterward moves
+    /// past the original array entry. The caller retains the replacement's pool.
+    void replaceLookaheadToken(Token replacement)
+    {
+        SLANG_RELEASE_ASSERT(!isAtEnd());
+        SLANG_RELEASE_ASSERT(replacement);
+        SLANG_RELEASE_ASSERT(!replacement.is<EndOfFileToken>());
+        m_nextToken = replacement;
+    }
 
-    int getCount() { return (int)(m_end - m_cursor); }
-
-    const Token* m_cursor;
-    const Token* m_end;
-    static Token getEndOfFileToken();
+    /// Consumes a matching token and returns its typed value; otherwise returns empty.
+    template<typename T>
+    T advanceIf()
+    {
+        auto token = peekToken().as<T>();
+        if (token)
+            readToken();
+        return token;
+    }
+    template<typename T>
+    bool is() const
+    {
+        return peekToken().is<T>();
+    }
+    int getCount() const { return m_cursor ? int(m_end - m_cursor) : 0; }
 
 private:
-    /// Update the lookahead token in `m_nextToken` to reflect the cursor state
-    void _updateLookaheadToken();
+    void _updateLookaheadToken() { m_nextToken = m_cursor == m_end ? m_endOfFile : *m_cursor; }
+    const Token* m_cursor = nullptr;
+    const Token* m_end = nullptr;
+    EndOfFileToken m_endOfFile;
+    Token m_nextToken;
+};
+
+/// A reader of a borrowed EOF-terminated lexeme sequence that repeats the stored EOF at its end.
+struct LexemeReader
+{
+    LexemeReader() = default;
+    explicit LexemeReader(const LexemeList& values)
+        : m_cursor(values.begin()), m_end(values.end())
+    {
+    }
+    Lexeme peekLexeme() const
+    {
+        SLANG_RELEASE_ASSERT(m_cursor);
+        return *m_cursor;
+    }
+    LexemeTypeTag peekLexemeTypeTag() const { return peekLexeme().getTypeTag(); }
+    SourceLoc peekLoc() const { return peekLexeme().getLoc(); }
+    Lexeme readLexeme()
+    {
+        auto result = peekLexeme();
+        if (m_cursor != m_end)
+            ++m_cursor;
+        return result;
+    }
+    bool isAtEnd() const { return m_cursor == m_end; }
+    int getCount() const { return m_cursor ? int(m_end - m_cursor) : 0; }
+
+private:
+    const Lexeme* m_cursor = nullptr;
+    const Lexeme* m_end = nullptr;
+};
+
+/// Recognition rules used by a lexer until another mode is selected.
+enum class LexerMode
+{
+    Normal,
+    ExpectingAngleBracketHeaderName,
 };
 
 typedef unsigned int LexerFlags;
@@ -110,15 +244,22 @@ enum
                                      << 2, ///< Suppress errors about invalid/unsupported characters
 };
 
+/// A stateful scanner of atomic lexemes or tokens with trivia in a borrowed pool.
 struct Lexer
 {
+    /// Initializes scanning over a source view using the supplied lexical pool.
+    ///
+    /// All returned values belong to `tokenPool`. The caller keeps that pool alive
+    /// while the lexer or any borrowed result is used.
     void initialize(
         SourceView* sourceView,
         DiagnosticSink* sink,
         NamePool* namePool,
-        MemoryArena* memoryArena);
+        TokenPool* tokenPool);
 
     ~Lexer();
+
+    TokenPool* getTokenPool() const { return m_tokenPool; }
 
     /// Runs the lexer to try and extract a single token, which is returned.
     /// This can be used by the DiagnosticSink to be able to display more appropriate
@@ -130,17 +271,27 @@ struct Lexer
     /// not needed by the DiagnosticSink.
     static UnownedStringSlice sourceLocationLexer(const UnownedStringSlice& in);
 
-    /// Lex the next token in the input stream, returning an EOF token if at end.
-    Token lexToken();
+    /// Reads one atomic lexeme, including trivia or EOF, preserving its physical and logical
+    /// spellings.
+    Lexeme readLexeme();
 
-    /// Lex all tokens (up to the end of the stream) that are semantically relevant
-    TokenList lexAllSemanticTokens();
+    /// Reads a token with leading and trailing trivia, returning a real EOF at end.
+    ///
+    /// Trailing trivia ends after the first `NewLine` lexeme. The lexer classifies
+    /// trivia from characters without lexing the following raw token, so callers
+    /// may change header-name mode or diagnostic suppression before that token.
+    Token readToken();
 
-    /// Lex all tokens (up to the end of the stream) that are relevant to things like markup
-    TokenList lexAllMarkupTokens();
+    /// Selects recognition rules before the next raw token is read.
+    ///
+    /// The selected mode remains in effect across reads until another mode is selected.
+    void setMode(LexerMode mode) { m_mode = mode; }
 
-    /// Lex all tokens (up to the end of the stream) whether relevant or not.
-    TokenList lexAllTokens();
+    /// Reads all tokens with attached trivia, including the terminating EOF.
+    TokenList readAllTokens();
+
+    /// Reads every atomic lexeme, including trivia and the terminating EOF.
+    LexemeList readAllLexemes();
 
     /// Get the diagnostic sink, taking into account flags. Will return null if suppressing
     /// diagnostics.
@@ -166,12 +317,28 @@ struct Lexer
     TokenFlags m_tokenFlags;
     LexerFlags m_lexerFlags;
 
-    MemoryArena* m_memoryArena;
+    TokenPool* m_tokenPool = nullptr;
+    LexerMode m_mode = LexerMode::Normal;
+
+    // Records whether a logical character read removed an escaped newline in the
+    // current lexeme. `readLexeme()` resets the flag before recognition and uses it
+    // to decide whether to build a logical spelling with those bytes removed.
+    bool m_hasLineSpliceInCurrentLexeme = false;
 };
 
 
 // Helper routines for extracting values from tokens
-String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink);
+/// Decodes a string literal, including a C++ raw string.
+///
+/// Requires a non-empty token. Escaped physical newlines have already been removed from its
+/// logical spelling. An unterminated ordinary literal yields its decoded prefix; an incomplete
+/// raw-string delimiter yields an empty string. The lexer diagnoses missing delimiters, and
+/// this function diagnoses invalid escape sequences when `sink` is non-null.
+String getStringLiteralTokenValue(RawStringLiteral token, DiagnosticSink* sink);
+inline String getStringLiteralTokenValue(StringLiteralToken token, DiagnosticSink* sink)
+{
+    return getStringLiteralTokenValue(token.getRawToken().as<RawStringLiteral>(), sink);
+}
 String getFileNameTokenValue(Token const& token);
 
 // Note about integer literal values. This is the underlying storage type, but
@@ -228,11 +395,15 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     bool& outPrecisionLost,
     UnownedStringSlice& outErrorContent);
 
-// Returns a positive 32-bit code point in range [0, 0xffffffff] on success or
-// -1 on failure. A failure is also diagnosed.
-//
-// See docs/language-reference/expressions-literal.md for the literal format.
-IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink);
+/// Decodes a character literal to a 32-bit value, or diagnoses invalid text and returns -1.
+///
+/// Requires a non-empty token. Escape sequences and UTF-8 characters use the same code-point
+/// interpretation; a literal must contain exactly one character between its quotes.
+IntegerLiteralValue getCharLiteralValue(RawCharLiteral token, DiagnosticSink* sink);
+inline IntegerLiteralValue getCharLiteralValue(CharLiteralToken token, DiagnosticSink* sink)
+{
+    return getCharLiteralValue(token.getRawToken().as<RawCharLiteral>(), sink);
+}
 
 } // namespace Slang
 

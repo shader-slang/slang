@@ -2,6 +2,7 @@
 #include "slang-fiddle-script.h"
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-io.h"
 #if !SLANG_USE_SYSTEM_LUA
 #include "lua/lapi.h"
 #include "lua/lauxlib.h"
@@ -119,32 +120,102 @@ int _template(lua_State* L)
 
 lua_State* L = nullptr;
 
-// Add a custom searcher that handles relative paths
-// So we can do things like require("source/slang/foo.lua")
-static int path_searcher(lua_State* L)
+/// Returns the file of the nearest file-backed Lua caller, or an empty string.
+static String findLuaCallerFile(lua_State* L)
 {
-    const char* modname = luaL_checkstring(L, 1);
-
-    if (luaL_loadfile(L, modname) == LUA_OK)
+    // Fiddle names each generated chunk after its C++ input. Lua uses the same
+    // `@file` notation for loaded modules, so sibling imports work in both cases.
+    lua_Debug frame = {};
+    for (int level = 1; lua_getstack(L, level, &frame); ++level)
     {
-        lua_pushstring(L, modname); // Push filename as second return
-        return 2;
+        lua_getinfo(L, "S", &frame);
+        if (frame.source && frame.source[0] == '@')
+            return String(frame.source + 1);
     }
-
-    // Not found
-    lua_pushfstring(L, "\n\tno file '%s'", modname);
-    return 1;
+    return String();
 }
 
+/// The stack result left by a module search, before any Lua error is raised.
+enum class ModuleSearchResult
+{
+    LoaderFound, ///< A compiled loader and its filename are on the stack.
+    NoLoader,    ///< The attempted paths' I/O errors are on the stack.
+    LoadError,   ///< A loader error is on the stack.
+};
+
+/// Searches for the module name in Lua stack slot 1.
+///
+/// Tries unqualified names beside their caller before trying the name as a literal path.
+/// Returns a `ModuleSearchResult` and leaves its described values on the stack.
+static ModuleSearchResult searchModulePaths(lua_State* L)
+{
+    // We return errors as values so C++ strings are destroyed before Lua raises them.
+    const String moduleName = luaL_checkstring(L, 1);
+    StringBuilder attemptedPathErrors;
+    if (Path::getFileName(moduleName) == moduleName)
+    {
+        auto callerFile = findLuaCallerFile(L);
+        if (callerFile.getLength())
+        {
+            auto fileName = moduleName.endsWith(".lua") ? moduleName : moduleName + ".lua";
+            auto siblingPath = Path::combine(Path::getParentDirectory(callerFile), fileName);
+            int result = luaL_loadfile(L, siblingPath.getBuffer());
+            if (result == LUA_OK)
+            {
+                lua_pushstring(L, siblingPath.getBuffer());
+                return ModuleSearchResult::LoaderFound;
+            }
+            // An open/read failure permits another search path. We preserve Lua's
+            // actual I/O error, including unreadable files, if no loader is found.
+            // Syntax and other loading errors stop resolution at the found module.
+            if (result != LUA_ERRFILE)
+                return ModuleSearchResult::LoadError;
+            attemptedPathErrors << "\n\t" << lua_tostring(L, -1);
+            lua_pop(L, 1);
+        }
+    }
+
+    // Existing Fiddle invocations use paths such as `source/slang/foo.lua`. We try
+    // those paths unchanged, then leave other module conventions to Lua's searchers.
+    int result = luaL_loadfile(L, moduleName.getBuffer());
+    if (result == LUA_OK)
+    {
+        lua_pushstring(L, moduleName.getBuffer());
+        return ModuleSearchResult::LoaderFound;
+    }
+    if (result != LUA_ERRFILE)
+        return ModuleSearchResult::LoadError;
+    attemptedPathErrors << "\n\t" << lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushstring(L, attemptedPathErrors.getBuffer());
+    return ModuleSearchResult::NoLoader;
+}
+
+/// Implements Lua's module-searcher result-count and error protocol for path loading.
+static int path_searcher(lua_State* L)
+{
+    // A system Lua build may raise errors with `longjmp`, which skips C++ destructors.
+    // We call `lua_error` only after `searchModulePaths` has returned normally.
+    auto result = searchModulePaths(L);
+    if (result == ModuleSearchResult::LoadError)
+        return lua_error(L);
+    return result == ModuleSearchResult::LoaderFound ? 2 : 1;
+}
+
+/// Inserts Fiddle's searcher after preload, preserving the remaining searchers.
 void install_path_searcher(lua_State* L)
 {
     lua_getglobal(L, "package");
     lua_getfield(L, -1, "searchers");
 
-    // Insert at position 2 (after preload)
+    for (lua_Integer index = lua_Integer(lua_rawlen(L, -1)); index >= 2; --index)
+    {
+        lua_rawgeti(L, -1, index);
+        lua_rawseti(L, -2, index + 1);
+    }
     lua_pushcfunction(L, path_searcher);
     lua_rawseti(L, -2, 2);
-
     lua_pop(L, 2);
 }
 
