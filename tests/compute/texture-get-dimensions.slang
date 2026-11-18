@@ -1,9 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -shaderobj -emit-spirv-via-glsl
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12  -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
-// TODO(JS): Doesn't work on vk currently
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 // TODO(JS): Doesn't work on CUDA as there aren't any CUDA functions to get dimensions.
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
 // Not supported in WGSL: 1D array texture not supported in WGSL
