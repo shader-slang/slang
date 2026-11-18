@@ -5,7 +5,9 @@
 
 // `__intrinsic_op(0)` is the identity intrinsic, but the declared return type
 // of the call is binding: `int get()` reinterprets the bits of the UInt-backed
-// struct as int. Issue #14576.
+// struct as int. Issue #14576. This file is the issue's exact shader, extracted
+// from strongly-typed-id.slang so the SPIR-V assembly check compiles it in
+// isolation; the SPIRV pins below assert the re-typed value is a bit-reinterpret.
 
 __intrinsic_type(UInt)
 struct MyId2

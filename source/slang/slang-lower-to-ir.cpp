@@ -1007,22 +1007,10 @@ LoweredValInfo emitCallToDeclRef(
         // so we will emit an instruction with the chosen
         // opcode, and the arguments to the call as its operands.
         //
-        if (intrinsicOpModifier->op == 0) // Identity, just pass operand 0 through.
+        if (intrinsicOpModifier->op == 0) // Identity; the helper below honors the declared type.
         {
             SLANG_RELEASE_ASSERT(argCount == 1);
-            auto result = args[0];
-            // The identity operation still honors the call's declared result type when
-            // that type re-describes the same bits, as in `__intrinsic_op(0) int get()`
-            // on a `__intrinsic_type(UInt)` struct: we reinterpret the bits with a
-            // bit-cast rather than convert them, so the value is unchanged. Identity
-            // declarations whose declared type plays a different role than the operand's
-            // type (`Ptr` to `Ref` for `operator*`, a value to `Ptr` for `operator&`)
-            // intentionally keep passing the operand through unchanged, because the
-            // passes that consume those types expect the operand as it was lowered.
-            if (result->getFullType() != type &&
-                isSameSizeFixedBasicTypePair(result->getFullType(), type))
-                result = builder->emitBitCast(type, result);
-            return LoweredValInfo::simple(result);
+            return LoweredValInfo::simple(retypeIdentityIntrinsicResult(builder, args[0], type));
         }
         auto intrinsicOp = IROp(getIntrinsicOp(funcDecl, intrinsicOpModifier));
         switch (intrinsicOp)

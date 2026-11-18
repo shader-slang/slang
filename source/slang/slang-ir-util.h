@@ -286,11 +286,33 @@ bool hasGenericAssemblyImplementation(IRFunc* func);
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 
-/// Return whether a bit-cast from `fromType` to `toType` is guaranteed lowerable on every
-/// target: both are basic types whose size is fixed and equal. Basic types whose size depends on
-/// the target (`intptr_t`, `uintptr_t`) do not qualify, so callers can use this predicate at
-/// lowering time, where no target is available to compare a target-dependent size against.
+/// Return whether `fromType` and `toType` are both fixed-size basic types of equal byte
+/// size. This is a size comparison between target-independent sizes only: basic types
+/// whose size depends on the target (`intptr_t`, `uintptr_t`, `bool`) do not qualify, so
+/// callers can use this predicate at lowering time, where no target is available to
+/// compare a target-dependent size against. A fresh size table is used because the
+/// existing width helpers encode only integer widths in bits (`maybeGetIntTypeWidth`)
+/// or only floating-point properties, not one fixed-vs-target-dependent classification
+/// over the whole basic-type set.
 bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType);
+
+/// Return the value that substitutes an `__intrinsic_op(0)` (identity) call whose
+/// operand is `operand` and whose declared result type is `declaredType`.
+///
+/// The identity operation still honors the call's declared result type when that type
+/// re-describes the operand's bits, as in `__intrinsic_op(0) int get()` on an
+/// `__intrinsic_type(UInt)` struct: we return a bit-cast of the operand to the declared
+/// type, which keeps the bit pattern (though not necessarily the numeric value)
+/// unchanged. The type comparison is pointer identity, which is sound because basic-type
+/// instructions are module-deduplicated singletons.
+///
+/// Every other shape keeps the operand as lowered. The declared type may play a
+/// different role than the operand's type (`Ptr` to `Ref` for `operator*`, `Ref` to
+/// `Ptr` for `operator&`), where a bit-cast is not a bit-reinterpret at all and the
+/// bit-cast lowering pass rejects the pair; or the pair may fall outside what every
+/// target can lower (vectors, size-mismatched scalars, `bool`, target-sized integers),
+/// which preserves the historical pass-through behavior.
+IRInst* retypeIdentityIntrinsicResult(IRBuilder* builder, IRInst* operand, IRType* declaredType);
 
 /// Return whether `type` is itself a texture or storage image, a sampler, a combined
 /// texture-sampler, a subpass input (including a GLSL input attachment), or an acceleration

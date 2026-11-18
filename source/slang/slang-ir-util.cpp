@@ -2772,13 +2772,15 @@ IRParam* getParamAt(IRBlock* block, UIndex ii)
     SLANG_UNEXPECTED("ii >= paramCount");
 }
 
-// Return the fixed byte size of a basic type, or 0 when the type is not a basic
-// type or its size depends on the target (`intptr_t`, `uintptr_t`).
+// Return the fixed byte size of a basic type, or 0 when the type is not a fixed-size
+// basic type or its size depends on the target. `intptr_t` and `uintptr_t` vary with the
+// target's pointer size, and `bool` is 4 bytes under the GPU/natural layout but 1 byte
+// under the C and LLVM rules used by the CPU and CUDA targets, so none of the three can
+// be matched by a size comparison at lowering time.
 static int32_t _getFixedBasicTypeSize(IROp op)
 {
     switch (op)
     {
-    case kIROp_BoolType:
     case kIROp_IntType:
     case kIROp_UIntType:
     case kIROp_FloatType:
@@ -2808,6 +2810,14 @@ bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType)
     if (fromSize == 0)
         return false;
     return fromSize == _getFixedBasicTypeSize(toType->getOp());
+}
+
+IRInst* retypeIdentityIntrinsicResult(IRBuilder* builder, IRInst* operand, IRType* declaredType)
+{
+    auto operandType = operand->getFullType();
+    if (operandType == declaredType || !isSameSizeFixedBasicTypePair(operandType, declaredType))
+        return operand;
+    return builder->emitBitCast(declaredType, operand);
 }
 
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
