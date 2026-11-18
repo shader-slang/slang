@@ -208,6 +208,10 @@ SlangResult passthroughDownstreamDiagnostics(
     IDownstreamCompiler* compiler,
     IArtifact* artifact)
 {
+    // A downstream compile that produced nothing has no diagnostics to extract.
+    if (!artifact)
+        return SLANG_OK;
+
     auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     if (!diagnostics)

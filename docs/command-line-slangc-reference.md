@@ -1213,6 +1213,10 @@ Language
 * `glsl` : GLSL language 
 * `hlsl` : HLSL language 
 * `cu`, `cuda` : CUDA 
+* `spirv` : SPIR-V 
+* `metal` : Metal language 
+* `wgsl` : WGSL language 
+* `llvm` : LLVM IR 
 
 <a id="language-version"></a>
 ## language-version

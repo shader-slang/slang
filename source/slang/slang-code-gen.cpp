@@ -105,6 +105,15 @@ SlangResult CodeGenContext::emitEntryPointsSource(ComPtr<IArtifact>& outArtifact
     auto endToEndReq = isPassThroughEnabled();
     if (endToEndReq)
     {
+        // Pass-through emits the source of exactly one entry point's translation unit; the
+        // loop below returns after its first iteration, so a count other than one would either
+        // emit nothing (zero) or silently drop every entry point after the first.
+        if (getEntryPointCount() != 1)
+        {
+            getSink()->diagnose(Diagnostics::PassThroughRequiresEntryPoint{});
+            return SLANG_FAIL;
+        }
+
         for (auto entryPointIndex : getEntryPointIndices())
         {
             auto translationUnit = getPassThroughTranslationUnit(endToEndReq, entryPointIndex);
@@ -361,6 +370,22 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 {
     outArtifact.setNull();
 
+    // Pass-through hands one translation unit's source to the downstream compiler: the unit of
+    // the (single) selected entry point. Whole-program targets (such as host-callable) carry
+    // every declared entry point — or none, since no `-entry` is required there — and only
+    // exactly one entry point identifies a translation unit to hand over, so anything else is
+    // diagnosed rather than passed to `getSingleEntryPointIndex` below. The check runs before
+    // the downstream compiler is loaded so that the outcome does not depend on whether the
+    // compiler is installed. It lives here rather than beside the language gate because the
+    // count is per emit context: a multi-entry-point request with one output per entry point
+    // emits one context per entry point, each with a single index, and those compiles must
+    // keep working.
+    if (isPassThroughEnabled() && getEntryPointCount() != 1)
+    {
+        getSink()->diagnose(Diagnostics::PassThroughRequiresEntryPoint{});
+        return SLANG_FAIL;
+    }
+
     auto sink = getSink();
     auto session = getSession();
 
@@ -460,11 +485,12 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         // We are just passing thru, so it's whatever it originally was
         sourceLanguage = translationUnit->sourceLanguage;
 
-        // TODO(JS): This seems like a bit of a hack
-        // That if a pass-through is being performed and the source language is Slang
-        // no downstream compiler knows how to deal with that, so probably means 'HLSL'
-        sourceLanguage =
-            (sourceLanguage == SourceLanguage::Slang) ? SourceLanguage::HLSL : sourceLanguage;
+        // A downstream compiler never consumes Slang source directly, so in pass-through mode
+        // Slang input means HLSL; `getPassThroughCompileLanguage` is the one definition of that
+        // mapping, shared with the source-language gate in
+        // `EndToEndCompileRequest::executeActionsInner`.
+        sourceLanguage = (SourceLanguage)DownstreamCompilerInfo::getPassThroughCompileLanguage(
+            (SlangSourceLanguage)sourceLanguage);
         sourceTarget = CodeGenTarget(TypeConvertUtil::getCompileTargetFromSourceLanguage(
             (SlangSourceLanguage)sourceLanguage));
 
@@ -1039,11 +1065,21 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-    // Extract diagnostics regardless of compile result
+    // Extract diagnostics regardless of compile result: a downstream compiler that fails may
+    // or may not have produced an artifact carrying them (the contract on
+    // `IDownstreamCompiler::compile` leaves that to the implementation), and
+    // `passthroughDownstreamDiagnostics` itself treats a null artifact as "no diagnostics",
+    // so the same call covers both outcomes and the other, unguarded callers.
     SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
 
     // Now check if compile failed
     SLANG_RETURN_ON_FAIL(compileResult);
+
+    // A compiler that reports success must have produced an output artifact; without this the
+    // association loop below would dereference a null artifact.
+    SLANG_ASSERT(artifact);
+    if (!artifact)
+        return SLANG_FAIL;
 
     // Copy over all of the information associated with the source into the output
     if (sourceArtifact)

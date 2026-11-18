@@ -1686,10 +1686,8 @@ static SlangResult _calcCommandLine(
 
             if (languageToWrite != SourceLanguage::Unknown)
             {
-                auto languageName = NameValueUtil::findName(
-                    TypeTextUtil::getLanguageInfos(),
-                    ValueInt(languageToWrite));
-                SLANG_RELEASE_ASSERT(languageName.getLength() != 0);
+                auto languageName =
+                    TypeTextUtil::getSourceLanguageName(SlangSourceLanguage(languageToWrite));
 
                 // Keep `-lang` adjacent to this translation unit's source paths. The command-line
                 // parser consumes those paths as explicit-language inputs, which reproduces a

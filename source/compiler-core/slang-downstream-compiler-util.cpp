@@ -52,13 +52,26 @@ struct DownstreamCompilerInfos
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
     infos.infos[int(SLANG_PASS_THROUGH_LLVM)] =
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    // The generic compiler dispatches to visual studio, clang or gcc, and accepts C and C++
+    // like each of them. Recording this is load-bearing for the pass-through language gate,
+    // which skips compilers with no table entry; it also means
+    // Session::setDefaultDownstreamCompiler accepts genericcpp for C/C++ (with no entry it
+    // would return SLANG_FAIL through the zero-flag default).
+    infos.infos[int(SLANG_PASS_THROUGH_GENERIC_C_CPP)] =
+        Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
 
     infos.infos[int(SLANG_PASS_THROUGH_NVRTC)] = Info(SourceLanguageFlag::CUDA);
 
     infos.infos[int(SLANG_PASS_THROUGH_DXC)] = Info(SourceLanguageFlag::HLSL);
     infos.infos[int(SLANG_PASS_THROUGH_FXC)] = Info(SourceLanguageFlag::HLSL);
-    infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] = Info(SourceLanguageFlag::GLSL);
-    infos.infos[int(SLANG_PASS_THROUGH_SPIRV_OPT)] = Info(SourceLanguageFlag::SPIRV);
+    // Glslang and spirv-opt are both served by the slang-glslang wrapper, whose compile
+    // handles either input: GLSL source (compiled to SPIR-V) or SPIR-V (optimized), so
+    // pass-through requests in either language work for both spellings, and
+    // `setDefaultDownstreamCompiler` accepts either language for them.
+    infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] =
+        Info(SourceLanguageFlag::GLSL | SourceLanguageFlag::SPIRV);
+    infos.infos[int(SLANG_PASS_THROUGH_SPIRV_OPT)] =
+        Info(SourceLanguageFlag::SPIRV | SourceLanguageFlag::GLSL);
 
     return infos;
 }
@@ -80,6 +93,13 @@ struct DownstreamCompilerInfos
 {
     const auto& info = getInfo(compiler);
     return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
+}
+
+/* static */ SlangSourceLanguage DownstreamCompilerInfo::getPassThroughCompileLanguage(
+    SlangSourceLanguage sourceLanguage)
+{
+    return (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG) ? SLANG_SOURCE_LANGUAGE_HLSL
+                                                           : sourceLanguage;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/

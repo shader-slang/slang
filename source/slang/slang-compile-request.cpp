@@ -249,16 +249,11 @@ static void _outputIncludes(
     }
 }
 
-/// Returns the user-facing name of a concrete source language for a diagnostic.
-///
-/// `Unknown` is out of contract because it represents the absence of a language selection rather
-/// than a language that can be named to a user.
+/// Returns the user-facing name of a source language, in the internal `SourceLanguage`
+/// spelling used by the front end.
 static UnownedStringSlice _getSourceLanguageName(SourceLanguage language)
 {
-    SLANG_RELEASE_ASSERT(language != SourceLanguage::Unknown);
-    auto name = NameValueUtil::findName(TypeTextUtil::getLanguageInfos(), ValueInt(language));
-    SLANG_RELEASE_ASSERT(name.getLength() != 0);
-    return name;
+    return TypeTextUtil::getSourceLanguageName(SlangSourceLanguage(language));
 }
 
 /// Merge one preprocessed source unit's language directive into translation-unit provenance.

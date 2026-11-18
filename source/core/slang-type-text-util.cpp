@@ -107,6 +107,10 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_SHADER_LLVM_IR, "ll", "llvm-shader-ir", "LLVM IR assembly (shader style)"},
 };
 
+// This table must carry an entry for every concrete `SlangSourceLanguage` except `Unknown`:
+// `TypeTextUtil::getSourceLanguageName` release-asserts a non-empty result, and
+// `findSourceLanguage` parses the `-lang` option from the same names, so an added entry also
+// makes its names accepted `-lang` spellings (previously an unknown-source-language error).
 static const NamesDescriptionValue s_languageInfos[] = {
     {SLANG_SOURCE_LANGUAGE_C, "c,C", "C language"},
     {SLANG_SOURCE_LANGUAGE_CPP, "cpp,c++,C++,cxx", "C++ language"},
@@ -114,6 +118,10 @@ static const NamesDescriptionValue s_languageInfos[] = {
     {SLANG_SOURCE_LANGUAGE_GLSL, "glsl", "GLSL language"},
     {SLANG_SOURCE_LANGUAGE_HLSL, "hlsl", "HLSL language"},
     {SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda", "CUDA"},
+    {SLANG_SOURCE_LANGUAGE_SPIRV, "spirv", "SPIR-V"},
+    {SLANG_SOURCE_LANGUAGE_METAL, "metal", "Metal language"},
+    {SLANG_SOURCE_LANGUAGE_WGSL, "wgsl", "WGSL language"},
+    {SLANG_SOURCE_LANGUAGE_LLVM, "llvm", "LLVM IR"},
 };
 
 static const NamesDescriptionValue s_languageVersionInfos[] = {
@@ -384,6 +392,14 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)
 {
     return NameValueUtil::findValue(getLanguageInfos(), text, SLANG_SOURCE_LANGUAGE_UNKNOWN);
+}
+
+/* static */ UnownedStringSlice TypeTextUtil::getSourceLanguageName(SlangSourceLanguage language)
+{
+    SLANG_RELEASE_ASSERT(language != SLANG_SOURCE_LANGUAGE_UNKNOWN);
+    auto name = NameValueUtil::findName(getLanguageInfos(), ValueInt(language));
+    SLANG_RELEASE_ASSERT(name.getLength() != 0);
+    return name;
 }
 
 /* static */ SlangLanguageVersion TypeTextUtil::findLanguageVersion(const UnownedStringSlice& text)
