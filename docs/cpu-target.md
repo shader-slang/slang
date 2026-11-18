@@ -15,6 +15,7 @@ Slang has preliminary support for producing CPU source and binaries.
 These limitations apply to Slang transpiling to C++. 
 
 * Barriers are not supported (making these work would require an ABI change)
+* Wave intrinsics: each thread is a wave of one lane. `WaveGetLaneCount()` is 1, `WaveGetLaneIndex()` is 0, `WaveIsFirstLane()` is true, the `WaveActive*` reductions and `WaveReadLaneFirst` / `WaveReadLaneAt` return the thread's own value, `WaveActiveBallot` sets bit 0 only, and the exclusive `WavePrefixSum` / `WavePrefixProduct` / `WavePrefixCountBits` return 0, 1 and 0. Code that assumes a fixed wave size larger than one does not work. Quad operations, shuffles, `WaveMatch` and the `WaveMask*` / `WaveMulti*` forms are not supported
 * Atomics are not supported in user code; the C++ backend implements only 32- and 64-bit integer atomic add, for compiler-generated code such as shader coverage counters
 * Limited support for [out of bounds](#out-of-bounds) accesses handling
 * Entry point/s cannot be named `main` (this is because downstream C++ compiler/s expecting a regular `main`)
