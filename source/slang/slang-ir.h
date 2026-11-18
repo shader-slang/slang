@@ -2100,6 +2100,14 @@ struct ModuleLinkingInfo : RefObject
     /// The result is only valid while the module is unchanged from when this info was built.
     ArrayView<IRInst*> getKnownBuiltins() { return m_knownBuiltins.getArrayView(); }
 
+    /// Query the acceleration cache for global variables whose initializers might have side
+    /// effects. The result is only valid while the module is unchanged from when this info was
+    /// built.
+    ArrayView<IRInst*> getGlobalVarsWithSideEffectingInit()
+    {
+        return m_globalVarsWithSideEffectingInit.getArrayView();
+    }
+
     /// Return the module's GlobalHashedStringLiterals aggregate, if present when this info was
     /// built.
     IRGlobalHashedStringLiterals* getGlobalHashedStringLiterals()
@@ -2117,6 +2125,7 @@ private:
     List<IRInst*> m_hlslExports;
     List<IRInst*> m_globalParams;
     List<IRInst*> m_knownBuiltins;
+    List<IRInst*> m_globalVarsWithSideEffectingInit;
 
     // Cached while walking global instructions with the linker caches above. Each module is
     // expected to contain at most one IRGlobalHashedStringLiterals instruction.
