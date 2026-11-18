@@ -88,10 +88,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // A non-square matrix pins the row and column roles of the expansion: the
 // rows of a `float3x2` are `float2`, so a dimensions mixup in the per-row
 // rewrite (building `float3` rows instead) fails the via-GLSL round-trip.
-// The helper is `[noinline]` so the `%` inside it stays in a non-entry
-// function, pinning that the walk covers every function, not just entry
-// points. The compound `%=` and the `%` consumed inside the `if` lower to
-// the same matrix `FRem` in a different block.
+// The compound `%=` in the entry point and the `%` inside the `if` each
+// lower to a matrix `FRem` in a different block of the same function.
 [noinline]
 float3x2 nonSquareHelper(float3x2 m)
 {
@@ -106,7 +104,7 @@ void nonSquareMain(uint3 tid : SV_DispatchThreadID)
     float3x2 n = nonSquareHelper(m);
     if (tid.x == 0)
     {
-        outputBuffer[0] = n[2][0];
+        outputBuffer[0] = n[2][0] + (m % 0.75)[2][1];
     }
 
     //CHECK_GLSL_NSQ-NOT: sign(m_0)
