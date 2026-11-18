@@ -4,8 +4,7 @@
 // module-scope static whose initializer is a pure constant expression has no
 // observable effect, so the host-target link must keep dropping it — no
 // __slang_global_constructor and no llvm.global_ctors entry should appear. The
-// side-effecting variants (static-init-atomic-diag.slang,
-// static-init-benign-ctor.slang) are the ones the link preserves.
+// side-effecting variants in this directory are the ones the link preserves.
 
 //CHECK-NOT: __slang_global_constructor
 //CHECK-NOT: llvm.global_ctors

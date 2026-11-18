@@ -1,0 +1,7 @@
+result code = 0
+standard error = {
+}
+standard output = {
+unreferenced-static-init=6
+referenced-static=11
+}

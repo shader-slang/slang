@@ -13,7 +13,7 @@
 
 //CHECK-DAG: define internal void @__slang_global_constructor
 //CHECK-DAG: call i32 @{{.*}}computeInitialValue
-// The mangled name of `s` is the export symbol `_SVR...1s`.
+// The mangled name of `s` is `_SVR...1s`.
 //CHECK-DAG: store i32 {{.*}}, ptr @{{.*}}1s
 // The ctor is registered in llvm.global_ctors so it runs once at load.
 //CHECK-DAG: llvm.global_ctors{{.*}}__slang_global_constructor
