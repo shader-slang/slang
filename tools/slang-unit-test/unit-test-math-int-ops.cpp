@@ -326,7 +326,7 @@ void checkComparisonPattern(
 
     SLANG_CHECK(checkEquals(
         getCompareExpectancy(compType, OrderType::LhsLessThanRhs),
-        fn(MathIntValue::constructFromValue(MathIntType::Int32Type, 0x800000000),
+        fn(MathIntValue::constructFromValue(MathIntType::Int32Type, 0x80000000U),
            MathIntValue::constructFromValue(MathIntType::UInt16Type, 0x7FFF))));
 }
 
