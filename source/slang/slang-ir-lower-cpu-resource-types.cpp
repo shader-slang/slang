@@ -75,8 +75,10 @@ struct ResourceTypeLoweringContext : InstPassBase
         // validateAtomicOperations, and isValidAtomicDest accepts UserPointer
         // but not Generic, so a Generic pointer here would make every atomic
         // into a lowered buffer fail destination validation. Generic would
-        // also never be fixed up later: address-space specialization only runs
-        // for the GLSL, Metal and WGSL targets. The host-memory model applies
+        // also never be fixed up later: address-space specialization runs only
+        // for GPU targets (GLSL, Metal, WGSL, and SPIR-V during its
+        // legalization pipeline), never on the CPU-via-LLVM path. The
+        // host-memory model applies
         // uniformly to all three sites, including the read-only
         // ConstantBuffer/ParameterBlock payload — on CPU that memory is
         // ordinary writable host memory, and the access qualifier stays

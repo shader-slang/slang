@@ -6268,7 +6268,7 @@ err(
     "atomic-operations-not-supported-on-llvm-cpu-target",
     55219,
     "atomic operations are not supported on this target",
-    span { loc = "location", message = "atomic operations are not supported when generating code for CPU targets through LLVM ('-emit-cpu-via-llvm'); the LLVM backend does not implement them" }
+    span { loc = "location", message = "atomic operations are not supported when generating code for CPU targets through LLVM; the LLVM backend does not implement them" }
 )
 
 err(
