@@ -37,7 +37,9 @@ struct DownstreamCompilerInfo
     static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
     /// Returns the source language a pass-through compile actually presents to the downstream
     /// compiler. No downstream compiler consumes Slang source directly, so Slang input is
-    /// treated as HLSL; every other language passes through unchanged.
+    /// treated as HLSL; every other language passes through unchanged. It lives here, next to
+    /// `canCompile`, because pass-through gating calls the two together: the gate validates
+    /// the language this mapping returns against the compiler's recorded languages.
     static SlangSourceLanguage getPassThroughCompileLanguage(SlangSourceLanguage sourceLanguage);
 
     DownstreamCompilerInfo()

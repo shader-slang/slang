@@ -84,8 +84,9 @@ SlangResult CommandLineDownstreamCompiler::compile(
     if (!isVersionCompatible(inOptions))
     {
         // Not possible to compile with this version of the interface.
-        // TODO: Fix other `IDownstreamCompiler::compile` implementations not always writing to
-        // `outArtifact` when returning early.
+        // TODO: Fix the `IDownstreamCompiler::compile` implementations that leave `outArtifact`
+        // unset on early failure (glslang's wrapper does; see the contract documented on the
+        // interface) so the artifact is always assigned.
         const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(inOptions.targetType);
         auto artifact = ArtifactUtil::createArtifact(targetDesc);
         auto diagnostics = ArtifactDiagnostics::create();

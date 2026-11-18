@@ -249,10 +249,8 @@ static void _outputIncludes(
     }
 }
 
-/// Returns the user-facing name of a concrete source language for a diagnostic.
-///
-/// `Unknown` is out of contract because it represents the absence of a language selection rather
-/// than a language that can be named to a user.
+/// Returns the user-facing name of a source language, in the internal `SourceLanguage`
+/// spelling used by the front end.
 static UnownedStringSlice _getSourceLanguageName(SourceLanguage language)
 {
     return TypeTextUtil::getSourceLanguageName(SlangSourceLanguage(language));

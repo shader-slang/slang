@@ -11,7 +11,8 @@ using namespace Slang;
 // IDownstreamCompiler::compile leaves that to the implementation), and callers that hit such a
 // failure flow the null artifact to passthroughDownstreamDiagnostics. The function must treat a
 // null artifact as "no diagnostics" rather than dereference it — this guards the shared fix on
-// every platform, independent of any downstream toolkit.
+// every platform, independent of any downstream toolkit. The null compiler argument is
+// incidental: the early return never touches it.
 SLANG_UNIT_TEST(passThroughDownstreamDiagnosticsNullArtifact)
 {
     DiagnosticSink sink;

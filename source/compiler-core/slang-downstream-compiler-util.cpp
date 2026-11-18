@@ -65,7 +65,9 @@ struct DownstreamCompilerInfos
     infos.infos[int(SLANG_PASS_THROUGH_DXC)] = Info(SourceLanguageFlag::HLSL);
     infos.infos[int(SLANG_PASS_THROUGH_FXC)] = Info(SourceLanguageFlag::HLSL);
     // Glslang and spirv-opt are both served by the slang-glslang wrapper, whose compile
-    // handles either input: GLSL source (compiled to SPIR-V) or SPIR-V (optimized).
+    // handles either input: GLSL source (compiled to SPIR-V) or SPIR-V (optimized), so
+    // pass-through requests in either language work for both spellings, and
+    // `setDefaultDownstreamCompiler` accepts either language for them.
     infos.infos[int(SLANG_PASS_THROUGH_GLSLANG)] =
         Info(SourceLanguageFlag::GLSL | SourceLanguageFlag::SPIRV);
     infos.infos[int(SLANG_PASS_THROUGH_SPIRV_OPT)] =

@@ -189,13 +189,13 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // downstream compiler, so that compiler must accept the unit's source language. The check
     // is deliberately fail-fast over every translation unit even though a pass-through
     // consume uses only one of them: a request mixing languages the selected compiler cannot
-    // all take is a command-line or API error worth rejecting up front, and the whole-program
-    // spellings of this request have no entry point at all, so scoping the check to
-    // entry-point translation units would report the less specific error. Like the coverage
-    // check above, this lives here (not in `OptionsParser::_parse`) so that C++ API callers
-    // using `setPassThrough()` are also covered, and like that check it runs before the
-    // preprocessor-output and no-codegen early-outs below: an incoherent pass-through request
-    // is diagnosed even when code generation would not have run.
+    // take is a command-line or API error worth rejecting up front, and whole-program requests
+    // have no entry point at all, so scoping the check to entry-point translation units would
+    // report the less specific error. Like the coverage check above, this lives here (not in
+    // `OptionsParser::_parse`) so that C++ API callers using `setPassThrough()` are also
+    // covered, and like that check it runs before the preprocessor-output and no-codegen
+    // early-outs below: an incoherent pass-through request is diagnosed even when code
+    // generation would not have run.
     if (m_passThrough != PassThroughMode::None)
     {
         const auto passThroughCompiler = SlangPassThrough(m_passThrough);
@@ -203,7 +203,9 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         // An entry with no source-language flags means the languages the compiler accepts are
         // not recorded in the table (metal, tint — there are no flag bits for Metal or WGSL
         // source; the spirv-dis and spirv-link entries are simply unrecorded), so leave such
-        // compilers' behavior unchanged.
+        // compilers' behavior unchanged. The skip is deliberate: recording those languages
+        // would mean inventing flag bits for source languages no current pass-through flow
+        // uses, and it can be revisited when a downstream compiler consuming them exists.
         if (compilerInfo.sourceLanguageFlags != 0)
         {
             bool languageRejected = false;
@@ -222,6 +224,8 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
                         SlangSourceLanguage(sourceLanguage)));
                 if (!DownstreamCompilerInfo::canCompile(passThroughCompiler, compileLanguage))
                 {
+                    // The diagnostic names the language the user selected, not the HLSL that
+                    // Slang input maps to for the capability check.
                     getSink()->diagnose(Diagnostics::PassThroughCannotCompileSourceLanguage{
                         .compiler = TypeTextUtil::getPassThroughName(passThroughCompiler),
                         .language = TypeTextUtil::getSourceLanguageName(
@@ -1542,11 +1546,16 @@ void EndToEndCompileRequest::setOutputContainerFormat(SlangContainerFormat forma
 void EndToEndCompileRequest::setPassThrough(SlangPassThrough inPassThrough)
 {
     // The enum arrives from the public API and from replayed record files, so pin the value to
-    // the enum's range before anything indexes a per-compiler table with it. `None` is the
-    // legal "no pass-through" value, unlike `setDownstreamCompilerPath`'s lower bound.
-    SLANG_ASSERT(
-        int(inPassThrough) >= int(PassThroughMode::None) &&
-        int(inPassThrough) < int(PassThroughMode::CountOf));
+    // the enum's range before anything indexes a per-compiler table with it; an assert would
+    // compile to an assumption in Release builds. `None` is the legal "no pass-through"
+    // value, and an out-of-range value is stored as `None` rather than rejected because the
+    // API method cannot report.
+    if (int(inPassThrough) < int(PassThroughMode::None) ||
+        int(inPassThrough) >= int(PassThroughMode::CountOf))
+    {
+        m_passThrough = PassThroughMode::None;
+        return;
+    }
     m_passThrough = PassThroughMode(inPassThrough);
 }
 
