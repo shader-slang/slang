@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
@@ -5254,6 +5255,28 @@ void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
                 legalizeBoolSwitch(switchInst);
         }
     }
+}
+
+static void legalizeShiftOperands(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+        legalizeScalarOperandsToMatchComposite(inst);
+        break;
+    default:
+        break;
+    }
+    for (auto child : inst->getModifiableChildren())
+    {
+        legalizeShiftOperands(child);
+    }
+}
+
+void legalizeShiftOperandsForGLSL(IRModule* module)
+{
+    legalizeShiftOperands(module->getModuleInst());
 }
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module)

@@ -2487,6 +2487,16 @@ Result linkAndOptimizeIR(
             // `bool` reaches here unchanged, so rewrite it to an integer switch.
             SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
 
+            // GLSL rejects a shift of a scalar by a vector, although it accepts a scalar
+            // operand on most other binary operators, and the front end lowers
+            // `scalar >> vector` to a single mixed-shape Lsh/Rsh. Direct SPIR-V
+            // emission splats the scalar operand itself while emitting, so the shapes only
+            // need unifying on the GLSL source path, which `-emit-spirv-via-glsl` also uses.
+            if (target == CodeGenTarget::GLSL)
+            {
+                SLANG_PASS(legalizeShiftOperandsForGLSL);
+            }
+
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
