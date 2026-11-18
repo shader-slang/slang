@@ -2825,6 +2825,11 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     // unless the use supplies generic arguments or the type through which the member was looked
     // up. Only in those cases can the use see operand values that the declaration check could
     // not, so only then does it report fold diagnostics again.
+    //
+    // TODO: Every use with the same arguments reports the same failure again. For example, two
+    // uses of `Generic<0>.quotient` where `quotient = 10 / N` each report the division by zero
+    // at the initializer. Reporting each failure once requires recording the reported failures
+    // by operation site and concrete operands.
     SubstitutionSet substitutions(declRef);
     ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
     newCircularityInfo.reportsFoldDiagnostics =

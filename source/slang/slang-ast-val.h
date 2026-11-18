@@ -250,6 +250,12 @@ class BuiltinOperationIntVal : public IntVal
             m_operands.add(ValNodeOperand(arg));
     }
 
+    // Return the constant result of applying `op` to `newArgs`, or null when the operation
+    // cannot be folded. Folding fails when an argument is still symbolic, when the result or an
+    // argument type is not an integer type that folding supports, or when the result is
+    // undefined or target-defined. A non-null `sink` receives the diagnostic for an undefined
+    // or target-defined result, but the return value is null either way.
+    //
     // `loc` is the source location of the operator expression being folded; it is used only to
     // locate the fold diagnostics (divide by zero and target-defined value). The sink-less
     // substitute/resolve callers leave it defaulted (they never diagnose).

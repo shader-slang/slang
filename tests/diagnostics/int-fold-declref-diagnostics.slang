@@ -57,7 +57,8 @@ void use_depends_on_failing()
 }
 
 // The declaration check of a generic constant cannot see `N`, so the use that supplies `N = 0`
-// reports the division by zero, at the initializer.
+// reports the division by zero, at the initializer. A second use of `Generic<0>.quotient` would
+// report it again (see the TODO in `SemanticsVisitor::tryConstantFoldDeclRef`).
 struct Generic<let N : int>
 {
     static const int quotient = 10 / N;

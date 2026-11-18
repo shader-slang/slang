@@ -25,82 +25,82 @@
 // Division and remainder by zero are undefined.
 
 static const int8_t div_i8_by_zero_b = int8_t(5) / int8_t(0);
-//CHECK:                                         ^ divide by zero
+//CHECK:                                         ^ error E30002
 void use_div_i8_by_zero_b() { switch (int8_t(0)) { case 0: case div_i8_by_zero_b: break; } }
 //CHECK:                                                        ^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const int8_t div_i8_by_zero_n = operator/(int8_t(5), int8_t(0));
-//CHECK:                               ^^^^^^^^ divide by zero
+//CHECK:                               ^^^^^^^^ error E30002
 void use_div_i8_by_zero_n() { switch (int8_t(0)) { case 0: case div_i8_by_zero_n: break; } }
 //CHECK:                                                        ^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 
 static const int8_t rem_i8_by_zero_b = int8_t(5) % int8_t(0);
-//CHECK:                                         ^ divide by zero
+//CHECK:                                         ^ error E30002
 void use_rem_i8_by_zero_b() { switch (int8_t(0)) { case 0: case rem_i8_by_zero_b: break; } }
 //CHECK:                                                        ^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const int8_t rem_i8_by_zero_n = operator%(int8_t(5), int8_t(0));
-//CHECK:                               ^^^^^^^^ divide by zero
+//CHECK:                               ^^^^^^^^ error E30002
 void use_rem_i8_by_zero_n() { switch (int8_t(0)) { case 0: case rem_i8_by_zero_n: break; } }
 //CHECK:                                                        ^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 
 static const uint8_t div_u8_by_zero_b = uint8_t(0x05) / uint8_t(0x00);
-//CHECK:                                              ^ divide by zero
+//CHECK:                                              ^ error E30002
 void use_div_u8_by_zero_b() { switch (uint8_t(0)) { case 0: case div_u8_by_zero_b: break; } }
 //CHECK:                                                         ^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const uint8_t div_u8_by_zero_n = operator/(uint8_t(0x05), uint8_t(0x00));
-//CHECK:                                ^^^^^^^^ divide by zero
+//CHECK:                                ^^^^^^^^ error E30002
 void use_div_u8_by_zero_n() { switch (uint8_t(0)) { case 0: case div_u8_by_zero_n: break; } }
 //CHECK:                                                         ^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 
 static const uint8_t rem_u8_by_zero_b = uint8_t(0x05) % uint8_t(0x00);
-//CHECK:                                              ^ divide by zero
+//CHECK:                                              ^ error E30002
 void use_rem_u8_by_zero_b() { switch (uint8_t(0)) { case 0: case rem_u8_by_zero_b: break; } }
 //CHECK:                                                         ^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const uint8_t rem_u8_by_zero_n = operator%(uint8_t(0x05), uint8_t(0x00));
-//CHECK:                                ^^^^^^^^ divide by zero
+//CHECK:                                ^^^^^^^^ error E30002
 void use_rem_u8_by_zero_n() { switch (uint8_t(0)) { case 0: case rem_u8_by_zero_n: break; } }
 //CHECK:                                                         ^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 
 static const int64_t div_i64_by_zero_b = int64_t(5) / int64_t(0);
-//CHECK:                                            ^ divide by zero
+//CHECK:                                            ^ error E30002
 void use_div_i64_by_zero_b() { switch (int64_t(0)) { case 0: case div_i64_by_zero_b: break; } }
 //CHECK:                                                          ^^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const int64_t div_i64_by_zero_n = operator/(int64_t(5), int64_t(0));
-//CHECK:                                 ^^^^^^^^ divide by zero
+//CHECK:                                 ^^^^^^^^ error E30002
 void use_div_i64_by_zero_n() { switch (int64_t(0)) { case 0: case div_i64_by_zero_n: break; } }
 //CHECK:                                                          ^^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 
 static const int64_t rem_i64_by_zero_b = int64_t(5) % int64_t(0);
-//CHECK:                                            ^ divide by zero
+//CHECK:                                            ^ error E30002
 void use_rem_i64_by_zero_b() { switch (int64_t(0)) { case 0: case rem_i64_by_zero_b: break; } }
 //CHECK:                                                          ^^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const int64_t rem_i64_by_zero_n = operator%(int64_t(5), int64_t(0));
-//CHECK:                                 ^^^^^^^^ divide by zero
+//CHECK:                                 ^^^^^^^^ error E30002
 void use_rem_i64_by_zero_n() { switch (int64_t(0)) { case 0: case rem_i64_by_zero_n: break; } }
 //CHECK:                                                          ^^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 
 static const uint64_t div_u64_by_zero_b = uint64_t(5) / uint64_t(0);
-//CHECK:                                              ^ divide by zero
+//CHECK:                                              ^ error E30002
 void use_div_u64_by_zero_b() { switch (uint64_t(0)) { case 0: case div_u64_by_zero_b: break; } }
 //CHECK:                                                           ^^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const uint64_t div_u64_by_zero_n = operator/(uint64_t(5), uint64_t(0));
-//CHECK:                                  ^^^^^^^^ divide by zero
+//CHECK:                                  ^^^^^^^^ error E30002
 void use_div_u64_by_zero_n() { switch (uint64_t(0)) { case 0: case div_u64_by_zero_n: break; } }
 //CHECK:                                                           ^^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 
 static const uint64_t rem_u64_by_zero_b = uint64_t(5) % uint64_t(0);
-//CHECK:                                              ^ divide by zero
+//CHECK:                                              ^ error E30002
 void use_rem_u64_by_zero_b() { switch (uint64_t(0)) { case 0: case rem_u64_by_zero_b: break; } }
 //CHECK:                                                           ^^^^^^^^^^^^^^^^^ could not extract value from integer constant
 
 static const uint64_t rem_u64_by_zero_n = operator%(uint64_t(5), uint64_t(0));
-//CHECK:                                  ^^^^^^^^ divide by zero
+//CHECK:                                  ^^^^^^^^ error E30002
 void use_rem_u64_by_zero_n() { switch (uint64_t(0)) { case 0: case rem_u64_by_zero_n: break; } }
 //CHECK:                                                           ^^^^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
 

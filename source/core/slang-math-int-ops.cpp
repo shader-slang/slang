@@ -334,6 +334,13 @@ MathIntResult MathIntOps::sub(
         overflow ? unsigned(MathIntResult::Overflow) : 0);
 }
 
+// Return the magnitude of `v` as an unsigned 64-bit value. The magnitude of every value fits,
+// including that of INT64_MIN, which is 2^63.
+static uint64_t getMagnitude(const MathIntValue& v)
+{
+    return isNegative(v) ? negU64(v.getUnsignedValue()) : v.getUnsignedValue();
+}
+
 MathIntResult MathIntOps::mul(
     const MathIntType& resultType,
     const MathIntValue& a,
@@ -343,27 +350,16 @@ MathIntResult MathIntOps::mul(
     if ((a.getUnsignedValue() == 0) || (b.getUnsignedValue() == 0))
         return MathIntOps::constructResult(resultType, 0, 0);
 
-    bool overflow{};
-
-    if (isNegative(a) && isNegative(b))
-    {
-        overflow = negU64(a.getUnsignedValue()) >
-                   (getMaxForType(resultType) / negU64(b.getUnsignedValue()));
-    }
-    else if (isNegative(a) && !isNegative(b))
-    {
-        return mul(resultType, b, a);
-    }
-    else if (!isNegative(a) && isNegative(b))
-    {
-        overflow =
-            a.getUnsignedValue() > (negU64(static_cast<uint64_t>(getMinForType(resultType))) /
-                                    negU64(b.getUnsignedValue()));
-    }
-    else
-    {
-        overflow = a.getUnsignedValue() > (getMaxForType(resultType) / b.getUnsignedValue());
-    }
+    // The product overflows when its magnitude exceeds the largest magnitude that the result
+    // type can hold for the product's sign. For example, an int8_t product may be at most 127
+    // when positive and at most 128 when negative, and an unsigned product may not be negative.
+    const uint64_t lhsMagnitude = getMagnitude(a);
+    const uint64_t rhsMagnitude = getMagnitude(b);
+    const bool isResultNegative = isNegative(a) != isNegative(b);
+    const uint64_t maxResultMagnitude =
+        isResultNegative ? negU64(static_cast<uint64_t>(getMinForType(resultType)))
+                         : getMaxForType(resultType);
+    const bool overflow = lhsMagnitude > maxResultMagnitude / rhsMagnitude;
 
     return MathIntOps::constructResult(
         resultType,

@@ -3172,6 +3172,9 @@ public:
     /// `initExpr` is an integer or `bool` literal, and null otherwise. For example, the
     /// initializer of `static const int8_t x = 300;` folds to the `int8_t` value 44, which is
     /// what folding the initializer after it has been checked and coerced to `int8_t` produces.
+    /// The result is also null for a literal whose conversion to `type` cannot be folded, such
+    /// as `static const float F = 1;`. A null result means only that the caller has no value
+    /// from this function and relies on checking the initializer.
     IntVal* tryFoldUncheckedLiteralInitializer(Type* type, Expr* initExpr);
 
     inline IntVal* getIntVal(SubstExpr<IntegerLiteralExpr> expr)

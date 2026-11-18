@@ -82,7 +82,7 @@ public:
     /// - setValue(MathIntType::Int8Type, uint8_t{0xFE}) -- sets:
     ///     type: 8-bit int, value -2 = 0xFFFFFFFFFFFFFFFE
     /// - setValue(MathIntType::UInt8Type, int16_t{0x1234}) -- sets:
-    ///     type: 8-bit int, value = 0xFFFFFFFFFFFFFF34
+    ///     type: 8-bit unsigned int, value 0x34 = 0x0000000000000034
     template<typename T>
     void setValue(const MathIntType& _type, T _value)
     {
@@ -325,7 +325,7 @@ public:
     /// @brief Returns MathIntTypes::BoolType(1) if a != 0 or b != 0
     static MathIntResult logicalOr(const MathIntValue& a, const MathIntValue& b);
 
-    /// @brief Returns MathIntTypes::BoolType(1) if a == 1 and b == 1
+    /// @brief Returns MathIntTypes::BoolType(1) if a != 0 and b != 0
     static MathIntResult logicalAnd(const MathIntValue& a, const MathIntValue& b);
 
     /// @brief Returns a != 0 ? b : c

@@ -4,7 +4,7 @@
 
 // CHECK: uint64_t
 // CHECK-NEXT: 9223372036854775808
-// CHECK-NEXT: 1
+// CHECK-NEXT: {{^}}1{{$}}
 // CHECK-NEXT: 18446744073709551615
 
 // This tests exhibits a bug in constant folding in which the right shift
