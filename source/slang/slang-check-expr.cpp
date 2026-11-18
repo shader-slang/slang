@@ -2506,7 +2506,15 @@ IntVal* SemanticsVisitor::tryFoldUncheckedLiteralInitializer(Type* type, Expr* i
 /// operands either. Folding them could report a diagnostic, or fail and leave the whole
 /// expression unfolded, for an operand that cannot affect the result, as in
 /// `true ? 3 : (1 << 32)`.
-static Index getShortCircuitResultArgIndex(BuiltinOperationKind op, ConstantIntVal* firstArg)
+///
+/// A `?:` with a scalar condition always short-circuits. `&&` and `||` short-circuit unless
+/// `-disable-short-circuit` is given, which `logicalOpsShortCircuit` reflects. With that option,
+/// both operands are evaluated, so an operand that is not constant keeps the expression from
+/// being constant even when the first operand decides its value.
+static Index getShortCircuitResultArgIndex(
+    BuiltinOperationKind op,
+    ConstantIntVal* firstArg,
+    bool logicalOpsShortCircuit)
 {
     const bool isTrue = firstArg->getValue() != 0;
     switch (op)
@@ -2514,9 +2522,9 @@ static Index getShortCircuitResultArgIndex(BuiltinOperationKind op, ConstantIntV
     case BuiltinOperationKind::Conditional:
         return isTrue ? 1 : 2;
     case BuiltinOperationKind::And:
-        return isTrue ? -1 : 0;
+        return (logicalOpsShortCircuit && !isTrue) ? 0 : -1;
     case BuiltinOperationKind::Or:
-        return isTrue ? 0 : -1;
+        return (logicalOpsShortCircuit && isTrue) ? 0 : -1;
     default:
         return -1;
     }
@@ -2580,7 +2588,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (auto constFirstArg = as<ConstantIntVal>(argVal); constFirstArg && a == 0)
         {
-            const Index resultArgIndex = getShortCircuitResultArgIndex(opKind, constFirstArg);
+            const bool logicalOpsShortCircuit =
+                !getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::DisableShortCircuit);
+            const Index resultArgIndex =
+                getShortCircuitResultArgIndex(opKind, constFirstArg, logicalOpsShortCircuit);
             if (resultArgIndex == 0)
                 return m_astBuilder->getIntVal(
                     invokeExpr.getExpr()->type.type,
