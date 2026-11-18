@@ -50,6 +50,11 @@ SlangResult IncludeSystem::findFile(
         }
     }
 
+    // The combined spelling can contain redundant ".." segments that inflate it past the OS
+    // path-length limit (MAX_PATH on Windows, PATH_MAX on POSIX) even though the simplified
+    // path is short, so collapse them before handing the path to the file system.
+    combinedPath = simplifyPath(combinedPath);
+
     // This checks the path exists
     SlangPathType pathType;
     SLANG_RETURN_ON_FAIL(m_fileSystemExt->getPathType(combinedPath.begin(), &pathType));
