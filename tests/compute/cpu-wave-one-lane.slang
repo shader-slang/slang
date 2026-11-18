@@ -8,6 +8,18 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// The C++ targets define a wave as exactly one lane; a GPU wave has at least one.
+bool hasExpectedLaneCount()
+{
+    __target_switch
+    {
+    case cpp:
+        return WaveGetLaneCount() == 1;
+    default:
+        return WaveGetLaneCount() >= 1;
+    }
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
@@ -15,7 +27,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     float f = float(x) * 0.5f;
     int3 v = int3(x, x + 1, x + 2);
 
-    outputBuffer[0] = WaveGetLaneCount() >= 1 ? 1 : 0;
+    outputBuffer[0] = hasExpectedLaneCount() ? 1 : 0;
     outputBuffer[1] = int(WaveGetLaneIndex());
     outputBuffer[2] = WaveIsFirstLane() ? 1 : 0;
     outputBuffer[3] = WaveActiveSum(x);

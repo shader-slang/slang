@@ -28038,9 +28038,11 @@ uint3 cudaBlockDim()
 
 //
 // `saturated_cooperation(c, f, s, u)` will call `f(s, u)` if not all lanes in the
-// workgroup are currently executing. however if all lanes are saturated, then
+// wave are currently executing. however if all lanes are saturated, then
 // for each unique `s` across all the active lanes `c(s, u)` is called. The
 // return value is the one corresponding to the input `s` from this lane.
+// (On the C++ targets every thread is a wave of one lane, which is always
+// saturated, so `c` is called once with the thread's own `s`.)
 //
 // Adjacent calls to saturated_cooperation are subject to fusion, i.e.
 //      saturated_cooperation(c1, f1, s, u1);
