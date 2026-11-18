@@ -626,8 +626,10 @@ void CPPSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     // including translation unit is the conservative direction for a global
     // precise-mode request (the CUDA fast-math front-matter define reaches
     // header artifacts the same way). The CPP source-language gate keeps CUDA
-    // output unchanged, because nvcc silently ignores STDC pragmas, so the
-    // pragma would be dead text there.
+    // output unchanged: nvcc never defines `__clang__`, but clang's CUDA mode
+    // does, so without the gate a clang-CUDA compile of precise-mode output
+    // would pick up the pragma and change CUDA codegen behavior the CUDA
+    // target does not promise.
     if (getSourceLanguage() == SourceLanguage::CPP &&
         getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Precise)
     {
