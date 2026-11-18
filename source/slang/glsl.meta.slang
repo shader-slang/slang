@@ -941,9 +941,9 @@ public matrix<T,N,N> inverse(matrix<T,N,N> m)
         }
         else
         {
-            // Each entry below is its cofactor expanded along the first row of the
+            // Each entry below is its cofactor expanded along the first column of the
             // 3x3 minor surviving the row/column removal: one product term per
-            // element of that row, each multiplying a 2x2 minor.
+            // element of that column, each multiplying a 2x2 minor.
             result[0][0] = (m[1][1] * (m[2][2]*m[3][3] - m[3][2]*m[2][3])
                 - m[2][1] * (m[1][2]*m[3][3] - m[3][2]*m[1][3])
                 + m[3][1] * (m[1][2]*m[2][3] - m[2][2]*m[1][3])) / det;
