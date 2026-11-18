@@ -19,7 +19,7 @@
 
 //METALLIB: @computeMain
 
-//TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
+//TEST_INPUT:ubuffer(format=R32Uint, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
 
 RWBuffer<uint> outputBuffer;
 
