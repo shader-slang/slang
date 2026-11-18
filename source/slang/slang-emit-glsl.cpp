@@ -2668,6 +2668,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // operands (`float3 % float3`), where a `?:` on a boolean vector
             // would not be. The operands are emitted at general precedence
             // because each use is wrapped in a `sign(...)`/`abs(...)` call.
+            // A matrix-typed `FRem` never reaches this case for GLSL-family
+            // targets: `legalizeMatrixFRemForGLSL` expands it per row
+            // upstream, so the operands here are always scalar or vector.
             auto argPrec = getInfo(EmitOp::General);
 
             m_writer->emit("(sign(");

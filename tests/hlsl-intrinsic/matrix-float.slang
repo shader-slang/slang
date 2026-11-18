@@ -1,6 +1,7 @@
-// NOTE the vk target runs (matrix `%` for the via-GLSL path is covered by
-// tests/glsl/test-14591.slang); WGSL stays disabled below (integer matrices,
-// double, and other unsupported scalar types).
+// NOTE the vk target runs the direct SPIR-V emitter, which already expands
+// matrix arithmetic per row at emit time; the GLSL/via-GLSL spelling of
+// matrix `%` is covered by tests/glsl/test-14591.slang. WGSL stays disabled
+// below; float-matrix `%` is also unimplemented for WGSL.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj

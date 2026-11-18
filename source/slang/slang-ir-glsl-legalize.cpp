@@ -5287,45 +5287,70 @@ static void legalizeMatrixFRem(IRInst* inst)
     builder.setInsertBefore(inst);
     auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
 
-    // A scalar operand is splatted once, outside the row loop, so that both
-    // operands of every row `FRem` are vectors: GLSL `mod` has no
-    // `mod(float, genType)` overload for a scalar dividend. A matrix operand
-    // returns `nullptr` here and contributes one extracted row per row of the
-    // result instead.
-    auto splatIfScalar = [&](IRInst* operand) -> IRInst*
+    // A scalar operand is splatted once, before the row loop, so that both
+    // operands of every row `FRem` are vectors: GLSL `mod` has a
+    // `genType mod(genType, float)` overload but no `mod(float, genType)` for
+    // a scalar dividend. A matrix operand is not splatted; it contributes one
+    // extracted row per row of the result. An operand here is always a matrix
+    // or a scalar: the type checker rejects matrix-vector mixes for
+    // component-wise arithmetic (`getBuiltinArithmeticCommonType`), and the
+    // `fmod` intrinsic path coerces its arguments to the matrix type before
+    // lowering to `FRem`.
+    IRInst* leftMatrix = nullptr;
+    IRInst* splattedLeft = nullptr;
+    IRInst* rightMatrix = nullptr;
+    IRInst* splattedRight = nullptr;
+    if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
+        leftMatrix = inst->getOperand(0);
+    else
     {
-        if (as<IRMatrixType>(operand->getDataType()))
-            return nullptr;
-        SLANG_RELEASE_ASSERT(as<IRBasicType>(operand->getDataType()));
-        return builder.emitMakeCompositeFromScalar(rowVectorType, operand);
-    };
-    auto splattedLeft = splatIfScalar(inst->getOperand(0));
-    auto splattedRight = splatIfScalar(inst->getOperand(1));
+        SLANG_RELEASE_ASSERT(
+            as<IRBasicType>(inst->getOperand(0)->getDataType()) &&
+            "Matrix FRem operands are matrix or scalar");
+        splattedLeft = builder.emitMakeCompositeFromScalar(rowVectorType, inst->getOperand(0));
+    }
+    if (as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+        rightMatrix = inst->getOperand(1);
+    else
+    {
+        SLANG_RELEASE_ASSERT(
+            as<IRBasicType>(inst->getOperand(1)->getDataType()) &&
+            "Matrix FRem operands are matrix or scalar");
+        splattedRight = builder.emitMakeCompositeFromScalar(rowVectorType, inst->getOperand(1));
+    }
 
     List<IRInst*> rows;
     for (IRIntegerValue row = 0; row < rowCount; row++)
     {
         auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
-        IRInst* args[2];
-        for (UInt j = 0; j < 2; j++)
-        {
-            IRInst* splatted = j == 0 ? splattedLeft : splattedRight;
-            args[j] =
-                splatted ? splatted : builder.emitElementExtract(inst->getOperand(j), rowIndexInst);
-        }
+        IRInst* leftRow =
+            leftMatrix ? builder.emitElementExtract(leftMatrix, rowIndexInst) : splattedLeft;
+        IRInst* rightRow =
+            rightMatrix ? builder.emitElementExtract(rightMatrix, rowIndexInst) : splattedRight;
+        IRInst* args[] = {leftRow, rightRow};
         rows.add(builder.emitIntrinsicInst(rowVectorType, kIROp_FRem, 2, args));
     }
     auto newInst = builder.emitMakeMatrix(matrixType, rows.getCount(), rows.getBuffer());
 
     inst->replaceUsesWith(newInst);
+    // Decorations move wholesale to the reassembled matrix. The decoration
+    // that can reach a `%` here is `precise`, and the GLSL-family emitters
+    // consume it where the value is bound: it keeps the aggregate from being
+    // folded into its use, and it is re-emitted as a `precise` qualifier on
+    // the temporary that holds it, which governs the full row-expanded
+    // expression. The direct SPIR-V emitter instead reads `precise` off each
+    // arithmetic instruction to emit per-row no-contraction, and it is
+    // excluded by the gate, so its matrix `FRem`s never pass through here.
     inst->transferDecorationsTo(newInst);
     inst->removeAndDeallocate();
 }
 
 void legalizeMatrixFRemForGLSL(IRModule* module)
 {
-    // The walk covers every function in the module, not just entry points, so
-    // a `%` on matrices inside a helper function is rewritten as well.
+    // This late in the pipeline every function the emitters can still reach
+    // is a concrete top-level `IRGlobalValueWithCode` (generic bodies have
+    // been specialized away), so walking the module's top-level functions
+    // covers every live `%` on matrices, not just entry points.
     for (auto globalInst : module->getGlobalInsts())
     {
         auto func = as<IRGlobalValueWithCode>(globalInst);
