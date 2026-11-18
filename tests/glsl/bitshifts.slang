@@ -35,22 +35,37 @@ void computeMain()
     int2 m2 = int2(s, s) >> uint2(1u);
     outputBuffer[6] = m2.x;
     outputBuffer[7] = m2.y;
+
+    // The splat keeps the scalar's own element type even when the vector's differs:
+    // `s` is an int, so it splats to ivec2, not uvec2.
+    int2 m3 = s >> uint2(1u, 1u);
+    outputBuffer[8] = m3.y;
+
+    // A runtime (loaded) scalar shift amount is splatted too, not just constants.
+    int2 r2 = int2(s, s) >> s;
+    outputBuffer[9] = r2.x;
 }
 
 // The scalar operand of a scalar-vector shift is splatted to the vector shape, so both sides
 // of every emitted shift have matching shapes. The splat keeps the scalar's own element
 // type (`int`): the shift overloads type the result independently of the other operand's
 // element type, so `vector<L,N> operator>>(L left, vector<R,N> right)` yields vector<L,N>.
-//GLSL: v2_0 = (ivec2(inputBuffer_0._data[uint(0)])) >> (ivec2(1));
+//GLSL: ivec2 _S1 = ivec2(inputBuffer_0._data[uint(0)]);
+//GLSL: v2_0 = _S1 >> (ivec2(1));
 //GLSL: v4_0 = (ivec4(s_0)) << (ivec4(1));
 // A scalar shift amount is splatted to the vector too, keeping its own element type.
-//GLSL: ivec2 _S2 = ivec2(1);
-//GLSL: (_S1 >> _S2)
-//GLSL: (_S1 << _S2)
+//GLSL: ivec2 _S3 = ivec2(1);
+//GLSL: (_S2 >> _S3)
+//GLSL: (_S2 << _S3)
 // Mixed-signedness operands stay untouched: GLSL accepts `ivec2 >> uvec2`.
-//GLSL: m2_0 = _S1 >> (uvec2(1U));
+//GLSL: m2_0 = _S2 >> (uvec2(1U));
+// The splat of an int scalar by a uint vector keeps the scalar's element type: the shifted
+// value stays ivec2 (`_S1` above) next to the untouched uvec2 amount.
+//GLSL: (_S1 >> uvec2(1U, 1U))
+// A runtime scalar amount is splatted the same way.
+//GLSL: (_S2 >> _S1)
 
 // Compiling the emitted GLSL through glslang must succeed and produce the shift ops.
-//GLSLSPV: OpShiftRight
-//GLSLSPV: OpShiftLeft
+//GLSLSPV: OpShiftRightArithmetic
+//GLSLSPV: OpShiftLeftLogical
 
