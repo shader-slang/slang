@@ -47,7 +47,8 @@ enum InputTextureSampleCount
 struct InputTextureDesc
 {
     int dimension = 2;
-    int arrayLength = 0;
+    int arrayLength = 0; ///< 0 means no array length was named, so the texture is not an
+                         ///< array; any positive value names an explicit array, even of one element
     bool isCube = false;
     bool isDepthTexture = false;
     bool isRWTexture = false;
