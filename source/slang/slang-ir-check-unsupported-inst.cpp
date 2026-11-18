@@ -586,8 +586,8 @@ static void checkUnsupportedLLVMCPUAtomics(IRModule* module, DiagnosticSink* sin
                 auto atomic = as<IRAtomicOperation>(inst);
                 if (!atomic)
                     continue;
-                auto loc = atomic->sourceLoc.isValid() ? atomic->sourceLoc
-                                                       : findFirstUseLoc(atomic);
+                auto loc =
+                    atomic->sourceLoc.isValid() ? atomic->sourceLoc : findFirstUseLoc(atomic);
                 sink->diagnose(
                     Diagnostics::AtomicOperationsNotSupportedOnLlvmCpuTarget{.location = loc});
             }
