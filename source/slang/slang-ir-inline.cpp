@@ -460,7 +460,20 @@ struct InliningPassBase
             if (op == kIROp_Nop)
             {
                 SLANG_RELEASE_ASSERT(call->getArgCount() >= 1);
-                call->replaceUsesWith(call->getArg(0));
+                auto result = call->getArg(0);
+                // The identity operation still honors the call's declared result type
+                // when that type re-describes the same bits, as in
+                // `__intrinsic_op(0) int get()` on a `__intrinsic_type(UInt)` struct:
+                // we reinterpret the bits with a bit-cast rather than convert them, so
+                // the value is unchanged. Identity declarations whose declared type
+                // plays a different role than the operand's type (`Ptr` to `Ref` for
+                // `operator*`, a value to `Ptr` for `operator&`) intentionally keep
+                // passing the operand through unchanged, because the passes that
+                // consume those types expect the operand as it was lowered.
+                if (result->getFullType() != call->getFullType() &&
+                    isSameSizeFixedBasicTypePair(result->getFullType(), call->getFullType()))
+                    result = builder.emitBitCast(call->getFullType(), result);
+                call->replaceUsesWith(result);
             }
             else
             {

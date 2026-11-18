@@ -286,6 +286,12 @@ bool hasGenericAssemblyImplementation(IRFunc* func);
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 
+/// Return whether a bit-cast from `fromType` to `toType` is guaranteed lowerable on every
+/// target: both are basic types whose size is fixed and equal. Basic types whose size depends on
+/// the target (`intptr_t`, `uintptr_t`) do not qualify, so callers can use this predicate at
+/// lowering time, where no target is available to compare a target-dependent size against.
+bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType);
+
 /// Return whether `type` is itself a texture or storage image, a sampler, a combined
 /// texture-sampler, a subpass input (including a GLSL input attachment), or an acceleration
 /// structure. Unlike a buffer, which a target can represent as a pointer to memory, a value of one

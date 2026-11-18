@@ -2772,6 +2772,44 @@ IRParam* getParamAt(IRBlock* block, UIndex ii)
     SLANG_UNEXPECTED("ii >= paramCount");
 }
 
+// Return the fixed byte size of a basic type, or 0 when the type is not a basic
+// type or its size depends on the target (`intptr_t`, `uintptr_t`).
+static int32_t _getFixedBasicTypeSize(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_BoolType:
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_FloatType:
+        return 4;
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+    case kIROp_DoubleType:
+        return 8;
+    case kIROp_Int16Type:
+    case kIROp_UInt16Type:
+    case kIROp_HalfType:
+    case kIROp_BFloat16Type:
+        return 2;
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType)
+{
+    auto fromSize = _getFixedBasicTypeSize(fromType->getOp());
+    if (fromSize == 0)
+        return false;
+    return fromSize == _getFixedBasicTypeSize(toType->getOp());
+}
+
 UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
 {
     switch (basicType->getOp())
