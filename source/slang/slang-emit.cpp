@@ -1473,8 +1473,6 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::HostVM:
-        case CodeGenTarget::HostObjectCode:
-        case CodeGenTarget::HostHostCallable:
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
@@ -1482,12 +1480,25 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
+        case CodeGenTarget::HostObjectCode:
+        case CodeGenTarget::HostHostCallable:
+            // These host targets take the CPU kernel ABI only when emitting
+            // through LLVM. HostHostCallable without -emit-cpu-via-llvm
+            // compiles through the downstream C++ path, whose host-callable
+            // functions keep their natural signatures for direct host calls.
+            if (!isCPUTargetViaLLVM(targetRequest))
+                break;
+            [[fallthrough]];
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CPPHeader:
         case CodeGenTarget::HostLLVMIR:
         case CodeGenTarget::ShaderLLVMIR:
         case CodeGenTarget::ShaderObjectCode:
         case CodeGenTarget::ShaderHostCallable:
+            // The always-created collected uniform-params struct is what gives
+            // every CPU-ABI entry point the same parameter-block pointer the
+            // emitted dispatcher hardcodes, even for a kernel with no uniform
+            // parameters of its own.
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -2497,6 +2508,11 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
         }
         break;
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::HostHostCallable:
+        if (!isCPUTargetViaLLVM(targetRequest))
+            break;
+        [[fallthrough]];
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
@@ -2606,9 +2622,16 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
     case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
+        // The guard sits inside the group rather than on the Host case labels
+        // above because CUDA falls through into this body and must not be
+        // filtered by the host-target condition.
+        if (target == CodeGenTarget::HostHostCallable && !isCPUTargetViaLLVM(targetRequest))
+            break;
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
