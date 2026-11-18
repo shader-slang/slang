@@ -63,6 +63,10 @@ struct ResourceTypeLoweringContext : InstPassBase
             type->getOp() == kIROp_HLSLRWStructuredBufferType)
             access = AccessQualifier::ReadWrite;
 
+        // The lowered buffer pointers use UserPointer because CPU buffer
+        // memory is host memory — the same address space a plain `T*` gets
+        // on CPU targets. Generic would remain un-specialized here, since
+        // address-space specialization only runs for GPU targets.
         switch (type->getOp())
         {
         case kIROp_ConstantBufferType:
@@ -73,7 +77,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 loweredType = builder.getPtrType(
                     as<IRType>(type->getOperand(0)),
                     access,
-                    AddressSpace::Generic,
+                    AddressSpace::UserPointer,
                     layoutType);
             }
             break;
@@ -90,7 +94,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto ptrType = builder.getPtrType(
                     bufferType->getElementType(),
                     access,
-                    AddressSpace::Generic,
+                    AddressSpace::UserPointer,
                     layoutType);
                 builder.createStructField(s, ptrKey, ptrType);
                 builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
@@ -109,7 +113,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto ptrType = builder.getPtrType(
                     builder.getUInt8Type(),
                     access,
-                    AddressSpace::Generic,
+                    AddressSpace::UserPointer,
                     layoutType);
                 builder.createStructField(s, ptrKey, ptrType);
                 builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
