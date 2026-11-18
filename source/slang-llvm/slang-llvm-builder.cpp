@@ -191,7 +191,7 @@ public:
     // runs the LLVM verifier and then the optimization pipeline. Returns false
     // and leaves the verifier's output in `moduleVerifyErrors` (and the module
     // unoptimized) when verification fails; every caller must turn that into
-    // `returnModuleVerifyError`, or the failure is silently dropped.
+    // `failWithModuleVerifyError`, or the failure is silently dropped.
     bool finalize();
 
     // This function inserts the given LLVM IR in the global scope.
