@@ -891,11 +891,14 @@ public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-// Conjoining with the GLSL_400 version-equivalence alias gates glsl >= 4.00,
-// hlsl >= sm_5_1 and cuda >= sm_6_0, and admits metal, cpp and llvm unversioned.
-// cpp_cuda_glsl_hlsl_metal_llvm has no spirv or wgsl target, so those two are
-// admitted unversioned by their own attributes, and GLSL_400's spirv_1_3 arm
-// never enters the spirv bucket.
+// Conjoining the first attribute with GLSL_400 ("GLSL 400 and related
+// capabilities of other targets") gates glsl >= 4.00, hlsl >= sm_5_1 and
+// cuda >= sm_6_0, and admits metal, cpp and llvm unversioned. spirv and wgsl
+// stay in their own attributes so GLSL_400's spirv_1_3 alternative can never
+// raise the spirv floor above what master admitted; the compound alias omits
+// both targets so the conjoin cannot reach them.
+[__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_llvm, GLSL_400)]
 [require(spirv)]
 [require(wgsl)]
@@ -939,7 +942,7 @@ public matrix<T,N,N> inverse(matrix<T,N,N> m)
             result[2][1] = -(m[0][0]*m[2][1] - m[2][0]*m[0][1]) / det;
             result[2][2] = (m[0][0]*m[1][1] - m[1][0]*m[0][1]) / det;
         }
-        else
+        else // if (N == 4)
         {
             // Each entry below is its cofactor expanded along the first column of the
             // 3x3 minor surviving the row/column removal: one product term per
