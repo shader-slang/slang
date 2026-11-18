@@ -29,7 +29,6 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
 

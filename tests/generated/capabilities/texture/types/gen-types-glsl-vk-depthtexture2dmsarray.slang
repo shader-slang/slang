@@ -25,7 +25,6 @@ DepthTexture2DMSArray texHandle;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: main
 // POSITIVE-NOT: {{(error|warning).*}}:
 

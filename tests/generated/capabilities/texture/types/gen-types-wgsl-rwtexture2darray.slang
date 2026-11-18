@@ -25,7 +25,6 @@ RWTexture2DArray<float4> texHandle;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
 

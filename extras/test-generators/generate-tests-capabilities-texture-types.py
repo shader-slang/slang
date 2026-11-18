@@ -491,7 +491,6 @@ RWStructuredBuffer<int> outputBuffer;
 void fragMain()
 {{
 // POSITIVE-NOT: {{{{(error|warning).*}}}}:
-// POSITIVE-NOT: {{{{(error|warning).*}}}}:
 // POSITIVE-LABEL: {labelName}
 // POSITIVE-NOT: {{{{(error|warning).*}}}}:
 
