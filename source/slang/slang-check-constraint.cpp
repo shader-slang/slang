@@ -941,7 +941,10 @@ Val* getGenericParamDefaultArgVal(SemanticsVisitor* visitor, Decl* paramDecl)
         SemanticsVisitor::ConstantFoldingCircularityInfo newCircularityInfo(
             makeDeclRef(paramDecl),
             nullptr);
-        return visitor->ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo);
+        return visitor->ExtractGenericArgVal(
+            valParam->initExpr,
+            valParam->getType(),
+            &newCircularityInfo);
     }
     return nullptr;
 }

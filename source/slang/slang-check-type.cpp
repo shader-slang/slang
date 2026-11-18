@@ -212,6 +212,7 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParam
 
 Val* SemanticsVisitor::ExtractGenericArgVal(
     Expr* exp,
+    Type* genericParamType,
     ConstantFoldingCircularityInfo* circularityInfo)
 {
     if (auto overloadedExpr = as<OverloadedExpr>(exp))
@@ -235,7 +236,7 @@ Val* SemanticsVisitor::ExtractGenericArgVal(
         }
         return ExtractGenericArgInteger(
             exp,
-            nullptr,
+            genericParamType,
             ConstantFoldingKind::LinkTime,
             getSink(),
             circularityInfo);
@@ -250,7 +251,7 @@ Type* SemanticsVisitor::InstantiateGenericType(
 
     for (auto argExpr : args)
     {
-        evaledArgs.add(ExtractGenericArgVal(argExpr));
+        evaledArgs.add(ExtractGenericArgVal(argExpr, nullptr, nullptr));
     }
 
     DeclRef<Decl> innerDeclRef =
@@ -395,7 +396,10 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     ConstantFoldingCircularityInfo newCircularityInfo(
                         makeDeclRef(valParam),
                         nullptr);
-                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
+                    args.add(ExtractGenericArgVal(
+                        valParam->initExpr,
+                        valParam->getType(),
+                        &newCircularityInfo));
                 }
             }
         }

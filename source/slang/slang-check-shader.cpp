@@ -3840,7 +3840,7 @@ static void _extractSpecializationArgs(
         auto argExpr = argExprs[ii];
 
         SpecializationArg arg;
-        arg.val = semanticsVisitor.ExtractGenericArgVal(argExpr);
+        arg.val = semanticsVisitor.ExtractGenericArgVal(argExpr, nullptr, nullptr);
         outArgs.add(arg);
     }
 }

@@ -2169,7 +2169,10 @@ public:
         ConstantFoldingCircularityInfo* circularityInfo = nullptr);
     IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
-    Val* ExtractGenericArgVal(Expr* exp, ConstantFoldingCircularityInfo* circularityInfo = nullptr);
+    Val* ExtractGenericArgVal(
+        Expr* exp,
+        Type* genericParamType,
+        ConstantFoldingCircularityInfo* circularityInfo);
 
     // Construct a type representing the instantiation of
     // the given generic declaration for the given arguments.
