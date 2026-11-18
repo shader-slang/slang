@@ -6071,7 +6071,7 @@ err(
 err(
     "pass-through-cannot-compile-source-language",
     52016,
-    "the pass-through compiler '~compiler' cannot compile '~language' source; '-pass-through' hands the original source to the downstream compiler, so remove '-pass-through' or select a pass-through compiler that accepts the language"
+    "the pass-through compiler '~compiler' cannot compile '~language' source; '-pass-through' hands the original source to that compiler, so remove '-pass-through' or select a pass-through compiler that accepts the language"
 )
 
 err(

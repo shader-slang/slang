@@ -185,33 +185,41 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
     }
 
-    // `-pass-through` hands the original source of each translation unit to the selected
-    // downstream compiler, so that compiler must accept every unit's source language. Like the
-    // coverage check above, this lives here (not in `OptionsParser::_parse`) so that C++ API
-    // callers using `setPassThrough()` are also covered.
+    // `-pass-through` hands the original source of a translation unit to the selected
+    // downstream compiler, so that compiler must accept the unit's source language. The check
+    // is deliberately fail-fast over every translation unit even though a pass-through
+    // consume uses only one of them: a request mixing languages the selected compiler cannot
+    // all take is a command-line or API error worth rejecting up front, and the whole-program
+    // spellings of this request have no entry point at all, so scoping the check to
+    // entry-point translation units would report the less specific error. Like the coverage
+    // check above, this lives here (not in `OptionsParser::_parse`) so that C++ API callers
+    // using `setPassThrough()` are also covered, and like that check it runs before the
+    // preprocessor-output and no-codegen early-outs below: an incoherent pass-through request
+    // is diagnosed even when code generation would not have run.
     if (m_passThrough != PassThroughMode::None)
     {
         const auto passThroughCompiler = SlangPassThrough(m_passThrough);
         const auto& compilerInfo = DownstreamCompilerInfo::getInfo(passThroughCompiler);
         // An entry with no source-language flags means the languages the compiler accepts are
-        // not recorded in the table (metal, tint), so leave such compilers' behavior unchanged.
+        // not recorded in the table (metal, tint, spirv-dis, spirv-link — there are no flag
+        // bits for Metal or WGSL source), so leave such compilers' behavior unchanged.
         if (compilerInfo.sourceLanguageFlags != 0)
         {
             bool languageRejected = false;
             for (const auto& translationUnit : getFrontEndReq()->translationUnits)
             {
                 const auto sourceLanguage = translationUnit->sourceLanguage;
+                // In pass-through mode the front end never runs, so the language here is
+                // exactly what option parsing or the API caller supplied. The command line
+                // rejects unidentifiable inputs, so `Unknown` arrives only through
+                // `addTranslationUnit(..., UNKNOWN)`; there is nothing to validate against,
+                // so such requests keep flowing to the downstream failure paths.
                 if (sourceLanguage == SourceLanguage::Unknown)
                     continue;
-                // In pass-through mode Slang input is treated as HLSL, because no downstream
-                // compiler consumes Slang source directly; see
-                // `CodeGenContext::emitWithDownstreamForEntryPoints`.
-                const auto compileLanguage = (sourceLanguage == SourceLanguage::Slang)
-                                                 ? SourceLanguage::HLSL
-                                                 : sourceLanguage;
-                if (!DownstreamCompilerInfo::canCompile(
-                        passThroughCompiler,
-                        SlangSourceLanguage(compileLanguage)))
+                const auto compileLanguage =
+                    SlangSourceLanguage(DownstreamCompilerInfo::getPassThroughCompileLanguage(
+                        SlangSourceLanguage(sourceLanguage)));
+                if (!DownstreamCompilerInfo::canCompile(passThroughCompiler, compileLanguage))
                 {
                     getSink()->diagnose(Diagnostics::PassThroughCannotCompileSourceLanguage{
                         .compiler = TypeTextUtil::getPassThroughName(passThroughCompiler),
@@ -1532,6 +1540,12 @@ void EndToEndCompileRequest::setOutputContainerFormat(SlangContainerFormat forma
 
 void EndToEndCompileRequest::setPassThrough(SlangPassThrough inPassThrough)
 {
+    // The enum arrives from the public API and from replayed record files, so pin the value to
+    // the enum's range before anything indexes a per-compiler table with it. `None` is the
+    // legal "no pass-through" value, unlike `setDownstreamCompilerPath`'s lower bound.
+    SLANG_ASSERT(
+        int(inPassThrough) >= int(PassThroughMode::None) &&
+        int(inPassThrough) < int(PassThroughMode::CountOf));
     m_passThrough = PassThroughMode(inPassThrough);
 }
 
