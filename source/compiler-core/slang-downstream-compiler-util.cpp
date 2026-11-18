@@ -52,6 +52,8 @@ struct DownstreamCompilerInfos
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
     infos.infos[int(SLANG_PASS_THROUGH_LLVM)] =
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_GENERIC_C_CPP)] =
+        Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
 
     infos.infos[int(SLANG_PASS_THROUGH_NVRTC)] = Info(SourceLanguageFlag::CUDA);
 
