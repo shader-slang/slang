@@ -575,8 +575,8 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
 // minimum-optimization mode must still reject it. Like the Metal checks, we visit only
 // top-level function bodies. The one other code shape the emitter lowers — a global variable's
 // initializer block (emitGlobalInstructionCtor) — cannot hold an atomic here: an atomic in a
-// static initializer is dropped before the emit-time IR, leaving the synthesized constructor
-// body empty, so the scan would find nothing in it. A generic that remains at this point is not
+// static initializer is dropped before the emit-time IR, so the scan would find nothing in it.
+// A generic that remains at this point is not
 // emitted. The Metal checks' second reason for that — unspecialized address spaces in such
 // bodies — does not apply: no address-space specialization runs on this path at all. The scan
 // covers atomic operations
