@@ -1,12 +1,16 @@
 // A Texture2D input with an explicit arrayLength of 1 is a single-element
-// 2D array: like the cube case, it must be created as an array texture so the
-// resource view type matches the Texture2DArray type the shader declares.
-// Both SPIR-V emit paths (direct and via GLSL) must classify the input
-// identically, so the test runs one leg with -emit-spirv-via-glsl and one
-// without. The regression guard is Vulkan debug-layer validation; the CHECK
-// value is deterministic because content=one fills every texel.
+// 2D array, the 2D counterpart of texture-cube-array-length-1.slang: it must
+// be created as an array texture so the resource view type matches the
+// Texture2DArray type the shader declares. render-test classifies the input
+// once, host-side; the test runs both SPIR-V emit paths (direct and via GLSL)
+// so each generated SPIR-V variant passes the Vulkan validation layer's
+// checks against the array texture. The dx12 and cuda legs sample through the
+// same resource on a second backend family (dx12 runs on Windows CI only).
+// The CHECK value is deterministic because content=one fills every texel.
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-compute -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -shaderobj
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
