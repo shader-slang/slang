@@ -1115,6 +1115,17 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             return;
         return DeclVisitor<VisitorType>::dispatch(val);
     }
+    // A condition clause holds its payload directly (the condition value expression and,
+    // for a declaration condition, the declared variable), so it is dispatched here
+    // rather than through one of the node-base visitors.
+    void dispatchIfNotNull(ConditionClause* clause)
+    {
+        if (!clause)
+            return;
+        if (auto declConditionClause = as<DeclConditionClause>(clause))
+            dispatchIfNotNull(declConditionClause->decl);
+        dispatchIfNotNull(clause->predicate);
+    }
 
     // Expr Visitor
     void visitExpr(Expr*) {}

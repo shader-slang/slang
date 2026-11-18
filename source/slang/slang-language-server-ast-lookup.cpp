@@ -638,6 +638,20 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
         return visitor.dispatch(expr);
     }
 
+    // A condition clause holds its payload directly (the condition value expression and,
+    // for a declaration condition, the declared variable), so it is searched here.
+    bool checkConditionClause(ConditionClause* clause)
+    {
+        if (!clause)
+            return false;
+        if (auto declConditionClause = as<DeclConditionClause>(clause))
+        {
+            if (_findAstNodeImpl(*context, declConditionClause->decl))
+                return true;
+        }
+        return checkExpr(clause->predicate);
+    }
+
     bool visitDeclStmt(DeclStmt* stmt) { return _findAstNodeImpl(*context, stmt->decl); }
 
     bool visitBlockStmt(BlockStmt* stmt)
@@ -668,7 +682,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        if (checkExpr(stmt->predicate))
+        if (checkConditionClause(stmt->predicate))
             return true;
         return dispatchIfNotNull(stmt->statement);
     }
@@ -711,7 +725,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitIfStmt(IfStmt* stmt)
     {
-        if (checkExpr(stmt->predicate))
+        if (checkConditionClause(stmt->predicate))
             return true;
         if (dispatchIfNotNull(stmt->positiveStatement))
             return true;
@@ -741,7 +755,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitWhileStmt(WhileStmt* stmt)
     {
-        if (checkExpr(stmt->predicate))
+        if (checkConditionClause(stmt->predicate))
             return true;
         return dispatchIfNotNull(stmt->statement);
     }

@@ -7898,7 +7898,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto condExpr = stmt->predicate;
+        auto clause = stmt->predicate;
+        // A declaration condition declares its variable right before the test, in the
+        // statement's condition slot, so the variable is initialized before the branch
+        // and is in scope for both arms.
+        if (auto declConditionClause = as<DeclConditionClause>(clause))
+            lowerDecl(context, declConditionClause->decl);
+
+        auto condExpr = clause->predicate;
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
@@ -8201,8 +8208,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         uint32_t coverageBranchSiteID = 0;
         SourceLoc coverageBranchLoc;
-        if (auto condExpr = stmt->predicate)
+        if (auto clause = stmt->predicate)
         {
+            // A declaration condition declares its variable in the condition slot, so the
+            // variable is re-initialized before every test, and a `continue` (which jumps
+            // to loopHead) re-runs the declaration, as in C++.
+            if (auto declConditionClause = as<DeclConditionClause>(clause))
+                lowerDecl(context, declConditionClause->decl);
+
+            auto condExpr = clause->predicate;
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
@@ -8293,9 +8307,16 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto condExpr = stmt->predicate)
+        if (auto clause = stmt->predicate)
         {
-            maybeEmitDebugLine(context, this, stmt, stmt->predicate->loc);
+            // A declaration condition declares its variable in the condition slot, so
+            // the variable is re-initialized before every test. A `continue` jumps here
+            // (testLabel), so it re-runs the declaration too, which is the C++ behavior.
+            if (auto declConditionClause = as<DeclConditionClause>(clause))
+                lowerDecl(context, declConditionClause->decl);
+
+            auto condExpr = clause->predicate;
+            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 

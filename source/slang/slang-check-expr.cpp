@@ -1369,7 +1369,10 @@ bool SemanticsVisitor::isWitnessUncheckedOptional(SubtypeWitness* witness)
         if (!ifStmt)
             continue;
 
-        IsTypeExpr* isType = as<IsTypeExpr>(ifStmt->predicate);
+        // The condition of an `if` is a condition clause whose predicate expression
+        // is checked in place, so the `is` expression, if any, is the predicate.
+        IsTypeExpr* isType =
+            ifStmt->predicate ? as<IsTypeExpr>(ifStmt->predicate->predicate) : nullptr;
         if (!isType)
             continue;
         VarExpr* var = as<VarExpr>(isType->value);

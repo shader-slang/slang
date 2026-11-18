@@ -4633,6 +4633,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void checkStmt(Stmt* stmt);
 
+    // Check a condition clause in place: bring its declaration to its declaration
+    // point, if it has one, then check the condition value expression.
+    void checkConditionClause(ConditionClause* clause);
+
     Stmt* findOuterStmtWithLabel(Name* label);
 
     void visitDeclStmt(DeclStmt* stmt);

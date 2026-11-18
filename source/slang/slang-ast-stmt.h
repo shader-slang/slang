@@ -80,11 +80,49 @@ class DeclStmt : public Stmt
     FIDDLE() DeclBase* decl = nullptr;
 };
 
+FIDDLE(abstract)
+class ConditionClause : public SyntaxNode
+{
+    FIDDLE(...)
+
+    /// The value of the condition as an expression. For an expression condition this is
+    /// the parsed expression. For a declaration condition, as in the HLSL `if (int count = c)`,
+    /// this is an expression naming the declared variable; semantic checking resolves it to the
+    /// declaration and coerces it to `bool`, like any other condition.
+    FIDDLE() Expr* predicate = nullptr;
+
+    /// The lexical scope introduced by the condition, when the condition declares anything
+    /// (`DeclConditionClause`). Statement checking and lookup work through the scopes that the
+    /// parser captures into expressions, so consumers only need this field to find the
+    /// declaration's owning scope for tooling and debug info. It is null for a plain expression.
+    FIDDLE() ScopeDecl* scopeDecl = nullptr;
+};
+
+// A condition written as an expression, as in `if (a < b)`.
+FIDDLE()
+class ExprConditionClause : public ConditionClause
+{
+    FIDDLE(...)
+};
+
+// A condition written as a single-variable declaration, as in the HLSL
+// `if (int count = c)`. The declared variable is visible in the condition itself and in the
+// statement's arms for `if` and `while`. For `do`-`while` the body runs before the condition,
+// so the variable is visible in the condition only.
+FIDDLE()
+class DeclConditionClause : public ConditionClause
+{
+    FIDDLE(...)
+
+    /// The variable that the condition declares.
+    FIDDLE() VarDeclBase* decl = nullptr;
+};
+
 FIDDLE()
 class IfStmt : public Stmt
 {
     FIDDLE(...)
-    FIDDLE() Expr* predicate = nullptr;
+    FIDDLE() ConditionClause* predicate = nullptr;
     FIDDLE() Stmt* positiveStatement = nullptr;
     FIDDLE() Stmt* negativeStatement = nullptr;
     FIDDLE() SourceLoc afterLoc;
@@ -235,7 +273,7 @@ FIDDLE()
 class WhileStmt : public LoopStmt
 {
     FIDDLE(...)
-    FIDDLE() Expr* predicate = nullptr;
+    FIDDLE() ConditionClause* predicate = nullptr;
     FIDDLE() Stmt* statement = nullptr;
 };
 
@@ -244,7 +282,7 @@ class DoWhileStmt : public LoopStmt
 {
     FIDDLE(...)
     FIDDLE() Stmt* statement = nullptr;
-    FIDDLE() Expr* predicate = nullptr;
+    FIDDLE() ConditionClause* predicate = nullptr;
 };
 
 // A compile-time, range-based `for` loop, which will not appear in the output code

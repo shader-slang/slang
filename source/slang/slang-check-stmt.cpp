@@ -281,13 +281,35 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     return e;
 }
 
+// Check a condition clause in place: bring its declaration to its declaration
+// point, if it has one, then check the condition value.
+//
+// Consider the HLSL `if (int count = c)`. The parser has built a
+// `DeclConditionClause` holding the declaration of `count` and an expression
+// naming `count`, so checking the clause is: check the declaration (its type
+// and initializer) at its declaration point, then send the naming expression
+// through the same `checkPredicateExpr` path as a plain expression condition,
+// which resolves it to `count` and coerces it to `bool`. A declaration
+// condition is not an `AssignExpr`, so the assignment-in-predicate check is
+// not involved.
+void SemanticsStmtVisitor::checkConditionClause(ConditionClause* clause)
+{
+    if (!clause)
+        return;
+    if (auto declConditionClause = as<DeclConditionClause>(clause))
+    {
+        checkDeclAtDeclarationPoint(declConditionClause->decl);
+    }
+    clause->predicate = checkPredicateExpr(clause->predicate);
+}
+
 void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
 {
     generateUniqueIDForStmt(stmt);
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    stmt->predicate = checkPredicateExpr(stmt->predicate);
+    checkConditionClause(stmt->predicate);
     subContext.checkStmt(stmt->statement);
     checkLoopInDifferentiableFunc(stmt);
 }
@@ -556,7 +578,7 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
 {
     WithOuterStmt subContext(this, stmt);
-    stmt->predicate = checkPredicateExpr(stmt->predicate);
+    checkConditionClause(stmt->predicate);
     subContext.checkStmt(stmt->positiveStatement);
     subContext.checkStmt(stmt->negativeStatement);
 }
@@ -636,7 +658,7 @@ void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
     generateUniqueIDForStmt(stmt);
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
-    stmt->predicate = checkPredicateExpr(stmt->predicate);
+    checkConditionClause(stmt->predicate);
     subContext.checkStmt(stmt->statement);
     checkLoopInDifferentiableFunc(stmt);
 }

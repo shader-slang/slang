@@ -265,6 +265,9 @@ public:
     ForStmt* ParseForStatement();
     WhileStmt* ParseWhileStatement();
     DoWhileStmt* ParseDoWhileStatement(Stmt* body);
+    // Parse the condition of an `if`, `while`, or `do`-`while` statement, wrapping the
+    // condition in a `ConditionClause`.
+    ConditionClause* parseConditionClause();
     CatchStmt* ParseDoCatchStatement(Stmt* body);
     Stmt* ParseDoStatement();
     BreakStmt* ParseBreakStatement();
@@ -7742,7 +7745,10 @@ Stmt* Parser::parseIfLetStatement()
     tempVarExpr->scope = currentScope;
     FillPosition(tempVarExpr);
     tempVarExpr->name = tempVarDecl->getName();
-    ifStatement->predicate = constructIfLetPredicate(this, tempVarExpr);
+    ExprConditionClause* conditionClause = astBuilder->create<ExprConditionClause>();
+    FillPosition(conditionClause);
+    conditionClause->predicate = constructIfLetPredicate(this, tempVarExpr);
+    ifStatement->predicate = conditionClause;
 
     ReadToken(TokenType::RParent);
 
@@ -7832,7 +7838,7 @@ IfStmt* Parser::parseIfStatement()
     FillPosition(ifStatement);
     ReadToken("if");
     ReadToken(TokenType::LParent);
-    ifStatement->predicate = ParseExpression();
+    ifStatement->predicate = parseConditionClause();
     ReadToken(TokenType::RParent);
     ifStatement->positiveStatement = parseControlFlowBody(ifStatement);
     if (LookAheadToken("else"))
@@ -7921,7 +7927,7 @@ WhileStmt* Parser::ParseWhileStatement()
     FillPosition(whileStatement);
     ReadToken("while");
     ReadToken(TokenType::LParent);
-    whileStatement->predicate = ParseExpression();
+    whileStatement->predicate = parseConditionClause();
     ReadToken(TokenType::RParent);
     whileStatement->statement = parseControlFlowBody();
     return whileStatement;
@@ -7934,7 +7940,7 @@ DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
     doWhileStatement->statement = body;
     ReadToken("while");
     ReadToken(TokenType::LParent);
-    doWhileStatement->predicate = ParseExpression();
+    doWhileStatement->predicate = parseConditionClause();
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
     return doWhileStatement;
@@ -8196,6 +8202,17 @@ Expr* Parser::ParseTypeAllowDecl()
 TypeExp Parser::ParseTypeExp()
 {
     return TypeExp(ParseType());
+}
+
+// Parse the condition of an `if`, `while`, or `do`-`while` statement, wrapping
+// it in an `ExprConditionClause`.
+ConditionClause* Parser::parseConditionClause()
+{
+    Expr* expr = ParseExpression();
+    ExprConditionClause* clause = astBuilder->create<ExprConditionClause>();
+    FillPosition(clause);
+    clause->predicate = expr;
+    return clause;
 }
 
 TypeExp Parser::ParseTypeExpAllowDecl()

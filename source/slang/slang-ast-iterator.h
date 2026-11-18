@@ -17,6 +17,7 @@ struct ASTIterator
     void visitDecl(DeclBase* decl);
     void visitExpr(Expr* expr);
     void visitStmt(Stmt* stmt);
+    void visitConditionClause(ConditionClause* clause);
 
     void maybeDispatchCallback(SyntaxNode* node)
     {
@@ -413,7 +414,7 @@ struct ASTIterator
         void visitDoWhileStmt(DoWhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitExpr(stmt->predicate);
+            iterator->visitConditionClause(stmt->predicate);
             dispatchIfNotNull(stmt->statement);
         }
 
@@ -464,7 +465,7 @@ struct ASTIterator
         void visitIfStmt(IfStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitExpr(stmt->predicate);
+            iterator->visitConditionClause(stmt->predicate);
             dispatchIfNotNull(stmt->positiveStatement);
             dispatchIfNotNull(stmt->negativeStatement);
         }
@@ -504,7 +505,7 @@ struct ASTIterator
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitExpr(stmt->predicate);
+            iterator->visitConditionClause(stmt->predicate);
             dispatchIfNotNull(stmt->statement);
         }
 
@@ -601,6 +602,15 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitExpr(Expr* expr)
 {
     ASTIteratorExprVisitor visitor(this);
     visitor.dispatchIfNotNull(expr);
+}
+template<typename CallbackFunc, typename FilterFunc>
+void ASTIterator<CallbackFunc, FilterFunc>::visitConditionClause(ConditionClause* clause)
+{
+    if (!clause)
+        return;
+    if (auto declConditionClause = as<DeclConditionClause>(clause))
+        visitDecl(declConditionClause->decl);
+    visitExpr(clause->predicate);
 }
 template<typename CallbackFunc, typename FilterFunc>
 void ASTIterator<CallbackFunc, FilterFunc>::visitStmt(Stmt* stmt)
