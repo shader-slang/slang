@@ -4,6 +4,7 @@
 
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
+#include "core/slang-process.h"
 #include "core/slang-std-writers.h"
 #include "core/slang-string-util.h"
 #include "core/slang-test-tool-util.h"
@@ -25,11 +26,13 @@
 #pragma comment(lib, "advapi32")
 #endif
 
+#include <errno.h>
 #include <slang-rhi.h>
 #include <slang-rhi/acceleration-structure-utils.h>
 #include <slang-rhi/shader-cursor.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define ENABLE_RENDERDOC_INTEGRATION 0
 
 #if ENABLE_RENDERDOC_INTEGRATION
@@ -1381,16 +1384,49 @@ void RenderTestApp::finalize()
     m_compilationOutput.output.reset();
 }
 
+/// Open `fileName` for binary writing, retrying a few times when the OS denies access, and report
+/// the path and the reason on stderr if the file still cannot be opened.
+///
+/// slang-test creates the output file just before it starts render-test. On Windows, another
+/// process, such as a virus scanner or the search indexer, can still hold the new file for a short
+/// time and make our open fail with EACCES (a sharing violation). That failure is transient, so we
+/// retry it with a growing delay. Any other error cannot be fixed by waiting, so we report it at
+/// once. Without the message, the test fails with exit code 1 and no output at all.
+static SlangResult openOutputFileForWrite(const String& fileName, FILE*& outFile)
+{
+    const int kMaxAttempts = 5;
+    int err = 0;
+    for (int attempt = 0; attempt < kMaxAttempts; ++attempt)
+    {
+        if (attempt != 0)
+            Process::sleepCurrentThread(attempt * 100);
+
+        FILE* f = nullptr;
+        err = (int)fopen_s(&f, fileName.getBuffer(), "wb");
+        if (err == 0 && f)
+        {
+            outFile = f;
+            return SLANG_OK;
+        }
+        if (err != EACCES)
+            break;
+    }
+    fprintf(
+        stderr,
+        "error: failed to open output file '%s' for writing: %s (errno %d)\n",
+        fileName.getBuffer(),
+        strerror(err),
+        err);
+    return SLANG_FAIL;
+}
+
 Result RenderTestApp::writeBindingOutput(const String& fileName)
 {
     // Wait until everything is complete
     m_queue->waitOnHost();
 
     FILE* f = nullptr;
-    if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
-    {
-        return SLANG_FAIL;
-    }
+    SLANG_RETURN_ON_FAIL(openOutputFileForWrite(fileName, f));
     FileWriter writer(f, WriterFlags(0));
 
     for (auto outputItem : m_outputPlan.items)

@@ -2,11 +2,11 @@
 // other target reports E36107. (The variadic abort(format, ...) is the GLSL/SPIR-V form; see
 // abort-unsupported-target.slang.)
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target wgsl -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target metal -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target glsl -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry computeMain -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target wgsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target metal -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target glsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target spirv -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target cuda -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 

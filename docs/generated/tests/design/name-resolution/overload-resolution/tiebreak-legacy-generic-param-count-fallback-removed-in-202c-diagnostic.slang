@@ -13,7 +13,7 @@
 // test, compiled with -std 202c: the tied frontier is not resolved and the
 // call fails with the ambiguous-call error (E39999), exit code -1.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -std 202c -target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -std 202c -target hlsl -entry main -stage compute
 
 int select<T>(vector<T, 3> value) { return 1; }
 int select<T, let N : int>(vector<T, N> value) { return 2; }

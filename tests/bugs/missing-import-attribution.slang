@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -entry computeMain -stage compute
 
 import this_file_does_not_exist;
 

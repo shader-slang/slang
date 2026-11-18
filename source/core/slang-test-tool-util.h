@@ -13,26 +13,27 @@ namespace Slang
 #endif
 
 /* When a tool is run as an executable the return code is the code returned from
-the last return of main. On unix this can be up to 8 bits.
+the last return of main. On unix this can be up to 8 bits, and a negative value is not a valid
+exit status there, so every value is non-negative.
 By normal command line tool conventions returning 0 means success. */
 enum class ToolReturnCode
 {
-    InternalCompilerError = -2, ///< The compiler hit an unexpected failure: an internal compiler
-                                ///< error, an assertion, an exception or an abort. This always
-                                ///< indicates a compiler bug and never a mistake in the input.
-    CompilationFailed = -1, ///< Compilation failure (-1 to maintain compatibility). This may still
-                            ///< produce output and may mean a test was successful.
-    Success = 0,            ///< Tool ran normally
-    Failed,                 ///< Tool failed
-    Ignored, ///< The run was ignored because it couldn't be run (because some optional feature was
-             ///< not present for example)
-    FailedToRun, ///< Could not even run the test
+    Success = 0,           ///< Tool ran normally
+    Failed = 1,            ///< Tool failed
+    CompilationFailed = 2, ///< Compilation failure. This may still produce output and may mean a
+                           ///< test was successful.
+    InternalCompilerError = 3, ///< The compiler hit an unexpected failure: an internal compiler
+                               ///< error, an assertion, an exception or an abort. This always
+                               ///< indicates a compiler bug and never a mistake in the input.
+    Ignored = 4, ///< The run was ignored because it couldn't be run (because some optional feature
+                 ///< was not present for example)
+    FailedToRun = 5, ///< Could not even run the test
 };
 
 enum class ToolReturnCodeSpan
 {
     // Span of all valid values
-    First = int(ToolReturnCode::InternalCompilerError),
+    First = int(ToolReturnCode::Success),
     Last = int(ToolReturnCode::FailedToRun),
     // Span of all values that indicate the test is 'done'
     FirstIsDone = int(ToolReturnCode::Ignored),

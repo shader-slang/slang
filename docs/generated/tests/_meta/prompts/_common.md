@@ -564,18 +564,18 @@ expected exit code is `0` unless the directive says otherwise with
 `exit-code=N`:
 
 ```
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry main -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):
 ```
 
 - A test whose claim is "the compiler rejects X" (an error diagnostic)
-  must set `exit-code=-1`: `-1` is a failed compile.
+  must set `exit-code=2`: `2` is a failed compile.
 - A test that passes a bad command-line option or a malformed option value
   expects `exit-code=1`: `1` is a command-line error.
 - A positive test (valid code, emitted text) keeps the default `0`. If it
-  now fails with `-1`, the code is rejected: read the diagnostic and fix
-  the test, never add `exit-code=-1` to hide it.
-- Pair every `exit-code=-1` with a `CHECK` on the diagnostic code (for
+  now fails with `2`, the code is rejected: read the diagnostic and fix
+  the test, never add `exit-code=2` to hide it.
+- Pair every `exit-code=2` with a `CHECK` on the diagnostic code (for
   example `// CHECK: E30011`), so the test cannot pass on an unrelated error.
   `CHECK-NOT: error` is useless: the FileCheck input always contains the
   header `standard error`.
@@ -585,8 +585,8 @@ expected exit code is `0` unless the directive says otherwise with
   `foo.slang.1`, ...). Each line needs its own `exit-code=` if it fails.
 
 Run the test locally after editing the directive; the message
-`expected exit code 0, but the exit code is -1` means the directive needs
-`exit-code=-1` (negative test) or the code is wrongly rejected (positive test).
+`expected exit code 0, but the exit code is 2` means the directive needs
+`exit-code=2` (negative test) or the code is wrongly rejected (positive test).
 
 ### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
 

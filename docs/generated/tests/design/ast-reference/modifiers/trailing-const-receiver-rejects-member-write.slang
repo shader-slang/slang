@@ -15,7 +15,7 @@
 // pins the not-an-l-value code, proving the trailing `const` made `this`
 // immutable.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -lang hlsl -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -lang hlsl -target hlsl -stage compute -entry main
 
 // CHECK: E30011
 struct S
