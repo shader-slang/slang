@@ -13,7 +13,7 @@
 // Compute test disabled, see https://github.com/shader-slang/slang/issues/8786
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target wgsl
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -wgpu
-//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
+//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1): -restrictive-capability-check -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

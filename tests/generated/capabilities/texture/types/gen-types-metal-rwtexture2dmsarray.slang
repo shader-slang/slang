@@ -13,7 +13,7 @@
 // Test disabled, see https://github.com/shader-slang/slang/issues/8721
 //DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): None
-//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_4
+//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_4
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -25,7 +25,6 @@ RWTexture2DMSArray<float4> texHandle;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE: result code = 0
 // POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
