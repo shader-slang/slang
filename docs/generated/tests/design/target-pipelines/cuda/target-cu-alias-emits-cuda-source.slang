@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#cuda-target-pipeline
-//META: doc_section_digest=9cd6b5cf2a7e0ecd0cd23138e83185dfb3a53ecb746d1e155e63f728b1c983e9
+//META: doc_section_digest=5700c9c35d69771ef061f665b0baa2d89de7b538fc053d2bd451b9b44fbf2395
 //META: purpose=CUDASource is spelled -target cuda or -target cu on the slangc command line, and the cu alias selects the same CUDASource pipeline and emits the same extern "C" __global__ kernel.
 //META: intent=functional
 //META: pipeline_stage=emit

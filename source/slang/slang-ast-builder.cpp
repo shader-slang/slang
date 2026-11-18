@@ -665,6 +665,16 @@ RefParamType* ASTBuilder::getRefParamType(Type* valueType)
     return dynamicCast<RefParamType>(getPtrType(valueType, "RefParamType"));
 }
 
+RefReadOnlyParamType* ASTBuilder::getRefReadOnlyParamType(Type* valueType)
+{
+    return dynamicCast<RefReadOnlyParamType>(getPtrType(valueType, "RefReadOnlyParamType"));
+}
+
+RefWriteOnlyParamType* ASTBuilder::getRefWriteOnlyParamType(Type* valueType)
+{
+    return dynamicCast<RefWriteOnlyParamType>(getPtrType(valueType, "RefWriteOnlyParamType"));
+}
+
 BorrowInParamType* ASTBuilder::getConstRefParamType(Type* valueType)
 {
     return dynamicCast<BorrowInParamType>(getPtrType(valueType, "BorrowInParamType"));

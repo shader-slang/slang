@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5[1m]
-generated_at: 2026-09-11T00:00:00Z
-source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
-watched_paths_digest: f5c4641b970d3d42ac6fe4f498b19dc32de033213a9f0b87f0858dc0f6d65f5b
+model: claude-sonnet-5-5
+generated_at: 2026-11-03T07:01:06Z
+source_commit: 2518a942d59b1228fc8cc70a37739baab82b6002
+watched_paths_digest: 69dce39dbf6b349f7f3cd835ce76adc9b75dc93c8ef91cd0955e180dfa1cd465
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -90,7 +90,7 @@ flowchart TD
 | `OverloadedExpr` | `Expr` | `name: Name*`, `base: Expr*`, `lookupResult2: LookupResult` | (none) | An unresolved overload set after name lookup; collapsed by overload resolution. |
 | `OverloadedExpr2` | `Expr` | `base: Expr*`, `candidateExprs: List<Expr*>` | (none) | Overload set carried as a list of candidate expressions instead of decl-refs. |
 | `IntegerLiteralExpr` | `LiteralExpr` | `value: IntegerLiteralValue`, `signedMinimumIntException: bool` (plus inherited `suffixType: BaseType`) | [integer literal](../syntax-reference/grammar.md#literal-forms-vs-token-kinds) | Integer literal; suffix and magnitude select the base type. |
-| `FloatingPointLiteralExpr` | `LiteralExpr` | `value: FloatingPointLiteralValue` (plus inherited `suffixType: BaseType`) | [float literal](../syntax-reference/grammar.md#literal-forms-vs-token-kinds) | Floating-point literal; `value` is the value as written, not rounded to `suffixType`. |
+| `FloatingPointLiteralExpr` | `LiteralExpr` | `value: FloatingPointLiteralValue` (plus inherited `suffixType: BaseType`) | [float literal](../syntax-reference/grammar.md#literal-forms-vs-token-kinds) | Floating-point literal; `value` is the suffix-converted value returned by the lexer helper. |
 | `BoolLiteralExpr` | `LiteralExpr` | `value: bool` | [bool literal](../syntax-reference/grammar.md#literal-forms-vs-token-kinds) | `true` or `false`. |
 | `NullPtrLiteralExpr` | `LiteralExpr` | (no additional state) | [null literal](../syntax-reference/grammar.md#literal-forms-vs-token-kinds) | `nullptr`. |
 | `NoneLiteralExpr` | `LiteralExpr` | (no additional state) | [none literal](../syntax-reference/grammar.md#literal-forms-vs-token-kinds) | `none` (empty optional). |
@@ -101,19 +101,19 @@ flowchart TD
 | `ExpandExpr` | `Expr` | `baseExpr: Expr*` | [pack expansion](../syntax-reference/grammar.md#types) | `expand E` over a type/value pack. |
 | `EachExpr` | `Expr` | `baseExpr: Expr*` | [pack expansion](../syntax-reference/grammar.md#types) | `each E` inside an `expand`. |
 | `AggTypeCtorExpr` | `ExprWithArgsBase` | `base: TypeExp`, `arguments: List<Expr*>` | (none) | Aggregate-type constructor; declared with checker support but no construction site (see the note below the table). |
-| `BuiltinOperatorExpr` | `ExprWithArgsBase` | `op: BuiltinOperationKind`, `arguments: List<Expr*>` | (none) | Synthesized builtin operator on scalar/vector/matrix operands; carries the resolved operation kind directly (1 unary or 2 operands). |
-| `InvokeExpr` | `AppExprBase` | `functionExpr: Expr*`, `arguments: List<Expr*>`, `argumentDelimeterLocs` | [call](../syntax-reference/grammar.md#expressions) | `f(...)`; also the post-resolution form of operator and cast expressions. |
+| `BuiltinOperatorExpr` | `ExprWithArgsBase` | `op: BuiltinOperationKind`, `elementTypeIsFloatingPoint: bool`, `arguments: List<Expr*>` | (none) | Synthesized builtin operator on scalar/vector/matrix operands; carries the resolved operation kind directly (1 unary or 2 operands); `elementTypeIsFloatingPoint` is set at check time and read only for `Mod`. |
+| `InvokeExpr` | `AppExprBase` | `functionExpr: Expr*`, `arguments: List<Expr*>`, `argumentDelimeterLocs: List<SourceLoc>` | [call](../syntax-reference/grammar.md#expressions) | `f(...)`; also the post-resolution form of operator and cast expressions. |
 | `ExplicitCtorInvokeExpr` | `InvokeExpr` | (inherits) | (none) | Synthesized constructor call; the marker tells the checker not to re-read a one-argument `T(x)` as a type coercion. |
-| `TryExpr` | `Expr` | `base: Expr*`, `tryClauseType` (Standard / Optional / Assert) | [try](../syntax-reference/grammar.md#expressions) | `try expr` wrapper for fallible calls. |
+| `TryExpr` | `Expr` | `base: Expr*`, `tryClauseType: TryClauseType` (Standard / Optional / Assert) | [try](../syntax-reference/grammar.md#expressions) | `try expr` wrapper for fallible calls. |
 | `NewExpr` | `InvokeExpr` | (inherits) | [new](../syntax-reference/grammar.md#expressions) | `new T(...)`. |
 | `OperatorExpr` | `InvokeExpr` | (inherits) | [operator](../syntax-reference/grammar.md#expressions) | Operator application reified as a call; shared base for the infix, prefix, postfix, select, and short-circuit operator forms. |
 | `InfixExpr` | `OperatorExpr` | (inherits) | [infix operator](../syntax-reference/grammar.md#expressions) | Binary operator (`a + b`). |
 | `PrefixExpr` | `OperatorExpr` | (inherits) | [prefix operator](../syntax-reference/grammar.md#expressions) | Unary prefix operator (`-a`, `!x`). |
 | `PostfixExpr` | `OperatorExpr` | (inherits) | [postfix operator](../syntax-reference/grammar.md#expressions) | Unary postfix operator (`a++`). |
 | `IndexExpr` | `Expr` | `baseExpression: Expr*`, `indexExprs: List<Expr*>` | [index](../syntax-reference/grammar.md#expressions) | `a[i]` (one or more indices). |
-| `MemberExpr` | `DeclRefExpr` | `baseExpression: Expr*`, `memberOperatorLoc` | [member](../syntax-reference/grammar.md#expressions) | `a.b`. |
+| `MemberExpr` | `DeclRefExpr` | `baseExpression: Expr*`, `memberOperatorLoc: SourceLoc` | [member](../syntax-reference/grammar.md#expressions) | `a.b`. |
 | `DerefMemberExpr` | `MemberExpr` | (inherits) | [pointer member](../syntax-reference/grammar.md#expressions) | `a->b`. |
-| `StaticMemberExpr` | `DeclRefExpr` | `baseExpression: Expr*`, `memberOperatorLoc` | [static member](../syntax-reference/grammar.md#expressions) | `T::m` (member on a type). |
+| `StaticMemberExpr` | `DeclRefExpr` | `baseExpression: Expr*`, `memberOperatorLoc: SourceLoc` | [static member](../syntax-reference/grammar.md#expressions) | `T::m` (member on a type). |
 | `MatrixSwizzleExpr` | `Expr` | `base: Expr*`, `elementCount: int`, `elementCoords: MatrixCoord[4]` | (none) | Matrix swizzle (`m._m00_m11`). |
 | `SwizzleExpr` | `Expr` | `base: Expr*`, `elementIndices: ShortList<uint32_t, 4>` | (none) | Vector swizzle (`v.xyz`); the checker rewrites a `MemberExpr` on a vector into this. |
 | `MakeRefExpr` | `Expr` | `base: Expr*` | (none) | L-value to reference conversion. |
@@ -168,6 +168,7 @@ flowchart TD
 | `TreatAsDifferentiableExpr` | `Expr` | `innerExpr: Expr*`, `flavor: Flavor` (NoDiff / Differentiable) | [`no_diff`](../syntax-reference/grammar.md#expressions) | Marks an inner call as differentiable or non-differentiable. |
 | `ThisTypeExpr` | `Expr` | `scope: Scope*` | (none) | Type expression for `This`; declared with visitor support but no construction site — a written `This` parses as an ordinary `VarExpr` named `This` (see the note below the table). |
 | `ThisInterfaceExpr` | `VarExpr` | (inherits) | (none) | Parser-synthesized stand-in for the enclosing `interface` type in the `This : IFoo` constraint of an interface default implementation. |
+| `HLSLUnsignedTypeExpr` | `Expr` | (no additional state) | [HLSL integer type specifier](../syntax-reference/grammar.md#types) | HLSL `unsigned` / `unsigned int` type expression; always denotes built-in `uint` (see the type-expression callout). |
 | `AndTypeExpr` | `Expr` | `left: TypeExp`, `right: TypeExp` | [conjunction type](../syntax-reference/grammar.md#types) | `T & U` conjunction-of-conformances type expression. |
 | `ModifiedTypeExpr` | `Expr` | `modifiers: Modifiers`, `base: TypeExp` | [type modifier](../syntax-reference/grammar.md#types) | Type expression with modifier prefixes. |
 | `PointerTypeExpr` | `Expr` | `base: TypeExp` | [pointer type](../syntax-reference/grammar.md#types) | `T*`. |
@@ -229,7 +230,12 @@ once at creation, every downstream consumer — constant folding via
 `BuiltinOperationIntVal` (see [values.md](values.md)), IR lowering,
 and for-loop trip-count inference — reads the `op` field rather than
 re-parsing an operator name. `arguments` holds one operand for a unary
-operator or two for a binary one.
+operator or two for a binary one. The checker also stores
+`elementTypeIsFloatingPoint`, computed from a concrete
+`BasicExpressionType` or from a generic parameter constrained to
+`__BuiltinFloatingPointType`; it matters only for `Mod` and carries no
+meaning for other operator kinds. How lowering consumes it is described
+in [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md).
 
 ### OverloadedExpr and OverloadedExpr2
 
@@ -275,36 +281,17 @@ any name-resolution result uniformly.
 
 ### LiteralExpr family
 
-`IntegerLiteralExpr`, `FloatingPointLiteralExpr`, `BoolLiteralExpr`,
-`NullPtrLiteralExpr`, `NoneLiteralExpr`, and `StringLiteralExpr`
-share `LiteralExpr` as a base. The numeric, character, and string
-literal paths store the originating `Token` on the base (so the source
-text and suffix are recoverable) along with the parsed `suffixType`;
-the keyword literals `true`, `false`, `nullptr`, and `none` are built
-by keyword callbacks that record only the source location, leaving the
-inherited token field unset. Adjacent string literals are merged during
-expression parsing — after lexing produces adjacent string-literal
-tokens — into a single `StringLiteralExpr` (see [tokens.md](../syntax-reference/tokens.md)).
-
-Two details of numeric literals are easy to get wrong. First, a
-`FloatingPointLiteralExpr` holds the value as written:
-`parseFloatingPointLiteralExpr` asks `getFloatingPointLiteralValue` for
-a `FloatingPointLiteralType` classification of the suffix (`Half`,
-`Float`, `Double`, or the error kinds `BadSignificand` / `BadSuffix`),
-maps it to `suffixType`, and stores the returned value unchanged — the
-parser itself no longer rounds or clamps. When that helper reports
-`isOutOfRange` or `precisionLost` the parser diagnoses it:
-`float-literal-unrepresentable` (40009) for an over-range magnitude,
-`float-literal-too-small` (40010) for an under-range one, and
-`float-hex-literal-precision-lost` (40019) for a truncated hex
-significand. All three are *warnings*, so the compile continues and the
-already-converted value is what lands in `value` — `1e50f` warns and
-stores `inf`. Second, a leading `-` or `+` is a
-prefix operator, not part of the literal token, so `parsePrefixExpr`
-folds the sign into a *copy* of the literal node; the
-`signedMinimumIntException` flag on `IntegerLiteralExpr` exists so that
-`-2147483648` and `-9223372036854775808` can be re-typed as `Int` /
-`Int64` after that fold instead of being diagnosed as too large.
+All literal classes share `LiteralExpr`; numeric, character, and string
+literals store the originating `Token` and `suffixType`, while the keyword
+literals (`true`, `false`, `nullptr`, `none`) record only a location, and
+adjacent string literals are merged during parsing (see
+[tokens.md](../syntax-reference/tokens.md)). A `FloatingPointLiteralExpr`
+holds the suffix-converted value: `getFloatingPointLiteralValue` rounds or
+truncates to `Half`/`Float`, and `parseFloatingPointLiteralExpr` stores the
+result unchanged, so `1e50f` warns (40009, 40010, or 40019 for the
+range and precision cases) and stores `inf`. A leading `-` is a prefix
+operator, so `parsePrefixExpr` folds it into a copy of the literal, and
+`signedMinimumIntException` lets `-2147483648` be re-typed as `Int`.
 
 ### PartiallyAppliedGenericExpr
 
@@ -369,8 +356,9 @@ qualify.
 into a fresh `ScopeDecl` (`paramScopeDecl`) parsed with the ordinary
 `ParseParameter` syntax, and `bodyStmt` holds either the `{ ... }`
 block or, for the single-expression form `(x) => x + 1`, a synthesized
-`ReturnStmt` wrapping that expression, so `(int x) => { return x + 1; }`
-and `(int x) => x + 1` build the same shape. There is no bare-identifier
+`ReturnStmt` wrapping that expression. The two forms therefore share the
+outer `LambdaExpr` shape but differ in `bodyStmt`: the braced form stores the
+parsed block, the expression form the bare synthesized `ReturnStmt`. There is no bare-identifier
 parameter form — the parameter list always has parentheses, and the
 lambda is recognized only when a balanced parenthesized group is
 followed by `=>`, so in `x => x + 1` the bare `x` parses as an ordinary
@@ -381,30 +369,23 @@ checker, not by the parser.
 
 ### Type-expression family (PointerTypeExpr, FuncTypeExpr, TupleTypeExpr, AndTypeExpr, ModifiedTypeExpr, PackBranchTypeExpr)
 
-These nodes are `Expr` subclasses even though they describe types,
-because Slang parses type expressions through the same recursive
-descent as value expressions and only resolves them to `Type` values
-(see [types.md](types.md)) during checking. Each one wraps `TypeExp`
-operands, which themselves bundle "expression as written" and
-"resolved type" so the checker can produce both diagnostics and
-canonical type identity. Not every type keyword gets its own node: a
-written `This` is parsed as a plain `VarExpr` whose name is `This` and
-resolved by lookup, so the `ThisTypeExpr` class in the header is not
-what a `This` in source becomes.
+These nodes are `Expr` subclasses because type expressions are parsed by the
+same recursive descent as values and resolved to `Type` values (see
+[types.md](types.md)) only during checking. Each wraps `TypeExp` operands that
+bundle the expression as written with its resolved type. A written `This`
+parses as a plain `VarExpr`, so `ThisTypeExpr` is not what `This` becomes.
 
-The surface spellings differ per node. `PointerTypeExpr` comes from a
-`*` suffix on a type and `AndTypeExpr` from an infix `&`, both parsed as
-type suffixes; `ModifiedTypeExpr` wraps a type written with modifier
-prefixes; `PackBranchTypeExpr` is parsed from the `__packBranch` keyword
-expression; and `FuncTypeExpr` requires the `functype` keyword —
-`functype(T1, T2) -> R`, the form the callback parameters in
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) use (e.g.
-`functype(T, T) -> T combineOp`). `TupleTypeExpr` is the exception: its
-parser function and the type-specifier branch that would call it are
-both compiled out in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp), so a
-`(T1, T2)` tuple type has no accepted spelling at this commit and
-nothing constructs the node.
+`HLSLUnsignedTypeExpr` is produced only for HLSL source, by
+`parseHLSLTraditionalIntegerTypeSpecifier` in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the checker
+types it directly as built-in `uint`. `FuncTypeExpr` requires the `functype`
+keyword (`functype(T, T) -> T combineOp` in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang)), while
+`PointerTypeExpr` (`*` suffix), `AndTypeExpr` (infix `&`), `ModifiedTypeExpr`
+(modifier prefixes) and `PackBranchTypeExpr` (`__packBranch`) have their own
+spellings. `TupleTypeExpr` is compiled out of
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp), so nothing
+constructs it at this commit.
 
 ## See also
 

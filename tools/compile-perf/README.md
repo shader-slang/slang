@@ -204,7 +204,7 @@ other workload in the suite measures.
 > One axis per workload is not a stylistic preference here. A mixed
 > "kitchen sink" cross-target shader was tried first and **failed**: a shared
 > super-linear front-end cost dominated it and flattened a 21× cuda/spirv
-> divergence to 1.1×. See `COVERAGE-ANALYSIS.md`.
+> divergence to 1.1×.
 
 | Test                   | Targets                        | What it generates                                                  | Isolates                                                                                                                                                                                         | Primary timers                                     |
 | ---------------------- | ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
@@ -377,6 +377,7 @@ python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.
 | `track.py`                           | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `daily_movers.py`                    | **daily progress summary** — suite-wide day boundaries ranked by headline movement with leaf-timer attribution and the commit range to bisect; `--workload <name>` for one workload's per-timer net + biggest step (date + commits)                                                                                                                                                                                                                                                                                                                                                                                 |
 | `trend.py`                           | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `perf_bisect.py`                     | **perf bisect** — for a confirmed nightly change: `targets` picks counters and a flat base night, `run` builds and measures master commits on the perf host and writes `bisect.json`/`bisect.md` after every step (used by `claude-perf-bisect.yml`), `triage` says from the archived samples whether the change looks real or like noise, as the Slack line (used by the nightly)                                                                                                                                                                                                                                  |
 | `lib/analyze.py`                     | per-`(workload,timer)` series helpers — used as a library by `report.py`, `track.py`, etc. (no standalone CLI yet)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `breakdown.py`                       | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **history pages** (per-workload detail pages under `analysis/workloads/`, linked from the landing page and the `*-releases.html` / `*-tot.html` cadence pages; `report_per_workload.html` is a redirect to the landing page) and **per-sweep** (stacked-area vs N in `sweep_report.html`); standalone CLI: `--label <tag>` prints aggregate + per-workload tables; `--html` writes SVG/HTML; `--workload <name>` prints the full indented timer tree |
 | `report.py`                          | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -420,9 +421,22 @@ via `--results <checkout-path>`.
 | `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
 | `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
+The publishing nightly also exports daily results and newly measured releases for
+BenchView; release exports include only active tests at their current default sizes.
+Runs with `sweep=true` skip BenchView and defer new-release discovery. Older suite
+checkouts defer release discovery when they lack release-export support.
+The benchmark host handles collection and delivery. Export failures do not block
+existing reports; an invalid release export also leaves the daily export intact.
+Skipped or failed release exports require a separate export of the archived results;
+they are not automatically retried after the release enters the tracked history.
+For local or historical exports, see `python3 benchview.py --help`.
+
 ---
 
 ## Notes / caveats
+
+Run the regression tests from the repository root with
+`python3 -m unittest discover -s tools/compile-perf/tests -t tools/compile-perf -p 'test_*.py'`.
 
 - **`parse` is sema-dominated:** `parseTranslationUnit` is cheap even for huge
   files; use that timer (not `frontEndExecute`) for the pure-parse signal.

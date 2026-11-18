@@ -314,14 +314,6 @@ static SourceLoc _getMemberOpLoc(Expr* expr)
     return SourceLoc();
 }
 
-void addSiblingScopeForContainerDecl(
-    ASTBuilder* builder,
-    ContainerDecl* dest,
-    ContainerDecl* source)
-{
-    addSiblingScopeForContainerDecl(builder, dest->ownedScope, source);
-}
-
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source)
 {
     auto subScope = builder->create<Scope>();
@@ -605,6 +597,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 expr->type = m_astBuilder->getErrorType();
             }
 
+            const bool isFieldWritableThroughWritableBase =
+                expr->type.isLeftValue && as<VarDeclBase>(declRef.getDecl());
+
             // The member's `QualType` supplies its own l-value status. An ordinary instance
             // member additionally requires an l-value base. Buffer accesses and property
             // accessors have the separate rules below when the base is not an l-value.
@@ -661,6 +656,13 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                     expr->type.isLeftValue = isLValue;
                 }
             }
+
+            // A field of a read-only memory location is part of that location, provided the
+            // field would be writable through a writable base. A property is excluded because
+            // its accessors do not name a memory location.
+            expr->type.isReadOnlyMemoryLocation = !expr->type.isLeftValue &&
+                                                  baseExpr->type.isReadOnlyMemoryLocation &&
+                                                  isFieldWritableThroughWritableBase;
             return expr;
         }
     }
@@ -718,8 +720,9 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
         // however, and so the code here might need updating sooner or
         // later.
         //
-        bool baseIsLVal = QualType(base->type.type).isLeftValue;
-        derefExpr->type.isLeftValue = baseIsLVal;
+        QualType refQualType(base->type.type);
+        derefExpr->type.isLeftValue = refQualType.isLeftValue;
+        derefExpr->type.isReadOnlyMemoryLocation = refQualType.isReadOnlyMemoryLocation;
     }
     else if (isImmutableBufferType(base->type))
     {
@@ -730,6 +733,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
         derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.isReadOnlyMemoryLocation = base->type.isReadOnlyMemoryLocation;
         derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
         derefExpr->type.isWriteOnly = base->type.isWriteOnly;
     }
@@ -3492,6 +3496,7 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     // TODO(tfoley): need to be more careful about this stuff
     subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
+    subscriptExpr->type.isReadOnlyMemoryLocation = baseExpr->type.isReadOnlyMemoryLocation;
 
     return subscriptExpr;
 }
@@ -3871,6 +3876,16 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
         }
     }
+    else
+    {
+        if (auto var =
+                findGroupSharedVariablePartlyWrittenInDifferentiatedBody(expr->left, expr->left))
+        {
+            getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+                .var = var,
+                .target = expr->left});
+        }
+    }
     expr->type = type;
     return expr;
 }
@@ -4219,22 +4234,52 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     return false;
 }
 
-static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
+/// Return whether a parameter of mode `mode` may be a reference to its argument's storage during
+/// the call, rather than a copy of it.
+static bool _mayParamBeReferenceToArgumentStorage(ParamPassingMode mode)
 {
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    return as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+    // An `in` parameter may become a borrow in `transformParamsToConstRef`, but that borrow is
+    // never a reference to argument storage the call can modify.
+    if (mode == ParamPassingMode::In)
+        return false;
+
+    // The `ref` modes are always references. The language defines `out`, `inout`, and borrow
+    // parameters as copies, but lets the compiler pass them by reference instead, on the
+    // assumption that well-written code cannot tell the difference. Targets make different
+    // choices: when `addArg` lowers such an argument that names a memory location, it passes the
+    // address of that location, which HLSL and GLSL then emit as copying parameters, while SPIR-V,
+    // Metal, CUDA, C++, and WGSL keep it as a pointer to the caller's variable.
+    return true;
 }
 
-static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
+/// Return whether passing overlapping argument storage to parameters of modes `first` and `second`
+/// may be undefined behavior, so that the potential-aliasing warning applies.
+static bool _mayAliasedArgumentsInterfere(ParamPassingMode first, ParamPassingMode second)
 {
-    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
-    if (as<OutParamType>(paramType))
-        return "out";
-    if (as<BorrowInOutParamType>(paramType))
-        return "inout";
-    if (as<RefParamType>(paramType))
-        return "ref";
-    return "in";
+    // A copy is taken before the call, so nothing done through the other parameter can affect it.
+    if (!_mayParamBeReferenceToArgumentStorage(first) ||
+        !_mayParamBeReferenceToArgumentStorage(second))
+        return false;
+
+    // A function that declares two reference parameters has opted into reference semantics for
+    // both, so we assume it handles their aliasing. A borrow, `out`, or `inout` parameter has value
+    // semantics that the target may implement by reference, so pairing one with any parameter that
+    // may write the storage still warns.
+    if (isByReferenceParamPassingMode(first) && isByReferenceParamPassingMode(second))
+        return false;
+
+    // Both parameters may be references to the same storage. Two read-only references
+    // (`ref_readonly`, `borrow`, `constref`) cannot change it, but a write through either one
+    // makes the result depend on how the target passed them. Consider this example:
+    //
+    //     int f(inout int a, __borrow int b) { a = 5; return b; }
+    //     int x = 1;
+    //     f(x, x);
+    //
+    // On HLSL, `a` and `b` are copies of `x`, so `f` returns 1. On Metal, both are pointers to
+    // `x`, so `f` returns 5.
+    return doesParamPassingModeIndicateWritableStorage(first) ||
+           doesParamPassingModeIndicateWritableStorage(second);
 }
 
 void SemanticsVisitor::_checkAliasedOutArguments(
@@ -4254,29 +4299,28 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     Index checkCount = Math::Min(argCount, paramCount);
 
     // For each pair of arguments, check if they refer to the same storage
-    // and at least one parameter is out/inout/ref. We compare expressions
-    // structurally: bare variables (a == a), member accesses (s.x == s.x
-    // but not s.x == s.y), and constant-index subscripts (arr[0] == arr[0]
-    // but not arr[0] == arr[1]).
+    // and their parameters' modes let the aliasing interfere. We compare
+    // expressions structurally: bare variables (a == a), member accesses
+    // (s.x == s.x but not s.x == s.y), and constant-index subscripts
+    // (arr[0] == arr[0] but not arr[0] == arr[1]).
     for (Index i = 0; i < checkCount; ++i)
     {
-        bool iIsOut = _isOutInOutOrRefParam(funcType, i);
+        const auto iMode = funcType->getParamPassingMode(i);
 
         for (Index j = i + 1; j < checkCount; ++j)
         {
-            // At least one of the two must be out/inout/ref.
-            bool jIsOut = _isOutInOutOrRefParam(funcType, j);
-            if (!iIsOut && !jIsOut)
+            const auto jMode = funcType->getParamPassingMode(j);
+            if (!_mayAliasedArgumentsInterfere(iMode, jMode))
                 continue;
 
             if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
                 continue;
 
-            // Both arguments refer to the same variable and at least
-            // one is out/inout/ref. Put the out/inout/ref parameter
-            // first in the diagnostic for clarity.
-            Index first = iIsOut ? i : j;
-            Index second = iIsOut ? j : i;
+            // Both arguments refer to the same variable. Put a parameter that
+            // may be written first in the diagnostic for clarity.
+            const bool iMayBeWritten = doesParamPassingModeIndicateWritableStorage(iMode);
+            Index first = iMayBeWritten ? i : j;
+            Index second = iMayBeWritten ? j : i;
 
             Name* paramNameFirst = nullptr;
             Name* paramNameSecond = nullptr;
@@ -4286,9 +4330,9 @@ void SemanticsVisitor::_checkAliasedOutArguments(
                 paramNameSecond = paramDeclRefs[second].getName();
 
             getSink()->diagnose(Diagnostics::PotentiallyAliasedOutParameter{
-                .direction1 = _getDirectionString(funcType, first),
+                .direction1 = funcType->getParamPassingMode(first),
                 .param1 = paramNameFirst,
-                .direction2 = _getDirectionString(funcType, second),
+                .direction2 = funcType->getParamPassingMode(second),
                 .param2 = paramNameSecond,
                 .firstArg = invoke->arguments[first]});
             break; // One warning per outer index i is enough.
@@ -4355,10 +4399,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 checkThrowingCallIsCovered(invoke);
 
             auto funcDeclRefExpr = as<DeclRefExpr>(invoke->functionExpr);
+            DeclRef<CallableDecl> callableDeclRef;
             List<DeclRef<ParamDecl>> paramDeclRefs;
             if (funcDeclRefExpr)
             {
-                if (auto callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>())
+                callableDeclRef = funcDeclRefExpr->declRef.as<CallableDecl>();
+                if (callableDeclRef)
                 {
                     paramDeclRefs =
                         getParametersForCallableSignature(m_astBuilder, callableDeclRef);
@@ -4380,7 +4426,14 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
 
-                if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
+                // A parameter that takes its default value has no argument, and a call through a
+                // value of function type has no parameter declarations, so neither has a
+                // `groupshared` argument to check.
+                //
+                if (paramDecl && argExpr && paramDecl->hasModifier<HLSLGroupSharedModifier>())
+                    checkArgumentOfGroupSharedParam(paramDecl, argExpr);
+
+                if (as<OutParamTypeBase>(paramType) || as<RefParamTypeBase>(paramType))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -4389,9 +4442,14 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     // for an `inout` parameter to be converted in both
                     // directions.
                     //
+                    // A `__ref_readonly` parameter only reads its argument, so the argument
+                    // may also be a memory location that the caller cannot write.
+                    const bool acceptsReadOnlyMemoryLocation =
+                        as<RefReadOnlyParamType>(paramType) != nullptr;
                     if (argExpr)
                     {
-                        if (!argExpr->type.isLeftValue)
+                        if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
+                                                            argExpr->type.isReadOnlyMemoryLocation))
                         {
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
@@ -4500,7 +4558,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1)
                                 {
                                     // Try and determine reason for failure
-                                    if (as<RefParamType>(paramType))
+                                    if (as<RefParamTypeBase>(paramType))
                                     {
                                         // Ref types are not allowed to use this mechanism
                                         // because it breaks atomics
@@ -4562,11 +4620,10 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Check for potentially aliased out/inout/ref arguments.
-            // If two arguments refer to the same root variable and at
-            // least one of them is out/inout/ref, the behavior is
-            // undefined (issue #10699).
+            // Warn when the same storage is passed to two parameters that may both be references
+            // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
+            checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -5750,7 +5807,7 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         // support autodiff, but it is not clear what a correct
         // one-size-fits-all behavior should be in that case.
         //
-        if (as<RefParamType>(primalParamType))
+        if (as<RefParamTypeBase>(primalParamType))
             return primalParamWrapperType;
 
         // Given a primal type that is a wrapper like `Out<T>`, we can
@@ -6012,13 +6069,24 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(
 
                 break;
             }
-        case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
             {
-                // Not allowed..
-                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                // We pass a reference parameter through unchanged and treat its storage as
+                // non-differentiable, as `BwdDiffFuncType::_resolveImplOverride` does.
+                //
+                // TODO: Differentiate the storage that a reference parameter refers to.
+                //
+                auto noDiffType = doesTypeHaveNoDiffModifier(paramValType)
+                                      ? paramValType
+                                      : m_astBuilder->getModifiedType(
+                                            paramValType,
+                                            {m_astBuilder->getNoDiffModifierVal()});
+                paramTypes.add(
+                    getParamTypeWithModeWrapper(m_astBuilder, noDiffType, paramPassingMode));
+                break;
             }
-
-            break;
         }
     }
 
@@ -6081,6 +6149,36 @@ struct HigherOrderInvokeExprCheckingActions
         return declRef.as<CallableDecl>();
     }
 
+    /// Return whether `funcExpr`, the function that a `fwd_diff` or `bwd_diff` differentiates, has
+    /// a reference parameter and a differentiability attribute. Such a function has already been
+    /// rejected at its declaration, so the caller gives the expression an error type instead of
+    /// building a derivative signature.
+    bool isDifferentiationAlreadyRejectedForReferenceParameter(
+        SemanticsVisitor* semantics,
+        Expr* funcExpr)
+    {
+        auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr);
+        if (!funcDeclRef || !hasReferenceParameter(funcDeclRef.getDecl()))
+            return false;
+
+        // Consider this example:
+        //
+        //     [Differentiable]
+        //     float prim(__ref float a, float x) { return a * x; }
+        //     ... fwd_diff(prim)(a, diffPair(x, 1.0)) ...
+        //
+        // `checkDifferentiableCallableSignature` has already reported the reference parameter at
+        // `[Differentiable]`, and no derivative is synthesized for `prim`. Looking up the
+        // `fwd_diff` member would therefore report a second, misleading error that `prim` lacks
+        // one, so we give the expression an error type instead.
+        //
+        // Without an attribute, `prim` has no derivative for the same reason as any function
+        // without one, and we let the lookup report the missing member as usual. That lookup
+        // needs a derivative signature, which keeps the reference parameter as it is.
+        //
+        return funcDeclRef.getDecl()->findModifier<DifferentiableAttribute>() != nullptr;
+    }
+
     // Extract the effective `this` parameter information for a statically referenced member method
     // (e.g. `Type::method`). Returns an empty result for declarations without that parameter and
     // for member methods referenced by name within their own type (e.g.
@@ -6121,6 +6219,11 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
+        if (isDifferentiationAlreadyRejectedForReferenceParameter(semantics, funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
+            return;
+        }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
         resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisParamInfo);
         if (auto funcDeclRef = getBaseFunctionDeclRef(semantics, funcExpr))
@@ -6153,6 +6256,11 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
+            return;
+        }
+        if (isDifferentiationAlreadyRejectedForReferenceParameter(semantics, funcExpr))
+        {
+            resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
             return;
         }
         auto thisParamInfo = getThisParamInfoForBaseFunc(semantics, funcExpr);
@@ -7384,7 +7492,17 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
     // Check if it's a type cast like float(x), half(x), double(x)
     else if (auto invokeExpr = as<InvokeExpr>(valueExpr))
     {
-        if (invokeExpr->arguments.getCount() == 1)
+        // Only a conversion to the floating-point type can be folded from its argument.
+        // Other one-argument calls, such as `asfloat(0x3F800000u)`, `bit_cast<float>(...)`
+        // or `sqrt(4.0f)`, produce a different value than converting the argument would.
+        bool isConversion = as<TypeCastExpr>(invokeExpr) != nullptr;
+        if (auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
+        {
+            if (as<ConstructorDecl>(funcDeclRefExpr->declRef.getDecl()))
+                isConversion = true;
+        }
+
+        if (isConversion && invokeExpr->arguments.getCount() == 1)
         {
             floatLitExpr = as<FloatingPointLiteralExpr>(invokeExpr->arguments[0]);
             if (!floatLitExpr)
@@ -7675,6 +7793,15 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 {
     expr->arg = CheckTerm(expr->arg);
 
+    // An operand that already failed to check has been reported, so we give the expression an
+    // error type rather than also reporting that the operand is not addressable.
+    //
+    if (as<ErrorType>(expr->arg->type))
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
     // This address-of feature is purely experimental and for prototyping.
     // Only allow known expressions.
     expr->type =
@@ -7685,6 +7812,415 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
+}
+
+// Return the sub-expression of `expr` that determines the address space of the storage `expr`
+// names, such as `g` for `g[i].a.x`, by stripping `(...)`, `[i]`, `.field`, and single-component
+// swizzles. The groupshared checks use it to find the declaration that carries `groupshared`.
+//
+// TODO: This query exists only because an expression's checked information does not record its
+// address space; once it does, callers can read that instead.
+static Expr* getSubExpressionDeterminingAddressSpace(Expr* expr)
+{
+    // An address-space modifier such as `groupshared` sits on the declaration of a whole
+    // variable, never on a part of one, so we walk out to the variable. `getValidTypeForAddressOf`
+    // would walk these projections itself, but it judges a field access by the field's
+    // declaration and so loses the base variable's address space (issue #14094).
+    //
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        else if (auto indexExpr = as<IndexExpr>(expr))
+            expr = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            // A multi-element swizzle may be non-contiguous, so it has no address of its own and
+            // the caller materializes a private temporary for it. We stop, so that such an
+            // argument is judged on its own and rejected rather than inheriting the base's address
+            // space.
+            //
+            if (swizzleExpr->elementIndices.getCount() > 1)
+                return expr;
+            expr = swizzleExpr->base;
+        }
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        {
+            if (matrixSwizzleExpr->elementCount > 1)
+                return expr;
+            expr = matrixSwizzleExpr->base;
+        }
+        else if (auto memberExpr = as<MemberExpr>(expr))
+        {
+            // We stop at a member reached through a pointer, because the pointer's own type
+            // carries the address space. We also stop at a member that is not a field stored in
+            // the base: a `static` field is a variable of its own, and a property or method names
+            // no part of the base's storage.
+            //
+            auto memberDecl = memberExpr->declRef.getDecl();
+            if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
+                (memberDecl && memberDecl->hasModifier<HLSLStaticModifier>()))
+                return expr;
+            expr = memberExpr->baseExpression;
+        }
+        else
+            return expr;
+    }
+}
+
+// Return whether `arg` is one of the type-only placeholder arguments that
+// `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types.
+static bool isSpecializeWithArgTypesPlaceholder(Expr* arg)
+{
+    // A placeholder is a bare `VarExpr` with a checked l-value type but neither a name nor a
+    // declaration. It stands for some l-value of its type and names no storage, so a check about
+    // which storage an argument names has no answer for it.
+    //
+    auto varExpr = as<VarExpr>(arg);
+    return varExpr && varExpr->astNodeType == ASTNodeType::VarExpr && !varExpr->name &&
+           !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
+}
+
+// Return whether `expr` has an error type, or is an implicit cast of an expression that has one.
+// The storage checks use it to skip an argument that already failed to check, since a storage
+// diagnostic for it would only repeat the reported error.
+static bool isErrorTypedOrCastFromErrorTyped(Expr* expr)
+{
+    if (as<ErrorType>(expr->type))
+        return true;
+
+    // Coercion wraps an error-typed operand in an implicit cast to the parameter's type, so we
+    // look through that cast.
+    //
+    auto castExpr = as<ImplicitCastExpr>(expr);
+    return castExpr && as<ErrorType>(castExpr->arguments[0]->type);
+}
+
+// Return whether `arg` names thread-group-shared storage, such as `g[i].a` for
+// `groupshared Pair g[4]`.
+bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
+{
+    SLANG_ASSERT(arg);
+
+    // A part of a variable is in the address space of the whole variable, so we judge the whole.
+    //
+    auto addressedExpr = getSubExpressionDeterminingAddressSpace(arg);
+    if (isSpecializeWithArgTypesPlaceholder(addressedExpr))
+        return false;
+
+    // `getValidTypeForAddressOf` gives the pointer type of an addressable expression, and that
+    // type carries the address space, so we read the address space from it instead of deciding
+    // addressability again here.
+    //
+    if (auto ptrType = getValidTypeForAddressOf(
+            this,
+            m_astBuilder,
+            addressedExpr,
+            getType(m_astBuilder, addressedExpr)))
+    {
+        if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
+            return (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
+    }
+    return false;
+}
+
+// Report an error if `argIn`, passed to the `groupshared` parameter `paramIn`, does not name
+// thread-group-shared storage.
+void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr* argIn)
+{
+    SLANG_ASSERT(paramIn && argIn && paramIn->hasModifier<HLSLGroupSharedModifier>());
+    if (isSpecializeWithArgTypesPlaceholder(argIn) || isErrorTypedOrCastFromErrorTyped(argIn))
+        return;
+
+    // A `groupshared` parameter is a reference to a thread-group-shared location, so its argument
+    // must name such a location. A private local, a copy, or an rvalue would let the callee treat
+    // memory that no other invocation can see as shared. HLSL proposal 0043 (`groupshared`
+    // Arguments) imposes the same rule.
+    //
+    if (!argumentNamesGroupSharedStorage(argIn))
+        getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
+            .param = getText(paramIn->getName()),
+            .arg = argIn});
+}
+
+// An argument of a call that the call writes back to the caller's storage when it returns: the
+// argument of an `out` or `inout` parameter, or the receiver of a `[mutating]` method, whose
+// implicit `this` is an `inout` parameter.
+struct WrittenBackArgument
+{
+    // The argument as written in the call.
+    Expr* arg = nullptr;
+
+    // The storage that the call writes back to: the operand of an implicit conversion of `arg`,
+    // or otherwise `arg` itself.
+    Expr* storage = nullptr;
+
+    // The parameter, or null for a receiver and for an argument of a call whose callee has no
+    // declaration, such as `bwd_diff(f)(...)`.
+    ParamDecl* param = nullptr;
+
+    bool isReceiver = false;
+
+    bool isConverted() const { return storage != arg; }
+};
+
+// Call `visit` with each argument of `invoke` that the call writes back to, other than arguments
+// that already failed to check.
+template<typename Visit>
+static void forEachWrittenBackArgument(
+    SemanticsVisitor* visitor,
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs,
+    Visit const& visit)
+{
+    Index argCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < argCount; ++i)
+    {
+        // Only an `out` or `inout` parameter is written back. A reference parameter, including a
+        // `groupshared` one, names its argument's storage, so the call accesses that storage in
+        // place and writes nothing back.
+        //
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)))
+            continue;
+        WrittenBackArgument written;
+        written.arg = invoke->arguments[i];
+        if (isErrorTypedOrCastFromErrorTyped(written.arg))
+            continue;
+
+        // An implicitly converted argument goes through a temporary of the parameter's type, and
+        // the call writes the temporary back to the operand of the conversion.
+        //
+        written.storage = written.arg;
+        if (auto lValueCast = as<LValueImplicitCastExpr>(written.arg))
+            written.storage = lValueCast->arguments[0];
+        if (i < paramDeclRefs.getCount())
+            written.param = paramDeclRefs[i].getDecl();
+        visit(written);
+    }
+
+    // A `[mutating]` method's implicit `this` is an `inout` parameter, so the call also writes back
+    // its receiver: the base expression of the member access. A call through a value of function
+    // type has no declaration to tell us the receiver mode, and no receiver.
+    //
+    if (!calleeDeclRef)
+        return;
+    auto thisParamInfo = visitor->findEffectiveThisParamInfo(calleeDeclRef);
+    if (!thisParamInfo || thisParamInfo->mode != ParamPassingMode::BorrowInOut)
+        return;
+    if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
+    {
+        WrittenBackArgument written;
+        written.arg = memberExpr->baseExpression;
+        written.storage = written.arg;
+        written.isReceiver = true;
+        visit(written);
+    }
+}
+
+// The source that makes a call write an argument back. At most one location is valid: the
+// parameter's `out` or `inout` keyword, the method's `[mutating]` attribute, or a method that can
+// modify `this` without one.
+struct WriteBackReason
+{
+    ParamPassingMode mode = ParamPassingMode::BorrowInOut;
+    SourceLoc modeLocation;
+    SourceLoc mutatingLocation;
+    SourceLoc methodLocation;
+};
+
+// Return the source that makes the call to `calleeDeclRef` write `written` back. For a receiver,
+// that is the `[mutating]` attribute, or else the method itself, such as a `set` accessor or a
+// method in HLSL source, where methods are mutating by default. A callee without a declaration,
+// such as `bwd_diff(f)`, has no source to point at, so the reason has no location.
+//
+// TODO: We read the passing mode and its location from the modifiers here, which duplicates what
+// `findEffectiveThisParamInfo` and `getParamPassingMode` already decide and handles only the
+// `[mutating]` and `out` modifiers. The locations belong in `ParamInfo`, so that this code can
+// treat a receiver and an ordinary parameter alike through one query.
+static WriteBackReason getWriteBackReason(
+    WrittenBackArgument const& written,
+    DeclRef<CallableDecl> calleeDeclRef)
+{
+    WriteBackReason reason;
+    if (written.isReceiver)
+    {
+        auto callee = calleeDeclRef.getDecl();
+        if (auto mutating = callee->findModifier<MutatingAttribute>())
+            reason.mutatingLocation = mutating->loc;
+        else
+            reason.methodLocation = callee->loc;
+    }
+    else if (written.param)
+    {
+        reason.mode = getParamPassingMode(written.param);
+        if (auto modeModifier = written.param->findModifier<OutModifier>())
+            reason.modeLocation = modeModifier->loc;
+    }
+    return reason;
+}
+
+// The modes in which autodiff generates a derivative of a function from its body.
+struct ModesDifferentiatedFromBody
+{
+    bool forward = false;
+    bool backward = false;
+
+    bool any() const { return forward || backward; }
+};
+
+// Return the modes in which autodiff generates a derivative of `func` from its body: those in
+// which `func` is marked differentiable and has no custom derivative.
+static ModesDifferentiatedFromBody getModesDifferentiatedFromBody(
+    SharedSemanticsContext* shared,
+    FunctionDeclBase* func)
+{
+    ModesDifferentiatedFromBody modes;
+    if (!func)
+        return modes;
+    bool isBackwardDifferentiable = func->hasModifier<BackwardDifferentiableAttribute>();
+    if (!isBackwardDifferentiable && !func->hasModifier<ForwardDifferentiableAttribute>())
+        return modes;
+
+    // A custom derivative may be attached by an attribute on `func`, or by a
+    // `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the derivative. We see the
+    // latter only when the derivative's module is visible from here.
+    //
+    bool hasCustomForward = func->hasModifier<ForwardDerivativeAttribute>() ||
+                            func->hasModifier<HasTrivialForwardDerivativeAttribute>();
+    bool hasCustomBackward = func->hasModifier<BackwardDerivativeAttribute>();
+    for (auto assoc : shared->getAssociatedDeclsForDecl(func))
+    {
+        if (assoc->kind == DeclAssociationKind::ForwardDerivativeFunc)
+            hasCustomForward = true;
+        else if (assoc->kind == DeclAssociationKind::BackwardDerivativeFunc)
+            hasCustomBackward = true;
+    }
+    modes.forward = !hasCustomForward;
+    modes.backward = isBackwardDifferentiable && !hasCustomBackward;
+    return modes;
+}
+
+// Return the thread-group-shared variable that `target` writes part of, if `target` is in the body
+// of a function whose derivative Slang may generate from that body, or null otherwise. `storage`
+// is the storage that `target` writes.
+Decl* SemanticsVisitor::findGroupSharedVariablePartlyWrittenInDifferentiatedBody(
+    Expr* target,
+    Expr* storage)
+{
+    SLANG_ASSERT(target && storage);
+    if (isErrorTypedOrCastFromErrorTyped(target))
+        return nullptr;
+
+    // Consider this example:
+    //
+    //     groupshared float g[4];
+    //     groupshared float4 v;
+    //     void setOne(inout float y) { y = 1.0; }
+    //
+    //     [Differentiable]
+    //     float f(uint i, float x)
+    //     {
+    //         g[i] = x;       // reported
+    //         v.yz += 1.0;    // reported
+    //         setOne(g[i]);   // reported
+    //         v = float4(0);  // not reported
+    //         return x;
+    //     }
+    //
+    // Autodiff prepares the body of `f` for differentiation by replacing the addresses it
+    // computes with values, so each reported write becomes a read of the whole variable, an
+    // update of the part, and a write of the whole variable. Each invocation then stores back
+    // stale copies of the parts that other invocations wrote.
+    //
+    // We report such a write in every function that is marked differentiable and has no visible
+    // custom derivative for some mode, whether or not any code requests that derivative. The rule
+    // is deliberately broader than the set of writes that race in a given program; we chose a
+    // rule that is easy to state over a precise one. A differentiability attribute allows any
+    // module that imports the function to request a derivative generated from its body, and only
+    // this module can check the body, so we check what the attribute allows rather than what one
+    // program requests. For the same reason, a custom derivative that another module declares
+    // does not exempt the function here. Basing the rule on the source, rather than on how
+    // lowering and autodiff currently rewrite each write, also keeps it in step as those passes
+    // change.
+    //
+    if (!getModesDifferentiatedFromBody(getShared(), m_parentFunc).any())
+        return nullptr;
+
+    Expr* wholeExpr = storage;
+    while (auto parenExpr = as<ParenExpr>(wholeExpr))
+        wholeExpr = parenExpr->base;
+
+    // A multi-element swizzle, such as `v.yz`, has no address of its own, so we judge the
+    // vector or matrix it selects from.
+    //
+    Expr* addressedExpr = wholeExpr;
+    if (auto swizzleExpr = as<SwizzleExpr>(wholeExpr))
+        addressedExpr = swizzleExpr->base;
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(wholeExpr))
+        addressedExpr = matrixSwizzleExpr->base;
+
+    if (!argumentNamesGroupSharedStorage(addressedExpr))
+        return nullptr;
+
+    // A write of the whole variable, such as `v = float4(0)`, stays a single store.
+    //
+    auto baseExpr = getSubExpressionDeterminingAddressSpace(addressedExpr);
+    if (baseExpr == wholeExpr)
+        return nullptr;
+
+    // A write to part of a `groupshared` parameter stays in place, because autodiff leaves the
+    // storage behind a reference parameter in memory.
+    //
+    auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr);
+    if (!baseDeclRefExpr || as<ParamDecl>(baseDeclRefExpr->declRef.getDecl()))
+        return nullptr;
+    return baseDeclRefExpr->declRef.getDecl();
+}
+
+// Report each argument of `invoke` that the call writes back to part of thread-group-shared
+// memory in the body of a function whose derivative Slang may generate from that body.
+void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    // A call can write its `out` and `inout` arguments and its `[mutating]` receiver, whatever
+    // the callee is, so in a differentiated body each such argument that is part of shared memory
+    // races like an assignment to that part.
+    //
+    bool callIsOperator = as<OperatorExpr>(invoke) != nullptr;
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        {
+            auto var = findGroupSharedVariablePartlyWrittenInDifferentiatedBody(
+                written.arg,
+                written.storage);
+            if (!var)
+                return;
+
+            // A note points at what makes the call write the argument back. A direct argument of
+            // a mutating operator, such as `g[i] += 1`, is written as plainly as by an assignment,
+            // so we report it like one, without pointing into the operator's declaration.
+            //
+            WriteBackReason reason;
+            if (!callIsOperator || written.isConverted())
+                reason = getWriteBackReason(written, calleeDeclRef);
+            getSink()->diagnose(Diagnostics::GroupsharedPartialWriteInDifferentiatedBody{
+                .var = var,
+                .mode = reason.mode,
+                .target = written.arg,
+                .modeLocation = reason.modeLocation,
+                .mutatingLocation = reason.mutatingLocation,
+                .methodLocation = reason.methodLocation});
+        });
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)
@@ -8511,9 +9047,12 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components. Only a single element is a memory location,
+    // because the elements of a matrix row or column need not be adjacent.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        elementCount == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }
@@ -8625,10 +9164,25 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components. A single element is a memory location, while
+    // several elements form a new tuple and so do not name one.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        swizExpr->elementIndices.getCount() == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
     return swizExpr;
+}
+
+/// Return whether the components of a vector swizzle are adjacent and in increasing order, as in
+/// `v.y` or `v.yzw` but not `v.xz` or `v.yx`. Only such a swizzle names a memory location.
+static bool areSwizzleComponentsContiguous(ShortList<uint32_t, 4> const& elementIndices)
+{
+    for (Index i = 1; i < elementIndices.getCount(); i++)
+    {
+        if (elementIndices[i] != elementIndices[0] + uint32_t(i))
+            return false;
+    }
+    return true;
 }
 
 Expr* SemanticsVisitor::CheckSwizzleExpr(
@@ -8733,10 +9287,14 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
                 swizExpr->elementIndices.getCount())));
     }
 
-    // A swizzle can be used as an l-value as long as there
-    // were no duplicates in the list of components
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base && swizExpr->base->type &&
-                                 swizExpr->base->type.isLeftValue;
+    // A swizzle of a writable base can be used as an l-value as long as there were no
+    // duplicates in the list of components. It is a memory location only if its components
+    // are adjacent and in order, as in `v.yz`; `v.xz` and `v.yx` can be written component by
+    // component but have no single address.
+    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
+    swizExpr->type.isReadOnlyMemoryLocation =
+        areSwizzleComponentsContiguous(swizExpr->elementIndices) &&
+        swizExpr->base->type.isReadOnlyMemoryLocation;
 
     return swizExpr;
 }

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#witness-tables-and-witness-facts
-//META: doc_section_digest=0c68dc8ed69a2be740d6103477e14debf003a9d0a8ff619d99b20472d3d16126
+//META: doc_section_digest=16ef6c8f112a2d877c25d0f6d0cebf34356b5864eb3afeb0d551253490cc2f26
 //META: purpose=A generic body that calls a method on a constrained type parameter emits a lookupWitness opcode whose operands are (witnessTable, requirementKey).
 //META: intent=functional
 //META: pipeline_stage=lower

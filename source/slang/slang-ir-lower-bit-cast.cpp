@@ -7,9 +7,48 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target.h"
 
 namespace Slang
 {
+
+// Is `halfType` a `vec2<f16>` and `otherType` a 32-bit scalar, or `halfType` a `vec4<f16>` and
+// `otherType` a `vec2` of 32-bit values? WGSL's `bitcast` converts directly between those shapes
+// in both directions, so the caller checks the bitcast's types in both orders.
+static bool isWGSLHalfVectorBitCast(IRType* halfType, IRType* otherType)
+{
+    auto halfVectorType = as<IRVectorType>(halfType);
+    if (!halfVectorType || halfVectorType->getElementType()->getOp() != kIROp_HalfType)
+        return false;
+    auto halfCount = as<IRIntLit>(halfVectorType->getElementCount());
+    if (!halfCount)
+        return false;
+
+    auto is32BitScalar = [](IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_IntType:
+        case kIROp_UIntType:
+        case kIROp_FloatType:
+            return true;
+        default:
+            return false;
+        }
+    };
+
+    if (halfCount->getValue() == 2)
+        return is32BitScalar(otherType);
+    if (halfCount->getValue() == 4)
+    {
+        auto otherVectorType = as<IRVectorType>(otherType);
+        auto otherCount =
+            otherVectorType ? as<IRIntLit>(otherVectorType->getElementCount()) : nullptr;
+        return otherCount && otherCount->getValue() == 2 &&
+               is32BitScalar(otherVectorType->getElementType());
+    }
+    return false;
+}
 
 struct BitCastLoweringContext
 {
@@ -355,6 +394,14 @@ struct BitCastLoweringContext
                 !isTypeEqual(fromType, toType))
                 return;
         }
+
+        // WGSL's `bitcast` converts directly between `vec2<f16>` and a 32-bit scalar, and
+        // between `vec4<f16>` and a two-element vector of 32-bit values. Keep those as they are:
+        // lowering them would go through 16-bit integers, which WGSL does not have.
+        if (isWGPUTarget(targetProgram->getTargetReq()) &&
+            (isWGSLHalfVectorBitCast(fromType, toType) ||
+             isWGSLHalfVectorBitCast(toType, fromType)))
+            return;
 
         // Ignore cases we cannot handle yet.
         if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))

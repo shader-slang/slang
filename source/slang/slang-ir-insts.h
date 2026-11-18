@@ -2852,12 +2852,12 @@ struct IRDebugFunction : IRInst
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
 
-    // The function's lexical parent scope, or null when its source has no compilation unit (an
-    // #include'd/#line-remapped source), or for a function from an IR blob that predates this
-    // operand. The only parent scope produced is the DebugCompilationUnit of the source file the
-    // function is defined in, so an imported function resolves to its own module's compilation unit
-    // rather than the entry point's. The operand type is a general parent scope, not specifically a
-    // compilation unit, so a lexical scope can occupy it without changing the operand's meaning.
+    // The function's lexical parent scope, or null when its source has no compilation unit
+    // (an #include'd/#line-remapped source). The only parent scope produced is the
+    // DebugCompilationUnit of the source file the function is defined in, so an imported function
+    // resolves to its own module's compilation unit rather than the entry point's. The operand type
+    // is a general parent scope, not specifically a compilation unit, so a lexical scope can occupy
+    // it without changing the operand's meaning.
     IRInst* getParentScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
 };
 
@@ -3521,7 +3521,15 @@ $(type_info.return_type) $(type_info.method_name)(
     // Form a ptr type to `valueType` using the same opcode and address space as `ptrWithAddrSpace`.
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
+    // Form a read-write reference parameter type to `valueType` in `addrSpace`.
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
+
+    // Form a reference parameter type to `valueType` in `addrSpace` with the access
+    // `accessQualifier` (read-write, read-only, or write-only).
+    IRRefParamType* getRefParamType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,
@@ -5060,6 +5068,14 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);
     }
 
+    /// Marks a global variable as belonging to the patch constant interface of a
+    /// tessellation shader, so that emit can distinguish it from per-control-point I/O:
+    /// SPIR-V emits the `Patch` decoration (SpvDecorationPatch), while GLSL emits the
+    /// patch storage qualifier. The interface consists of patch constant function
+    /// outputs in a hull (tessellation control) shader and patch constant inputs in a
+    /// domain (tessellation evaluation) shader.
+    void addGLSLPatchDecoration(IRInst* value) { addDecoration(value, kIROp_GLSLPatchDecoration); }
+
     void addImportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
         addDecoration(value, kIROp_ImportDecoration, getStringValue(mangledName));
@@ -5275,9 +5291,9 @@ $(type_info.return_type) $(type_info.method_name)(
     void addKeepAliveDecoration(IRInst* value) { addDecoration(value, kIROp_KeepAliveDecoration); }
 
     void addPublicDecoration(IRInst* value) { addDecoration(value, kIROp_PublicDecoration); }
-    void addHLSLExportDecoration(IRInst* value)
+    IRDecoration* addHLSLExportDecoration(IRInst* value)
     {
-        addDecoration(value, kIROp_HLSLExportDecoration);
+        return addDecoration(value, kIROp_HLSLExportDecoration);
     }
     void addHasExplicitHLSLBindingDecoration(IRInst* value)
     {

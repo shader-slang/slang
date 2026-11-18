@@ -59,6 +59,14 @@
 namespace Slang
 {
 
+bool PhiEliminationOptions::shouldEliminatePhiForType(IRType* type) const
+{
+    type = (IRType*)unwrapAttributedType(type);
+    return !preserveScalarAndCompositePhis ||
+           !(isScalarOrVectorType(type) || isCompositeType(type) || as<IRMatrixType>(type));
+}
+
+
 struct PhiEliminationContext
 {
     // We are going to make some effort to re-use intermediate structures across
@@ -228,10 +236,7 @@ struct PhiEliminationContext
 
         if (m_options.useRegisterAllocation)
         {
-            m_registerAllocation = allocateRegistersForFunc(
-                func,
-                m_dominatorTree,
-                m_options.eliminateCompositeTypedPhiOnly);
+            m_registerAllocation = allocateRegistersForFunc(func, m_dominatorTree, m_options);
             m_mapRegToTempVar = createTempVarForInsts(func);
         }
     }
@@ -455,8 +460,7 @@ struct PhiEliminationContext
                 m_mapRegToTempVar.tryGetValue(registerInfo->get(), temp);
             }
 
-            bool shouldAllocTemp =
-                !m_options.eliminateCompositeTypedPhiOnly || isCompositeType(param->getFullType());
+            bool shouldAllocTemp = m_options.shouldEliminatePhiForType(param->getFullType());
 
             if (!temp && shouldAllocTemp)
             {

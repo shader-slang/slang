@@ -17,9 +17,9 @@ namespace Slang
 //
 struct SharedSCCPContext
 {
-    IRModule* module;
-    TargetProgram* targetProgram;
-    DiagnosticSink* sink;
+    IRModule* module = nullptr;
+    TargetProgram* targetProgram = nullptr;
+    DiagnosticSink* sink = nullptr;
     TranslationContext* translationContext = nullptr;
 };
 //

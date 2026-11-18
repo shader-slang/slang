@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
-//META: doc_section_digest=687130475ff4ddc8d392b53fafb20c7efbd82d162c595dcf4113ef5f326b0274
+//META: doc_section_digest=406739b370a5ef05319669d01da3461b7d7e09195ac8ecfdfe64017fe9eca325
 //META: purpose=An array extent `N + 1` on a generic value parameter never forms a `BuiltinOperationIntVal`; it arrives as a `PolynomialIntVal` that lowers to `constexprAdd(1 : Int, %N)` with the constant term emitted first, so the operand order does not follow the source.
 //META: intent=boundary
 //META: pipeline_stage=lower

@@ -14,6 +14,11 @@
     { "option": "SLANG_ENABLE_PCH" },
     { "option": "SLANG_STANDARD_MODULE_DEVELOP_BUILD" },
     {
+      "option": "SLANG_BUILD_MONOLITHIC_STANDARD_MODULE_LIBRARY",
+      "value": "ON",
+      "install_test": "true"
+    },
+    {
       "option": "SLANG_ENABLE_SLANGD",
       "extra_cmake_flags": "-DSLANG_ENABLE_TESTS=OFF -DSLANG_ENABLE_EXAMPLES=OFF"
     },

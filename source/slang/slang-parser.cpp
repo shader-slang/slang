@@ -141,6 +141,10 @@ public:
     SourceLoc lastErrorLoc;
     ParserOptions options;
     Modifiers* pendingModifiers = nullptr;
+
+    // The container receiving variables from the current HLSL `for` initializer, or null
+    // outside an initializer. Declarations in nested containers are excluded.
+    ContainerDecl* hlslForLoopInitializerContainer = nullptr;
     int genericDepth = 0;
 
     // Is the parser in a "recovering" state?
@@ -161,16 +165,20 @@ public:
     }
 
     // Push a new scope that makes the members of `containerDecl` visible to lookup,
-    // without replacing the scope that `containerDecl` owns. The semantic checker
-    // attaches scopes to `ownedScope` (for example, the namespaces of the same name
-    // that a module imports), so code that only needs lookup into an existing
-    // container uses this function to leave those attachments in place.
+    // without replacing the scope that `containerDecl` owns.
+    //
+    // A namespace gets one such scope per `{ ... }` body, and one more for each qualified
+    // declaration that names it, such as `A` in `namespace A::B`. We record all of them in
+    // `NamespaceDecl::lexicalScopes`, because the semantic checker attaches the imported
+    // namespaces of the same name to each one.
     void pushLookupScope(ContainerDecl* containerDecl)
     {
         Scope* newScope = astBuilder->create<Scope>();
         newScope->containerDecl = containerDecl;
         newScope->parent = currentScope;
         currentScope = newScope;
+        if (auto namespaceDecl = as<NamespaceDecl>(containerDecl))
+            namespaceDecl->lexicalScopes.add(newScope);
         resetLookupScope();
     }
 
@@ -241,6 +249,8 @@ public:
     Stmt* ParseStatement(
         Stmt* parentStmt = nullptr,
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
+    /// Parse a control-flow body, including the implicit scope of an unbraced HLSL body.
+    Stmt* parseControlFlowBody(Stmt* parentStmt = nullptr);
     Stmt* parseBlockStatement(
         AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
     // Test whether lookahead is a declaration keyword allowed in statement contexts.
@@ -4767,23 +4777,23 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
                 namespaceDecl->nameAndLoc = nameAndLoc;
                 namespaceDecl->loc = nameAndLoc.loc;
                 AddMember(parentDecl, namespaceDecl);
-                if (auto parentNamespace = as<NamespaceDecl>(parentDecl))
+                // We push a scope only for the parent of a later component, because the
+                // parent of the first component is the scope we are already in.
+                if (result)
                 {
-                    parser->PushScope(parentDecl);
+                    auto parentNamespace = as<NamespaceDecl>(parentDecl);
+                    SLANG_ASSERT(parentNamespace);
+                    parser->PushScope(parentNamespace);
                     nestedNamespaceDecls.add(parentNamespace);
                 }
             }
             else if (result)
             {
                 // Consider `namespace A::B { ... }` where both `A` and `B` already
-                // exist. The body must see the members this module declares in `A`,
-                // as it does when the user writes `namespace A { namespace B { ... } }`,
-                // so we push a scope for `A`. The checker attaches the imported
-                // namespaces named `A` to the scope that `A` owns. Every body of `A`,
-                // and the create branch above, replaces that scope, and the code in
-                // whichever body still owns it finds imported names through it. The
-                // scope we push here therefore leaves `ownedScope` alone, and it
-                // carries no imported members of `A` (see #13714).
+                // exist. The body must see the members of `A`, as it does when the
+                // user writes `namespace A { namespace B { ... } }`, so we push a
+                // scope for `A`. `A` already owns the scope of one of its own bodies,
+                // so this scope serves lookup only.
                 parser->pushLookupScope(parentDecl);
                 lookupScopeCount++;
             }
@@ -6013,6 +6023,27 @@ static UniformParameterShadowVarDecl* createUniformParameterShadowVarIfNeeded(
     return shadowVar;
 }
 
+/// Attach an `HLSLForLoopInitializerAttribute` to a variable in the current initializer.
+///
+/// We record the initializer's container in `Parser::hlslForLoopInitializerContainer`.
+/// A type or lambda inside an initializer can introduce declarations in nested containers.
+/// We exclude those declarations by requiring the variable's parent to be the recorded container.
+static void addHLSLForLoopInitializerAttributeIfNeeded(Parser* parser, Decl* decl)
+{
+    auto initializerContainer = parser->hlslForLoopInitializerContainer;
+    if (!initializerContainer)
+        return;
+    if (decl->parentDecl != initializerContainer)
+        return;
+    auto varDecl = as<VarDecl>(decl);
+    if (!varDecl)
+        return;
+
+    auto attribute = parser->astBuilder->create<HLSLForLoopInitializerAttribute>();
+    attribute->loc = varDecl->loc;
+    addModifier(varDecl, attribute);
+}
+
 // Finish up work on a declaration that was parsed.
 static void CompleteDecl(
     Parser* parser,
@@ -6122,10 +6153,19 @@ static void CompleteDecl(
             {
                 for (auto enumCase : enumDecl->getMembersOfType<EnumCaseDecl>())
                 {
+                    // We add one alias per distinct case name. The redeclaration check of the
+                    // `EnumCaseDecl` reports a repeated case, and an alias for it would be
+                    // reported again at the same location.
+                    if (enumDecl->getPrevDirectMemberDeclWithSameName(enumCase))
+                        continue;
                     auto staticConstDecl = parser->astBuilder->create<LetDecl>();
                     staticConstDecl->nameAndLoc = enumCase->nameAndLoc;
                     addModifier(staticConstDecl, parser->astBuilder->create<HLSLStaticModifier>());
                     addModifier(staticConstDecl, parser->astBuilder->create<ConstModifier>());
+                    auto aliasModifier =
+                        parser->astBuilder->create<UnscopedEnumCaseAliasModifier>();
+                    aliasModifier->enumCaseDecl = enumCase;
+                    addModifier(staticConstDecl, aliasModifier);
 
                     // Copy visibility modifiers from the enum declaration
                     if (auto visibilityModifier = modifiers.findModifier<VisibilityModifier>())
@@ -6144,6 +6184,12 @@ static void CompleteDecl(
             }
         }
     }
+
+    // Consider `for (int2 v = 0, w = int2(v.x < 2, 0); false;) {}`.
+    // Parsing `w` can check `v.x` to distinguish comparison from generic application.
+    // We attach the attribute before setting `ReadyForParserLookup` so that lookup can select
+    // the new `v` over an earlier local with the same name.
+    addHLSLForLoopInitializerAttributeIfNeeded(parser, decl);
 
     if (parser->semanticsVisitor && parser->getStage() == ParsingStage::Body)
     {
@@ -7757,6 +7803,29 @@ Stmt* Parser::parseIfLetStatement()
     return newBody;
 }
 
+Stmt* Parser::parseControlFlowBody(Stmt* parentStmt)
+{
+    if (getSourceLanguage() != SourceLanguage::HLSL)
+        return ParseStatement(parentStmt);
+    if (LookAheadToken(TokenType::LBrace))
+        return ParseStatement(parentStmt);
+
+    // Consider `for (int i = 0; i < 2; ++i) for (int i = 0; i < 3; ++i) {}`.
+    // HLSL places each initializer in the containing scope. The outer loop's body has an
+    // implicit scope even without braces, so the inner initializer must belong to that body,
+    // not the block containing the outer loop. We represent the body with an ordinary
+    // `BlockStmt` so checking and debug lowering use the same ownership as a braced body.
+    auto blockStmt = astBuilder->create<BlockStmt>();
+    FillPosition(blockStmt);
+    blockStmt->scopeDecl = astBuilder->create<ScopeDecl>();
+    pushScopeAndSetParent(blockStmt->scopeDecl);
+    blockStmt->body = ParseStatement(parentStmt);
+    // The next token bounds the implicit body for language-server AST searches.
+    blockStmt->closingSourceLoc = tokenReader.peekLoc();
+    PopScope();
+    return blockStmt;
+}
+
 IfStmt* Parser::parseIfStatement()
 {
     IfStmt* ifStatement = astBuilder->create<IfStmt>();
@@ -7765,11 +7834,11 @@ IfStmt* Parser::parseIfStatement()
     ReadToken(TokenType::LParent);
     ifStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
-    ifStatement->positiveStatement = ParseStatement(ifStatement);
+    ifStatement->positiveStatement = parseControlFlowBody(ifStatement);
     if (LookAheadToken("else"))
     {
         ReadToken("else");
-        ifStatement->negativeStatement = ParseStatement(ifStatement);
+        ifStatement->negativeStatement = parseControlFlowBody(ifStatement);
     }
     ifStatement->afterLoc = tokenReader.peekLoc();
 
@@ -7810,7 +7879,12 @@ ForStmt* Parser::ParseForStatement()
     ReadToken(TokenType::LParent);
     if (!LookAheadToken(TokenType::Semicolon))
     {
+        // Only variables completed for this initializer's own container receive the attribute.
+        // Saving the previous container also keeps nested initializer parsing independent.
+        auto previousInitializerContainer = hlslForLoopInitializerContainer;
+        hlslForLoopInitializerContainer = brokenScoping ? currentScope->containerDecl : nullptr;
         stmt->initialStatement = ParseStatement();
+        hlslForLoopInitializerContainer = previousInitializerContainer;
         if (as<DeclStmt>(stmt->initialStatement) || as<ExpressionStmt>(stmt->initialStatement))
         {
             // These are the only allowed form of initial statements of a for loop.
@@ -7833,7 +7907,7 @@ ForStmt* Parser::ParseForStatement()
     if (!LookAheadToken(TokenType::RParent))
         stmt->sideEffectExpression = ParseExpression();
     ReadToken(TokenType::RParent);
-    stmt->statement = ParseStatement();
+    stmt->statement = parseControlFlowBody();
 
     if (!brokenScoping)
         PopScope();
@@ -7849,7 +7923,7 @@ WhileStmt* Parser::ParseWhileStatement()
     ReadToken(TokenType::LParent);
     whileStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
-    whileStatement->statement = ParseStatement();
+    whileStatement->statement = parseControlFlowBody();
     return whileStatement;
 }
 
@@ -7904,7 +7978,7 @@ Stmt* Parser::ParseDoStatement()
 {
     SourceLoc position = tokenReader.peekLoc();
     ReadToken("do");
-    Stmt* statement = ParseStatement();
+    Stmt* statement = parseControlFlowBody();
     if (LookAheadToken("while"))
     {
         Stmt* whileStatement = ParseDoWhileStatement(statement);
@@ -10002,6 +10076,13 @@ static Expr* parseSPIRVAsmExpr(Parser* parser, SourceLoc loc)
 {
     SPIRVAsmExpr* asmExpr = parser->astBuilder->create<SPIRVAsmExpr>();
     asmExpr->loc = loc;
+    // An internal qualifier can appear between spirv_asm and its body.
+    if (AdvanceIf(parser, TokenType::LBracket))
+    {
+        parser->ReadToken("__assumeValidResourceOperands");
+        parser->ReadToken(TokenType::RBracket);
+        asmExpr->assumeValidResourceOperands = true;
+    }
     parser->ReadToken(TokenType::LBrace);
     while (!parser->tokenReader.isAtEnd())
     {
@@ -11140,6 +11221,9 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
+    _makeParseModifier("__ref_readonly", getSyntaxClass<RefReadOnlyModifier>()),
+    _makeParseModifier("__ref_writeonly", getSyntaxClass<RefWriteOnlyModifier>()),
+    _makeParseModifier("__borrow", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),

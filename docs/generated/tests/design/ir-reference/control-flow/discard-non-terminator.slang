@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#discard
-//META: doc_section_digest=514f555500d363eea7dd98f26b6683cfaa8b8f6c0c28b30280011646ebaa5e52
+//META: doc_section_digest=3cf81b6eb3d95b5fa46670b0fed82bde67855866c317c17db56b427401c89356
 //META: purpose=`discard` is not a terminator: it sits as an ordinary instruction inside a block, and the block's real terminator (unconditionalBranch to the post-if merge) follows.
 //META: intent=functional
 //META: pipeline_stage=lower

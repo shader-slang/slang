@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations
-//META: doc_section_digest=660b8f85e32242335c2f53585b6b33fcee2998390a47d71a9f0e187a004c5469
+//META: doc_section_digest=3aceda666e9b61557ae6e477f56a082f9ca8a551751410e690a18985649e0b14
 //META: purpose=The late Metal-only `MetalPointerLowering` invocation converts a pointer field inside a buffer element type to `UIntPtr` (MSL `ulong`) so no `device T* device*` survives.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -36,7 +36,13 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
-          submodules: "recursive"
+          submodules: "false"
+          fetch-depth: "1"
+
+      - name: Update submodules
+        uses: ./.github/actions/submodule-update-retry
+        timeout-minutes: 15
+        with:
           fetch-depth: "1"
 
       - name: Common Test Setup

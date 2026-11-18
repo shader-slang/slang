@@ -53,8 +53,10 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // WGSL: case i32(0):
-// WGSL: if(a_{{[0-9]+}} > i32(5))
+// WGSL: if{{[(]+}}a_{{[0-9]+}} > i32(5)
 // WGSL: break;
+// WGSL: i32(2)
+// WGSL-NOT: break;
 // WGSL: default :
 // WGSL-NOT: break;
 

@@ -64,9 +64,21 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
             {
                 a = argSbLoad->getOperand(0);
             }
-            else if (auto argBbLoad = as<IRByteAddressBufferLoad>(a))
+            else if (as<IRByteAddressBufferLoad>(a))
             {
-                a = argBbLoad->getOperand(0);
+                // We leave a load from a byte-address buffer at the call site, and pass the
+                // value that it loads to the callee, for two reasons:
+                //
+                // - A load that moves into a callee takes its offset from a parameter. The
+                //   byte-address legalizer reads a vector or an array with a single access
+                //   only when it can prove that the access is aligned, from an explicit
+                //   alignment or from a literal offset, and reads it in smaller pieces
+                //   otherwise.
+                //
+                // - Moving a load into a callee sinks it past the instructions between it and
+                //   the call, and those can write the buffer when it is writable.
+                //
+                return false;
             }
             else if (auto argFieldExtract = as<IRFieldExtract>(a))
             {

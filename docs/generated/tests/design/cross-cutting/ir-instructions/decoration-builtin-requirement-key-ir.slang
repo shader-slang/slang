@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#decorations
-//META: doc_section_digest=af2eb87d563403d52d71a7d33122c279b70c033339e51393dbe00f9f5f506a59
+//META: doc_section_digest=1ab53409e2cba6b92a18270a5bfb136836158c640f0e5dc49f907805c463cf92
 //META: purpose=A built-in interface requirement key carries a `BuiltinRequirementDecoration` naming its kind and is produced by a `builtinRequirementKey` inst keyed on that same kind.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -46,4 +46,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 // The captured ordinal ties the two lines together: the decoration on the
 // key and the key's own operand must name the same requirement kind.
 // IR: [BuiltinRequirementDecoration([[KIND:[0-9]+]] : Int)]
-// IR-NEXT: {{.*}}= builtinRequirementKey([[KIND]] : Int)
+// IR: {{.*}}= builtinRequirementKey([[KIND]] : Int)

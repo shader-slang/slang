@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 
-//CHECK-NOT: error 39999: ambiguous call to 'mul'
+//CHECK-NOT: E39999: ambiguous call to 'mul'
 
 [shader("compute")]
 void main() {

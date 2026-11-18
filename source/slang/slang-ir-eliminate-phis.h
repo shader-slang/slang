@@ -8,18 +8,26 @@ namespace Slang
 struct CodeGenContext;
 struct IRModule;
 
+// Controls which block parameters are lowered to mutable temporary variables.
 struct PhiEliminationOptions
 {
-    bool eliminateCompositeTypedPhiOnly = false;
+    // Direct SPIR-V can emit scalar, vector, matrix, struct, and array parameters as OpPhi.
+    // Keep other types in memory, including pointer parameters that would otherwise require
+    // VariablePointers support. Resource members have already been handled by type legalization.
+    bool preserveScalarAndCompositePhis = false;
     bool useRegisterAllocation = true;
+    // Returns whether a block parameter of this type needs a temporary. The register allocator
+    // uses the same decision so that retained parameters never acquire mutable storage.
+    bool shouldEliminatePhiForType(IRType* type) const;
+
     static PhiEliminationOptions getFast() { return PhiEliminationOptions{false, false}; }
 };
 
-/// Eliminate all "phi nodes" from the given `module`.
+/// Eliminate the "phi nodes" selected by `options` from the given `module`.
 ///
-/// This process moves the code in `module` *out* of SSA form,
-/// so that it is more suitable for emission on targets that
-/// are not themselves based on an SSA representation.
+/// This process replaces selected block parameters with mutable storage, suitable for targets
+/// that cannot emit those parameters in SSA form. Unselected parameters and their branch
+/// arguments remain in SSA form.
 ///
 /// If livenessMode is enabled LiveRangeStarts will be inserted into the module.
 void eliminatePhis(LivenessMode livenessMode, IRModule* module, PhiEliminationOptions options);

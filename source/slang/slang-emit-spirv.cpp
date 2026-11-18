@@ -15,6 +15,7 @@
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
 #include "slang-rich-diagnostics.h"
+#include "spirv/unified1/NonSemanticShaderDebugInfo100.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
@@ -3749,6 +3750,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     UnownedStringSlice("SPV_EXT_descriptor_indexing"));
                 requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArray);
                 break;
+            case kIROp_GLSLPatchDecoration:
+                // User patch I/O only; gl_TessLevel* get Patch from getBuiltinGlobalVar.
+                emitOpDecorate(
+                    getSection(SpvLogicalSectionID::Annotations),
+                    decor,
+                    varInst,
+                    SpvDecorationPatch);
+                break;
             }
         }
     }
@@ -4355,40 +4364,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     irDebugFunc,
                     irFunc);
             }
-            if (funcDebugScope)
-            {
-                emitOpDebugScope(
-                    spvBlock,
-                    nullptr,
-                    m_voidType,
-                    getNonSemanticDebugInfoExtInst(),
-                    funcDebugScope);
-
-                // For the first block only, emit a DebugLine immediately after DebugScope.
-                // This is required for debuggers like RenderDoc to be able to step into
-                // functions. Without this, parameter copying code (DebugDeclare, OpStore)
-                // appears between DebugScope and the first DebugLine, preventing the
-                // debugger from mapping the function entry point to source code.
-                if (irBlock == irFunc->getFirstBlock())
-                {
-                    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
-                    {
-                        if (auto irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc()))
-                        {
-                            emitOpDebugLine(
-                                spvBlock,
-                                nullptr,
-                                m_voidType,
-                                getNonSemanticDebugInfoExtInst(),
-                                irDebugFunc->getFile(),
-                                irDebugFunc->getLine(),
-                                irDebugFunc->getLine(),
-                                irDebugFunc->getCol(),
-                                irDebugFunc->getCol());
-                        }
-                    }
-                }
-            }
             // In addition to normal basic blocks,
             // all loops gets a header block.
             for (auto irInst : irBlock->getChildren())
@@ -4444,6 +4419,43 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 for (auto irParam : irBlock->getParams())
                 {
                     emitPhi(spvBlock, irParam);
+                }
+            }
+            // Debug scope instructions are ordinary SPIR-V instructions, so they must follow
+            // the block's OpPhi prefix. For example, a source-level if/else can merge two
+            // values into a parameter here even when both branches have debug scopes.
+            if (funcDebugScope)
+            {
+                emitOpDebugScope(
+                    spvBlock,
+                    nullptr,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    funcDebugScope);
+
+                // For the first block only, emit a DebugLine immediately after DebugScope.
+                // This is required for debuggers like RenderDoc to be able to step into
+                // functions. Without this, parameter copying code (DebugDeclare, OpStore)
+                // appears between DebugScope and the first DebugLine, preventing the
+                // debugger from mapping the function entry point to source code.
+                if (irBlock == irFunc->getFirstBlock())
+                {
+                    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                    {
+                        if (auto irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc()))
+                        {
+                            emitOpDebugLine(
+                                spvBlock,
+                                nullptr,
+                                m_voidType,
+                                getNonSemanticDebugInfoExtInst(),
+                                irDebugFunc->getFile(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getCol(),
+                                irDebugFunc->getCol());
+                        }
+                    }
                 }
             }
             for (auto irInst : irBlock->getOrdinaryInsts())
@@ -8103,10 +8115,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_fragment_shader_barycentric"));
 
-                    auto interpolationModeDecor =
-                        inst->findDecoration<IRInterpolationModeDecoration>();
-                    if (interpolationModeDecor &&
-                        interpolationModeDecor->getMode() == IRInterpolationMode::NoPerspective)
+                    if (hasInterpolationMode(inst, IRInterpolationMode::NoPerspective))
                     {
                         return getBuiltinGlobalVar(
                             inst->getFullType(),
@@ -8329,21 +8338,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    bool isGlobalValueInst(IRInst* inst)
-    {
-        if (as<IRConstant>(inst))
-            return true;
-        switch (inst->getOp())
-        {
-        case kIROp_Func:
-        case kIROp_GlobalParam:
-        case kIROp_GlobalVar:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     void emitLoopHeaderBlock(IRLoop* loopInst, SpvInst* loopHeaderBlock)
     {
         bool hasBackJump = false;
@@ -8463,7 +8457,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                     SLANG_ASSERT(argStartIndex + paramIndex < branchInst->getOperandCount());
                     auto valueInst = branchInst->getOperand(argStartIndex + paramIndex);
-                    if (isGlobalValueInst(valueInst))
+                    // Module-scope operands are emitted on demand, including composite
+                    // constants such as float4(1.0) used only by this phi. Local operands
+                    // can come from a loop back edge and must keep their forward references.
+                    if (as<IRModuleInst>(valueInst->getParent()))
                         ensureInst(valueInst);
                     emitOperand(getIRInstSpvID(valueInst));
                     auto sourceBlock = as<IRBlock>(branchInst->getParent());
@@ -9735,13 +9732,32 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitCastPtrToInt(SpvInstParent* parent, IRInst* inst)
     {
-        return emitInst(
+        // `OpConvertPtrToU` requires an unsigned result type, so a cast to an unsigned integer
+        // converts directly, and a cast to a signed integer converts to the unsigned integer of
+        // the same width and then bitcasts to the result. `OpConvertUToPtr` accepts an integer
+        // operand of either signedness, so `emitCastIntToPtr` needs no matching step.
+        const auto toType = inst->getDataType();
+        if (!isSignedType(toType))
+        {
+            return emitInst(
+                parent,
+                inst,
+                SpvOpConvertPtrToU,
+                inst->getFullType(),
+                kResultID,
+                inst->getOperand(0));
+        }
+
+        IRBuilder builder(inst);
+        const auto unsignedType = getUnsignedTypeFromSignedType(&builder, toType);
+        auto unsignedV = emitInst(
             parent,
-            inst,
+            nullptr,
             SpvOpConvertPtrToU,
-            inst->getFullType(),
+            unsignedType,
             kResultID,
             inst->getOperand(0));
+        return emitOpBitcast(parent, inst, toType, unsignedV);
     }
 
     SpvInst* emitCastPtrToBool(SpvInstParent* parent, IRInst* inst)
@@ -10950,6 +10966,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    // Returns the SPIR-V debug flags corresponding to `inst`'s decorations.
+    static SpvWord getSpirvDebugFlags(IRInst* inst)
+    {
+        SpvWord flags = 0;
+        if (isArtificialInst(inst))
+            flags |= NonSemanticShaderDebugInfo100FlagArtificial;
+        return flags;
+    }
+
     SpvInst* emitDebugFunction(
         SpvInstParent* parent,
         SpvInst* firstBlock,
@@ -10964,8 +10989,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // Use the parent scope bound at IR-gen so an imported function resolves to its own
             // module's compilation unit. Fall back to the module-global scope for an included or
-            // line-remapped source without a compilation unit, or an IR blob predating this
-            // operand. findDebugScope also handles a null debugFunc (no IRDebugFuncDecoration).
+            // line-remapped source without a compilation unit. findDebugScope also handles a
+            // null debugFunc (no IRDebugFuncDecoration).
             SpvInst* scope = nullptr;
             if (debugFunc)
             {
@@ -10993,7 +11018,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugFunc->getCol(),
                 scope,
                 debugFunc->getName(),
-                builder.getIntValue(builder.getUIntType(), 0),
+                builder.getIntValue(builder.getUIntType(), getSpirvDebugFlags(debugFunc)),
                 debugFunc->getLine());
         }
 
@@ -12397,7 +12422,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return;
         requireVariableBufferCapabilityIfNeeded(funcType->getResultType());
         for (UInt i = 0; i < funcType->getParamCount(); i++)
-            requireVariableBufferCapabilityIfNeeded(funcType->getParamType(i));
+        {
+            // A `groupshared` parameter's type is its `Workgroup` pointer wrapped in the
+            // group-shared rate.
+            //
+            auto paramType = funcType->getParamType(i);
+            if (auto rateQualifiedType = as<IRRateQualifiedType>(paramType))
+                paramType = rateQualifiedType->getValueType();
+            requireVariableBufferCapabilityIfNeeded(paramType);
+        }
     }
 
     // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
@@ -12483,7 +12516,10 @@ SlangResult emitSPIRVFromIR(
 #endif
 
     SPIRVEmitContext context(irModule, codeGenContext->getTargetProgram(), sink);
+    const auto errorCountBeforeLegalize = sink->getErrorCount();
     legalizeIRForSPIRV(&context, irModule, irEntryPoints, codeGenContext);
+    if (sink->getErrorCount() > errorCountBeforeLegalize)
+        return SLANG_FAIL;
 
 #if 0
     {

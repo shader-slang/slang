@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#breadcrumbs
-//META: doc_section_digest=ee50f893f900a92b30aa33a0f0d7c293ea38bc4b91c473a3c0f9e511f4700f32
+//META: doc_section_digest=33d07243bfb42afebbc13d5fbbb87264e2fb46bd44f69743fdec1ff0e2f6c8b3
 //META: purpose=A member reached only through an unchecked optional conformance is removed after lookup, and the empty result is reported as the required-constraint-is-not-checked diagnostic (E30403).
 //META: intent=negative
 //META: pipeline_stage=check

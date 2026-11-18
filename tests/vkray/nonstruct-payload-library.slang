@@ -80,7 +80,7 @@ void callableArray(inout float data[4])
 }
 
 // HLSL-DAG: struct [[rayPayload:RayPayload_t[A-Za-z0-9_]*]]{{[[:space:]]*[{][[:space:]]*}}float4 [[rayField:[A-Za-z0-9_]+]];
-// HLSL-DAG: struct [[arrayData:ForceVarIntoStructTemporarily_t[A-Za-z0-9_]*]]{{[[:space:]]*[{][[:space:]]*}}float [[arrayField:[A-Za-z0-9_]+]][int(4)];
+// HLSL-DAG: struct [[arrayData:ForceVarIntoStructTemporarily_t[A-Za-z0-9_]*]]{{[[:space:]]*[{][[:space:]]*}}float [[arrayField:[A-Za-z0-9_]+]][4L];
 // HLSL-DAG: struct [[vectorData:ForceVarIntoStructTemporarily_t[A-Za-z0-9_]*]]{{[[:space:]]*[{][[:space:]]*}}float4 [[vectorField:[A-Za-z0-9_]+]];
 // HLSL-DAG: struct [[scalarData:ForceVarIntoStructTemporarily_t[A-Za-z0-9_]*]]{{[[:space:]]*[{][[:space:]]*}}float [[scalarField:[A-Za-z0-9_]+]];
 // HLSL-NOT: struct RayPayload_t
@@ -97,12 +97,12 @@ void callableArray(inout float data[4])
 // HLSL: [[vectorTemp]].[[vectorField]] =
 // HLSL: CallShader(1U, [[vectorTemp]]);
 // HLSL: [[arrayData]] [[arrayTemp:[A-Za-z0-9_]+]];
-// HLSL: [[arrayTemp]].[[arrayField]][int(3)] =
+// HLSL: [[arrayTemp]].[[arrayField]][3L] =
 // HLSL: CallShader(2U, [[arrayTemp]]);
 // HLSL: [[trace]].[[rayField]];
 // HLSL: [[scalarTemp]].[[scalarField]]
 // HLSL: = [[vectorTemp]].[[vectorField]];
-// HLSL: [[arrayTemp]].[[arrayField]][int(3)]
+// HLSL: [[arrayTemp]].[[arrayField]][3L]
 
 // HLSL: void [[shade:shade[A-Za-z0-9_]*]](inout float4
 

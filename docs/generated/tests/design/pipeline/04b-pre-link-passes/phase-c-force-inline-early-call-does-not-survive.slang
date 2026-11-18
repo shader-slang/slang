@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#performmandatoryearlyinlining-and-the-surrounding-loop
-//META: doc_section_digest=7d58c22cafbb0d77ef5703bd494dd1748093f0d1c8c3829cb91172d782a30276
+//META: doc_section_digest=45700e5c47e0a2ee88e4d198dd52d0a8014c20dcf49db894f9da9ec487600515
 //META: purpose=A call to a same-module force-inline-early function is a hard requirement rather than a hint, so it is gone from the pre-link snapshot while an ordinary call survives.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

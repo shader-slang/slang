@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-E
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):-E
 
 // Undefining a macro that is not defined within C/C++ is defined as *not* an error or a warning.
 // On checking with DXC/FXC they also have this behavior (ie they don't output anything)
