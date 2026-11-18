@@ -5346,14 +5346,39 @@ static void legalizeMatrixFRem(IRInst* inst)
     inst->removeAndDeallocate();
 }
 
+// Splat the scalar dividend of a vector-typed `FRem` to the vector type, and
+// leave the instruction in place with the splat as its dividend.
+//
+// Consider this example:
+//
+//     float3 c = ...;
+//     float3 r = 0.75 % c;
+//
+// GLSL `mod` has a `genType mod(genType, float)` overload but no
+// `mod(float, genType)` overload, so the emitter's `sign(x) * mod(abs(x),
+// abs(y))` spelling is invalid exactly when the dividend is the scalar and
+// the divisor is the vector. Splatting the dividend to the vector type makes
+// every remaining operand shape spellable: `vec % vec` and `vec % scalar`
+// were already fine, and scalar/scalar operands are not rewritten here.
+// The divisor is left as-is for the same reason.
+static void legalizeVectorFRemScalarDividend(IRInst* inst)
+{
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    auto splattedDividend = builder.emitMakeCompositeFromScalar(
+        as<IRVectorType>(inst->getDataType()),
+        inst->getOperand(0));
+    builder.replaceOperand(inst->getOperands(), splattedDividend);
+}
+
 void legalizeFRemForGLSL(IRModule* module)
 {
     // This late in the pipeline every function the emitters can still reach
     // is a concrete top-level `IRGlobalValueWithCode` (generic bodies have
-    // been specialized away), and no live matrix `FRem` sits outside a
-    // function body either — global initializers are constant at this stage —
-    // so walking the module's top-level functions covers every live `%` on
-    // matrices, not just entry points.
+    // been specialized away), and no live `FRem` sits outside a function
+    // body either — global initializers are constant at this stage — so
+    // walking the module's top-level functions covers every live `%`, not
+    // just entry points.
     for (auto globalInst : module->getGlobalInsts())
     {
         auto func = as<IRGlobalValueWithCode>(globalInst);
@@ -5364,8 +5389,17 @@ void legalizeFRemForGLSL(IRModule* module)
             for (auto inst = block->getFirstInst(); inst;)
             {
                 auto next = inst->getNextInst();
-                if (inst->getOp() == kIROp_FRem && as<IRMatrixType>(inst->getDataType()))
+                if (inst->getOp() != kIROp_FRem)
+                {
+                    inst = next;
+                    continue;
+                }
+                if (as<IRMatrixType>(inst->getDataType()))
                     legalizeMatrixFRem(inst);
+                else if (
+                    as<IRVectorType>(inst->getDataType()) &&
+                    as<IRBasicType>(inst->getOperand(0)->getDataType()))
+                    legalizeVectorFRemScalarDividend(inst);
                 inst = next;
             }
         }

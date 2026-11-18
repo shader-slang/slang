@@ -2487,14 +2487,16 @@ Result linkAndOptimizeIR(
             // `bool` reaches here unchanged, so rewrite it to an integer switch.
             SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
 
-            // GLSL has no matrix overloads for the builtins used to spell a floating-point
-            // remainder, so a matrix-typed `FRem` must be expanded per row before emission.
-            // `shouldEmitSPIRVDirectly()` conjoins `isSPIRV(target)` with the emit-method
-            // option, so it is false for plain GLSL and for SPIR-V-via-GLSL alike, and the
-            // single check covers the whole GLSL family; direct SPIR-V is excluded because
-            // its emitter reads `precise` off each matrix arithmetic instruction to attach
-            // per-row no-contraction, which the pass's wholesale decoration transfer would
-            // break.
+            // GLSL cannot spell every floating-point-remainder operand shape with its
+            // builtins — `mod` has no matrix overloads and no `mod(float, genType)`
+            // overload — so the unspellable `FRem` shapes must be rewritten before
+            // emission. `shouldEmitSPIRVDirectly()` conjoins `isSPIRV(target)` with
+            // the emit-method option, so it is false for plain GLSL and for
+            // SPIR-V-via-GLSL alike, and the single check covers the whole GLSL
+            // family; direct SPIR-V is excluded because its emitter handles both
+            // shapes itself and reads `precise` off each arithmetic instruction to
+            // attach per-row no-contraction, which the pass's wholesale decoration
+            // transfer would break.
             if (!targetProgram->shouldEmitSPIRVDirectly())
                 SLANG_PASS(legalizeFRemForGLSL);
 

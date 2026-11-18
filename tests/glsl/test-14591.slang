@@ -17,6 +17,9 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL_NSQ): -target glsl -stage compute -entry nonSquareMain -profile glsl_450 -validate-with-downstream-compiler
 //TEST:SIMPLE(filecheck=CHECK_SPV_NSQ): -target spirv-asm -emit-spirv-via-glsl -stage compute -entry nonSquareMain
 
+//TEST:SIMPLE(filecheck=CHECK_GLSL_VEC): -target glsl -stage compute -entry vectorMain -profile glsl_450 -validate-with-downstream-compiler
+//TEST:SIMPLE(filecheck=CHECK_SPV_VEC): -target spirv-asm -emit-spirv-via-glsl -stage compute -entry vectorMain
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 
 RWStructuredBuffer<float> outputBuffer;
@@ -133,4 +136,28 @@ void nonSquareMain(uint3 tid : SV_DispatchThreadID)
     //CHECK_GLSL_NSQ-NOT: abs(m_1)
     //CHECK_SPV_NSQ: OpFMod %v2float
     //CHECK_SPV_NSQ: OpCompositeConstruct %mat3v2float
+}
+
+// A scalar dividend against a vector divisor is the #14608 shape: GLSL `mod`
+// has no `mod(float, genType)` overload, so the dividend must be splatted to
+// the vector type by the same legalization. The reverse order (vector
+// dividend, scalar divisor) already spells valid `mod(genType, float)`.
+[numthreads(1, 1, 1)]
+void vectorMain(uint3 tid : SV_DispatchThreadID)
+{
+    float3 c = float3(1.5, 2.5, 3.5) * float(tid.x + 1);
+    float3 r = 0.75 % c;
+    float3 s = c % 0.75;
+    outputBuffer[0] = r.x + s.x;
+
+    // The scalar dividend must never be passed to `sign`/`mod` bare; the
+    // splat makes both operands vectors.
+    //CHECK_GLSL_VEC-NOT: sign(0.75)
+    //CHECK_GLSL_VEC-NOT: mod(abs(0.75)
+    //CHECK_GLSL_VEC: vec3(0.75)
+    //CHECK_GLSL_VEC-SAME: * mod(abs(vec3(0.75)
+    // The control (vector dividend, scalar divisor) keeps its valid form.
+    //CHECK_GLSL_VEC: sign(c_0)
+    //CHECK_GLSL_VEC-SAME: * mod(abs(c_0), abs(0.75)
+    //CHECK_SPV_VEC: OpFMod %v3float
 }
