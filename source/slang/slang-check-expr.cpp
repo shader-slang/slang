@@ -305,6 +305,16 @@ Scope* SemanticsVisitor::getScope(SyntaxNode* node)
     return nullptr;
 }
 
+/// Return whether `type` is a builtin unsigned integer type, such as `uint` or `uint64_t`.
+static bool _isUnsignedIntegerType(Type* type)
+{
+    auto basicType = as<BasicExpressionType>(type);
+    if (!basicType)
+        return false;
+    const BaseTypeInfo& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+    return (info.flags & BaseTypeInfo::Flag::Integer) && !(info.flags & BaseTypeInfo::Flag::Signed);
+}
+
 static SourceLoc _getMemberOpLoc(Expr* expr)
 {
     if (auto m = as<MemberExpr>(expr))
@@ -3614,12 +3624,21 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 nullptr,
                 ConstantFoldingKind::SpecializationConstant);
 
-            // Validate that array size is non-negative.
+            // Validate that the array size is non-negative and fits in `int`, the type in which
+            // `ArrayExpressionType` stores it. The size keeps the type of its expression here,
+            // so an unsigned size such as `0xFFFFFFFFu` is too large rather than negative.
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
             {
-                if (constElementCount->getValue() < 0)
+                const IntegerLiteralValue size = constElementCount->getValue();
+                if (size < 0 && !_isUnsignedIntegerType(constElementCount->getType()))
                 {
                     getSink()->diagnose(Diagnostics::InvalidArraySize{
+                        .location = subscriptExpr->indexExprs[0]->loc});
+                    return CreateErrorExpr(subscriptExpr);
+                }
+                if (uint64_t(size) > uint64_t(INT32_MAX))
+                {
+                    getSink()->diagnose(Diagnostics::ArraySizeTooLarge{
                         .location = subscriptExpr->indexExprs[0]->loc});
                     return CreateErrorExpr(subscriptExpr);
                 }

@@ -1471,6 +1471,13 @@ err(
 )
 
 err(
+    "array-size-too-large",
+    30034,
+    "array size too large",
+    span { loc = "location", message = "array size must not exceed 2147483647." }
+)
+
+err(
     "disallowed-array-of-non-addressable-type",
     30028,
     "arrays of non-addressable type not allowed",

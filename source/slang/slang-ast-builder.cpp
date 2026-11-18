@@ -766,6 +766,19 @@ PtrTypeBase* ASTBuilder::getPtrType(
         ptrTypeName));
 }
 
+/// Return the constant `size` converted to `int`, the type in which array, vector and matrix
+/// types store their sizes. The value is converted, not relabeled, so that the result is a valid
+/// `int` constant even when `size` does not fit in `int`. For example, the `uint` size
+/// 2147483648 becomes the `int` value -2147483648. The checker reports sizes that do not fit
+/// before they get here, so the conversion only keeps the representation valid.
+static IntVal* convertConstantSizeToInt(ASTBuilder* astBuilder, ConstantIntVal* size)
+{
+    auto intSize = as<IntVal>(
+        TypeCastIntVal::tryFoldImpl(astBuilder, astBuilder->getIntType(), size, nullptr));
+    SLANG_RELEASE_ASSERT(intSize);
+    return intSize;
+}
+
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
 {
     if (!elementCount)
@@ -776,7 +789,7 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         // Canonicalize constant elementCount to int.
         if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
         {
-            elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
+            elementCount = convertConstantSizeToInt(this, elementCountConstantInt);
         }
         else
         {
@@ -826,7 +839,7 @@ VectorExpressionType* ASTBuilder::getVectorType(Type* elementType, IntVal* eleme
     // Canonicalize constant elementCount to int.
     if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
     {
-        elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
+        elementCount = convertConstantSizeToInt(this, elementCountConstantInt);
     }
     Val* args[] = {elementType, elementCount};
     return as<VectorExpressionType>(
@@ -842,11 +855,11 @@ MatrixExpressionType* ASTBuilder::getMatrixType(
     // Canonicalize constant size arguments to int.
     if (auto rowCountConstantInt = as<ConstantIntVal>(rowCount))
     {
-        rowCount = getIntVal(getIntType(), rowCountConstantInt->getValue());
+        rowCount = convertConstantSizeToInt(this, rowCountConstantInt);
     }
     if (auto colCountConstantInt = as<ConstantIntVal>(colCount))
     {
-        colCount = getIntVal(getIntType(), colCountConstantInt->getValue());
+        colCount = convertConstantSizeToInt(this, colCountConstantInt);
     }
     Val* args[] = {elementType, rowCount, colCount, layout};
     return as<MatrixExpressionType>(
