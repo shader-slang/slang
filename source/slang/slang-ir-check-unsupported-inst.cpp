@@ -577,9 +577,9 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
 // initializer block (emitGlobalInstructionCtor) — cannot hold an atomic here: an atomic in a
 // static initializer is dropped before the emit-time IR, leaving the synthesized constructor
 // body empty, so the scan would find nothing in it. A generic that remains at this point is not
-// emitted (the Metal
-// checks' second reason — unspecialized address spaces in such bodies — does not apply: no
-// address-space specialization runs on this path at all). The scan covers atomic operations
+// emitted. The Metal checks' second reason for that — unspecialized address spaces in such
+// bodies — does not apply: no address-space specialization runs on this path at all. The scan
+// covers atomic operations
 // only; barrier ops also lack emitter support and still abort until the LLVM backend implements
 // them. The findFirstUseLoc fallback mirrors the func-typed checks below: if an atomic ever
 // reaches here without its own source location, the diagnostic still points at user code.
