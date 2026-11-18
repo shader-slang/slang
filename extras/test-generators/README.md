@@ -46,7 +46,7 @@ In the template below, a marker like `<<NAME>>` is a part that the script replac
 
 <<DISABLE_COMMENTS>>
 //<<DISABLE_POS>>TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target <<POSITIVE_TARGET>>
-//<<DISABLE_CMP>>TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): <<COMPUTE_TARGET>>
+//<<DISABLE_CMP>>TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): <<COMPUTE_TARGET>>
 //<<DISABLE_NEG>>TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1): -restrictive-capability-check -entry fragMain -stage fragment -target <<NEGATIVE_TARGET>>
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -107,7 +107,7 @@ The three `TEST` lines are the three tests in each file.
 | Test       | Directive                                      | What it checks                                                                            |
 | ---------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Positive   | `TEST:SIMPLE(filecheck=POSITIVE)`              | `fragMain` compiles on the minimum version without an error or a warning (exit code `0`). |
-| Functional | `TEST(compute):COMPARE_COMPUTE`                | `computeMain` runs on the real backend. The buffer holds `12346`. This test needs a GPU.  |
+| Functional | `TEST:COMPARE_COMPUTE`                         | `computeMain` runs on the real backend. The buffer holds `12346`. This test needs a GPU.  |
 | Negative   | `TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1)` | `fragMain` fails to compile (exit code `-1`) on the version below the minimum.            |
 
 The `POSITIVE` and `NEGATIVE` check lines are inside the body of `fragMain`. The `-restrictive-capability-check` option makes the compiler report a missing capability as an error.

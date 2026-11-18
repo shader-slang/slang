@@ -12,7 +12,7 @@
 
 // Negative test disabled, see https://github.com/shader-slang/slang/issues/8908
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_420
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
 //DISABLE_TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_410
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
