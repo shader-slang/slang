@@ -13,7 +13,7 @@
 // ByteAddressBuffer/RWByteAddressBuffer/StructuredBuffer/RWStructuredBuffer:
 //
 //     struct LoweredType {
-//         T* data;
+//         Ptr<T, AddressSpace::UserPointer> data;
 //         size_t size;
 //     }
 //
@@ -22,7 +22,7 @@
 //
 // ConstantBufferType/ParameterBlockType:
 //
-//     typealias LoweredType = T*;
+//     typealias LoweredType = Ptr<T, AddressSpace::UserPointer>;
 //
 //     Instructions that access `LoweredType` are lowered immediately in this
 //     pass such that they access members through the pointer as needed.
@@ -38,6 +38,11 @@
 //
 //     This pass itself doesn't deal with such function calls, they should
 //     eventually be fully handled in the core module and the LLVM emitter.
+//
+//     The `void*` lowering intentionally passes no address space: these values
+//     are opaque handles, never dereferenced. The buffer pointers above carry
+//     UserPointer because CPU buffer memory is host memory; `lowerType`
+//     records why that address space is load-bearing.
 
 namespace Slang
 {
@@ -63,10 +68,19 @@ struct ResourceTypeLoweringContext : InstPassBase
             type->getOp() == kIROp_HLSLRWStructuredBufferType)
             access = AccessQualifier::ReadWrite;
 
-        // The lowered buffer pointers use UserPointer because CPU buffer
-        // memory is host memory — the same address space a plain `T*` gets
-        // on CPU targets. Generic would remain un-specialized here, since
-        // address-space specialization only runs for GPU targets.
+        // The three buffer-shaped cases below type their pointers UserPointer
+        // because CPU buffer memory is host memory — the same address space a
+        // plain `T*` gets on CPU targets. The choice is load-bearing, not
+        // cosmetic: this pass runs immediately before
+        // validateAtomicOperations, and isValidAtomicDest accepts UserPointer
+        // but not Generic, so a Generic pointer here would make every atomic
+        // into a lowered buffer fail destination validation. Generic would
+        // also never be fixed up later: address-space specialization only runs
+        // for the GLSL, Metal and WGSL targets. The host-memory model applies
+        // uniformly to all three sites, including the read-only
+        // ConstantBuffer/ParameterBlock payload — on CPU that memory is
+        // ordinary writable host memory, and the access qualifier stays
+        // carried by the pointer type.
         switch (type->getOp())
         {
         case kIROp_ConstantBufferType:
