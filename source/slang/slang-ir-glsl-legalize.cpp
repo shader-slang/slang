@@ -5256,6 +5256,166 @@ void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
     }
 }
 
+// Expand a single matrix-typed `FRem` (`%` on floating-point matrices) into one
+// `FRem` per row, and replace the instruction with a `MakeMatrix` of the row
+// results.
+//
+// Consider this example:
+//
+//     float2x2 m = ...;
+//     float2x2 r = m % 0.75;   // also `m % n` and `0.75 % m`
+//
+// The core module lowers `%` to a single matrix-typed `IRFRem` with a scalar
+// operand left scalar (`frem(%m, 0.75)`, not broadcast to a matrix). The GLSL
+// text emitter spells `FRem` as `sign(x) * mod(abs(x), abs(y))`, which only
+// type-checks when `sign`/`abs`/`mod` see scalar or vector operands: GLSL has
+// no matrix overloads for those builtins, and `mod` has a
+// `genType mod(genType, float)` overload but no `mod(float, genType)`. We
+// therefore extract each row of every matrix operand and splat every scalar
+// operand to the row vector type, so each row `FRem` has vector operands and
+// the emitted construction is valid GLSL. This mirrors what the direct SPIR-V
+// emitter does at emit time (its `emitArithmetic` matrix branch), but lives in
+// the IR so the GLSL-family text emitters only ever see vector-shaped `FRem`s.
+// It is a deliberate second home for the per-row shape: `legalizeMatrixTypes`
+// already expands matrix arithmetic per row, but only for the matrix types it
+// lowers (integer/bool matrices); float matrices are valid in GLSL except
+// for the `%` spelling, so they are rewritten here, one op at a time, at the
+// point where every pass that could materialize a concrete `FRem`
+// (specialization, inlining) has run and nothing before emission
+// reintroduces a matrix-typed one.
+static void legalizeMatrixFRem(IRInst* inst)
+{
+    auto matrixType = as<IRMatrixType>(inst->getDataType());
+    SLANG_RELEASE_ASSERT(matrixType && "Matrix FRem legalization requires a matrix result type");
+    auto rowCount = getIntVal(matrixType->getRowCount());
+    auto colCount = getIntVal(matrixType->getColumnCount());
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
+
+    // A scalar operand is splatted once, before the row loop, so that both
+    // operands of every row `FRem` are vectors: GLSL `mod` has a
+    // `genType mod(genType, float)` overload but no `mod(float, genType)` for
+    // a scalar dividend. A matrix operand is not splatted; it contributes one
+    // extracted row per row of the result. An operand here is always a matrix
+    // or a scalar: the type checker rejects matrix-vector mixes for
+    // component-wise arithmetic (`getBuiltinArithmeticCommonType`), and the
+    // `%` operator's lowering (`IFloat.mod` and `__frem` in the core module)
+    // builds a matrix `FRem` only from operands the checker has already given
+    // matching shapes — matrix/matrix, or matrix/scalar.
+    struct RowOperand
+    {
+        IRInst* matrix; // non-null when the operand is a matrix
+        IRInst* splat;  // non-null when the operand is a scalar
+    };
+    auto classifyOperand = [&](IRInst* operand) -> RowOperand
+    {
+        if (as<IRMatrixType>(operand->getDataType()))
+            return {operand, nullptr};
+        SLANG_RELEASE_ASSERT(
+            as<IRBasicType>(operand->getDataType()) && "Matrix FRem operands are matrix or scalar");
+        return {nullptr, builder.emitMakeCompositeFromScalar(rowVectorType, operand)};
+    };
+    auto left = classifyOperand(inst->getOperand(0));
+    auto right = classifyOperand(inst->getOperand(1));
+
+    List<IRInst*> rows;
+    // The loop runs `rowCount` iterations over rows, each row `colCount`
+    // components wide — `emitElementExtract` on a matrix yields row `i`, so a
+    // `float3x2` produces three `float2` rows.
+    for (IRIntegerValue row = 0; row < rowCount; row++)
+    {
+        auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
+        IRInst* leftRow =
+            left.matrix ? builder.emitElementExtract(left.matrix, rowIndexInst) : left.splat;
+        IRInst* rightRow =
+            right.matrix ? builder.emitElementExtract(right.matrix, rowIndexInst) : right.splat;
+        IRInst* args[] = {leftRow, rightRow};
+        rows.add(builder.emitIntrinsicInst(rowVectorType, kIROp_FRem, 2, args));
+    }
+    auto newInst = builder.emitMakeMatrix(matrixType, rows.getCount(), rows.getBuffer());
+
+    inst->replaceUsesWith(newInst);
+    // Decorations move wholesale to the reassembled matrix. `precise` is the
+    // one whose semantics this rewrite must preserve, and the GLSL-family
+    // emitters consume it where the value is bound: it keeps the aggregate
+    // from being folded into its use, and it is re-emitted as a `precise`
+    // qualifier on the temporary that holds it, which governs the full
+    // row-expanded expression. Any other decoration that happens to sit on
+    // the `%` moves harmlessly with the same transfer. The direct SPIR-V
+    // emitter instead reads `precise` off each arithmetic instruction to
+    // emit per-row no-contraction, and it is excluded by the gate, so its
+    // matrix `FRem`s never pass through here.
+    inst->transferDecorationsTo(newInst);
+    inst->removeAndDeallocate();
+}
+
+// Splat the scalar dividend of a vector-typed `FRem` to the vector type, and
+// leave the instruction in place with the splat as its dividend.
+//
+// Consider this example:
+//
+//     float3 c = ...;
+//     float3 r = 0.75 % c;
+//
+// GLSL `mod` has a `genType mod(genType, float)` overload but no
+// `mod(float, genType)` overload, so the emitter's `sign(x) * mod(abs(x),
+// abs(y))` spelling is invalid exactly when the dividend is the scalar and
+// the divisor is the vector. Splatting the dividend to the vector type makes
+// every remaining operand shape spellable: `vec % vec` and `vec % scalar`
+// were already fine, and scalar/scalar operands are not rewritten here.
+// The divisor is left as-is for the same reason.
+static void legalizeVectorFRemScalarDividend(IRInst* inst)
+{
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    auto splattedDividend = builder.emitMakeCompositeFromScalar(
+        as<IRVectorType>(inst->getDataType()),
+        inst->getOperand(0));
+    builder.replaceOperand(
+        inst->getOperands(), // operand 0, the dividend
+        splattedDividend);
+}
+
+void legalizeFRemForGLSL(IRModule* module)
+{
+    // This late in the pipeline every function the emitters can still reach
+    // is a concrete top-level `IRGlobalValueWithCode` (generic bodies have
+    // been specialized away), and no live `FRem` sits outside a function
+    // body either — global initializers are constant at this stage — so
+    // walking the module's top-level functions covers every live `%`, not
+    // just entry points.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRGlobalValueWithCode>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst = block->getFirstInst(); inst;)
+            {
+                // The matrix rewrite deallocates `inst` (both rewrites
+                // insert before it), so the successor is captured up front
+                // to keep the walk safe.
+                auto next = inst->getNextInst();
+                if (inst->getOp() != kIROp_FRem)
+                {
+                    inst = next;
+                    continue;
+                }
+                if (as<IRMatrixType>(inst->getDataType()))
+                    legalizeMatrixFRem(inst);
+                else if (
+                    as<IRVectorType>(inst->getDataType()) &&
+                    as<IRBasicType>(inst->getOperand(0)->getDataType()))
+                    legalizeVectorFRemScalarDividend(inst);
+                inst = next;
+            }
+        }
+    }
+}
+
 void legalizeConstantBufferLoadForGLSL(IRModule* module)
 {
     // Constant buffers and parameter blocks are represented as `uniform` blocks

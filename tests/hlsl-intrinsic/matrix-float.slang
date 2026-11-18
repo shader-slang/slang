@@ -1,10 +1,15 @@
-// TODO(JS):
-// NOTE we can't test on VK/gl at the moment because we don't support intrinsics over matrices on that target currently
+// NOTE the vk target runs the direct SPIR-V emitter — the default emit
+// method, which this line relies on — and that emitter already expands
+// matrix arithmetic per row at emit time; the matrix intrinsics this file
+// exercises (sin, cos, atan2, ...) reach it as per-row vector calls through
+// the core module's stdlib overloads. The GLSL/via-GLSL spelling of
+// matrix `%` is covered by tests/glsl/test-14591.slang. WGSL stays disabled
+// below; float-matrix `%` is also unimplemented for WGSL.
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj -render-feature hardware-device
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 // Not supported in WGSL: Integer matrices, Double and other unsupported scalar types
