@@ -3,9 +3,8 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-// Every test of these commands defines the macro SLANG_TEST_<TARGET> of its target. The test of the
-// first line is a request, the second line is an explicit line, and the CUDA test is a copy of the
-// explicit line that `slang-test` makes.
+// Every test of these commands defines the macro SLANG_TEST_<TARGET> of its target. The line above
+// runs for the targets vk, glsl, cuda and cpu, and each run defines the macro of its own target.
 #if !defined(SLANG_TEST_VK) && !defined(SLANG_TEST_GLSL) && !defined(SLANG_TEST_CPU) && \
     !defined(SLANG_TEST_CUDA)
 #error "The test does not define the macro of its target."

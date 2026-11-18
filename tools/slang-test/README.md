@@ -145,18 +145,18 @@ By default, the test runs for all targets with an API that the machine supports.
 
 By default, `targets=all` is implied.
 
-Such a line is a request. It does not run itself. For each target, `slang-test` makes a copy of the line with the arguments of the target. This is the same mechanism as the synthesized tests of other commands. In the test result, the name of each copy has `syn` and the target, for example:
+Such a line runs once for each target, like a loop over the targets. The line itself does not run. For each target, `slang-test` adds the arguments of the target to the line and runs it. In the test result, the name of each test has the target in parentheses, for example:
 
 ```
-tests/compute/my-test.slang.1 syn (dx11)
-tests/compute/my-test.slang.1 syn (dx12)
-tests/compute/my-test.slang.1 syn (vk)
-tests/compute/my-test.slang.1 syn (glsl)
-tests/compute/my-test.slang.1 syn (wgpu)
+tests/compute/my-test.slang.1 (dx11)
+tests/compute/my-test.slang.1 (dx12)
+tests/compute/my-test.slang.1 (vk)
+tests/compute/my-test.slang.1 (glsl)
+tests/compute/my-test.slang.1 (wgpu)
 ...
 ```
 
-The number in the name is the index of the test line in the file, which is the same for all copies of a line. Line 0 has no number. The number does not depend on the APIs of the machine, so a name is the same on every machine. Use the name in a list of expected failures.
+The number in the name is the index of the test line in the file. It is the same for all targets of a line. Line 0 has no number. The number does not depend on the APIs of the machine, so a name is the same on every machine. Use the whole name in a list of expected failures, or in `-exclude-prefix` and `-skip-list`. The entry `tests/compute/my-test.slang.1` selects all targets of the line, and the entry `tests/compute/my-test.slang.1 (vk)` selects one target.
 
 To test with different command-line arguments, add more lines. Each line makes its own tests for each target:
 
@@ -220,8 +220,8 @@ The result is the union of the tokens. A hyphen between names removes more than 
 Follow these rules:
 
 - `slang-test` makes a test only for an API that the machine has, and that the option `-synthesizedTestApi` allows. By default, all APIs are allowed.
-- A request makes all of its targets. Another line of the file does not change this, even if that line tests the same target. For example, `targets=all` with `-option-a` and `targets=cuda` with `-option-b` give two different `cuda` tests.
-- A `DISABLE_TEST` line does not switch a target off for a request. Use `targets=all-<name>`.
+- A line runs for all of its targets. Another line of the file does not change this, even if that line tests the same target. For example, `targets=all` with `-option-a` and `targets=cuda` with `-option-b` give two different `cuda` tests.
+- A `DISABLE_TEST` line does not switch a target off for another line. Use `targets=all-<name>`.
 - Use `+` between the names, and not a comma. A comma separates the options of the test line, so `targets=vk,cpu` is the option `targets=vk` and the option `cpu`. `slang-test` reports an error for this.
 - An unknown name is an error. `slang-test` does not skip it.
 - Other test commands, such as `SIMPLE`, do not support `targets=`. `slang-test` reports an error for them.
@@ -236,11 +236,11 @@ Follow these rules:
 #endif
 ```
 
-`vk` and `glsl` use the same API, but they have two macros, because the Slang compiler takes a different path for each. Every test of the three commands has the macro of its target. The synthesized tests of other commands do not have the macro.
+`vk` and `glsl` use the same API, but they have two macros, because the Slang compiler takes a different path for each. Every test of the three commands has the macro of its target. The tests of other commands do not have the macro.
 
 #### Other details
 
-A test that `slang-test` made reads the expected file of the line that it comes from. For example, a copy of the line at index 1 reads `foo.slang.1.expected.txt`. A copy writes files that have the target in their name, for example `foo.slang.1.vk.actual.txt`. The copies of a line do not write the same file.
+The test of a target reads the expected file of its line. For example, the tests of the line at index 1 read `foo.slang.1.expected.txt`. A test writes files that have the target in their name, for example `foo.slang.1.vk.actual.txt`. The tests of the targets of a line do not write the same file.
 
 A `.hlsl` test file needs the option `-slang`, so the test commands add it to the line that they run. A `.slang` file does not need it. For a `.slang` file, the command adds `-slang` only if the line has another language option, such as `-hlsl`. The last language option wins.
 

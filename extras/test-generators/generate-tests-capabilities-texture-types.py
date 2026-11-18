@@ -477,7 +477,7 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
             disableNegativeSimpleTestPrefix = "DISABLE_"
             testDisabledComment += f"\n// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}"
 
-    # The compute test is a request for one target of `slang-test`: `targets=<name>`. A disabled
+    # The compute test line runs for the target that `targets=<name>` names. A disabled
     # compute test has no line, because `DISABLE_TEST` has no effect on the COMPARE_COMPUTE command.
     computeTestLine = ""
     if disableComputeTestPrefix == "":

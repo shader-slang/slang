@@ -120,14 +120,9 @@ struct TestOptions
     bool isEnabled = true;
     bool isSynthesized = false;
 
-    // True for a test line of a COMPARE_COMPUTE command that has no render API argument. Such a
-    // line is a request: it asks `slang-test` to make the tests of its targets (see
-    // `_calcTargetTests`), and it does not run itself.
-    bool isSynthesisRequest = false;
-
-    // For a test that `_calcTargetTests` made, the index of the request in the test list of the
-    // file. The test reads the expected file of the request if it has none of its own, for example
-    // `foo.slang.1.expected.txt` for the request at index 1. It is -1 for any other test.
+    // For the test of one target of a line with `targets=`, the index of that line in the test list
+    // of the file. The test reads the expected file of the line, for example
+    // `foo.slang.1.expected.txt` for the line at index 1. It is -1 for any other test.
     Index sourceIndex = -1;
 
     // The label of the target (for example `vk`) that the `targets=` option gave to this test.
@@ -196,10 +191,12 @@ static void _addRenderTestOptions(
 // - The file specific to this test:      input.outputStem + suffix
 // - The general file for a set of tests: input.fileName + suffix;
 //
-// A test that `slang-test` made from a request reads the file of the request, and not the file of
-// its own index. The index of such a test counts the tests of the file, and it is not an index that
-// the author wrote. For example, in a file with a request at index 0 and a `CROSS_COMPILE` line at
-// index 1, the copy of the request at index 2 must not read `foo.slang.2.expected`.
+// The test of one target of a line reads the expected file of the line, for example
+// `foo.slang.1.expected.txt` for the line at index 1. It does not read the file of its position in
+// the test list. That position is not an index that the author wrote, and it can be the index of
+// another line. For example, in a file with a `COMPARE_COMPUTE` line at index 0 and a
+// `CROSS_COMPILE` line at index 1, the test of a target of the line 0 is at position 2, and it must
+// not read `foo.slang.2.expected`, which belongs to the line at index 2.
 static SlangResult _readTestFile(const TestInput& input, const String& suffix, String& out)
 {
     StringBuilder buf;
@@ -634,7 +631,7 @@ static RenderApiType _getRenderApiOfTarget(const TestTarget& target)
 // Returns the label of the target that a test line with the render API argument runs on, for
 // example `vk` for `-vk` and `glsl` for `-vk -emit-spirv-via-glsl`. The label is empty if the
 // arguments have no render API. A test line has the same target whether it is a line that the
-// author wrote (`-mtl`), or a test that `slang-test` made from a request (`-metal`).
+// author wrote (`-mtl`), or a test that `slang-test` made for one target of a line (`-metal`).
 static String _getTestTargetLabelFromArgs(const List<String>& args)
 {
     const RenderApiType api = _getRenderApiFromArgs(args);
@@ -679,25 +676,33 @@ static bool _hasImplicitDeviceLanguageArg(const List<String>& args)
     return false;
 }
 
-// Returns true if the test line is a request for synthesized tests: a line of a COMPARE_COMPUTE
-// command that does not say which render API it runs on.
+// Returns true if the test is a line that runs once for each of its targets: a line of a
+// COMPARE_COMPUTE command.
 //
 // Consider this line:
 //
 //     //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
 //
-// The author did not choose an API, so `slang-test` makes the test for each API that it knows
-// (`targets=all`), and the line does not run itself. A line that has an API argument, such as
-// `-vk`, is a test of that API and is not a request.
-static bool _isSynthesisRequest(const TestOptions& options)
+// The author does not choose an API. `slang-test` runs the line for each target (`targets=all`),
+// and the line itself does not run. A line of these commands cannot name a render API
+// (`_addTestLine` reports an error), so every such line is a line of this kind. The tests of its
+// targets have the same command, but they are not lines: `_calcTargetTests` marks them as made for
+// one target.
+static bool _isMultiTargetLine(const TestOptions& options)
 {
     return isTargetsOptionSupportedByCommand(options.command.getUnownedSlice()) &&
-           _getRenderApiFromArgs(options.args) == RenderApiType::Unknown &&
-           !_hasImplicitDeviceLanguageArg(options.args);
+           !options.isSynthesized;
 }
 
-// Adds the test line `testDetails` to `outTestList`, after it marks the line as a synthesis request
-// if it is one, and checks the line.
+// Returns true if the arguments of the test line choose a render API, with an argument such as
+// `-vk`, or with a language that implies one, such as `-wgsl`.
+static bool _namesRenderApi(const List<String>& args)
+{
+    return _getRenderApiFromArgs(args) != RenderApiType::Unknown ||
+           _hasImplicitDeviceLanguageArg(args);
+}
+
+// Adds the test line `testDetails` to `outTestList`, after it checks the line.
 //
 // A line of a COMPARE_COMPUTE command cannot name a render API. The author chooses the targets with
 // the `targets=` option, and `slang-test` makes one test for each target. The line `-vk` is an
@@ -711,8 +716,6 @@ static SlangResult _addTestLine(
     FileTestList* outTestList,
     TestContext* context)
 {
-    testDetails.options.isSynthesisRequest = _isSynthesisRequest(testDetails.options);
-
     auto reportError = [&](const char* message, const String& detail)
     {
         if (context && context->getTestReporter())
@@ -736,12 +739,12 @@ static SlangResult _addTestLine(
         return SLANG_E_INVALID_ARG;
     };
 
-    const bool isFamilyCommand =
-        isTargetsOptionSupportedByCommand(testDetails.options.command.getUnownedSlice());
+    const bool isMultiTargetLine = _isMultiTargetLine(testDetails.options);
 
     // The line chooses its targets with `targets=`. An API argument would choose them a second
     // time. A line that `DISABLE_TEST` disables does not run, so it has nothing to check.
-    if (isFamilyCommand && testDetails.options.isEnabled && !testDetails.options.isSynthesisRequest)
+    if (isMultiTargetLine && testDetails.options.isEnabled &&
+        _namesRenderApi(testDetails.options.args))
     {
         const String label = _getTestTargetLabelFromArgs(testDetails.options.args);
         StringBuilder hint;
@@ -759,7 +762,7 @@ static SlangResult _addTestLine(
         return SLANG_OK;
     }
 
-    if (!isFamilyCommand)
+    if (!isMultiTargetLine)
     {
         return reportError(
             "the 'targets=' option is not supported by the command. Use it with COMPARE_COMPUTE, "
@@ -6588,8 +6591,8 @@ static void _calcSynthesizedTests(
     // Add the explicit parameter
     for (const auto& srcTest : srcTests)
     {
-        // A request is not a test that runs. `_calcTargetTests` makes the tests of a request.
-        if (srcTest.options.isSynthesisRequest)
+        // A line with targets does not run. `_calcTargetTests` makes the test of each target.
+        if (_isMultiTargetLine(srcTest.options))
             continue;
 
         const auto& requirements = srcTest.requirements;
@@ -6660,8 +6663,8 @@ static void _calcSynthesizedTests(
         // Mark as synthesized
         synthOptions.isSynthesized = true;
 
-        // The synthesized test uses another render API than the source line, so a label of the
-        // source line (it has one if it is a synthesized test) would name it wrongly.
+        // The test uses another render API than the source line, so the target of the source line
+        // (it has one if the source is the test of a target) would name it wrongly.
         synthOptions.targetLabel = String();
 
         StringBuilder builder;
@@ -6700,60 +6703,63 @@ static void _calcSynthesizedTests(
     }
 }
 
-// Makes the tests that the requests of a file ask for, and adds them to `ioSynthTests`.
+// Adds the test of each target of each line with targets to `ioTests`, like a loop over the targets
+// of the line.
 //
-// Consider this line, which is a request (see `_isSynthesisRequest`):
+// Consider this line:
 //
 //     //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
 //
-// The line has no `targets=`, so it means `targets=all`. This function adds a copy of the line for
+// The line has no `targets=`, so it means `targets=all`. The function adds a copy of the line for
 // each target of `all`: `... -vk`, `... -dx11`, and so on. A line with `targets=all-vk-cuda` gets
 // the targets of that list, and a line with `targets=vk+cpu` gets exactly these two.
 //
-// A request makes all of its targets. Another line of the file does not change that, even if the
-// line tests the same target. Consider these two lines:
+// A line makes the tests of all its targets. Another line of the file does not change that, even if
+// the line tests the same target. Consider these two lines:
 //
 //     //TEST:COMPARE_COMPUTE(targets=all): -option-a
 //     //TEST:COMPARE_COMPUTE(targets=cuda): -option-b
 //
 // The first line makes a `cuda` test with `-option-a`, and the second line makes a `cuda` test with
 // `-option-b`. They are two different tests. The option `-synthesizedTestApi` of `slang-test`, and
-// the APIs that the machine has, limit every request. The function sets `outTargetApis` to the APIs
+// the APIs that the machine has, limit every line. The function sets `outTargetApis` to the APIs
 // that it made tests for.
 static void _calcTargetTests(
     TestContext* context,
     const List<TestDetails>& srcTests,
-    List<TestDetails>& ioSynthTests,
+    List<TestDetails>& ioTests,
     RenderApiFlags& outTargetApis)
 {
-    struct Request
+    struct TargetLine
     {
         const TestDetails* test;
         Index index;
         List<const TestTarget*> targets;
     };
-    List<Request> requests;
+    List<TargetLine> lines;
 
     for (Index srcIndex = 0; srcIndex < srcTests.getCount(); ++srcIndex)
     {
         const TestDetails& srcTest = srcTests[srcIndex];
-        if (!srcTest.options.isSynthesisRequest)
+
+        // A line that `DISABLE_TEST` disables does not run, and it makes no test.
+        if (!_isMultiTargetLine(srcTest.options) || !srcTest.options.isEnabled)
             continue;
 
-        Request request;
-        request.test = &srcTest;
-        request.index = srcIndex;
+        TargetLine line;
+        line.test = &srcTest;
+        line.index = srcIndex;
 
         // The gather step checked the value, so the expansion cannot fail.
         String value = "all";
         srcTest.options.commandOptions.tryGetValue("targets", value);
         String error;
         SLANG_RETURN_VOID_ON_FAIL(
-            expandTestTargetList(value.getUnownedSlice(), request.targets, error));
-        requests.add(request);
+            expandTestTargetList(value.getUnownedSlice(), line.targets, error));
+        lines.add(line);
     }
 
-    // The tests of the highest API come first, as the other synthesized tests do.
+    // The tests of the highest API come first, as the tests of the other commands do.
     for (int apiIndex = int(RenderApiType::CountOf) - 1; apiIndex >= 0; --apiIndex)
     {
         const RenderApiFlags apiBit = RenderApiFlags(1) << apiIndex;
@@ -6761,31 +6767,30 @@ static void _calcTargetTests(
             continue;
 
         const RenderApiType api = RenderApiType(apiIndex);
-        for (const auto& request : requests)
+        for (const auto& line : lines)
         {
-            for (const TestTarget* target : request.targets)
+            for (const TestTarget* target : line.targets)
             {
                 if (_getRenderApiOfTarget(*target) != api)
                     continue;
 
-                TestDetails synthTestDetails(request.test->options);
-                TestOptions& synthOptions = synthTestDetails.options;
-                synthOptions.isSynthesisRequest = false;
-                synthOptions.isSynthesized = true;
-                synthOptions.commandOptions.remove("targets");
-                synthOptions.targetLabel = target->label;
-                synthOptions.sourceIndex = request.index;
+                TestDetails targetTest(line.test->options);
+                TestOptions& targetOptions = targetTest.options;
+                targetOptions.isSynthesized = true;
+                targetOptions.commandOptions.remove("targets");
+                targetOptions.targetLabel = target->label;
+                targetOptions.sourceIndex = line.index;
                 if (auto c = context->categorySet.find(RenderApiUtil::getApiName(api)))
-                    synthOptions.addCategory(c);
-                appendTestTargetArgs(*target, synthOptions.args);
+                    targetOptions.addCategory(c);
+                appendTestTargetArgs(*target, targetOptions.args);
 
                 // Work out the info about this test
-                context->setTestRequirements(&synthTestDetails.requirements);
-                runTest(context, "", "", "", synthOptions);
+                context->setTestRequirements(&targetTest.requirements);
+                runTest(context, "", "", "", targetOptions);
                 context->setTestRequirements(nullptr);
 
-                SLANG_ASSERT(synthTestDetails.requirements.explicitRenderApi == api);
-                ioSynthTests.add(synthTestDetails);
+                SLANG_ASSERT(targetTest.requirements.explicitRenderApi == api);
+                ioTests.add(targetTest);
                 outTargetApis |= apiBit;
             }
         }
@@ -6825,8 +6830,8 @@ static void _calcSynthesizedCompileTargetTests(
 
     for (const auto& srcTest : srcTests)
     {
-        // A test that `_calcTargetTests` made has an explicit API and a label, so it is a source of
-        // a compile-only test. The other synthesized tests are copies, and they are not.
+        // The test of one target of a line has an explicit API and a target, so it is a source of a
+        // compile-only test. The tests that the old synthesis made are copies, and they are not.
         if (!srcTest.options.isEnabled ||
             (srcTest.options.isSynthesized && srcTest.options.targetLabel.getLength() == 0) ||
             !_isGpuComputeCommand(srcTest.options.command))
@@ -7016,20 +7021,34 @@ static String insertSubtestIndex(const String& testName, int index)
 
 // Check if a prefix specifies a subtest index (e.g., "foo.slang.1" or "foo.slang.0")
 // Returns the subtest index if found, or -1 if not a subtest prefix.
+// Returns true if an entry of `entries` is the whole name of the test, for example
+// `tests/compute/parameter-block.slang (llvm)`. An entry that is a path or a path with an index
+// (`foo.slang.1`) selects the tests of a file or of a line, and an entry with the target selects
+// the one copy of a line for that target.
+static bool _isTestNameInList(const List<String>& entries, const UnownedStringSlice& testName)
+{
+    for (const auto& entry : entries)
+    {
+        if (entry.getUnownedSlice() == testName)
+            return true;
+    }
+    return false;
+}
+
 // The index that names a test in the test list, and in the command line entries that select it.
 //
-// A test that `slang-test` made from a request has the index of its request, so that the name
-// `foo.slang.1 syn (vk)` says "the first copy of the line 1 for the target vk", and it does not
-// depend on the APIs that the machine has. The target tells the copies of a request apart. Any
-// other test has its position in the list.
+// The test of one target of a line has the index of that line, so that the name
+// `foo.slang.1 (vk)` says "the line 1 for the target vk", and it does not depend on the APIs that
+// the machine has. The target tells the tests of one line apart. Any other test has its position in
+// the list.
 static Index _getTestNameIndex(const TestOptions& options, Index positionInList)
 {
     return options.sourceIndex >= 0 ? options.sourceIndex : positionInList;
 }
 
-// Returns the path that the file output of a test has as its prefix, for example `foo.slang.1`. A
-// copy of a request adds its target (`foo.slang.1.vk`), because the copies of a request have the
-// same name index, and they must not write the same files.
+// Returns the path that the file output of a test has as its prefix, for example `foo.slang.1`. The
+// test of one target of a line adds the target (`foo.slang.1.vk`), because the tests of one line
+// have the same name index, and they must not write the same files.
 static String _getTestOutputStem(
     const String& filePath,
     const TestOptions& options,
@@ -7072,8 +7091,8 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // We can get the test info for each of them
         for (auto& testDetails : testList.tests)
         {
-            // A request does not run. Its tests have their own requirements.
-            if (testDetails.options.isSynthesisRequest)
+            // A line with targets does not run. The test of each target has its own requirements.
+            if (_isMultiTargetLine(testDetails.options))
                 continue;
 
             auto& requirements = testDetails.requirements;
@@ -7100,7 +7119,8 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     {
         List<TestDetails> synthesizedTests;
 
-        // The requests of the file (the lines that have no render API) make their tests first.
+        // The lines with targets (the lines of the COMPARE_COMPUTE commands) make their tests
+        // first.
         RenderApiFlags targetApis = 0;
         _calcTargetTests(context, testList.tests, synthesizedTests, targetApis);
 
@@ -7178,8 +7198,8 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         Index subTestIndex = testOrder[orderIdx];
         auto& testDetails = testList.tests[subTestIndex];
 
-        // A request does not run. The tests that it asks for are in the list after the lines.
-        if (testDetails.options.isSynthesisRequest)
+        // A line with targets does not run. The test of each target is in the list after the lines.
+        if (_isMultiTargetLine(testDetails.options))
         {
             continue;
         }
@@ -7210,11 +7230,6 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
         // Work out the test name - taking into account render api / if synthesized
         StringBuilder testName(nameStem);
-
-        if (testDetails.options.isSynthesized)
-        {
-            testName << " syn";
-        }
 
         const auto& requirements = testDetails.requirements;
 
@@ -7260,11 +7275,13 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // Per-subtest exclusion, and it has to happen HERE rather than in
         // shouldRunTest(): that runs before subtests are expanded, so it can
         // only see the source path. A synthesized variant such as
-        // `tests/compute/parameter-block.slang.6 syn (llvm)` can crash the
+        // `tests/compute/parameter-block.slang (llvm)` can crash the
         // worker outright, which also rules out -expected-failure-list —
         // that reclassifies a result only after the test returns, and this
         // one never does. The skip must be pre-dispatch, so it is.
-        if (TestToolUtil::isSubtestExcluded(
+        if (_isTestNameInList(context->options.excludePrefixes, testName.getUnownedSlice()) ||
+            _isTestNameInList(context->options.skipList, testName.getUnownedSlice()) ||
+            TestToolUtil::isSubtestExcluded(
                 context->options.excludePrefixes,
                 context->options.skipList,
                 filePath,

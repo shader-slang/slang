@@ -121,8 +121,10 @@ struct Options
     // always the subCommand itself.
     Slang::List<Slang::String> subCommandArgs;
 
-    // By default we synthesize tests for all APIs. A test line that has no render API asks for them
-    // (`targets=all`), and a test cannot run on an API writes `targets=all-<name>`.
+    // The APIs for which `slang-test` runs the lines of COMPARE_COMPUTE, COMPARE_COMPUTE_EX and
+    // COMPARE_RENDER_COMPUTE, and for which it adds tests of the other commands that do not name an
+    // API. The default is all APIs. A line chooses its own targets with `targets=`, and a test that
+    // cannot run on a target writes `targets=all-<name>`.
     Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf;
 
     // If true, print detailed adapter information
