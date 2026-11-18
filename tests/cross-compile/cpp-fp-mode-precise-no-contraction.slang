@@ -1,7 +1,8 @@
 // Under `-fp-mode precise`, the C++ output tells the C++ compiler not to contract `a * b + c` into a
 // fused multiply-add (Clang does it within an expression by default, GCC across expressions,
 // wherever the target has FMA instructions). The pragmas come before the prelude, so the prelude's
-// inline functions are compiled under them too. The default and fast modes leave contraction to
+// inline functions are compiled under them too, and the previous settings are restored at the end,
+// so code after a generated header keeps its own. The default and fast modes leave contraction to
 // the compiler.
 
 //TEST:SIMPLE(filecheck=PRECISE): -target cpp -stage compute -entry computeMain -fp-mode precise
@@ -24,19 +25,35 @@ void computeMain()
 }
 
 // PRECISE: #if defined(__clang__)
+// PRECISE-NEXT: #pragma float_control(push)
 // PRECISE-NEXT: #pragma clang fp contract(off)
 // PRECISE-NEXT: #elif defined(__GNUC__)
+// PRECISE-NEXT: #pragma GCC push_options
 // PRECISE-NEXT: #pragma GCC optimize("fp-contract=off")
 // PRECISE-NEXT: #elif defined(_MSC_VER)
+// PRECISE-NEXT: #pragma float_control(push)
 // PRECISE-NEXT: #pragma fp_contract(off)
 // PRECISE-NEXT: #endif
 // PRECISE: #include "{{.*}}slang-cpp-prelude.h"
 // PRECISE: computeMain
+// PRECISE: #if defined(__clang__)
+// PRECISE-NEXT: #pragma float_control(pop)
+// PRECISE-NEXT: #elif defined(__GNUC__)
+// PRECISE-NEXT: #pragma GCC pop_options
+// PRECISE-NEXT: #elif defined(_MSC_VER)
+// PRECISE-NEXT: #pragma float_control(pop)
+// PRECISE-NEXT: #endif
 
 // DEFAULT-NOT: fp contract
 // DEFAULT-NOT: fp_contract
+// DEFAULT-NOT: fp-contract
+// DEFAULT-NOT: float_control
 // DEFAULT: computeMain
+// DEFAULT-NOT: float_control
 
 // FAST-NOT: fp contract
 // FAST-NOT: fp_contract
+// FAST-NOT: fp-contract
+// FAST-NOT: float_control
 // FAST: computeMain
+// FAST-NOT: float_control

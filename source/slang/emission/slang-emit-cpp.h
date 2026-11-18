@@ -68,6 +68,9 @@ protected:
     virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
     virtual void emitFrontMatterImpl(TargetRequest* targetReq) SLANG_OVERRIDE;
+    // True when the output is C++ source compiled under `-fp-mode precise`, so it opens and closes
+    // a region in which the C++ compiler must not contract floating-point expressions.
+    bool _shouldDisableFpContraction();
     virtual void emitPreModuleImpl() SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
     virtual void emitSimpleFuncParamImpl(IRParam* param) SLANG_OVERRIDE;
