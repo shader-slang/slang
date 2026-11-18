@@ -1481,18 +1481,20 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
-        case CodeGenTarget::HostObjectCode:
         case CodeGenTarget::HostHostCallable:
-            // These host targets take the CPU kernel ABI only when emitting
-            // through LLVM. HostHostCallable without -emit-cpu-via-llvm
-            // compiles through the downstream C++ path, whose host-callable
-            // functions keep their natural signatures for direct host calls.
+            // HostHostCallable takes the CPU kernel ABI only when emitting
+            // through LLVM; without -emit-cpu-via-llvm it compiles through
+            // the downstream C++ path, whose host-callable functions keep
+            // their natural signatures for direct host calls. HostObjectCode
+            // has no such non-LLVM path — isCPUTargetViaLLVM is always true
+            // for it — so it sits in the unguarded group below.
             if (!isCPUTargetViaLLVM(targetRequest))
                 break;
             [[fallthrough]];
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CPPHeader:
         case CodeGenTarget::HostLLVMIR:
+        case CodeGenTarget::HostObjectCode:
         case CodeGenTarget::ShaderLLVMIR:
         case CodeGenTarget::ShaderObjectCode:
         case CodeGenTarget::ShaderHostCallable:
@@ -2509,7 +2511,6 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
         }
         break;
-    case CodeGenTarget::HostObjectCode:
     case CodeGenTarget::HostHostCallable:
         if (!isCPUTargetViaLLVM(targetRequest))
             break;
@@ -2518,6 +2519,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
@@ -2673,6 +2675,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::HostHostCallable:
         if (isCPUTargetViaLLVM(targetRequest))
             SLANG_PASS(removeRawDefaultConstructors);
         break;
@@ -4047,9 +4050,10 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
                 result,
                 artifact,
                 codeGenContext->getSink());
-            // The artifact still reaches the caller on failure (its diagnostics
-            // were reported above) so it can inspect the error; attach adopts
-            // the emit's single reference instead of adding a leaking one.
+            // attach adopts the emit's single returned reference (the ComPtr
+            // constructor would AddRef and leak one). Diagnostics were already
+            // reported to the sink above; callers do not read the artifact on
+            // failure, so this keeps ownership well-defined and leak-free.
             outArtifact.attach(artifact);
             SLANG_RETURN_ON_FAIL(result);
         }
