@@ -150,11 +150,6 @@ struct ShaderInputLayoutParser
         else if (word == "format")
         {
             val->textureDesc.format = parseFormatOption(parser);
-
-            if (val->textureDesc.format == Format::Undefined)
-            {
-                return SLANG_FAIL;
-            }
         }
         else
         {
@@ -426,11 +421,6 @@ struct ShaderInputLayoutParser
         else if (word == "format")
         {
             val->bufferDesc.format = parseFormatOption(parser);
-
-            if (val->bufferDesc.format == Format::Undefined)
-            {
-                return SLANG_FAIL;
-            }
         }
         else
         {
@@ -456,12 +446,25 @@ struct ShaderInputLayoutParser
         return SLANG_OK;
     }
 
+    // Parses the "format" option shared by texture and buffer inputs. An unknown name is
+    // rejected here because Format::Undefined doubles as the "no format requested" default
+    // downstream: the buffer path forwards the stored format verbatim into the descriptor
+    // (unlike textures, which substitute a default), and on Vulkan that produces a
+    // VK_FORMAT_UNDEFINED buffer view, silently breaking typed-buffer access.
     Format parseFormatOption(Misc::TokenReader& parser)
     {
         parser.Read("=");
         auto formatWord = parser.ReadWord();
 
-        return _getFormatFromName(formatWord.getUnownedSlice());
+        auto format = _getFormatFromName(formatWord.getUnownedSlice());
+        if (format == Format::Undefined)
+        {
+            throw ShaderInputLayoutFormatException(
+                StringBuilder()
+                << "Unknown format '" << formatWord << "' at line "
+                << parser.NextToken().Position.Line);
+        }
+        return format;
     }
 
     template<typename T>
