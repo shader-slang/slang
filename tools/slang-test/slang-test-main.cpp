@@ -118,6 +118,9 @@ struct TestOptions
     List<TestCategory*> categories;
 
     bool isEnabled = true;
+    // True for a test that the synthesis of other APIs, or the synthesis of compile-only tests,
+    // made from another test line. The test of one target of a line with `targets=` is not one of
+    // them: it has `target`.
     bool isSynthesized = false;
 
     // For the test of one target of a line with `targets=`, the index of that line in the test list
@@ -205,19 +208,15 @@ static SlangResult _readTestFile(const TestInput& input, const String& suffix, S
         buf << input.filePath;
         if (input.testOptions->sourceIndex != 0)
             buf << "." << input.testOptions->sourceIndex;
-        buf << suffix;
-        if (auto r = Slang::File::readAllText(buf, out); SLANG_SUCCEEDED(r))
-        {
-            return r;
-        }
     }
     else
     {
-        buf << input.outputStem << suffix;
-        if (auto r = Slang::File::readAllText(buf, out); SLANG_SUCCEEDED(r))
-        {
-            return r;
-        }
+        buf << input.outputStem;
+    }
+    buf << suffix;
+    if (auto r = Slang::File::readAllText(buf, out); SLANG_SUCCEEDED(r))
+    {
+        return r;
     }
 
     buf.clear();
@@ -665,14 +664,14 @@ static bool _hasImplicitDeviceLanguageArg(const List<String>& args)
 //     //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
 //
 // The author does not choose an API. `slang-test` runs the line for each target (`targets=all`),
-// and the line itself does not run. A line of these commands cannot name a render API
-// (`_addTestLine` reports an error), so every such line is a line of this kind. The tests of its
-// targets have the same command, but they are not lines: `_calcTargetTests` marks them as made for
-// one target.
+// and the line itself does not run. A line of these commands cannot choose its target with an
+// argument (`_addTestLine` reports an error), so every such line is a line of this kind. The test
+// of one target has the same command, but it has the target in `TestOptions::target`, so it is not
+// a line.
 static bool _isMultiTargetLine(const TestOptions& options)
 {
     return isTargetsOptionSupportedByCommand(options.command.getUnownedSlice()) &&
-           !options.isSynthesized;
+           options.target == 0;
 }
 
 // Returns the option `targets=` that replaces the arguments of the test line that choose the
@@ -6669,9 +6668,6 @@ static void _calcSynthesizedTests(
         // Mark as synthesized
         synthOptions.isSynthesized = true;
 
-        // The test uses another render API than the source line, so the target of the source line
-        // (it has one if the source is the test of a target) would name it wrongly.
-        synthOptions.target = 0;
 
         StringBuilder builder;
         builder << "-";
@@ -6782,7 +6778,6 @@ static void _calcTargetTests(
 
                 TestDetails targetTest(line.test->options);
                 TestOptions& targetOptions = targetTest.options;
-                targetOptions.isSynthesized = true;
                 targetOptions.commandOptions.remove("targets");
                 targetOptions.target = target.flag;
                 targetOptions.sourceIndex = line.index;
@@ -6838,8 +6833,7 @@ static void _calcSynthesizedCompileTargetTests(
     {
         // The test of one target of a line has an explicit API and a target, so it is a source of a
         // compile-only test. The tests that the old synthesis made are copies, and they are not.
-        if (!srcTest.options.isEnabled ||
-            (srcTest.options.isSynthesized && srcTest.options.target == 0) ||
+        if (!srcTest.options.isEnabled || srcTest.options.isSynthesized ||
             !_isGpuComputeCommand(srcTest.options.command))
             continue;
 
@@ -7357,7 +7351,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             // A `.expected` file that the test line never reads is an error, so that
             // such files do not stay in the repository.
             const String unusedExpectedFile =
-                testDetails.options.isSynthesized
+                (testDetails.options.isSynthesized || testDetails.options.target)
                     ? String()
                     : _findUnusedExpectedFile(filePath, subTestIndex, testList);
 
