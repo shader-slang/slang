@@ -140,9 +140,8 @@ SLANG_UNIT_TEST(bindingRangeDescriptorSetReflection)
     gOutput.clear();
     printBindingRanges(globalParamsLayout);
     SLANG_CHECK(
-        gOutput.produceString() ==
-        "binding range 1: space 0, binding 2\n"
-        "binding range 2: space 3, binding 5\n");
+        gOutput.produceString() == "binding range 1: space 0, binding 2\n"
+                                   "binding range 2: space 3, binding 5\n");
 
     // The binding ranges inside the parameter block are relative to the
     // block. The space of the block itself is the `SubElementRegisterSpace`
@@ -153,13 +152,11 @@ SLANG_UNIT_TEST(bindingRangeDescriptorSetReflection)
     auto materialLayout = globalParamsLayout->getFieldByIndex(0);
     SLANG_CHECK(
         materialLayout->getTypeLayout()->getKind() == slang::TypeReflection::Kind::ParameterBlock);
-    SLANG_CHECK(
-        materialLayout->getOffset(slang::ParameterCategory::SubElementRegisterSpace) == 1);
+    SLANG_CHECK(materialLayout->getOffset(slang::ParameterCategory::SubElementRegisterSpace) == 1);
 
     gOutput.clear();
     printBindingRanges(materialLayout->getTypeLayout()->getElementTypeLayout());
     SLANG_CHECK(
-        gOutput.produceString() ==
-        "binding range 0: space 0, binding 1\n"
-        "binding range 1: space 0, binding 2\n");
+        gOutput.produceString() == "binding range 0: space 0, binding 1\n"
+                                   "binding range 1: space 0, binding 2\n");
 }
