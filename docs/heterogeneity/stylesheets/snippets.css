@@ -109,6 +109,25 @@
 .md-typeset .monaco-editor textarea { min-height: 0; padding: 0; border: 0; box-shadow: none; }
 .md-typeset .monaco-editor .view-lines { line-height: inherit; }
 .snippet-status { color: #435342; font-size: 13px; }
+.snippet-result-stop {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 2px;
+  padding: 0 6px 0 3px;
+  border: 1px solid #dce4dd;
+  border-radius: 3px;
+  color: #52634f;
+  background: #f8faf7;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.snippet-result-stop svg { width: 12px; height: 12px; }
+.snippet-result-stop:hover:not(:disabled) { background: #eef3eb; border-color: #9fb39d; }
+.snippet-result-stop:disabled { cursor: default; opacity: .55; }
+.snippet-result-stop:focus-visible { outline: 2px solid #386b22; outline-offset: 1px; }
 .snippet-result-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; }
 .snippet-adapter {
   margin-left: auto;

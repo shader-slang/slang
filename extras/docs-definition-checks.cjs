@@ -95,27 +95,27 @@ exports.checkDocsDefinitions = async function (browser, baseURL) {
         }
 
         await jump("sphere-sdf", "import sdf;", "sdf", "public interface", 9);
-        await jump("blending", 'import "sphere-tracer";', "sphere-tracer", "import", 10);
+        await jump("render-blending", 'import "sphere-tracer";', "sphere-tracer", "import", 10);
         await jump("simple-sphere-tracer", "sphereDistance(hitPosition,", "sphere-distance", "sphereDistance");
-        await jump("blending", "BlendedSDF : ISDF", "sdf", "ISDF", "BlendedSDF : ".length);
-        await jump("blending", "SphereSDF left", "sphere-sdf", "SphereSDF");
+        await jump("render-blending", "BlendedSDF : ISDF", "sdf", "ISDF", "BlendedSDF : ".length);
+        await jump("render-blending", "SphereSDF left", "sphere-sdf", "SphereSDF");
         // There are two sphereTrace definitions in the tutorial. Resolve the imported
         // generic overload, rather than choosing a cell by matching the symbol text.
-        await jump("blending", "sphereTrace(shape", "sphere-tracer", "sphereTrace");
+        await jump("render-blending", "sphereTrace(shape", "sphere-tracer", "sphereTrace");
 
         assert.equal(await card("camera").evaluate(element => element.closest("details").open), false);
-        await at("intersection", "camera.direction(", "camera.".length);
-        const point = await cursorPoint("intersection");
+        await at("render-intersection", "camera.direction(", "camera.".length);
+        const point = await cursorPoint("render-intersection");
         await page.mouse.click(point.x, point.y);
         assert.equal(await page.evaluate(() => document.activeElement.closest("[data-snippet]")?.dataset.snippet),
-            "intersection", "Plain click must place the cursor without navigating");
+            "render-intersection", "Plain click must place the cursor without navigating");
         await page.keyboard.down("Control");
         try { await page.mouse.click(point.x, point.y); }
         finally { await page.keyboard.up("Control"); }
         await destination("camera", "direction");
 
-        await at("intersection", "runFrames(w");
-        const menuPoint = await cursorPoint("intersection");
+        await at("render-intersection", "runFrames(w");
+        const menuPoint = await cursorPoint("render-intersection");
         await page.mouse.click(menuPoint.x, menuPoint.y, { button: "right" });
         // Monaco intentionally ignores mouse-up for the first 100 ms of a menu's life.
         await page.getByRole("menuitem", { name: /^Go to Definition/ }).click({ delay: 150 });
@@ -136,22 +136,22 @@ exports.checkDocsDefinitions = async function (browser, baseURL) {
             .replace("public float3 direction", "/* π 🪟 */ public float3 editedDirection");
         await edit("camera", edited);
         await card("camera").evaluate(element => { element.closest("details").open = false; });
-        await at("intersection", "camera.direction(", "camera.".length);
-        await input("intersection").press("F12");
-        await card("intersection").getByText(/No definition found for 'direction'/).waitFor();
+        await at("render-intersection", "camera.direction(", "camera.".length);
+        await input("render-intersection").press("F12");
+        await card("render-intersection").getByText(/No definition found for 'direction'/).waitFor();
         assert.equal(await card("camera").evaluate(element => element.closest("details").open), false,
             "An old symbol name must not navigate to a stale definition");
-        await input("intersection").press("Escape");
-        await edit("intersection", sources["intersection.slang"].replace("camera.direction", "camera.editedDirection"));
-        await jump("intersection", "camera.editedDirection(", "camera", "editedDirection", "camera.".length);
+        await input("render-intersection").press("Escape");
+        await edit("render-intersection", sources["render-intersection.slang"].replace("camera.direction", "camera.editedDirection"));
+        await jump("render-intersection", "camera.editedDirection(", "camera", "editedDirection", "camera.".length);
         await input("camera").press("Control+z");
         sources["camera.slang"] = readSdfTutorial().sources["camera.slang"];
         await input("camera").press("Control+A");
         assert.equal(await selectedText("camera"), sources["camera.slang"], "Destination undo history must survive the jump");
-        await open("intersection");
-        await input("intersection").press("Control+z");
-        await input("intersection").press("Control+A");
-        assert.equal(await selectedText("intersection"), readSdfTutorial().sources["intersection.slang"],
+        await open("render-intersection");
+        await input("render-intersection").press("Control+z");
+        await input("render-intersection").press("Control+A");
+        assert.equal(await selectedText("render-intersection"), readSdfTutorial().sources["render-intersection.slang"],
             "Source contents and undo history must remain in their original editor");
 
         // Imported files without an open cell also need the destination's text for

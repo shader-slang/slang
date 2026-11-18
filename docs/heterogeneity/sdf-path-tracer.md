@@ -200,7 +200,7 @@ to colour a slice through the chosen sphere's field.
         A nested [compute dispatch](grid-dispatch.md) runs the pixel calculations on the
         GPU. These language details do not change the graphics algorithm.
 
-<!-- runnable: sphere canvas=16:9 -->
+<!-- runnable: render-sphere canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -230,8 +230,8 @@ void main(Window w)
 }
 ```
 
-**Try it:** change [`radius`](cell:sphere.slang#radius) to `0.7` and press ![Run](images/snippet-run.svg "Run") in the cell. Then try
-[`sliceZ`](cell:sphere.slang#sliceZ) at `0.5`. Why does the cross-section shrink? At a
+**Try it:** change [`radius`](cell:render-sphere.slang#radius) to `0.7` and press ![Run](images/snippet-run.svg "Run") in the cell. Then try
+[`sliceZ`](cell:render-sphere.slang#sliceZ) at `0.5`. Why does the cross-section shrink? At a
 slice farther from the centre than the radius, there is no inside region at all.
 
 ### 1.2: Find the surface with sphere tracing
@@ -364,7 +364,7 @@ public bool sphereTrace(float3 center, float radius, float3 origin, float3 direc
 }
 ```
 
-<!-- runnable: intersection canvas=16:9 -->
+<!-- runnable: render-intersection canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -395,11 +395,11 @@ void main(Window w)
 }
 ```
 
-**Try it:** change [`radius`](cell:intersection.slang#radius) in this example to `0.7`,
+**Try it:** change [`radius`](cell:render-intersection.slang#radius) in this example to `0.7`,
 then press ![Run](images/snippet-run.svg "Run"). The white silhouette becomes smaller
 without changing the shared distance function. You can also reduce
-[`maxSteps`](cell:intersection.slang#maxSteps) to see why rays near the edge can need
-more steps. Increase [`hitTolerance`](cell:intersection.slang#hitTolerance) to `0.05`
+[`maxSteps`](cell:render-intersection.slang#maxSteps) to see why rays near the edge can need
+more steps. Increase [`hitTolerance`](cell:render-intersection.slang#hitTolerance) to `0.05`
 to see how stopping farther from the surface enlarges the silhouette.
 Keep the camera outside the sphere: this tutorial traces opaque surfaces from outside.
 A `false` result means no hit was found within the distance and step limits; a budget
@@ -427,7 +427,7 @@ distance samples a little to either side of the point along each axis. This is a
 
 ??? example "Deep Dive 1.3.1: Estimating SDF normals with finite differences"
     Let $\varepsilon$ be the small offset passed as `epsilon` to
-    [`surfaceNormal`](cell:shading.slang#surfaceNormal), and
+    [`surfaceNormal`](cell:render-shading.slang#surfaceNormal), and
     $\mathbf e_x = (1, 0, 0)$ be a unit step along x. We estimate the x component
     of the gradient with
 
@@ -474,11 +474,11 @@ public float3 shadeNormal(float3 normal, float3 color, float3 light, float fill)
 }
 ```
 
-At each hit, [`surfaceNormal`](cell:shading.slang#surfaceNormal) samples the sphere's
+At each hit, [`surfaceNormal`](cell:render-shading.slang#surfaceNormal) samples the sphere's
 distance field to estimate its normal. [`shadeNormal`](cell:normal-shading.slang#shadeNormal)
 then uses that normal to calculate the light-facing colour.
 
-<!-- runnable: shading canvas=16:9 -->
+<!-- runnable: render-shading canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -528,10 +528,10 @@ void main(Window w)
 }
 ```
 
-**Try it:** change [`lightDirection`](cell:shading.slang#lightDirection)'s x component
+**Try it:** change [`lightDirection`](cell:render-shading.slang#lightDirection)'s x component
 from `-0.6` to `0.6`. The bright side
-moves from left to right. Then choose another [`surfaceColor`](cell:shading.slang#surfaceColor). To explore the normal
-estimate, try increasing [`normalEpsilon`](cell:shading.slang#normalEpsilon) to `0.2`; large offsets blur local detail, while
+moves from left to right. Then choose another [`surfaceColor`](cell:render-shading.slang#surfaceColor). To explore the normal
+estimate, try increasing [`normalEpsilon`](cell:render-shading.slang#normalEpsilon) to `0.2`; large offsets blur local detail, while
 extremely small offsets can lose precision when subtracting nearly equal distances.
 
 ### 1.4: Combine spheres with a smooth union
@@ -679,7 +679,7 @@ $$
 
 Whenever either field is negative, their minimum is negative too, so the result
 contains the inside of both objects. In code, `left.distance(p)` and `right.distance(p)`
-sample the fields of the two spheres stored in [`BlendedSDF`](cell:blending.slang#BlendedSDF).
+sample the fields of the two spheres stored in [`BlendedSDF`](cell:render-blending.slang#BlendedSDF).
 
 ![Ordinary and smooth unions of the same overlapping spheres. The ordinary union
 has a sharp join, while the smooth union fills out and rounds the join. Dashed
@@ -689,13 +689,13 @@ Both outlines are zero contours of their combined fields: points where the field
 equals zero. The sphere positions and radii are identical in both views.
 
 Our smooth minimum starts with the smaller distance, then subtracts a small correction
-where the two distances are similar. [`blendWidth`](cell:blending.slang#blendWidth) sets the width of that transition
+where the two distances are similar. [`blendWidth`](cell:render-blending.slang#blendWidth) sets the width of that transition
 in scene units. A larger value fills out the join; zero gives the ordinary union.
 This changes the geometry, so both ray intersections and normals must sample the
 combined field. Blending only the pixel colours would leave the crease in place.
 
 ??? example "Deep Dive 1.4.1: The polynomial smooth-union formula"
-    Let $a$ and $b$ be the two sampled distances and $k$ be the `width` argument to [`smoothUnion`](cell:blending.slang#smoothUnion). For $k > 0$,
+    Let $a$ and $b$ be the two sampled distances and $k$ be the `width` argument to [`smoothUnion`](cell:render-blending.slang#smoothUnion). For $k > 0$,
     first compute how close the distances are to each other:
 
     $$
@@ -718,14 +718,14 @@ combined field. Blending only the pixel colours would leave the crease in place.
     distance everywhere.
 
 Press ![Run](images/snippet-run.svg "Run") in this cell to replace the single sphere with a connected, shaded pair.
-[`BlendedSDF`](cell:blending.slang#BlendedSDF) stores the two spheres and a blend
+[`BlendedSDF`](cell:render-blending.slang#BlendedSDF) stores the two spheres and a blend
 width. Its distance method combines their answers. The shared
 [`sphereTrace`](cell:sphere-tracer.slang#sphereTrace) and
 [`surfaceNormal`](cell:sphere-tracer.slang#surfaceNormal) both receive that same shape,
 so both the silhouette and shading follow the combined surface. This example keeps
 the same camera and lighting settings as before.
 
-<!-- runnable: blending canvas=16:9 -->
+<!-- runnable: render-blending canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -788,11 +788,11 @@ void main(Window w)
 }
 ```
 
-**Try it:** set [`blendWidth`](cell:blending.slang#blendWidth) to `0.0` and press ![Run](images/snippet-run.svg "Run") again to reveal the crease. Then try
+**Try it:** set [`blendWidth`](cell:render-blending.slang#blendWidth) to `0.0` and press ![Run](images/snippet-run.svg "Run") again to reveal the crease. Then try
 `0.3`, `0.6`, and `1.0` to see the connecting neck grow. With `blendWidth = 0.6`,
-change [`halfSeparation`](cell:blending.slang#halfSeparation) to `1.2`: the spheres move
-far enough apart for the neck to break. Change [`leftRadius`](cell:blending.slang#leftRadius)
-independently of [`rightRadius`](cell:blending.slang#rightRadius) to make an uneven pair.
+change [`halfSeparation`](cell:render-blending.slang#halfSeparation) to `1.2`: the spheres move
+far enough apart for the neck to break. Change [`leftRadius`](cell:render-blending.slang#leftRadius)
+independently of [`rightRadius`](cell:render-blending.slang#rightRadius) to make an uneven pair.
 
 The combined field is a conservative distance bound outside this shape, rather than
 an exact distance everywhere. It still supports our sphere-tracing steps, and its
@@ -930,7 +930,7 @@ public float4 displayColor(float3 linear, float exposure)
 The runnable example chooses the map and camera, then displays the light arriving
 along each camera ray.
 
-<!-- runnable: environment canvas=16:9 -->
+<!-- runnable: render-environment canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -958,9 +958,9 @@ void main(Window w)
 ```
 
 This view shows only the part of the surroundings in front of the camera, not the
-entire rectangle. **Try it:** in [the environment example](cell:environment.slang#main),
+entire rectangle. **Try it:** in [the environment example](cell:render-environment.slang#main),
 replace `direction` in the lookup with `-direction` to look behind you. Then try
-an [`exposure`](cell:environment.slang#exposure) of `0.5` or `2.0` to darken or brighten this view.
+an [`exposure`](cell:render-environment.slang#exposure) of `0.5` or `2.0` to darken or brighten this view.
 
 ### 2.2: Render a mirror sphere
 
@@ -1032,7 +1032,7 @@ public float3 escapedLight<S : ISDF>(S sdf, RWTexture2D<float4> environmentMap,
 }
 ```
 
-<!-- runnable: mirror canvas=16:9 -->
+<!-- runnable: render-mirror canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -1085,7 +1085,7 @@ The sphere now reflects lights that may be behind the camera. There is no random
 sampling, so rerunning gives the same image. The reflected room and windows show
 the surroundings from different directions; the material itself is a perfect mirror.
 
-**Try it:** temporarily set [`rayOffset`](cell:mirror.slang#rayOffset) to `0.0`. The mirror
+**Try it:** temporarily set [`rayOffset`](cell:render-mirror.slang#rayOffset) to `0.0`. The mirror
 turns black because the new ray hits its starting surface. Restore `0.004` and rerun
 to let reflected rays escape again.
 
@@ -1482,7 +1482,7 @@ public float3 tracePath<S : IScene>(S scene,
 The example wraps the sphere and its Lambertian material in a scene and traces one
 path per pixel. Each pixel's random state chooses the direction at the bounce.
 
-<!-- runnable: diffuse canvas=16:9 -->
+<!-- runnable: render-diffuse canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -1527,12 +1527,12 @@ void main(Window w)
 
 The sphere is deliberately noisy: each pixel has seen only one incoming direction.
 The background stays smooth because a viewing ray that misses needs no random choice.
-**Try it:** change [`sampleIndex`](cell:diffuse.slang#sampleIndex) from `0` to `1`.
+**Try it:** change [`sampleIndex`](cell:render-diffuse.slang#sampleIndex) from `0` to `1`.
 The noise changes, but the general lighting stays similar. Change
-[`albedo`](cell:diffuse.slang#albedo) to alter the surface colour; keep each channel
+[`albedo`](cell:render-diffuse.slang#albedo) to alter the surface colour; keep each channel
 between 0 and 1.
 
-Then try [`bounceLimit`](cell:diffuse.slang#bounceLimit) values of `0` and `4`. At `0`
+Then try [`bounceLimit`](cell:render-diffuse.slang#bounceLimit) values of `0` and `4`. At `0`
 the sphere turns black: every path that reaches it needs a bounce, and none is
 allowed. At `4` the image matches `1`, because a ray leaving a single convex sphere
 always escapes. Extra bounces start to matter in [3.2](#32-render-a-coated-sphere-on-a-checkerboard-floor),
@@ -1632,7 +1632,7 @@ public void runProgressive<F : IFunc<float3, uint2, uint2, uint>>(
     a fresh Run also creates a fresh VM. See [host functions](host-functions.md) for
     the execution model.
 
-<!-- runnable: accumulation canvas=16:9 -->
+<!-- runnable: render-accumulation canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -1669,11 +1669,11 @@ void main(Window w)
 }
 ```
 
-**Try it:** compare [`sampleLimit`](cell:accumulation.slang#sampleLimit) values of
+**Try it:** compare [`sampleLimit`](cell:render-accumulation.slang#sampleLimit) values of
 `1`, `32`, `128`, and `4096`. The pattern settles into soft
 lighting as more directions contribute. Random error typically falls in proportion
 to $1 / \sqrt{N}$ for $N$ samples: halving the noise takes about four times as many samples.
-For a fixed sample limit, changing [`samplesPerFrame`](cell:accumulation.slang#samplesPerFrame) changes how often the image
+For a fixed sample limit, changing [`samplesPerFrame`](cell:render-accumulation.slang#samplesPerFrame) changes how often the image
 updates, rather than the samples used in the final average. Try `1` and `32` to
 compare; larger batches do more GPU work between opportunities to handle input.
 The camera ray still passes through each pixel's centre, so this step reduces lighting
@@ -1733,7 +1733,7 @@ preferentially.
 The example below uses cosine-weighted sampling and stops after 32 samples, so you
 can compare it with uniform sampling at the same count.
 
-<!-- runnable: cosine-sampling canvas=16:9 -->
+<!-- runnable: render-cosine-sampling canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -1770,11 +1770,11 @@ void main(Window w)
 }
 ```
 
-**Try it:** change [`sampling`](cell:cosine-sampling.slang#sampling) to
+**Try it:** change [`sampling`](cell:render-cosine-sampling.slang#sampling) to
 [`HemisphereSampling.Uniform`](cell:hemisphere.slang#HemisphereSampling.Uniform) and
 rerun. Both methods estimate the same lighting, but uniform sampling is visibly
 noisier after the same 32 samples. Then raise
-[`sampleLimit`](cell:cosine-sampling.slang#sampleLimit) to `4096` to see both settle.
+[`sampleLimit`](cell:render-cosine-sampling.slang#sampleLimit) to `4096` to see both settle.
 
 We now have environment lighting, a mirror, a path tracer with a matte material,
 progressive accumulation, and importance sampling. Next we will give the sphere
@@ -1858,8 +1858,8 @@ gathers light from every direction above it, weighted by the cosine. The GGX lob
 roughness 0.35, is a narrow petal around the mirror direction, and roughness sets how
 wide it is.
 
-Two parameters control our material. **[`roughness`](cell:glossy.slang#roughness)**
-broadens the reflection. **[`F0`](cell:glossy.slang#F0)** is the reflection colour when
+Two parameters control our material. **[`roughness`](cell:render-glossy.slang#roughness)**
+broadens the reflection. **[`F0`](cell:render-glossy.slang#F0)** is the reflection colour when
 looking straight at a facet, in linear RGB with each component in `[0, 1]`. This
 material has only the **specular** (mirror-like) reflection term; it has no diffuse
 albedo.
@@ -2037,7 +2037,7 @@ The example places the GGX material in a
 GGX BRDF, so the compiler specializes [`tracePath`](cell:path-tracer.slang#tracePath)
 for it; the tracer's code is unchanged.
 
-<!-- runnable: glossy canvas=16:9 -->
+<!-- runnable: render-glossy canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -2081,8 +2081,8 @@ The window's reflection is now blurred. The comparison below keeps `F0 = 0.9` an
 The reflected window becomes progressively softer while the sphere's outline stays
 the same.](images/sdf-ggx-roughness.png)
 
-**Try it:** push [`roughness`](cell:glossy.slang#roughness) beyond the figure's range,
-to `0.05` and `1.0`. Change [`F0`](cell:glossy.slang#F0) to `float3(0.9, 0.55, 0.2)` for a warm
+**Try it:** push [`roughness`](cell:render-glossy.slang#roughness) beyond the figure's range,
+to `0.05` and `1.0`. Change [`F0`](cell:render-glossy.slang#F0) to `float3(0.9, 0.55, 0.2)` for a warm
 metallic reflection. With `roughness = 0` and `F0 = float3(1.0)`, the result matches our
 original mirror. Rerun after changing a parameter so accumulation starts fresh.
 
@@ -2316,7 +2316,7 @@ Those subpixel samples smooth the sphere's silhouette and the checker edges as
 they accumulate; this is **antialiasing**. The same [`Camera`](cell:camera.slang#Camera)
 supports it: we pass a jittered pixel position instead of the pixel centre.
 
-<!-- runnable: final-scene canvas=16:9 -->
+<!-- runnable: render-final-scene canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -2362,14 +2362,14 @@ void main(Window w)
 }
 ```
 
-**Try it:** change [`baseColor`](cell:final-scene.slang#baseColor),
-[`roughness`](cell:final-scene.slang#roughness), or
-[`checkerWidth`](cell:final-scene.slang#checkerWidth). Adjust
-[`floorHalfSize`](cell:final-scene.slang#floorHalfSize) to change the board's
+**Try it:** change [`baseColor`](cell:render-final-scene.slang#baseColor),
+[`roughness`](cell:render-final-scene.slang#roughness), or
+[`checkerWidth`](cell:render-final-scene.slang#checkerWidth). Adjust
+[`floorHalfSize`](cell:render-final-scene.slang#floorHalfSize) to change the board's
 footprint.
-Set [`coatWeight`](cell:final-scene.slang#coatWeight) to `0` to see the blue sphere without its glossy highlight.
-Compare [`bounceLimit`](cell:final-scene.slang#bounceLimit) values of `1` and `4`: the extra bounces let the sphere and floor
-illuminate one another. Increase [`sampleLimit`](cell:final-scene.slang#sampleLimit)
+Set [`coatWeight`](cell:render-final-scene.slang#coatWeight) to `0` to see the blue sphere without its glossy highlight.
+Compare [`bounceLimit`](cell:render-final-scene.slang#bounceLimit) values of `1` and `4`: the extra bounces let the sphere and floor
+illuminate one another. Increase [`sampleLimit`](cell:render-final-scene.slang#sampleLimit)
 to average more paths. As before, rerun after editing to start a fresh average.
 
 ## Chapter 4: Make the path tracer interactive
@@ -2577,7 +2577,7 @@ starting from the same view. Its pixel-sampling function is the one from 3.2, ex
 that it receives the camera instead of capturing a fixed one. It keeps running until
 you press Stop.
 
-<!-- runnable: interactive canvas=16:9 -->
+<!-- runnable: render-interactive canvas=16:9 -->
 
 ```slang
 import slang.runtime;
@@ -2622,7 +2622,7 @@ void main(Window w)
 ```
 
 **Try it:** drag across the image to orbit, and scroll to zoom. Set
-[`samplesPerFrame`](cell:interactive.slang#samplesPerFrame) to `1` for a more responsive
+[`samplesPerFrame`](cell:render-interactive.slang#samplesPerFrame) to `1` for a more responsive
 drag: each frame finishes sooner, but the image is noisier while it moves. To see why
 the reset matters, comment out the `frame.firstSample = 0;` line marked "Earlier samples
 saw a different view" in [`runInteractive`](cell:interactive-renderer.slang#runInteractive)

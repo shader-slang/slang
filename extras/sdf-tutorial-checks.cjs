@@ -3,7 +3,7 @@ const path = require("node:path");
 
 exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
     const { cells, sources } = require("./sdf-tutorial-sources.cjs").readSdfTutorial();
-    const names = ["sphere", "intersection", "shading", "blending", "environment", "mirror", "diffuse", "accumulation", "cosine-sampling", "glossy", "final-scene", "interactive"];
+    const names = ["render-sphere", "render-intersection", "render-shading", "render-blending", "render-environment", "render-mirror", "render-diffuse", "render-accumulation", "render-cosine-sampling", "render-glossy", "render-final-scene", "render-interactive"];
     assert.deepEqual(cells.filter(cell => cell.kind === "runnable").map(cell => cell.name), names);
     for (const cell of cells.filter(cell => cell.kind === "module")) {
         for (const [, dependency] of cell.source.matchAll(/^import\s+"?([\w-]+)"?;/gm)) {
@@ -60,7 +60,7 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
             await button.click();
         }
         async function blendShape() {
-            return card("blending").locator(".snippet-display canvas").evaluate(canvas => {
+            return card("render-blending").locator(".snippet-display canvas").evaluate(canvas => {
                 const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
                 const isSurface = (x, y) => {
                     const i = 4 * (y * canvas.width + x);
@@ -87,78 +87,78 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
             }
         }
         // Run a dependent cell while its support extras are still collapsed.
-        await run("blending");
-        for (const name of ["sphere", "intersection", "shading"]) {
+        await run("render-blending");
+        for (const name of ["render-sphere", "render-intersection", "render-shading"]) {
             assert.equal(await card(name).locator(".snippet-result").isVisible(), false);
         }
         const blended = await blendShape();
         assert.equal(blended.rowSegments, 1, "Blended spheres must form a connected silhouette");
         assert.ok(blended.neckPixels > 0, "The blended shape must have a visible neck");
-        await card("blending").locator(".snippet-display canvas").screenshot({
+        await card("render-blending").locator(".snippet-display canvas").screenshot({
             path: path.join(outputDirectory, "sdf-blending.png"),
         });
-        await edit("blending", sources["blending.slang"].replace("blendWidth = 0.6", "blendWidth = 0.0"));
-        await run("blending");
+        await edit("render-blending", sources["render-blending.slang"].replace("blendWidth = 0.6", "blendWidth = 0.0"));
+        await run("render-blending");
         const hardUnion = await blendShape();
         assert.equal(hardUnion.rowSegments, 1, "The default spheres overlap even without smoothing");
         assert.ok(blended.neckPixels > hardUnion.neckPixels * 1.25,
             "Smooth union must visibly fill out the join compared with an ordinary union");
-        await edit("blending", sources["blending.slang"].replace("halfSeparation = 0.9", "halfSeparation = 1.2"));
-        await run("blending");
+        await edit("render-blending", sources["render-blending.slang"].replace("halfSeparation = 0.9", "halfSeparation = 1.2"));
+        await run("render-blending");
         assert.equal((await blendShape()).rowSegments, 2, "Moving the spheres apart must break the neck");
-        await reset("blending");
+        await reset("render-blending");
 
-        await run("shading");
-        assert.equal(await card("sphere").locator(".snippet-result").isVisible(), false);
-        assert.equal(await card("intersection").locator(".snippet-result").isVisible(), false);
-        const shaded = await pixels("shading");
+        await run("render-shading");
+        assert.equal(await card("render-sphere").locator(".snippet-result").isVisible(), false);
+        assert.equal(await card("render-intersection").locator(".snippet-result").isVisible(), false);
+        const shaded = await pixels("render-shading");
         assert.ok(shaded.center[1] > shaded.center[0] + 30, "Sphere must be green");
         assert.ok(shaded.left[1] > shaded.right[1] + 25, "Upper-left side must face the light");
-        await card("shading").screenshot({ path: path.join(outputDirectory, "sdf-shading.png") });
-        await run("sphere");
-        const slice = await pixels("sphere");
+        await card("render-shading").screenshot({ path: path.join(outputDirectory, "sdf-shading.png") });
+        await run("render-sphere");
+        const slice = await pixels("render-sphere");
         assert.ok(slice.center[0] > slice.center[2] + 100, "Inside slice must be orange");
         assert.ok(slice.corner[2] > slice.corner[0] + 100, "Outside slice must be blue");
-        await card("sphere").screenshot({ path: path.join(outputDirectory, "sdf-sphere.png") });
-        await run("intersection");
-        const mask = await pixels("intersection");
+        await card("render-sphere").screenshot({ path: path.join(outputDirectory, "sdf-sphere.png") });
+        await run("render-intersection");
+        const mask = await pixels("render-intersection");
         assert.deepEqual(mask.center, [255, 255, 255, 255]);
         assert.deepEqual(mask.corner, [0, 0, 0, 255]);
-        await card("intersection").screenshot({ path: path.join(outputDirectory, "sdf-tracing.png") });
+        await card("render-intersection").screenshot({ path: path.join(outputDirectory, "sdf-tracing.png") });
 
         // Both execution and the visible language service must consume helper edits.
         await edit("sphere-distance", sources["sphere-distance.slang"].replaceAll("sphereDistance", "ballDistance"));
         await card("simple-sphere-tracer").locator(".snippet-monaco textarea").focus();
         await card("simple-sphere-tracer").locator(".squiggly-error").first().waitFor({ state: "attached", timeout: 90000 });
-        assert.equal(await card("intersection").locator(".snippet-source-status").isVisible(), true);
+        assert.equal(await card("render-intersection").locator(".snippet-source-status").isVisible(), true);
         await reset("sphere-distance");
         await page.waitForFunction(() => !document.querySelector('[data-snippet="simple-sphere-tracer"] .squiggly-error'), null, { timeout: 90000 });
 
         // Lesson settings are independent; only shared algorithm edits cross cell boundaries.
-        await edit("sphere", sources["sphere.slang"].replace("radius = 1.0", "radius = 0.7"));
-        await run("intersection");
-        assert.equal((await pixels("intersection")).white, mask.white,
+        await edit("render-sphere", sources["render-sphere.slang"].replace("radius = 1.0", "radius = 0.7"));
+        await run("render-intersection");
+        assert.equal((await pixels("render-intersection")).white, mask.white,
             "Changing the slice's radius must not configure the intersection lesson");
-        await reset("sphere");
-        await edit("intersection", sources["intersection.slang"].replace("radius = 1.0", "radius = 0.7"));
-        await run("intersection");
-        const smaller = await pixels("intersection");
+        await reset("render-sphere");
+        await edit("render-intersection", sources["render-intersection.slang"].replace("radius = 1.0", "radius = 0.7"));
+        await run("render-intersection");
+        const smaller = await pixels("render-intersection");
         assert.ok(smaller.white < mask.white * 0.6 && smaller.white > mask.white * 0.35,
             "The intersection lesson's own radius must shrink its mask");
-        assert.equal(await card("intersection").locator(".snippet-source-status").isVisible(), false);
-        await reset("intersection");
+        assert.equal(await card("render-intersection").locator(".snippet-source-status").isVisible(), false);
+        await reset("render-intersection");
         await edit("sphere-distance", sources["sphere-distance.slang"].replace("- radius;", "- radius * 0.7;"));
-        await run("intersection");
-        assert.equal((await pixels("intersection")).white, smaller.white, "Shared geometry edits must reach consumers");
+        await run("render-intersection");
+        assert.equal((await pixels("render-intersection")).white, smaller.white, "Shared geometry edits must reach consumers");
         await reset("sphere-distance");
-        await run("intersection");
-        assert.equal((await pixels("intersection")).white, mask.white, "Reset must restore imported code");
+        await run("render-intersection");
+        assert.equal((await pixels("render-intersection")).white, mask.white, "Reset must restore imported code");
 
-        await edit("shading", sources["shading.slang"].replace("float3(-0.6, 0.8, -1.0)", "float3(0.6, -0.8, -1.0)"));
-        await run("shading");
-        const movedLight = await pixels("shading");
+        await edit("render-shading", sources["render-shading.slang"].replace("float3(-0.6, 0.8, -1.0)", "float3(0.6, -0.8, -1.0)"));
+        await run("render-shading");
+        const movedLight = await pixels("render-shading");
         assert.ok(movedLight.right[1] > movedLight.left[1] + 25, "Changing the light must move the highlight");
-        await reset("shading");
+        await reset("render-shading");
 
         const normalError = await page.evaluate(async ({ sources, baseURL }) => {
             const { init } = await import(new URL("assets/slangvm/src/index.js", baseURL));
@@ -184,20 +184,20 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
         assert.ok(normalError < 0.001, `Finite-difference normal error: ${normalError}`);
 
         // Asset mappings must work even when this imported dependency has never been run.
-        await run("mirror");
-        assert.equal(await card("environment").locator(".snippet-result").isVisible(), false);
-        const mirror = await pixels("mirror");
-        await run("environment");
-        const environment = await pixels("environment");
+        await run("render-mirror");
+        assert.equal(await card("render-environment").locator(".snippet-result").isVisible(), false);
+        const mirror = await pixels("render-mirror");
+        await run("render-environment");
+        const environment = await pixels("render-environment");
         assert.deepEqual(mirror.corner, environment.corner, "Misses must show the same environment");
         assert.notDeepEqual(mirror.left, environment.left, "Hits must reflect another direction");
-        await edit("environment", sources["environment.slang"].replace("exposure = 1.0", "exposure = 0.5"));
-        await run("environment");
-        const darker = await pixels("environment");
+        await edit("render-environment", sources["render-environment.slang"].replace("exposure = 1.0", "exposure = 0.5"));
+        await run("render-environment");
+        const darker = await pixels("render-environment");
         assert.ok(darker.corner.slice(0, 3).reduce((a, b) => a + b) < environment.corner.slice(0, 3).reduce((a, b) => a + b),
             "The visible exposure global must control display brightness");
-        await reset("environment");
-        await run("environment");
+        await reset("render-environment");
+        await run("render-environment");
 
         async function imageData(name) {
             return card(name).locator(".snippet-display canvas").evaluate(canvas => ({
@@ -217,31 +217,31 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
             }
             return sum / count;
         }
-        await run("diffuse");
-        const oneSample = await imageData("diffuse");
+        await run("render-diffuse");
+        const oneSample = await imageData("render-diffuse");
         await edit("prng", sources["prng.slang"].replace("sampleIndex + 1u", "sampleIndex + 2u"));
         await card("prng").evaluate(element => { element.closest("details").open = false; });
-        await run("diffuse");
-        const changedSeed = await imageData("diffuse");
+        await run("render-diffuse");
+        const changedSeed = await imageData("render-diffuse");
         assert.ok(changedSeed.data.some((value, i) => value !== oneSample.data[i]),
             "The renderer must consume edits to its PRNG module while collapsed");
         await card("prng").evaluate(element => { element.closest("details").open = true; });
         await reset("prng");
         assert.equal(await card("prng").locator(".snippet-run").isHidden(), true);
-        await run("diffuse");
-        assert.deepEqual(await imageData("diffuse"), oneSample);
-        await edit("accumulation", sources["accumulation.slang"].replace("sampleLimit = 4096", "sampleLimit = 1"));
-        await run("accumulation");
-        assert.deepEqual(await imageData("accumulation"), oneSample,
+        await run("render-diffuse");
+        assert.deepEqual(await imageData("render-diffuse"), oneSample);
+        await edit("render-accumulation", sources["render-accumulation.slang"].replace("sampleLimit = 4096", "sampleLimit = 1"));
+        await run("render-accumulation");
+        assert.deepEqual(await imageData("render-accumulation"), oneSample,
             "The first accumulated frame must equal the standalone sample, without uninitialized history");
         // A partial final batch must use exactly the same samples/weights as single-sample frames.
-        const partialBatch = sources["accumulation.slang"].replace("sampleLimit = 4096", "sampleLimit = 47");
-        await edit("accumulation", partialBatch);
-        await run("accumulation");
-        const batched = await imageData("accumulation");
-        await edit("accumulation", partialBatch.replace("samplesPerFrame = 32", "samplesPerFrame = 1"));
-        await run("accumulation");
-        const unbatched = await imageData("accumulation");
+        const partialBatch = sources["render-accumulation.slang"].replace("sampleLimit = 4096", "sampleLimit = 47");
+        await edit("render-accumulation", partialBatch);
+        await run("render-accumulation");
+        const batched = await imageData("render-accumulation");
+        await edit("render-accumulation", partialBatch.replace("samplesPerFrame = 32", "samplesPerFrame = 1"));
+        await run("render-accumulation");
+        const unbatched = await imageData("render-accumulation");
         assert.equal(batched.width, unbatched.width);
         assert.equal(batched.height, unbatched.height);
         assert.ok(batched.data.every((value, i) => Math.abs(value - unbatched.data[i]) <= 1),
@@ -249,24 +249,24 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
 
         // Use the lesson's full budget: the rotated HDR window needs more than 128 samples
         // for a reliable noise comparison in the now brightly lit central patch.
-        await edit("accumulation", sources["accumulation.slang"]);
-        await run("accumulation");
-        const averaged = await imageData("accumulation");
+        await edit("render-accumulation", sources["render-accumulation.slang"]);
+        await run("render-accumulation");
+        const averaged = await imageData("render-accumulation");
         assert.ok(noise(averaged) < noise(oneSample) * 0.2,
             `4096 samples must visibly reduce noise: ${noise(oneSample)} -> ${noise(averaged)}`);
 
         // At the lesson's 32 samples, cosine-weighted sampling must be less noisy than uniform.
-        await run("cosine-sampling");
-        const cosineSamples = await imageData("cosine-sampling");
-        await edit("cosine-sampling", sources["cosine-sampling.slang"]
+        await run("render-cosine-sampling");
+        const cosineSamples = await imageData("render-cosine-sampling");
+        await edit("render-cosine-sampling", sources["render-cosine-sampling.slang"]
             .replace("= HemisphereSampling.Cosine;", "= HemisphereSampling.Uniform;"));
-        await run("cosine-sampling");
-        const uniformSamples = await imageData("cosine-sampling");
-        await reset("cosine-sampling");
-        await run("cosine-sampling");
+        await run("render-cosine-sampling");
+        const uniformSamples = await imageData("render-cosine-sampling");
+        await reset("render-cosine-sampling");
+        await run("render-cosine-sampling");
         assert.ok(noise(cosineSamples) < noise(uniformSamples),
             `Cosine sampling must reduce noise at 32 samples: ${noise(uniformSamples)} -> ${noise(cosineSamples)}`);
-        for (const name of ["environment", "mirror", "diffuse", "accumulation", "cosine-sampling"]) {
+        for (const name of ["render-environment", "render-mirror", "render-diffuse", "render-accumulation", "render-cosine-sampling"]) {
             await card(name).locator(".snippet-display canvas").screenshot({
                 path: path.join(outputDirectory, `sdf-${name}.png`),
             });
@@ -333,7 +333,7 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
             `Uniform and cosine sampling must recover albedo under white light: ${samplingError}`);
 
         await require("./sdf-ggx-checks.cjs").checkGGXNumerics(page, sources, baseURL);
-        for (const name of ["glossy"]) {
+        for (const name of ["render-glossy"]) {
             await run(name);
             await card(name).locator(".snippet-display canvas").screenshot({
                 path: path.join(outputDirectory, `sdf-${name}.png`),
@@ -345,14 +345,14 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
                 .replace("sampleLimit = 4096", "sampleLimit = 1"));
             await run(name);
             const smooth = await imageData(name);
-            const mirror = await imageData("mirror");
+            const mirror = await imageData("render-mirror");
             assert.deepEqual(smooth, mirror, `${name}: zero roughness and F0=1 must match the mirror`);
             await reset(name);
         }
 
         await require("./sdf-scene-checks.cjs").checkSceneNumerics(page, sources, baseURL);
-        await run("final-scene");
-        const finalPixels = await card("final-scene").locator(".snippet-display canvas").evaluate(canvas => {
+        await run("render-final-scene");
+        const finalPixels = await card("render-final-scene").locator(".snippet-display canvas").evaluate(canvas => {
             const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
             let blue = 0;
             for (let i = 0; i < data.length; i += 4) {
@@ -362,7 +362,7 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
             return blue / (canvas.height * canvas.height);
         });
         assert.ok(finalPixels > 0.12 && finalPixels < 0.4, "The blue sphere must occupy a substantial part of the final image");
-        await card("final-scene").locator(".snippet-display canvas").screenshot({
+        await card("render-final-scene").locator(".snippet-display canvas").screenshot({
             path: path.join(outputDirectory, "sdf-final-scene.png"),
         });
 
@@ -370,11 +370,11 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
         // 2D snapshot of the last frame. Dragging with a real mouse must orbit the camera.
         await require("./sdf-orbit-checks.cjs").checkOrbitController(page, sources, baseURL);
         async function runInteractive(drag) {
-            await card("interactive").locator(".snippet-monaco textarea").focus();
-            await card("interactive").locator(".snippet-monaco textarea").press("Control+Enter");
-            await page.waitForFunction(() => document.querySelector('[data-snippet="interactive"] .snippet-status')
+            await card("render-interactive").locator(".snippet-monaco textarea").focus();
+            await card("render-interactive").locator(".snippet-monaco textarea").press("Control+Enter");
+            await page.waitForFunction(() => document.querySelector('[data-snippet="render-interactive"] .snippet-status')
                 .textContent === "Running…", null, { timeout: 90000 });
-            const live = card("interactive").locator(".snippet-display canvas");
+            const live = card("render-interactive").locator(".snippet-display canvas");
             await live.waitFor();
             await page.waitForTimeout(3000);
             if (drag) {
@@ -387,12 +387,12 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
                 await page.mouse.up();
                 await page.waitForTimeout(2000);
             }
-            assert.equal(await card("interactive").locator(".snippet-status").textContent(), "Running…",
+            assert.equal(await card("render-interactive").locator(".snippet-status").textContent(), "Running…",
                 "The interactive example must keep running after its sample limit");
-            await card("interactive").locator(".snippet-stop").click();
-            await page.waitForFunction(() => document.querySelector('[data-snippet="interactive"] .snippet-status')
+            await card("render-interactive").locator(".snippet-stop").click();
+            await page.waitForFunction(() => document.querySelector('[data-snippet="render-interactive"] .snippet-status')
                 .textContent === "Stopped", null, { timeout: 30000 });
-            return imageData("interactive");
+            return imageData("render-interactive");
         }
         function blockAverages(image, blocks = 8) {
             const sums = new Array(blocks * blocks * 3).fill(0), counts = new Array(blocks * blocks).fill(0);
@@ -406,31 +406,31 @@ exports.checkSdfTutorial = async function (browser, baseURL, outputDirectory) {
             }
             return sums.map((sum, i) => sum / counts[Math.floor(i / 3)]);
         }
-        await edit("interactive", sources["interactive.slang"].replace("sampleLimit = 4096", "sampleLimit = 64"));
+        await edit("render-interactive", sources["render-interactive.slang"].replace("sampleLimit = 4096", "sampleLimit = 64"));
         const stillView = blockAverages(await runInteractive(false));
         const orbitedView = blockAverages(await runInteractive(true));
-        await reset("interactive");
+        await reset("render-interactive");
         const viewChange = stillView.reduce((sum, value, i) => sum + Math.abs(value - orbitedView[i]), 0) / stillView.length;
         assert.ok(viewChange > 15, `Dragging must orbit the interactive view: block difference ${viewChange}`);
 
         // Observe sample indices across a real resize, then exercise the reader's Stop button.
         await edit("frame-loop", sources["frame-loop.slang"]
             .replace("frame.firstSample += frame.sampleCount;", "frame.firstSample += frame.sampleCount; print(frame.firstSample);"));
-        await edit("accumulation", sources["accumulation.slang"]
+        await edit("render-accumulation", sources["render-accumulation.slang"]
             .replace("sampleLimit = 4096", "sampleLimit = 65536"));
-        await card("accumulation").locator(".snippet-monaco textarea").press("Control+Enter");
+        await card("render-accumulation").locator(".snippet-monaco textarea").press("Control+Enter");
         await page.waitForFunction(() => /\b64\b/.test(
-            document.querySelector('[data-snippet="accumulation"] .snippet-output').textContent), null, { timeout: 90000 });
+            document.querySelector('[data-snippet="render-accumulation"] .snippet-output').textContent), null, { timeout: 90000 });
         await page.setViewportSize({ width: 1000, height: 800 });
         await page.waitForFunction(() => {
-            const counts = document.querySelector('[data-snippet="accumulation"] .snippet-output')
+            const counts = document.querySelector('[data-snippet="render-accumulation"] .snippet-output')
                 .textContent.trim().split(/\s+/).map(Number);
             return counts.some((count, i) => i > 0 && count === 32 && counts[i - 1] > 32);
         }, null, { timeout: 90000 });
-        await card("accumulation").locator(".snippet-stop").click();
-        await page.waitForFunction(() => document.querySelector('[data-snippet="accumulation"] .snippet-status')
+        await card("render-accumulation").locator(".snippet-stop").click();
+        await page.waitForFunction(() => document.querySelector('[data-snippet="render-accumulation"] .snippet-status')
             .textContent === "Stopped", null, { timeout: 30000 });
-        await reset("accumulation");
+        await reset("render-accumulation");
         await reset("frame-loop");
         await page.setViewportSize({ width: 390, height: 844 });
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Tutorial mobile overflow");

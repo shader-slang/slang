@@ -308,10 +308,10 @@ const { checkDocsCellLinks } = require("./docs-cell-link-checks.cjs");
                 .matchAll(/^<!-- runnable: ([a-z0-9-]+)(?: [^>]*)? -->/gm)]
                 .map(match => `${name.slice(0, -3)}/${match[1]}`));
         assert.deepEqual(documented.sort(), ["grid-dispatch/grid-dispatch",
-            "sdf-path-tracer/sphere", "sdf-path-tracer/intersection", "sdf-path-tracer/shading", "sdf-path-tracer/blending",
-            "sdf-path-tracer/environment", "sdf-path-tracer/mirror", "sdf-path-tracer/diffuse", "sdf-path-tracer/accumulation",
-            "sdf-path-tracer/cosine-sampling", "sdf-path-tracer/glossy", "sdf-path-tracer/final-scene",
-            "sdf-path-tracer/interactive",
+            "sdf-path-tracer/render-sphere", "sdf-path-tracer/render-intersection", "sdf-path-tracer/render-shading", "sdf-path-tracer/render-blending",
+            "sdf-path-tracer/render-environment", "sdf-path-tracer/render-mirror", "sdf-path-tracer/render-diffuse", "sdf-path-tracer/render-accumulation",
+            "sdf-path-tracer/render-cosine-sampling", "sdf-path-tracer/render-glossy", "sdf-path-tracer/render-final-scene",
+            "sdf-path-tracer/render-interactive",
             ...examples.map(([route, name]) => `${route}/${name}`)].sort(), "Every runnable example needs browser coverage");
         for (const [route, name, expected] of examples) {
             const context = await browser.newContext();

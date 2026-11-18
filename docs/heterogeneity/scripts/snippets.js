@@ -114,6 +114,10 @@
       <div class="snippet-result" hidden>
         <div class="snippet-result-header">
           <div class="snippet-status" role="status"></div>
+          <button type="button" class="snippet-result-stop" title="Stop execution" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor" stroke="none"/></svg>
+            Stop
+          </button>
           <div class="snippet-adapter" hidden></div>
         </div>
         <div class="snippet-display" hidden></div>
@@ -145,6 +149,8 @@
     const run = card.querySelector(".snippet-run");
     run.hidden = isModule;
     const stop = card.querySelector(".snippet-stop");
+    // Long canvas runs scroll the editor's controls out of view, so the result repeats Stop.
+    const resultStop = card.querySelector(".snippet-result-stop");
     const reset = card.querySelector(".snippet-reset");
     const result = card.querySelector(".snippet-result");
     const status = card.querySelector(".snippet-status");
@@ -209,11 +215,11 @@
       worker = null;
       canvasRun = null;
       run.disabled = reset.disabled = false;
-      stop.disabled = false;
+      stop.disabled = resultStop.disabled = false;
       editor.setReadOnly(false);
       run.hidden = isModule;
-      if (document.activeElement === stop) run.focus({ preventScroll: true });
-      stop.hidden = true;
+      if (document.activeElement === stop || document.activeElement === resultStop) run.focus({ preventScroll: true });
+      stop.hidden = resultStop.hidden = true;
       card.classList.remove("snippet-running");
       card.classList.toggle("snippet-error", error);
       status.textContent = message;
@@ -245,7 +251,7 @@
       run.disabled = reset.disabled = true;
       editor.setReadOnly(true);
       run.hidden = true;
-      stop.hidden = false;
+      stop.hidden = resultStop.hidden = false;
       if (focusStop) stop.focus({ preventScroll: true });
       try {
         const receive = (data) => {
@@ -329,14 +335,16 @@
     }
 
     run.addEventListener("click", execute);
-    stop.addEventListener("click", () => {
+    function stopRun() {
       if (canvasRun) {
         clearTimeout(timeout);
         status.textContent = "Stopping…";
-        stop.disabled = true;
+        stop.disabled = resultStop.disabled = true;
         canvasRun.abort();
       } else finish("Stopped");
-    });
+    }
+    stop.addEventListener("click", stopRun);
+    resultStop.addEventListener("click", stopRun);
     reset.addEventListener("click", () => {
       runSources = undefined;
       editor.setValue(original, foldLines);

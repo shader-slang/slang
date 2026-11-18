@@ -159,26 +159,26 @@
     "/slang/runtime/window/simple_window.slang": "../assets/slangvm/slang/slang/runtime/window/simple_window.slang",
     "/slang/runtime/resource/buffer_view.slang": "../assets/slangvm/slang/slang/runtime/resource/buffer_view.slang"
   },
-  "sphere": {},
-  "shading": {},
-  "blending": {},
-  "environment": {
+  "render-sphere": {},
+  "render-shading": {},
+  "render-blending": {},
+  "render-environment": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
-  "mirror": {
+  "render-mirror": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
-  "diffuse": {
+  "render-diffuse": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
-  "accumulation": {
+  "render-accumulation": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
-  "cosine-sampling": {
+  "render-cosine-sampling": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
   "ggx": {},
-  "glossy": {
+  "render-glossy": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
   "frame-loop": {},
@@ -191,16 +191,16 @@
   "progressive-renderer": {},
   "simple-sphere-tracer": {},
   "checker-scene": {},
-  "final-scene": {
+  "render-final-scene": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
   "orbit-controller": {},
   "interactive-renderer": {},
-  "interactive": {
+  "render-interactive": {
     "/relax_inn_seaview_suite_front_1k.exr": "../images/relax_inn_seaview_suite_front_1k.exr"
   },
   "sphere-distance": {},
-  "intersection": {},
+  "render-intersection": {},
   "normal-shading": {},
   "sdf": {},
   "sphere-sdf": {},

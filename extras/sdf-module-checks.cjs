@@ -11,12 +11,12 @@ exports.checkSdfModuleFallback = async function (browser, baseURL, sources) {
         await page.waitForFunction(() => document.querySelector('[data-snippet="camera"] .snippet-language-status')
             .textContent.startsWith("Editor unavailable"));
         async function runMask() {
-            await card("intersection").locator("textarea.snippet-editor").press("Control+Enter");
+            await card("render-intersection").locator("textarea.snippet-editor").press("Control+Enter");
             await page.waitForFunction(() => /^(Finished|Could not run)/.test(
-                document.querySelector('[data-snippet="intersection"] .snippet-status').textContent), null, { timeout: 90000 });
-            assert.equal(await card("intersection").locator(".snippet-status").textContent(), "Finished",
-                await card("intersection").locator(".snippet-output").textContent());
-            return card("intersection").locator("canvas").evaluate(canvas => {
+                document.querySelector('[data-snippet="render-intersection"] .snippet-status').textContent), null, { timeout: 90000 });
+            assert.equal(await card("render-intersection").locator(".snippet-status").textContent(), "Finished",
+                await card("render-intersection").locator(".snippet-output").textContent());
+            return card("render-intersection").locator("canvas").evaluate(canvas => {
                 const pixels = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
                 let count = 0;
                 for (let i = 0; i < pixels.length; i += 4) if (pixels[i] === 255) count++;

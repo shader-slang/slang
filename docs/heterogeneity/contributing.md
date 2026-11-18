@@ -164,9 +164,10 @@ compiler. Text examples compile the current text in a fresh module worker and VM
 output and diagnostics below the editor. Stop terminates the worker. Runs time out
 after two minutes, and printed output is limited to 64 KiB of text.
 
-The runnable name is also the file's name: `<!-- runnable: sphere -->` creates
-`sphere.slang`. Names must be unique on a page. Another cell on that page can use
-`import sphere;` to access its public declarations. Each press of ![Run](images/snippet-run.svg "Run") compiles a snapshot of
+The runnable name is also the file's name: `<!-- runnable: render-sphere -->` creates
+`render-sphere.slang`. Names must be unique on a page; examples that draw an image use a
+`render-` prefix. Another cell on that page can use `import "render-sphere";` (quoted,
+because of the hyphen) to access its public declarations. Each press of ![Run](images/snippet-run.svg "Run") compiles a snapshot of
 the current text in all cells, so imported cells need not be run first. Only the
 selected cell's `main` executes. IntelliSense also sees edits to imported cells.
 Use **Ctrl+click** (**⌘+click** on macOS), **F12**, or **Go to Definition** in the

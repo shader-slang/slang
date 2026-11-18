@@ -234,7 +234,11 @@
 }
 
 /* Equation names written as `% label: ...` sit under the equation as a small caption. */
+/* On narrow screens, Material sizes every child of a display equation to min-content so
+   the equation can centre and scroll; the caption instead spans the block, so it wraps
+   only when it must. */
 .md-typeset div.arithmatex .math-label {
+  width: auto;
   margin-top: 0.15em;
   color: var(--md-default-fg-color--light);
   font-size: 0.64rem;
