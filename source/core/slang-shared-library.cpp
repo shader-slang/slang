@@ -2,6 +2,7 @@
 
 #include "slang-com-ptr.h"
 #include "slang-io.h"
+#include "slang-list.h"
 #include "slang-string-util.h"
 
 #if defined(_WIN32)
@@ -136,15 +137,25 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
         GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
         (LPCSTR)symbolInLib,
         &moduleHandle);
-    const int maxLength = 1024;
-    wchar_t filenameBuffer[maxLength];
-    auto length = GetModuleFileNameW(moduleHandle, filenameBuffer, maxLength);
-    if (length == maxLength)
+    // GetModuleFileNameW silently truncates a path that does not fit the buffer and returns the
+    // buffer size, so we grow the buffer until the returned length is smaller; a fixed buffer
+    // would return the truncated path of a library installed in a long directory (or empty).
+    List<wchar_t> buffer;
+    buffer.setCount(1024);
+    while (true)
     {
-        // Insufficient buffer, return empty.
-        return String();
+        const DWORD size = DWORD(buffer.getCount());
+        const DWORD length = ::GetModuleFileNameW(moduleHandle, buffer.getBuffer(), size);
+        if (length == 0)
+        {
+            return String();
+        }
+        if (length < size)
+        {
+            return String::fromWString(buffer.getBuffer());
+        }
+        buffer.setCount(size + size / 2);
     }
-    return String::fromWString(filenameBuffer);
 
 #elif SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY
     Dl_info dllInfo;

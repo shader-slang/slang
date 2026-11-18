@@ -54,11 +54,22 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
         return SLANG_FAIL;
     }
 
-    char value[MAX_PATH];
-    DWORD size = MAX_PATH;
-
-    // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regqueryvalueexa
-    ret = RegQueryValueExA(key, keyName, nullptr, nullptr, (LPBYTE)value, &size);
+    // RegQueryValueExA reports the required size (in `size`) when the buffer is too small, so we
+    // grow and retry rather than silently truncating a value longer than a MAX_PATH buffer.
+    List<char> value;
+    value.setCount(MAX_PATH);
+    DWORD size = 0;
+    while (true)
+    {
+        size = DWORD(value.getCount());
+        // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regqueryvalueexa
+        ret = RegQueryValueExA(key, keyName, nullptr, nullptr, (LPBYTE)value.getBuffer(), &size);
+        if (ret != ERROR_MORE_DATA)
+        {
+            break;
+        }
+        value.setCount(size + size / 2);
+    }
     RegCloseKey(key);
 
     if (ret != ERROR_SUCCESS)
@@ -66,7 +77,12 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
         return SLANG_FAIL;
     }
 
-    outString = value;
+    // A REG_SZ value normally includes its terminator in the returned size; terminate
+    // unconditionally so a value stored without one cannot read past the copied bytes.
+    value.setCount(size + 1);
+    value[size] = 0;
+
+    outString = value.getBuffer();
     return SLANG_OK;
 }
 
@@ -297,12 +313,44 @@ static SlangResult _findVersionsWithVSWhere(
 
     CommandLine cmd;
 
-    // Lookup directly %ProgramFiles(x86)% path
-    // https://docs.microsoft.com/en-us/windows/desktop/api/shlobj_core/nf-shlobj_core-shgetfolderpatha
-    HWND hwnd = GetConsoleWindow();
-
-    char programFilesPath[_MAX_PATH];
-    SHGetFolderPathA(hwnd, CSIDL_PROGRAM_FILESX86, NULL, 0, programFilesPath);
+    // We read the folder through its environment variables rather than SHGetFolderPathA:
+    // SHGetFolderPathA writes into a caller-allocated MAX_PATH buffer and gives no size
+    // feedback, so a longer path would be silently truncated, while GetEnvironmentVariableA
+    // reports the required size and allows a grow-retry. `ProgramFiles(x86)` is only defined on
+    // 64-bit processes; a 32-bit process finds the same folder under `ProgramFiles`, so we fall
+    // back to that name.
+    String programFilesPath;
+    {
+        static const char* const envVarNames[] = {"ProgramFiles(x86)", "ProgramFiles"};
+        for (auto envVarName : envVarNames)
+        {
+            List<char> buffer;
+            buffer.setCount(_MAX_PATH);
+            while (true)
+            {
+                const DWORD size = DWORD(buffer.getCount());
+                const DWORD res = ::GetEnvironmentVariableA(envVarName, buffer.getBuffer(), size);
+                if (res == 0)
+                {
+                    break;
+                }
+                if (res < size)
+                {
+                    programFilesPath = buffer.getBuffer();
+                    break;
+                }
+                buffer.setCount(res + 1);
+            }
+            if (programFilesPath.getLength() > 0)
+            {
+                break;
+            }
+        }
+    }
+    if (programFilesPath.getLength() == 0)
+    {
+        return SLANG_FAIL;
+    }
 
     String vswherePath = programFilesPath;
     vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
