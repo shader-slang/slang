@@ -1532,6 +1532,9 @@ struct TypeLayoutContext
     // The target request that is triggering layout
     TargetRequest* targetReq;
 
+    // the target program's options for a linked program, so layout agrees with codegen
+    CompilerOptionSet* optionSet;
+
     // Optional sink for reporting layout-time diagnostics.
     DiagnosticSink* sink = nullptr;
 
@@ -1699,6 +1702,7 @@ private:
 //
 TypeLayoutContext getInitialLayoutContextForTarget(
     TargetRequest* targetRequest,
+    CompilerOptionSet& optionSet,
     ProgramLayout* programLayout,
     slang::LayoutRules rules);
 

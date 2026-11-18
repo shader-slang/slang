@@ -21,6 +21,17 @@ void CompilerOptionSet::load(uint32_t count, const slang::CompilerOptionEntry* e
             value.stringValue = entries[i].value.stringValue0;
             value.stringValue2 = entries[i].value.stringValue1;
         }
+        // store at most one layout flag, so a false flag leaves the layout to be inherited
+        if (isMatrixLayoutOption(entries[i].name))
+        {
+            if (value.intValue)
+                setMatrixLayoutMode(
+                    entries[i].name == CompilerOptionName::MatrixLayoutRow
+                        ? kMatrixLayoutMode_RowMajor
+                        : kMatrixLayoutMode_ColumnMajor);
+            continue;
+        }
+
         add(entries[i].name, value);
 
         // When we see option EmitSpirvDirectly or EmitSpirvViaGLSL, we will need to
@@ -480,6 +491,24 @@ bool CompilerOptionSet::isLevelLocal(CompilerOptionName name)
     return name == CompilerOptionName::DownstreamArgs;
 }
 
+bool CompilerOptionSet::isMatrixLayoutOption(CompilerOptionName name)
+{
+    return name == CompilerOptionName::MatrixLayoutRow ||
+           name == CompilerOptionName::MatrixLayoutColumn;
+}
+
+bool CompilerOptionSet::hasMatrixLayoutOption()
+{
+    return hasOption(CompilerOptionName::MatrixLayoutRow) ||
+           hasOption(CompilerOptionName::MatrixLayoutColumn);
+}
+
+void CompilerOptionSet::clearMatrixLayoutOptions()
+{
+    options.remove(CompilerOptionName::MatrixLayoutRow);
+    options.remove(CompilerOptionName::MatrixLayoutColumn);
+}
+
 CompilerOptionSet CompilerOptionSet::copyWithoutLevelLocalOptions() const
 {
     CompilerOptionSet result = *this;
@@ -589,8 +618,7 @@ MatrixLayoutMode CompilerOptionSet::getMatrixLayoutMode()
 
 void CompilerOptionSet::setMatrixLayoutMode(MatrixLayoutMode mode)
 {
-    options.remove(CompilerOptionName::MatrixLayoutColumn);
-    options.remove(CompilerOptionName::MatrixLayoutRow);
+    clearMatrixLayoutOptions();
     if (mode == kMatrixLayoutMode_ColumnMajor)
         set(CompilerOptionName::MatrixLayoutColumn, true);
     if (mode == kMatrixLayoutMode_RowMajor)

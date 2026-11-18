@@ -1291,7 +1291,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
         getMatrixLayoutAxisCounts(
             (size_t)rowCount->getValue(),
             (size_t)columnCount->getValue(),
-            codeGenContext->getTargetReq()->getOptionSet().getMatrixLayoutMode(),
+            codeGenContext->getTargetProgram()->getOptionSet().getMatrixLayoutMode(),
             locationCount,
             unusedMinorCount);
         IRTypeLayout::Builder builder(&irBuilder);
