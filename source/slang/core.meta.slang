@@ -4061,6 +4061,10 @@ __intrinsic_op($(kIROp_IsHalf))
 bool __isHalf_impl(T t);
 
 __generic<T>
+__intrinsic_op($(kIROp_IsDouble))
+bool __isDouble_impl(T t);
+
+__generic<T>
 [__unsafeForceInlineEarly]
 bool __isFloat()
 {
@@ -4079,6 +4083,13 @@ __generic<T>
 bool __isHalf()
 {
     return __isHalf_impl(__declVal<T>());
+}
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isDouble()
+{
+    return __isDouble_impl(__declVal<T>());
 }
 
 __generic<T>

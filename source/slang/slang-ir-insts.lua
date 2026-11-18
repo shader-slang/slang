@@ -2897,6 +2897,7 @@ local insts = {
 	-- Check whether an operand's type is floating point type or packed floating point type (fp8,bf16)
 	{ IsCoopFloat = {operands = { { "value" } } } },
 	{ IsHalf = { operands = { { "value" } } } },
+	{ IsDouble = { operands = { { "value" } } } },
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },

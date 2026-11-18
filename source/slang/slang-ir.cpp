@@ -9831,6 +9831,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_IsSignedInt:
     case kIROp_IsUnsignedInt:
     case kIROp_IsHalf:
+    case kIROp_IsDouble:
     case kIROp_IsBindlessTextureNVEncodable:
     case kIROp_IsType:
         return false;

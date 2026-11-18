@@ -65,6 +65,7 @@ bool doesInstOnlyDependOnOperandTypes(IRInst* inst)
     case kIROp_IsUnsignedInt:
     case kIROp_IsSignedInt:
     case kIROp_IsHalf:
+    case kIROp_IsDouble:
     case kIROp_IsFloat:
     case kIROp_IsCoopFloat:
     case kIROp_IsVector:

@@ -2070,6 +2070,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsInt:
         case kIROp_IsFloat:
         case kIROp_IsHalf:
+        case kIROp_IsDouble:
         case kIROp_IsUnsignedInt:
         case kIROp_IsSignedInt:
         case kIROp_IsBool:
@@ -2106,6 +2107,9 @@ struct PeepholeContext : InstPassBase
                         break;
                     case kIROp_IsHalf:
                         result = elementType->getOp() == kIROp_HalfType;
+                        break;
+                    case kIROp_IsDouble:
+                        result = elementType->getOp() == kIROp_DoubleType;
                         break;
                     case kIROp_IsUnsignedInt:
                         result = isIntegralType(elementType) && !getIntTypeSigned(elementType);
