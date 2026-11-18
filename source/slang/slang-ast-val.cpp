@@ -2376,7 +2376,7 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
 }
 
 // Note: type must be BasicExpressionType
-MathIntType expressionTypeToMathIntType(Type* type)
+static MathIntType expressionTypeToMathIntType(Type* type)
 {
     auto exprType = as<BasicExpressionType>(type);
     SLANG_RELEASE_ASSERT(exprType);
@@ -2435,7 +2435,7 @@ static BasicExpressionType* getIntegerFoldingType(ASTBuilder* astBuilder, Type* 
     return nullptr;
 }
 
-MathIntValue createMathIntValue(BasicExpressionType* type, ConstantIntVal* c)
+static MathIntValue createMathIntValue(BasicExpressionType* type, ConstantIntVal* c)
 {
     return MathIntValue::constructFromValue(expressionTypeToMathIntType(type), c->getValue());
 }

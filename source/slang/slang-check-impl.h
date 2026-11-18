@@ -3225,6 +3225,7 @@ public:
     /// `_validateCircularVarDefinition` performs this fold, and folds of the same initializer
     /// through uses of `varDecl` rely on it to suppress duplicate diagnostics.
     bool isInitializerFoldedByDeclarationCheck(VarDeclBase* varDecl);
+
     /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<InvokeExpr> invokeExpr,
