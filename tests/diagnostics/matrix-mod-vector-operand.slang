@@ -13,6 +13,10 @@ void f(float2x2 m, float2 v)
     //CHECK: no overload for '%' applicable to arguments of type (matrix
     float2x2 r = m % v;
     outputBuffer[0] = r[0][0];
+    // Both operand orders go through the same rejection; a scalar result with
+    // a matrix operand would reach neither rewrite in the legalization.
+    //CHECK: no overload for '%' applicable to arguments of type (vector
+    outputBuffer[1] = (v % m)[0];
 }
 
 [numthreads(1, 1, 1)]

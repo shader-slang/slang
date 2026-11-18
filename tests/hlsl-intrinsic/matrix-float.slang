@@ -1,6 +1,8 @@
 // NOTE the vk target runs the direct SPIR-V emitter — the default emit
 // method, which this line relies on — and that emitter already expands
-// matrix arithmetic per row at emit time; the GLSL/via-GLSL spelling of
+// matrix arithmetic per row at emit time; the matrix intrinsics this file
+// exercises (sin, cos, atan2, ...) reach it as per-row vector calls through
+// the core module's stdlib overloads. The GLSL/via-GLSL spelling of
 // matrix `%` is covered by tests/glsl/test-14591.slang. WGSL stays disabled
 // below; float-matrix `%` is also unimplemented for WGSL.
 

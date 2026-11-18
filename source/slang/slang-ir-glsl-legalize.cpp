@@ -5368,7 +5368,9 @@ static void legalizeVectorFRemScalarDividend(IRInst* inst)
     auto splattedDividend = builder.emitMakeCompositeFromScalar(
         as<IRVectorType>(inst->getDataType()),
         inst->getOperand(0));
-    builder.replaceOperand(inst->getOperands(), splattedDividend);
+    builder.replaceOperand(
+        inst->getOperands(), // operand 0, the dividend
+        splattedDividend);
 }
 
 void legalizeFRemForGLSL(IRModule* module)
@@ -5388,6 +5390,8 @@ void legalizeFRemForGLSL(IRModule* module)
         {
             for (auto inst = block->getFirstInst(); inst;)
             {
+                // The rewrites deallocate `inst` (and insert before it), so the
+                // successor is captured up front to keep the walk safe.
                 auto next = inst->getNextInst();
                 if (inst->getOp() != kIROp_FRem)
                 {
