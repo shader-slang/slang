@@ -78,8 +78,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && i4[0][3] == 0.0 && i4[1][3] == 0.0 && i4[2][3] == 0.0 && i4[3][3] == 1.0;
 
 #if defined(TARGET_HLSL)
-    // The E39999 codegen gate rejects 1x1 matrices on every target except
-    // HLSL, so only that compile leg runs this case.
+    // The E39999 IR-validation gate ("matrices with 1 column or row") rejects
+    // 1x1 matrices on every target except HLSL, so only that compile leg can
+    // run this case.
     const matrix<float, 1, 1> m1 = matrix<float, 1, 1>(2.0);
     const matrix<float, 1, 1> i1 = inverse(m1);
     ok = ok && i1[0][0] == 0.5;
