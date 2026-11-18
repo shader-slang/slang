@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -stage compute -entry computeMain -disable-non-essential-validations -skip-spirv-validation
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -stage compute -entry computeMainPtrArg -disable-non-essential-validations -skip-spirv-validation
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -stage compute -entry computeMainDirect -disable-non-essential-validations -skip-spirv-validation
-//TEST:SIMPLE(filecheck=CONFLICT):-target spirv -stage compute -entry computeMainConflict -disable-non-essential-validations -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CONFLICT,exit-code=2):-target spirv -stage compute -entry computeMainConflict -disable-non-essential-validations -skip-spirv-validation
 
 // Regression test for shader-slang/slang#12563. With the recursion check (E55201) disabled, a
 // recursive call's result is provisional until the cycle settles, and it must not read as a second
