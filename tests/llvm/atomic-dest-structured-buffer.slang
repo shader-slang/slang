@@ -3,10 +3,12 @@
 // to concrete host-memory pointers before atomic validation runs, and a buffer
 // element qualifies as device-buffer memory just like a `T*` or `groupshared`
 // destination does. The LLVM emitter does not implement atomic instructions
-// yet, so the expected outcome of this compile is the unsupported-instruction
-// diagnostic — and never the invalid-atomic-destination diagnostic.
+// yet (tracked as #14191, whose implementer should upgrade this test to a
+// full compute comparison), so the expected outcome of this compile is the
+// unsupported-instruction diagnostic — and never the
+// invalid-atomic-destination diagnostic.
 
-//TEST:SIMPLE(filecheck=CHECK): -target llvm-host-ir -emit-cpu-via-llvm -whole-program -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target llvm-host-ir -emit-cpu-via-llvm -whole-program -entry main -stage compute
 
 RWStructuredBuffer<Atomic<uint>> counts;
 
