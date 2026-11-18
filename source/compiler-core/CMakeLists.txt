@@ -25,8 +25,7 @@ endif()
 # We compile the checked-in kind and type definitions because `slang-fiddle` links
 # `compiler-core`. The maintenance targets run after `slang-fiddle` is built; making either
 # target a prerequisite of `compiler-core` would introduce a dependency cycle.
-set(
-    SLANG_LEXEME_DEFINITION_FILES
+set(SLANG_LEXEME_DEFINITION_FILES
     slang-lexeme-defs.h
     slang-raw-lexeme-types.h
     slang-token-types.h
@@ -59,7 +58,23 @@ add_custom_target(
 
 # Fiddle can rewrite its input to update template markers. We give the check input copies
 # in the build directory so checking stale snapshots does not edit the checkout.
-set(SLANG_LEXEME_CHECK_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lexeme-definitions-check/$<CONFIG>")
+set(SLANG_LEXEME_CHECK_DIRECTORY
+    "${CMAKE_CURRENT_BINARY_DIR}/lexeme-definitions-check/$<CONFIG>"
+)
+# We compare every template's output so extending the definition list also extends the check.
+set(SLANG_LEXEME_CHECK_COMMANDS)
+foreach(lexeme_definition_file IN LISTS SLANG_LEXEME_DEFINITION_FILES)
+    list(
+        APPEND
+        SLANG_LEXEME_CHECK_COMMANDS
+        COMMAND
+        ${CMAKE_COMMAND}
+        -E
+        compare_files
+        "${CMAKE_CURRENT_SOURCE_DIR}/${lexeme_definition_file}.fiddle"
+        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/${lexeme_definition_file}.fiddle"
+    )
+endforeach()
 add_custom_target(
     check-lexeme-definitions
     COMMAND
@@ -67,25 +82,12 @@ add_custom_target(
         "${SLANG_LEXEME_CHECK_DIRECTORY}/input"
         "${SLANG_LEXEME_CHECK_DIRECTORY}/output"
     COMMAND
-        ${CMAKE_COMMAND} -E copy_if_different
-        ${SLANG_LEXEME_DEFINITION_HEADERS}
-        ${SLANG_LEXEME_DEFINITION_LUA}
-        "${SLANG_LEXEME_CHECK_DIRECTORY}/input/"
+        ${CMAKE_COMMAND} -E copy_if_different ${SLANG_LEXEME_DEFINITION_HEADERS}
+        ${SLANG_LEXEME_DEFINITION_LUA} "${SLANG_LEXEME_CHECK_DIRECTORY}/input/"
     COMMAND
-        $<TARGET_FILE:slang-fiddle> -i "${SLANG_LEXEME_CHECK_DIRECTORY}/input/" -o
-        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/" ${SLANG_LEXEME_DEFINITION_FILES}
-    COMMAND
-        ${CMAKE_COMMAND} -E compare_files
-        "${CMAKE_CURRENT_SOURCE_DIR}/slang-lexeme-defs.h.fiddle"
-        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/slang-lexeme-defs.h.fiddle"
-    COMMAND
-        ${CMAKE_COMMAND} -E compare_files
-        "${CMAKE_CURRENT_SOURCE_DIR}/slang-raw-lexeme-types.h.fiddle"
-        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/slang-raw-lexeme-types.h.fiddle"
-    COMMAND
-        ${CMAKE_COMMAND} -E compare_files
-        "${CMAKE_CURRENT_SOURCE_DIR}/slang-token-types.h.fiddle"
-        "${SLANG_LEXEME_CHECK_DIRECTORY}/output/slang-token-types.h.fiddle"
+        $<TARGET_FILE:slang-fiddle> -i "${SLANG_LEXEME_CHECK_DIRECTORY}/input/"
+        -o "${SLANG_LEXEME_CHECK_DIRECTORY}/output/"
+        ${SLANG_LEXEME_DEFINITION_FILES} ${SLANG_LEXEME_CHECK_COMMANDS}
     DEPENDS
         slang-fiddle
         ${SLANG_LEXEME_DEFINITION_HEADERS}
@@ -96,6 +98,7 @@ add_custom_target(
     VERBATIM
 )
 set_target_properties(
-    regenerate-lexeme-definitions check-lexeme-definitions
+    regenerate-lexeme-definitions
+    check-lexeme-definitions
     PROPERTIES FOLDER generated
 )

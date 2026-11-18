@@ -171,8 +171,9 @@ static void _handleNewLineInner(Lexer* lexer, int c)
     }
 }
 
-// Reads a logical code point after removing backslash-newline pairs. Both
-// lookahead and consumption use this procedure so they recognize identical input.
+// Reads a logical code point after removing backslash-newline pairs, using a space
+// for invalid UTF-8 so identifier and number scanning stop at the invalid sequence.
+// Both lookahead and consumption use this procedure so they recognize identical input.
 // Only consumption supplies a diagnostic sink and commits the resulting cursor.
 static int _readCodePoint(
     const Lexer* lexer,
@@ -233,6 +234,8 @@ static int _readCodePoint(
             isInvalid = true;
         if (isInvalid)
         {
+            // We have consumed the invalid bytes so the next read can make progress.
+            // The lexer still retains those bytes in the lexeme's physical spelling.
             diagnose(
                 sink,
                 _getSourceLoc(*lexer, sequenceStart),

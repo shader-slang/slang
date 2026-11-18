@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -E
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -E
 
 // An unterminated physical header name is invalid input, so the preprocessor
 // must not remove its final path character and attempt to open the truncated name.

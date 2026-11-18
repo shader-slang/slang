@@ -87,8 +87,8 @@ SLANG_UNIT_TEST(lexemePoolSeparatesSpellingFromOccurrences)
     SLANG_CHECK(first.getFlags() == 0);
     SLANG_CHECK(second.getFlags() == (TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace));
 
-    // Scrubbing does not erase the distinction between physical spellings. Keeping that
-    // distinction lets a token stream reproduce the escaped newline exactly.
+    // Identical logical spellings do not make different physical spellings share an object.
+    // Keeping that distinction lets a token stream reproduce the escaped newline exactly.
     auto unspliced = pool.createLexeme(LexemeTypeTag::Identifier, logicalSpelling, logicalSpelling);
     SLANG_CHECK(first.getObject() != unspliced.getObject());
     SLANG_CHECK(first.getLogicalSpelling() == unspliced.getLogicalSpelling());
@@ -584,6 +584,8 @@ SLANG_UNIT_TEST(lexerInvalidUnicodeCannotBecomeEndOfFile)
     // The extended seven-byte encoding denotes FFFFFFFF, which becomes -1 if cast
     // to a signed 32-bit integer. The lexer must reject that code point before it
     // can be confused with EOF, preserving both the invalid bytes and the next token.
+    // `_readCodePoint()` recovers from an invalid encoding by returning a space to the scanner.
+    // We therefore expect `WhiteSpaceTrivia` that preserves all seven physical bytes.
     const char bytes[] =
         {char(0xFE), char(0x83), char(0xBF), char(0xBF), char(0xBF), char(0xBF), char(0xBF), 'x'};
     LexemeTestInput input(UnownedStringSlice(bytes, sizeof(bytes)));
@@ -622,6 +624,8 @@ SLANG_UNIT_TEST(lexerRejectsUnicodeSurrogate)
 {
     // ED A0 80 encodes the surrogate U+D800, which is not a Unicode scalar value.
     // Recovery must consume those three bytes and leave the ASCII identifier intact.
+    // `_readCodePoint()` returns a recovery space, so we expect `WhiteSpaceTrivia`
+    // that preserves the three physical bytes of the invalid encoding.
     const char bytes[] = {char(0xED), char(0xA0), char(0x80), 'x'};
     LexemeTestInput input(UnownedStringSlice(bytes, sizeof(bytes)));
     auto invalidSequence = input.lexer.readLexeme();

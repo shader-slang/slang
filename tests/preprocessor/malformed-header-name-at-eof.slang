@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -E
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -E
 
 // The final escaped newline reaches logical EOF without closing the header name.
 //CHECK-NOT: include file

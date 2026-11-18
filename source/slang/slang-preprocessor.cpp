@@ -149,6 +149,13 @@ struct Environment
 // exact implementation, we will define an abstract base class for input
 // streams.
 
+/// Returns `token` with the logical context before its replacement occurrence.
+static Token withLeadingFlags(Token token, TokenFlags flags)
+{
+    constexpr TokenFlags mask = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+    return token.withFlags((token.getFlags() & ~mask) | (flags & mask));
+}
+
 /// A logical stream of tokens.
 struct InputStream
 {
@@ -175,6 +182,12 @@ struct InputStream
     /// At the end of the stream should return a token with `TokenType::EndOfFile`.
     ///
     virtual Token peekToken() = 0;
+
+    /// Returns logical separators after the last token, once this stream is exhausted.
+    ///
+    /// Empty replacements can leave a separator for the next stream. Physical EOF
+    /// flags and definition-ending trivia do not describe that logical separator.
+    virtual TokenFlags getTrailingFlags() const { return 0; }
 
     // Because different implementations of this abstract base class will
     // store differnet amounts of data, we need a virtual descritor to
@@ -241,6 +254,20 @@ struct PretokenizedInputStream : InputStream
 
     virtual Token peekToken() SLANG_OVERRIDE { return m_tokenReader.peekToken(); }
 
+    /// Replaces leading context before any tokens have been read from this stream.
+    ///
+    /// A nonempty substitution has no trailing separator. An empty substitution
+    /// leaves `flags` for the next token, rather than retaining argument-list whitespace.
+    void setSubstitutionFlags(TokenFlags flags)
+    {
+        if (m_tokenReader.isAtEnd())
+            m_trailingFlags = flags;
+        else
+            m_tokenReader.replaceLookaheadToken(withLeadingFlags(peekToken(), flags));
+    }
+
+    TokenFlags getTrailingFlags() const SLANG_OVERRIDE { return m_trailingFlags; }
+
     virtual SourceLoc findNextLineEndImpl(SourceLoc from, UInt& lineCount) const SLANG_OVERRIDE
     {
         // Not implemented
@@ -258,6 +285,8 @@ protected:
 
     /// Reader for pre-tokenized input
     TokenReader m_tokenReader;
+    /// The replacement position's context, only for a wholly empty substitution.
+    TokenFlags m_trailingFlags = 0;
 };
 
 // While macro bodies are the main use case for pre-tokenized input strams,
@@ -318,6 +347,7 @@ struct InputStreamStack
             delete s;
         }
         m_top = nullptr;
+        m_pendingFlags = 0;
     }
 
     /// Read a token from the top-most input stream with input
@@ -338,7 +368,15 @@ struct InputStreamStack
             //
             auto token = m_top->readToken();
             if (token.getTypeTag() != TokenType::EndOfFile)
+            {
+                token = token.withFlags(token.getFlags() | m_pendingFlags);
+                m_pendingFlags = 0;
                 return token;
+            }
+
+            // Only explicit logical boundaries survive an exhausted replacement.
+            // Its EOF may still describe unrelated physical definition whitespace.
+            m_pendingFlags |= m_top->getTrailingFlags();
 
             // If the top stream has run out of input we try to
             // switch to its parent, if any.
@@ -405,12 +443,15 @@ struct InputStreamStack
         // an remove this wrinkle.
         //
         auto top = m_top;
+        TokenFlags pendingFlags = m_pendingFlags;
         for (;;)
         {
             SLANG_ASSERT(top);
             auto token = top->peekToken();
             if (token.getTypeTag() != TokenType::EndOfFile)
-                return token;
+                return token.withFlags(token.getFlags() | pendingFlags);
+
+            pendingFlags |= top->getTrailingFlags();
 
             auto parent = top->getParent();
             if (parent)
@@ -452,6 +493,15 @@ struct InputStreamStack
     /// Get the top stream of the input stack
     InputStream* getTopStream() { return m_top; }
 
+    /// Returns the logical trailing boundary when every stream is exhausted.
+    TokenFlags getTrailingFlags() const
+    {
+        TokenFlags flags = m_pendingFlags;
+        for (auto stream = m_top; stream; stream = stream->getParent())
+            flags |= stream->getTrailingFlags();
+        return flags;
+    }
+
     SourceLoc findNextLineEnd(SourceLoc from, UInt lineCount = 1) const
     {
         auto top = m_top;
@@ -471,6 +521,8 @@ struct InputStreamStack
 private:
     /// The top of the stack of input streams
     InputStream* m_top = nullptr;
+    /// Separators crossed since the last ordinary token was returned.
+    TokenFlags m_pendingFlags = 0;
 };
 
 // Another (relatively) simple case of an input stream is one that reads
@@ -715,13 +767,13 @@ struct MacroInvocation : InputStream
 {
     typedef InputStream Super;
 
-    /// Create a new expansion of `macro`
+    /// Creates an expansion whose first result uses the macro-name occurrence's `flags`.
     MacroInvocation(
         Preprocessor* preprocessor,
         MacroDefinition* macro,
         SourceLoc macroInvocationLoc,
         SourceLoc initiatingMacroInvocationLoc,
-        bool isStartOfLine = false);
+        TokenFlags flags = 0);
 
     /// Prime the input stream
     ///
@@ -740,6 +792,13 @@ struct MacroInvocation : InputStream
     }
 
     virtual Token peekToken() SLANG_OVERRIDE { return m_lookaheadToken; }
+
+    TokenFlags getTrailingFlags() const SLANG_OVERRIDE
+    {
+        if (!m_hasTokens)
+            return m_invocationFlags;
+        return m_pendingFlags | m_currentOpStreams.getTrailingFlags();
+    }
 
     /// Is the given `macro` considered "busy" during the given macroinvocation?
     static bool isBusy(MacroDefinition* macro, MacroInvocation* duringMacroInvocation);
@@ -801,6 +860,18 @@ private:
     /// Actually read a new token (not just using the lookahead)
     Token _readTokenImpl();
 
+    /// Reads an operation token and consumes preceding empty-operation separators once.
+    Token _readCurrentOpToken()
+    {
+        auto token = m_currentOpStreams.readToken();
+        if (!token.is<EndOfFileToken>())
+        {
+            token = token.withFlags(token.getFlags() | m_pendingFlags);
+            m_pendingFlags = 0;
+        }
+        return token;
+    }
+
     // In order to play back a macro definition, we will play back the ops
     // in its body one at a time. Each op may expand to a stream of zero or
     // more tokens, so we need some state to track all of that.
@@ -827,16 +898,20 @@ private:
     void _pushSingleTokenStream(
         TokenType tokenType,
         SourceLoc tokenLoc,
-        UnownedStringSlice const& content);
+        UnownedStringSlice const& content,
+        TokenFlags flags = 0);
 
     /// Push a stream for a source-location builtin (`__FILE__` or `__LINE__`), with content set up
     /// by `valueBuilder`
     template<typename F>
     void _pushStreamForSourceLocBuiltin(TokenType tokenType, F const& valueBuilder);
 
-    /// Indicate that whether this invocation is at the start of a line, this can be determined by
-    /// the macro invocation token.
-    bool m_isStartOfLine = false;
+    /// Leading context of the macro name, independent of definition-site trivia.
+    TokenFlags m_invocationFlags = 0;
+    /// Empty-operation separators awaiting a token read, not the token held by lookahead.
+    TokenFlags m_pendingFlags = 0;
+    /// Whether this invocation produces any ordinary token after initial empty operations.
+    bool m_hasTokens = false;
 };
 
 // Playing back macro bodies for macro invocations is one part of the expansion process, and the
@@ -879,6 +954,27 @@ struct ExpansionInputStream : InputStream
     {
         _maybeBeginMacroInvocation();
         return m_lookaheadToken;
+    }
+
+    /// Applies parameter-position context before the first expanded result is consumed.
+    ///
+    /// Prescanning happens first so leading empty macros cannot expose argument context.
+    /// Trailing argument gaps are discarded; a wholly empty argument leaves only `flags`.
+    void setSubstitutionFlags(TokenFlags flags)
+    {
+        auto token = peekToken();
+        m_hasSubstitutionFlags = true;
+        if (token.is<EndOfFileToken>())
+            m_substitutionTrailingFlags = flags;
+        else
+            m_lookaheadToken = withLeadingFlags(token, flags);
+    }
+
+    TokenFlags getTrailingFlags() const SLANG_OVERRIDE
+    {
+        if (m_hasSubstitutionFlags)
+            return m_substitutionTrailingFlags;
+        return m_inputStreams.getTrailingFlags();
     }
 
     // The "raw" read operations on an expansion input strema bypass
@@ -942,6 +1038,9 @@ private:
     Token m_lookaheadToken;
 
     bool m_hasLookaheadToken = false;
+    /// Parameter substitution trims trailing argument context after prescanning.
+    bool m_hasSubstitutionFlags = false;
+    TokenFlags m_substitutionTrailingFlags = 0;
 
     /// Cache the next unexpanded token if it has not already been requested.
     void _ensureLookaheadToken()
@@ -1527,14 +1626,14 @@ MacroInvocation::MacroInvocation(
     MacroDefinition* macro,
     SourceLoc macroInvocationLoc,
     SourceLoc initiatingMacroInvocationLoc,
-    bool isStartOfLine)
+    TokenFlags flags)
     : Super(preprocessor)
 {
     m_macro = macro;
     m_firstBusyMacroInvocation = this;
     m_macroInvocationLoc = macroInvocationLoc;
     m_initiatingMacroInvocationLoc = initiatingMacroInvocationLoc;
-    m_isStartOfLine = isStartOfLine;
+    m_invocationFlags = flags;
 }
 
 void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
@@ -1543,6 +1642,11 @@ void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
 
     _initCurrentOpStream();
     m_lookaheadToken = _readTokenImpl();
+
+    // In `<NAME>`, whitespace in `#define NAME file.h` is outside the replacement.
+    // The first surviving result instead inherits the context of this use of `NAME`.
+    m_hasTokens = !m_lookaheadToken.is<EndOfFileToken>();
+    m_lookaheadToken = withLeadingFlags(m_lookaheadToken, m_invocationFlags);
 
     reportMacroInvocationForContentAssist(m_preprocessor, this);
 }
@@ -1757,7 +1861,6 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
             return;
         }
 
-        bool isStartOfLine = (token.getFlags() & TokenFlag::AtStartOfLine) != 0;
         // Now we get to the slightly trickier cases.
         //
         // *If* the identifier names a macro, but we are currently in the
@@ -1825,7 +1928,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                     macro,
                     token.getLoc(),
                     m_initiatingMacroInvocationLoc,
-                    isStartOfLine);
+                    token.getFlags());
                 invocation->prime(busyMacros);
                 _pushMacroInvocation(invocation);
             }
@@ -1883,7 +1986,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                     macro,
                     token.getLoc(),
                     m_initiatingMacroInvocationLoc,
-                    isStartOfLine);
+                    token.getFlags());
 
                 // We start by consuming the opening `(` that we checked for above.
                 //
@@ -2046,7 +2149,7 @@ Token MacroInvocation::_readTokenImpl()
     // In either of those cases, we can start by reading the next token
     // from the expansion of the current op.
     //
-    Token token = m_currentOpStreams.readToken();
+    Token token = _readCurrentOpToken();
     Index tokenOpIndex = m_macroOpIndex;
 
     // Once we've read that `token`, we need to work to establish or
@@ -2081,14 +2184,6 @@ Token MacroInvocation::_readTokenImpl()
             // We can safely return with our invaraints intact, because
             // the next attempt to read a token will read a non-EOF.
             //
-            // Before returning, we need to check whether this macro invocation is
-            // at start of line, if it is, we must mark the first token as start of line
-            // as well, otherwise the expanded code could be invalid.
-            if (m_isStartOfLine)
-            {
-                token = token.withFlags(token.getFlags() | TokenFlag::AtStartOfLine);
-                m_isStartOfLine = false;
-            }
             return token;
         }
 
@@ -2111,14 +2206,6 @@ Token MacroInvocation::_readTokenImpl()
         //
         if (nextOpIndex == m_macro->ops.getCount())
         {
-            // Before returning, we need to check whether this macro invocation is
-            // at start of line, if it is, we must mark the first token as start of line
-            // as well, otherwise the expanded code could be invalid.
-            if (m_isStartOfLine)
-            {
-                token = token.withFlags(token.getFlags() | TokenFlag::AtStartOfLine);
-                m_isStartOfLine = false;
-            }
             return token;
         }
 
@@ -2126,6 +2213,10 @@ Token MacroInvocation::_readTokenImpl()
         // those streams to reclaim their memory before we push any new
         // ones.
         //
+        // A later empty operation may precede a token we have not read yet.
+        // We save that gap for the next read, without changing the held `token`.
+        TokenFlags trailingFlags = m_currentOpStreams.getTrailingFlags();
+        m_pendingFlags |= trailingFlags;
         m_currentOpStreams.popAll();
 
         // Now we've commited to moving to the next op in the macro
@@ -2172,7 +2263,7 @@ Token MacroInvocation::_readTokenImpl()
                 //
                 if (token.getTypeTag() == TokenType::EndOfFile)
                 {
-                    token = m_currentOpStreams.readToken();
+                    token = _readCurrentOpToken();
                     tokenOpIndex = m_macroOpIndex;
                 }
             }
@@ -2193,6 +2284,16 @@ Token MacroInvocation::_readTokenImpl()
                 // We will accumulate the pasted token as a string and then re-lex it.
                 //
                 StringBuilder pastedContent;
+
+                // Pasting replaces the left operand's position, even if that operand
+                // is empty. Whitespace around `##` is not part of the pasted result.
+                TokenFlags pasteFlags = trailingFlags;
+                if (tokenOpIndex == nextOpIndex - 1)
+                {
+                    if (!token.is<EndOfFileToken>())
+                        pasteFlags = token.getFlags();
+                }
+                pasteFlags |= m_pendingFlags;
 
                 // Note that this is *not* the same as saying that we paste together the
                 // last token the preceded the `##` with the first token that follows it.
@@ -2264,9 +2365,11 @@ Token MacroInvocation::_readTokenImpl()
                 // If the right operand yields at least one non-EOF token, we append
                 // that token's logical spelling to our paste result.
                 //
-                Token rightToken = m_currentOpStreams.readToken();
+                Token rightToken = _readCurrentOpToken();
                 if (rightToken.getTypeTag() != TokenType::EndOfFile)
                     pastedContent << rightToken.getLogicalSpelling();
+                else
+                    m_currentOpStreams.popAll(); // The empty right operand leaves no separator.
 
                 // Now we need to re-lex the token(s) that resulted from pasting, which requires
                 // us to create a fresh source file to represent the paste result.
@@ -2324,6 +2427,7 @@ Token MacroInvocation::_readTokenImpl()
                 //
                 SingleUseInputStream* inputStream =
                     new SingleUseInputStream(m_preprocessor, lexedTokens);
+                inputStream->setSubstitutionFlags(pasteFlags);
                 m_currentOpStreams.push(inputStream);
 
                 // There's one final detail to cover before we move on. *If* we used `token` as part
@@ -2344,7 +2448,7 @@ Token MacroInvocation::_readTokenImpl()
                     // If `Y` expands to a single token, then `X ## Y` should be treated
                     // as the left operand to the `Y ## Z` paste.
                     //
-                    token = m_currentOpStreams.readToken();
+                    token = _readCurrentOpToken();
                     tokenOpIndex = m_macroOpIndex;
                 }
 
@@ -2359,13 +2463,14 @@ Token MacroInvocation::_readTokenImpl()
 void MacroInvocation::_pushSingleTokenStream(
     TokenType tokenType,
     SourceLoc tokenLoc,
-    UnownedStringSlice const& content)
+    UnownedStringSlice const& content,
+    TokenFlags flags)
 {
     // We create generated spelling in the pool selected for this preprocessing operation.
     // The pool owns the characters and shares identical generated tokens without
     // attaching trivia from the macro definition or invocation.
     auto pool = getTokenPool();
-    Token token = pool->createToken(tokenType, content, tokenLoc);
+    Token token = pool->createToken(tokenType, content, tokenLoc, flags);
 
     TokenList lexedTokens(pool);
     lexedTokens.add(token);
@@ -2560,11 +2665,11 @@ void MacroInvocation::_initCurrentOpStream()
             //
             auto tokenReader = _getArgTokens(paramIndex);
 
-            // Because expansion doesn't apply to this parameter reference, we can simply
-            // play back those tokens exactly as they appeared in the argument list.
-            //
+            // The spellings remain unexpanded, but the first occurrence replaces the
+            // parameter's position. Argument-list whitespace is outside that position.
             PretokenizedInputStream* stream =
                 new PretokenizedInputStream(m_preprocessor, tokenReader);
+            stream->setSubstitutionFlags(m_macro->tokens.getTokens()[op.index0].getFlags());
             m_currentOpStreams.push(stream);
         }
         break;
@@ -2586,6 +2691,9 @@ void MacroInvocation::_initCurrentOpStream()
             //
             ExpansionInputStream* expansion = new ExpansionInputStream(m_preprocessor, stream);
             expansion->setInitiatingMacroSourceLoc(m_initiatingMacroInvocationLoc);
+            // The parameter's position supplies context after prescan removes leading
+            // empty macros; neither end of the argument contributes a separator.
+            expansion->setSubstitutionFlags(m_macro->tokens.getTokens()[op.index0].getFlags());
             m_currentOpStreams.push(expansion);
         }
         break;
@@ -2637,7 +2745,11 @@ void MacroInvocation::_initCurrentOpStream()
             // Once we've constructed the content of the stringized result, we need to push
             // a new single-token stream that represents that content.
             //
-            _pushSingleTokenStream(TokenType::StringLiteral, loc, builder.getUnownedSlice());
+            _pushSingleTokenStream(
+                TokenType::StringLiteral,
+                loc,
+                builder.getUnownedSlice(),
+                m_macro->tokens.getTokens()[tokenIndex].getFlags());
         }
         break;
 

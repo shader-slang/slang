@@ -21,6 +21,10 @@ namespace Slang
 using TokenFlags = uint8_t;
 
 /// Occurrence context used by preprocessing and parsing.
+///
+/// The lexer derives these flags from logical token context; an escaped newline
+/// introduces no separator. Preprocessing assigns context to replacement occurrences
+/// without changing their spelling, attached physical trivia, or source location.
 struct TokenFlag
 {
     enum Enum : TokenFlags

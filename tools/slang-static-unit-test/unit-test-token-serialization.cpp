@@ -108,7 +108,7 @@ SLANG_UNIT_TEST(tokenASTSerializationPreservesLexicalValues)
     auto globalSession = unitTestContext->slangGlobalSession;
     SLANG_CHECK_ABORT(globalSession);
 
-    for (bool includeLocations : {false, true})
+    for (bool shouldIncludeLocations : {false, true})
     {
         // We destroy the producing session before loading its bytes. Only the
         // serialized stream crosses that lifetime boundary.
@@ -141,7 +141,7 @@ SLANG_UNIT_TEST(tokenASTSerializationPreservesLexicalValues)
             // The container API makes omission of location data explicit. The
             // token serializer must preserve lexical state under either policy.
             SerialContainerUtil::WriteOptions options;
-            if (includeLocations)
+            if (shouldIncludeLocations)
                 options.sourceManagerToUseWhenSerializingSourceLocs =
                     module->getLinkage()->getSourceManager();
             SLANG_CHECK_ABORT(
@@ -176,7 +176,7 @@ SLANG_UNIT_TEST(tokenASTSerializationPreservesLexicalValues)
             SLANG_CHECK(first.getFlags() == expectedFlags);
             retainedToken = TokenRef(first.as<IdentifierToken>());
 
-            if (includeLocations)
+            if (shouldIncludeLocations)
             {
                 // Registering only the identifier's location would lose the
                 // leading comment's line metadata and the line after the splice.

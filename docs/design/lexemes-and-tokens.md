@@ -121,7 +121,11 @@ These offsets describe the consecutive input bytes represented by a token and it
 
 `AtStartOfLine` and `AfterWhitespace` are occurrence flags used by preprocessing.
 For example, a function-like macro definition depends on whether whitespace separates the macro name from `(`.
-Macro expansion can also change the first token's line context without changing its spelling.
+During macro expansion, the first replacement token takes its leading context from the replaced occurrence.
+Its spelling, physical trivia, and location can still come from the macro definition.
+A separator before a macro's replacement list is therefore not automatically a separator in the expanded sequence.
+Separators around an empty replacement carry forward to the next token.
+Argument substitution discards the argument's outer logical separators and uses the parameter's position for leading context.
 Those facts belong to the occurrence rather than to a shared object.
 Attached trivia exposes both spellings and its location with zero occurrence flags; the raw-token occurrence carries the preprocessing context.
 
