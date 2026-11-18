@@ -1,9 +1,12 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -shaderobj -emit-spirv-via-glsl
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12  -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+// The tCubeArray TEST_INPUT below names arrayLength=1: render-test creates it
+// as a one-element cube array, so the vk legs query dimensions through a view
+// that matches the TextureCubeArray parameter on both SPIR-V emit paths.
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -shaderobj -emit-spirv-via-glsl
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-slang -vk -compute -shaderobj
 // TODO(JS): Doesn't work on CUDA as there aren't any CUDA functions to get dimensions.
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
 // Not supported in WGSL: 1D array texture not supported in WGSL
