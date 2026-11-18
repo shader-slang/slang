@@ -612,24 +612,26 @@ void CPPSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     // `-ffp-contract=fast`) is otherwise free to contract `a*b+c` into an FMA
     // and change the result. `#pragma STDC FP_CONTRACT OFF` is the standard
     // file-scope way to forbid that, and front matter is emitted ahead of the
-    // prelude, so the pragma covers the whole module. Per compiler, the guard
-    // buys: clang honors the pragma; GCC honors it since 14 and ignores it
-    // before that (still fusing, so those users must pass `-ffp-contract=off`
-    // themselves); MSVC is excluded because it does not contract under its
-    // default `/fp:precise`, and its handling of unknown STDC pragmas is not
-    // verified, so we keep the pragma away from it rather than risk a
-    // diagnostic in every Windows build that includes our output. Header
-    // artifacts carry the pragma as well: their inline module definitions need
-    // the guarantee, and extending it to the rest of the including translation
-    // unit is the conservative direction for a global precise-mode request (the
-    // CUDA fast-math front-matter define reaches header artifacts the same
-    // way). The CPP source-language gate keeps CUDA output unchanged, because
-    // nvcc defines `__GNUC__` but silently ignores STDC pragmas, so the pragma
-    // would be dead text there.
+    // prelude, so the pragma covers the whole module. The guard admits exactly
+    // the compilers that honor the pragma: clang and its relatives (which
+    // define `__clang__`). GCC documents FP_CONTRACT as not implemented in
+    // every current release — it ignores the pragma and warns
+    // `-Wunknown-pragmas` under `-Wall` — so GCC consumers see no pragma and
+    // must pass `-ffp-contract=off` themselves. MSVC is excluded because it
+    // does not contract under its default `/fp:precise`, and its handling of
+    // unknown STDC pragmas is not verified, so we keep the pragma away from it
+    // rather than risk a diagnostic in every Windows build that includes our
+    // output. Header artifacts carry the pragma as well: their inline module
+    // definitions need the guarantee, and extending it to the rest of the
+    // including translation unit is the conservative direction for a global
+    // precise-mode request (the CUDA fast-math front-matter define reaches
+    // header artifacts the same way). The CPP source-language gate keeps CUDA
+    // output unchanged, because nvcc silently ignores STDC pragmas, so the
+    // pragma would be dead text there.
     if (getSourceLanguage() == SourceLanguage::CPP &&
         getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Precise)
     {
-        m_writer->emit("#if defined(__clang__) || defined(__GNUC__)\n");
+        m_writer->emit("#if defined(__clang__)\n");
         m_writer->emit("#pragma STDC FP_CONTRACT OFF\n");
         m_writer->emit("#endif\n");
     }
