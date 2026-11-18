@@ -4,11 +4,11 @@ implementing numerics;
 // one generic overload above another from their interface refinements. Keep the ranks aligned with
 // the existing core tiers:
 //
-// - Rank -10 is the ordinary interface-generic fallback. Unranked core math overloads and rank-10
-//   builtin operators therefore continue to handle builtin types.
-//   The dot-product wrapper now explicitly uses this fallback rank. Slang 202c removes the
-//   deprecated generic-parameter-count tie-breaker, so the rank keeps concrete core overloads
-//   preferred independently of that compatibility rule.
+// - Rank -10 is the ordinary interface-generic fallback. Wrappers that share a name with a
+//   core-module overload (dot, any, all, abs, rcp) carry this rank explicitly, so unranked core
+//   overloads and rank-10 builtin operators continue to handle builtin types. Slang 202c removes
+//   the deprecated generic-parameter-count tie-breaker, so these ranks keep concrete core
+//   overloads preferred independently of that compatibility rule.
 // - Rank -4 is immediately below the legacy IArithmetic operator tier at -3 (with IFloat at -2
 //   and IDifferentiableArithmetic at -1), so existing generic constraints retain their operators.
 // - Ranks -9 and -11 bracket the legacy IComparable relation adapters at -10. Scalar bool-valued
