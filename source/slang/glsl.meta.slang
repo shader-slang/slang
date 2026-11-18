@@ -891,9 +891,11 @@ public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-// The GLSL_400 version-equivalence alias gates glsl >= 4.00, hlsl >= sm_5_1 and
-// cuda >= sm_6_0, and admits metal, cpp and llvm unversioned. It has no spirv or
-// wgsl arm, so those two targets are admitted unversioned by their own attributes.
+// Conjoining with the GLSL_400 version-equivalence alias gates glsl >= 4.00,
+// hlsl >= sm_5_1 and cuda >= sm_6_0, and admits metal, cpp and llvm unversioned.
+// cpp_cuda_glsl_hlsl_metal_llvm has no spirv or wgsl target, so those two are
+// admitted unversioned by their own attributes, and GLSL_400's spirv_1_3 arm
+// never enters the spirv bucket.
 [require(cpp_cuda_glsl_hlsl_metal_llvm, GLSL_400)]
 [require(spirv)]
 [require(wgsl)]
