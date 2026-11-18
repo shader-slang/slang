@@ -83,6 +83,15 @@ static SlangResult _calcCombinedPath(
         }
     }
 
+    // The combined path is the spelling used for every later operation on the file (existence
+    // checks, unique identity, loading), so it must be the minimal one: a path assembled with
+    // `..` segments, like `dir/../dir/file.slang`, inflates the effective length, and on Windows
+    // a path over the legacy ~260-character limit makes those operations fail even though the
+    // equivalent simplified path would fit. `Path::simplify` collapses `x/..` pairs, matching
+    // what `getPath(PathKind::Simplified)` returns for the same path, and keeps leading `..`
+    // segments, which cannot be resolved without an absolute base.
+    relPath = Path::simplify(relPath);
+
     *pathOut = StringUtil::createStringBlob(relPath).detach();
     return SLANG_OK;
 }
