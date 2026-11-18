@@ -2,12 +2,13 @@
 
 // `-pass-through` hands the original source file to the selected downstream compiler, and a
 // C/C++-only compiler (clang, gcc, visualstudio, llvm, genericcpp) cannot consume Slang or
-// any other shader language. The no-`-entry` and `-entry` variants below guarded, pre-fix, the
-// downstream compile failing and the null out-artifact reaching
-// passthroughDownstreamDiagnostics; the `wgsl`-suffixed variants guard the language-name lookup
-// that release-asserted on languages missing from the name table. (Pass-through skips the
-// Slang front end entirely, so this file's body is inert for every variant — which is also why
-// the wgsl variants can re-add this same file with `-lang wgsl`.)
+// any other shader language. The no-`-entry` variants guarded, pre-fix, the empty
+// entry-point list reaching `getSingleEntryPointIndex` (the #14603 crash); the `-entry`
+// variant reached the downstream compile with source the compiler cannot consume. The
+// `wgsl`-suffixed variants guard the language-name lookup that release-asserted on languages
+// missing from the name table. (Pass-through skips the Slang front end entirely, so this
+// file's body is inert for every variant — which is also why the wgsl variants can re-add
+// this same file with `-lang wgsl`.)
 
 export __extern_cpp int add(int a, int b) { return a + b; }
 

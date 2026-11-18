@@ -55,8 +55,8 @@ struct DownstreamCompilerInfos
     // The generic compiler dispatches to visual studio, clang or gcc, and accepts C and C++
     // like each of them. Recording this is load-bearing for the pass-through language gate,
     // which skips compilers with no table entry; it also means
-    // Session::setDefaultDownstreamCompiler accepts genericcpp for C/C++ (it previously
-    // returned SLANG_FAIL through the zero-flag default).
+    // Session::setDefaultDownstreamCompiler accepts genericcpp for C/C++ (with no entry it
+    // would return SLANG_FAIL through the zero-flag default).
     infos.infos[int(SLANG_PASS_THROUGH_GENERIC_C_CPP)] =
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
 

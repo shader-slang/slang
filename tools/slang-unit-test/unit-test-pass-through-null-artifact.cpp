@@ -1,7 +1,7 @@
 // unit-test-pass-through-null-artifact.cpp
 
-#include "compiler-core/slang-downstream-compiler.h"
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-downstream-compiler.h"
 #include "slang-compiler.h"
 #include "unit-test/slang-unit-test.h"
 
