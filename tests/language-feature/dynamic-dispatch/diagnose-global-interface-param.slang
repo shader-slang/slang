@@ -7,13 +7,13 @@
 // interface-typed globals for dynamic dispatch (bare `uniform IFoo`
 // at global scope crashes; see diagnose-global-interface-param-bare.slang).
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cuda -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cpp -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cuda -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cpp -stage compute -entry computeMain
 
 [anyValueSize(16)]
 interface IFoo

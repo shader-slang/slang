@@ -2,7 +2,7 @@
 // is an error. `slangc` does not skip the validation silently, and `slang-test` does not remove
 // the option for such a target.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hpp -entry computeMain -stage compute -validate-with-downstream-compiler
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hpp -entry computeMain -stage compute -validate-with-downstream-compiler
 
 // CHECK: error[E52015]
 // CHECK: '-validate-with-downstream-compiler' cannot be used with target 'hpp'
