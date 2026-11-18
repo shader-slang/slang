@@ -202,6 +202,21 @@ class TypeCastIntVal : public IntVal
         Val* base,
         DiagnosticSink* sink);
 
+    // Return the constant of type `resultType` that converting the floating-point value `value`
+    // to `resultType` produces, truncating toward zero, or null when the conversion cannot be
+    // folded. `resultType` must be an integer, `bool` or enum type. The conversion is not
+    // folded when its result is target-defined: when the truncated value does not fit in
+    // `resultType`, or `value` is NaN or infinite. For example, converting 300.0 to `int8_t`
+    // is not folded, because C, C++ and SPIR-V leave the result undefined and GPUs commonly
+    // saturate it to 127. A non-null `sink` then receives a target-defined value warning at
+    // `loc`.
+    static IntVal* tryFoldFromFloat(
+        ASTBuilder* astBuilder,
+        Type* resultType,
+        double value,
+        DiagnosticSink* sink,
+        SourceLoc loc);
+
     bool _isLinkTimeValOverride()
     {
         if (auto intBase = as<IntVal>(getBase()))

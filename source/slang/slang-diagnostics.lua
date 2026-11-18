@@ -1370,6 +1370,13 @@ warning(
     span { loc = "location", message = "the value of expression ~arg0Val ~op ~arg1Val is target-defined." }
 )
 
+warning(
+    "target-defined-float-conversion",
+    30036,
+    "target-defined value",
+    span { loc = "location", message = "converting ~value to '~type:Type' is target-defined." }
+)
+
 err(
     "break-outside-loop",
     30003,

@@ -13,6 +13,10 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <typeinfo>
 
 namespace Slang
@@ -2438,6 +2442,65 @@ static BasicExpressionType* getIntegerFoldingType(ASTBuilder* astBuilder, Type* 
 static MathIntValue createMathIntValue(BasicExpressionType* type, ConstantIntVal* c)
 {
     return MathIntValue::constructFromValue(expressionTypeToMathIntType(type), c->getValue());
+}
+
+/// Return decimal text that reads back as exactly `value` and reads as a floating-point value.
+/// An integral value below 1e20 in magnitude is written in full, as in "300.0" or
+/// "18446744073709551616.0" for 2^64, which covers the bounds of every integer type. Any other
+/// value is written with the fewest significant digits that read back exactly, as in "300.5"
+/// or "1e+300". The default "%g" format keeps only six significant digits, which would show
+/// 2^63 and the slightly smaller values that still fit in `int64_t` the same way.
+static String formatFloatValueForDiagnostic(double value)
+{
+    if (std::isnan(value))
+        return "nan";
+    if (std::isinf(value))
+        return value < 0 ? "-inf" : "inf";
+
+    char text[512];
+    if (value == std::trunc(value) && std::fabs(value) < 1e20)
+    {
+        snprintf(text, sizeof(text), "%.0f.0", value);
+        return String(text);
+    }
+
+    for (int precision = 1; precision <= 17; ++precision)
+    {
+        snprintf(text, sizeof(text), "%.*g", precision, value);
+        if (strtod(text, nullptr) == value)
+            break;
+    }
+    return String(text);
+}
+
+IntVal* TypeCastIntVal::tryFoldFromFloat(
+    ASTBuilder* astBuilder,
+    Type* resultType,
+    double value,
+    DiagnosticSink* sink,
+    SourceLoc loc)
+{
+    auto resultBasicType = getIntegerFoldingType(astBuilder, resultType);
+    SLANG_RELEASE_ASSERT(resultBasicType);
+
+    MathIntResult res =
+        MathIntOps::convertFloatValue(expressionTypeToMathIntType(resultBasicType), value);
+
+    // A null `sink` means the caller suppresses these diagnostics.
+    // See also SemanticsVisitor::getFoldDiagnosticSink.
+    if (res.flags & MathIntResult::TargetDefined)
+    {
+        if (sink)
+        {
+            sink->diagnose(Diagnostics::TargetDefinedFloatConversion{
+                .value = formatFloatValueForDiagnostic(value),
+                .type = resultType,
+                .location = loc});
+        }
+        return nullptr;
+    }
+
+    return astBuilder->getIntVal(resultType, res.value.getSignedValue());
 }
 
 IntVal* BuiltinOperationIntVal::tryFoldImpl(

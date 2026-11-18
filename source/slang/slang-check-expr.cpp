@@ -3267,11 +3267,14 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         {
             if (auto floatLitExpr = typeCastOperand.as<FloatingPointLiteralExpr>())
             {
-                // When explicitly casting from float type to integer type, let's fold it as
-                // an integer value.
-                const IntegerLiteralValue value =
-                    IntegerLiteralValue(floatLitExpr.getExpr()->value);
-                val = m_astBuilder->getIntVal(substType, value);
+                // An explicit cast of a floating-point literal to an integer type folds to the
+                // integer value of the literal, truncated toward zero, when that value fits.
+                val = TypeCastIntVal::tryFoldFromFloat(
+                    m_astBuilder,
+                    substType,
+                    floatLitExpr.getExpr()->value,
+                    getFoldDiagnosticSink(circularityInfo),
+                    expr.getExpr()->loc);
             }
         }
 
