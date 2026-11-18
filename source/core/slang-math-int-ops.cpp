@@ -1,6 +1,7 @@
 #include "slang-math-int-ops.h"
 
 #include <bit>
+#include <type_traits>
 
 namespace Slang
 {
@@ -51,6 +52,18 @@ uint64_t getMaxForType(const MathIntType& type)
         else
             return (uint64_t{1} << (type.width & 63U)) - 1U;
     }
+}
+
+// Return the two's-complement negation of `a`, i.e. `-a` modulo 2^64. We negate unsigned
+// magnitudes because negating a signed value such as INT64_MIN overflows, which is undefined
+// behavior. Writing `-a` on a `uint64_t` is well defined but triggers MSVC warning C4146, so we
+// spell the negation out here. The template parameter with `static_assert` rejects any argument
+// that would otherwise convert implicitly to `uint64_t`.
+template<typename T>
+constexpr uint64_t negU64(T a)
+{
+    static_assert(std::is_same_v<T, uint64_t>);
+    return uint64_t{0} - a;
 }
 
 struct Int128
@@ -334,7 +347,8 @@ MathIntResult MathIntOps::mul(
 
     if (isNegative(a) && isNegative(b))
     {
-        overflow = (-a.getUnsignedValue()) > (getMaxForType(resultType) / (-b.getUnsignedValue()));
+        overflow = negU64(a.getUnsignedValue()) >
+                   (getMaxForType(resultType) / negU64(b.getUnsignedValue()));
     }
     else if (isNegative(a) && !isNegative(b))
     {
@@ -342,8 +356,9 @@ MathIntResult MathIntOps::mul(
     }
     else if (!isNegative(a) && isNegative(b))
     {
-        overflow = a.getUnsignedValue() >
-                   ((-static_cast<uint64_t>(getMinForType(resultType))) / (-b.getUnsignedValue()));
+        overflow =
+            a.getUnsignedValue() > (negU64(static_cast<uint64_t>(getMinForType(resultType))) /
+                                    negU64(b.getUnsignedValue()));
     }
     else
     {
@@ -375,12 +390,12 @@ MathIntResult MathIntOps::div(
 
     if (isNegative(a) && isNegative(b))
     {
-        res = (-a.getUnsignedValue()) / (-b.getUnsignedValue());
+        res = negU64(a.getUnsignedValue()) / negU64(b.getUnsignedValue());
         overflow = !valueInRange(resultType, extendToI128(res));
     }
     else if (isNegative(a) && !isNegative(b))
     {
-        Int128 res128 = negI128(extendToI128((-a.getUnsignedValue()) / b.getUnsignedValue()));
+        Int128 res128 = negI128(extendToI128(negU64(a.getUnsignedValue()) / b.getUnsignedValue()));
         overflow = !valueInRange(resultType, res128);
         res = res128.lo;
     }
@@ -390,7 +405,7 @@ MathIntResult MathIntOps::div(
         //
         // If b <= -2, the uint64_t division a / -b has no overflow. The critical test is
         // UINT64_MAX / -2 == -INT64_MAX, which fits in int64_t.
-        Int128 res128 = negI128(extendToI128(a.getUnsignedValue() / (-b.getUnsignedValue())));
+        Int128 res128 = negI128(extendToI128(a.getUnsignedValue() / negU64(b.getUnsignedValue())));
         overflow = !valueInRange(resultType, res128);
         res = res128.lo;
     }
@@ -427,7 +442,7 @@ MathIntResult MathIntOps::rem(
 
     if (isNegative(a))
     {
-        dividend = -a.getUnsignedValue();
+        dividend = negU64(a.getUnsignedValue());
         signedRem = true;
     }
     else
@@ -437,7 +452,7 @@ MathIntResult MathIntOps::rem(
     }
 
     if (isNegative(b))
-        divisor = -b.getUnsignedValue();
+        divisor = negU64(b.getUnsignedValue());
     else
         divisor = b.getUnsignedValue();
 
