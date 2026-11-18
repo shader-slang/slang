@@ -81,6 +81,7 @@ SLANG_UNIT_TEST(passThroughLanguageTable)
     // The generic C/C++ entry is load-bearing for `setDefaultDownstreamCompiler` too.
     ComPtr<slang::IGlobalSession> session;
     SLANG_CHECK(SLANG_SUCCEEDED(slang::createGlobalSession(session.writeRef())));
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        session->setDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_C, SLANG_PASS_THROUGH_GENERIC_C_CPP)));
+    SLANG_CHECK(SLANG_SUCCEEDED(session->setDefaultDownstreamCompiler(
+        SLANG_SOURCE_LANGUAGE_C,
+        SLANG_PASS_THROUGH_GENERIC_C_CPP)));
 }

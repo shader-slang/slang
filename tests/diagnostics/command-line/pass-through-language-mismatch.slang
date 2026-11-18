@@ -7,7 +7,7 @@
 // pass Slang source to a compiler that records only C/C++; the `wgsl`-suffixed variants pass a
 // translation unit in the named language via `-lang`; the multi-TU variant mixes a C++ unit the
 // compiler accepts with a wgsl unit it does not, pinning the fail-fast over all translation
-// units; the tint variant proves a compiler with no recorded languages is skipped (E51700
+// units; the tint variant proves a compiler with no recorded languages is skipped (E52016
 // never appears; the request instead fails the entry-point check, which is only reached when
 // the language gate let it through); the id variant pins the E52016 id itself. (Pass-through
 // skips the Slang front end entirely, so this file's body is inert for every variant — which is

@@ -225,7 +225,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
                 if (!DownstreamCompilerInfo::canCompile(passThroughCompiler, compileLanguage))
                 {
                     // The diagnostic names the language the user selected, not the HLSL that
-                    // Slang input maps to for the capability check.
+                    // Slang input maps to for the canCompile check.
                     getSink()->diagnose(Diagnostics::PassThroughCannotCompileSourceLanguage{
                         .compiler = TypeTextUtil::getPassThroughName(passThroughCompiler),
                         .language = TypeTextUtil::getSourceLanguageName(
