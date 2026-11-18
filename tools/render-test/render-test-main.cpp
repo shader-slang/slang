@@ -1411,7 +1411,8 @@ static SlangResult openOutputFileForWrite(const String& fileName, FILE*& outFile
         if (err != EACCES)
             break;
     }
-    StdWriters::getError().print(
+    fprintf(
+        stderr,
         "error: failed to open output file '%s' for writing: %s (errno %d)\n",
         fileName.getBuffer(),
         strerror(err),
