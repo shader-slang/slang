@@ -1473,8 +1473,6 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::HostVM:
-        case CodeGenTarget::HostObjectCode:
-        case CodeGenTarget::HostHostCallable:
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
@@ -1485,6 +1483,8 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CPPHeader:
         case CodeGenTarget::HostLLVMIR:
+        case CodeGenTarget::HostObjectCode:
+        case CodeGenTarget::HostHostCallable:
         case CodeGenTarget::ShaderLLVMIR:
         case CodeGenTarget::ShaderObjectCode:
         case CodeGenTarget::ShaderHostCallable:
@@ -2501,6 +2501,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
@@ -2606,6 +2608,8 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
     case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
