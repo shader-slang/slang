@@ -2374,7 +2374,9 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     // declaration — invalid C++. Declare each function called from a global
     // initializer up front; its definition still comes from the later pass.
     {
-        HashSet<IRFunc*> funcsToDeclare;
+        // Declaration order follows first-use order so the emitted text is stable
+        // across runs.
+        OrderedHashSet<IRFunc*> funcsToDeclare;
         for (auto action : actions)
         {
             if (action.level != EmitAction::Level::Definition)
