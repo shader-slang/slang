@@ -12137,6 +12137,12 @@ bool SemanticsVisitor::checkInterfaceConformance(
             continue;
         if (as<InterfaceDefaultImplDecl>(requiredMemberDecl.getDecl()))
             continue;
+        // A typealias in an interface is a plain alias, not a requirement.
+        auto innerMemberDecl = requiredMemberDecl.getDecl();
+        while (auto genericDecl = as<GenericDecl>(innerMemberDecl))
+            innerMemberDecl = genericDecl->inner;
+        if (as<TypeDefDecl>(innerMemberDecl))
+            continue;
         ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
         // Validate attributes on empty declarations before skipping them as requirements.
         if (as<EmptyDecl>(requiredMemberDecl.getDecl()))
