@@ -5256,6 +5256,94 @@ void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
     }
 }
 
+// Expand a single matrix-typed `FRem` (`%` on floating-point matrices) into one
+// `FRem` per row, and replace the instruction with a `MakeMatrix` of the row
+// results.
+//
+// Consider this example:
+//
+//     float2x2 m = ...;
+//     float2x2 r = m % 0.75;   // also `m % n` and `0.75 % m`
+//
+// The core module lowers `%` to a single matrix-typed `IRFRem` with a scalar
+// operand left scalar (`frem(%m, 0.75)`, not broadcast to a matrix). The GLSL
+// text emitter spells `FRem` as `sign(x) * mod(abs(x), abs(y))`, which only
+// type-checks when `sign`/`abs`/`mod` see scalar or vector operands: GLSL has
+// no matrix overloads for those builtins, and `mod` has a
+// `genType mod(genType, float)` overload but no `mod(float, genType)`. We
+// therefore extract each row of every matrix operand and splat every scalar
+// operand to the row vector type, so each row `FRem` has vector operands and
+// the emitted construction is valid GLSL. This mirrors what the direct SPIR-V
+// emitter does at emit time (its `emitArithmetic` matrix branch), but lives in
+// the IR so the GLSL-family text emitters only ever see vector-shaped `FRem`s.
+static void legalizeMatrixFRem(IRInst* inst)
+{
+    auto matrixType = as<IRMatrixType>(inst->getDataType());
+    SLANG_RELEASE_ASSERT(matrixType && "Matrix FRem legalization requires a matrix result type");
+    auto rowCount = getIntVal(matrixType->getRowCount());
+    auto colCount = getIntVal(matrixType->getColumnCount());
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+    auto rowVectorType = builder.getVectorType(matrixType->getElementType(), colCount);
+
+    // A scalar operand is splatted once, outside the row loop, so that both
+    // operands of every row `FRem` are vectors: GLSL `mod` has no
+    // `mod(float, genType)` overload for a scalar dividend. A matrix operand
+    // returns `nullptr` here and contributes one extracted row per row of the
+    // result instead.
+    auto splatIfScalar = [&](IRInst* operand) -> IRInst*
+    {
+        if (as<IRMatrixType>(operand->getDataType()))
+            return nullptr;
+        SLANG_RELEASE_ASSERT(as<IRBasicType>(operand->getDataType()));
+        return builder.emitMakeCompositeFromScalar(rowVectorType, operand);
+    };
+    auto splattedLeft = splatIfScalar(inst->getOperand(0));
+    auto splattedRight = splatIfScalar(inst->getOperand(1));
+
+    List<IRInst*> rows;
+    for (IRIntegerValue row = 0; row < rowCount; row++)
+    {
+        auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
+        IRInst* args[2];
+        for (UInt j = 0; j < 2; j++)
+        {
+            IRInst* splatted = j == 0 ? splattedLeft : splattedRight;
+            args[j] =
+                splatted ? splatted : builder.emitElementExtract(inst->getOperand(j), rowIndexInst);
+        }
+        rows.add(builder.emitIntrinsicInst(rowVectorType, kIROp_FRem, 2, args));
+    }
+    auto newInst = builder.emitMakeMatrix(matrixType, rows.getCount(), rows.getBuffer());
+
+    inst->replaceUsesWith(newInst);
+    inst->transferDecorationsTo(newInst);
+    inst->removeAndDeallocate();
+}
+
+void legalizeMatrixFRemForGLSL(IRModule* module)
+{
+    // The walk covers every function in the module, not just entry points, so
+    // a `%` on matrices inside a helper function is rewritten as well.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRGlobalValueWithCode>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst = block->getFirstInst(); inst;)
+            {
+                auto next = inst->getNextInst();
+                if (inst->getOp() == kIROp_FRem && as<IRMatrixType>(inst->getDataType()))
+                    legalizeMatrixFRem(inst);
+                inst = next;
+            }
+        }
+    }
+}
+
 void legalizeConstantBufferLoadForGLSL(IRModule* module)
 {
     // Constant buffers and parameter blocks are represented as `uniform` blocks

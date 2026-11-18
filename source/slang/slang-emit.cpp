@@ -2487,6 +2487,14 @@ Result linkAndOptimizeIR(
             // `bool` reaches here unchanged, so rewrite it to an integer switch.
             SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
 
+            // GLSL has no matrix overloads for the builtins used to spell a floating-point
+            // remainder, so a matrix-typed `FRem` must be expanded per row before emission.
+            // Direct SPIR-V is excluded because its emitter already expands matrix
+            // arithmetic per row at emit time and relies on the matrix-typed `FRem`.
+            if (target == CodeGenTarget::GLSL ||
+                (isSPIRV(target) && !targetProgram->shouldEmitSPIRVDirectly()))
+                SLANG_PASS(legalizeMatrixFRemForGLSL);
+
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
