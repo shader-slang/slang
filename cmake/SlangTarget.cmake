@@ -182,6 +182,25 @@ function(slang_add_target dir type)
     endif()
 
     #
+    # Embed a longPathAware application manifest into Windows executables.
+    #
+    # On Windows 10 (1607) and later the per-machine LongPathsEnabled registry
+    # opt-in only takes effect for an executable that declares longPathAware
+    # in its application manifest. Without that declaration our tools still
+    # fail to open or write files whose full paths exceed MAX_PATH, even on
+    # machines where long paths are enabled. CMake embeds .manifest source
+    # files into binaries built with the MSVC toolchain (both the VS and the
+    # Ninja generators), so listing the shared manifest as a source covers
+    # every executable created through slang_add_target.
+    #
+    # We use ${slang_SOURCE_DIR} rather than CMAKE_CURRENT_LIST_DIR here
+    # because the latter resolves to the directory of the caller at function
+    # execution time, not to this file's directory.
+    if(WIN32 AND MSVC AND type STREQUAL "EXECUTABLE")
+        target_sources(${target} PRIVATE ${slang_SOURCE_DIR}/cmake/slang-app.manifest)
+    endif()
+
+    #
     # Set the output directory
     #
     # We don't want the output directory to be sensitive to where
