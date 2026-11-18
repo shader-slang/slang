@@ -125,9 +125,9 @@ struct TestOptions
     // `foo.slang.1.expected.txt` for the line at index 1. It is -1 for any other test.
     Index sourceIndex = -1;
 
-    // The label of the target (for example `vk`) that the `targets=` option gave to this test.
-    // It is empty for a test line that has no `targets=` option.
-    String targetLabel;
+    // The target (a `TestTargetFlag`, for example `Vk`) that this test runs for. It is one bit for
+    // the test of one target of a line with `targets=`, and 0 for any other test.
+    TestTargetFlags target = 0;
 };
 
 struct FileTestInfoImpl : public FileTestInfo
@@ -620,38 +620,19 @@ static SlangResult _normalizeTestOutputPaths(
 
 static RenderApiType _getRenderApiFromArgs(const List<String>& args);
 
-// Returns the render API that `target` runs on, for example `Vulkan` for `vk`.
-static RenderApiType _getRenderApiOfTarget(const TestTarget& target)
-{
-    const char* const flag = target.renderTestArgs[0];
-    SLANG_ASSERT(flag && flag[0] == '-');
-    return RenderApiUtil::findApiTypeByName(UnownedStringSlice(flag + 1));
-}
-
-// Returns the label of the target that a test line with the render API argument runs on, for
-// example `vk` for `-vk` and `glsl` for `-vk -emit-spirv-via-glsl`. The label is empty if the
-// arguments have no render API. A test line has the same target whether it is a line that the
-// author wrote (`-mtl`), or a test that `slang-test` made for one target of a line (`-metal`).
-static String _getTestTargetLabelFromArgs(const List<String>& args)
+// Returns the first target that runs on the render API of the arguments, for example `vk` for `-vk`
+// and `metal` for `-mtl`. It returns null if the arguments have no render API. The function only
+// tells the author which option replaces the argument. The target of a test is
+// `TestOptions::target`.
+static const TestTarget* _findTestTargetOfArgs(const List<String>& args)
 {
     const RenderApiType api = _getRenderApiFromArgs(args);
-    if (api == RenderApiType::Unknown)
-        return String();
-
-    // `vk` and `glsl` use the same API. The path of the compiler tells them apart.
-    if (api == RenderApiType::Vulkan)
-        return args.contains("-emit-spirv-via-glsl") ? "glsl" : "vk";
-
-    List<const TestTarget*> targets;
-    String error;
-    if (SLANG_FAILED(expandTestTargetList(UnownedStringSlice("all"), targets, error)))
-        return String();
-    for (const TestTarget* target : targets)
+    for (Index i = 0; i < getTestTargetCount(); ++i)
     {
-        if (_getRenderApiOfTarget(*target) == api)
-            return target->label;
+        if (getTestTargetAt(i).api == api)
+            return &getTestTargetAt(i);
     }
-    return String();
+    return nullptr;
 }
 
 // Returns true if an argument of `args` names a language that implies a render API, for example
@@ -694,12 +675,38 @@ static bool _isMultiTargetLine(const TestOptions& options)
            !options.isSynthesized;
 }
 
-// Returns true if the arguments of the test line choose a render API, with an argument such as
-// `-vk`, or with a language that implies one, such as `-wgsl`.
-static bool _namesRenderApi(const List<String>& args)
+// Returns the option `targets=` that replaces the arguments of the test line that choose the
+// target, for example `targets=vk` for `-vk`, or `targets=glsl` for `-emit-spirv-via-glsl`. The
+// arguments are a render API (`-vk`), a language that implies one (`-wgsl`), or the path of the
+// compiler to the code of the target (`-emit-spirv-via-glsl`). It returns an empty string if the
+// arguments do not choose the target.
+static String _getTargetsOptionForArgs(const List<String>& args)
 {
-    return _getRenderApiFromArgs(args) != RenderApiType::Unknown ||
-           _hasImplicitDeviceLanguageArg(args);
+    // The path of the compiler is part of the target: `vk` and `glsl` differ in this path, and so
+    // do `cpu` and `llvm`.
+    static const struct
+    {
+        const char* argument;
+        const char* target;
+    } kPathArguments[] = {
+        {"-emit-spirv-directly", "vk"},
+        {"-emit-spirv-via-glsl", "glsl"},
+        {"-emit-cpu-via-cpp", "cpu"},
+        {"-emit-cpu-via-llvm", "llvm"},
+    };
+    for (const auto& path : kPathArguments)
+    {
+        if (args.contains(path.argument))
+            return String("targets=") + path.target;
+    }
+
+    if (const TestTarget* target = _findTestTargetOfArgs(args))
+    {
+        StringBuilder option;
+        option << "targets=" << target->label;
+        return option.produceString();
+    }
+    return _hasImplicitDeviceLanguageArg(args) ? String("targets=<name>") : String();
 }
 
 // Adds the test line `testDetails` to `outTestList`, after it checks the line.
@@ -743,16 +750,18 @@ static SlangResult _addTestLine(
 
     // The line chooses its targets with `targets=`. An API argument would choose them a second
     // time. A line that `DISABLE_TEST` disables does not run, so it has nothing to check.
-    if (isMultiTargetLine && testDetails.options.isEnabled &&
-        _namesRenderApi(testDetails.options.args))
+    if (isMultiTargetLine && testDetails.options.isEnabled)
     {
-        const String label = _getTestTargetLabelFromArgs(testDetails.options.args);
-        StringBuilder hint;
-        hint << "'targets=" << (label.getLength() ? label : String("<name>")) << "'";
-        return reportError(
-            "the test line names a render API in its arguments. Remove the API argument and add "
-            "the option ",
-            hint.produceString());
+        const String option = _getTargetsOptionForArgs(testDetails.options.args);
+        if (option.getLength())
+        {
+            StringBuilder hint;
+            hint << "'" << option << "'";
+            return reportError(
+                "the test line chooses the target with a render API or a SPIR-V path in its "
+                "arguments. Remove the argument and add the option ",
+                hint.produceString());
+        }
     }
 
     String targetsValue;
@@ -783,9 +792,9 @@ static SlangResult _addTestLine(
         }
     }
 
-    List<const TestTarget*> targets;
+    TestTargetFlags targets;
     String error;
-    if (SLANG_FAILED(expandTestTargetList(targetsValue.getUnownedSlice(), targets, error)))
+    if (SLANG_FAILED(parseTestTargets(targetsValue.getUnownedSlice(), targets, error)))
         return reportError("the 'targets=' option is wrong: ", error);
 
     outTestList->tests.add(testDetails);
@@ -5316,15 +5325,12 @@ TestResult runComputeComparisonImpl(
         cmdLine.addArg(arg);
     }
 
-    // Every test defines `SLANG_TEST_<TARGET>` for its target, so that the shader can pick the code
-    // for one target. The target comes from the render API argument, so a line that the author
-    // wrote
-    // (`-cpu`) and a test that `slang-test` made have the macro in the same way.
-    const String targetLabel = _getTestTargetLabelFromArgs(input.testOptions->args);
-    if (targetLabel.getLength())
+    // The test of a target defines `SLANG_TEST_<TARGET>`, so that the shader can pick the code for
+    // one target.
+    if (input.testOptions->target)
     {
         cmdLine.addArg("-Xslang");
-        cmdLine.addArg(getTestTargetDefinition(targetLabel.getUnownedSlice()));
+        cmdLine.addArg(getTestTargetDefinition(getTestTarget(input.testOptions->target)));
     }
 
     for (int i = 0; i < int(numLangOpts); ++i)
@@ -6665,7 +6671,7 @@ static void _calcSynthesizedTests(
 
         // The test uses another render API than the source line, so the target of the source line
         // (it has one if the source is the test of a target) would name it wrongly.
-        synthOptions.targetLabel = String();
+        synthOptions.target = 0;
 
         StringBuilder builder;
         builder << "-";
@@ -6734,7 +6740,7 @@ static void _calcTargetTests(
     {
         const TestDetails* test;
         Index index;
-        List<const TestTarget*> targets;
+        TestTargetFlags targets;
     };
     List<TargetLine> lines;
 
@@ -6754,8 +6760,7 @@ static void _calcTargetTests(
         String value = "all";
         srcTest.options.commandOptions.tryGetValue("targets", value);
         String error;
-        SLANG_RETURN_VOID_ON_FAIL(
-            expandTestTargetList(value.getUnownedSlice(), line.targets, error));
+        SLANG_RETURN_VOID_ON_FAIL(parseTestTargets(value.getUnownedSlice(), line.targets, error));
         lines.add(line);
     }
 
@@ -6769,20 +6774,21 @@ static void _calcTargetTests(
         const RenderApiType api = RenderApiType(apiIndex);
         for (const auto& line : lines)
         {
-            for (const TestTarget* target : line.targets)
+            for (Index targetIndex = 0; targetIndex < getTestTargetCount(); ++targetIndex)
             {
-                if (_getRenderApiOfTarget(*target) != api)
+                const TestTarget& target = getTestTargetAt(targetIndex);
+                if (!(line.targets & target.flag) || target.api != api)
                     continue;
 
                 TestDetails targetTest(line.test->options);
                 TestOptions& targetOptions = targetTest.options;
                 targetOptions.isSynthesized = true;
                 targetOptions.commandOptions.remove("targets");
-                targetOptions.targetLabel = target->label;
+                targetOptions.target = target.flag;
                 targetOptions.sourceIndex = line.index;
                 if (auto c = context->categorySet.find(RenderApiUtil::getApiName(api)))
                     targetOptions.addCategory(c);
-                appendTestTargetArgs(*target, targetOptions.args);
+                appendTestTargetArgs(target, targetOptions.args);
 
                 // Work out the info about this test
                 context->setTestRequirements(&targetTest.requirements);
@@ -6833,7 +6839,7 @@ static void _calcSynthesizedCompileTargetTests(
         // The test of one target of a line has an explicit API and a target, so it is a source of a
         // compile-only test. The tests that the old synthesis made are copies, and they are not.
         if (!srcTest.options.isEnabled ||
-            (srcTest.options.isSynthesized && srcTest.options.targetLabel.getLength() == 0) ||
+            (srcTest.options.isSynthesized && srcTest.options.target == 0) ||
             !_isGpuComputeCommand(srcTest.options.command))
             continue;
 
@@ -7059,8 +7065,8 @@ static String _getTestOutputStem(
     const Index nameIndex = _getTestNameIndex(options, positionInList);
     if (nameIndex != 0)
         stem << "." << nameIndex;
-    if (options.sourceIndex >= 0 && options.targetLabel.getLength())
-        stem << "." << options.targetLabel;
+    if (options.sourceIndex >= 0 && options.target)
+        stem << "." << getTestTarget(options.target).label;
     return stem.produceString();
 }
 
@@ -7245,9 +7251,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
         // A test line with `targets=` shows its target. The label tells `vk` from `glsl`,
         // which use the same render API.
-        if (testDetails.options.targetLabel.getLength())
+        if (testDetails.options.target)
         {
-            testName << " (" << testDetails.options.targetLabel << ")";
+            testName << " (" << getTestTarget(testDetails.options.target).label << ")";
         }
         // Display list of used apis on render test
         else if (requirements.usedRenderApiFlags)

@@ -181,7 +181,7 @@ Use `COMPARE_COMPUTE_EX` only for a test that must choose its own mode, for exam
 
 #### No render API argument
 
-A line of these commands cannot have a render API argument, such as `-vk` or `-cpu`, or a language argument that implies one, such as `-wgsl`. `slang-test` reports an error, and the test fails. The text of the error names the option to use. For example, the line below is an error, and the text asks for `targets=vk`:
+A line of these commands cannot choose its target with an argument. The arguments that choose a target are a render API (`-vk`, `-cpu`), a language that implies one (`-wgsl`), and the path of the compiler to the code of the target (`-emit-spirv-directly`, `-emit-spirv-via-glsl`, `-emit-cpu-via-cpp`, `-emit-cpu-via-llvm`). `slang-test` reports an error, and the test fails. The text of the error names the option to use, for example `targets=glsl` for `-emit-spirv-via-glsl`. For example, the line below is an error, and the text asks for `targets=vk`:
 
 ```
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
@@ -199,19 +199,19 @@ A line that `DISABLE_TEST` disables does not run, so `slang-test` does not check
 
 The value of `targets=` is a list of names, separated by plus signs (`+`). These names are valid:
 
-| Name         | Meaning                                        | In `all` | Predefined macro   |
-| ------------ | ---------------------------------------------- | -------- | ------------------ |
-| `vk`         | `-vk -emit-spirv-directly`                     | yes      | `SLANG_TEST_VK`    |
-| `glsl`       | `-vk -emit-spirv-via-glsl`                     | yes      | `SLANG_TEST_GLSL`  |
-| `dx11`       | `-dx11`                                        | yes      | `SLANG_TEST_DX11`  |
-| `dx12`       | `-dx12`                                        | yes      | `SLANG_TEST_DX12`  |
-| `metal`      | `-metal`                                       | yes      | `SLANG_TEST_METAL` |
-| `cuda`       | `-cuda`                                        | yes      | `SLANG_TEST_CUDA`  |
-| `cpu`        | `-cpu`                                         | yes      | `SLANG_TEST_CPU`   |
-| `wgpu`       | `-wgpu`                                        | yes      | `SLANG_TEST_WGPU`  |
-| `llvm`       | `-llvm`                                        | yes      | `SLANG_TEST_LLVM`  |
-| `all`        | every target that has "yes" in the last column |          |                    |
-| `all-<name>` | every target of `all` except `<name>`          |          |                    |
+| Name         | Arguments of `render-test`   | Predefined macro   |
+| ------------ | ---------------------------- | ------------------ |
+| `vk`         | `-vk -emit-spirv-directly`   | `SLANG_TEST_VK`    |
+| `glsl`       | `-vk -emit-spirv-via-glsl`   | `SLANG_TEST_GLSL`  |
+| `dx11`       | `-dx11`                      | `SLANG_TEST_DX11`  |
+| `dx12`       | `-dx12`                      | `SLANG_TEST_DX12`  |
+| `metal`      | `-metal`                     | `SLANG_TEST_METAL` |
+| `cuda`       | `-cuda`                      | `SLANG_TEST_CUDA`  |
+| `cpu`        | `-cpu`                       | `SLANG_TEST_CPU`   |
+| `wgpu`       | `-wgpu`                      | `SLANG_TEST_WGPU`  |
+| `llvm`       | `-llvm`                      | `SLANG_TEST_LLVM`  |
+| `all`        | every target in this table   |                    |
+| `all-<name>` | every target except `<name>` |                    |
 
 Use `all-<name>` for a test that cannot run on a target. For example, `targets=all-vk-cuda` runs on every target except `vk` and `cuda`, and `targets=vk+metal+cpu` runs on these three targets only.
 

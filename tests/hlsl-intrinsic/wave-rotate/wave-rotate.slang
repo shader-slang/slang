@@ -1,6 +1,6 @@
 // TEST_CATEGORY(wave, compute)
 //TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):
 //TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=CHECK):-profile sm_6_0 -Xslang... -capability GL_KHR_shader_subgroup_rotate -X.
 //TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-xslang -DMETAL
 

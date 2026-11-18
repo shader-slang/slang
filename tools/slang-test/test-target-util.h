@@ -2,24 +2,63 @@
 #define TEST_TARGET_UTIL_H
 
 #include "core/slang-list.h"
+#include "core/slang-render-api-util.h"
 #include "core/slang-string.h"
 #include "slang.h"
 
 namespace Slang
 {
 
-// A backend that a `COMPARE_COMPUTE` test line can name in its `targets=` option.
+// A target that a `COMPARE_COMPUTE` test line can name in its `targets=` option. There is one bit
+// for each target, so that a list of targets is a set of bits: `all-vk-cuda` is
+// `AllOf & ~(Vk | Cuda)`.
+//
+// `Vk` and `Glsl` use the same render API (Vulkan). The Slang compiler takes a different path for
+// each of them, so they are two targets, and `RenderApiFlag` cannot tell them apart.
+//
+// Use a struct wrapped Enum instead of enum class, as `RenderApiFlag` does, so that the values can
+// be manipulated as integrals.
+struct TestTargetFlag
+{
+    enum Enum
+    {
+        Vk = 1 << 0,
+        Glsl = 1 << 1,
+        Dx11 = 1 << 2,
+        Dx12 = 1 << 3,
+        Metal = 1 << 4,
+        Cuda = 1 << 5,
+        Cpu = 1 << 6,
+        Wgpu = 1 << 7,
+        Llvm = 1 << 8,
+        AllOf = (1 << 9) - 1, ///< All bits set
+    };
+};
+typedef uint32_t TestTargetFlags;
+
+// The description of one target.
 struct TestTarget
 {
-    // The name that the author writes in `targets=`, for example `glsl`.
+    // The bit of the target.
+    TestTargetFlag::Enum flag;
+
+    // The name that the author writes in `targets=`, for example `glsl`. It has no hyphen and no
+    // comma, because `all-<name>` and the list of options use them.
     const char* label;
 
-    // The arguments that select the backend in `render-test`. The list ends with a null pointer.
-    const char* renderTestArgs[3];
+    // The render API that the target runs on.
+    RenderApiType api;
 
-    // True if `targets=all` includes this target.
-    bool isInAll;
+    // The arguments that select the target in `render-test`. The list ends with a null pointer.
+    const char* renderTestArgs[3];
 };
+
+// Returns the number of targets, and the target at `index`. The targets have the order of the bits.
+Index getTestTargetCount();
+const TestTarget& getTestTargetAt(Index index);
+
+// Returns the target that has the bit `flag`. `flag` must have exactly one bit of `AllOf`.
+const TestTarget& getTestTarget(TestTargetFlags flag);
 
 // Returns true if the test command accepts the `targets=` option.
 //
@@ -32,42 +71,40 @@ bool isTargetsOptionSupportedByCommand(const UnownedStringSlice& command);
 void appendTestTargetArgs(const TestTarget& target, List<String>& ioArgs);
 
 // Returns the macro definition that `slang-test` passes to the Slang compiler (as
-// `-Xslang <definition>`) for the test of the target with the label `label`. The name of the macro
-// is `SLANG_TEST_` and the label in capital letters. For example, `metal` gives
-// `-DSLANG_TEST_METAL` and `glsl` gives `-DSLANG_TEST_GLSL`. A shader uses the macro to pick the
-// code for one target:
+// `-Xslang <definition>`) for the test of `target`. The name of the macro is `SLANG_TEST_` and the
+// label in capital letters. For example, `metal` gives `-DSLANG_TEST_METAL` and `glsl` gives
+// `-DSLANG_TEST_GLSL`. A shader uses the macro to pick the code for one target:
 //
 //     #if defined(SLANG_TEST_METAL)
 //
 // A label has only letters and digits, so the result is a valid macro name.
-String getTestTargetDefinition(const UnownedStringSlice& label);
+String getTestTargetDefinition(const TestTarget& target);
 
-// Turns the value of a `targets=` option into a list of targets.
+// Returns true if `name` is `all` or the label of a target.
+bool isTestTargetName(const UnownedStringSlice& name);
+
+// Turns the value of a `targets=` option into a set of targets.
 //
 // The value is a list of tokens that a plus sign separates, for example `vk+cpu`. A comma does
 // not work as a separator, because it separates the options of a test line. A token is one of
 // these:
 //
-//   all         every target that has `isInAll` set;
+//   all         every target;
 //   <name>      the target with that label;
-//   all-<name>  every target of `all` except the target with that label.
+//   all-<name>  every target except the target with that label.
 //
 // An `all-<name>` token can remove more than one target: a hyphen between the names adds one. For
-// example, `all-vk-cuda` is every target of `all` except `vk` and `cuda`, and `vk+cpu` is these two
+// example, `all-vk-cuda` is every target except `vk` and `cuda`, and `vk+cpu` is these two
 // targets. There is no other way to remove a target: a token such as `-vk` is an unknown name.
 //
-// The result is the union of the tokens. `outTargets` has no duplicates and uses the order of the
-// table, not the order of the tokens, so that the test names are stable.
+// The result is the union (the OR) of the tokens.
 //
-// Returns true if `name` is `all` or the label of a target.
-bool isTestTargetName(const UnownedStringSlice& name);
-
 // Returns `SLANG_E_INVALID_ARG` and sets `outError` for an unknown name, an empty token, or an
 // empty result. A name that is wrong must be an error, because a silent skip would run the test
 // on fewer targets than the author wants.
-SlangResult expandTestTargetList(
+SlangResult parseTestTargets(
     const UnownedStringSlice& value,
-    List<const TestTarget*>& outTargets,
+    TestTargetFlags& outTargets,
     String& outError);
 
 } // namespace Slang
