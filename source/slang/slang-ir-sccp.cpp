@@ -651,13 +651,23 @@ struct SCCPContext
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 * c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
+    // Signed `INT64_MIN / -1` and `INT64_MIN % -1` overflow `IRIntegerValue`, and a host division
+    // instruction such as x86-64 `idiv` traps on them. We fold a division by -1 without dividing:
+    // the quotient is the wrapped negation, so `INT64_MIN / -1` is `INT64_MIN`, and the remainder
+    // is 0. These are the values narrower signed types already fold to, because their quotient is
+    // computed in 64 bits and wraps when truncated to the type.
     LatticeVal evalDiv(IRType* type, LatticeVal v0, LatticeVal v1)
     {
         return evalBinaryImpl(
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 / c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                if (c1 == -1)
+                    return IRIntegerValue(IRUnsignedIntegerValue(0) - IRUnsignedIntegerValue(c0));
+                return c0 / c1;
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
@@ -667,7 +677,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 % c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                if (c1 == -1)
+                    return IRIntegerValue(0);
+                return c0 % c1;
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 % c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return fmod(c0, c1); });
     }
