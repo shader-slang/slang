@@ -5,7 +5,8 @@
 // command line without `-entry`, so with pass-through there is no translation unit to hand
 // over — and with more than one entry point there is no single source to hand over either.
 // Every variant below must produce E52017: the CHECK and TWO variants on the binary
-// host-callable path, the CPP variants on the source-target path, and the IDS variant pins the E52017 id.
+// host-callable path, the CPP variants on the source-target path, and the IDS variant pins
+// the E52017 id.
 
 // clang-format keeps `// CHECK:` comments spaced in C files, and the diagnostic-annotation
 // parser only recognizes an unspaced `//CHECK:` prefix, so keep the directive formatting off.
