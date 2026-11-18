@@ -60,8 +60,9 @@ static IRType* getCompositeTypeWithElementType(
 }
 
 // If one operand is a composite type (vector or matrix), and the other one is a scalar
-// type, then the scalar is converted to a composite type.
-static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
+// type, then the scalar is splatted to a composite type, keeping its own element type for
+// shifts (see the declaration for the full contract).
+void legalizeScalarOperandsToMatchComposite(IRInst* inst)
 {
     if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
         as<IRBasicType>(inst->getOperand(1)->getDataType()))

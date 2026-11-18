@@ -28,6 +28,16 @@ void legalizeEntryPointsForGLSL(
 // integer selector; the C-family and Metal emitters accept a bool switch directly.
 void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module);
 
+// GLSL rejects a shift of a scalar by a vector (`scalar >> ivec2`), although it accepts a
+// scalar shift amount. The front end lowers a shift with a scalar and a vector operand to
+// a single Lsh/Rsh instruction (the intrinsic overload `vector<L,N> operator>>(L, vector<R,N>)`),
+// so the mismatched shape reaches GLSL emission unchanged. Splats the scalar operand of
+// every Lsh/Rsh to the other operand's composite shape, in either operand position — the
+// already-valid `vector >> scalar` direction is rewritten too, for uniformity with the
+// shared helper that the Metal and WGSL legalizations use for the same shapes — so both
+// sides of every emitted shift have matching shapes.
+void legalizeShiftOperandsForGLSL(IRModule* module);
+
 void legalizeConstantBufferLoadForGLSL(IRModule* module);
 
 void legalizeDispatchMeshPayloadForGLSL(IRModule* module);
