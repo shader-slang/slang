@@ -2434,6 +2434,21 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             if (knownBuiltin && knownBuiltin->getName() == KnownBuiltinDeclName::NullDifferential)
                 cloneAndKeepAlive(inst);
         }
+
+        // Host-style targets give module-scope `static` variables process lifetime: the
+        // variables become real globals, and an initializer with observable effects must run
+        // once at load time whether or not any entry point references the variable. Kernel
+        // targets are excluded, because they move selected initializers into the entry
+        // points (see `moveGlobalVarInitializationToEntryPoints`), where an unreferenced
+        // global can still be eliminated freely. Cloning such globals here, with a
+        // `[keepAlive]` decoration, carries them and their initializers through dead-code
+        // elimination; the target emitter then decides how to run the initializer (the LLVM
+        // emitter defers it into the module constructor registered with `llvm.global_ctors`).
+        if (!isKernelTarget(target))
+        {
+            for (auto inst : linkingInfo->getGlobalVarsWithSideEffectingInit())
+                cloneAndKeepAlive(inst);
+        }
     }
 
     // In previous steps, we have skipped cloning the witness table entries, and
@@ -2496,19 +2511,14 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // cheap global-instruction scan, which is a no-op for every module without such a global.
     replaceGLSLAtomicUintGlobals(context, state->irModule);
 
-    // TODO: *technically* we should consider the case where
-    // we have global variables with initializers, since
-    // these should get run whether or not the entry point
-    // references them.
-    //
-    // Or alternatively we can define by fiat that the initializers
-    // on global variables get run at an unspecified time between
-    // program startup and the first access to a given global.
-    // Such a definition gives us the freedom to eliminate globals
-    // that are never accessed, while still doing "eager"
-    // initialization for globals that are referenced (instead of
-    // having to add the overhead of lazy initialization a la
-    // function-`static` variables).
+    // TODO: On kernel targets, global variables with initializers are handled by
+    // `moveGlobalVarInitializationToEntryPoints`, which moves selected initializers into
+    // the entry points. Whether an initializer on a global that no entry point references
+    // should run there too (instead of being eliminated) is an open design question: the
+    // host-target case is handled above via the side-effecting-initializer allowlist, while
+    // kernel targets currently define by fiat that such initializers run at an unspecified
+    // time between program startup and the first access to the global, which permits
+    // eliminating globals that are never accessed.
 
     // Now that we've cloned the entry point and everything
     // it refers to, we can package up the data we return
