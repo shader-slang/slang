@@ -1574,6 +1574,11 @@ IRInst* cloneGlobalValueImpl(
 {
     auto clonedValue =
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
+    // `cloneInst` above recursively clones every referenced value first, so by the time
+    // the dependent is moved to the end of the module here, all of its dependencies
+    // already precede it. The module constructor that runs global initializers visits
+    // them in module order, so a preserved initializer always executes after the
+    // globals its initializer reads have been initialized.
     clonedValue->moveToEnd();
 
     // A linked symbol can have several same-mangled-name declarations across the input
@@ -2436,27 +2441,33 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 cloneAndKeepAlive(inst);
         }
 
-        // Host-style targets that emit a whole program give module-scope variables process
-        // lifetime: they become real globals, and an initializer with observable effects must
-        // run once at load time whether or not any entry point references the variable. The
-        // preservation predicate is the IR shape, not the surface syntax: every `IRGlobalVar`
-        // whose initializer blocks contain an instruction that might have side effects is
-        // cloned here — the same classification DCE relies on, so a global is preserved
-        // exactly when eliminating it would also drop an observable effect of its initializer.
-        // The loop below visits builtin modules too; today none of them define a global with
-        // a side-effecting initializer, so the predicate selects user globals in practice.
-        // Cloning with a `[keepAlive]` decoration carries each global and its initializer
-        // through dead-code elimination; the emitter for the target then decides how the
-        // initializer runs (the LLVM emitter defers it into the module constructor registered
-        // with `llvm.global_ctors`; the C++ source emitter emits a namespace-scope call to
-        // the initializer function). The constructor runs initializers in module order, and
-        // that order is dependency-first by construction: cloning a global pulls its
-        // referenced globals in through the recursive operand clone inside `cloneInst`, and
-        // only then is the dependent itself moved to the end of the module
-        // (`cloneGlobalValueImpl`), so a preserved initializer's global dependencies always
-        // precede it in the linked module. Kernel targets are excluded:
-        // `shouldExtractInitializer` moves the initializers of the globals each target uses
-        // into the entry points, where an unreferenced global can still be eliminated freely.
+        // Host-style targets (the `!isKernelTarget(target)` gate below is the whole
+        // condition — no whole-program option takes part) give module-scope variables
+        // process lifetime: they become real globals, and an initializer with observable
+        // effects must run once at load time whether or not any entry point references
+        // the variable.
+        //
+        // The preservation predicate is the IR shape, not the surface syntax: every
+        // `IRGlobalVar` whose initializer blocks contain an instruction that might have
+        // side effects is cloned here. The scan uses a conservative superset of the
+        // classification DCE relies on (DCE's analysis can prove more instructions
+        // pure), so a global is preserved at least whenever eliminating it would drop
+        // an observable effect of its initializer — and possibly also when the
+        // initializer turns out to be pure. The per-module loop above visits builtin
+        // modules too; today none of them define a global with a side-effecting
+        // initializer, so the predicate selects user globals in practice.
+        //
+        // Cloning with a `[keepAlive]` decoration carries each global and its
+        // initializer through dead-code elimination; the emitter for the target then
+        // decides how the initializer runs (the LLVM emitter defers it into the module
+        // constructor registered with `llvm.global_ctors`; the C++ source emitter emits
+        // a namespace-scope call to the initializer function). The constructor runs
+        // initializers in module order, which is dependency-first by construction (see
+        // the note on `cloneGlobalValueImpl`).
+        //
+        // Kernel targets are excluded: `shouldExtractInitializer` moves the initializers
+        // of the globals each target uses into the entry points, where an unreferenced
+        // global can still be eliminated freely.
         if (!isKernelTarget(target))
         {
             for (auto inst : linkingInfo->getGlobalVarsWithSideEffectingInit())
@@ -2524,13 +2535,14 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // cheap global-instruction scan, which is a no-op for every module without such a global.
     replaceGLSLAtomicUintGlobals(context, state->irModule);
 
-    // TODO: On kernel targets, the global-init pass extracts every initializer from the
-    // linked module and injects it into each entry point, so a linked global is re-initialized
-    // at every entry-point launch, and a global that was not cloned into the linked module
-    // never runs its initializer at all. Whether an initializer on a global that no entry
-    // point references should be preserved there (the host-target case is handled above via
-    // the side-effecting-initializer allowlist) is an open design question; today such a
-    // global is simply eliminated.
+    // TODO: On kernel targets, the global-init pass extracts the initializers selected by
+    // `shouldExtractInitializer` from the linked module and injects them into each entry
+    // point, so an extracted linked global is re-initialized at every entry-point launch,
+    // and a global that was not cloned into the linked module never runs its initializer
+    // at all. Whether an initializer on a global that no entry point references should be
+    // preserved there (the host-target case is handled above via the side-effecting-
+    // initializer allowlist) is an open design question; today such a global is simply
+    // eliminated.
 
     // Now that we've cloned the entry point and everything
     // it refers to, we can package up the data we return

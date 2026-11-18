@@ -105,9 +105,11 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // invocation. For example, `generateDllImportFuncs` creates a null-initialized function
         // pointer that caches a resolved symbol across calls. Moving that initializer into an
         // entry point would reset the persistent cache each time the entry point is called.
-        // This predicate mirrors the link-time allowlist for globals with side-effecting
-        // initializers (`linkIR`); the two must stay in agreement so a host-target global is
-        // preserved at the link and its initializer is not also injected into entry points.
+        // This gate is the same kernel-target test the link-time allowlist for globals with
+        // side-effecting initializers keys on (`linkIR`), so an ordinary host-target global
+        // preserved at the link never also has its initializer injected into entry points.
+        // Resource-candidate globals are the exception: `shouldExtractInitializer` takes the
+        // per-invocation-replacement branch before consulting this predicate.
         if (!isKernelTarget(target))
             return false;
 
