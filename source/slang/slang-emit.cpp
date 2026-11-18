@@ -2496,7 +2496,7 @@ Result linkAndOptimizeIR(
             // per-row no-contraction, which the pass's wholesale decoration transfer would
             // break.
             if (!targetProgram->shouldEmitSPIRVDirectly())
-                SLANG_PASS(legalizeMatrixFRemForGLSL);
+                SLANG_PASS(legalizeFRemForGLSL);
 
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }

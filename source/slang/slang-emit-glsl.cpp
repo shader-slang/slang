@@ -2669,7 +2669,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // would not be. The operands are emitted at general precedence
             // because each use is wrapped in a `sign(...)`/`abs(...)` call.
             // A matrix-typed `FRem` never reaches this case for GLSL-family
-            // targets: `legalizeMatrixFRemForGLSL` expands it per row
+            // targets: `legalizeFRemForGLSL` expands it per row
             // upstream. Of the remaining shapes, a scalar divisor against
             // scalar or vector operands is fine (`mod(genType, float)`
             // exists), but a scalar dividend against a vector divisor is

@@ -5346,7 +5346,7 @@ static void legalizeMatrixFRem(IRInst* inst)
     inst->removeAndDeallocate();
 }
 
-void legalizeMatrixFRemForGLSL(IRModule* module)
+void legalizeFRemForGLSL(IRModule* module)
 {
     // This late in the pipeline every function the emitters can still reach
     // is a concrete top-level `IRGlobalValueWithCode` (generic bodies have

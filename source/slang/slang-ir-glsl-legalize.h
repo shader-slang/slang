@@ -34,7 +34,7 @@ void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module);
 // direct SPIR-V emitter expands matrix arithmetic per row itself and keeps
 // the matrix-typed `FRem`. The full rationale lives with the definition in
 // slang-ir-glsl-legalize.cpp.
-void legalizeMatrixFRemForGLSL(IRModule* module);
+void legalizeFRemForGLSL(IRModule* module);
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module);
 
