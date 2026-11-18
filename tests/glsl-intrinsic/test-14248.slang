@@ -1,12 +1,16 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE_EX(filecheck=CHECK_SPIR): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 //TEST:SIMPLE_EX(filecheck=CHECK_HLSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target hlsl -DTARGET_HLSL
+//TEST:SIMPLE_EX(filecheck=CHECK_HLSL_FLOOR): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target hlsl -profile sm_5_0
 //TEST:SIMPLE_EX(filecheck=CHECK_WGSL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target wgsl
+// Validate the emitted WGSL through Tint on CI (ignored where the downstream compiler is absent).
+//TEST:SIMPLE_EX(filecheck=CHECK_WGSL_SPV): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target wgsl-spirv-asm
 //TEST:SIMPLE_EX(filecheck=CHECK_METAL): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target metal
 //TEST:SIMPLE_EX(filecheck=CHECK_CUDA): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cuda
 //TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/test-14248.slang -stage compute -entry computeMain -target cpp
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -llvm -compute -entry computeMain -source-language glsl -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -shaderobj -entry computeMain -source-language glsl -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -shaderobj -entry computeMain -source-language glsl -output-using-type
 
@@ -21,7 +25,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // CHECK_GLSL: inverse(
     // CHECK_SPIR: MatrixInverse{{ }}
+    // E41012 is the implicit profile-upgrade diagnostic; the widened requires
+    // must not raise any newly admitted target's capability floor.
     // CHECK_HLSL-NOT: E41012
+    // The count is 4 = the 2x2/3x3/4x4 cases plus the TARGET_HLSL-only 1x1
+    // case below; the fallback lowers each inverse() to a native determinant.
     // CHECK_HLSL-COUNT-4: determinant(
     // CHECK_WGSL-NOT: E41012
     // CHECK_WGSL: determinant(
@@ -31,6 +39,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK_CUDA: void computeMain(
     // CHECK_CPP-NOT: E41012
     // CHECK_CPP: void _computeMain(
+    // The sm_5_0 floor leg pins the deliberate GLSL_400 convention: older
+    // profiles are implicitly upgraded (E41012), matching the sibling
+    // intrinsics gated the same way.
+    // CHECK_HLSL_FLOOR: E41012
+    // CHECK_WGSL_SPV: computeMain
     // BUF: 1
 
     // The fallback must reproduce exact results for matrices whose inverse
@@ -65,8 +78,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         && i4[0][3] == 0.0 && i4[1][3] == 0.0 && i4[2][3] == 0.0 && i4[3][3] == 1.0;
 
 #if defined(TARGET_HLSL)
-    // 1x1 matrices only legalize on the HLSL target, so only that compile leg
-    // runs this case.
+    // The E39999 codegen gate rejects 1x1 matrices on every target except
+    // HLSL, so only that compile leg runs this case.
     const matrix<float, 1, 1> m1 = matrix<float, 1, 1>(2.0);
     const matrix<float, 1, 1> i1 = inverse(m1);
     ok = ok && i1[0][0] == 0.5;
