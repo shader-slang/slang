@@ -448,13 +448,26 @@ public:
         return DeclRef<T>(getOrCreate<MemberDeclRef>(memberDecl, parent.declRefBase));
     }
 
+    /// Return the interned constant of type `type` with the stored value `value`. The type must
+    /// not be null, and the value must already be narrowed to the type (see
+    /// `isValueInRangeOfConstantType`), because the constant stores `value` as given.
     ConstantIntVal* getIntVal(Type* type, IntegerLiteralValue value)
     {
         // A constant without a type cannot be lowered to IR, and integer folding cannot know
         // its width, so every producer must know the type of the value it creates.
         SLANG_RELEASE_ASSERT(type);
+        SLANG_ASSERT(isValueInRangeOfConstantType(type, value));
         return getOrCreate<ConstantIntVal>(type, value);
     }
+
+    /// Return true when `value` is already in the canonical form for a constant of type `type`.
+    /// A `bool` constant is 0 or 1, and a builtin integer constant narrower than 64 bits is the
+    /// sign- or zero-extension of its low bits, as its signedness requires. For example, the
+    /// `uint` value `0xffffffff00000000` is not canonical. Every other type, such as an enum,
+    /// is accepted. The integer folder reads a constant's stored value directly, so a value that
+    /// is out of range would make two constants that are equal in the target type compare
+    /// unequal.
+    static bool isValueInRangeOfConstantType(Type* type, IntegerLiteralValue value);
 
     IntVal* getTypeCastIntVal(Type* type, Val* base)
     {

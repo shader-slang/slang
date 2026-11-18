@@ -10329,17 +10329,11 @@ static Expr* parsePrefixExpr(Parser* parser)
 
                     newLiteral->signedMinimumIntException = false;
 
-                    // Need to get the basic type, so we can fit to underlying type
-                    if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
-                    {
-                        value = _fixIntegerLiteral(
-                            basicExprType->getBaseType(),
-                            value,
-                            nullptr,
-                            nullptr);
-                    }
-
-                    newLiteral->value = value;
+                    // Fit the folded value to the literal's type, which the suffix determines.
+                    // The parser does not assign `type` to a literal, so the suffix is the only
+                    // source of the type here. For example, `~0xffffffffu` folds to 0 in `uint`.
+                    newLiteral->value =
+                        _fixIntegerLiteral(newLiteral->suffixType, value, nullptr, nullptr);
                 }
 
                 return newLiteral;
