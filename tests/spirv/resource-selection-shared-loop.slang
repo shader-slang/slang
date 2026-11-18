@@ -6,28 +6,36 @@
 // so replacing the resource parameters must also preserve the counter's position.
 // The shared select feeds two later selects, requiring its index to be available to
 // both even when the graph walk reaches those users in a different order.
-// CHECK: OpStore %a %int_0
-// CHECK: OpStore %b %int_1
-// CHECK: OpStore %c %int_2
-// CHECK: OpStore %k %uint_0
-// CHECK: OpLoopMerge
+// CHECK: OpFunction
+// CHECK: %[[ENTRY:[^ ]+]] = OpLabel
+// CHECK: OpBranch %[[HEADER:[^ ]+]]{{( |$)}}
+// CHECK: %[[HEADER]] = OpLabel
+// CHECK: %[[A:[^ ]+]] = OpPhi %int %[[SELECTED:[^ ]+]] %[[BACK_EDGE:[^ ]+]] %int_0 %[[ENTRY]]{{( |$)}}
+// CHECK: %[[B:[^ ]+]] = OpPhi %int %[[NEXT:[^ ]+]] %[[BACK_EDGE]] %int_1 %[[ENTRY]]{{( |$)}}
+// CHECK: %[[C:[^ ]+]] = OpPhi %int %[[SHARED:[^ ]+]] %[[BACK_EDGE]] %int_2 %[[ENTRY]]{{( |$)}}
+// CHECK: %[[K:[^ ]+]] = OpPhi %uint %[[NEXT_K:[^ ]+]] %[[BACK_EDGE]] %uint_0 %[[ENTRY]]{{( |$)}}
+// CHECK: OpLoopMerge %[[AFTER_LOOP:[^ ]+]] %[[BACK_EDGE]] None
 // CHECK: %[[COND_X:[^ ]+]] = OpFOrdGreaterThan %bool
-// CHECK: %[[A:[^ ]+]] = OpLoad %int %a
-// CHECK: %[[B:[^ ]+]] = OpLoad %int %b
-// CHECK: %[[SHARED:[^ ]+]] = OpSelect %int %[[COND_X]] %[[A]] %[[B]]
+// CHECK: %[[SHARED]] = OpSelect %int %[[COND_X]] %[[A]] %[[B]]{{( |$)}}
 // CHECK: %[[COND_Y:[^ ]+]] = OpFOrdGreaterThan %bool
-// CHECK: %[[C:[^ ]+]] = OpLoad %int %c
-// CHECK: %[[NEXT:[^ ]+]] = OpSelect %int %[[COND_Y]] %[[SHARED]] %[[C]]
-// CHECK: %[[SELECTED:[^ ]+]] = OpSelect %int {{[^ ]+}} %[[SHARED]] %[[NEXT]]
-// CHECK: %[[K:[^ ]+]] = OpLoad %uint %k
-// CHECK: %[[NEXT_K:[^ ]+]] = OpIAdd %uint %[[K]] %uint_1
-// CHECK: OpStore %a %[[SELECTED]]
-// CHECK: OpStore %b %[[NEXT]]
-// CHECK: OpStore %c %[[SHARED]]
-// CHECK: OpStore %k %[[NEXT_K]]
-// CHECK: OpImageSampleExplicitLod
-// CHECK: OpImageSampleExplicitLod
-// CHECK: OpImageSampleExplicitLod
+// CHECK: %[[NEXT]] = OpSelect %int %[[COND_Y]] %[[SHARED]] %[[C]]{{( |$)}}
+// CHECK: %[[SELECTED]] = OpSelect %int {{[^ ]+}} %[[SHARED]] %[[NEXT]]{{( |$)}}
+// CHECK: %[[NEXT_K]] = OpIAdd %uint %[[K]] %uint_1{{( |$)}}
+// CHECK: %[[BACK_EDGE]] = OpLabel
+// CHECK: OpBranch %[[HEADER]]{{( |$)}}
+// CHECK: %[[AFTER_LOOP]] = OpLabel
+// CHECK: %[[A_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[A]]{{( |$)}}
+// CHECK: %[[A_SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[A_POINTER]]{{( |$)}}
+// CHECK: %[[A_PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} {{[^ ]+}} %[[A_SAMPLER]]{{( |$)}}
+// CHECK: OpImageSampleExplicitLod {{[^ ]+}} %[[A_PAIR]]{{( |$)}}
+// CHECK: %[[B_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[B]]{{( |$)}}
+// CHECK: %[[B_SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[B_POINTER]]{{( |$)}}
+// CHECK: %[[B_PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} {{[^ ]+}} %[[B_SAMPLER]]{{( |$)}}
+// CHECK: OpImageSampleExplicitLod {{[^ ]+}} %[[B_PAIR]]{{( |$)}}
+// CHECK: %[[C_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[C]]{{( |$)}}
+// CHECK: %[[C_SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[C_POINTER]]{{( |$)}}
+// CHECK: %[[C_PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} {{[^ ]+}} %[[C_SAMPLER]]{{( |$)}}
+// CHECK: OpImageSampleExplicitLod {{[^ ]+}} %[[C_PAIR]]{{( |$)}}
 
 SamplerState samplers[3];
 Texture2D<float4> texture;

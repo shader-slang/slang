@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 fxc 47.0: tests/cross-compile/fxc-error.hlsl(8): error X3004:  undeclared identifier 'gOutputBuffer'
 }

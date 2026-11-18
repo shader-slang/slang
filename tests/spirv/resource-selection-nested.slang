@@ -12,10 +12,28 @@
 // SELECT: %selected = OpSelect %int {{.*}} %a %b
 // SELECT: OpAccessChain {{.*}} %samplers %selected
 // SELECT: OpImageSampleExplicitLod
-// LOOP: OpTypePointer Function %int
-// LOOP: OpLoopMerge
-// LOOP: OpImageSampleExplicitLod
-// LOOP: OpImageSampleExplicitLod
+// The two integer phis exchange their previous values on the same back edge,
+// while the independent counter advances by one. Each final phi indexes its sampler.
+// LOOP: OpFunction
+// LOOP: %[[ENTRY:[^ ]+]] = OpLabel
+// LOOP: OpBranch %[[HEADER:[^ ]+]]{{( |$)}}
+// LOOP: %[[HEADER]] = OpLabel
+// LOOP: %[[A:[^ ]+]] = OpPhi %int %[[B:[^ ]+]] %[[BACK_EDGE:[^ ]+]] %int_0 %[[ENTRY]]{{( |$)}}
+// LOOP: %[[B]] = OpPhi %int %[[A]] %[[BACK_EDGE]] %int_1 %[[ENTRY]]{{( |$)}}
+// LOOP: %[[K:[^ ]+]] = OpPhi %uint %[[NEXT_K:[^ ]+]] %[[BACK_EDGE]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP: OpLoopMerge %[[AFTER_LOOP:[^ ]+]] %[[BACK_EDGE]] None
+// LOOP: %[[NEXT_K]] = OpIAdd %uint %[[K]] %uint_1{{( |$)}}
+// LOOP: %[[BACK_EDGE]] = OpLabel
+// LOOP: OpBranch %[[HEADER]]{{( |$)}}
+// LOOP: %[[AFTER_LOOP]] = OpLabel
+// LOOP: %[[A_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[A]]{{( |$)}}
+// LOOP: %[[A_SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[A_POINTER]]{{( |$)}}
+// LOOP: %[[A_PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} {{[^ ]+}} %[[A_SAMPLER]]{{( |$)}}
+// LOOP: OpImageSampleExplicitLod {{[^ ]+}} %[[A_PAIR]]{{( |$)}}
+// LOOP: %[[B_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[B]]{{( |$)}}
+// LOOP: %[[B_SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[B_POINTER]]{{( |$)}}
+// LOOP: %[[B_PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} {{[^ ]+}} %[[B_SAMPLER]]{{( |$)}}
+// LOOP: OpImageSampleExplicitLod {{[^ ]+}} %[[B_PAIR]]{{( |$)}}
 
 SamplerState samplers[8];
 Texture2D<float4> texture;

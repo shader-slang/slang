@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 tests/diagnostics/missing-file.slang(1): error 20001: unexpected end of file, expected ';'
 tests/diagnostics/missing-file.slang(4): error 2: cannot find file 'does-not-exist.slang'.

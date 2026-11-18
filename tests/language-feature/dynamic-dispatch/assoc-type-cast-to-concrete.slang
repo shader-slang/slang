@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cpp -entry computeMain -stage compute
 
 //
 // Limitation: Direct Cast to Concrete Type

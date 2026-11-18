@@ -14,7 +14,7 @@
 // pins both the diagnostic code and the aliased spelling in the message; the
 // alias name `Celsius` never appears in it.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage compute -entry main
 
 typealias Celsius = float;
 struct S { int v; }
