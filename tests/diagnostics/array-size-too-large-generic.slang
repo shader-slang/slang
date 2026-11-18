@@ -33,6 +33,12 @@ struct Outer<let M : uint64_t>
     Buffer64<M> inner;
 }
 
+// An inner dimension of a multi-dimensional array is a substituted count like any other.
+struct Grid<let N : uint64_t>
+{
+    float cells[4][N];
+}
+
 // A specialization whose oversized field is never referenced in checked code is not
 // diagnosed; the check runs when a reference to the field is type-checked.
 uniform Buffer64<0x100000001ull> neverUsed;
@@ -65,6 +71,12 @@ void computeMain()
 //CHECK:         ^^^^ error E30025
 //CHECK:         ^^^^ array size must be non-negative.
 
+    // A positive signed size above the limit is an upper-bound violation too.
+    SignedBuffer<0x100000001> signedBig;
+    signedBig.data[0] = 1.0;
+//CHECK:      ^^^^ error E30034
+//CHECK:      ^^^^ array size must not exceed 2147483646.
+
     // A uint64 size whose magnitude does not fit int64 is still an upper-bound violation,
     // not a negative one.
     Buffer64<0xFFFFFFFFFFFFFFFFull> uint64Max;
@@ -87,6 +99,11 @@ void computeMain()
     outer.inner.data[0] = 1.0;
 //CHECK:        ^^^^ error E30034
 //CHECK:        ^^^^ array size must not exceed 2147483646.
+
+    Grid<0x100000001ull> grid;
+    grid.cells[0][1] = 1.0;
+//CHECK: ^^^^^ error E30034
+//CHECK: ^^^^^ array size must not exceed 2147483646.
 
     fill<0x100000001ull>(buffer64.data);
 //CHECK:                          ^^^^ error E30034

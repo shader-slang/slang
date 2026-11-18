@@ -1463,6 +1463,8 @@ err(
     span { loc = "location", message = "array size must be non-negative." }
 )
 
+-- The bound is kUnsizedArrayMagicLength (slang-syntax.h) minus one: INT32_MAX itself is the
+-- unsized-array sentinel and is rejected with this error.
 err(
     "array-size-too-large",
     30034,
