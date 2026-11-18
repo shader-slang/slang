@@ -5104,11 +5104,14 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
-/// Return whether any ordinary instruction in `globalVar`'s initializer code might have side
-/// effects, so that eliminating the global would also drop an observable effect of running its
-/// initializer. The scan skips terminators and parameters: every initializer block ends in a
-/// `return`, which the conservative default of `mightHaveSideEffects` would otherwise flag,
-/// making the predicate match every initialized global instead of only the side-effecting ones.
+/// Return whether any non-terminator instruction in `globalVar`'s initializer code might have
+/// side effects, so that eliminating the global would also drop an observable effect of running
+/// its initializer. Returns false for a global without initializer blocks (there is no
+/// initializer code to drop). Every initializer block ends in a terminator — a `return` in the
+/// exit block, a branch in an intermediate block — and the conservative default of
+/// `mightHaveSideEffects` flags all terminators, so skipping them is what keeps the predicate
+/// from matching every initialized global instead of only the side-effecting ones. Parameters
+/// need no explicit skip: `getOrdinaryInsts()` already excludes them.
 static bool initializerMightHaveSideEffects(IRGlobalVar* globalVar)
 {
     for (auto block = globalVar->getFirstBlock(); block; block = block->getNextBlock())
@@ -5157,7 +5160,7 @@ void ModuleLinkingInfo::_build(IRModule* module)
 
         if (auto globalVar = as<IRGlobalVar>(inst))
         {
-            if (globalVar->getFirstBlock() && initializerMightHaveSideEffects(globalVar))
+            if (initializerMightHaveSideEffects(globalVar))
                 m_globalVarsWithSideEffectingInit.add(globalVar);
         }
 

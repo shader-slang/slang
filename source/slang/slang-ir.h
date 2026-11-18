@@ -2101,8 +2101,10 @@ struct ModuleLinkingInfo : RefObject
     ArrayView<IRInst*> getKnownBuiltins() { return m_knownBuiltins.getArrayView(); }
 
     /// Query the acceleration cache for global variables whose initializers might have side
-    /// effects. The result is only valid while the module is unchanged from when this info was
-    /// built.
+    /// effects. Membership is conservative: an entry is recorded when the initializer code
+    /// contains an instruction that `mightHaveSideEffects` cannot prove pure, so a listed
+    /// global may in fact be side-effect-free. The result is only valid while the module is
+    /// unchanged from when this info was built.
     ArrayView<IRInst*> getGlobalVarsWithSideEffectingInit()
     {
         return m_globalVarsWithSideEffectingInit.getArrayView();
@@ -2178,7 +2180,7 @@ public:
     /// Ensure the module-owned acceleration cache used by linker global handling is built.
     /// A built cache assumes the module will not change after it is built; callers must
     /// manually rebuild it if module-scope annotations, global params, exports, known builtins,
-    /// or global hashed string literals change.
+    /// global hashed string literals, or global variables' initializer code change.
     void _ensureLinkingInfo();
 
     /// Build or return the module-owned acceleration cache used by linker global handling.
