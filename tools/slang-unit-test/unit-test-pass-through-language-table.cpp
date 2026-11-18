@@ -50,8 +50,10 @@ SLANG_UNIT_TEST(passThroughLanguageTable)
     }
 
     // NVRTC compiles CUDA and nothing else.
-    SLANG_CHECK(DownstreamCompilerInfo::canCompile(SLANG_PASS_THROUGH_NVRTC, SLANG_SOURCE_LANGUAGE_CUDA));
-    SLANG_CHECK(!DownstreamCompilerInfo::canCompile(SLANG_PASS_THROUGH_NVRTC, SLANG_SOURCE_LANGUAGE_C));
+    SLANG_CHECK(
+        DownstreamCompilerInfo::canCompile(SLANG_PASS_THROUGH_NVRTC, SLANG_SOURCE_LANGUAGE_CUDA));
+    SLANG_CHECK(
+        !DownstreamCompilerInfo::canCompile(SLANG_PASS_THROUGH_NVRTC, SLANG_SOURCE_LANGUAGE_C));
 
     // Slang input is treated as HLSL for capability checks; everything else passes through.
     SLANG_CHECK(
