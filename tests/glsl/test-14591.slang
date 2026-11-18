@@ -10,8 +10,12 @@
 
 //TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -emit-spirv-via-glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry computeMain -profile glsl_450
+//TEST:SIMPLE(filecheck=CHECK_SPV_DIRECT): -target spirv-asm -emit-spirv-directly -stage compute -entry computeMain
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -emit-spirv-via-glsl -output-using-type -shaderobj
+
+//TEST:SIMPLE(filecheck=CHECK_GLSL_NSQ): -target glsl -stage compute -entry nonSquareMain -profile glsl_450
+//TEST:SIMPLE(filecheck=CHECK_SPV_NSQ): -target spirv-asm -emit-spirv-via-glsl -stage compute -entry nonSquareMain
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 
@@ -48,9 +52,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
     // In the SPIR-V built via GLSL, the remainder runs one row at a time
     // (`OpFMod` on `v2float` rows) and the matrix is reassembled from the
-    // row results.
+    // row results. The direct SPIR-V path is not rewritten by the GLSL
+    // legalization; its own emitter expands the rows as `OpFRem`.
     //CHECK_SPV: OpFMod %v2float
     //CHECK_SPV: OpCompositeConstruct %mat2v2float
+    //CHECK_SPV_DIRECT: OpFRem %v2float
 
     outputBuffer[0] = r[0][0];
     outputBuffer[1] = r[1][0];
@@ -77,4 +83,43 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     //BUF: 0.75
     //BUF: 0.75
     //BUF: 0.75
+}
+
+// A non-square matrix pins the row and column roles of the expansion: the
+// rows of a `float3x2` are `float2`, so a dimensions mixup in the per-row
+// rewrite (building `float3` rows instead) fails the via-GLSL round-trip.
+// The helper is `[noinline]` so the `%` inside it stays in a non-entry
+// function, pinning that the walk covers every function, not just entry
+// points. The compound `%=` and the `%` consumed inside the `if` lower to
+// the same matrix `FRem` in a different block.
+[noinline]
+float3x2 nonSquareHelper(float3x2 m)
+{
+    return m % 0.75;
+}
+
+[numthreads(1, 1, 1)]
+void nonSquareMain(uint3 tid : SV_DispatchThreadID)
+{
+    float3x2 m = float3x2(-2.5, 2.5, 3.5, -3.5, 1.25, -1.25) * float(tid.x + 1);
+    m %= 0.75;
+    float3x2 n = nonSquareHelper(m);
+    if (tid.x == 0)
+    {
+        outputBuffer[0] = n[2][0];
+    }
+
+    //CHECK_GLSL_NSQ-NOT: sign(m_0)
+    //CHECK_GLSL_NSQ-NOT: mod(abs(m_0)
+    // The helper is a separate function (`[noinline]`), so its third row
+    // existing at all pins that the walk rewrote a non-entry function.
+    //CHECK_GLSL_NSQ: sign(m_0[2])
+    //CHECK_GLSL_NSQ-SAME: * mod(abs(m_0[2])
+    //CHECK_GLSL_NSQ: vec2(0.75)
+    // The compound `%=` in the entry point lowers to the same per-row
+    // expansion of its own matrix (m_1), on `v2float` rows.
+    //CHECK_GLSL_NSQ: sign(m_1[2])
+    //CHECK_GLSL_NSQ-SAME: * mod(abs(m_1[2])
+    //CHECK_SPV_NSQ: OpFMod %v2float
+    //CHECK_SPV_NSQ: OpCompositeConstruct %mat3v2float
 }
