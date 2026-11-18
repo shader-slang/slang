@@ -3301,33 +3301,11 @@ static void removeUnreachableCodeAfterDiscardForOpKill(
                 if (!discardInst)
                     continue;
 
-                // Get the block's terminator
-                auto terminator = block->getTerminator();
-                if (!terminator)
-                    continue;
-
-                // Check if there are instructions between discard and terminator
-                bool hasInstructionsBetween = false;
-                bool foundDiscard = false;
-                for (auto inst : block->getOrdinaryInsts())
-                {
-                    if (foundDiscard && inst != terminator)
-                    {
-                        hasInstructionsBetween = true;
-                        break;
-                    }
-                    else if (inst == discardInst)
-                    {
-                        foundDiscard = true;
-                    }
-                }
-
-                if (!hasInstructionsBetween)
-                    continue;
-
-                // Remove all instructions after discard and replace terminator with unreachable
+                // Remove the original terminator even when it immediately follows discard.
+                // A branch after OpKill is never emitted, so retaining it in the IR would give
+                // successor phi nodes an incoming value from a block that cannot reach them.
                 List<IRInst*> toRemove;
-                foundDiscard = false;
+                bool foundDiscard = false;
                 for (auto inst : block->getOrdinaryInsts())
                 {
                     if (foundDiscard)

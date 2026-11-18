@@ -2822,6 +2822,13 @@ Result linkAndOptimizeIR(
         simplificationOptions.cfgOptions.removeTrivialSingleIterationLoops = true;
         SLANG_PASS(simplifyIR, targetProgram, simplificationOptions, sink);
     }
+    else if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    {
+        // Multi-level break lowering introduces local variables even in the minimum-optimization
+        // pipeline. Reconstruct SSA while each local's declaration still marks the start of its
+        // lifetime. SPIR-V places function variables in the entry block, losing that boundary.
+        SLANG_PASS(constructSSA);
+    }
 
     if (isKhronosTarget(targetRequest) && !emitSpirvDirectly)
     {
@@ -2840,11 +2847,9 @@ Result linkAndOptimizeIR(
     // The earlier void cleanup has already run, so remove these new placeholders before emit.
     SLANG_PASS(cleanUpVoidType);
 
-    // As a late step, we need to take the SSA-form IR and move things *out*
-    // of SSA form, by eliminating all "phi nodes" (block parameters) and
-    // introducing explicit temporaries instead. Doing this at the IR level
-    // means that subsequent emit logic doesn't need to contend with the
-    // complexities of blocks with parameters.
+    // Most targets need block parameters lowered to explicit temporary variables before emission.
+    // Direct SPIR-V retains scalar and composite parameters so their incoming values remain
+    // explicit.
     //
     {
         // Get the liveness mode.
@@ -2869,8 +2874,29 @@ Result linkAndOptimizeIR(
         PhiEliminationOptions phiEliminationOptions;
         if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
         {
-            phiEliminationOptions.eliminateCompositeTypedPhiOnly = false;
-            phiEliminationOptions.useRegisterAllocation = true;
+            // Consider an inlined search inside a ray-generation loop:
+            //
+            //     [ForceInline] float find(float t)
+            //     {
+            //         for (uint i = 0; i < 4; ++i)
+            //             if (t < buf[i]) return buf[i];
+            //         return 1.0;
+            //     }
+            //
+            //     for (int bounce = 0; bounce < 8; ++bounce)
+            //     {
+            //         TraceRay(...);
+            //         ray.TMax = find(t);
+            //     }
+            //
+            // After break lowering and SSA construction, the search result can have an undefined
+            // incoming value on an exhausted-search path where it is unused. Demoting that phi
+            // skips the undefined store. SPIR-V function-scope storage then keeps the previous
+            // iteration's contents, creating a false dependency across TraceRay when a downstream
+            // optimizer reconstructs SSA. The same problem affects structs, arrays, and matrices:
+            // demoting an undefined aggregate also leaves its scalar fields carrying old values.
+            // Emit the existing scalar and composite phis directly instead.
+            phiEliminationOptions.preserveScalarAndCompositePhis = true;
         }
         SLANG_PASS(eliminatePhis, livenessMode, phiEliminationOptions);
         // If liveness is enabled add liveness ranges based on the accumulated liveness
