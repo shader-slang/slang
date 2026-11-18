@@ -228,6 +228,25 @@ class TypeCastIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
+// Return the index of the operand that alone gives the result of the short-circuiting
+// operation `op` once its first operand is the constant `firstArg`, or -1 when the result
+// depends on the remaining operands. For example, `true ? a : b` gives the value of operand 1
+// (`a`), and `false && b` gives the truth value of operand 0 (`false`).
+//
+// Folding stops at the operand selected here because the language does not evaluate the other
+// operands either. Folding them could report a diagnostic, or fail and leave the whole
+// expression unfolded, for an operand that cannot affect the result, as in
+// `true ? 3 : (1 << 32)`.
+//
+// A `?:` with a scalar condition always short-circuits. `&&` and `||` short-circuit unless
+// `-disable-short-circuit` is given, which `logicalOpsShortCircuit` reflects. With that option,
+// both operands are evaluated, so an operand that is not constant keeps the expression from
+// being constant even when the first operand decides its value.
+Index getShortCircuitResultArgIndex(
+    BuiltinOperationKind op,
+    ConstantIntVal* firstArg,
+    bool logicalOpsShortCircuit);
+
 // Return the `MathIntType` in which integer folding represents the values of `type`: the type
 // itself for a builtin integer or `bool` type, or the tag type of an enum type. For example, the
 // cases of `enum Flags : uint8_t` fold as `MathIntType::UInt8Type` values. Return

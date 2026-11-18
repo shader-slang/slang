@@ -2507,6 +2507,25 @@ IntVal* TypeCastIntVal::tryFoldFromFloat(
     return astBuilder->getIntVal(resultType, res.value.getSignedValue());
 }
 
+Index getShortCircuitResultArgIndex(
+    BuiltinOperationKind op,
+    ConstantIntVal* firstArg,
+    bool logicalOpsShortCircuit)
+{
+    const bool isTrue = firstArg->getValue() != 0;
+    switch (op)
+    {
+    case BuiltinOperationKind::Conditional:
+        return isTrue ? 1 : 2;
+    case BuiltinOperationKind::And:
+        return (logicalOpsShortCircuit && !isTrue) ? 0 : -1;
+    case BuiltinOperationKind::Or:
+        return (logicalOpsShortCircuit && isTrue) ? 0 : -1;
+    default:
+        return -1;
+    }
+}
+
 IntVal* BuiltinOperationIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
@@ -2523,6 +2542,22 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
     const MathIntType resType = getFoldOperandMathIntType(astBuilder, resultType);
     if (resType.width == 0)
         return nullptr;
+
+    // A `?:` whose condition is constant takes the value of the selected operand, even when the
+    // other operand is still symbolic. For example, after `B = true` and `N = 32` are
+    // substituted into `B ? 1 : (1 << N)`, the shift stays unfolded because its value is
+    // target-defined, but the result is 1. We do not apply this to `&&` and `||` here, because
+    // whether they short-circuit depends on `-disable-short-circuit`, which this fold cannot see.
+    if (newArgs.getCount() == 3)
+    {
+        if (auto condition = as<ConstantIntVal>(newArgs[0]))
+        {
+            const Index resultArgIndex =
+                getShortCircuitResultArgIndex(op, condition, /*logicalOpsShortCircuit*/ false);
+            if (resultArgIndex > 0)
+                return newArgs[resultArgIndex];
+        }
+    }
 
     for (auto arg : newArgs)
     {

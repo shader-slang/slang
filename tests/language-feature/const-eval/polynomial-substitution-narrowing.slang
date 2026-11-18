@@ -9,16 +9,21 @@
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outBuf
 RWStructuredBuffer<int> outBuf;
 
+// With `N = 0xFFFFFFFFu`, `N + 1u` wraps to 0 in `uint`, so the size is 0 * 2 + 1 = 1. In 64 bits
+// it would be 0x200000001.
 struct WrapAfterMul<let N : uint>
 {
     float data[(N + 1u) * 2u + 1u];
 }
 
+// With `N = 0xFFFFFFFFu`, `N + 2u` wraps to 1 in `uint`. In 64 bits it would be 0x100000001.
 struct WrapAfterAdd<let N : uint>
 {
     float data[N + 2u];
 }
 
+// With `N = 1u`, the term `N * 65536u * 65536u` is 2^32, which wraps to 0 in `uint`, so the size
+// is 3. In 64 bits it would be 0x100000003.
 struct WrapHighTerm<let N : uint>
 {
     float data[N * 65536u * 65536u + 3u];

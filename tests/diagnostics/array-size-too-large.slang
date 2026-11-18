@@ -7,6 +7,8 @@
 
 static const uint kLargeSize = 2147483648u;
 
+// An enum whose unsigned 64-bit tag keeps bit 63 as part of a large value. Its case used as an
+// array size is too large, not negative, although the stored 64-bit value reads as negative.
 enum LargeEnum : uint64_t
 {
     TopBit = 0x8000000000000000ull,

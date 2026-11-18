@@ -2505,39 +2505,6 @@ IntVal* SemanticsVisitor::tryFoldUncheckedLiteralInitializer(Type* type, Expr* i
     return as<IntVal>(TypeCastIntVal::tryFoldImpl(m_astBuilder, type, literalVal, nullptr));
 }
 
-/// Return the index of the operand that alone gives the result of the short-circuiting
-/// operation `op` once its first operand is the constant `firstArg`, or -1 when the result
-/// depends on the remaining operands. For example, `true ? a : b` gives the value of operand 1
-/// (`a`), and `false && b` gives the truth value of operand 0 (`false`).
-///
-/// Folding stops at the operand selected here because the language does not evaluate the other
-/// operands either. Folding them could report a diagnostic, or fail and leave the whole
-/// expression unfolded, for an operand that cannot affect the result, as in
-/// `true ? 3 : (1 << 32)`.
-///
-/// A `?:` with a scalar condition always short-circuits. `&&` and `||` short-circuit unless
-/// `-disable-short-circuit` is given, which `logicalOpsShortCircuit` reflects. With that option,
-/// both operands are evaluated, so an operand that is not constant keeps the expression from
-/// being constant even when the first operand decides its value.
-static Index getShortCircuitResultArgIndex(
-    BuiltinOperationKind op,
-    ConstantIntVal* firstArg,
-    bool logicalOpsShortCircuit)
-{
-    const bool isTrue = firstArg->getValue() != 0;
-    switch (op)
-    {
-    case BuiltinOperationKind::Conditional:
-        return isTrue ? 1 : 2;
-    case BuiltinOperationKind::And:
-        return (logicalOpsShortCircuit && !isTrue) ? 0 : -1;
-    case BuiltinOperationKind::Or:
-        return (logicalOpsShortCircuit && isTrue) ? 0 : -1;
-    default:
-        return -1;
-    }
-}
-
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
     SubstExpr<InvokeExpr> invokeExpr,
     ConstantFoldingKind kind,
