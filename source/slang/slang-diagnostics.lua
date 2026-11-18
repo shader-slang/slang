@@ -1467,7 +1467,7 @@ err(
     "array-size-too-large",
     30034,
     "array size too large",
-    span { loc = "location", message = "array size must not exceed 2147483647." }
+    span { loc = "location", message = "array size must not exceed 2147483646." }
 )
 
 err(

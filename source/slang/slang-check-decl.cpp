@@ -1664,30 +1664,27 @@ bool isGlobalShaderParameter(VarDeclBase* decl)
 }
 
 /// Return whether `type` is a builtin unsigned integer type, such as `uint` or `uint64_t`.
+/// Classification goes through the base-type info table so that a future unsigned base type
+/// is classified by the one place that registers its flags.
 static bool _isUnsignedIntegerType(Type* type)
 {
     auto basicType = as<BasicExpressionType>(type);
     if (!basicType)
         return false;
-    switch (basicType->getBaseType())
-    {
-    case BaseType::UInt:
-    case BaseType::UInt64:
-    case BaseType::UIntPtr:
-    case BaseType::UInt16:
-    case BaseType::UInt8:
-        return true;
-    default:
-        return false;
-    }
+    auto flags = BaseTypeInfo::getInfo(basicType->getBaseType()).flags;
+    return (flags & BaseTypeInfo::Flag::Integer) != 0 && (flags & BaseTypeInfo::Flag::Signed) == 0;
 }
 
 /// Return `val` with any `TypeCastIntVal` wrappers removed, so that the result denotes the
-/// value in the type it was written with. An array type stores its element count as an
-/// `int`; the array-type builder wraps a count that is symbolic and not `int`-typed in an
+/// value in the type it was written with. An array type stores its element count as an `int`;
+/// the array-type builder wraps a count that is symbolic and not `int`-typed in an
 /// `int`-typed cast, and generic value-parameter unification likewise wraps an argument in a
-/// cast to the parameter's type. These wrappers are the canonical conversion-to-storage form,
-/// so removing them recovers the original count rather than an accidental spelling.
+/// cast to the parameter's type. A user-written cast such as `float data[int(N)]` produces the
+/// same wrapper node, and is peeled with the same intent: a cast on a count is a conversion
+/// whose narrowing is exactly what the caller needs to judge, whether the compiler inserted it
+/// for storage or the user wrote it. If a wrapper's base is not an `IntVal`, the value is left
+/// wrapped; the caller then sees a non-constant count and skips validation rather than
+/// misjudging a shape it does not understand.
 static IntVal* unwrapTypeCastIntVals(IntVal* val)
 {
     while (auto castVal = as<TypeCastIntVal>(val))
@@ -1714,16 +1711,21 @@ static IntVal* unwrapTypeCastIntVals(IntVal* val)
 /// substituted with `N = 0x100000001ull`, and that cast folds with a C-style `(int)` conversion
 /// and no diagnostic sink, silently producing a one-element array. The declaration-site checks
 /// (`validateArraySizeForVariable` and the subscript-type check) see only the symbolic count,
-/// so the size is never checked against the `int` storage. This function re-runs that check
-/// where the specialized type is materialized with a sink available, which is the point the
-/// issue text for #14595 prescribes.
+/// so the size is never checked against the `int` storage. The first point where the count is
+/// known *and* a diagnostic sink is available is the type lookup of a reference to the field,
+/// so the validation is re-run here. The check therefore runs once per reference, at the
+/// reference's location: a specialization whose oversized field is never referenced keeps the
+/// silently truncated type, since covering declaration-only uses needs validation where
+/// specializations are created, not at a use site.
 ///
 /// Substituting the cast wrapper itself would fold and wrap before the check could see the
 /// value, so we unwrap the wrappers and substitute the inner `IntVal`, which keeps the count
 /// in its original type (here `uint64_t`) and preserves the full magnitude. Counts that are
-/// already constant at their declaration are skipped: those are covered by the
-/// declaration-site checks, so re-checking them here would report a second diagnostic for the
-/// same size.
+/// already constant at their declaration are skipped: the declaration-site size checks own
+/// them, and re-checking a count here would report the same size a second time. The skip tests
+/// the count directly, which is exhaustive because the array-type builder canonicalizes a
+/// constant count to a plain `int` constant at construction, so a constant never hides under a
+/// wrapper (an unsized array's sentinel constant is covered by the same skip).
 static bool maybeDiagnoseSubstitutedArraySize(
     ASTBuilder* astBuilder,
     DiagnosticSink* sink,
@@ -1731,7 +1733,7 @@ static bool maybeDiagnoseSubstitutedArraySize(
     SourceLoc loc)
 {
     auto arrayType = as<ArrayExpressionType>(declRef.getDecl()->type);
-    if (!arrayType || arrayType->isUnsized())
+    if (!arrayType)
         return false;
 
     IntVal* elementCount = arrayType->getElementCount();
@@ -1740,6 +1742,9 @@ static bool maybeDiagnoseSubstitutedArraySize(
 
     IntVal* count = unwrapTypeCastIntVals(elementCount);
     IntVal* substCount = as<IntVal>(count->substitute(astBuilder, SubstitutionSet(declRef)));
+    // Every `IntVal` substitution path yields an `IntVal` (a malformed result is an
+    // `ErrorIntVal`, which is one), so a null here is out of contract.
+    SLANG_ASSERT(substCount);
     if (!substCount)
         return false;
     substCount = unwrapTypeCastIntVals(substCount);
@@ -1749,12 +1754,18 @@ static bool maybeDiagnoseSubstitutedArraySize(
         return false;
 
     IntegerLiteralValue value = constantCount->getValue();
+    // An unsigned constant above INT64_MAX (for example `0xFFFFFFFFFFFFFFFFull`) is stored as
+    // a negative `IntegerLiteralValue`, so a negative value in an unsigned type denotes a huge
+    // magnitude rather than a negative count; it is judged by the upper-bound check below.
     if (value < 0 && !_isUnsignedIntegerType(constantCount->getType()))
     {
         sink->diagnose(Diagnostics::InvalidArraySize{.location = loc});
         return true;
     }
-    if (uint64_t(value) > uint64_t(INT32_MAX))
+    // `kUnsizedArrayMagicLength` (INT32_MAX) means "unsized" to every downstream consumer
+    // (type layout, reflection, conformance tagging), so a count of exactly that value would
+    // silently become an unsized array. The largest valid size is therefore INT32_MAX - 1.
+    if (uint64_t(value) >= uint64_t(kUnsizedArrayMagicLength))
     {
         sink->diagnose(Diagnostics::ArraySizeTooLarge{.location = loc});
         return true;
@@ -1794,8 +1805,9 @@ QualType getTypeForDeclRef(
         qualType.type = getType(astBuilder, varDeclRef);
 
         // A count that becomes constant only through generic substitution was not covered by
-        // the declaration-site checks, so validate it here where a sink and this use's location
-        // are available. Replacing the type with the error type stops cascading diagnostics.
+        // the declaration-site checks, so validate it here where a sink and this use's
+        // location are available; the check runs once per reference. Replacing the type with
+        // the error type stops cascading diagnostics.
         if (sink && loc.isValid() &&
             maybeDiagnoseSubstitutedArraySize(astBuilder, sink, varDeclRef, loc))
         {
