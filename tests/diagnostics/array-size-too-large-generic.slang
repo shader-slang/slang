@@ -39,6 +39,26 @@ struct Grid<let N : uint64_t>
     float cells[4][N];
 }
 
+// An arithmetic narrowing is a new count, judged by its folded value rather than by the
+// magnitude of the value it was computed from.
+struct ModBuffer<let N : uint64_t>
+{
+    float data[N % 256];
+}
+
+struct ShrunkBuffer<let N : uint64_t>
+{
+    float data[N - 1];
+}
+
+// A field referenced only from the generic's own method body is checked once symbolically;
+// the reference in the body does not diagnose the specialization.
+struct MethodBuffer<let N : uint64_t>
+{
+    float data[N];
+    float get() { return data[0]; }
+}
+
 // A specialization whose oversized field is never referenced in checked code is not
 // diagnosed; the check runs when a reference to the field is type-checked.
 uniform Buffer64<0x100000001ull> neverUsed;
@@ -104,6 +124,24 @@ void computeMain()
     grid.cells[0][1] = 1.0;
 //CHECK: ^^^^^ error E30034
 //CHECK: ^^^^^ array size must not exceed 2147483646.
+
+    // Arithmetic narrowing is judged by its folded value: 0x100000001 % 256 folds to 1, and a
+    // one-element array is what the source asked for.
+    ModBuffer<0x100000001ull> modBuffer;
+    modBuffer.data[0] = 1.0;
+
+    // 0x100000001 - 1 folds to 0x100000000, still oversized.
+    ShrunkBuffer<0x100000001ull> shrunkBuffer;
+    shrunkBuffer.data[0] = 1.0;
+//CHECK:         ^^^^ error E30034
+//CHECK:         ^^^^ array size must not exceed 2147483646.
+
+    // The method body's reference is checked once symbolically; the call does not diagnose.
+    MethodBuffer<0x100000001ull> methodBuffer;
+    float methodValue = methodBuffer.get();
+    methodBuffer.data[0] = methodValue;
+//CHECK:         ^^^^ error E30034
+//CHECK:         ^^^^ array size must not exceed 2147483646.
 
     fill<0x100000001ull>(buffer64.data);
 //CHECK:                          ^^^^ error E30034

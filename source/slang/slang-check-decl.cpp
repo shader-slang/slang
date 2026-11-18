@@ -1715,30 +1715,35 @@ static IntVal* unwrapTypeCastIntVals(IntVal* val)
 /// (`validateArraySizeForVariable` and the subscript-type check) see only the symbolic count,
 /// so the size is never checked against the `int` storage. The first point where the count is
 /// known *and* a diagnostic sink is available is the type lookup of a reference to the field,
-/// so the validation is re-run here. The check therefore runs once per reference, at the
-/// reference's location: a specialization whose oversized field is never referenced — or
-/// whose field is reached only from the generic's own method bodies, or through a property —
-/// keeps the silently truncated type, since covering those needs validation where
-/// specializations are created, not at a use site. The caller guarantees a non-null sink and a
-/// valid location.
+/// so the validation is re-run here, once per sink-carrying reference, at the reference's
+/// location. A specialization whose oversized field is never referenced — or whose field is
+/// reached only from the generic's own method bodies, or through a property — keeps the
+/// silently truncated type (for a shader parameter, the truncated count is what layout and
+/// reflection report), since covering those needs validation where specializations are created,
+/// not at a use site. The check is skipped when the caller supplies no sink or no valid
+/// location; the call site guards on exactly those conditions because some `getTypeForDeclRef`
+/// callers (the two-argument wrapper and the clone/lookup paths) pass no sink at all.
 ///
 /// Substituting the cast wrapper itself would fold and wrap before the check could see the
 /// value, so we unwrap the wrappers and substitute the inner `IntVal`, which keeps the count
 /// in its original type (here `uint64_t`) and preserves the full magnitude. The substituted
 /// value can itself carry a wrapper — a unified generic argument is wrapped when its type
-/// differs from the parameter's — so it is unwrapped again after substitution. Every array
-/// level of the declared type is examined, so an inner dimension such as `float cells[4][N]`
-/// is checked even though its outer count is constant.
+/// differs from the parameter's — so it is unwrapped again after substitution. Each array
+/// level of the declared type is examined in turn, so an inner dimension such as
+/// `float cells[4][N]` is checked even though its outer count is constant; validation stops at
+/// the first failing level because the reference's type becomes the error type, and reporting
+/// the remaining levels would only add noise.
 ///
 /// Counts that are already constant at their declaration are skipped. A negative constant is
 /// rejected where it is written, so re-checking it here would report the same size twice.
-/// A directly-written constant above the limit is likewise not diagnosed by this check: an
-/// `int`-typed constant count keeps its full pre-cast value, which is a separate
+/// A directly-written constant above the limit is likewise not diagnosed by this check: the
+/// array-type builder canonicalizes it to an `int`-typed constant that keeps the full pre-cast
+/// magnitude (for example, `float data[0x100000001ull]` stores 4294967297), which is a separate
 /// representation gap from the substituted counts this check exists for. The skip tests the
-/// count directly, and no constant hides under a wrapper: the array-type builder canonicalizes
-/// a constant count to a plain `int` constant at construction, and the expression checker
-/// folds a cast of an already-constant operand before the count ever reaches the builder (an
-/// unsized array's sentinel constant is covered by the same skip).
+/// count directly, and no constant hides under a wrapper: the builder's canonicalization and
+/// the expression checker's folding of a cast over an already-constant operand together leave
+/// no constant under a wrapper (an unsized array's sentinel constant is covered by the same
+/// skip).
 static bool maybeDiagnoseSubstitutedArraySize(
     ASTBuilder* astBuilder,
     DiagnosticSink* sink,
@@ -1767,6 +1772,9 @@ static bool maybeDiagnoseSubstitutedArraySize(
         substitutedCount = unwrapTypeCastIntVals(substitutedCount);
 
         auto substitutedConstant = as<ConstantIntVal>(substitutedCount);
+        // A count that is still symbolic after substitution (a substitution set that does not
+        // resolve every generic layer) is not evaluable here; the declaration-site checks
+        // already accepted it symbolically.
         if (!substitutedConstant)
             continue;
 
