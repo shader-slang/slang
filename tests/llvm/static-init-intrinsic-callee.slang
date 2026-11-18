@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target host-cpp -whole-program -O0 -entry main -stage compute
 
-// Companion regression for the round-2 review of shader-slang/slang#14578: a
+// Companion regression for shader-slang/slang#14578: a
 // global initializer that calls a target-intrinsic function must not leave a
 // storage-class prefix dangling in the emitted C++ — `emitFuncDecl` emits
 // nothing for a target-intrinsic callee, so the forward-declaration pass must
