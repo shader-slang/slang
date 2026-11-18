@@ -43,8 +43,8 @@ void computeMain()
 // The CPU test checks the values that SCCP produces. The quotient is not 0, so the quotient
 // array has 2 elements, and the remainder is 0, so the remainder array has 1 element.
 //BUF: type: int64_t
-//BUF-NEXT: 2
-//BUF-NEXT: 1
-//BUF-NEXT: -9223372036854775808
-//BUF-NEXT: -9223372036854775808
-//BUF-NEXT: 0
+//BUF-NEXT: {{^}}2{{$}}
+//BUF-NEXT: {{^}}1{{$}}
+//BUF-NEXT: {{^}}-9223372036854775808{{$}}
+//BUF-NEXT: {{^}}-9223372036854775808{{$}}
+//BUF-NEXT: {{^}}0{{$}}

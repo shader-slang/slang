@@ -251,10 +251,12 @@ class BuiltinOperationIntVal : public IntVal
     }
 
     // Return the constant result of applying `op` to `newArgs`, or null when the operation
-    // cannot be folded. Folding fails when an argument is still symbolic, when the result or an
-    // argument type is not an integer type that folding supports, or when the result is
-    // undefined or target-defined. A non-null `sink` receives the diagnostic for an undefined
-    // or target-defined result, but the return value is null either way.
+    // cannot be folded. `resultType` and the type of each constant argument must be an integer,
+    // `bool` or enum type; a builtin type such as `float` is out of contract and fails a release
+    // assertion. Folding fails when an argument is still symbolic, when a type is not a builtin
+    // scalar or enum type, or when the result is undefined or target-defined. A non-null `sink`
+    // receives the diagnostic for an undefined or target-defined result, but the return value is
+    // null either way.
     //
     // `loc` is the source location of the operator expression being folded; it is used only to
     // locate the fold diagnostics (divide by zero and target-defined value). The sink-less

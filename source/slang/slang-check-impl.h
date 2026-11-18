@@ -3211,7 +3211,8 @@ public:
     /// Return the sink for the diagnostics that folding a single operation reports, such as
     /// division by zero, or null when these diagnostics are suppressed.
     ///
-    /// We report each such diagnostic once, from the fold that first sees the operand values.
+    /// We report each such diagnostic from the fold that first sees the operand values, so that
+    /// repeated folds of the same initializer do not report it again.
     /// Consider this example:
     ///
     ///     static const int a = 1 / 0;
@@ -3221,7 +3222,8 @@ public:
     /// The `case` label folds the same initializer with the same operand values again through
     /// `tryConstantFoldDeclRef`, so it reports nothing. If `a` were a member of a generic type
     /// and the use supplied the generic arguments, the use would see operand values that the
-    /// declaration check could not, so it reports.
+    /// declaration check could not, so it reports. Each such use reports, even when another use
+    /// already supplied the same arguments (see the TODO in `tryConstantFoldDeclRef`).
     DiagnosticSink* getFoldDiagnosticSink(ConstantFoldingCircularityInfo* circularityInfo);
 
     /// Return whether checking `varDecl` folds its initializer and reports the fold diagnostics.

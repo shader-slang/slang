@@ -25,7 +25,7 @@ static const int or_true_skips_shift = ((true || ((1 << 40) == 0)) == true) ? 1 
 
 // The selected operand is still folded and diagnosed.
 static const int cond_true_picks_shift = ((true ? (1 << 32) : 3) == 3) ? 1 : 0;
-//CHECK:                                             ^^ target-defined value
+//CHECK:                                             ^^ warning E30005
 //CHECK:                                             ^^ the value of expression 1 << 32 is target-defined.
 
 void use()
