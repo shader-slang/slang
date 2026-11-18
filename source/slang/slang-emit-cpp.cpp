@@ -603,6 +603,30 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc)
     m_hasString = (artifactDesc.style == ArtifactStyle::Host);
 }
 
+void CPPSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
+{
+    Super::emitFrontMatterImpl(targetReq);
+
+    // Precise mode must leave a trace in the emitted source: the C++ compiler that
+    // compiles it (clang by default with `-ffp-contract=on`, GCC with
+    // `-ffp-contract=fast`) is otherwise free to contract `a*b+c` into an FMA and
+    // change the result. `#pragma STDC FP_CONTRACT OFF` is the standard file-scope
+    // way to forbid that, and front matter is emitted ahead of the prelude, so the
+    // pragma covers the whole module. The `__clang__`/`__GNUC__` guard limits the
+    // pragma to compilers that give it meaning: MSVC ignores it (and does not
+    // contract under its default `/fp:precise`), and GCC before 14 ignores it too.
+    // The CPP source-language gate keeps CUDA output unchanged, because nvcc
+    // defines `__GNUC__` but silently ignores STDC pragmas, so the pragma would be
+    // dead text there.
+    if (getSourceLanguage() == SourceLanguage::CPP &&
+        getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Precise)
+    {
+        m_writer->emit("#if defined(__clang__) || defined(__GNUC__)\n");
+        m_writer->emit("#pragma STDC FP_CONTRACT OFF\n");
+        m_writer->emit("#endif\n");
+    }
+}
+
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     // For use the CPP-specific emitType implementation
