@@ -256,9 +256,7 @@ static void _outputIncludes(
 static UnownedStringSlice _getSourceLanguageName(SourceLanguage language)
 {
     SLANG_RELEASE_ASSERT(language != SourceLanguage::Unknown);
-    auto name = NameValueUtil::findName(TypeTextUtil::getLanguageInfos(), ValueInt(language));
-    SLANG_RELEASE_ASSERT(name.getLength() != 0);
-    return name;
+    return TypeTextUtil::getSourceLanguageName(SlangSourceLanguage(language));
 }
 
 /// Merge one preprocessed source unit's language directive into translation-unit provenance.
