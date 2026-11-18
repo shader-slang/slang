@@ -12,7 +12,7 @@
 // Counterpart of `decl-class-hlsl-generic.hlsl`: in Slang source
 // `ParseClass` reads a name and then expects `{`, so `<` is unexpected.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):
 
 //CHECK: E20001
 class Box<T>

@@ -13,7 +13,7 @@
 // as the positive companion, compiled without the option, leaves the global
 // uniform immutable, so the assignment reports E30011 (not an l-value).
 
-//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=-1):-lang hlsl docs/generated/tests/design/ast-reference/declarations/uniformparametershadowvardecl-assign-without-compat-rejected.slang -target hlsl -entry main -stage compute
+//TEST:SIMPLE_EX(filecheck=CHECK,exit-code=2):-lang hlsl docs/generated/tests/design/ast-reference/declarations/uniformparametershadowvardecl-assign-without-compat-rejected.slang -target hlsl -entry main -stage compute
 
 uniform uint x;
 RWStructuredBuffer<uint> outBuf;

@@ -12,7 +12,7 @@
 // Verifies the HLSL-only rejection of `signed` and traditional integer
 // names; CHECK-DAG asserts both codes appear.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl
 
 void f()
 {

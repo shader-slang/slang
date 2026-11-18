@@ -13,7 +13,7 @@
 // overload failure. The error E39999 must still be reported (exit code -1), and
 // CHECK-NOT asserts no candidate note is rendered.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute -notes-disable 40011
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -entry main -stage compute -notes-disable 40011
 
 void f(int a) {}
 void f(float a, int b) {}

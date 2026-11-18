@@ -13,13 +13,11 @@ slangc -help-style markdown -h
 
 ```
 Exit codes:
-  0   Success.
-  1   The command line was invalid, or the tool failed to run.
-  -1  The compilation failed because of errors in the input.
-  -2  The compiler hit an unexpected failure: an internal compiler error, an
-      assertion, an exception or an abort. This is a bug in the compiler.
-Where the exit status has only 8 bits (for example on Linux and macOS), -1 is
-reported as 255 and -2 as 254.
+  0  Success.
+  1  The command line was invalid, or the tool failed to run.
+  2  The compilation failed because of errors in the input.
+  3  The compiler hit an unexpected failure: an internal compiler error, an
+     assertion, an exception or an abort. This is a bug in the compiler.
 ```
 ### Quick Links
 

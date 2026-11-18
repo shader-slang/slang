@@ -4,10 +4,8 @@
 // Check that a function returning a selected heap buffer is legalized to select an index,
 // and that the caller can write through the resulting buffer pointer.
 
-// CHECK: %[[VAR:[^ ]+]] = OpVariable %_ptr_Function_uint Function
-// CHECK: OpStore %[[VAR]] %uint_2
-// CHECK: OpStore %[[VAR]] %uint_3
-// CHECK: %[[INDEX:[^ ]+]] = OpLoad %uint %[[VAR]]
+// CHECK: OpBranchConditional {{[^ ]+}} %[[TRUE:[^ ]+]] %[[FALSE:[^ ]+]]
+// CHECK: %[[INDEX:[^ ]+]] = OpPhi %uint %uint_2 %[[TRUE]] %uint_3 %[[FALSE]]
 // CHECK: %[[DESC:[^ ]+]] = OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %[[INDEX]]
 // CHECK: %[[BUFFER:[^ ]+]] = OpBufferPointerEXT {{.*}} %[[DESC]]
 // CHECK: %[[ELEMENT:[^ ]+]] = OpAccessChain {{.*}} %[[BUFFER]] %int_0

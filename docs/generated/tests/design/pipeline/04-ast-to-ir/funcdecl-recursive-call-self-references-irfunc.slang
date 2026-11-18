@@ -18,7 +18,7 @@
 // Later passes reject recursion on every target (E55201), so the test
 // expects exit code -1; the lowering IR dump is still emitted first.
 
-//TEST:SIMPLE(filecheck=CHECK, exit-code=-1):-target spirv-asm -dump-ir -o - -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK, exit-code=2):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

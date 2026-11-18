@@ -1045,7 +1045,9 @@ is not generated if the base struct has a user-defined constructor. See GitHub i
 [#13064](https://github.com/shader-slang/slang/issues/13064) for details.
 
 > ⚠️ **Warning:** Struct-from-struct inheritance is unstable in Slang 2025 and earlier language versions, and
-> has been removed in Slang 2026. Use composition (a struct as a member) instead.
+> has been removed in Slang 2026. Use composition (a struct as a member) instead. In those earlier versions, a
+> struct that inherits from another struct also cannot be used as an entry-point varying input or output when
+> targeting SPIR-V or GLSL, or as a varying input when targeting Metal or WGSL.
 
 Initializer Lists
 ----------

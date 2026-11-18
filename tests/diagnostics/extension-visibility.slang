@@ -3,7 +3,7 @@
 // Confirm that visibility of `extensions` is
 // correctly scoped via `import`.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):
 
 import extension_visibility_a;
 

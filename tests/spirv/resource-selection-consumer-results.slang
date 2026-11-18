@@ -61,26 +61,23 @@ uint getTextureIndex(SamplerState sampler)
 // DISPATCH-INDEX: OpBranchConditional %[[CHOICE]] %[[CALL_A:[^ ]+]] %[[CALL_B:[^ ]+]]{{( |$)}}
 // DISPATCH-INDEX: %[[CALL_A]] = OpLabel
 // DISPATCH-INDEX: %[[RESULT_A:[^ ]+]] = OpFunctionCall %uint %[[FN_A:[^ ]+]]{{( |$)}}
-// DISPATCH-INDEX: OpStore %[[RESULT_SLOT:[^ ]+]] %[[RESULT_A]]{{( |$)}}
 // DISPATCH-INDEX: OpBranch %[[CALL_MERGE]]{{( |$)}}
 // DISPATCH-INDEX: %[[CALL_B]] = OpLabel
 // DISPATCH-INDEX: %[[RESULT_B:[^ ]+]] = OpFunctionCall %uint %[[FN_B:[^ ]+]]{{( |$)}}
-// DISPATCH-INDEX: OpStore %[[RESULT_SLOT]] %[[RESULT_B]]{{( |$)}}
 // DISPATCH-INDEX: OpBranch %[[CALL_MERGE]]{{( |$)}}
 // DISPATCH-INDEX: %[[CALL_MERGE]] = OpLabel
+// DISPATCH-INDEX: %[[INDEX:[^ ]+]] = OpPhi %uint %[[RESULT_B]] %[[CALL_B]] %[[RESULT_A]] %[[CALL_A]]{{( |$)}}
 // DISPATCH-INDEX: OpSelectionMerge %[[SAMPLE_MERGE:[^ ]+]] None
 // DISPATCH-INDEX: OpBranchConditional %[[CHOICE]] %[[SAMPLE_A:[^ ]+]] %[[SAMPLE_B:[^ ]+]]{{( |$)}}
 // DISPATCH-INDEX: %[[SAMPLE_A]] = OpLabel
-// DISPATCH-INDEX: %[[INDEX_A:[^ ]+]] = OpLoad %uint %[[RESULT_SLOT]]{{( |$)}}
-// DISPATCH-INDEX: %[[PTR_A:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[INDEX_A]]{{( |$)}}
+// DISPATCH-INDEX: %[[PTR_A:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[INDEX]]{{( |$)}}
 // DISPATCH-INDEX: %[[IMAGE_A:[^ ]+]] = OpLoad {{[^ ]+}} %firstTexture{{( |$)}}
 // DISPATCH-INDEX: %[[SAMPLER_A:[^ ]+]] = OpLoad {{[^ ]+}} %[[PTR_A]]{{( |$)}}
 // DISPATCH-INDEX: %[[PAIR_A:[^ ]+]] = OpSampledImage {{[^ ]+}} %[[IMAGE_A]] %[[SAMPLER_A]]{{( |$)}}
 // DISPATCH-INDEX: OpImageSampleExplicitLod {{[^ ]+}} %[[PAIR_A]]{{( |$)}}
 // DISPATCH-INDEX: OpBranch %[[SAMPLE_MERGE]]{{( |$)}}
 // DISPATCH-INDEX: %[[SAMPLE_B]] = OpLabel
-// DISPATCH-INDEX: %[[INDEX_B:[^ ]+]] = OpLoad %uint %[[RESULT_SLOT]]{{( |$)}}
-// DISPATCH-INDEX: %[[PTR_B:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[INDEX_B]]{{( |$)}}
+// DISPATCH-INDEX: %[[PTR_B:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[INDEX]]{{( |$)}}
 // DISPATCH-INDEX: %[[IMAGE_B:[^ ]+]] = OpLoad {{[^ ]+}} %secondTexture{{( |$)}}
 // DISPATCH-INDEX: %[[SAMPLER_B:[^ ]+]] = OpLoad {{[^ ]+}} %[[PTR_B]]{{( |$)}}
 // DISPATCH-INDEX: %[[PAIR_B:[^ ]+]] = OpSampledImage {{[^ ]+}} %[[IMAGE_B]] %[[SAMPLER_B]]{{( |$)}}
@@ -128,14 +125,12 @@ float4 singleRecipeIndex(float2 uv : TEXCOORD) : SV_Target
 // DISPATCH-BOOL: OpBranchConditional %[[CHOICE]] %[[CALL_A:[^ ]+]] %[[CALL_B:[^ ]+]]{{( |$)}}
 // DISPATCH-BOOL: %[[CALL_A]] = OpLabel
 // DISPATCH-BOOL: %[[RESULT_A:[^ ]+]] = OpFunctionCall %bool %[[FN_A:[^ ]+]]{{( |$)}}
-// DISPATCH-BOOL: OpStore %[[RESULT_SLOT:[^ ]+]] %[[RESULT_A]]{{( |$)}}
 // DISPATCH-BOOL: OpBranch %[[CALL_MERGE]]{{( |$)}}
 // DISPATCH-BOOL: %[[CALL_B]] = OpLabel
 // DISPATCH-BOOL: %[[RESULT_B:[^ ]+]] = OpFunctionCall %bool %[[FN_B:[^ ]+]]{{( |$)}}
-// DISPATCH-BOOL: OpStore %[[RESULT_SLOT]] %[[RESULT_B]]{{( |$)}}
 // DISPATCH-BOOL: OpBranch %[[CALL_MERGE]]{{( |$)}}
 // DISPATCH-BOOL: %[[CALL_MERGE]] = OpLabel
-// DISPATCH-BOOL: %[[RESULT:[^ ]+]] = OpLoad %bool %[[RESULT_SLOT]]{{( |$)}}
+// DISPATCH-BOOL: %[[RESULT:[^ ]+]] = OpPhi %bool %[[RESULT_B]] %[[CALL_B]] %[[RESULT_A]] %[[CALL_A]]{{( |$)}}
 // DISPATCH-BOOL: %[[NOT_RESULT:[^ ]+]] = OpLogicalNot %bool %[[RESULT]]{{( |$)}}
 // DISPATCH-BOOL: %[[TAG_A:[^ ]+]] = OpSelect %uint %[[NOT_RESULT]] %uint_1 %uint_0{{( |$)}}
 // DISPATCH-BOOL: %[[TAG_B:[^ ]+]] = OpSelect %uint %[[NOT_RESULT]] %uint_3 %uint_2{{( |$)}}
@@ -225,15 +220,13 @@ float4 singleRecipeCondition(float2 uv : TEXCOORD) : SV_Target
 // PROJECTED: %[[CALL_A]] = OpLabel
 // PROJECTED: %[[ARG_A:[^ ]+]] = OpLoad {{[^ ]+}} %firstSampler{{( |$)}}
 // PROJECTED: %[[RESULT_A:[^ ]+]] = OpFunctionCall %uint %[[FN_A:[^ ]+]] %[[ARG_A]]{{( |$)}}
-// PROJECTED: OpStore %[[RESULT_SLOT:[^ ]+]] %[[RESULT_A]]{{( |$)}}
 // PROJECTED: OpBranch %[[CALL_MERGE]]{{( |$)}}
 // PROJECTED: %[[CALL_B]] = OpLabel
 // PROJECTED: %[[ARG_B:[^ ]+]] = OpLoad {{[^ ]+}} %secondSampler{{( |$)}}
 // PROJECTED: %[[RESULT_B:[^ ]+]] = OpFunctionCall %uint %[[FN_A]] %[[ARG_B]]{{( |$)}}
-// PROJECTED: OpStore %[[RESULT_SLOT]] %[[RESULT_B]]{{( |$)}}
 // PROJECTED: OpBranch %[[CALL_MERGE]]{{( |$)}}
 // PROJECTED: %[[CALL_MERGE]] = OpLabel
-// PROJECTED: %[[INDEX:[^ ]+]] = OpLoad %uint %[[RESULT_SLOT]]{{( |$)}}
+// PROJECTED: %[[INDEX:[^ ]+]] = OpPhi %uint %[[RESULT_B]] %[[CALL_B]] %[[RESULT_A]] %[[CALL_A]]{{( |$)}}
 // PROJECTED: %[[IMAGE_PTR:[^ ]+]] = OpAccessChain {{[^ ]+}} %textures %[[INDEX]]{{( |$)}}
 // PROJECTED: %[[IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %[[IMAGE_PTR]]{{( |$)}}
 // PROJECTED: OpImageFetch {{[^ ]+}} %[[IMAGE]]{{( |$)}}
