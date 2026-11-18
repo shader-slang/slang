@@ -1,5 +1,5 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -source-language hlsl -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -source-language hlsl -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -source-language hlsl -output-using-type -xslang -Wno-30081
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -source-language hlsl -output-using-type -xslang -Wno-30081
 
 // An HLSL-dialect declaration used as a `do`-`while` condition is scoped to the
 // condition itself (the body runs before the condition, so it never sees the variable),

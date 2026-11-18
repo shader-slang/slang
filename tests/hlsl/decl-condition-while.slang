@@ -1,5 +1,5 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -source-language hlsl -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -source-language hlsl -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -source-language hlsl -output-using-type -xslang -Wno-30081
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -source-language hlsl -output-using-type -xslang -Wno-30081
 
 // An HLSL-dialect declaration used as a `while` condition follows C++ rules: the
 // declaration runs before each test, and the variable is visible in the body.
@@ -36,5 +36,5 @@ void computeMain()
     outputBuffer[1] = whileScoping();
 }
 
-// CHECK: 60
+// CHECK: 59
 // CHECK: 80

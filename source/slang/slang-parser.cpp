@@ -265,9 +265,15 @@ public:
     ForStmt* ParseForStatement();
     WhileStmt* ParseWhileStatement();
     DoWhileStmt* ParseDoWhileStatement(Stmt* body);
-    // Parse the condition of an `if`, `while`, or `do`-`while` statement, wrapping the
-    // condition in a `ConditionClause`.
+    // Parse the condition of an `if`, `while`, or `do`-`while` statement: either an
+    // expression (`ExprConditionClause`) or, in the HLSL dialect, a single-variable
+    // declaration with an initializer (`DeclConditionClause`).
     ConditionClause* parseConditionClause();
+    // Parse the declaration form of a condition, e.g. the `int count = c` of `if (int count = c)`.
+    // The caller has already committed to the declaration form. The declared variable is scoped
+    // like a C++ condition: the condition scope is pushed here and recorded on the clause, and
+    // the statement parser that owns the clause pops it when the variable goes out of scope.
+    DeclConditionClause* parseDeclConditionClause();
     CatchStmt* ParseDoCatchStatement(Stmt* body);
     Stmt* ParseDoStatement();
     BreakStmt* ParseBreakStatement();
@@ -7846,6 +7852,10 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = parseControlFlowBody(ifStatement);
     }
+    // A declaration condition introduces a scope that spans the whole statement, so it
+    // closes after the `else` arm. The variable stays visible in both arms, like C++.
+    if (ifStatement->predicate && ifStatement->predicate->scopeDecl)
+        PopScope();
     ifStatement->afterLoc = tokenReader.peekLoc();
 
     return ifStatement;
@@ -7930,6 +7940,10 @@ WhileStmt* Parser::ParseWhileStatement()
     whileStatement->predicate = parseConditionClause();
     ReadToken(TokenType::RParent);
     whileStatement->statement = parseControlFlowBody();
+    // A declaration condition is visible in the body, so its scope spans the body and
+    // closes with the statement.
+    if (whileStatement->predicate && whileStatement->predicate->scopeDecl)
+        PopScope();
     return whileStatement;
 }
 
@@ -7943,6 +7957,11 @@ DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
     doWhileStatement->predicate = parseConditionClause();
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
+    // The body of a `do`-`while` is parsed before the condition, so a declaration
+    // condition is visible in the condition only, never in the body. Its scope
+    // closes here, immediately after the condition.
+    if (doWhileStatement->predicate && doWhileStatement->predicate->scopeDecl)
+        PopScope();
     return doWhileStatement;
 }
 
@@ -8204,14 +8223,128 @@ TypeExp Parser::ParseTypeExp()
     return TypeExp(ParseType());
 }
 
-// Parse the condition of an `if`, `while`, or `do`-`while` statement, wrapping
-// it in an `ExprConditionClause`.
+// Parse the condition of an `if`, `while`, or `do`-`while` statement.
+//
+// The condition is normally an expression, but the HLSL dialect also allows a
+// single-variable declaration, as in:
+//
+//     if (int count = items.Length - 3)
+//         ...
+//
+// Because a condition declaration must have an initializer, the declaration form
+// has no ambiguity: after a trial type we require the `<name> =` shape before
+// committing to a declaration. An expression like `a * b` therefore parses as a
+// multiply, even though `a * b` could otherwise be read as declaring a pointer
+// `b` of type `a*` (the same ambiguity `ParseStatement` resolves in favor of
+// declarations in statement position, where `a * b;` is useless as an expression).
+//
+// The Slang and GLSL dialects reject the declaration form with a dedicated
+// diagnostic instead of the generic unexpected-token cascade they produced
+// before, but we still parse the declaration so recovery continues with one
+// clear message.
 ConditionClause* Parser::parseConditionClause()
 {
+    if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
+    {
+        // We might be looking at a declaration condition, or at an expression
+        // that starts with a name, and we need to figure out which. We'll
+        // solve this with backtracking, like `ParseStatement` does for
+        // declarations in statement position.
+        //
+        // The trial parses with a shadow parser and sink, the same setup
+        // `tryParseGenericApp` uses, so a failed trial cannot leak diagnostics
+        // into the real compile: `ParseType` reads `<` after a name as a
+        // generic application (there are no comparisons in the type grammar),
+        // so trial-parsing a condition like `if (x < T(0))` as a type would
+        // otherwise report "expected '>'".
+        DiagnosticSink trialSink(sink->getSourceManager(), nullptr);
+        Parser trialParser(*this);
+        trialParser.sink = &trialSink;
+
+        // Modifiers can precede the type in a declaration condition, as in
+        // `if (const int count = ...)`, so the trial parses them too.
+        ParseModifiers(&trialParser);
+        _parseInfixTypeExpr(&trialParser, false);
+
+        bool isDeclCondition = trialSink.getErrorCount() == 0 && !trialParser.hasSeenCompletionToken &&
+                               (trialParser.LookAheadToken(TokenType::Identifier) ||
+                                trialParser.LookAheadToken(TokenType::CompletionRequest)) &&
+                               trialParser.LookAheadToken(TokenType::OpAssign, 1);
+
+        if (isDeclCondition)
+        {
+            if (getSourceLanguage() != SourceLanguage::HLSL)
+            {
+                sink->diagnose(
+                    Diagnostics::DeclarationAsConditionRequiresHlsl{.location = tokenReader.peekLoc()});
+            }
+            return parseDeclConditionClause();
+        }
+
+        // Not a declaration, so the condition is an expression. The trial only
+        // touched the shadow parser, so this parser is still at the start of
+        // the condition.
+    }
+
     Expr* expr = ParseExpression();
     ExprConditionClause* clause = astBuilder->create<ExprConditionClause>();
     FillPosition(clause);
     clause->predicate = expr;
+    return clause;
+}
+
+// Parse the declaration form of a condition, e.g. the `int count = c` of
+// `if (int count = c)`.
+//
+// The declaration reuses the same machinery as a local variable declaration:
+// `ParseType` for the type, `parseInitDeclarator` for the name and initializer,
+// and `CompleteDecl` to attach modifiers and add the variable to the condition's
+// scope. The variable therefore gets the same checking, lookup, and lowering as
+// any other local, with no condition-specific decl kind.
+//
+// Consider `while (int i = n--)`. The clause we build holds the declaration of
+// `i` plus an expression that names `i`. Semantic checking brings `i` to its
+// declaration point, then checks the naming expression through the same
+// predicate path as a plain expression condition, so it resolves to `i` and
+// coerces to `bool`. IR lowering declares `i` in the loop's condition slot, so
+// it is initialized before each test and a `continue` re-runs the initializer,
+// which is what the C++ condition semantics require.
+DeclConditionClause* Parser::parseDeclConditionClause()
+{
+    DeclConditionClause* clause = astBuilder->create<DeclConditionClause>();
+    FillPosition(clause);
+
+    // The declared variable lives in its own scope, so it never leaks into the
+    // enclosing block. The scope stays open until the statement parser that owns
+    // this clause pops it (after the arms for `if`/`while`, right after the
+    // condition for `do`-`while`).
+    ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+    pushScopeAndSetParent(scopeDecl);
+    clause->scopeDecl = scopeDecl;
+
+    auto modifiers = ParseModifiers(this);
+    Expr* typeSpec = ParseType();
+
+    InitDeclarator initDeclarator = parseInitDeclarator(this, kDeclaratorParseOptions_None);
+    DeclaratorInfo declaratorInfo;
+    declaratorInfo.typeSpec = typeSpec;
+    UnwrapDeclarator(this, initDeclarator, &declaratorInfo);
+
+    VarDeclBase* varDecl = CreateVarDeclForContext(astBuilder, currentScope->containerDecl);
+    CompleteVarDecl(this, varDecl, declaratorInfo);
+    CompleteDecl(this, varDecl, currentScope->containerDecl, modifiers, nullptr);
+    clause->decl = varDecl;
+
+    // An expression that names the declared variable, like the one the
+    // `if (let ...)` desugaring builds for its binding. Checking resolves it
+    // to the declaration, and the declaration is already complete by then,
+    // because the condition is checked before the arms.
+    VarExpr* varExpr = astBuilder->create<VarExpr>();
+    varExpr->scope = currentScope;
+    varExpr->loc = varDecl->getNameLoc();
+    varExpr->name = varDecl->getName();
+    clause->predicate = varExpr;
+
     return clause;
 }
 
