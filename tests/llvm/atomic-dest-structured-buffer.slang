@@ -9,6 +9,7 @@
 // invalid-atomic-destination diagnostic.
 
 //TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target llvm-host-ir -emit-cpu-via-llvm -whole-program -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target host-callable -emit-cpu-via-llvm -whole-program -entry main -stage compute
 
 RWStructuredBuffer<Atomic<uint>> counts;
 
