@@ -286,14 +286,19 @@ bool hasGenericAssemblyImplementation(IRFunc* func);
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
 
+/// Return whether `type` is itself a texture or storage image, a sampler, a combined
+/// texture-sampler, a subpass input (including a GLSL input attachment), or an acceleration
+/// structure. Unlike a buffer, which a target can represent as a pointer to memory, a value of one
+/// of these types is an opaque handle that only dedicated operations can use.
+bool isImageSamplerOrAccelerationStructureType(IRType* type);
+
 /// Return whether `fromType` and `toType` are both fixed-size basic types of equal byte
-/// size. This is a size comparison between target-independent sizes only: basic types
-/// whose size depends on the target (`intptr_t`, `uintptr_t`, `bool`) do not qualify, so
-/// callers can use this predicate at lowering time, where no target is available to
-/// compare a target-dependent size against. A fresh size table is used because the
+/// size. Only target-independent sizes are compared, so callers can use this predicate
+/// at lowering time, where no target is available to compare a target-dependent size
+/// against; types whose size depends on the target, and types no layout rule can size,
+/// do not qualify. A fresh size table (see its comment in the .cpp) is used because the
 /// existing width helpers encode only integer widths in bits (`maybeGetIntTypeWidth`)
-/// or only floating-point properties, not one fixed-vs-target-dependent classification
-/// over the whole basic-type set.
+/// or only floating-point properties.
 bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType);
 
 /// Return the value that substitutes an `__intrinsic_op(0)` (identity) call whose
@@ -303,22 +308,17 @@ bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType);
 /// re-describes the operand's bits, as in `__intrinsic_op(0) int get()` on an
 /// `__intrinsic_type(UInt)` struct: we return a bit-cast of the operand to the declared
 /// type, which keeps the bit pattern (though not necessarily the numeric value)
-/// unchanged. The type comparison is pointer identity, which is sound because basic-type
-/// instructions are module-deduplicated singletons.
+/// unchanged.
 ///
 /// Every other shape keeps the operand as lowered. The declared type may play a
 /// different role than the operand's type (`Ptr` to `Ref` for `operator*`, `Ref` to
-/// `Ptr` for `operator&`), where a bit-cast is not a bit-reinterpret at all and the
-/// bit-cast lowering pass rejects the pair; or the pair may fall outside what every
-/// target can lower (vectors, size-mismatched scalars, `bool`, target-sized integers),
-/// which preserves the historical pass-through behavior.
+/// `Ptr` for `operator&`), where a bit-cast is not a bit-reinterpret at all. Pairs
+/// outside this fix's scope — vectors, size-mismatched scalars, `bool`, target-sized
+/// integers, and types no layout rule can size — also keep the operand as lowered,
+/// preserving the historical pass-through. Vector re-typings remain a known remainder
+/// of the issue, reachable only through fully generic identity declarations such as
+/// `__slang_noop_cast` (`__intrinsic_type` names a scalar type).
 IRInst* retypeIdentityIntrinsicResult(IRBuilder* builder, IRInst* operand, IRType* declaredType);
-
-/// Return whether `type` is itself a texture or storage image, a sampler, a combined
-/// texture-sampler, a subpass input (including a GLSL input attachment), or an acceleration
-/// structure. Unlike a buffer, which a target can represent as a pointer to memory, a value of one
-/// of these types is an opaque handle that only dedicated operations can use.
-bool isImageSamplerOrAccelerationStructureType(IRType* type);
 
 /// Test for opaque values or invalid recursion in the by-value storage of `type`.
 ///

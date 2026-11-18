@@ -1007,7 +1007,8 @@ LoweredValInfo emitCallToDeclRef(
         // so we will emit an instruction with the chosen
         // opcode, and the arguments to the call as its operands.
         //
-        if (intrinsicOpModifier->op == 0) // Identity; the helper below honors the declared type.
+        // Identity: retypeIdentityIntrinsicResult honors the declared result type.
+        if (intrinsicOpModifier->op == 0)
         {
             SLANG_RELEASE_ASSERT(argCount == 1);
             return LoweredValInfo::simple(retypeIdentityIntrinsicResult(builder, args[0], type));

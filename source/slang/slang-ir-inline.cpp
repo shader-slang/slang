@@ -462,7 +462,7 @@ struct InliningPassBase
                 SLANG_RELEASE_ASSERT(call->getArgCount() >= 1);
                 // Calls to intrinsic-op functions survive lowering when they are minted
                 // indirectly, e.g. an interface requirement dispatched through a witness
-                // table; the mandatory inlining pass resolves them here.
+                // table; the mandatory-early inlining pass resolves them here.
                 auto result =
                     retypeIdentityIntrinsicResult(&builder, call->getArg(0), call->getFullType());
                 call->replaceUsesWith(result);

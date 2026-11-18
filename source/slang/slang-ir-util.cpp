@@ -2772,11 +2772,17 @@ IRParam* getParamAt(IRBlock* block, UIndex ii)
     SLANG_UNEXPECTED("ii >= paramCount");
 }
 
-// Return the fixed byte size of a basic type, or 0 when the type is not a fixed-size
-// basic type or its size depends on the target. `intptr_t` and `uintptr_t` vary with the
-// target's pointer size, and `bool` is 4 bytes under the GPU/natural layout but 1 byte
-// under the C and LLVM rules used by the CPU and CUDA targets, so none of the three can
-// be matched by a size comparison at lowering time.
+// Return the fixed byte size of a basic type, or 0 when the type is not a
+// fixed-size basic type, its size depends on the target, or no layout rule can
+// size it. `intptr_t` and `uintptr_t` vary with the target's pointer size, and
+// `bool` is 4 bytes under the GPU/natural layout but 1 byte under the C and
+// LLVM rules used by the CPU and CUDA targets, so neither can be matched by a
+// size comparison at lowering time. `char` has a fixed size on the C-family
+// targets, but no layout rule defines its size, so the bit-cast lowering could
+// not size a pair involving it either. The packed-float types (bfloat16, the
+// 8-bit float formats) are a sibling of the basic-type family in the IR, and
+// their bit-cast emission legs are not verified on every target, so pairs
+// involving them keep the historical pass-through.
 static int32_t _getFixedBasicTypeSize(IROp op)
 {
     switch (op)
@@ -2792,12 +2798,9 @@ static int32_t _getFixedBasicTypeSize(IROp op)
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
     case kIROp_HalfType:
-    case kIROp_BFloat16Type:
         return 2;
     case kIROp_Int8Type:
     case kIROp_UInt8Type:
-    case kIROp_FloatE4M3Type:
-    case kIROp_FloatE5M2Type:
         return 1;
     default:
         return 0;
@@ -2815,7 +2818,8 @@ bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType)
 IRInst* retypeIdentityIntrinsicResult(IRBuilder* builder, IRInst* operand, IRType* declaredType)
 {
     auto operandType = operand->getFullType();
-    if (operandType == declaredType || !isSameSizeFixedBasicTypePair(operandType, declaredType))
+    if (operandType->getOp() == declaredType->getOp() ||
+        !isSameSizeFixedBasicTypePair(operandType, declaredType))
         return operand;
     return builder->emitBitCast(declaredType, operand);
 }
