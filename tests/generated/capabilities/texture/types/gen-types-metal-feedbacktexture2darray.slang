@@ -11,7 +11,6 @@
 //
 
 //DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
-//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): None
 //TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_4
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer

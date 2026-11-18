@@ -121,12 +121,9 @@ struct Options
     // always the subCommand itself.
     Slang::List<Slang::String> subCommandArgs;
 
-    // By default we potentially synthesize test for all
-    // TODO: Vulkan is disabled by default for now as the majority as vulkan synthesized tests
-    // CPU is disabled by default
-    // CUDA is disabled by default
-    Slang::RenderApiFlags synthesizedTestApis =
-        Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::CPU);
+    // By default we synthesize tests for all APIs. A test line that has no render API asks for them
+    // (`targets=all`), and a test cannot run on an API writes `targets=all-<name>`.
+    Slang::RenderApiFlags synthesizedTestApis = Slang::RenderApiFlag::AllOf;
 
     // If true, print detailed adapter information
     bool showAdapterInfo = false;

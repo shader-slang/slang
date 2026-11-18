@@ -129,6 +129,121 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
 
+### Runtime test with multiple targets
+
+Use `COMPARE_COMPUTE`, `COMPARE_COMPUTE_EX` or `COMPARE_RENDER_COMPUTE` to test the runtime behavior of a shader.
+
+```
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
+```
+
+By default, the test runs for all targets with an API that the machine supports. To specify or limit the targets, use the option `targets=`:
+
+```
+//TEST:COMPARE_COMPUTE(targets=all-cuda, filecheck-buffer=CHECK): -any-options-as-needed
+```
+
+By default, `targets=all` is implied.
+
+Such a line is a request. It does not run itself. For each target, `slang-test` makes a copy of the line with the arguments of the target. This is the same mechanism as the synthesized tests of other commands. In the test result, the name of each copy has `syn` and the target, for example:
+
+```
+tests/compute/my-test.slang.1 syn (dx11)
+tests/compute/my-test.slang.1 syn (dx12)
+tests/compute/my-test.slang.1 syn (vk)
+tests/compute/my-test.slang.1 syn (glsl)
+tests/compute/my-test.slang.1 syn (wgpu)
+...
+```
+
+The number in the name is the index of the test line in the file, which is the same for all copies of a line. Line 0 has no number. The number does not depend on the APIs of the machine, so a name is the same on every machine. Use the name in a list of expected failures.
+
+To test with different command-line arguments, add more lines. Each line makes its own tests for each target:
+
+```
+//TEST:COMPARE_COMPUTE(targets=all-cuda, filecheck-buffer=CHECK): -Xslang -DTEST_A
+//TEST:COMPARE_COMPUTE(targets=all-cuda, filecheck-buffer=CHECK): -Xslang -DTEST_B
+```
+
+#### The commands
+
+The three commands differ only in the arguments that they add to the `render-test` command line:
+
+| Command                  | Adds        |
+| ------------------------ | ----------- |
+| `COMPARE_COMPUTE`        | `-compute`  |
+| `COMPARE_COMPUTE_EX`     | nothing     |
+| `COMPARE_RENDER_COMPUTE` | `-gcompute` |
+
+Use `COMPARE_COMPUTE` for a compute test. Do not write `-compute` on the line, because the command adds it.
+
+Use `COMPARE_COMPUTE_EX` only for a test that must choose its own mode, for example `-mesh`, `-task` or `-rt`. The command adds no argument, so the line must have the mode argument.
+
+#### No render API argument
+
+A line of these commands cannot have a render API argument, such as `-vk` or `-cpu`, or a language argument that implies one, such as `-wgsl`. `slang-test` reports an error, and the test fails. The text of the error names the option to use. For example, the line below is an error, and the text asks for `targets=vk`:
+
+```
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
+```
+
+Write the line like this:
+
+```
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type
+```
+
+A line that `DISABLE_TEST` disables does not run, so `slang-test` does not check it.
+
+#### The option `targets=`
+
+The value of `targets=` is a list of names, separated by plus signs (`+`). These names are valid:
+
+| Name         | Meaning                                        | In `all` | Predefined macro   |
+| ------------ | ---------------------------------------------- | -------- | ------------------ |
+| `vk`         | `-vk -emit-spirv-directly`                     | yes      | `SLANG_TEST_VK`    |
+| `glsl`       | `-vk -emit-spirv-via-glsl`                     | yes      | `SLANG_TEST_GLSL`  |
+| `dx11`       | `-dx11`                                        | yes      | `SLANG_TEST_DX11`  |
+| `dx12`       | `-dx12`                                        | yes      | `SLANG_TEST_DX12`  |
+| `metal`      | `-metal`                                       | yes      | `SLANG_TEST_METAL` |
+| `cuda`       | `-cuda`                                        | yes      | `SLANG_TEST_CUDA`  |
+| `cpu`        | `-cpu`                                         | yes      | `SLANG_TEST_CPU`   |
+| `wgpu`       | `-wgpu`                                        | yes      | `SLANG_TEST_WGPU`  |
+| `llvm`       | `-llvm`                                        | yes      | `SLANG_TEST_LLVM`  |
+| `all`        | every target that has "yes" in the last column |          |                    |
+| `all-<name>` | every target of `all` except `<name>`          |          |                    |
+
+Use `all-<name>` for a test that cannot run on a target. For example, `targets=all-vk-cuda` runs on every target except `vk` and `cuda`, and `targets=vk+metal+cpu` runs on these three targets only.
+
+The result is the union of the tokens. A hyphen between names removes more than one target: `all-vk-cuda` is `all` without `vk` and `cuda`. Only `all-<name>` removes a target. A token such as `-vk` is an unknown name, and `slang-test` reports an error. The tests have the order of the table above, and a target does not run twice.
+
+Follow these rules:
+
+- `slang-test` makes a test only for an API that the machine has, and that the option `-synthesizedTestApi` allows. By default, all APIs are allowed.
+- A request makes all of its targets. Another line of the file does not change this, even if that line tests the same target. For example, `targets=all` with `-option-a` and `targets=cuda` with `-option-b` give two different `cuda` tests.
+- A `DISABLE_TEST` line does not switch a target off for a request. Use `targets=all-<name>`.
+- Use `+` between the names, and not a comma. A comma separates the options of the test line, so `targets=vk,cpu` is the option `targets=vk` and the option `cpu`. `slang-test` reports an error for this.
+- An unknown name is an error. `slang-test` does not skip it.
+- Other test commands, such as `SIMPLE`, do not support `targets=`. `slang-test` reports an error for them.
+
+#### Predefined macros
+
+`slang-test` passes one macro definition to the Slang compiler for each test, as `-Xslang -DSLANG_TEST_<TARGET>`. The last column of the table above lists the macro of each target. `<TARGET>` is the name of the target in capital letters. A test defines the macro of its own target and no other macro. A shader uses the macro to pick the code for one target:
+
+```
+#if defined(SLANG_TEST_METAL)
+// Code for the Metal test only.
+#endif
+```
+
+`vk` and `glsl` use the same API, but they have two macros, because the Slang compiler takes a different path for each. Every test of the three commands has the macro of its target. The synthesized tests of other commands do not have the macro.
+
+#### Other details
+
+A test that `slang-test` made reads the expected file of the line that it comes from. For example, a copy of the line at index 1 reads `foo.slang.1.expected.txt`. A copy writes files that have the target in their name, for example `foo.slang.1.vk.actual.txt`. The copies of a line do not write the same file.
+
+A `.hlsl` test file needs the option `-slang`, so the test commands add it to the line that they run. A `.slang` file does not need it. For a `.slang` file, the command adds `-slang` only if the line has another language option, such as `-hlsl`. The last language option wins.
+
 ### Unused `.expected` files
 
 A test line with the `filecheck=PREFIX` or `diag=PREFIX` option checks its output with FileCheck or with the diagnostic annotations. It never reads a `.expected` file. If such a file exists for the test line, `slang-test` reports an error and the test fails. Remove the file, or remove the option from the test line.

@@ -239,6 +239,18 @@ def getMetalTests():
     return (backend, tests)
 
 
+def getComputeTestTargetName(renderTestArguments):
+    """Returns the name of the `targets=` option of `slang-test` for the arguments of `render-test`."""
+    arguments = renderTestArguments.split()
+    if "-vk" in arguments:
+        return "glsl" if "-emit-spirv-via-glsl" in arguments else "vk"
+    names = {"-wgpu": "wgpu", "-mtl": "metal"}
+    for argument in arguments:
+        if argument in names:
+            return names[argument]
+    raise ValueError(f"No target of slang-test for the arguments: {renderTestArguments}")
+
+
 def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
 
     backend = {
@@ -465,6 +477,12 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
             disableNegativeSimpleTestPrefix = "DISABLE_"
             testDisabledComment += f"\n// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}"
 
+    # The compute test is a request for one target of `slang-test`: `targets=<name>`. A disabled
+    # compute test has no line, because `DISABLE_TEST` has no effect on the COMPARE_COMPUTE command.
+    computeTestLine = ""
+    if disableComputeTestPrefix == "":
+        computeTestLine = f"//TEST:COMPARE_COMPUTE(targets={getComputeTestTargetName(positiveComputeTestTarget)}, filecheck-buffer=POSITIVE_RESULT):\n"
+
     testStr = f"""// THIS IS A GENERATED FILE. DO NOT EDIT!
 // Instead, edit extras/test-generators/generate-tests-capabilities-texture-types.py, and
 // regenerate this test by running:
@@ -478,8 +496,7 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
 //
 {testDisabledComment}
 //{disablePositiveSimpleTestPrefix}TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target {positiveSimpleTestTarget}
-//{disableComputeTestPrefix}TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): {positiveComputeTestTarget}
-//{disableNegativeSimpleTestPrefix}TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target {negativeSimpleTestTarget}
+{computeTestLine}//{disableNegativeSimpleTestPrefix}TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target {negativeSimpleTestTarget}
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
