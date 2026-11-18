@@ -4,9 +4,7 @@
 // with a resource type or a type that recursively contains
 // resources.
 //
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -vk
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -cpu
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 //
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

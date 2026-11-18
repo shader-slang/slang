@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for https://github.com/shader-slang/slang/issues/13000:
 // bwd_diff through two nested, non-unrolled [MaxIters] loops with unequal

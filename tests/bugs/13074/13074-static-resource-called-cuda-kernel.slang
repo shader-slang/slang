@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CUDA): -O0 -target cuda -validate-ir -line-directive-mode none
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -O0
 
 // A CUDA kernel can be launched by external code or called directly by another function.
 // `fixEntryPointCallsites` preserves the launchable kernel and redirects ordinary calls to a device

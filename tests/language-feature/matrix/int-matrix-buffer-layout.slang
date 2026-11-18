@@ -3,9 +3,8 @@
 // reflection gives for a column-major matrix, so a wrong storage layout in
 // the generated code returns a different word.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -emit-spirv-via-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -emit-spirv-directly -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -xslang -matrix-layout-row-major
 
 struct IntMatrices
 {

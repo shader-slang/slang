@@ -1,8 +1,7 @@
 // Test hash functions for grid encoding
 // Reference: tiny-cuda-nn common_device.h hash implementations
 
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=BUF): -xslang -experimental-feature -output-using-type
 import slang.neural;
 
 // Output buffer for test results (22 results total)

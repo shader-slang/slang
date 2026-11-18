@@ -3,14 +3,11 @@
 // Test using interface tops as top-level shader parameters
 // (whether global, or on an entry point).
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu):
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_0
+//TEST:COMPARE_COMPUTE(targets=vk+cpu):
 // Passing, but: slang-test: Test context Slang session is leaking #5610
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 // First we will define some fake interfaces for testing.
 // Let's pretend we are doing some kind of random number

@@ -8,12 +8,11 @@
 //missing implementation of system (varying?) values
 //DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -xslang -DTARGET_VK
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -emit-spirv-directly -xslang -DTARGET_VK
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DTARGET_VK
+//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 // There are some issues with the Metal backend when using glsl-style syntax - this should be fixed.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -entry computeMain -source-language glsl -xslang -DTARGET_METAL
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DTARGET_METAL
 
 #version 430
 

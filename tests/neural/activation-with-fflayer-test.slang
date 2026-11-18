@@ -1,9 +1,9 @@
 // Test activations integrated with FFLayer (layer + activation end-to-end).
 //
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUFFER):-profile cs_6_6 -xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUFFER):-output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
 import slang.neural;
 
@@ -41,15 +41,15 @@ bool testFFLayerReLU()
 {
     setupParams();
     let baseAddr = Address(params);
-    
+
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, ReLU<float>, true>;
     let layer = Layer();
-    
+
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
-    
+
     let y = layer.eval<Address>(x, baseAddr);
-    
+
     // ReLU([-1, 2]) = [0, 2]
     return approxEqual(y[0], 0.0) && approxEqual(y[1], 2.0);
 }
@@ -60,16 +60,16 @@ bool testFFLayerLeakyReLU()
 {
     setupParams();
     let baseAddr = Address(params);
-    
+
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, LeakyReLU<float>, true>;
     let leakyRelu = LeakyReLU<float>(0.1);  // alpha = 0.1
     let layer = Layer(leakyRelu);
-    
+
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
-    
+
     let y = layer.eval<Address>(x, baseAddr);
-    
+
     // LeakyReLU([-1, 2], 0.1) = [-0.1, 2]
     return approxEqual(y[0], -0.1) && approxEqual(y[1], 2.0);
 }
@@ -80,15 +80,15 @@ bool testFFLayerSigmoid()
 {
     setupParams();
     let baseAddr = Address(params);
-    
+
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, Sigmoid<float>, true>;
     let layer = Layer();
-    
+
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
-    
+
     let y = layer.eval<Address>(x, baseAddr);
-    
+
     // Sigmoid([0, 0]) = [0.5, 0.5]
     return approxEqual(y[0], 0.5) && approxEqual(y[1], 0.5);
 }
@@ -99,15 +99,15 @@ bool testFFLayerTanh()
 {
     setupParams();
     let baseAddr = Address(params);
-    
+
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, TanhActivation<float>, true>;
     let layer = Layer();
-    
+
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
-    
+
     let y = layer.eval<Address>(x, baseAddr);
-    
+
     // Tanh([0, 0]) = [0, 0]
     return approxEqual(y[0], 0.0) && approxEqual(y[1], 0.0);
 }
@@ -118,15 +118,15 @@ bool testFFLayerExp()
 {
     setupParams();
     let baseAddr = Address(params);
-    
+
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, ExpActivation<float>, true>;
     let layer = Layer();
-    
+
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
-    
+
     let y = layer.eval<Address>(x, baseAddr);
-    
+
     // Exp([0, 0]) = [1, 1]
     return approxEqual(y[0], 1.0) && approxEqual(y[1], 1.0);
 }
@@ -137,15 +137,15 @@ bool testFFLayerIdentity()
 {
     setupParams();
     let baseAddr = Address(params);
-    
+
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, IdentityActivation<float>, true>;
     let layer = Layer();
-    
+
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
-    
+
     let y = layer.eval<Address>(x, baseAddr);
-    
+
     // Identity([-1, 2]) = [-1, 2]
     return approxEqual(y[0], -1.0) && approxEqual(y[1], 2.0);
 }
@@ -156,16 +156,16 @@ bool testFFLayerSine()
 {
     setupParams();
     let baseAddr = Address(params);
-    
+
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, SineActivation<float>, true>;
     let layer = Layer();
-    
+
     float pi = 3.14159265;
     float[2] arr = {0.0, pi / 2.0};
     let x = Vec2(arr);
-    
+
     let y = layer.eval<Address>(x, baseAddr);
-    
+
     // Sin([0, pi/2]) = [0, 1]
     return approxEqual(y[0], 0.0, 0.001) && approxEqual(y[1], 1.0, 0.001);
 }

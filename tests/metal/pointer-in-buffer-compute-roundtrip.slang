@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -render-features argument-buffer-tier-2 -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -emit-spirv-directly -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-render-features argument-buffer-tier-2 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type
 
 // Runtime validation of three-level pointer chain (int*** -> int** -> int* -> int).
 // Builds the pointer chain in a setup function using __getAddress on struct

@@ -1,9 +1,7 @@
 // row-major.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -compile-arg -O3 -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cpu):-output-using-type -compile-arg -O3 -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type -xslang -matrix-layout-row-major
 
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 0.0  0.0 1.0 0.0 0.0  0.0 0.0 1.0 0.0 10.0 20.0 30.0 1.0]):name matrixBuffer
 ConstantBuffer<float4x4> matrixBuffer;
@@ -17,7 +15,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float4 v = float4(1, 2, 3, 1);
 
     float4x4 M = matrixBuffer;
-    
+
     float4 r = mul(v, M);
 
     output[0] = r.x;

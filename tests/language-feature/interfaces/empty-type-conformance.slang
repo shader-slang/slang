@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx11 -compute  -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute  -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx11, filecheck-buffer=CHECK):-output-using-type
 
 interface TestInterface {
     float sample();

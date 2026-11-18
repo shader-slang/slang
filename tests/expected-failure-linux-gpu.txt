@@ -8,4 +8,4 @@
 slang-unit-test-tool/RecordReplay_cpu_hello_world.internal
 
 # Ray tracing tests - CUDA/OptiX issues on T4
-tests/pipeline/ray-tracing/raygen.slang (cuda)
+tests/pipeline/ray-tracing/raygen.slang syn (cuda)

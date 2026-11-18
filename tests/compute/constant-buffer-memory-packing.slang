@@ -1,14 +1,9 @@
 // column-major-with-row-major-operations.slang
 
 // Metal/CPP/CUDA do not deal with packing currently, different results will occur.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -xslang -DTARGET_WITHOUT_PACKING
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -xslang -DTARGET_WITHOUT_PACKING
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-llvm -compute -xslang -DTARGET_WITHOUT_PACKING
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=BUF):-xslang -DTARGET_WITHOUT_PACKING
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -emit-spirv-via-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-mtl -compute
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm, filecheck-buffer=BUF):
 
 
 // CPP/CUDA due to natural layout rules will recieve the following ROW matrix:

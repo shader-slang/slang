@@ -3,8 +3,7 @@
 // Confirm that user-defined initializer/constructor
 // methods in a type work as expected.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct Pair
 {

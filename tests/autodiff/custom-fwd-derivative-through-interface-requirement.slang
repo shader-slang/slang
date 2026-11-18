@@ -8,14 +8,14 @@
 // synthesized one, a conformer with both custom derivatives uses each in its own mode, and a
 // differentiable custom derivative still provides second-order derivatives through a direct call.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CONCRETE):-cpu -shaderobj -output-using-type -Xslang... -DCONCRETE -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=EXISTENTIAL):-cpu -shaderobj -output-using-type -Xslang... -DEXISTENTIAL -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=GENERIC):-cpu -shaderobj -output-using-type -Xslang... -DGENERIC -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=MIXED):-cpu -shaderobj -output-using-type -Xslang... -DMIXED -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=DYNAMIC):-cpu -shaderobj -output-using-type -Xslang... -DDYNAMIC -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BACKWARD):-cpu -shaderobj -output-using-type -Xslang... -DBACKWARD -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BOTH):-cpu -shaderobj -output-using-type -Xslang... -DBOTH -X.
-//TEST:COMPARE_COMPUTE(filecheck-buffer=HIGHER_ORDER):-cpu -shaderobj -output-using-type -Xslang... -DHIGHER_ORDER -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CONCRETE):-output-using-type -Xslang... -DCONCRETE -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=EXISTENTIAL):-output-using-type -Xslang... -DEXISTENTIAL -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=GENERIC):-output-using-type -Xslang... -DGENERIC -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=MIXED):-output-using-type -Xslang... -DMIXED -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=DYNAMIC):-output-using-type -Xslang... -DDYNAMIC -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BACKWARD):-output-using-type -Xslang... -DBACKWARD -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BOTH):-output-using-type -Xslang... -DBOTH -X.
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=HIGHER_ORDER):-output-using-type -Xslang... -DHIGHER_ORDER -X.
 
 // `outputBuffer[0]` counts custom-derivative invocations (except in HIGHER_ORDER, where it holds
 // the second derivative), and the remaining slots hold the derivative from each call path.

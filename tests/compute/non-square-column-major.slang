@@ -3,13 +3,9 @@
 // Note! This test doesn't work on CUDA or CPU targets, because both these targets ignore
 // row/column major setting, as well as they handle alignment differently.
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -compile-arg -O3 -xslang -matrix-layout-column-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -xslang -matrix-layout-column-major -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=METAL):-slang  -output-using-type -shaderobj -mtl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=LLVM):-llvm -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm):-output-using-type -xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=METAL):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=LLVM):-output-using-type -xslang -matrix-layout-column-major
 
 // matrix<R, C>
 //TEST_INPUT:cbuffer(data=[1.0 0.0 10.0 0.0  0.0 1.0 20.0 0.0]):name matrixBuffer
@@ -24,7 +20,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float3 v = float3(1, 2, 1);
 
     float3x2 M = matrixBuffer;
-    
+
     float2 r = mul(v, M);
 
     // Metal always uses scalar layout + row major, so it is computing

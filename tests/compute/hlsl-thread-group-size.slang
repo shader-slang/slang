@@ -2,8 +2,7 @@
 // verifying all three dimensions. Control test for the GLSL counterpart.
 // Regression test for https://github.com/shader-slang/slang/issues/9953
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -compute -entry computeMain
+//TEST:COMPARE_COMPUTE(targets=metal+cuda+cpu, filecheck-buffer=BUF):-entry computeMain
 
 // Thread group: 2 x 3 x 4 = 24 threads total
 // Buffer: 25 slots (24 for thread writes + 1 sentinel for overflow)

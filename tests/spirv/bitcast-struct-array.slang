@@ -10,7 +10,7 @@
 // CHECK-DAG: OpShiftLeftLogical
 // CHECK-DAG: OpBitwiseOr
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -compute -emit-spirv-directly -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type
 
 struct IntPair
 {

@@ -1,7 +1,5 @@
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -43,7 +41,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpA dpa = dpA(a, azero);
 
         B.Differential dout = {1.0, 1.0};
-        
+
         __bwd_diff(f)(dpa, dout);
         outputBuffer[0] = dpa.d.x; // Expect: 6
         outputBuffer[1] = dpa.d.y; // Expect: 0

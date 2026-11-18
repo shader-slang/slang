@@ -1,4 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
 
 float getData<L:IBufferDataLayout>(StructuredBuffer<float3, L> p, int index)
 {

@@ -1,7 +1,3 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -compile-arg -O3 -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 
 // We are going to pass -Gis to DXC.
 // Test can only work on DXC.
@@ -12,10 +8,10 @@
 // -Xdxc -Vd from the issue body is the same single-option grammar.
 
 // Single-option form: -Xdxc <opt>
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -Xdxc -Gis -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx12):-Xdxc -Gis
 
 // Scoped block form: -Xdxc... <opts> -X.
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -Xdxc... -Gis -X. -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx12):-Xdxc... -Gis -X.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 

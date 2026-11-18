@@ -1,5 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -vk -shaderobj -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=BUFFER): -output-using-type
 
 interface IAddressLike : IDifferentiablePtrType
 {
@@ -89,7 +88,7 @@ void computeMain()
     var addrPair = DifferentialPtrPair<MyAddress>(addr, gradAddr);
     var xPair = diffPair(1.0f);
     bwd_diff(compute)(addrPair, xPair, 1.0f);
-    
+
     // Copy from gradbuf to output
     result[0] = gradBuf[0];
     result[1] = gradBuf[1];

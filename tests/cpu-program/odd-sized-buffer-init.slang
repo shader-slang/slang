@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // List's initial capacity is 16 uint32_t words (64 bytes). This 142-byte buffer therefore forces
 // the old code to allocate only 35 words (140 bytes), so ASan detects the RHI's two-byte over-read;

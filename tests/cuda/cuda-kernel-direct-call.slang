@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -Xslang -O0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -Xslang -O3
 
 // A kernel remains externally launchable, but direct calls must use an ordinary device clone.
 // Prevent inlining so the CUDA source check and runtime tests exercise that distinction.

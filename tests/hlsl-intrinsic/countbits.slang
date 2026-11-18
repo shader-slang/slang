@@ -1,12 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx11
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -dx12
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -wgpu -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -llvm -compute
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):
 
 //CHK:1
 

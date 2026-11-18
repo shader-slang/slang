@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // CHECK: 2
 // CHECK-NEXT: 0

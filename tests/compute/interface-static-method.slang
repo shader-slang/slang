@@ -1,13 +1,10 @@
 // interface-static-method.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 interface IHideout
 {
-	int getAnimalCount();	
+	int getAnimalCount();
 }
 
 interface ISuperhero
@@ -19,7 +16,7 @@ interface ISuperhero
 
 struct Batcave : IHideout
 {
-	int batCount;	
+	int batCount;
 
 	int getAnimalCount() { return batCount; }
 }

@@ -1,6 +1,6 @@
 // simple-namespace.slang
 
-//TEST(compute):COMPARE_COMPUTE:-vk -render-feature int16
+//TEST:COMPARE_COMPUTE(targets=vk):-render-feature int16
 
 // Test that default initialization works with 16-bit types under Vulkan.
 

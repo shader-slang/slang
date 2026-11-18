@@ -1,6 +1,6 @@
 // struct-bit-cast.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that bit_cast works for bit-reinterpreting one struct type as another.
 

@@ -1,6 +1,6 @@
 // bool-vector.slang
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
 
 // Test direct SPIR-V emit on arrays in uniforms.
 

@@ -14,12 +14,12 @@
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute -profile cs_5_1
 //TEST:SIMPLE(filecheck=DXBC):-target dxbc-assembly -entry computeMain -stage compute -profile cs_5_1
 //TEST:SIMPLE(filecheck=DXBCDIV):-target dxbc-assembly -entry computeMain -stage compute -profile cs_5_1
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H23):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H25):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H26):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=H27):-dx12 -use-dxbc -profile cs_5_1 -render-feature double -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=BUF):-use-dxbc -profile cs_5_1 -render-feature double
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=H23):-use-dxbc -profile cs_5_1 -render-feature double
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=H25):-use-dxbc -profile cs_5_1 -render-feature double
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=H26):-use-dxbc -profile cs_5_1 -render-feature double
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=H27):-use-dxbc -profile cs_5_1 -render-feature double
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):
 
 //TEST_INPUT:ubuffer(data=[0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA 0xAAAAAAAA], stride=4):out,name=output
 RWByteAddressBuffer output;

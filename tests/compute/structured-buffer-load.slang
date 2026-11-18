@@ -1,9 +1,6 @@
 // structured-buffer-load.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-wgpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-mtl -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):
 
 // readBuffer.Load(0)=3, readBuffer[1]=5, readWriteBuffer.Load(2)=7, readWriteBuffer[3]=49 -> sum=64=0x40
 //TEST_INPUT:ubuffer(data=[3 5 0 0], stride=4):name=readBuffer

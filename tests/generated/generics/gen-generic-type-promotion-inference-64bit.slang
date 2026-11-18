@@ -20,7 +20,7 @@
 // 64-bit types (int64_t, uint64_t, double) may require extensions on GPU
 // backends, so this test runs on CPU only.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
 
 T add<T : IArithmetic>(T a, T b)
 {

@@ -1,14 +1,8 @@
 // We currently don't support matrix intrinsics on glsl based targets
 // There are problems with double on dx12/dxbc so we disable that
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -output-using-type -shaderobj -render-feature hardware-device
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj -render-feature double
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_0 -output-using-type -render-feature hardware-device
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<double> outputBuffer;
@@ -25,8 +19,8 @@ Float calcTotal(FloatVector v)
     return v.x + v.y;
 }
 
-Float calcTotal(FloatMatrix v) 
-{ 
+Float calcTotal(FloatMatrix v)
+{
     return calcTotal(v[0]) + calcTotal(v[1]);
 }
 
@@ -49,34 +43,34 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     Float scalarF = idx * (1.0f / (4.0f));
 
-    FloatMatrix ft = {}; 
+    FloatMatrix ft = {};
 
     FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02}, { scalarF + 0.011, scalarF + 0.022}};
-    
+
     // fmod - doesn't work on double on D3D/DX
     // ft += FloatMatrix(IntMatrix(((f % makeFloatMatrix(0.11f)) * makeFloatMatrix(100)) + makeFloatMatrix(0.5)));
-    
+
     ft += rcp(makeFloatMatrix(1.0l) + f);
     ft += FloatMatrix(sign(f - makeFloatMatrix(0.5l)));
-    
+
     // Lets try some matrix/matrix
     ft = f * ft;
-    
+
     // Lets try some vector matrix
-    
+
     {
         FloatMatrix r = {mul(f[0], ft), mul(ft, f[1])};
         ft += r;
     }
-    
+
     ft += saturate(f * makeFloatMatrix(4) - makeFloatMatrix(2.0l));
-       
+
     ft += abs(f * makeFloatMatrix(4) - makeFloatMatrix(2.0l));
-           
+
     ft += min(makeFloatMatrix(0.5l), f);
     ft += max(f, makeFloatMatrix(0.75l));
 
     ft += clamp(f, makeFloatMatrix(0.1l), makeFloatMatrix(0.3l));
-    
+
     outputBuffer[idx] = calcTotal(ft);
 }

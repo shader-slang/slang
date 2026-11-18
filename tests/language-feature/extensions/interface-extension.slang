@@ -2,8 +2,7 @@
 
 // Test that an `extension` applied to an interface type works as users expect
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 interface ICounter
 {

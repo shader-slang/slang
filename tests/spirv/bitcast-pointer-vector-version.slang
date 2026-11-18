@@ -14,7 +14,7 @@
 // Instead, it should be lowered
 //CHECK_SPIRV14-NOT: OpBitcast %v2uint %.*_ptr
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -compute -emit-spirv-directly -output-using-type -capability vk_mem_model
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type -capability vk_mem_model
 
 //TEST_INPUT: set inputPtr = ubuffer(data=[1073741824 1077936128 1082130432], stride=4);
 uniform float* inputPtr;
@@ -30,7 +30,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     // Test pointer -> vector<uint2> bitcast (should use OpBitcast in SPIR-V 1.5+)
     uint2 vec2 = bit_cast<uint2>(inputPtr);
-    
+
     // Extract the pointer value back and use it
     float* ptr_restored = bit_cast<float*>(vec2);
     outputBuffer[0] = asuint(ptr_restored[0]);

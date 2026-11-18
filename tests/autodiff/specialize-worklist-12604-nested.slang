@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // Regression guard for shader-slang/slang#12604 (on-demand specialization path). Drives a nested
 // generic-in-generic shape (`scaledSquare<Wrap<Doubler>>`) through `__fwd_diff`, which specializes

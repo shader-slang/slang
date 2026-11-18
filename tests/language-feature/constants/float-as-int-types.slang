@@ -1,7 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -output-using-type -emit-spirv-directly
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -dx12 -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF): -mtl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=BUF): -output-using-type
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4, count=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
@@ -12,7 +9,7 @@ RWStructuredBuffer<int> outputBuffer;
 // half 1.0 = 0x3C00 = 15360
 static const int16_t halfOne = __floatAsInt(1.0h);
 
-// Float (32-bit) -> int32_t  
+// Float (32-bit) -> int32_t
 // float 1.0 = 0x3F800000 = 1065353216
 static const int floatOne = __floatAsInt(1.0f);
 

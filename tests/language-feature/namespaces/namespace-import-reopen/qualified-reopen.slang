@@ -4,7 +4,7 @@
 // lookup finds the imported members of `Foo` through the lookup-only scope that the parser
 // pushes for `Foo`, as it does inside `namespace Foo { namespace B { ... } }`.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 import reopen_lib;
 

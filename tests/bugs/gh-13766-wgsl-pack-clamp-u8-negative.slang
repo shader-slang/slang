@@ -2,12 +2,9 @@
 // negative lane to 0. On WGSL it was emitted as `pack4xU8Clamp(vec4<u32>(x))`, which converts
 // to `u32` before clamping, so a negative lane wrapped and was clamped to 255.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu -compute -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -profile cs_6_6 -render-feature hardware-device -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -g0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+metal+cpu+wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK):-profile cs_6_6 -render-feature hardware-device -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-g0 -output-using-type
 
 // The WGSL source must clamp the low end in `i32` before the conversion to `u32`.
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute

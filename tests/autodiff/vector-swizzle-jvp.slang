@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -32,7 +30,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
         outputBuffer[0] = __fwd_diff(f)(dpfloat3(a, da)).d.x;  // Expect: 1
         outputBuffer[1] = __fwd_diff(f)(dpfloat3(a, da)).d.y;  // Expect: 0.5
-        
+
         float3 x = float3(0.5, 2.0, 0.5);
         float4 y = float4(-1.5, 1.0, 4.0, 2.0);
         float3 dx = float3(1.0, 0.0, -1.0);
@@ -40,6 +38,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
         outputBuffer[2] = __fwd_diff(g)(dpfloat3(x, dx), dpfloat4(y, dy)).d.x; // Expect: -2.25
         outputBuffer[3] = __fwd_diff(g)(dpfloat3(x, dx), dpfloat4(y, dy)).d.y; // Expect: 0.5
-        
+
     }
 }

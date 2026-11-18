@@ -2,7 +2,7 @@
 // `const` with a warning) is usable as a compile-time constant, e.g., as an
 // array dimension or vector element count.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -Wno-31227
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -Wno-31227
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 
 RWStructuredBuffer<uint> outputBuffer;

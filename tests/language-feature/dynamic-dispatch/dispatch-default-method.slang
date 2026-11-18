@@ -2,7 +2,7 @@
 // Verifies that a type using the default keeps the default behavior,
 // while a type that overrides it gets the overridden behavior.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;

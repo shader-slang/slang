@@ -8,12 +8,11 @@
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-clustered.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -source-language glsl -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
-buffer MyBlockName2 
+buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;
@@ -36,8 +35,8 @@ bool testVLogical() {
     return true
         & subgroupClusteredAnd(gvec(T(1)), 1) == gvec(T(1))
         & subgroupClusteredOr(gvec(T(1)), 1) == gvec(T(1))
-        & subgroupClusteredXor(gvec(T(1)), 1) == gvec(T(1))   
-        ;     
+        & subgroupClusteredXor(gvec(T(1)), 1) == gvec(T(1))
+        ;
 }
 
 bool testLogical() {
@@ -110,10 +109,10 @@ bool testArithmetic() {
         & testVArithmetic<float, 3>()
         & testVArithmetic<float, 4>()
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
-        & testVArithmetic<double, 2>() 
+        & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
         & testVArithmetic<double, 4>()
-        & test1Arithmetic<half>() 
+        & test1Arithmetic<half>()
         & testVArithmetic<half, 2>()
         & testVArithmetic<half, 3>()
         & testVArithmetic<half, 4>()
@@ -121,15 +120,15 @@ bool testArithmetic() {
         & testVArithmetic<int, 2>()
         & testVArithmetic<int, 3>()
         & testVArithmetic<int, 4>()
-        & test1Arithmetic<int8_t>() 
+        & test1Arithmetic<int8_t>()
         & testVArithmetic<int8_t, 2>()
         & testVArithmetic<int8_t, 3>()
         & testVArithmetic<int8_t, 4>()
-        & test1Arithmetic<int16_t>() 
+        & test1Arithmetic<int16_t>()
         & testVArithmetic<int16_t, 2>()
         & testVArithmetic<int16_t, 3>()
         & testVArithmetic<int16_t, 4>()
-        & test1Arithmetic<int64_t>() 
+        & test1Arithmetic<int64_t>()
         & testVArithmetic<int64_t, 2>()
         & testVArithmetic<int64_t, 3>()
         & testVArithmetic<int64_t, 4>()
@@ -137,15 +136,15 @@ bool testArithmetic() {
         & testVArithmetic<uint, 2>()
         & testVArithmetic<uint, 3>()
         & testVArithmetic<uint, 4>()
-        & test1Arithmetic<uint8_t>() 
+        & test1Arithmetic<uint8_t>()
         & testVArithmetic<uint8_t, 2>()
         & testVArithmetic<uint8_t, 3>()
         & testVArithmetic<uint8_t, 4>()
-        & test1Arithmetic<uint16_t>() 
+        & test1Arithmetic<uint16_t>()
         & testVArithmetic<uint16_t, 2>()
         & testVArithmetic<uint16_t, 3>()
         & testVArithmetic<uint16_t, 4>()
-        & test1Arithmetic<uint64_t>() 
+        & test1Arithmetic<uint64_t>()
         & testVArithmetic<uint64_t, 2>()
         & testVArithmetic<uint64_t, 3>()
         & testVArithmetic<uint64_t, 4>()

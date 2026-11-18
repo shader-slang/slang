@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -emit-spirv-via-glsl -shaderobj -Xslang -O3
+//TEST(compute):COMPARE_COMPUTE(targets=all-cuda-cpu, filecheck-buffer=CHECK):-emit-spirv-via-glsl -shaderobj -Xslang -O3
 
 //TEST_INPUT:ubuffer(data=[1 0], stride=4):name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer

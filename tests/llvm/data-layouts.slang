@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):
 struct A
 {
     uint64_t f0;

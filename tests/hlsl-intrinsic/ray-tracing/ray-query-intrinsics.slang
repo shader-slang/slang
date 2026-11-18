@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -output-using-type -profile cs_6_5 -render-feature ray-query
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature ray-query
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=DX12):-output-using-type -profile cs_6_5 -render-feature ray-query
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=VK):-output-using-type -render-feature ray-query
 
 //TEST_INPUT: set accelStruct = AccelerationStructure
 uniform RaytracingAccelerationStructure accelStruct;
@@ -35,15 +35,15 @@ float GetRayT<let RAY_QUERY_FLAGS: uint>(uint rayInlineFlags)
                 return 0.0f;
         }
     }
-    else 
+    else
     {
         if( rq.CommittedStatus() == COMMITTED_TRIANGLE_HIT )
-        {  
+        {
             rq.Abort();
             return rq.CommittedRayT();
         }
     }
-    
+
     return 0.0f;
 }
 

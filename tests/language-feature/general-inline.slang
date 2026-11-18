@@ -1,9 +1,6 @@
 // general-inline.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-llvm -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 [ForceInline]
 int test(int r)

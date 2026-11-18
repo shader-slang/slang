@@ -1,9 +1,7 @@
 // scope.slang
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
-// Confirm that scoping on enums and types works 
+// Confirm that scoping on enums and types works
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -15,9 +13,9 @@ enum Color
     Blue,
 }
 
-struct Thing 
+struct Thing
 {
-    int a; 
+    int a;
     struct Another
     {
         int b;
@@ -28,7 +26,7 @@ int test(int val)
 {
     Color c = Color.Red;
 
-    Thing::Another another;    
+    Thing::Another another;
     another.b = 20;
 
     if(val > 1)

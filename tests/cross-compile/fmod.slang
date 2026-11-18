@@ -3,10 +3,7 @@
 // Ensure that HLSL `fmod` works and produces
 // expected output on Vulkan/GLSL.
 
-//TEST(compute):COMPARE_COMPUTE:-dx11 -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -compute -shaderobj -emit-spirv-via-glsl
-//TEST(compute):COMPARE_COMPUTE:-vk -compute -shaderobj -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE:-llvm -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx11+llvm):
 
 //TEST_INPUT:cbuffer(data=[4 0 0 0]):name=C
 cbuffer C

@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -compile-arg -msvc-style-bitfield-packing
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -compile-arg -msvc-style-bitfield-packing
 
 // Regression for shader-slang/slang#11844: empty/partial initialization of a struct
 // that mixes bitfields with a trailing normal field must zero-initialize the hidden

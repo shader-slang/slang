@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -cpu
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
 
 // Regression test for the `_coerce` fast-rejection of opaque generic type
 // parameters into scalar builtins (overload-resolution perf optimization).

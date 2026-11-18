@@ -1,9 +1,8 @@
 // Test packing a user provided value and typeID into an existential value.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0 -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11):-profile sm_5_0 -output-using-type
 
 [anyValueSize(16)]
 interface IInterface

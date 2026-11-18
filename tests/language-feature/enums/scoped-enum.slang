@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -xslang -DDEFAULT_UNSCOPED=0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -xslang -DDEFAULT_UNSCOPED=1 -xslang -unscoped-enum
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -xslang -DDEFAULT_UNSCOPED=0
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -xslang -DDEFAULT_UNSCOPED=1 -xslang -unscoped-enum
 
 // Complementary test for unscoped-enum.slang and unscoped-enum-negative.slang. This just verifies that
 // the scoped enums work.

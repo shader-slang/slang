@@ -2,11 +2,7 @@
 // address after a branch is the one computed inside the branch, the index is declared inside
 // the branch, so the code after the branch must reach it through a variable declared outside.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-via-glsl
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // glslang rejects GLSL that names a variable outside its scope, so this line checks the GLSL
 // output without a GPU.

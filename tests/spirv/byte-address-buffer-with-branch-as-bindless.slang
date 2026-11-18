@@ -1,9 +1,8 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=SPIRV): -vk -shaderobj -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=SPIRV): -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV_BRANCH): -target spirv-asm -stage compute -entry computeMain -DBRANCH
 
 // VariablePointersStorageBuffer is not working on the current GCP servers; driver 573.07.
 // github issue #8876
-//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=BRANCH): -vk -shaderobj -output-using-type -emit-spirv-directly -Xslang -DBRANCH
 
 // This tests if a dynamic branching works for the legalization from ByteAddressBuffer to StructurredBuffer.
 

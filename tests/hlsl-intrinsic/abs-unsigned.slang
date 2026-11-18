@@ -1,10 +1,7 @@
 // `abs` of an unsigned 32-bit or 64-bit integer returns its input unchanged (#13983).
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature int64 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-via-glsl -render-feature int64 -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK):-render-feature int64 -output-using-type
 
 // Signed element types still lower to `SAbs`; unsigned ones emit no `SAbs` at all. The
 // `OpEntryPoint` anchor fails the rows when compilation fails, which glslang does when the GLSL

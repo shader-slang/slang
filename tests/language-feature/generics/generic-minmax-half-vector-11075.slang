@@ -1,6 +1,5 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type -render-features half
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -render-features half
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type -render-features half
 
 // Regression test for shader-slang/slang#11075: `half` scalars, vectors and matrices, which need
 // the `half` render feature on cuda/vk.

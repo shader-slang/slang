@@ -1,7 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:-cuda -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -output-using-type -shaderobj
-//TEST(compute,vulkan):COMPARE_COMPUTE:-vk -output-using-type -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all): -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -18,7 +15,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 	int tid = int(dispatchThreadID.x);
     float value = values[tid];
-    
+
     outputBuffer[tid * 2] = quantize(sin(value));
     outputBuffer[tid * 2 + 1] = quantize(cos(value));
 }

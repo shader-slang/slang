@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -cuda -compute
+//TEST:COMPARE_COMPUTE(targets=all):
 
 interface IGetter
 {

@@ -4,16 +4,12 @@
 //TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion -g1
 //TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion -g2
 //TEST():SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -line-directive-mode none -target hlsl -loop-inversion -g3
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-dx12 -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type -Xslang -loop-inversion -Xslang -g
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type -Xslang -loop-inversion -Xslang -g0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type -Xslang -loop-inversion -Xslang -g1
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type -Xslang -loop-inversion -Xslang -g2
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type -Xslang -loop-inversion -Xslang -g3
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-vk -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=OUT):-cpu -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=OUT):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=OUT):-output-using-type -Xslang -loop-inversion -Xslang -g
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=OUT):-output-using-type -Xslang -loop-inversion -Xslang -g0
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=OUT):-output-using-type -Xslang -loop-inversion -Xslang -g1
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=OUT):-output-using-type -Xslang -loop-inversion -Xslang -g2
+//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=OUT):-output-using-type -Xslang -loop-inversion -Xslang -g3
 
 // Check that all the backends cope with the slightly unusual IR the loop inversion generated
 
