@@ -757,6 +757,15 @@ SlangResult LLVMDownstreamCompiler::compile(
         {
             opts.FastMath = true;
         }
+        else if (options.floatingPointMode == DownstreamCompileOptions::FloatingPointMode::Precise)
+        {
+            // The in-process equivalent of the `-ffp-contract=off` flag we pass to a
+            // downstream gcc/clang compile: keep the front end from contracting
+            // `a*b+c` into an FMA. Without this, the host-callable path honors
+            // precise mode only in spirit — on hosts whose base ISA has FMA (e.g.
+            // AArch64) the JIT would otherwise fuse freely.
+            opts.DefaultFPContractMode = clang::LangOptions::FPM_Off;
+        }
     }
 
     {
