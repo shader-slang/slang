@@ -2487,6 +2487,31 @@ IntVal* SemanticsVisitor::tryFoldUncheckedLiteralInitializer(Type* type, Expr* i
     return as<IntVal>(TypeCastIntVal::tryFoldImpl(m_astBuilder, type, literalVal, nullptr));
 }
 
+/// Return the index of the operand that alone gives the result of the short-circuiting
+/// operation `op` once its first operand is the constant `firstArg`, or -1 when the result
+/// depends on the remaining operands. For example, `true ? a : b` gives the value of operand 1
+/// (`a`), and `false && b` gives the truth value of operand 0 (`false`).
+///
+/// Folding stops at the operand selected here because the language does not evaluate the other
+/// operands either. Folding them could report a diagnostic, or fail and leave the whole
+/// expression unfolded, for an operand that cannot affect the result, as in
+/// `true ? 3 : (1 << 32)`.
+static Index getShortCircuitResultArgIndex(BuiltinOperationKind op, ConstantIntVal* firstArg)
+{
+    const bool isTrue = firstArg->getValue() != 0;
+    switch (op)
+    {
+    case BuiltinOperationKind::Conditional:
+        return isTrue ? 1 : 2;
+    case BuiltinOperationKind::And:
+        return isTrue ? -1 : 0;
+    case BuiltinOperationKind::Or:
+        return isTrue ? 0 : -1;
+    default:
+        return -1;
+    }
+}
+
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
     SubstExpr<InvokeExpr> invokeExpr,
     ConstantFoldingKind kind,
@@ -2528,6 +2553,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     if (argCount > kMaxArgs)
         return nullptr;
 
+    const BuiltinOperationKind opKind = getBuiltinOperationKindFromString(
+        getText(funcDeclRef.getName()).getUnownedSlice(),
+        argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
+
     // Before checking the operation name, let's look at the arguments
     List<IntVal*> newArgs;
     IntVal* argVals[kMaxArgs];
@@ -2538,6 +2567,20 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         auto argVal = tryFoldIntegerConstantExpression(argExpr, kind, circularityInfo);
         if (!argVal)
             return nullptr;
+
+        if (auto constFirstArg = as<ConstantIntVal>(argVal); constFirstArg && a == 0)
+        {
+            const Index resultArgIndex = getShortCircuitResultArgIndex(opKind, constFirstArg);
+            if (resultArgIndex == 0)
+                return m_astBuilder->getIntVal(
+                    invokeExpr.getExpr()->type.type,
+                    constFirstArg->getValue() != 0);
+            if (resultArgIndex > 0)
+                return tryFoldIntegerConstantExpression(
+                    getArg(invokeExpr, resultArgIndex),
+                    kind,
+                    circularityInfo);
+        }
 
         argVals[a] = argVal;
 
@@ -2611,9 +2654,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             // re-evaluates once its operands become concrete. This is the same representation
             // the fast path's `BuiltinOperatorExpr` folds to, so there is exactly one `IntVal`
             // form per operator regardless of which path reached it.
-            auto opKind = getBuiltinOperationKindFromString(
-                getText(opName).getUnownedSlice(),
-                argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
             if (opKind == BuiltinOperationKind::Unknown)
                 return nullptr;
             return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
@@ -2642,12 +2682,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }
     else
     {
-        auto opName = funcDeclRef.getName();
-
-        BuiltinOperationKind opKind = getBuiltinOperationKindFromString(
-            getText(opName).getUnownedSlice(),
-            argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
-
         if (opKind == BuiltinOperationKind::Unknown)
             return nullptr;
 
