@@ -2368,6 +2368,43 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
     _emitForwardDeclarations(actions);
 
+    // The passes below emit every global (with its initializer function, for a
+    // non-constant initializer) before any function definition, so a global
+    // initializer that calls a function would reference it ahead of its
+    // declaration — invalid C++. Declare each function called from a global
+    // initializer up front; its definition still comes from the later pass.
+    {
+        HashSet<IRFunc*> funcsToDeclare;
+        for (auto action : actions)
+        {
+            if (action.level != EmitAction::Level::Definition)
+                continue;
+            auto globalVar = as<IRGlobalVar>(action.inst);
+            if (!globalVar)
+                continue;
+            for (auto block = globalVar->getFirstBlock(); block; block = block->getNextBlock())
+            {
+                for (auto inst : block->getOrdinaryInsts())
+                {
+                    auto call = as<IRCall>(inst);
+                    if (!call)
+                        continue;
+                    if (auto func = as<IRFunc>(call->getCallee()))
+                        funcsToDeclare.add(func);
+                }
+            }
+        }
+        for (auto func : funcsToDeclare)
+        {
+            // Match the storage specifier the definition pass emits (a
+            // non-public, non-exported function is declared `static`), so the
+            // declaration and the definition agree.
+            if (!isPublicOrExportedFunc(func))
+                m_writer->emit("static ");
+            emitForwardDeclaration(func);
+        }
+    }
+
     {
         // Output all the thread locals
         for (auto action : actions)
