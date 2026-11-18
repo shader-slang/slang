@@ -12,8 +12,8 @@
 
 // Compute test disabled, see https://github.com/shader-slang/slang/issues/8457
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_3
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -mtl
-//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -mtl
+//DISABLE_TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -25,12 +25,10 @@ DepthTexture2DMS texHandle;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
 
-// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
-// NEGATIVE: {{error[E[[:digit:]]+]}}:
+//NEGATIVE: error
 
     int ret = 0;
     ret = int((texHandle.Load(int2(0, 0), 0)).x);

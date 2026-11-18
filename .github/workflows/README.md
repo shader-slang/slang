@@ -131,6 +131,7 @@ is deleted right after — so check the workflow's own run list, not the PR.
 | `ci.yml`                          | yes    | yes         | Build + test umbrella; aggregates into one gate job.                                                  |
 | `check-formatting.yml`            | yes    | yes         | Checks formatting; comment `/format` to auto-fix.                                                     |
 | `check-python-core.yml`           | yes    | yes         | Compile-checks the repo's Python scripts.                                                             |
+| `check-generated-tests.yml`       | yes    | yes         | Verifies the tests in `tests/generated` match their generators in `extras/test-generators`.           |
 | `check-workflow-scripts.yml`      | yes    | yes         | Unit-tests the JavaScript the board-sync workflows embed.                                             |
 | `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                                                                |
 | `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                                                            |
