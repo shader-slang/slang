@@ -1,4 +1,4 @@
-// The per-row matrix-FRem legalization (legalizeMatrixFRemForGLSL) relies on
+// The per-row matrix-FRem legalization (legalizeFRemForGLSL) relies on
 // the type checker rejecting matrix-vector mixes for component-wise
 // arithmetic: its release assert that a matrix `FRem`'s operands are matrix
 // or scalar can only hold while the front end rejects vector operands
