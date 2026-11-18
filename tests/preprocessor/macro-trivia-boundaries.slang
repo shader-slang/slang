@@ -14,7 +14,7 @@
 #define SPLICED_FUNCTION\
 (x) x
 
-// Whitespace before the opening parenthesis makes OBJECT object-like.
+// Whitespace before the opening parenthesis makes `OBJECT` object-like.
 #if OBJECT != 7
 #error The object-like macro was parsed as function-like.
 #endif

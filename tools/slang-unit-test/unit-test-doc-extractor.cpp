@@ -8,6 +8,7 @@
 
 using namespace Slang;
 
+/// Checks comment association across files and the lifetime of copied documentation text.
 SLANG_UNIT_TEST(docExtractorAssociatesCommentsAcrossFiles)
 {
     // We use different comment styles and declaration positions so stale lexemes from the

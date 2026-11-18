@@ -221,6 +221,7 @@ void _checkLexicalRoundTrip(UnownedStringSlice text)
 
 } // namespace
 
+/// Checks every scanner-produced kind against independent spelling and classification examples.
 SLANG_UNIT_TEST(lexerRecognizesEveryScannerProducedKind)
 {
     // These expected kinds are written independently of the generated lexeme descriptors.
@@ -322,6 +323,7 @@ SLANG_UNIT_TEST(lexerRecognizesEveryScannerProducedKind)
     }
 }
 
+/// Checks the complete longest-spelling segmentation of overlapping punctuation runs.
 SLANG_UNIT_TEST(lexerPunctuationUsesLongestSpelling)
 {
     // Each run has more punctuation than one token can consume. We specify the complete
@@ -365,10 +367,10 @@ SLANG_UNIT_TEST(lexerPunctuationUsesLongestSpelling)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that `<...>` requires `LexerMode::ExpectingAngleBracketHeaderName` to form one lexeme.
 SLANG_UNIT_TEST(lexerHeaderNameRecognitionIsContextual)
 {
-    // The same `<` begins punctuation normally and a complete header name in the selected
-    // mode. Comment-looking bytes belong to the header name rather than separate trivia.
+    // Comment-looking bytes belong to the header name rather than separate trivia.
     const auto text = UnownedStringSlice("<one/*two*/.h>");
     LexicalCoverageInput normal(text);
     SLANG_CHECK(normal.lexer.readLexeme().is<RawOpLess>());
@@ -382,6 +384,7 @@ SLANG_UNIT_TEST(lexerHeaderNameRecognitionIsContextual)
     SLANG_CHECK(header.sink.getErrorCount() == 0);
 }
 
+/// Checks that embedded zero ends recognition while preserving the remaining physical input bytes.
 SLANG_UNIT_TEST(lexerEmbeddedZeroRetainsTheRemainingPhysicalBytes)
 {
     // We need a zero byte to reach the lexer unchanged. `SourceFile::decodeContentBlob()`
@@ -433,6 +436,7 @@ SLANG_UNIT_TEST(lexerEmbeddedZeroRetainsTheRemainingPhysicalBytes)
     }
 }
 
+/// Checks byte preservation, progress, locations, diagnostics, and EOF for both lexer interfaces.
 SLANG_UNIT_TEST(lexerBoundedFragmentsPreserveBothLexicalStreams)
 {
     // Prefixes cut through UTF-8 sequences, comment openers, escapes, numeric exponents, and

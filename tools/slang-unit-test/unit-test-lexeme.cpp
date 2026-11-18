@@ -62,6 +62,7 @@ private:
 
 } // namespace
 
+/// Checks that interning shares spelling data while occurrence locations and flags stay distinct.
 SLANG_UNIT_TEST(lexemePoolSeparatesSpellingFromOccurrences)
 {
     // The same spelling can occur at different locations and with different preprocessing
@@ -96,10 +97,9 @@ SLANG_UNIT_TEST(lexemePoolSeparatesSpellingFromOccurrences)
     SLANG_CHECK(unspliced.getPhysicalSpelling() == logicalSpelling);
 }
 
+/// Checks that changing caller-owned text cannot alter a pooled spelling or its interning identity.
 SLANG_UNIT_TEST(lexemePoolOwnsInputText)
 {
-    // Pool creation must copy caller-owned text. Changing that text afterward must not
-    // alter an existing object or make lookup miss the original spelling.
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
     char spelling[] = "item";
@@ -118,6 +118,7 @@ SLANG_UNIT_TEST(lexemePoolOwnsInputText)
     SLANG_CHECK(lexeme.getObject() == repeated.getObject());
 }
 
+/// Checks that token interning preserves trivia order and occurrence-specific locations and flags.
 SLANG_UNIT_TEST(tokenPoolInternsOrderedTrivia)
 {
     // For the physical cluster " /*c*/x\n", the raw token starts six bytes after
@@ -182,6 +183,7 @@ SLANG_UNIT_TEST(tokenPoolInternsOrderedTrivia)
     SLANG_CHECK(token.getTrailingTrivia()[0].getLoc() == SourceLoc::fromRaw(101));
 }
 
+/// Checks that empty checked values differ from EOF and that wrappers preserve type membership.
 SLANG_UNIT_TEST(lexemeTypedValuesDistinguishEmptyFromEndOfFile)
 {
     // Failed casts return empty values. EOF has an object and remains a valid member
@@ -212,10 +214,10 @@ SLANG_UNIT_TEST(lexemeTypedValuesDistinguishEmptyFromEndOfFile)
     SLANG_CHECK(number.as<IntegerLiteralToken>().getObject() == number.getObject());
 }
 
+/// Checks that replacement spellings and flags leave shared immutable token objects unchanged.
 SLANG_UNIT_TEST(tokenReplacementPreservesSharedObject)
 {
-    // A replacement is a fresh factory request. Other occurrences of the original
-    // token must continue to refer to the original immutable object.
+    // A replacement is a fresh factory request.
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
     auto original = pool.createToken(TokenType::Identifier, UnownedStringSlice("before"));
@@ -236,10 +238,9 @@ SLANG_UNIT_TEST(tokenReplacementPreservesSharedObject)
     SLANG_CHECK(repeated.getFlags() == 0);
 }
 
+/// Checks that a conditional read advances only on a match and returns a typed token or empty.
 SLANG_UNIT_TEST(tokenReaderTypedConditionalRead)
 {
-    // A mismatched conditional read leaves the cursor untouched. A matching read
-    // returns the requested type and advances to the following token.
     RefPtr<TokenPool> poolOwner = new TokenPool();
     auto& pool = *poolOwner;
     TokenList tokens(poolOwner);
@@ -264,6 +265,7 @@ SLANG_UNIT_TEST(tokenReaderTypedConditionalRead)
     SLANG_CHECK(!reader.advanceIf<IdentifierToken>());
 }
 
+/// Checks that splitting `>>` preserves physical locations, trailing trivia, and unknown locations.
 SLANG_UNIT_TEST(tokenSplitPreservesPhysicalOffsetsAndTrailingTrivia)
 {
     // The first `>` is followed by a backslash, a newline, and the second `>`.
@@ -306,6 +308,7 @@ SLANG_UNIT_TEST(tokenSplitPreservesPhysicalOffsetsAndTrailingTrivia)
         !pool.createSecondGreaterToken(unlocated.getRawToken().as<RawOpRsh>()).getLoc().isValid());
 }
 
+/// Checks that copied token references retain lexical storage and names until their last release.
 SLANG_UNIT_TEST(tokenRefRetainsPoolAndName)
 {
     // Clients without an AST can retain a typed token after both the name pool and
@@ -353,10 +356,10 @@ SLANG_UNIT_TEST(tokenRefRetainsPoolAndName)
     SLANG_CHECK(wasPoolDestroyed);
 }
 
+/// Checks that a token list retains its chosen pool through value replacement and releases it
+/// when the list is reset.
 SLANG_UNIT_TEST(tokenListRetainsItsSelectedPool)
 {
-    // The sequence keeps its one selected pool alive after the allocating owner
-    // leaves scope. Replacing its values does not add or change pool ownership.
     bool wasDestroyed = false;
     TokenList tokens;
     {
@@ -378,6 +381,7 @@ SLANG_UNIT_TEST(tokenListRetainsItsSelectedPool)
     SLANG_CHECK(wasDestroyed);
 }
 
+/// Checks that a saved token list owns spelling, names, and trivia after its input owners expire.
 SLANG_UNIT_TEST(tokenListRetainsLexicalStorage)
 {
     // A saved token list can outlive the lexer, the name pool, and the `SourceManager`.
@@ -399,6 +403,7 @@ SLANG_UNIT_TEST(tokenListRetainsLexicalStorage)
     SLANG_CHECK(reader.peekTokenType() == TokenType::EndOfFile);
 }
 
+/// Checks that appending a token already in the list preserves its occurrence while the list grows.
 SLANG_UNIT_TEST(tokenListAppendPreservesAliasedOccurrence)
 {
     // Appending an occurrence already in the sequence must remain valid while the
@@ -422,6 +427,7 @@ SLANG_UNIT_TEST(tokenListAppendPreservesAliasedOccurrence)
     }
 }
 
+/// Checks that indexed and sequential trivia access preserve unknown source locations.
 SLANG_UNIT_TEST(tokenTriviaPreservesUnknownSourceLocations)
 {
     // A token reconstructed without debug locations can still have spelling and
@@ -471,6 +477,7 @@ SLANG_UNIT_TEST(tokenTriviaPreservesUnknownSourceLocations)
     SLANG_CHECK(reconstructed.getUnownedSlice() == UnownedStringSlice(" /*c*/42\n "));
 }
 
+/// Checks that atomic lexemes and EOF preserve every input byte and its physical location.
 SLANG_UNIT_TEST(lexerAtomicLexemesReconstructInput)
 {
     // Each spelling byte belongs to one atomic lexeme. Standalone line continuations
@@ -510,6 +517,7 @@ SLANG_UNIT_TEST(lexerAtomicLexemesReconstructInput)
     }
 }
 
+/// Checks that a final backslash is diagnosed without reading outside a bounded input view.
 SLANG_UNIT_TEST(lexerFinalBackslashUsesBufferEnd)
 {
     // The byte after the view is deliberately nonzero. The final backslash is an
@@ -526,6 +534,7 @@ SLANG_UNIT_TEST(lexerFinalBackslashUsesBufferEnd)
     SLANG_CHECK(input.sink.getErrorCount() == 1);
 }
 
+/// Checks that a terminal splice preserves a complete CRLF or LFCR within the bounded view.
 SLANG_UNIT_TEST(lexerTerminalSpliceUsesCompleteNewline)
 {
     // A terminal splice is trivia after `a`. Both two-byte newline spellings must
@@ -548,6 +557,7 @@ SLANG_UNIT_TEST(lexerTerminalSpliceUsesCompleteNewline)
     }
 }
 
+/// Checks that incomplete UTF-8 is diagnosed and consumed only through the bounded view's end.
 SLANG_UNIT_TEST(lexerTruncatedUtf8UsesBufferEnd)
 {
     // E2 82 begins a three-byte UTF-8 sequence. The third byte lies outside the view,
@@ -562,6 +572,7 @@ SLANG_UNIT_TEST(lexerTruncatedUtf8UsesBufferEnd)
     SLANG_CHECK(eof.getLoc() == input.beginLoc + 2);
 }
 
+/// Checks that invalid UTF-8 recovery preserves a following ASCII identifier.
 SLANG_UNIT_TEST(lexerInvalidUtf8PreservesFollowingAscii)
 {
     // The ASCII `b` cannot continue E2 82. After diagnosing those two bytes, the
@@ -579,6 +590,7 @@ SLANG_UNIT_TEST(lexerInvalidUtf8PreservesFollowingAscii)
     SLANG_CHECK(input.sink.getErrorCount() == 1);
 }
 
+/// Checks that out-of-range UTF-8 cannot become EOF and preserves following input.
 SLANG_UNIT_TEST(lexerInvalidUnicodeCannotBecomeEndOfFile)
 {
     // The extended seven-byte encoding denotes FFFFFFFF, which becomes -1 if cast
@@ -607,10 +619,9 @@ SLANG_UNIT_TEST(lexerInvalidUnicodeCannotBecomeEndOfFile)
     SLANG_CHECK(reconstructed.getUnownedSlice() == UnownedStringSlice(bytes, sizeof(bytes)));
 }
 
+/// Checks that the lexer accepts U+10FFFF, the largest Unicode scalar value, in an identifier.
 SLANG_UNIT_TEST(lexerAcceptsMaximumUnicodeScalar)
 {
-    // U+10FFFF is the largest Unicode scalar value. The lexer accepts non-ASCII
-    // scalar values in identifiers, including this last value in the valid range.
     const char bytes[] = {char(0xF4), char(0x8F), char(0xBF), char(0xBF)};
     LexemeTestInput input(UnownedStringSlice(bytes, sizeof(bytes)));
     auto identifier = input.lexer.readLexeme();
@@ -620,6 +631,7 @@ SLANG_UNIT_TEST(lexerAcceptsMaximumUnicodeScalar)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that surrogate encodings are diagnosed while preserving the following identifier.
 SLANG_UNIT_TEST(lexerRejectsUnicodeSurrogate)
 {
     // ED A0 80 encodes the surrogate U+D800, which is not a Unicode scalar value.
@@ -639,6 +651,7 @@ SLANG_UNIT_TEST(lexerRejectsUnicodeSurrogate)
     SLANG_CHECK(input.sink.getErrorCount() == 1);
 }
 
+/// Checks that a spliced identifier keeps both original bytes and its logical name.
 SLANG_UNIT_TEST(lexerRetainsPhysicalAndLogicalSpellings)
 {
     // Identifier lookup uses the spelling after line splicing, while reconstruction
@@ -653,6 +666,7 @@ SLANG_UNIT_TEST(lexerRetainsPhysicalAndLogicalSpellings)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that attached trivia partitions the input and preserves block comments across newlines.
 SLANG_UNIT_TEST(lexerTokenTriviaPartitionsPhysicalInput)
 {
     // The newline inside a block comment does not split that lexeme. Trailing trivia
@@ -690,10 +704,9 @@ SLANG_UNIT_TEST(lexerTokenTriviaPartitionsPhysicalInput)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that a trivia-only input is retained entirely as a real EOF token's leading trivia.
 SLANG_UNIT_TEST(lexerTriviaOnlyFileUsesEndOfFileToken)
 {
-    // With no preceding token, every comment and newline belongs to EOF's leading
-    // trivia. EOF remains a token even when all bytes in the file are trivia.
     const char* text = " //only\n\t/*last*/";
     LexemeTestInput input(text);
     auto eof = input.lexer.readToken();
@@ -707,10 +720,10 @@ SLANG_UNIT_TEST(lexerTriviaOnlyFileUsesEndOfFileToken)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that repeated reader EOF results retain the stored occurrence and its trivia.
 SLANG_UNIT_TEST(tokenReaderPreservesStoredEndOfFileTrivia)
 {
     // The first newline trails `a`; the remaining newline and comment lead EOF.
-    // Reading the list must return that exact EOF occurrence, including its trivia.
     LexemeTestInput input("a\n\n//last");
     auto tokens = input.lexer.readAllTokens();
     const auto storedEOF = *tokens.end();
@@ -736,6 +749,7 @@ SLANG_UNIT_TEST(tokenReaderPreservesStoredEndOfFileTrivia)
     }
 }
 
+/// Checks that a bounded reader repeats its supplied EOF occurrence at the range end.
 SLANG_UNIT_TEST(tokenReaderBoundedRangeUsesExplicitEndOfFile)
 {
     // The range excludes `two`. Its supplied EOF has a different location and flags
@@ -757,10 +771,9 @@ SLANG_UNIT_TEST(tokenReaderBoundedRangeUsesExplicitEndOfFile)
     }
 }
 
+/// Checks that an empty reader needs no backing array and repeats its supplied EOF occurrence.
 SLANG_UNIT_TEST(tokenReaderEmptyRangeUsesExplicitEndOfFile)
 {
-    // An empty range needs no backing array. Its explicit EOF remains readable and
-    // stable because the reader does not need to dereference either range pointer.
     RefPtr<TokenPool> pool = new TokenPool();
     auto endpoint = pool->createEndOfFile(SourceLoc::fromRaw(150));
     TokenReader reader(nullptr, nullptr, endpoint);
@@ -771,6 +784,7 @@ SLANG_UNIT_TEST(tokenReaderEmptyRangeUsesExplicitEndOfFile)
     SLANG_CHECK(reader.readToken().getObject() == endpoint.getObject());
 }
 
+/// Checks that reader cursors restore both the original `>>` and its unconsumed second closer.
 SLANG_UNIT_TEST(tokenReaderRestoresPartiallyConsumedRightShift)
 {
     // After consuming the first closer of `>>`, the parser replaces lookahead with
@@ -810,6 +824,7 @@ SLANG_UNIT_TEST(tokenReaderRestoresPartiallyConsumedRightShift)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that reading trailing trivia defers recognition and diagnostics for the next raw token.
 SLANG_UNIT_TEST(lexerTrailingTriviaDoesNotReadNextRawToken)
 {
     // The next string literal is malformed. Reading the identifier may consume its
@@ -823,6 +838,7 @@ SLANG_UNIT_TEST(lexerTrailingTriviaDoesNotReadNextRawToken)
     SLANG_CHECK(input.sink.getErrorCount() > 0);
 }
 
+/// Checks that token reads stop at the first trailing newline before a diagnostic-policy change.
 SLANG_UNIT_TEST(lexerTrailingTriviaStopsBeforeFollowingLine)
 {
     // A preprocessor can change diagnostic policy after reading the complete directive
@@ -840,6 +856,7 @@ SLANG_UNIT_TEST(lexerTrailingTriviaStopsBeforeFollowingLine)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks that header-name mode can be selected after `include` even with no intervening space.
 SLANG_UNIT_TEST(lexerAngleBracketHeaderNameModePrecedesAdjacentOperand)
 {
     // There is no space between "include" and its operand. Switching mode after
@@ -857,6 +874,7 @@ SLANG_UNIT_TEST(lexerAngleBracketHeaderNameModePrecedesAdjacentOperand)
     SLANG_CHECK(input.sink.getErrorCount() == 0);
 }
 
+/// Checks raw and ordinary string decoding, including incomplete and unterminated delimiters.
 SLANG_UNIT_TEST(lexerStringLiteralValuesDistinguishRawAndEscapedText)
 {
     // Ordinary strings decode escapes, while a raw string preserves the same backslash
@@ -895,6 +913,7 @@ SLANG_UNIT_TEST(lexerStringLiteralValuesDistinguishRawAndEscapedText)
     SLANG_CHECK(incomplete.sink.getErrorCount() > 0);
 }
 
+/// Checks complete-character decoding for escaped and UTF-8 literals and rejects invalid bodies.
 SLANG_UNIT_TEST(lexerCharacterLiteralValuesRequireOneCompleteCharacter)
 {
     // A Unicode escape and the corresponding UTF-8 bytes denote the same code point.
@@ -922,6 +941,7 @@ SLANG_UNIT_TEST(lexerCharacterLiteralValuesRequireOneCompleteCharacter)
     }
 }
 
+/// Checks that concrete descriptors and abstract ranges agree with the lexical categories.
 SLANG_UNIT_TEST(lexemeTypeRangesClassifyConcreteTags)
 {
     // Every concrete tag indexes one leaf descriptor. Abstract ranges must agree

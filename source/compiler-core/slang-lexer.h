@@ -103,7 +103,7 @@ private:
     const Token* m_end = nullptr;
 };
 
-/// Reads borrowed tokens and repeats the supplied EOF after reaching the range end.
+/// A reader of borrowed tokens that repeats the supplied EOF at the range end.
 ///
 /// Full sequences provide their stored EOF. A bounded subsequence must supply an
 /// EOF explicitly; the reader never allocates lexical storage or reinterprets a token.
@@ -200,7 +200,7 @@ private:
     Token m_nextToken;
 };
 
-/// Reads atomic lexemes, including trivia, from an EOF-terminated borrowed sequence.
+/// A reader of a borrowed EOF-terminated lexeme sequence that repeats the stored EOF at its end.
 struct LexemeReader
 {
     LexemeReader() = default;
@@ -271,7 +271,7 @@ struct Lexer
     /// not needed by the DiagnosticSink.
     static UnownedStringSlice sourceLocationLexer(const UnownedStringSlice& in);
 
-    /// Reads one atomic lexeme, including trivia, preserving both its physical and logical
+    /// Reads one atomic lexeme, including trivia or EOF, preserving its physical and logical
     /// spellings.
     Lexeme readLexeme();
 

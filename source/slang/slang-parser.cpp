@@ -8320,6 +8320,7 @@ Precedence GetOpLevel(Parser* parser, const Token& token)
     }
 }
 
+/// Reads an operator token and returns a name lookup expression in the current scope.
 static Expr* parseOperator(Parser* parser)
 {
     // The ternary expression calls the operator named `?:`, although its first

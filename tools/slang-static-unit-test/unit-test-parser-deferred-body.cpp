@@ -29,6 +29,7 @@ void checkVarExpr(Expr* expression, const char* expectedName, SourceLoc expected
 
 } // namespace
 
+/// Checks that expression tokens use the AST builder's pool after temporary input is released.
 SLANG_UNIT_TEST(parserTermStringUsesBuilderTokenPool)
 {
     slang::SessionDesc sessionDesc = {};
@@ -52,6 +53,7 @@ SLANG_UNIT_TEST(parserTermStringUsesBuilderTokenPool)
     SLANG_CHECK(literal->token.getLogicalSpelling() == UnownedStringSlice("123"));
 }
 
+/// Checks that an incomplete deferred body retains the physical EOF occurrence and its trivia.
 SLANG_UNIT_TEST(parserDeferredBodyRetainsTerminatingEOF)
 {
     // The missing closing brace makes the file's EOF terminate body capture.
@@ -120,6 +122,7 @@ SLANG_UNIT_TEST(parserDeferredBodyRetainsTerminatingEOF)
     SLANG_CHECK(!translationUnit->isChecked);
 }
 
+/// Checks that a balanced deferred body ends with a trivia-free EOF at the next declaration.
 SLANG_UNIT_TEST(parserBalancedDeferredBodyEndsBeforeNextDeclarationTrivia)
 {
     // We parse two bodies without checking them. The first body's synthetic EOF belongs at
@@ -207,6 +210,7 @@ SLANG_UNIT_TEST(parserBalancedDeferredBodyEndsBeforeNextDeclarationTrivia)
     SLANG_CHECK(!translationUnit->isChecked);
 }
 
+/// Checks that failed generic speculation restores a split `>>` and the remaining expression.
 SLANG_UNIT_TEST(parserGenericSpeculationRestoresSplitToken)
 {
     // With no declarations in scope, `tryParseGenericApp` speculates that `a` is generic.

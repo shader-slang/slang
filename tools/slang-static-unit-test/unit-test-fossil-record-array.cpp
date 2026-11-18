@@ -44,6 +44,7 @@ void serialize(S const& serializer, MarkedValue& value)
 
 using namespace Slang;
 
+/// Checks that layout, typed access, and deserialization agree on record-array tail padding.
 SLANG_UNIT_TEST(fossilRecordArrayPreservesTailPadding)
 {
     // The serialized fields occupy five bytes, but the integer requires four-byte

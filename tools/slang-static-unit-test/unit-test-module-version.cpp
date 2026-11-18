@@ -451,6 +451,7 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
     }
 }
 
+/// Checks that the compatibility gate rejects modules marked with the version-43 lexeme schema.
 SLANG_UNIT_TEST(serializedModuleRejectsVersion43LexemeTags)
 {
     // Version 43 assigned tags to abstract classes as well as concrete lexeme types.

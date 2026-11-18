@@ -208,7 +208,7 @@ struct InputStream
     /// Get the diagnostic sink to use for messages related to this stream
     DiagnosticSink* getSink();
 
-    /// The lexical pool selected for the preprocessing operation.
+    /// Returns the lexical pool selected for the preprocessing operation.
     TokenPool* getTokenPool();
 
     InputStream* getParent() { return m_parent; }
@@ -552,6 +552,7 @@ struct LexerInputStream : InputStream
 
     Lexer* getLexer() { return &m_lexer; }
 
+    /// Reads the next token without lexing its successor.
     Token readToken() SLANG_OVERRIDE
     {
         // We consume the cached token without fetching its successor. Directive
@@ -561,6 +562,7 @@ struct LexerInputStream : InputStream
         return result;
     }
 
+    /// Returns cached lookahead, or reads it using the current lexer settings.
     Token peekToken() SLANG_OVERRIDE
     {
         // We fill lookahead only on demand so that consuming a directive name
@@ -860,7 +862,9 @@ private:
     /// Actually read a new token (not just using the lookahead)
     Token _readTokenImpl();
 
-    /// Reads an operation token and consumes preceding empty-operation separators once.
+    /// Reads the next token from the current operation's stream.
+    ///
+    /// Pending separators are applied once to the next non-EOF token.
     Token _readCurrentOpToken()
     {
         auto token = m_currentOpStreams.readToken();
@@ -983,6 +987,7 @@ struct ExpansionInputStream : InputStream
     // a file, since we often want to read unexpanded tokens for
     // preprocessor directives.
 
+    /// Reads lookahead without expanding it or fetching its successor.
     Token readRawToken()
     {
         // The next physical token must remain unread until a directive handler
@@ -992,6 +997,7 @@ struct ExpansionInputStream : InputStream
         return result;
     }
 
+    /// Returns lookahead without expanding it, fetching it only when uncached.
     Token peekRawToken()
     {
         _ensureLookaheadToken();

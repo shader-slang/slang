@@ -172,7 +172,7 @@ static void _handleNewLineInner(Lexer* lexer, int c)
 }
 
 // Reads a logical code point after removing backslash-newline pairs, using a space
-// for invalid UTF-8 so identifier and number scanning stop at the invalid sequence.
+// for failed UTF-8 decoding so identifier and number scanning stop at the failed sequence.
 // Both lookahead and consumption use this procedure so they recognize identical input.
 // Only consumption supplies a diagnostic sink and commits the resulting cursor.
 static int _readCodePoint(
@@ -252,6 +252,9 @@ static int _readCodePoint(
     return c;
 }
 
+/// Returns the code point `offset` logical positions ahead, or `kEOF` at the view's end.
+///
+/// Requires `offset >= 0`. Lookahead leaves the cursor and diagnostics unchanged.
 static int _peek(Lexer* lexer, int offset = 0)
 {
     RawByteCursor cursor{lexer->m_cursor, lexer->m_end};
@@ -264,6 +267,10 @@ static int _peek(Lexer* lexer, int offset = 0)
     return result;
 }
 
+/// Reads a logical code point and advances the byte cursor, or returns `kEOF` at the view's end.
+///
+/// Failed UTF-8 decoding yields a recovery space. Diagnostics obey lexer suppression and limits.
+/// Removed line splices are recorded for the current lexeme's logical spelling.
 static int _advance(Lexer* lexer)
 {
     RawByteCursor cursor{lexer->m_cursor, lexer->m_end};
@@ -1716,11 +1723,14 @@ static void _lexRawStringLiteralBody(Lexer* lexer)
     }
 }
 
+/// Returns a raw string's body without decoding escapes, or an empty slice for missing or
+/// mismatched delimiters.
+///
+/// Requires a non-empty `token` whose logical spelling starts with `R"`.
 static UnownedStringSlice getRawStringLiteralTokenValue(RawStringLiteral token)
 {
-    // We extract the body of a C++ raw string such as R"tag(body)tag" without decoding
-    // escapes. An incomplete raw string is still a string token after lexer diagnostics,
-    // so we verify both delimiters before forming the body slice.
+    // We check both delimiters in a raw string such as `R"tag(body)tag"` before slicing its body.
+    // The lexer can also produce a string token for incomplete text.
     SLANG_RELEASE_ASSERT(token);
     auto content = token.getLogicalSpelling();
     SLANG_RELEASE_ASSERT(content.startsWith("R\""));

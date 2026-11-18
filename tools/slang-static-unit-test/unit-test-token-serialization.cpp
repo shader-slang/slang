@@ -44,7 +44,7 @@ Token getFieldSemanticToken(Module* module, const char* structName)
     return semantic->name;
 }
 
-/// Checks the spelling and context shared by both semantic-token occurrences.
+/// Checks the spliced `COLOR` spelling, preprocessing flags, and attached `lead`/`tail` comments.
 void checkSemanticToken(Token token)
 {
     // The semantic has one logical identifier, but its physical spelling crosses a
@@ -82,6 +82,8 @@ void checkHumaneLocation(SourceManager* manager, SourceLoc loc, Int line, Int co
 
 } // namespace
 
+/// Checks that AST serialization preserves token spelling, trivia, shared identity,
+/// optional locations, and lexical storage beyond each session's lifetime.
 SLANG_UNIT_TEST(tokenASTSerializationPreservesLexicalValues)
 {
     // The two fields below use the semantic COLOR, with an escaped newline

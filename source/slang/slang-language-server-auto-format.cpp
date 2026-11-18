@@ -67,7 +67,11 @@ String findClangFormatTool()
     return String();
 }
 
-/// Reads a braced assembly body and fills `range`, or returns false for missing delimiters.
+/// Reads a braced body from `lexer`, with the `spirv_asm` keyword already consumed.
+///
+/// Returns whether both braces were found, filling `range` with their locations on success.
+/// Consumes one token if `{` is missing, or through the matching `}` or EOF otherwise.
+/// Leaves `range` unchanged on failure; `lexer` is never rewound.
 static bool _tryReadSpirvAsmBodyRange(Lexer& lexer, TextRange& range)
 {
     // The `spirv_asm` keyword must be followed by a braced body. Token reads skip trivia,
