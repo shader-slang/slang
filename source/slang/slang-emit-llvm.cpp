@@ -1,5 +1,6 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-diagnostic-util.h"
 #include "core/slang-char-util.h"
 #include "core/slang-func-ptr.h"
 #include "core/slang-io.h"
@@ -775,12 +776,10 @@ struct LLVMEmitter
 
         if (errorArtifact)
         {
-            auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(errorArtifact);
-            for (Int i = 0; i < diagnostics->getCount(); ++i)
-            {
-                auto diag = diagnostics->getAt(i);
-                getSink()->diagnoseRaw(Severity(diag->severity), diag->text);
-            }
+            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+                SLANG_FAIL,
+                errorArtifact,
+                getSink());
             return SLANG_FAIL;
         }
 

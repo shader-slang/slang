@@ -9,9 +9,21 @@
 namespace Slang
 {
 
+class DiagnosticSink;
+
 struct ArtifactDiagnosticUtil
 {
     typedef ArtifactDiagnostic::Severity Severity;
+
+    /// Report the diagnostics attached to an error `artifact` to `sink` when
+    /// `result` indicates a failure. Downstream code generators (for example
+    /// the LLVM builder) package their failures as artifacts rather than
+    /// writing to the sink themselves, so without this step such a failure
+    /// would return without any visible message.
+    static void reportDiagnosticsOnFailure(
+        SlangResult result,
+        IArtifact* artifact,
+        DiagnosticSink* sink);
 
     /// Given severity return as text
     static UnownedStringSlice getSeverityText(Severity severity);

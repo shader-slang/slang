@@ -2,6 +2,7 @@
 
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-diagnostic-util.h"
 #include "compiler-core/slang-artifact-impl.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-name.h"
@@ -2520,6 +2521,11 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
+        // Every CPU-via-LLVM target must appear in all three CPU-ABI
+        // legalization dispatches in this function (entry-point uniform
+        // params, varying params here, explicit global context): the LLVM
+        // CPU emitter hardcodes the three-pointer kernel call, so a target
+        // missing from any one of them produces a verifier-invalid module.
         {
             SLANG_PASS(
                 legalizeEntryPointVaryingParamsForCPU,
@@ -3973,31 +3979,6 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
     return SLANG_OK;
 }
 
-// Report the diagnostics attached to an error `artifact` (for example the
-// LLVM verifier output stashed by the LLVM builder) in `codeGenContext`'s
-// sink when LLVM code generation returned a failure. The LLVM builder
-// packages its failures as artifacts rather than writing to the sink itself,
-// so without this step a failure would return without any visible message.
-static void reportLLVMArtifactDiagnosticsOnFailure(
-    CodeGenContext* codeGenContext,
-    SlangResult result,
-    IArtifact* artifact)
-{
-    if (SLANG_FAILED(result) && artifact)
-    {
-        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
-        if (diagnostics)
-        {
-            auto sink = codeGenContext->getSink();
-            for (Int i = 0; i < diagnostics->getCount(); ++i)
-            {
-                auto diag = diagnostics->getAt(i);
-                sink->diagnoseRaw(Severity(diag->severity), diag->text);
-            }
-        }
-    }
-}
-
 SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
 {
     auto target = codeGenContext->getTargetFormat();
@@ -4032,8 +4013,14 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
         {
             IArtifact* artifact = nullptr;
             auto result = emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
-            reportLLVMArtifactDiagnosticsOnFailure(codeGenContext, result, artifact);
-            outArtifact = ComPtr<IArtifact>(artifact);
+            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+                result,
+                artifact,
+                codeGenContext->getSink());
+            // The artifact still reaches the caller on failure (its diagnostics
+            // were reported above) so it can inspect the error; attach adopts
+            // the emit's single reference instead of adding a leaking one.
+            outArtifact.attach(artifact);
             SLANG_RETURN_ON_FAIL(result);
         }
         break;
@@ -4042,8 +4029,11 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
         {
             IArtifact* artifact = nullptr;
             auto result = emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
-            reportLLVMArtifactDiagnosticsOnFailure(codeGenContext, result, artifact);
-            outArtifact = ComPtr<IArtifact>(artifact);
+            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+                result,
+                artifact,
+                codeGenContext->getSink());
+            outArtifact.attach(artifact);
             SLANG_RETURN_ON_FAIL(result);
         }
         break;
@@ -4052,8 +4042,11 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
         {
             IArtifact* artifact = nullptr;
             auto result = emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
-            reportLLVMArtifactDiagnosticsOnFailure(codeGenContext, result, artifact);
-            outArtifact = ComPtr<IArtifact>(artifact);
+            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+                result,
+                artifact,
+                codeGenContext->getSink());
+            outArtifact.attach(artifact);
             SLANG_RETURN_ON_FAIL(result);
         }
         break;
