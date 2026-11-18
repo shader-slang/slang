@@ -37,9 +37,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float2x2 b = 0.75 % m;
     precise float2x2 p = a % n;
 
-    // The whole matrix must never be passed to `sign`, `abs`, or `mod`, as
-    // either argument of the `mod` call. The parenthesized forms never match
-    // the valid row spelling (`abs(m_0[0])` has `[` where these have `)`).
+    // The whole matrix must never be passed to `sign`, `abs`, or `mod`, in
+    // either argument of the `mod` call. The parenthesized pattern never
+    // matches the valid row spelling (`abs(m_0[0])` has `[` where it has `)`).
     //CHECK_GLSL-NOT: sign(m_0)
     //CHECK_GLSL-NOT: abs(m_0)
     // Each row of `m` is passed on its own, so the emitted construction is
