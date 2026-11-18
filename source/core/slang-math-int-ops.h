@@ -20,11 +20,6 @@ struct MathIntType
     // Whether the integer type is signed
     bool isSigned{};
 
-    bool isValid() const
-    {
-        return width != 0U;
-    }
-
     // width: 0, unsigned -- null/invalid type
     static const MathIntType NullType;
 
@@ -163,9 +158,6 @@ struct MathIntResult
     };
 
     unsigned flags{};
-
-    // Whether the result is safe to be folded
-    bool isFoldable() const { return ((flags & (Undefined | TargetDefined)) == 0U); }
 };
 
 /// @brief Integer math ops
@@ -198,7 +190,7 @@ class MathIntOps
 {
 public:
     template<typename T>
-    static MathIntResult constructResultWithValueAndFlags(
+    static MathIntResult constructResult(
         MathIntType type,
         T rawValue,
         unsigned flags)
@@ -212,7 +204,7 @@ public:
 
     static MathIntResult constructBoolResult(bool value)
     {
-        return constructResultWithValueAndFlags(MathIntType::BoolType, value ? 1U : 0U, 0U);
+        return constructResult(MathIntType::BoolType, value ? 1U : 0U, 0U);
     }
 
     MathIntOps() = delete;

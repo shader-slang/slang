@@ -3132,9 +3132,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                               varDecl->initExpr,
                               ConstantFoldingKind::LinkTime,
                               nullptr)
-                        : tryFoldUncheckedLiteralInitializer(
-                              varDecl->type.type,
-                              varDecl->initExpr);
+                        : tryFoldUncheckedLiteralInitializer(varDecl->type.type, varDecl->initExpr);
             }
         }
     }

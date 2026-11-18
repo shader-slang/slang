@@ -254,7 +254,7 @@ String MathIntValue::toString() const
 MathIntResult MathIntOps::cast(const MathIntType& resultType, const MathIntValue& a)
 {
     const bool overflow = !valueInRange(resultType, extendToI128(a));
-    return constructResultWithValueAndFlags(
+    return constructResult(
         resultType,
         a.getUnsignedValue(),
         overflow ? unsigned(MathIntResult::Overflow) : 0);
@@ -302,7 +302,7 @@ MathIntResult MathIntOps::add(
 {
     Int128 res = addI128(extendToI128(a), extendToI128(b));
     const bool overflow = !valueInRange(resultType, res);
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         res.lo,
         overflow ? unsigned(MathIntResult::Overflow) : 0);
@@ -315,7 +315,7 @@ MathIntResult MathIntOps::sub(
 {
     Int128 res = subI128(extendToI128(a), extendToI128(b));
     const bool overflow = !valueInRange(resultType, res);
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         res.lo,
         overflow ? unsigned(MathIntResult::Overflow) : 0);
@@ -328,7 +328,7 @@ MathIntResult MathIntOps::mul(
 {
     // multiply by 0?
     if ((a.getUnsignedValue() == 0) || (b.getUnsignedValue() == 0))
-        return MathIntOps::constructResultWithValueAndFlags(resultType, 0, 0);
+        return MathIntOps::constructResult(resultType, 0, 0);
 
     bool overflow{};
 
@@ -350,7 +350,7 @@ MathIntResult MathIntOps::mul(
         overflow = a.getUnsignedValue() > (getMaxForType(resultType) / b.getUnsignedValue());
     }
 
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         a.getUnsignedValue() * b.getUnsignedValue(),
         overflow ? unsigned(MathIntResult::Overflow) : 0);
@@ -364,7 +364,7 @@ MathIntResult MathIntOps::div(
     // division by 0?
     if (b.getUnsignedValue() == 0)
     {
-        return MathIntOps::constructResultWithValueAndFlags(
+        return MathIntOps::constructResult(
             resultType,
             getMaxForType(resultType),
             MathIntResult::Undefined);
@@ -407,7 +407,7 @@ MathIntResult MathIntOps::div(
         flags |= MathIntResult::TargetDefined;
     }
 
-    return MathIntOps::constructResultWithValueAndFlags(resultType, res, flags);
+    return MathIntOps::constructResult(resultType, res, flags);
 }
 
 MathIntResult MathIntOps::rem(
@@ -417,7 +417,7 @@ MathIntResult MathIntOps::rem(
 {
     if (b.getUnsignedValue() == 0)
     {
-        return MathIntOps::constructResultWithValueAndFlags(
+        return MathIntOps::constructResult(
             resultType,
             0,
             MathIntResult::Undefined);
@@ -457,14 +457,14 @@ MathIntResult MathIntOps::rem(
     // TargetDefined. This catches issues such as INT_MIN % -1.
     flags |= div(resultType, a, b).flags & MathIntResult::TargetDefined;
 
-    return MathIntOps::constructResultWithValueAndFlags(resultType, res128.lo, flags);
+    return MathIntOps::constructResult(resultType, res128.lo, flags);
 }
 
 MathIntResult MathIntOps::neg(const MathIntType& resultType, const MathIntValue& a)
 {
     Int128 res = negI128(extendToI128(a));
     const bool overflow = !valueInRange(resultType, res);
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         res.lo,
         overflow ? unsigned(MathIntResult::Overflow) : 0);
@@ -475,7 +475,7 @@ MathIntResult MathIntOps::bitwiseAnd(
     const MathIntValue& a,
     const MathIntValue& b)
 {
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         (a.getUnsignedValue() & b.getUnsignedValue()),
         0);
@@ -486,7 +486,7 @@ MathIntResult MathIntOps::bitwiseOr(
     const MathIntValue& a,
     const MathIntValue& b)
 {
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         a.getUnsignedValue() | b.getUnsignedValue(),
         0);
@@ -497,7 +497,7 @@ MathIntResult MathIntOps::bitwiseXor(
     const MathIntValue& a,
     const MathIntValue& b)
 {
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         a.getUnsignedValue() ^ b.getUnsignedValue(),
         0);
@@ -505,7 +505,7 @@ MathIntResult MathIntOps::bitwiseXor(
 
 MathIntResult MathIntOps::bitwiseNot(const MathIntType& resultType, const MathIntValue& a)
 {
-    return MathIntOps::constructResultWithValueAndFlags(resultType, ~a.getUnsignedValue(), 0);
+    return MathIntOps::constructResult(resultType, ~a.getUnsignedValue(), 0);
 }
 
 MathIntResult MathIntOps::lsh(
@@ -517,7 +517,7 @@ MathIntResult MathIntOps::lsh(
     const unsigned shiftAmount =
         resultType.width > 0U ? b.getUnsignedValue() % resultType.width : 0U;
 
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         a.getUnsignedValue() << shiftAmount,
         targetDefined ? unsigned(MathIntResult::TargetDefined) : 0);
@@ -538,7 +538,7 @@ MathIntResult MathIntOps::rsh(
     else
         value = a.getUnsignedValue() >> shiftAmount;
 
-    return MathIntOps::constructResultWithValueAndFlags(
+    return MathIntOps::constructResult(
         resultType,
         value,
         targetDefined ? unsigned(MathIntResult::TargetDefined) : 0);
@@ -559,7 +559,10 @@ MathIntResult MathIntOps::logicalAnd(const MathIntValue& a, const MathIntValue& 
     return constructBoolResult(a.getUnsignedValue() && b.getUnsignedValue());
 }
 
-MathIntResult MathIntOps::ternaryConditional(const MathIntValue& a, const MathIntValue& b, const MathIntValue& c)
+MathIntResult MathIntOps::ternaryConditional(
+    const MathIntValue& a,
+    const MathIntValue& b,
+    const MathIntValue& c)
 {
     MathIntResult res{};
     if (a.getUnsignedValue())

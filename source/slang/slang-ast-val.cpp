@@ -1,8 +1,8 @@
 // slang-ast-type.cpp
 #include "slang-ast-val.h"
 
-#include "core/slang-uint-set.h"
 #include "core/slang-math-int-ops.h"
+#include "core/slang-uint-set.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
@@ -2375,46 +2375,47 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
-MathIntType expressionTypeToMathIntType(Type *type)
+// Note: type must be BasicExpressionType
+MathIntType expressionTypeToMathIntType(Type* type)
 {
     auto exprType = as<BasicExpressionType>(type);
     SLANG_RELEASE_ASSERT(exprType);
 
     switch (exprType->getBaseType())
     {
-        case BaseType::Int:
-            return MathIntType::Int32Type;
+    case BaseType::Int:
+        return MathIntType::Int32Type;
 
-        case BaseType::UInt:
-            return MathIntType::UInt32Type;
+    case BaseType::UInt:
+        return MathIntType::UInt32Type;
 
-        case BaseType::Int64:
-        case BaseType::IntPtr:
-            return MathIntType::Int64Type;
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+        return MathIntType::Int64Type;
 
-        case BaseType::UInt64:
-        case BaseType::UIntPtr:
-            return MathIntType::UInt64Type;
+    case BaseType::UInt64:
+    case BaseType::UIntPtr:
+        return MathIntType::UInt64Type;
 
-        case BaseType::Int16:
-            return MathIntType::Int16Type;
+    case BaseType::Int16:
+        return MathIntType::Int16Type;
 
-        case BaseType::UInt16:
-            return MathIntType::UInt16Type;
+    case BaseType::UInt16:
+        return MathIntType::UInt16Type;
 
-        case BaseType::Char:
-        case BaseType::Int8:
-            return MathIntType::Int8Type;
+    case BaseType::Char:
+    case BaseType::Int8:
+        return MathIntType::Int8Type;
 
-        case BaseType::UInt8:
-            return MathIntType::UInt8Type;
+    case BaseType::UInt8:
+        return MathIntType::UInt8Type;
 
-        case BaseType::Bool:
-            return MathIntType::BoolType;
+    case BaseType::Bool:
+        return MathIntType::BoolType;
 
-        default:
-            SLANG_RELEASE_ASSERT(!"Unhandled base type");
-            return MathIntType::NullType;
+    default:
+        SLANG_RELEASE_ASSERT(!"Unhandled base type");
+        return MathIntType::NullType;
     }
 }
 
@@ -2488,9 +2489,9 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
 
     MathIntType resType{expressionTypeToMathIntType(resultBasicExprType)};
 
-    const MathIntValue &arg0 = constArgs.at(0);
-    const MathIntValue &arg1 = constArgs.at(1);
-    const MathIntValue &arg2 = constArgs.at(2);
+    const MathIntValue& arg0 = constArgs.at(0);
+    const MathIntValue& arg1 = constArgs.at(1);
+    const MathIntValue& arg2 = constArgs.at(2);
 
     MathIntResult res{};
 
@@ -2566,11 +2567,8 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
         return nullptr;
     }
 
-    SLANG_RELEASE_ASSERT(res.value.hasValue());
-
-    // A null `sink` means the caller suppresses these diagnostics, either because nothing
-    // reports them (substitution and resolution) or because another fold of the same
-    // expression already did (see `SemanticsVisitor::getFoldDiagnosticSink`).
+    // A null `sink` means the caller suppresses these diagnostics.
+    // See also SemanticsVisitor::getFoldDiagnosticSink.
     if (res.flags & MathIntResult::Undefined)
     {
         if (sink)
@@ -2593,7 +2591,7 @@ IntVal* BuiltinOperationIntVal::tryFoldImpl(
         return nullptr;
     }
 
-    // Note: we'll ignore integer overflows here even if MathIntResults reports
+    // Note: We'll ignore integer overflows here even if MathIntResults reports
     // it. Wrapping is intended.
     return astBuilder->getIntVal(resultType, res.value.getSignedValue());
 }

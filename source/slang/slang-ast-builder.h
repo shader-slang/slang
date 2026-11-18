@@ -452,7 +452,7 @@ public:
     {
         // A constant without a type cannot be lowered to IR, and integer folding cannot know
         // its width, so every producer must know the type of the value it creates.
-        SLANG_ASSERT(type);
+        SLANG_RELEASE_ASSERT(type);
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
