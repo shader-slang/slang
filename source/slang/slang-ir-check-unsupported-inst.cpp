@@ -565,10 +565,41 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
     }
 }
 
+// Diagnose atomic operations for CPU targets compiled through LLVM. The LLVM
+// backend implements none of the IR atomic operations, so an atomic reaching
+// this pass would abort code generation with an internal "Unsupported
+// instruction for LLVM target!" error. Diagnosing it here reports the gap as
+// an ordinary error at the source location instead. Like the Metal checks
+// above, we visit only top-level functions, because those are the bodies the
+// emitter emits; a generic that remains at this point is not emitted.
+static void checkUnsupportedLLVMCPUAtomics(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto atomic = as<IRAtomicOperation>(inst);
+                if (!atomic)
+                    continue;
+                auto loc = atomic->sourceLoc.isValid() ? atomic->sourceLoc : findFirstUseLoc(atomic);
+                sink->diagnose(
+                    Diagnostics::AtomicOperationsNotSupportedOnLlvmCpuTarget{.location = loc});
+            }
+        }
+    }
+}
+
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     if (isMetalTarget(target))
         checkUnsupportedMetalInsts(module, sink);
+    else if (isCPUTargetViaLLVM(target))
+        checkUnsupportedLLVMCPUAtomics(module, sink);
 
     // The CUDA/PTX emitter has no type name for a multisampled texture, whereas
     // the host C++ emitter does.
