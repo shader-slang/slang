@@ -361,6 +361,17 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 {
     outArtifact.setNull();
 
+    // Pass-through hands the source of a single entry point's translation unit to the downstream
+    // compiler. Whole-program targets (such as host-callable) compile without entry points, so
+    // such a request has nothing to hand over; diagnose rather than index an empty entry-point
+    // list. The check runs before the downstream compiler is loaded so that the outcome does not
+    // depend on whether the compiler is installed.
+    if (isPassThroughEnabled() && getEntryPointCount() == 0)
+    {
+        getSink()->diagnose(Diagnostics::PassThroughRequiresEntryPoint{});
+        return SLANG_FAIL;
+    }
+
     auto sink = getSink();
     auto session = getSession();
 
@@ -1039,8 +1050,13 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-    // Extract diagnostics regardless of compile result
-    SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
+    // Extract diagnostics regardless of compile result, when there is an artifact to read them
+    // from. A downstream compiler that cannot process the input can fail without setting the
+    // output artifact, because out params are only assigned on success.
+    if (artifact)
+    {
+        SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
+    }
 
     // Now check if compile failed
     SLANG_RETURN_ON_FAIL(compileResult);
