@@ -2417,10 +2417,15 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
             // text; an entry point must not be declared ahead of its
             // attributes), so no declaration is owed for them; skipping them
             // here also keeps a storage-class prefix from dangling in the
-            // output. A body-less callee is emitted as a plain declaration by
-            // the functions pass, so it takes no prefix here either — only a
-            // definition-shaped declaration carries the storage specifier, and
-            // `emitFuncStorageSpecifier` is the one source of that rule.
+            // output. A body-less callee is skipped too: the functions pass
+            // emits it as a plain declaration, and an early duplicate could
+            // disagree with that declaration's linkage (an `extern "C"`
+            // function's early declaration would need the same wrapping).
+            // A body-less callee referenced from an initializer is therefore a
+            // known limitation — that shape did not compile before this pass
+            // existed either. Only a definition-shaped declaration carries the
+            // storage specifier, and `emitFuncStorageSpecifier` is the one
+            // source of that rule.
             if (isTargetIntrinsic(func) || asEntryPoint(func) || !func->getFirstBlock())
                 continue;
             emitFuncStorageSpecifier(func);
