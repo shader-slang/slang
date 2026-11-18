@@ -12,7 +12,7 @@
 
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target wgsl
 //TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -wgpu
-//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1): -restrictive-capability-check -entry fragMain -stage fragment -target None
+//DISABLE_TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -27,8 +27,7 @@ void fragMain()
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
 
-// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
-// NEGATIVE: {{error[E[[:digit:]]+]}}:
+//NEGATIVE: error
 
     int ret = 0;
     ret = int((texHandle.Load(int3(0, 0, 0))).x);

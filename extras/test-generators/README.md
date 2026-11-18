@@ -47,7 +47,7 @@ In the template below, a marker like `<<NAME>>` is a part that the script replac
 <<DISABLE_COMMENTS>>
 //<<DISABLE_POS>>TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target <<POSITIVE_TARGET>>
 //<<DISABLE_CMP>>TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): <<COMPUTE_TARGET>>
-//<<DISABLE_NEG>>TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1): -restrictive-capability-check -entry fragMain -stage fragment -target <<NEGATIVE_TARGET>>
+//<<DISABLE_NEG>>TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target <<NEGATIVE_TARGET>>
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -62,8 +62,7 @@ void fragMain()
 // POSITIVE-LABEL: <<LABEL>>
 // POSITIVE-NOT: {{(error|warning).*}}:
 
-// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
-// NEGATIVE: {{error[E[[:digit:]]+]}}:
+//NEGATIVE: error
 
     int ret = 0;
     <<OP_STATEMENTS>>
@@ -103,13 +102,15 @@ void computeMain()
 
 The three `TEST` lines are the three tests in each file.
 
-| Test       | Directive                                      | What it checks                                                                            |
-| ---------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Positive   | `TEST:SIMPLE(filecheck=POSITIVE)`              | `fragMain` compiles on the minimum version without an error or a warning (exit code `0`). |
-| Functional | `TEST:COMPARE_COMPUTE`                         | `computeMain` runs on the real backend. The buffer holds `12346`. This test needs a GPU.  |
-| Negative   | `TEST:SIMPLE(filecheck=NEGATIVE,exit-code=-1)` | `fragMain` fails to compile (exit code `-1`) on the version below the minimum.            |
+| Test       | Directive                                   | What it checks                                                                               |
+| ---------- | ------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Positive   | `TEST:SIMPLE(filecheck=POSITIVE)`           | `fragMain` compiles on the minimum version without an error or a warning (exit code `0`).    |
+| Functional | `TEST:COMPARE_COMPUTE`                      | `computeMain` runs on the real backend. The buffer holds `12346`. This test needs a GPU.     |
+| Negative   | `TEST:SIMPLE(diag=NEGATIVE,non-exhaustive)` | `fragMain` fails to compile (exit code `-1`) with an error on the version below the minimum. |
 
-The `POSITIVE` and `NEGATIVE` check lines are inside the body of `fragMain`. The `-restrictive-capability-check` option makes the compiler report a missing capability as an error.
+The `POSITIVE` check lines are FileCheck lines. They are inside the body of `fragMain`. The `-restrictive-capability-check` option makes the compiler report a missing capability as an error.
+
+The negative test is a diagnostic test. The line `//NEGATIVE: error` is an annotation that expects at least one diagnostic with the severity `error`. The `non-exhaustive` option lets the other diagnostics of the compiler stay without annotation. An error always comes with notes, for example "see call to ...", and these notes depend on the backend and the texture type. A test with `non-exhaustive` fails if all the diagnostics have an annotation. This cannot happen here, because every error has at least one note.
 
 The functional test expects `12346`, which is `0x12345 + 1`. The texture content is `one`, so each operation that runs in the functional test makes `ret` equal to `1`.
 
