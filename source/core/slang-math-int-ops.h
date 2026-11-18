@@ -204,6 +204,24 @@ public:
         return constructResult(MathIntType::BoolType, value ? 1U : 0U, 0U);
     }
 
+    /// @brief Converts the floating-point value `value` to the integer type `resultType`,
+    /// truncating toward zero.
+    ///
+    /// If the truncated value does not fit in `resultType`, or `value` is NaN or infinite, the
+    /// result is target-defined.
+    ///
+    /// For MathIntType::BoolType, the result is 1 if `value` is nonzero and 0 otherwise, as in
+    /// C. A NaN is target-defined for BoolType too, because targets disagree on whether NaN
+    /// compares unequal to zero.
+    ///
+    /// Examples:
+    /// - convertFloatValue(Int8Type, -128.9) == -128
+    /// - convertFloatValue(Int8Type, 128.0) sets TargetDefined
+    /// - convertFloatValue(UInt8Type, -0.5) == 0 (truncates to zero, which is in range)
+    /// - convertFloatValue(UInt64Type, 9223372036854775808.0) == 0x8000000000000000
+    /// - convertFloatValue(UInt64Type, 18446744073709551616.0) sets TargetDefined
+    static MathIntResult convertFloatValue(const MathIntType& resultType, double value);
+
     MathIntOps() = delete;
     ~MathIntOps() = delete;
 

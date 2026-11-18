@@ -1,6 +1,7 @@
 #include "slang-math-int-ops.h"
 
 #include <bit>
+#include <cmath>
 #include <type_traits>
 
 namespace Slang
@@ -262,6 +263,43 @@ String MathIntValue::toString() const
 
         return num;
     }
+}
+
+MathIntResult MathIntOps::convertFloatValue(const MathIntType& resultType, double value)
+{
+    SLANG_RELEASE_ASSERT(resultType.width > 0U && resultType.width <= 64U);
+
+    if (std::isnan(value))
+        return constructResult(resultType, 0U, MathIntResult::TargetDefined);
+
+    if (resultType.width == MathIntType::BoolType.width)
+        return constructBoolResult(value != 0.0);
+
+    // We compare the truncated value against the bounds of `resultType` in `double`, where
+    // every bound is exact: -2^(width-1) and 2^(width-1) for signed types, and 2^width for
+    // unsigned types. A value that passes the check converts to int64_t or uint64_t with
+    // defined behavior. An infinity fails the check, because it compares beyond every bound.
+    //
+    // Note: the lower bound is inclusive and the upper bound is exclusive to
+    // avoid rounding of boundary values. For example, UINT64_MAX is not exactly
+    // representable as a double, but INT64_MIN is.
+    const double truncated = std::trunc(value);
+
+    if (resultType.isSigned)
+    {
+        const double minValue = static_cast<double>(getMinForType(resultType));
+        const double maxExclusive = -minValue;
+        if (!(truncated >= minValue && truncated < maxExclusive))
+            return constructResult(resultType, 0U, MathIntResult::TargetDefined);
+
+        return constructResult(resultType, static_cast<int64_t>(truncated), 0U);
+    }
+
+    const double maxExclusive = std::ldexp(1.0, resultType.width);
+    if (!(truncated >= 0.0 && truncated < maxExclusive))
+        return constructResult(resultType, 0U, MathIntResult::TargetDefined);
+
+    return constructResult(resultType, static_cast<uint64_t>(truncated), 0U);
 }
 
 MathIntResult MathIntOps::cast(const MathIntType& resultType, const MathIntValue& a)

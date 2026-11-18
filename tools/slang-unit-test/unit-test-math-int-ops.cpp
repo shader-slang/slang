@@ -4,7 +4,9 @@
 #include "unit-test/slang-unit-test.h"
 
 #include <cinttypes>
+#include <cmath>
 #include <cstdio>
+#include <limits>
 
 using namespace Slang;
 
@@ -174,6 +176,104 @@ SLANG_UNIT_TEST(mathIntOpsCastToBool)
     SLANG_CHECK(checkEquals(
         MathIntOps::constructResult(MathIntType::BoolType, 1, 0),
         MathIntOps::castToBool(MathIntValue::constructFromValue(MathIntType::UInt64Type, 11000))));
+}
+
+// Conversions from floating-point values. In-range values truncate toward zero. A value whose
+// truncation is out of range, and NaN or infinity, is target-defined.
+SLANG_UNIT_TEST(mathIntOpsConvertFloatValue)
+{
+    const double inf = std::numeric_limits<double>::infinity();
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double twoPow63 = std::ldexp(1.0, 63);
+    const double twoPow64 = std::ldexp(1.0, 64);
+
+    auto checkValue = [](const MathIntType& type, double value, auto expected)
+    {
+        return checkEquals(
+            MathIntOps::constructResult(type, expected, 0),
+            MathIntOps::convertFloatValue(type, value));
+    };
+    auto checkTargetDefined = [](const MathIntType& type, double value)
+    {
+        return checkEquals(
+            MathIntOps::constructResult(type, 0U, MathIntResult::TargetDefined),
+            MathIntOps::convertFloatValue(type, value));
+    };
+
+    // int8_t: truncation toward zero, and both ends of the range.
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, 0.0, 0));
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, -0.0, 0));
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, 1.9, 1));
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, -1.9, -1));
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, -0.5, 0));
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, 127.9, 127));
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, -128.0, -128));
+    SLANG_CHECK(checkValue(MathIntType::Int8Type, -128.9, -128));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int8Type, 128.0));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int8Type, -129.0));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int8Type, 300.0));
+
+    // uint8_t: a negative value that truncates to zero is in range, -1 is not.
+    SLANG_CHECK(checkValue(MathIntType::UInt8Type, 255.9, 255U));
+    SLANG_CHECK(checkValue(MathIntType::UInt8Type, -0.5, 0U));
+    SLANG_CHECK(checkValue(MathIntType::UInt8Type, -0.9, 0U));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt8Type, 256.0));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt8Type, -1.0));
+
+    // int16_t and uint16_t
+    SLANG_CHECK(checkValue(MathIntType::Int16Type, 32767.5, 32767));
+    SLANG_CHECK(checkValue(MathIntType::Int16Type, -32768.5, -32768));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int16Type, 32768.0));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int16Type, -32769.0));
+    SLANG_CHECK(checkValue(MathIntType::UInt16Type, 65535.5, 65535U));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt16Type, 65536.0));
+
+    // int32_t and uint32_t
+    SLANG_CHECK(checkValue(MathIntType::Int32Type, 2147483647.9, 2147483647));
+    SLANG_CHECK(checkValue(MathIntType::Int32Type, -2147483648.9, INT32_MIN));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int32Type, 2147483648.0));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int32Type, -2147483649.0));
+    SLANG_CHECK(checkValue(MathIntType::UInt32Type, 4294967295.5, 0xFFFFFFFFU));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt32Type, 4294967296.0));
+
+    // int64_t: -2^63 is exact and in range. The largest double below 2^63 is 2^63 - 1024,
+    // and the next double below -2^63 is -2^63 - 2048.
+    SLANG_CHECK(checkValue(MathIntType::Int64Type, -twoPow63, INT64_MIN));
+    SLANG_CHECK(checkValue(
+        MathIntType::Int64Type,
+        std::nextafter(twoPow63, 0.0),
+        int64_t(0x7FFFFFFFFFFFFC00)));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int64Type, twoPow63));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int64Type, std::nextafter(-twoPow63, -inf)));
+
+    // uint64_t: 2^63 is in range, which a conversion through int64_t would get wrong. The
+    // largest double below 2^64 is 2^64 - 2048. UINT64_MAX rounds to 2^64 as a double, so it
+    // is out of range.
+    SLANG_CHECK(checkValue(MathIntType::UInt64Type, twoPow63, uint64_t(0x8000000000000000)));
+    SLANG_CHECK(checkValue(
+        MathIntType::UInt64Type,
+        std::nextafter(twoPow64, 0.0),
+        uint64_t(0xFFFFFFFFFFFFF800)));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt64Type, twoPow64));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt64Type, double(UINT64_MAX)));
+    SLANG_CHECK(checkValue(MathIntType::UInt64Type, -0.9, uint64_t(0)));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt64Type, -1.0));
+
+    // NaN and infinities are target-defined for every integer type.
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int32Type, nan));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int32Type, inf));
+    SLANG_CHECK(checkTargetDefined(MathIntType::Int32Type, -inf));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt64Type, nan));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt64Type, inf));
+    SLANG_CHECK(checkTargetDefined(MathIntType::UInt64Type, -inf));
+
+    // bool: nonzero is true, including fractions and infinities. NaN is target-defined.
+    SLANG_CHECK(checkValue(MathIntType::BoolType, 0.0, 0U));
+    SLANG_CHECK(checkValue(MathIntType::BoolType, -0.0, 0U));
+    SLANG_CHECK(checkValue(MathIntType::BoolType, 0.5, 1U));
+    SLANG_CHECK(checkValue(MathIntType::BoolType, -2.0, 1U));
+    SLANG_CHECK(checkValue(MathIntType::BoolType, inf, 1U));
+    SLANG_CHECK(checkTargetDefined(MathIntType::BoolType, nan));
 }
 
 
