@@ -348,7 +348,11 @@ public:
 
     /// Get the desc of this compiler
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
-    /// Compile using the specified options. The result is in resOut
+    /// Compile using the specified options. The result is in resOut.
+    ///
+    /// On success `*outArtifact` is always assigned. On failure the implementation decides:
+    /// some compilers assign an artifact that carries diagnostics, others leave `*outArtifact`
+    /// unset (null). Callers must not assume an artifact exists on failure.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     compile(const CompileOptions& options, IArtifact** outArtifact) = 0;
     /// Returns true if compiler can do a transformation of `from` to `to` Artifact types

@@ -35,6 +35,10 @@ struct DownstreamCompilerInfo
     static const This& getInfo(SlangPassThrough compiler);
     /// True if this compiler can compile the specified language
     static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
+    /// Returns the source language a pass-through compile actually presents to the downstream
+    /// compiler. No downstream compiler consumes Slang source directly, so Slang input is
+    /// treated as HLSL; every other language passes through unchanged.
+    static SlangSourceLanguage getPassThroughCompileLanguage(SlangSourceLanguage sourceLanguage);
 
     DownstreamCompilerInfo()
         : sourceLanguageFlags(0)

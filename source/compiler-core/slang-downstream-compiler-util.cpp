@@ -52,6 +52,11 @@ struct DownstreamCompilerInfos
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
     infos.infos[int(SLANG_PASS_THROUGH_LLVM)] =
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    // The generic compiler dispatches to visual studio, clang or gcc, and accepts C and C++
+    // like each of them. Recording this is load-bearing for the pass-through language gate,
+    // which skips compilers with no table entry; it also means
+    // Session::setDefaultDownstreamCompiler accepts genericcpp for C/C++ (it previously
+    // returned SLANG_FAIL through the zero-flag default).
     infos.infos[int(SLANG_PASS_THROUGH_GENERIC_C_CPP)] =
         Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
 
@@ -82,6 +87,13 @@ struct DownstreamCompilerInfos
 {
     const auto& info = getInfo(compiler);
     return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
+}
+
+/* static */ SlangSourceLanguage DownstreamCompilerInfo::getPassThroughCompileLanguage(
+    SlangSourceLanguage sourceLanguage)
+{
+    return (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG) ? SLANG_SOURCE_LANGUAGE_HLSL
+                                                           : sourceLanguage;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerUtil !!!!!!!!!!!!!!!!!!!!!!*/

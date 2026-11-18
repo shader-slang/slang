@@ -255,7 +255,6 @@ static void _outputIncludes(
 /// than a language that can be named to a user.
 static UnownedStringSlice _getSourceLanguageName(SourceLanguage language)
 {
-    SLANG_RELEASE_ASSERT(language != SourceLanguage::Unknown);
     return TypeTextUtil::getSourceLanguageName(SlangSourceLanguage(language));
 }
 

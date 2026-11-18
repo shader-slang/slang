@@ -87,6 +87,9 @@ struct TypeTextUtil
 
     /// Returns the user-facing name of a concrete source language, for use in diagnostics.
     ///
+    /// The name is the canonical first parse name in lower case ("c" for C, "cpp" for C++),
+    /// not the description string ("C language") or one of the alternative spellings.
+    ///
     /// `Unknown` is out of contract because it represents the absence of a language selection
     /// rather than a language that can be named to a user.
     static UnownedStringSlice getSourceLanguageName(SlangSourceLanguage language);
