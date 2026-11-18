@@ -5279,8 +5279,10 @@ void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
 // It is a deliberate second home for the per-row shape: `legalizeMatrixTypes`
 // already expands matrix arithmetic per row, but only for the matrix types it
 // lowers (integer/bool matrices); float matrices are valid in GLSL except
-// for this one construction, so they are rewritten here, one op at a time,
-// at the late target-specific stage where the emit method is known.
+// for the `%` spelling, so they are rewritten here, one op at a time, at the
+// point where every pass that could materialize a concrete `FRem`
+// (specialization, inlining) has run and nothing before emission
+// reintroduces a matrix-typed one.
 static void legalizeMatrixFRem(IRInst* inst)
 {
     auto matrixType = as<IRMatrixType>(inst->getDataType());
@@ -5319,6 +5321,9 @@ static void legalizeMatrixFRem(IRInst* inst)
     auto right = classifyOperand(inst->getOperand(1));
 
     List<IRInst*> rows;
+    // The loop runs `rowCount` iterations over rows, each row `colCount`
+    // components wide — `emitElementExtract` on a matrix yields row `i`, so a
+    // `float3x2` produces three `float2` rows.
     for (IRIntegerValue row = 0; row < rowCount; row++)
     {
         auto rowIndexInst = builder.getIntValue(builder.getIntType(), row);
