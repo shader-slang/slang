@@ -20,7 +20,7 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
 /// including HLSL source output, are not checked by this operation.
 void checkUnsupportedResourceLocals(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 
-/// Diagnose atomic operations for CPU targets compiled through LLVM. The LLVM backend implements
+/// Diagnose atomic operations for CPU-via-LLVM targets. The LLVM backend implements
 /// no IR atomic operation, so an atomic reaching the emitter aborts code generation with an
 /// internal error. Call after `validateAtomicOperations` so destination validation still runs
 /// first. This validation is required regardless of the selected optimization mode.

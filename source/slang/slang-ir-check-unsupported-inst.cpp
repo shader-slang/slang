@@ -572,7 +572,9 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
 // this file, whose failures surface in the downstream Metal compiler — this one is invoked
 // unconditionally (see slang-emit.cpp): minimum-optimization mode must still reject it. Like
 // the Metal checks, we visit only top-level functions, because those are the bodies the emitter
-// emits; a generic that remains at this point is not emitted. The scan covers atomic operations
+// emits; a generic that remains at this point is not emitted (the Metal checks' second reason —
+// unspecialized address spaces in such bodies — does not apply: no address-space specialization
+// runs on this path at all). The scan covers atomic operations
 // only; barrier ops also lack emitter support and still abort until the LLVM backend implements
 // them. A synthesized atomic may carry no source location of its own; findFirstUseLoc points
 // the diagnostic at the first user-code use.
