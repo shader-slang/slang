@@ -3628,6 +3628,8 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
     Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     if (argCount < getSpecializationParamCount())
     {
         sink->diagnose(Diagnostics::MismatchSpecializationArguments{
