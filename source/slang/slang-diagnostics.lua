@@ -6077,7 +6077,7 @@ err(
 err(
     "pass-through-requires-entry-point",
     52017,
-    "pass-through compilation requires an entry point to select the source handed to the downstream compiler; specify an entry point with '-entry' or remove '-pass-through'"
+    "pass-through compilation requires exactly one entry point to select the source handed to the downstream compiler; specify an entry point with '-entry' or remove '-pass-through'"
 )
 
 warning(

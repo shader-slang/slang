@@ -361,12 +361,14 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 {
     outArtifact.setNull();
 
-    // Pass-through hands the source of a single entry point's translation unit to the downstream
-    // compiler. Whole-program targets (such as host-callable) compile without entry points, so
-    // such a request has nothing to hand over; diagnose rather than index an empty entry-point
-    // list. The check runs before the downstream compiler is loaded so that the outcome does not
-    // depend on whether the compiler is installed.
-    if (isPassThroughEnabled() && getEntryPointCount() == 0)
+    // Pass-through hands the source of the translation unit of a single entry point to the
+    // downstream compiler. Whole-program targets (such as host-callable) carry every declared
+    // entry point — or none, since no `-entry` is required there — and only exactly one
+    // entry point identifies a translation unit to hand over, so anything else is diagnosed
+    // rather than passed to `getSingleEntryPointIndex` below. The check runs before the
+    // downstream compiler is loaded so that the outcome does not depend on whether the
+    // compiler is installed.
+    if (isPassThroughEnabled() && getEntryPointCount() != 1)
     {
         getSink()->diagnose(Diagnostics::PassThroughRequiresEntryPoint{});
         return SLANG_FAIL;
@@ -471,11 +473,12 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         // We are just passing thru, so it's whatever it originally was
         sourceLanguage = translationUnit->sourceLanguage;
 
-        // TODO(JS): This seems like a bit of a hack
-        // That if a pass-through is being performed and the source language is Slang
-        // no downstream compiler knows how to deal with that, so probably means 'HLSL'
-        sourceLanguage =
-            (sourceLanguage == SourceLanguage::Slang) ? SourceLanguage::HLSL : sourceLanguage;
+        // A downstream compiler never consumes Slang source directly, so in pass-through mode
+        // Slang input means HLSL; `getPassThroughCompileLanguage` is the one definition of that
+        // mapping, shared with the source-language gate in
+        // `EndToEndCompileRequest::executeActionsInner`.
+        sourceLanguage = (SourceLanguage)DownstreamCompilerInfo::getPassThroughCompileLanguage(
+            (SlangSourceLanguage)sourceLanguage);
         sourceTarget = CodeGenTarget(TypeConvertUtil::getCompileTargetFromSourceLanguage(
             (SlangSourceLanguage)sourceLanguage));
 
@@ -1051,8 +1054,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
     // Extract diagnostics regardless of compile result, when there is an artifact to read them
-    // from. A downstream compiler that cannot process the input can fail without setting the
-    // output artifact, because out params are only assigned on success.
+    // from: on failure a downstream compiler may leave the output artifact unset (the contract
+    // on `IDownstreamCompiler::compile` leaves that to the implementation).
     if (artifact)
     {
         SLANG_RETURN_ON_FAIL(passthroughDownstreamDiagnostics(getSink(), compiler, artifact));
@@ -1060,6 +1063,11 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
     // Now check if compile failed
     SLANG_RETURN_ON_FAIL(compileResult);
+
+    // A compiler that reports success must have produced an output artifact; without this the
+    // association loop below would dereference a null artifact.
+    if (!artifact)
+        return SLANG_FAIL;
 
     // Copy over all of the information associated with the source into the output
     if (sourceArtifact)

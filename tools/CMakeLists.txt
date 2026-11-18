@@ -505,10 +505,13 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # export annotation, so it is not visible from outside the DLL. The unit tests
     # call it directly, so compile the .cpp again into this module without
     # publishing an internal validator as part of the stable public ABI.
+    # slang-pass-through.cpp is recompiled for the same reason: the unit tests call
+    # passthroughDownstreamDiagnostics() directly, and the function is internal to the DLL.
     target_sources(
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/source/slang/slang-pass-through.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-context.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
