@@ -5257,6 +5257,11 @@ void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
     }
 }
 
+// Splats the scalar operand of every mixed-shape Lsh/Rsh in `inst`'s subtree (including
+// global-scope initializers, not just function code) to the other operand's composite
+// shape, via the shared shift-aware helper. Deliberately only the shape: GLSL needs no
+// unsigned shift amount (it accepts signed and mixed-signedness shifts) and no
+// mixed-signedness unification, unlike the WGSL legalization of the same operators.
 static void legalizeShiftOperands(IRInst* inst)
 {
     switch (inst->getOp())
