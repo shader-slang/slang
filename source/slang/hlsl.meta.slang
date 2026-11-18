@@ -8306,12 +8306,18 @@ T acos(T x)
     {
     case cpp: __intrinsic_asm "$P_acos($0)";
     case cuda: __intrinsic_asm "$P_acos($0)";
-    case glsl: __intrinsic_asm "acos";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'acos' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "acos";
     case hlsl: __intrinsic_asm "acos";
     case metal: __intrinsic_asm "acos";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Acos $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'acos' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Acos $x
+        };
     case wgsl: __intrinsic_asm "acos";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.acos($0)";
     }
@@ -8324,12 +8330,18 @@ vector<T, N> acos(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "acos";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'acos' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "acos";
     case hlsl: __intrinsic_asm "acos";
     case metal: __intrinsic_asm "acos";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Acos $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'acos' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Acos $x
+        };
     case wgsl: __intrinsic_asm "acos";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.acos($0)";
     default:
@@ -8364,11 +8376,17 @@ T acosh(T x)
     {
     case cpp: __intrinsic_asm "$P_acosh($0)";
     case cuda: __intrinsic_asm "$P_acosh($0)";
-    case glsl: __intrinsic_asm "acosh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'acosh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "acosh";
     case metal: __intrinsic_asm "acosh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Acosh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'acosh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Acosh $x
+        };
     case wgsl: __intrinsic_asm "acosh";
     default:
         return log(x + sqrt( x * x - T(1)));
@@ -8383,11 +8401,17 @@ vector<T,N> acosh(vector<T,N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "acosh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'acosh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "acosh";
     case metal: __intrinsic_asm "acosh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Acosh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'acosh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T,N> result glsl450 Acosh $x
+        };
     case wgsl: __intrinsic_asm "acosh";
     default:
         VECTOR_MAP_UNARY(T, N, acosh, x);
@@ -8895,12 +8919,18 @@ T asin(T x)
     {
     case cpp: __intrinsic_asm "$P_asin($0)";
     case cuda: __intrinsic_asm "$P_asin($0)";
-    case glsl: __intrinsic_asm "asin";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'asin' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "asin";
     case hlsl: __intrinsic_asm "asin";
     case metal: __intrinsic_asm "asin";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Asin $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'asin' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Asin $x
+        };
     case wgsl: __intrinsic_asm "asin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.asin($0)";
     }
@@ -8913,12 +8943,18 @@ vector<T, N> asin(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "asin";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'asin' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "asin";
     case hlsl: __intrinsic_asm "asin";
     case metal: __intrinsic_asm "asin";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Asin $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'asin' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Asin $x
+        };
     case wgsl: __intrinsic_asm "asin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.asin($0)";
     default:
@@ -8953,11 +8989,17 @@ T asinh(T x)
     {
     case cpp: __intrinsic_asm "$P_asinh($0)";
     case cuda: __intrinsic_asm "$P_asinh($0)";
-    case glsl: __intrinsic_asm "asinh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'asinh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "asinh";
     case metal: __intrinsic_asm "asinh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Asinh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'asinh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Asinh $x
+        };
     case wgsl: __intrinsic_asm "asinh";
     default:
         return log(x + sqrt(x * x + T(1)));
@@ -8972,11 +9014,17 @@ vector<T,N> asinh(vector<T,N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "asinh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'asinh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "asinh";
     case metal: __intrinsic_asm "asinh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Asinh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'asinh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T,N> result glsl450 Asinh $x
+        };
     case wgsl: __intrinsic_asm "asinh";
     default:
         VECTOR_MAP_UNARY(T, N, asinh, x);
@@ -9494,12 +9542,18 @@ T atan(T x)
     {
     case cpp: __intrinsic_asm "$P_atan($0)";
     case cuda: __intrinsic_asm "$P_atan($0)";
-    case glsl: __intrinsic_asm "atan";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'atan' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "atan";
     case hlsl: __intrinsic_asm "atan";
     case metal: __intrinsic_asm "atan";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Atan $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'atan' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Atan $x
+        };
     case wgsl: __intrinsic_asm "atan";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan($0)";
     }
@@ -9512,12 +9566,18 @@ vector<T, N> atan(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "atan";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'atan' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "atan";
     case hlsl: __intrinsic_asm "atan";
     case metal: __intrinsic_asm "atan";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Atan $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'atan' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Atan $x
+        };
     case wgsl: __intrinsic_asm "atan";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan($0)";
     default:
@@ -9552,12 +9612,18 @@ T atan2(T y, T x)
     {
     case cpp: __intrinsic_asm "$P_atan2($0, $1)";
     case cuda: __intrinsic_asm "$P_atan2($0, $1)";
-    case glsl: __intrinsic_asm "atan($0,$1)";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'atan2' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "atan($0,$1)";
     case hlsl: __intrinsic_asm "atan2";
     case metal: __intrinsic_asm "atan2";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Atan2 $y $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'atan2' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Atan2 $y $x
+        };
     case wgsl: __intrinsic_asm "atan2";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan2($0, $1)";
     }
@@ -9570,12 +9636,18 @@ vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "atan($0,$1)";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'atan2' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "atan($0,$1)";
     case hlsl: __intrinsic_asm "atan2";
     case metal: __intrinsic_asm "atan2";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Atan2 $y $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'atan2' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Atan2 $y $x
+        };
     case wgsl: __intrinsic_asm "atan2";
     default:
         VECTOR_MAP_BINARY(T, N, atan2, y, x);
@@ -9609,11 +9681,17 @@ T atanh(T x)
     {
     case cpp: __intrinsic_asm "$P_atanh($0)";
     case cuda: __intrinsic_asm "$P_atanh($0)";
-    case glsl: __intrinsic_asm "atanh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'atanh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "atanh";
     case metal: __intrinsic_asm "atanh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Atanh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'atanh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Atanh $x
+        };
     case wgsl: __intrinsic_asm "atanh";
     default:
         return T(0.5) * log((T(1) + x) / (T(1) - x));
@@ -9628,11 +9706,17 @@ vector<T,N> atanh(vector<T,N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "atanh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'atanh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "atanh";
     case metal: __intrinsic_asm "atanh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Atanh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'atanh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T,N> result glsl450 Atanh $x
+        };
     case wgsl: __intrinsic_asm "atanh";
     default:
         VECTOR_MAP_UNARY(T, N, atanh, x);
@@ -9996,12 +10080,18 @@ T cos(T x)
     {
     case cpp: __intrinsic_asm "$P_cos($0)";
     case cuda: __intrinsic_asm "$P_cos($0)";
-    case glsl: __intrinsic_asm "cos";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'cos' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
     case metal: __intrinsic_asm "cos";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Cos $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'cos' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Cos $x
+        };
     case wgsl: __intrinsic_asm "cos";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
     }
@@ -10014,12 +10104,18 @@ vector<T, N> cos(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "cos";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'cos' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
     case metal: __intrinsic_asm "cos";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Cos $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'cos' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Cos $x
+        };
     case wgsl: __intrinsic_asm "cos";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
     default:
@@ -10053,12 +10149,18 @@ T cosh(T x)
     {
     case cpp: __intrinsic_asm "$P_cosh($0)";
     case cuda: __intrinsic_asm "$P_cosh($0)";
-    case glsl: __intrinsic_asm "cosh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'cosh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "cosh";
     case hlsl: __intrinsic_asm "cosh";
     case metal: __intrinsic_asm "cosh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Cosh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'cosh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Cosh $x
+        };
     case wgsl: __intrinsic_asm "cosh";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.cosh($0)";
     }
@@ -10071,12 +10173,18 @@ vector<T,N> cosh(vector<T,N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "cosh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'cosh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "cosh";
     case hlsl: __intrinsic_asm "cosh";
     case metal: __intrinsic_asm "cosh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Cosh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'cosh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T,N> result glsl450 Cosh $x
+        };
     case wgsl: __intrinsic_asm "cosh";
     default:
         VECTOR_MAP_UNARY(T,N, cosh, x);
@@ -10544,11 +10652,17 @@ T degrees(T x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "degrees";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'degrees' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "degrees";
     case hlsl: __intrinsic_asm "degrees";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Degrees $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'degrees' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Degrees $x
+        };
     case wgsl: __intrinsic_asm "degrees";
     default:
         return x * (T(180) / T.getPi());
@@ -10562,11 +10676,17 @@ vector<T, N> degrees(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "degrees";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'degrees' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "degrees";
     case hlsl: __intrinsic_asm "degrees";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Degrees $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'degrees' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Degrees $x
+        };
     case wgsl: __intrinsic_asm "degrees";
     default:
         VECTOR_MAP_UNARY(T, N, degrees, x);
@@ -11343,12 +11463,18 @@ T exp(T x)
     {
     case cpp: __intrinsic_asm "$P_exp($0)";
     case cuda: __intrinsic_asm "$P_exp($0)";
-    case glsl: __intrinsic_asm "exp";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'exp' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "exp";
     case hlsl: __intrinsic_asm "exp";
     case metal: __intrinsic_asm "exp";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Exp $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'exp' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Exp $x
+        };
     case wgsl: __intrinsic_asm "exp";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
     }
@@ -11362,12 +11488,18 @@ vector<T, N> exp(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "exp";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'exp' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "exp";
     case hlsl: __intrinsic_asm "exp";
     case metal: __intrinsic_asm "exp";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Exp $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'exp' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Exp $x
+        };
     case wgsl: __intrinsic_asm "exp";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
     default:
@@ -13389,12 +13521,18 @@ T log(T x)
     {
     case cpp: __intrinsic_asm "$P_log($0)";
     case cuda: __intrinsic_asm "$P_log($0)";
-    case glsl: __intrinsic_asm "log";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'log' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "log";
     case hlsl: __intrinsic_asm "log";
     case metal: __intrinsic_asm "log";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Log $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'log' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Log $x
+        };
     case wgsl: __intrinsic_asm "log";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log($0)";
     }
@@ -13407,12 +13545,18 @@ vector<T, N> log(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "log";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'log' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "log";
     case hlsl: __intrinsic_asm "log";
     case metal: __intrinsic_asm "log";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Log $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'log' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Log $x
+        };
     case wgsl: __intrinsic_asm "log";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log($0)";
     default:
@@ -13447,10 +13591,15 @@ T log10(T x)
     case hlsl: __intrinsic_asm "log10";
     case metal: __intrinsic_asm "log10";
     case wgsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
-    case glsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'log10' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
     case cuda: __intrinsic_asm "$P_log10($0)";
     case cpp: __intrinsic_asm "$P_log10($0)";
     case spirv:
+        static_assert(!__isDouble<T>(),
+            "'log10' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
     {
         const T tmp = T(0.43429448190325182765112891891661);
         return spirv_asm {
@@ -13472,8 +13621,13 @@ vector<T,N> log10(vector<T,N> x)
     case hlsl: __intrinsic_asm "log10";
     case metal: __intrinsic_asm "log10";
     case wgsl: __intrinsic_asm "(log( $0 ) * $S0(0.43429448190325182765112891891661) )";
-    case glsl: __intrinsic_asm "(log( $0 ) * $S0(0.43429448190325182765112891891661) )";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'log10' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "(log( $0 ) * $S0(0.43429448190325182765112891891661) )";
     case spirv:
+        static_assert(!__isDouble<T>(),
+            "'log10' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
     {
         const T tmp = T(0.43429448190325182765112891891661);
         return spirv_asm {
@@ -13513,12 +13667,18 @@ T log2(T x)
     {
     case cpp: __intrinsic_asm "$P_log2($0)";
     case cuda: __intrinsic_asm "$P_log2($0)";
-    case glsl: __intrinsic_asm "log2";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'log2' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "log2";
     case hlsl: __intrinsic_asm "log2";
     case metal: __intrinsic_asm "log2";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Log2 $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'log2' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Log2 $x
+        };
     case wgsl: __intrinsic_asm "log2";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log2($0)";
     }
@@ -13531,12 +13691,18 @@ vector<T,N> log2(vector<T,N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "log2";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'log2' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "log2";
     case hlsl: __intrinsic_asm "log2";
     case metal: __intrinsic_asm "log2";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Log2 $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'log2' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T,N> result glsl450 Log2 $x
+        };
     case wgsl: __intrinsic_asm "log2";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log2($0)";
     default:
@@ -15240,12 +15406,18 @@ T pow(T x, T y)
     {
     case cpp: __intrinsic_asm "$P_pow($0, $1)";
     case cuda: __intrinsic_asm "$P_pow($0, $1)";
-    case glsl: __intrinsic_asm "pow";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'pow' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "pow";
     case hlsl: __intrinsic_asm "pow";
     case metal: __intrinsic_asm "pow";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Pow $x $y
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'pow' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Pow $x $y
+        };
     case wgsl: __intrinsic_asm "pow";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
     }
@@ -15258,12 +15430,18 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "pow";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'pow' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "pow";
     case hlsl: __intrinsic_asm "pow";
     case metal: __intrinsic_asm "pow";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Pow $x $y
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'pow' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Pow $x $y
+        };
     case wgsl: __intrinsic_asm "pow";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
     default:
@@ -15460,11 +15638,17 @@ T radians(T x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "radians";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'radians' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "radians";
     case hlsl: __intrinsic_asm "radians";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Radians $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'radians' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Radians $x
+        };
     case wgsl: __intrinsic_asm "radians";
     default:
         return x * (T.getPi() / T(180.0f));
@@ -15478,11 +15662,17 @@ vector<T, N> radians(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "radians";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'radians' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "radians";
     case hlsl: __intrinsic_asm "radians";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Radians $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'radians' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Radians $x
+        };
     case wgsl: __intrinsic_asm "radians";
     default:
         return x * (T.getPi() / T(180.0f));
@@ -16063,12 +16253,18 @@ T sin(T x)
     {
     case cpp: __intrinsic_asm "$P_sin($0)";
     case cuda: __intrinsic_asm "$P_sin($0)";
-    case glsl: __intrinsic_asm "sin";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'sin' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
     case metal: __intrinsic_asm "sin";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Sin $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'sin' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Sin $x
+        };
     case wgsl: __intrinsic_asm "sin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
     }
@@ -16081,12 +16277,18 @@ vector<T, N> sin(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "sin";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'sin' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
     case metal: __intrinsic_asm "sin";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Sin $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'sin' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Sin $x
+        };
     case wgsl: __intrinsic_asm "sin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
     default:
@@ -16217,12 +16419,18 @@ T sinh(T x)
     {
     case cpp: __intrinsic_asm "$P_sinh($0)";
     case cuda: __intrinsic_asm "$P_sinh($0)";
-    case glsl: __intrinsic_asm "sinh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'sinh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "sinh";
     case hlsl: __intrinsic_asm "sinh";
     case metal: __intrinsic_asm "sinh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Sinh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'sinh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Sinh $x
+        };
     case wgsl: __intrinsic_asm "sinh";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sinh($0)";
     }
@@ -16235,12 +16443,18 @@ vector<T, N> sinh(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "sinh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'sinh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "sinh";
     case hlsl: __intrinsic_asm "sinh";
     case metal: __intrinsic_asm "sinh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Sinh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'sinh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Sinh $x
+        };
     case wgsl: __intrinsic_asm "sinh";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sinh($0)";
     default:
@@ -16476,12 +16690,18 @@ T tan(T x)
     {
     case cpp: __intrinsic_asm "$P_tan($0)";
     case cuda: __intrinsic_asm "$P_tan($0)";
-    case glsl: __intrinsic_asm "tan";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'tan' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "tan";
     case hlsl: __intrinsic_asm "tan";
     case metal: __intrinsic_asm "tan";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Tan $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'tan' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Tan $x
+        };
     case wgsl: __intrinsic_asm "tan";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.tan($0)";
     }
@@ -16494,12 +16714,18 @@ vector<T, N> tan(vector<T, N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "tan";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'tan' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "tan";
     case hlsl: __intrinsic_asm "tan";
     case metal: __intrinsic_asm "tan";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T, N> result glsl450 Tan $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'tan' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T, N> result glsl450 Tan $x
+        };
     case wgsl: __intrinsic_asm "tan";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.tan($0)";
     default:
@@ -16533,12 +16759,18 @@ T tanh(T x)
     {
     case cpp: __intrinsic_asm "$P_tanh($0)";
     case cuda: __intrinsic_asm "$P_tanh($0)";
-    case glsl: __intrinsic_asm "tanh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'tanh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "tanh";
     case hlsl: __intrinsic_asm "tanh";
     case metal: __intrinsic_asm "tanh";
-    case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 Tanh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'tanh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$T result glsl450 Tanh $x
+        };
     case wgsl: __intrinsic_asm "tanh";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.tanh($0)";
     }
@@ -16551,12 +16783,18 @@ vector<T,N> tanh(vector<T,N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "tanh";
+    case glsl:
+        static_assert(!__isDouble<T>(),
+            "'tanh' of a 'double' is not supported for the 'glsl' target (including SPIR-V via '-emit-spirv-via-glsl'). GLSL has no double-precision overload of this operation; compute in 'float', or use a target that supports it (CUDA, C++).");
+        __intrinsic_asm "tanh";
     case hlsl: __intrinsic_asm "tanh";
     case metal: __intrinsic_asm "tanh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 Tanh $x
-    };
+    case spirv:
+        static_assert(!__isDouble<T>(),
+            "'tanh' of a 'double' is not supported for the 'spirv' target. The GLSL.std.450 instruction for this operation is defined only for 16/32-bit floats; compute in 'float', or use a target that supports it (CUDA, C++).");
+        return spirv_asm {
+            OpExtInst $$vector<T,N> result glsl450 Tanh $x
+        };
     case wgsl: __intrinsic_asm "tanh";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.tanh($0)";
     default:
