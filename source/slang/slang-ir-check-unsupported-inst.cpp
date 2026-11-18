@@ -573,7 +573,11 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
 // -minimum-slang-optimization because a failure they miss still surfaces in the downstream
 // Metal compiler, while this one guards an abort that happens inside the Slang process, so
 // minimum-optimization mode must still reject it. Like the Metal checks, we visit only
-// top-level function bodies; a generic that remains at this point is not emitted (the Metal
+// top-level function bodies. The one other code shape the emitter lowers — a global variable's
+// initializer block (emitGlobalInstructionCtor) — cannot hold an atomic here: an atomic in a
+// static initializer is dropped before the emit-time IR, leaving the synthesized constructor
+// body empty, so the scan would find nothing in it. A generic that remains at this point is not
+// emitted (the Metal
 // checks' second reason — unspecialized address spaces in such bodies — does not apply: no
 // address-space specialization runs on this path at all). The scan covers atomic operations
 // only; barrier ops also lack emitter support and still abort until the LLVM backend implements
