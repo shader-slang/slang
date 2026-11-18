@@ -426,6 +426,11 @@ struct ShaderInputLayoutParser
         else if (word == "format")
         {
             val->bufferDesc.format = parseFormatOption(parser);
+
+            if (val->bufferDesc.format == Format::Undefined)
+            {
+                return SLANG_FAIL;
+            }
         }
         else
         {
