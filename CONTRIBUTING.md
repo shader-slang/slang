@@ -258,7 +258,7 @@ For a quick reference, follow the instructions below.
 
 #### Linux
 
-1. Install VulkanSDK by following the [Instructions from LunarG](https://vulkan.lunarg.com/doc/view/latest/linux/getting_started_ubuntu.html).
+1. Install VulkanSDK by following the [Instructions from LunarG](https://vulkan.lunarg.com/doc/view/latest/linux/getting_started.html).
    ```
    $ sudo apt update
    $ sudo apt install vulkan-sdk
