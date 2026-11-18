@@ -1,10 +1,11 @@
-// TODO(JS):
-// NOTE we can't test on VK/gl at the moment because we don't support intrinsics over matrices on that target currently
+// NOTE the vk target runs (matrix `%` for the via-GLSL path is covered by
+// tests/glsl/test-14591.slang); WGSL stays disabled below (integer matrices,
+// double, and other unsupported scalar types).
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj -render-feature hardware-device
-//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
 // Not supported in WGSL: Integer matrices, Double and other unsupported scalar types
