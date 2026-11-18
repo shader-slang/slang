@@ -3556,12 +3556,12 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
 ///
 /// A FileCheck test or a diagnostic test only looks at the text of the output, so it does not
 /// notice when the tool fails, or when it does not fail. The expected exit code is 0 for a
-/// FileCheck test and -1 (a failed compilation) for a diagnostic test (`diag=`), because a
+/// FileCheck test and 2 (a failed compilation) for a diagnostic test (`diag=`), because a
 /// diagnostic test usually checks an error. A test that expects another value says so with
 /// `exit-code=N`, for example a diagnostic test that has only warnings uses `exit-code=0`. N must
-/// be 0 (success), -1 (the compilation failed because of errors in the input) or 1 (the command
-/// line was invalid, or the tool failed to run), as in the exit codes that `slangc -help` lists.
-/// The test fails for another value. The exit code -2 is never an expected result, because it
+/// be 0 (success), 1 (the command line was invalid, or the tool failed to run) or 2 (the
+/// compilation failed because of errors in the input), as in the exit codes that `slangc -help`
+/// lists. The test fails for another value. The exit code 3 is never an expected result, because it
 /// reports an internal compiler error, which is a bug in the compiler.
 /// Tests that compare with an `.expected` file do not need this check, because the result code is
 /// a part of the text they compare.
@@ -3584,7 +3584,8 @@ static bool _checkExpectedExitCode(
 
     auto reporter = context->getTestReporter();
 
-    int expectedExitCode = isDiagTest ? -1 : 0;
+    int expectedExitCode =
+        isDiagTest ? int(ToolReturnCode::CompilationFailed) : int(ToolReturnCode::Success);
     String exitCodeOption;
     if (input.testOptions->commandOptions.tryGetValue("exit-code", exitCodeOption))
     {
@@ -3593,23 +3594,24 @@ static bool _checkExpectedExitCode(
         {
             reporter->message(
                 TestMessageType::TestFailure,
-                "the value of `exit-code` must be -1, 0 or 1");
+                "the value of `exit-code` must be 0, 1 or 2");
             return false;
         }
         if (parsedExitCode == int(ToolReturnCode::InternalCompilerError))
         {
             reporter->message(
                 TestMessageType::TestFailure,
-                "`exit-code=-2` is not allowed, because -2 reports an internal compiler error. "
+                "`exit-code=3` is not allowed, because 3 reports an internal compiler error. "
                 "A test must never expect an internal compiler error. Fix the compiler bug "
                 "instead");
             return false;
         }
-        if (parsedExitCode < -1 || parsedExitCode > 1)
+        if (parsedExitCode < int(ToolReturnCode::Success) ||
+            parsedExitCode > int(ToolReturnCode::CompilationFailed))
         {
             reporter->message(
                 TestMessageType::TestFailure,
-                "the value of `exit-code` must be -1, 0 or 1");
+                "the value of `exit-code` must be 0, 1 or 2");
             return false;
         }
         expectedExitCode = int(parsedExitCode);
@@ -5553,7 +5555,7 @@ TestResult skipTest(TestContext* /* context */, TestInput& /*input*/)
 //   //TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
 //
 // The args are forwarded to slangc (after -target spirv -g2 -o <stem>.spv).
-// libspvdb is vendored at tests/spvdb and is always linked in when slang-test
+// libspvdb is vendored at tools/spvdb and is always linked in when slang-test
 // is built (see the SLANG_ENABLE_SPVDB block in tools/CMakeLists.txt).
 // ---------------------------------------------------------------------------
 

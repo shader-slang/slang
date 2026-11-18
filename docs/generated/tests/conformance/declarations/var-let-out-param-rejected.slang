@@ -13,7 +13,7 @@
 // Passing immutable `x` to `fill(out int v)` must trigger E30047; CHECK-DAG
 // confirms both the error severity and the diagnostic code.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK, exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK, exit-code=2):
 
 void fill(out int v) { v = 99; }
 

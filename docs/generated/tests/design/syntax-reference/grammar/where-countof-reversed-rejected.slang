@@ -12,7 +12,7 @@
 // Verifies `3 == countof(T)` is recognized only to emit the targeted
 // diagnostic; CHECK asserts E30437.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl
 
 void f<each T>(expand each T t) where 3 == countof(T) {}
 

@@ -956,6 +956,14 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             }
         }
 
+        // The generated code needs the OptiX headers for ray-tracing stages, and for compute
+        // code that uses OptiX cooperative vectors (`optix_coopvec` capability).
+        if (options.pipelineType == DownstreamCompileOptions::PipelineType::RayTracing ||
+            getTargetCaps().implies(CapabilityAtom::optix_coopvec))
+        {
+            options.flags |= DownstreamCompileOptions::Flag::RequiresOptix;
+        }
+
         // Add all the search paths (as calculated earlier - they will only be set if this is a pass
         // through else will be empty)
         options.includePaths = allocator.allocate(includePaths);

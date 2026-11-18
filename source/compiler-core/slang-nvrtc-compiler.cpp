@@ -1428,15 +1428,22 @@ SlangResult NVRTCDownstreamCompiler::compile(
     List<const char*> headers;
     List<const char*> headerIncludeNames;
 
-    // If compiling for OptiX, we need to add the appropriate search paths to the
-    // command line.
+    // OptiX needs `--relocatable-device-code=true` only for ray-tracing pipelines. A compute
+    // shader that uses OptiX cooperative vectors needs the headers but not this flag.
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
         // OptiX requires this flag (OptiX Programming Guide, section 6.1). It prevents the compiler
         // from removing callables as dead code.
         cmdLine.addArg("--relocatable-device-code=true");
+    }
 
+    // If the code needs OptiX, we need to add the appropriate search paths to the
+    // command line.
+    //
+    if (options.pipelineType == PipelineType::RayTracing ||
+        (options.flags & DownstreamCompileOptions::Flag::RequiresOptix))
+    {
         if (SLANG_FAILED(_maybeAddOptixSupport(options, cmdLine, diagnostics)))
         {
             diagnostics->setResult(SLANG_FAIL);

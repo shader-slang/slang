@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -entry computeMain -profile cs_5_0 -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -entry computeMain -profile cs_5_0 -target hlsl
 RWStructuredBuffer<uint> outputBuffer;
 
 // CHECK: divide by zero

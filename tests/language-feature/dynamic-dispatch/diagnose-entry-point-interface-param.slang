@@ -2,13 +2,13 @@
 // to generate dispatch code. Without any registered conformances, the compiler
 // cannot determine which concrete types may be passed and must reject the code.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cpp -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cuda -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cpp -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cuda -stage compute -entry computeMain
 
 [anyValueSize(16)]
 interface IFoo
