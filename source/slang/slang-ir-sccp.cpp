@@ -1,6 +1,7 @@
 // slang-ir-sccp.cpp
 #include "slang-ir-sccp.h"
 
+#include "core/slang-math-int-ops.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-translate.h"
 #include "slang-ir.h"
@@ -9,6 +10,34 @@
 namespace Slang
 {
 
+/// Return the `MathIntType` of the IR integer type with opcode `op`. Pointer-sized integer
+/// types are 64 bits wide.
+static MathIntType getMathIntTypeOfIRIntType(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Int8Type:
+        return MathIntType::Int8Type;
+    case kIROp_Int16Type:
+        return MathIntType::Int16Type;
+    case kIROp_IntType:
+        return MathIntType::Int32Type;
+    case kIROp_Int64Type:
+    case kIROp_IntPtrType:
+        return MathIntType::Int64Type;
+    case kIROp_UInt8Type:
+        return MathIntType::UInt8Type;
+    case kIROp_UInt16Type:
+        return MathIntType::UInt16Type;
+    case kIROp_UIntType:
+        return MathIntType::UInt32Type;
+    case kIROp_UInt64Type:
+    case kIROp_UIntPtrType:
+        return MathIntType::UInt64Type;
+    default:
+        SLANG_UNEXPECTED("not an IR integer type");
+    }
+}
 
 // This file implements the Spare Conditional Constant Propagation (SCCP) optimization.
 //
@@ -355,8 +384,18 @@ struct SCCPContext
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
-                resultVal =
-                    getBuilder()->getIntValue(type, (IRIntegerValue)irConstant->value.floatVal);
+                {
+                    // A float value whose truncation does not fit in the destination type
+                    // converts to a target-defined value, and converting it in C++ would be
+                    // undefined behavior. For example, `(uint64_t)9223372036854775808.0` fits,
+                    // but `(IRIntegerValue)` of 2^63 does not. We leave such a cast unfolded.
+                    const MathIntResult res = MathIntOps::convertFloatValue(
+                        getMathIntTypeOfIRIntType(type->getOp()),
+                        irConstant->value.floatVal);
+                    if (res.flags & MathIntResult::TargetDefined)
+                        return LatticeVal::getAny();
+                    resultVal = getBuilder()->getIntValue(type, res.value.getSignedValue());
+                }
                 break;
             case kIROp_IntLit:
             case kIROp_BoolLit:
@@ -869,7 +908,11 @@ struct SCCPContext
         case kIROp_UIntType:
         case kIROp_UInt64Type:
         case kIROp_UIntPtrType:
-            resultVal = getBuilder()->getIntValue(type, -c0->value.intVal);
+            // We negate in `uint64_t`, which wraps, so that negating `INT64_MIN` gives
+            // `INT64_MIN` instead of signed-overflow undefined behavior.
+            resultVal = getBuilder()->getIntValue(
+                type,
+                IRIntegerValue(uint64_t(0) - uint64_t(c0->value.intVal)));
             break;
         case kIROp_FloatType:
         case kIROp_DoubleType:
