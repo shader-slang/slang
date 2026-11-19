@@ -11,7 +11,7 @@ anchored to
 
 Audience: nightly CI. The bundle exercises the **per-target layout IR
 module** built by `TargetProgram::createIRModuleForLayout` in
-[slang-lower-to-ir.cpp](../../../../../source/slang/slang-lower-to-ir.cpp).
+[slang-lower-to-ir.cpp](../../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp).
 The layout-IR module is a sibling of the executable IR module
 documented in [pipeline-04b-pre-link-passes.md](pipeline-04b-pre-link-passes.md); its
 only job is to carry `IRLayoutDecoration`s on stub globals and
@@ -199,10 +199,10 @@ in `README.md`.
 
 ## Source files you may consult for _verification only_
 
-- `source/slang/slang-lower-to-ir.cpp` (`createIRModuleForLayout`,
+- `source/slang/lower-to-ir/slang-lower-to-ir.cpp` (`createIRModuleForLayout`,
   for the actual construction sequence and surrounding context)
 - `source/slang/slang-target-program.h` (cache field, lazy accessor)
-- `source/slang/slang-parameter-binding.cpp` (produces `ProgramLayout`)
+- `source/slang/layout-and-binding/slang-parameter-binding.cpp` (produces `ProgramLayout`)
 
 You may **not** mine these for behavioural claims that the doc
 does not make.

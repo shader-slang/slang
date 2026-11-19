@@ -15,7 +15,7 @@ adding a new IR opcode that the lowering step must produce.
 1. `# AST-to-IR Lowering` (title)
 2. `## Inputs and outputs` — checked AST → `IRModule`.
 3. `## Lowering driver` — describe the entry point in
-   [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp);
+   [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp);
    how the lowering visitor walks decls, stmts, exprs, types and emits
    IR via `IRBuilder`.
 4. `## IRBuilder and instruction creation` — briefly explain the

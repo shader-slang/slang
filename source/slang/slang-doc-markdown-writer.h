@@ -2,9 +2,9 @@
 #ifndef SLANG_DOC_MARKDOWN_WRITER_H
 #define SLANG_DOC_MARKDOWN_WRITER_H
 
-#include "slang-ast-print.h"
 #include "slang-compiler.h"
 #include "slang-doc-ast.h"
+#include "slang/ast/slang-ast-print.h"
 
 namespace Slang
 {

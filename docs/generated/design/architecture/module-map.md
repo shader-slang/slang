@@ -118,17 +118,17 @@ lives in the [pipeline](../pipeline) and
 | Linkage | `slang-session.h`, `slang-session.cpp` | The class behind the public `slang::ISession` — a per-configuration scope owning search paths, target settings, and the source manager |
 | Linkable components | `slang-linkable.h`, `slang-linkable.cpp`, `slang-linkable-impls.h`, `slang-linkable-impls.cpp` | `IComponentType` and its composite / specialized variants — the linkable-program abstraction used by the back-end |
 | Session (global) | `slang-global-session.h`, `slang-global-session.cpp` | Global-session-scoped `Session` class behind `slang::IGlobalSession` |
-| Name lookup | [slang-lookup.h](../../../../source/slang/slang-lookup.h), `slang-lookup.cpp`, `slang-lookup-spirv.h` | Scope and member lookup filtered by a `LookupMask` of declaration kinds |
+| Name lookup | [slang-lookup.h](../../../../source/slang/semantic-checking/slang-lookup.h), `slang-lookup.cpp`, `slang-lookup-spirv.h` | Scope and member lookup filtered by a `LookupMask` of declaration kinds |
 | Name mangling | [slang-mangle.h](../../../../source/slang/slang-mangle.h), `slang-mangle.cpp` | Mangled linkage names for declarations and their hashed forms |
-| Parameter binding and layout | [slang-parameter-binding.h](../../../../source/slang/slang-parameter-binding.h), `slang-parameter-binding.cpp`, [slang-type-layout.h](../../../../source/slang/slang-type-layout.h), `slang-type-layout.cpp` | Assigns binding locations or registers to shader parameters, using the per-target layout rules for types |
+| Parameter binding and layout | [slang-parameter-binding.h](../../../../source/slang/layout-and-binding/slang-parameter-binding.h), `slang-parameter-binding.cpp`, [slang-type-layout.h](../../../../source/slang/layout-and-binding/slang-type-layout.h), `slang-type-layout.cpp` | Assigns binding locations or registers to shader parameters, using the per-target layout rules for types |
 | Bytecode interpreter | [slang-vm.h](../../../../source/slang/slang-vm.h), `slang-vm.cpp`, `slang-vm-bytecode.h`, `slang-vm-bytecode.cpp`, `slang-vm-inst-impl.h`, `slang-vm-inst-impl.cpp` | `ByteCodeInterpreter` and the bytecode format that executes the VM emitter's output |
 
 ### Frontend (lex / preprocess / parse)
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| Preprocessor | [slang-preprocessor.h](../../../../source/slang/slang-preprocessor.h), [slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp) | `#include`, macros, conditional directives |
-| Parser | [slang-parser.h](../../../../source/slang/slang-parser.h), [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) | Recursive-descent parser that produces the AST; two-stage model |
+| Preprocessor | [slang-preprocessor.h](../../../../source/slang/preprocessor/slang-preprocessor.h), [slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp) | `#include`, macros, conditional directives |
+| Parser | [slang-parser.h](../../../../source/slang/parser/slang-parser.h), [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) | Recursive-descent parser that produces the AST; two-stage model |
 | Syntax declarations | `slang-syntax.h`, `slang-syntax.cpp` | Syntax-as-declaration: keyword → parser-callback registry |
 
 ### AST
@@ -159,11 +159,11 @@ visitor and serialization support. One logical unit per node family.
 ### Semantic checking
 
 One file per checking concern; all collaborate through
-[slang-check-impl.h](../../../../source/slang/slang-check-impl.h).
+[slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h).
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| Top-level driver | [slang-check.h](../../../../source/slang/slang-check.h), [slang-check.cpp](../../../../source/slang/slang-check.cpp) | Visitor orchestration; entry point for AST checking |
+| Top-level driver | [slang-check.h](../../../../source/slang/semantic-checking/slang-check.h), [slang-check.cpp](../../../../source/slang/slang-check.cpp) | Visitor orchestration; entry point for AST checking |
 | Internal interface | `slang-check-impl.h` | Shared state passed between check files |
 | Declaration checking | `slang-check-decl.cpp` | Resolves and validates `Decl` nodes |
 | Expression checking | `slang-check-expr.cpp` | Type-checks `Expr` nodes |
@@ -183,14 +183,14 @@ One file per checking concern; all collaborate through
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| Lowering driver | [slang-lower-to-ir.h](../../../../source/slang/slang-lower-to-ir.h), [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | Walks the checked AST and emits IR via `IRBuilder` |
+| Lowering driver | [slang-lower-to-ir.h](../../../../source/slang/lower-to-ir/slang-lower-to-ir.h), [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp) | Walks the checked AST and emits IR via `IRBuilder` |
 
 ### IR core
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| IR types and instructions | [slang-ir.h](../../../../source/slang/slang-ir.h), [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) | `IRInst`, `IRModule`, `IRBuilder`, traversal helpers |
-| Instruction definitions | [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h), [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) | Lua-driven catalog of opcodes; see [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md) |
+| IR types and instructions | [slang-ir.h](../../../../source/slang/ir/slang-ir.h), [slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) | `IRInst`, `IRModule`, `IRBuilder`, traversal helpers |
+| Instruction definitions | [slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h), [slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua) | Lua-driven catalog of opcodes; see [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md) |
 
 ### IR passes
 

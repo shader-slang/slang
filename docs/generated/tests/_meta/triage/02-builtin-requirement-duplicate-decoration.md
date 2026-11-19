@@ -74,7 +74,7 @@ if (!requirementKey->findDecoration<IRBuiltinRequirementDecoration>())
     builder->addBuiltinRequirementDecoration(requirementKey, (IRIntegerValue)builtinRole);
 ```
 
-— `source/slang/slang-lower-to-ir.cpp:1817-1820`
+— `source/slang/lower-to-ir/slang-lower-to-ir.cpp:1817-1820`
 
 `addBuiltinRequirementDecoration` has exactly one caller in the tree
 (confirmed by grep over `source/`), so a second _add_ is not the obvious

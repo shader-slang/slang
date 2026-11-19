@@ -152,7 +152,7 @@ in [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h):
   range. The same enum reports the two malformed cases,
   `BadSignificand` and `BadSuffix`, with `outErrorContent` carrying the
   offending text; the parser's `parseFloatingPointLiteralExpr`
-  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+  ([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) line
   9098) turns them into `InvalidFloatingPointLiteralNumber` and
   `InvalidFloatingPointLiteralSuffix` (lines 9131-9143), the only
   caller in the watched sources. `outIsOutOfRange` means the result is
@@ -213,9 +213,9 @@ and malformed UTF-8 is rejected again. The diagnostics are defined in
 ## Preprocessor
 
 Implemented in
-[source/slang/slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp);
+[source/slang/preprocessor/slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp);
 public surface in
-[slang-preprocessor.h](../../../../source/slang/slang-preprocessor.h).
+[slang-preprocessor.h](../../../../source/slang/preprocessor/slang-preprocessor.h).
 
 The `Preprocessor` is configured through `PreprocessorDesc`, which
 takes:
@@ -247,7 +247,7 @@ parameter reference is compiled to a parameter op (`ExpandedParam`,
 `UnexpandedParam`, or `StringizedParam`) carrying the parameter index.
 At invocation, `MacroInvocation` replays the matching argument's token
 range by index (`_getArgTokens`,
-[slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)),
+[slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)),
 wrapping it in an `ExpansionInputStream` for the `ExpandedParam` case so
 argument tokens are themselves macro-expanded — there is no per-invocation
 environment of pseudo-macros.
@@ -273,7 +273,7 @@ the conditional directives (`#if`, `#ifdef`, `#ifndef`, `#else`,
 
 Directives are looked up by name in a callback table, so adding one is
 a matter of registering a new callback in
-[slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp).
+[slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp).
 The `kDirectives` table holds the C / HLSL-style set (`#if` and friends, `#include`,
 `#define`, `#undef`, `#warning`, `#error`, `#line`, `#pragma`) plus
 the Slang language-selection directives `#language` / `#lang` and the
@@ -293,7 +293,7 @@ followed by a version —
 through its `SourceLanguageDirective` out-parameter (language, the
 location of the first directive, and the Slang version) and the
 version through `outLanguageVersion`
-([slang-preprocessor.h](../../../../source/slang/slang-preprocessor.h)).
+([slang-preprocessor.h](../../../../source/slang/preprocessor/slang-preprocessor.h)).
 Only the first selection in a source segment is kept:
 `_tryApplySourceLanguageDirective` (line 4516) diagnoses a later
 directive naming a different language
@@ -351,7 +351,7 @@ naming no object-like macro evaluates to `0` after the
 [slang-include-system.cpp](../../../../source/compiler-core/slang-include-system.cpp),
 which consults the `Linkage`'s search paths. For angle-form includes,
 `HandleIncludeDirective`
-([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp))
+([slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp))
 concatenates the raw tokens between `OpLess` and `OpGreater` into the
 path string and selects `IncludeSystem::Mode::System`; quoted includes
 take the path from a single `StringLiteral` token. Resolution returns a
@@ -362,7 +362,7 @@ that file. The handler's `handleFileDependency` callback records dependencies.
 
 `#pragma warning(push/pop/disable/...)` state is tracked by a
 `WarningStateTracker`
-([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)),
+([slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)),
 which records, per diagnostic id, a timeline keyed on an absolute
 source-location axis. Because each `__include`d file is preprocessed in
 its own `preprocessSource` pass with a fresh `Preprocessor`, the
@@ -383,7 +383,7 @@ source locations are chosen differently:
    definition. Their `SourceLoc` is the location of the corresponding
    token in the macro *definition*, replayed by
    `MacroInvocation::readToken`
-   ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)).
+   ([slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)).
    No new `SourceView` is created for the invocation, so such a
    diagnostic points into the macro body rather than at the call site.
 2. **Argument tokens** — tokens taken from the call-site argument
@@ -397,7 +397,7 @@ source locations are chosen differently:
    where the category-1 rule would put it.
 3. **Constructed tokens** — synthesized fresh, with three different
    source-location rules
-   ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)):
+   ([slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)):
    - *Builtins* (`__LINE__`, `__FILE__`) are pushed by
      `_pushStreamForSourceLocBuiltin`, which gives the synthesized token
      `m_macroInvocationLoc`, attributing it to the invocation site (the
@@ -452,7 +452,7 @@ long as the view's `PathInfo::Type` is `TokenPaste`, emitting a
   invocation can expand to no tokens, and an unclosed conditional is
   diagnosed once per still-open conditional at end-of-file, as
   `EndOfFileInPreprocessorConditional`
-  ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+  ([slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)
   line 4836). The stray closer is a separate diagnostic,
   `DirectiveWithoutIf` (line 3530); `CyclicInclude` fires
   when a resolved include is already open on the include stack (line

@@ -47,7 +47,7 @@ Driven by:
 
 - [slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
   (lexer)
-- [slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+- [slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)
   (preprocessor and `#include`)
 - [slang-include-system.cpp](../../../../source/compiler-core/slang-include-system.cpp)
   (path resolution)
@@ -65,7 +65,7 @@ comparison disambiguation has type information to lean on.
 
 Driven by:
 
-- [slang-parser.cpp](../../../../source/slang/slang-parser.cpp)
+- [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp)
 - the `slang-ast-*.h` headers under
   [source/slang/](../../../../source/slang) (AST data model)
 
@@ -82,10 +82,10 @@ Driven by:
 
 - [slang-check.cpp](../../../../source/slang/slang-check.cpp)
 - the per-concern files
-  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
-  [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp),
-  [slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp),
-  ..., [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
+  ([slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp),
+  [slang-check-expr.cpp](../../../../source/slang/semantic-checking/slang-check-expr.cpp),
+  [slang-check-stmt.cpp](../../../../source/slang/semantic-checking/slang-check-stmt.cpp),
+  ..., [slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp))
 
 Detail: [03-semantic-check.md](03-semantic-check.md).
 
@@ -106,8 +106,8 @@ detail doc for the mechanics.
 
 Driven by:
 
-- [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-- [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (`IRBuilder`,
+- [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
+- [slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) (`IRBuilder`,
   hoistable / global value deduplication)
 
 Detail: [04-ast-to-ir.md](04-ast-to-ir.md).

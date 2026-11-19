@@ -8,6 +8,8 @@ These documents can only be trusted to reflect the state of the codebase or the 
 
 Developers interested in contributing to Slang might want to start with the [Overview](overview.md) document, which describes the overall compilation pipeline that Slang uses and the purpose of the various steps (both implemented and planned).
 
+The [Source Organization](source-organization.md) document describes how we organize implementation concerns into directories and document their architecture, starting with the [compiler](../../source/slang/compiler.md).
+
 The [Coding Conventions](coding-conventions.md) document describes the conventions that should be followed in all code added to the Slang project.
 
 The [Interfaces](interfaces.md) document describes the high-level design plan for Slang's interfaces and generics features.

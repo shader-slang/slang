@@ -171,8 +171,8 @@ You may look at these to confirm a CLI spelling or to spot-check that
 the chunk markers in `-dump-module` output are stable. You may **not**
 mine them for behavioural claims the doc does not make.
 
-- `source/slang/slang-serialize-container.cpp` (chunk codes)
-- `source/slang/slang-ir-insts.lua` (`Unrecognized`, `module_version`)
+- `source/slang/serialization/slang-serialize-container.cpp` (chunk codes)
+- `source/slang/ir/slang-ir-insts.lua` (`Unrecognized`, `module_version`)
 - `tests/ir/dump-module.slang`, `tests/ir/dump-module-info.slang`
 - `tests/modules/multi-target-module.slang`
 - `tests/feature/source-map/emit-source-map.slang`
