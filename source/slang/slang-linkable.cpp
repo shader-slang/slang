@@ -1303,7 +1303,42 @@ ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 {
     auto astBuilder = getLinkage()->getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
-    return as<ConstantIntVal>(intVal->linkTimeResolve(getMangledNameToIntValMap()));
+    auto& map = getMangledNameToIntValMap();
+    // A single `linkTimeResolve` pass substitutes one level of exported constants: an
+    // exported constant defined in terms of another extern, e.g.
+    // `export extern static const int B = A + 1;`, still holds a symbolic factor after
+    // the first pass replaces `B` with its initializer's value. Iterate to a fixpoint:
+    // every pass either reaches one or resolves at least one not-yet-resolved extern
+    // reference, and at most `map.getCount()` distinct externs exist, so
+    // `map.getCount() + 1` passes suffice — the `+ 1` is the final pass that folds a
+    // fully-substituted polynomial into a constant. Progress is detected by object
+    // identity, which is why the `linkTimeResolve` contract requires an override to
+    // return its receiver — not an equal copy — when nothing resolved; a rebuilt-but-equal
+    // value merely consumes one pass before the next returns the receiver unchanged. The
+    // pass budget is `min(map.getCount() + 1, kMaxLinkTimeResolvePasses)`: the map-size
+    // arm alone would let thousands of padding `export const` declarations inflate the
+    // work bound, and each pass of a multiplicative chain can wrap the previous pass's
+    // polynomial into one more nesting level, so the constant cap also bounds that
+    // nesting — and the per-pass recursion through it — for adversarial input. A chain
+    // deeper than the cap, a self-referential cycle, or an intermediate that stops being
+    // an `IntVal` all simply end unresolved (the caller diagnoses the value as
+    // non-constant) instead of exhausting stack or time.
+    static constexpr Index kMaxLinkTimeResolvePasses = 64;
+    Val* result = intVal;
+    for (Index i = 0,
+               iterationLimit = Math::Min((Index)(map.getCount() + 1), kMaxLinkTimeResolvePasses);
+         i < iterationLimit;
+         i++)
+    {
+        auto intValResult = as<IntVal>(result);
+        if (!intValResult)
+            break;
+        auto resolved = intValResult->linkTimeResolve(map);
+        if (resolved == result)
+            break;
+        result = resolved;
+    }
+    return as<ConstantIntVal>(result);
 }
 
 TargetProgram* ComponentType::getTargetProgram(TargetRequest* target)

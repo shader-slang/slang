@@ -733,28 +733,61 @@ Modifier* SemanticsVisitor::validateAttribute(
         //
         // Binding attribute may also be created from GLSL style layout qualifiers where only one of
         // the args are specified, hence check for each individually.
-        ConstantIntVal* binding = nullptr;
+        // Link-time constant arguments are checked with a null diagnostic sink, so an
+        // argument that does not fold returns null silently. A present-but-invalid
+        // argument must not be treated like a never-specified one (that would silently
+        // bind at index 0), so diagnose it with the same "not a compile-time constant"
+        // error a plain constant argument gets and drop the attribute; a valid half
+        // must not survive as a partial explicit binding.
+        bool anyInvalidArgument = false;
+        IntVal* binding = nullptr;
         if (attr->args[0])
-            binding = checkConstantIntVal(attr->args[0]);
+        {
+            binding = checkLinkTimeConstantIntVal(attr->args[0]);
+            if (!binding)
+            {
+                // An argument that already reported its own error (an undefined
+                // identifier, a type error) must not be re-diagnosed here — only a
+                // checked-but-non-constant expression gets the "not a compile-time
+                // constant" error.
+                if (!IsErrorExpr(attr->args[0]))
+                    getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                        .location = attr->args[0]->loc});
+                anyInvalidArgument = true;
+            }
+        }
 
-        ConstantIntVal* set = nullptr;
+        IntVal* set = nullptr;
         if (attr->args[1])
-            set = checkConstantIntVal(attr->args[1]);
+        {
+            set = checkLinkTimeConstantIntVal(attr->args[1]);
+            if (!set)
+            {
+                if (!IsErrorExpr(attr->args[1]))
+                    getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                        .location = attr->args[1]->loc});
+                anyInvalidArgument = true;
+            }
+        }
 
-        if (!binding && !set)
+        if (anyInvalidArgument || (!binding && !set))
         {
             return nullptr;
         }
 
+        // The values are kept as `IntVal`s (rather than folded to integers here) so that
+        // link-time constants remain selectable by a linked override; parameter binding
+        // resolves them against the linked program.
+        //
+        // A missing argument is left alone rather than defaulted here: GLSL
+        // `layout(binding = N)` and `layout(set = M)` arrive as separate qualifiers that
+        // merge into one attribute and re-validate in turn, so a later pass must not
+        // clobber the value a previous pass stored. An argument that never appears on any
+        // pass keeps the field null, and consumers treat null as index 0.
         if (binding)
-        {
-            bindingAttr->binding = int32_t(binding->getValue());
-        }
-
+            bindingAttr->binding = binding;
         if (set)
-        {
-            bindingAttr->set = int32_t(set->getValue());
-        }
+            bindingAttr->set = set;
     }
     else if (auto simpleLayoutAttr = as<GLSLSimpleIntegerLayoutAttribute>(attr))
     {
@@ -2639,17 +2672,45 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     {
         if (const auto glslBindingAttribute = syntaxNode->findModifier<GLSLBindingAttribute>())
         {
-            if (glslOffsetAttribute->args.getCount() == 0)
+            // A `binding` argument that was never specified means index 0 (GLSL
+            // `layout(set = N, offset = ...)`). The offset tracker keys every offset by a
+            // concrete descriptor binding index, and checking never re-runs after linking,
+            // so a binding index that is still a symbolic link-time constant (e.g. derived
+            // from an `extern` constant) cannot participate: diagnose it and skip offset
+            // assignment for this declaration entirely — including an explicit
+            // `layout(offset = N)`, which goes through the same per-binding bookkeeping.
+            // Linking a module that defines the constant later cannot help here, so the
+            // message names the concrete-index constraint rather than the link-time
+            // remedies that `binding-attribute-requires-concrete-value` offers.
+            IntegerLiteralValue bindingIndex = 0;
+            bool canTrackOffsets = true;
+            if (auto bindingConst = as<ConstantIntVal>(glslBindingAttribute->binding))
             {
-                glslOffsetAttribute->offset = getGLSLBindingOffsetTracker()->getNextBindingOffset(
-                    glslBindingAttribute->binding);
+                bindingIndex = bindingConst->getValue();
             }
-            else if (const auto constVal = checkConstantIntVal(glslOffsetAttribute->args[0]))
+            else if (glslBindingAttribute->binding)
             {
-                glslOffsetAttribute->offset = uint64_t(constVal->getValue());
-                getGLSLBindingOffsetTracker()->setBindingOffset(
-                    glslBindingAttribute->binding,
-                    glslOffsetAttribute->offset);
+                canTrackOffsets = false;
+                getSink()->diagnose(Diagnostics::GlslOffsetRequiresConcreteBinding{
+                    .location = glslBindingAttribute->loc});
+            }
+            // The tracker keys offsets on a 32-bit `int` binding index, so a concrete
+            // binding above INT32_MAX (representable in the `IntVal` field since this
+            // change) narrows silently here — meaningless as a Vulkan binding either way.
+            if (canTrackOffsets)
+            {
+                if (glslOffsetAttribute->args.getCount() == 0)
+                {
+                    glslOffsetAttribute->offset =
+                        getGLSLBindingOffsetTracker()->getNextBindingOffset(bindingIndex);
+                }
+                else if (const auto constVal = checkConstantIntVal(glslOffsetAttribute->args[0]))
+                {
+                    glslOffsetAttribute->offset = uint64_t(constVal->getValue());
+                    getGLSLBindingOffsetTracker()->setBindingOffset(
+                        bindingIndex,
+                        glslOffsetAttribute->offset);
+                }
             }
         }
         else

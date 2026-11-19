@@ -1727,6 +1727,28 @@ void PolynomialIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
+// Multiply and add integer-literal values through the unsigned type, as
+// `BuiltinOperationIntVal::tryFoldImpl` does for the builtin arithmetic ops: signed
+// overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
+// unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
+// Every arithmetic operation on integer-literal values inside the polynomial machinery
+// (the fold loops, the builder's term/constant accumulation, `canonicalize`, and
+// `PolynomialIntVal::mul`) routes through these helpers, so an out-of-range constant
+// (e.g. a huge link-time binding expression) can never make the compiler itself execute
+// UB, and the substitution and link-time-resolution walks cannot diverge in wrapping
+// behavior.
+static IntegerLiteralValue wrapMul(IntegerLiteralValue a, IntegerLiteralValue b)
+{
+    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
+    return (IntegerLiteralValue)(UInt(a) * UInt(b));
+}
+
+static IntegerLiteralValue wrapAdd(IntegerLiteralValue a, IntegerLiteralValue b)
+{
+    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
+    return (IntegerLiteralValue)(UInt(a) + UInt(b));
+}
+
 struct PolynomialIntValBuilder
 {
     ASTBuilder* astBuilder;
@@ -1744,16 +1766,16 @@ struct PolynomialIntValBuilder
     {
         if (auto c = as<ConstantIntVal>(operand))
         {
-            constantTerm += c->getValue() * multiplier;
+            constantTerm = wrapAdd(constantTerm, wrapMul(c->getValue(), multiplier));
             return true;
         }
         else if (auto poly = as<PolynomialIntVal>(operand))
         {
-            constantTerm += poly->getConstantTerm() * multiplier;
+            constantTerm = wrapAdd(constantTerm, wrapMul(poly->getConstantTerm(), multiplier));
             for (auto term : poly->getTerms())
             {
                 auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
-                    multiplier * term->getConstFactor(),
+                    wrapMul(multiplier, term->getConstFactor()),
                     term->getParamFactors());
                 terms.add(newTerm);
             }
@@ -1782,7 +1804,7 @@ struct PolynomialIntValBuilder
                 if (term->canCombineWith(*newTerm))
                 {
                     term = astBuilder->getOrCreate<PolynomialIntValTerm>(
-                        term->getConstFactor() + newTerm->getConstFactor(),
+                        wrapAdd(term->getConstFactor(), newTerm->getConstFactor()),
                         term->getParamFactors());
                     return;
                 }
@@ -1814,7 +1836,7 @@ struct PolynomialIntValBuilder
                         }
                         newFactor = astBuilder->getOrCreate<PolynomialIntValFactor>(
                             newFactor->getParam(),
-                            newFactor->getPower() + factor->getPower());
+                            wrapAdd(newFactor->getPower(), factor->getPower()));
                         factorFound = true;
                         break;
                     }
@@ -1834,7 +1856,7 @@ struct PolynomialIntValBuilder
             }
             if (newFactors2.getCount() == 0)
             {
-                newConstantTerm += term->getConstFactor();
+                newConstantTerm = wrapAdd(newConstantTerm, term->getConstFactor());
                 continue;
             }
             newFactors2.sort([](PolynomialIntValFactor* t1, PolynomialIntValFactor* t2)
@@ -1903,18 +1925,30 @@ Val* PolynomialIntVal::_substituteImplOverride(
     builder.constantTerm = getConstantTerm();
     for (auto& term : getTerms())
     {
-        IntegerLiteralValue evaluatedTermConstFactor;
+        IntegerLiteralValue evaluatedTermConstFactor = term->getConstFactor();
         List<PolynomialIntValFactor*> evaluatedTermParamFactors;
-        evaluatedTermConstFactor = term->getConstFactor();
         for (auto& factor : term->getParamFactors())
         {
             auto substResult = factor->getParam()->substituteImpl(astBuilder, subst, &diff);
 
             if (auto constantVal = as<ConstantIntVal>(substResult))
             {
+                // Fold the constant in `power` times via repeated squaring: each
+                // source-level squaring of a symbolic factor doubles its exponent, so a
+                // linear loop would run 2^n times for n squarings — a compiler hang from
+                // a few dozen source lines. Squaring needs one step per exponent bit, so
+                // even a maximal int64 exponent is ~63 wrapping multiplies.
+                IntegerLiteralValue cPow = 1;
+                IntegerLiteralValue base = constantVal->getValue();
                 auto power = factor->getPower();
-                for (IntegerLiteralValue i = 0; i < power; i++)
-                    evaluatedTermConstFactor *= constantVal->getValue();
+                while (power > 0)
+                {
+                    if (power & 1)
+                        cPow = wrapMul(cPow, base);
+                    base = wrapMul(base, base);
+                    power >>= 1;
+                }
+                evaluatedTermConstFactor = wrapMul(evaluatedTermConstFactor, cPow);
             }
             else if (auto intResult = as<IntVal>(substResult))
             {
@@ -1925,7 +1959,7 @@ Val* PolynomialIntVal::_substituteImplOverride(
         }
         if (evaluatedTermParamFactors.getCount() == 0)
         {
-            builder.constantTerm += evaluatedTermConstFactor;
+            builder.constantTerm = wrapAdd(builder.constantTerm, evaluatedTermConstFactor);
         }
         else
         {
@@ -1987,14 +2021,14 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
         {
             PolynomialIntValBuilder builder(astBuilder);
             // add poly0.constant * poly1.constant
-            builder.constantTerm = poly0->getConstantTerm() * poly1->getConstantTerm();
+            builder.constantTerm = wrapMul(poly0->getConstantTerm(), poly1->getConstantTerm());
             // add poly0.constant * poly1.terms
             if (poly0->getConstantTerm() != 0)
             {
                 for (auto term : poly1->getTerms())
                 {
                     auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
-                        poly0->getConstantTerm() * term->getConstFactor(),
+                        wrapMul(poly0->getConstantTerm(), term->getConstFactor()),
                         term->getParamFactors());
                     builder.terms.add(newTerm);
                 }
@@ -2005,7 +2039,7 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
                 for (auto term : poly0->getTerms())
                 {
                     auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
-                        poly1->getConstantTerm() * term->getConstFactor(),
+                        wrapMul(poly1->getConstantTerm(), term->getConstFactor()),
                         term->getParamFactors());
                     builder.terms.add(newTerm);
                 }
@@ -2021,7 +2055,7 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
                     for (auto f : term1->getParamFactors())
                         newFactors.add(f);
                     auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
-                        term0->getConstFactor() * term1->getConstFactor(),
+                        wrapMul(term0->getConstFactor(), term1->getConstFactor()),
                         newFactors.getArrayView());
                     builder.terms.add(newTerm);
                 }
@@ -2031,11 +2065,11 @@ IntVal* PolynomialIntVal::mul(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1)
         else if (auto cVal1 = as<ConstantIntVal>(op1))
         {
             PolynomialIntValBuilder builder(astBuilder);
-            builder.constantTerm = poly0->getConstantTerm() * cVal1->getValue();
+            builder.constantTerm = wrapMul(poly0->getConstantTerm(), cVal1->getValue());
             for (auto term : poly0->getTerms())
             {
                 auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
-                    term->getConstFactor() * cVal1->getValue(),
+                    wrapMul(term->getConstFactor(), cVal1->getValue()),
                     term->getParamFactors());
                 builder.terms.add(newTerm);
             }
@@ -2179,11 +2213,22 @@ Val* TypeCastIntVal::tryFoldImpl(
 
 Val* TypeCastIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
 {
+    // Same contract fix as `BuiltinOperationIntVal::_linkTimeResolveOverride`: returning
+    // `tryFoldImpl`'s null when the base stays symbolic would discard the partial progress
+    // this pass made (the base may have resolved one chain link), so fold when the
+    // resolved base became concrete, rebuild when it changed but stayed symbolic, and
+    // return the receiver when nothing resolved.
     auto intValBase = as<IntVal>(getBase());
     if (!intValBase)
         return this;
     auto resolvedBase = intValBase->linkTimeResolve(map);
-    return tryFoldImpl(getCurrentASTBuilder(), getType(), resolvedBase, nullptr);
+    if (resolvedBase == intValBase)
+        return this;
+    if (auto newVal = tryFoldImpl(getCurrentASTBuilder(), getType(), resolvedBase, nullptr))
+        return newVal;
+    auto resolvedIntValBase = as<IntVal>(resolvedBase);
+    SLANG_ASSERT(resolvedIntValBase);
+    return getCurrentASTBuilder()->getTypeCastIntVal(getType(), resolvedIntValBase);
 }
 
 Val* TypeCastIntVal::_substituteImplOverride(
@@ -2567,10 +2612,30 @@ Val* BuiltinOperationIntVal::_substituteImplOverride(
 
 Val* BuiltinOperationIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
 {
+    // Mirror `_substituteImplOverride` (fold if every argument became concrete, otherwise
+    // rebuild with the resolved arguments): the fixpoint loop in
+    // `ComponentType::tryFoldIntVal` relies on every `_linkTimeResolveOverride` returning
+    // its receiver unchanged when nothing resolved, so returning nullptr for a still
+    // symbolic result would discard the partial progress this pass made and reject
+    // computable chained-extern values.
+    bool diff = false;
     List<IntVal*> newArgs;
     for (auto arg : getArgs())
-        newArgs.add(as<IntVal>(arg->linkTimeResolve(map)));
-    return tryFoldImpl(getCurrentASTBuilder(), getType(), getOp(), newArgs, nullptr);
+    {
+        auto resolvedArg = as<IntVal>(arg->linkTimeResolve(map));
+        SLANG_ASSERT(resolvedArg);
+        if (resolvedArg != arg)
+            diff = true;
+        newArgs.add(resolvedArg);
+    }
+    if (!diff)
+        return this;
+    if (auto newVal = tryFoldImpl(getCurrentASTBuilder(), getType(), getOp(), newArgs, nullptr))
+        return newVal;
+    return getCurrentASTBuilder()->getOrCreate<BuiltinOperationIntVal>(
+        getType(),
+        getOp(),
+        newArgs.getArrayView());
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SizeOfIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3345,6 +3410,105 @@ Val* PolynomialIntVal::_resolveImplOverride()
     if (diff)
         return builder.getIntVal(getType());
 
+    return this;
+}
+
+// Resolve a polynomial against the linked program's exported link-time constant values,
+// mirroring `_substituteImplOverride`: a factor whose parameter resolves to a constant
+// folds into its term's constant factor (repeated `power` times), and a factor that stays
+// symbolic is kept as a factor of the rebuilt polynomial. When every factor resolves to a
+// constant the builder canonicalizes the result down to a single `ConstantIntVal`, which
+// lets consumers such as `ComponentType::tryFoldIntVal` fold expressions like
+// `(V == 3 ? 7 : 9) - 6` once the linked value of `V` is known. The walk is a deliberate
+// twin of the substitution walk, with exactly two differences, so a future edit to one
+// can be checked against the other: (1) how a factor's parameter is resolved —
+// `linkTimeResolve(map)` here versus `substituteImpl` there; (2) the policy when a
+// factor's resolution is not an `IntVal`: under the header contract no override produces
+// one, but where substitution silently drops such a factor from the rebuilt term, this
+// walk asserts and — release-mode robustness — returns the whole polynomial unresolved,
+// so a contract violation is surfaced rather than silently losing factors. Everything
+// else — the repeated-squaring power fold, the power-1 polynomial absorption, the
+// wrapping arithmetic, the builder tail — must stay in step between the two.
+Val* PolynomialIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+{
+    auto astBuilder = getCurrentASTBuilder();
+
+    bool diff = false;
+    PolynomialIntValBuilder builder(astBuilder);
+    builder.constantTerm = getConstantTerm();
+    for (auto& term : getTerms())
+    {
+        IntegerLiteralValue evaluatedTermConstFactor = term->getConstFactor();
+        List<PolynomialIntValFactor*> evaluatedTermParamFactors;
+        for (auto& factor : term->getParamFactors())
+        {
+            auto resolvedResult = as<IntVal>(factor->getParam()->linkTimeResolve(map));
+            SLANG_ASSERT(resolvedResult);
+            if (!resolvedResult)
+                return this;
+
+            if (resolvedResult != factor->getParam())
+                diff = true;
+
+            if (auto constantVal = as<ConstantIntVal>(resolvedResult))
+            {
+                // Same repeated-squaring fold as `_substituteImplOverride`: a linear
+                // power loop would run 2^n times for n source-level squarings.
+                IntegerLiteralValue cPow = 1;
+                IntegerLiteralValue base = constantVal->getValue();
+                auto power = factor->getPower();
+                while (power > 0)
+                {
+                    if (power & 1)
+                        cPow = wrapMul(cPow, base);
+                    base = wrapMul(base, base);
+                    power >>= 1;
+                }
+                evaluatedTermConstFactor = wrapMul(evaluatedTermConstFactor, cPow);
+            }
+            else
+            {
+                auto newFactor = astBuilder->getOrCreate<PolynomialIntValFactor>(
+                    resolvedResult,
+                    factor->getPower());
+                evaluatedTermParamFactors.add(newFactor);
+            }
+        }
+        if (evaluatedTermParamFactors.getCount() == 0)
+        {
+            builder.constantTerm = wrapAdd(builder.constantTerm, evaluatedTermConstFactor);
+        }
+        else
+        {
+            // A single power-1 factor whose parameter resolved to another polynomial (an
+            // exported constant defined as an expression over further externs) is absorbed
+            // into the builder so the result stays one canonical polynomial instead of
+            // nesting a polynomial-valued factor.
+            if (evaluatedTermParamFactors.getCount() == 1 &&
+                evaluatedTermParamFactors[0]->getPower() == 1)
+            {
+                if (auto polyTerm = as<PolynomialIntVal>(evaluatedTermParamFactors[0]->getParam()))
+                {
+                    builder.addToPolynomialTerm(polyTerm, evaluatedTermConstFactor);
+                    continue;
+                }
+            }
+            auto newTerm = astBuilder->getOrCreate<PolynomialIntValTerm>(
+                evaluatedTermConstFactor,
+                evaluatedTermParamFactors.getArrayView());
+            builder.terms.add(newTerm);
+        }
+    }
+
+    // A canonical receiver always has at least one term (a fold that empties the term
+    // list is built as a `ConstantIntVal`), so an empty term list here means some factor
+    // folded into the constant term this pass.
+    if (builder.terms.getCount() == 0)
+        return astBuilder->getIntVal(getType(), builder.constantTerm);
+    if (diff)
+    {
+        return builder.getIntVal(getType());
+    }
     return this;
 }
 

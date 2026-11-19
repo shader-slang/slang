@@ -1103,8 +1103,19 @@ FIDDLE()
 class GLSLBindingAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() int32_t binding = 0;
-    FIDDLE() int32_t set = 0;
+    // The Vulkan descriptor `binding` and `set` indices. Both are stored as `IntVal`s so
+    // that expressions over link-time constants (e.g. derived from `extern` constants)
+    // can be used. A null field means the argument was not specified on any validation
+    // pass — GLSL `binding`/`set` qualifiers arrive as separate modifiers that merge,
+    // each re-validating the attribute — and reads as descriptor index 0. That covers
+    // the defaulted `set` of `[[vk::binding(x)]]` and a qualifier that named only the
+    // other argument (`layout(set = N)` leaves `binding` null). Parameter binding
+    // resolves both against the linked program via `ComponentType::tryFoldIntVal`
+    // (source/slang/slang-linkable.h); the one consumer that cannot resolve them is the
+    // GLSL `offset` layout path in the checker, which needs a concrete index at check
+    // time and rejects symbolic values with a diagnostic.
+    FIDDLE() IntVal* binding = nullptr;
+    FIDDLE() IntVal* set = nullptr;
 };
 
 FIDDLE()
@@ -1123,7 +1134,11 @@ FIDDLE()
 class GLSLOffsetLayoutAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() int64_t offset;
+    // Defaults to zero: the checker's symbolic-binding skip path cannot assign an
+    // offset, and although the emitted error fails the compile request, later phases
+    // keep walking the AST while diagnostics are collected — the default keeps that
+    // walk defined instead of reading an uninitialized field.
+    FIDDLE() int64_t offset = 0;
 };
 
 // Implicitly added offset qualifier when no offset is specified.

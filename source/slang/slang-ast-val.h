@@ -150,6 +150,11 @@ class IntVal : public Val
 
     bool isLinkTimeVal();
     bool _isLinkTimeValOverride() { return false; }
+    // Resolve this value against the linked program's exported constants. The contract
+    // every `_linkTimeResolveOverride` must uphold: return the receiver unchanged when
+    // nothing resolved, a rebuilt (still possibly symbolic) value when progress was
+    // made, or a fully-folded `ConstantIntVal`; never null for a still-symbolic result,
+    // so `ComponentType::tryFoldIntVal`'s fixpoint loop can iterate on partial progress.
     Val* linkTimeResolve(Dictionary<String, IntVal*>& mapMangledNameToVal);
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>&) { return this; }
 };
@@ -682,6 +687,7 @@ public:
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
+    Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 
     static IntVal* neg(ASTBuilder* astBuilder, IntVal* base);
     static IntVal* add(ASTBuilder* astBuilder, IntVal* op0, IntVal* op1);

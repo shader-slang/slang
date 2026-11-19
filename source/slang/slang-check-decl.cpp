@@ -3931,7 +3931,31 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         //
         if (!varDecl->val)
         {
-            varDecl->val = _validateCircularVarDefinition(varDecl);
+            // An `extern` constant's own value is its default initializer, folded as far
+            // as check time allows (further `extern` references inside it stay symbolic,
+            // e.g. `export extern static const int B = A + 1;` folds to a polynomial over
+            // `A`): the exported-constants map publishes `val` as the overridable default
+            // a linked module replaces, and the self-referential `DeclRefIntVal` that
+            // `_validateCircularVarDefinition` yields for externs — the right result for
+            // a *reference* to the variable — would make every resolution of `B` come
+            // back as `B`. The earlier fold in `SemanticsDeclHeaderVisitor::
+            // checkVarDeclCommon` only handles literals because it runs on the
+            // not-yet-checked initializer; the initializer is checked here. Check-time
+            // circularity detection is unavailable for extern constants (the constant
+            // folder's extern branch never walks initializers), so a cyclic default is
+            // accepted here and surfaces as an unresolved value at layout — unless its
+            // initializer is lowered, which can still trip IR lowering's pre-existing
+            // unguarded recursion over self-referential initializers (issue #14556).
+            if (varDecl->hasModifier<ExternModifier>() && varDecl->hasModifier<ConstModifier>() &&
+                isScalarIntegerType(varDecl->type))
+            {
+                varDecl->val =
+                    tryConstantFoldExpr(initExpr, ConstantFoldingKind::LinkTime, nullptr);
+            }
+            if (!varDecl->val)
+            {
+                varDecl->val = _validateCircularVarDefinition(varDecl);
+            }
             // If this is a global `static const` variable and we still couldn't constant-fold
             // its initializer (and no new error was emitted during init checking, e.g. for an
             // undefined identifier, a circular definition, or a type error), check whether the
