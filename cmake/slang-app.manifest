@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+    Shared application manifest declaring longPathAware, so that the Windows
+    LongPathsEnabled registry opt-in takes effect for our executables.
+    slang_add_windows_manifest (cmake/SlangTarget.cmake) attaches this file to
+    every executable created through slang_add_target, and raw-add_executable
+    executables opt in by calling that helper.
+
+    This fragment is merged by the manifest tool with the linker-generated
+    default manifest, which supplies the assembly identity and trustInfo, so
+    the omission of those sections here is intentional.
+-->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
     <application xmlns="urn:schemas-microsoft-com:asm.v3">
         <windowsSettings xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
