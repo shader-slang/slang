@@ -77,7 +77,7 @@ static TestTargetFlags findTargetFlag(const UnownedStringSlice& label)
 
 bool isTestTargetName(const UnownedStringSlice& name)
 {
-    return name == "all" || findTargetFlag(name) != 0;
+    return name == "all" || name == "none" || findTargetFlag(name) != 0;
 }
 
 static String getValidNames()
@@ -111,6 +111,10 @@ SlangResult parseTestTargets(
     outTargets = 0;
     TestTargetFlags result = 0;
 
+    // `none` selects no target. It is the whole value, because a union with it has no use.
+    if (value.trim() == "none")
+        return SLANG_OK;
+
     // A split that drops the empty segments would hide an empty token, which is an error here.
     UnownedStringSlice rest = value;
     for (bool isLast = false; !isLast;)
@@ -124,6 +128,12 @@ SlangResult parseTestTargets(
         if (token.getLength() == 0)
         {
             outError = "'targets=' has an empty name. Add a name, or remove the extra '+'.";
+            return SLANG_E_INVALID_ARG;
+        }
+
+        if (token == "none")
+        {
+            outError = "'targets=none' selects no target, so it cannot have another name.";
             return SLANG_E_INVALID_ARG;
         }
 
@@ -165,7 +175,7 @@ SlangResult parseTestTargets(
 
     if (result == 0)
     {
-        outError = "'targets=' selects no target.";
+        outError = "'targets=' selects no target. Write 'targets=none' to select no target.";
         return SLANG_E_INVALID_ARG;
     }
     outTargets = result;

@@ -212,8 +212,11 @@ The value of `targets=` is a list of names, separated by plus signs (`+`). These
 | `llvm`       | `-llvm`                      | `SLANG_TEST_LLVM`  |
 | `all`        | every target in this table   |                    |
 | `all-<name>` | every target except `<name>` |                    |
+| `none`       | no target                    |                    |
 
 Use `all-<name>` for a test that cannot run on a target. For example, `targets=all-vk-cuda` runs on every target except `vk` and `cuda`, and `targets=vk+metal+cpu` runs on these three targets only.
+
+Use `none` for a line that must not run on any target, for example a disabled test that has no target to name. The line makes no test. `none` is the whole value, so `none+vk` is an error. A list that removes every target, such as `all-vk-glsl-dx11-dx12-metal-cuda-cpu-wgpu-llvm`, is also an error, because the author must write `none` to say it.
 
 The result is the union of the tokens. A hyphen between names removes more than one target: `all-vk-cuda` is `all` without `vk` and `cuda`. Only `all-<name>` removes a target. A token such as `-vk` is an unknown name, and `slang-test` reports an error. The tests have the order of the table above, and a target does not run twice.
 

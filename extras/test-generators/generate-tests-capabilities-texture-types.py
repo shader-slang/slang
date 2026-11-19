@@ -466,10 +466,8 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
             testDisabledComment += f"\n// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}"
 
     # The compute test line runs once for the target that `targets=` names. A test that has no
-    # target is always disabled, so its line has no `targets=` option.
-    computeTestTargets = ""
-    if positiveComputeTestTarget != "None":
-        computeTestTargets = f"targets={positiveComputeTestTarget}, "
+    # target is always disabled, and its line has `targets=none`.
+    computeTestTargets = "none" if positiveComputeTestTarget == "None" else positiveComputeTestTarget
 
     testStr = f"""// THIS IS A GENERATED FILE. DO NOT EDIT!
 // Instead, edit extras/test-generators/generate-tests-capabilities-texture-types.py, and
@@ -484,7 +482,7 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
 //
 {testDisabledComment}
 //{disablePositiveSimpleTestPrefix}TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target {positiveSimpleTestTarget}
-//{disableComputeTestPrefix}TEST:COMPARE_COMPUTE({computeTestTargets}filecheck-buffer=POSITIVE_RESULT):
+//{disableComputeTestPrefix}TEST:COMPARE_COMPUTE(targets={computeTestTargets}, filecheck-buffer=POSITIVE_RESULT):
 //{disableNegativeSimpleTestPrefix}TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target {negativeSimpleTestTarget}
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer

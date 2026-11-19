@@ -46,7 +46,7 @@ In the template below, a marker like `<<NAME>>` is a part that the script replac
 
 <<DISABLE_COMMENTS>>
 //<<DISABLE_POS>>TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target <<POSITIVE_TARGET>>
-//<<DISABLE_CMP>>TEST:COMPARE_COMPUTE(<<COMPUTE_TARGETS>>filecheck-buffer=POSITIVE_RESULT):
+//<<DISABLE_CMP>>TEST:COMPARE_COMPUTE(targets=<<COMPUTE_TARGET>>, filecheck-buffer=POSITIVE_RESULT):
 //<<DISABLE_NEG>>TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target <<NEGATIVE_TARGET>>
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -81,22 +81,22 @@ void computeMain()
 
 ### What each marker becomes
 
-| Marker                                                  | Replaced with                                                                                                                      | Source in the script                  |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `<<BACKEND>>`                                           | The backend name, for example `glsl-vk`.                                                                                           | `backend["name"]`                     |
-| `<<TEXTURE_TYPE>>`                                      | The Slang texture type, for example `RWTexture2D<float4>`. It appears twice: in the header and in the declaration.                 | Key of the `tests` table              |
-| `<<MIN_VERSION>>`                                       | The first backend version that supports the type. `None` means no version supports it.                                             | `TestInfo.minVersion`                 |
-| `<<POSITIVE_VERSION>>`                                  | The version that the positive test uses. This is the lowest version that supports the type.                                        | `getPositiveNegativeBackendTargets()` |
-| `<<NEGATIVE_VERSION>>`                                  | The version that the negative test uses. This is the highest version below the minimum that Slang supports.                        | `getPositiveNegativeBackendTargets()` |
-| `<<DISABLE_COMMENTS>>`                                  | Zero or more comment lines with an issue link, one for each disabled test. Empty when no test is disabled.                         | `TestInfo` disable flags              |
-| `<<DISABLE_POS>>`, `<<DISABLE_CMP>>`, `<<DISABLE_NEG>>` | `DISABLE_` or nothing. `DISABLE_` turns the line into a comment that `slang-test` ignores.                                         | See "When a test is disabled"         |
-| `<<POSITIVE_TARGET>>`                                   | The compiler options for the positive test, for example `glsl -profile glsl_450`.                                                  | Second item of the version tuple      |
-| `<<COMPUTE_TARGETS>>`                                   | The text `targets=<name>, `, or nothing when the test has no target. The `<name>` is a target of `slang-test`, for example `glsl`. | Third item of the version tuple       |
-| `<<NEGATIVE_TARGET>>`                                   | The compiler options for the negative test.                                                                                        | Second item of the version tuple      |
-| `<<TEXTURE_INPUT>>`                                     | The `TEST_INPUT` description of the texture, for example `Texture3D(size=4, content = one)`.                                       | `testInputForTestType`                |
-| `<<EXTRA_INPUT>>`                                       | Extra resources that some operations need. Empty for most operations.                                                              | See "Extra resources"                 |
-| `<<LABEL>>`                                             | The label that `POSITIVE-LABEL` looks for in the compiler output. `main` on `glsl-vk`. `fragMain` on the other backends.           | `backend["positive-label"]`           |
-| `<<OP_STATEMENTS>>`                                     | The statements that use the texture. It appears twice: in `fragMain` and in `computeMain`.                                         | `getStatementsForTestOp()`            |
+| Marker                                                  | Replaced with                                                                                                            | Source in the script                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `<<BACKEND>>`                                           | The backend name, for example `glsl-vk`.                                                                                 | `backend["name"]`                     |
+| `<<TEXTURE_TYPE>>`                                      | The Slang texture type, for example `RWTexture2D<float4>`. It appears twice: in the header and in the declaration.       | Key of the `tests` table              |
+| `<<MIN_VERSION>>`                                       | The first backend version that supports the type. `None` means no version supports it.                                   | `TestInfo.minVersion`                 |
+| `<<POSITIVE_VERSION>>`                                  | The version that the positive test uses. This is the lowest version that supports the type.                              | `getPositiveNegativeBackendTargets()` |
+| `<<NEGATIVE_VERSION>>`                                  | The version that the negative test uses. This is the highest version below the minimum that Slang supports.              | `getPositiveNegativeBackendTargets()` |
+| `<<DISABLE_COMMENTS>>`                                  | Zero or more comment lines with an issue link, one for each disabled test. Empty when no test is disabled.               | `TestInfo` disable flags              |
+| `<<DISABLE_POS>>`, `<<DISABLE_CMP>>`, `<<DISABLE_NEG>>` | `DISABLE_` or nothing. `DISABLE_` turns the line into a comment that `slang-test` ignores.                               | See "When a test is disabled"         |
+| `<<POSITIVE_TARGET>>`                                   | The compiler options for the positive test, for example `glsl -profile glsl_450`.                                        | Second item of the version tuple      |
+| `<<COMPUTE_TARGET>>`                                    | The target of `slang-test` for the compute test, for example `glsl`. `none` when the test has no target.                 | Third item of the version tuple       |
+| `<<NEGATIVE_TARGET>>`                                   | The compiler options for the negative test.                                                                              | Second item of the version tuple      |
+| `<<TEXTURE_INPUT>>`                                     | The `TEST_INPUT` description of the texture, for example `Texture3D(size=4, content = one)`.                             | `testInputForTestType`                |
+| `<<EXTRA_INPUT>>`                                       | Extra resources that some operations need. Empty for most operations.                                                    | See "Extra resources"                 |
+| `<<LABEL>>`                                             | The label that `POSITIVE-LABEL` looks for in the compiler output. `main` on `glsl-vk`. `fragMain` on the other backends. | `backend["positive-label"]`           |
+| `<<OP_STATEMENTS>>`                                     | The statements that use the texture. It appears twice: in `fragMain` and in `computeMain`.                               | `getStatementsForTestOp()`            |
 
 ### What the fixed text does
 
@@ -230,7 +230,7 @@ The markers get these values:
 | `<<DISABLE_POS>>`                         | Nothing                                                              |
 | `<<DISABLE_CMP>>`, `<<DISABLE_NEG>>`      | `DISABLE_`                                                           |
 | `<<POSITIVE_TARGET>>`                     | `glsl -profile glsl_450`                                             |
-| `<<COMPUTE_TARGETS>>`                     | `targets=glsl, `                                                     |
+| `<<COMPUTE_TARGET>>`                      | `glsl`                                                               |
 | `<<NEGATIVE_TARGET>>`                     | `glsl -profile glsl_440`                                             |
 | `<<TEXTURE_INPUT>>`                       | `Texture3D(size=4, content = one)`                                   |
 | `<<EXTRA_INPUT>>`                         | Empty (operation 23 needs no extra resource)                         |

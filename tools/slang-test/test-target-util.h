@@ -90,6 +90,7 @@ bool isTestTargetName(const UnownedStringSlice& name);
 // these:
 //
 //   all         every target;
+//   none        no target, so the line makes no test. It is the whole value;
 //   <name>      the target with that label;
 //   all-<name>  every target except the target with that label.
 //
@@ -97,10 +98,11 @@ bool isTestTargetName(const UnownedStringSlice& name);
 // example, `all-vk-cuda` is every target except `vk` and `cuda`, and `vk+cpu` is these two
 // targets. There is no other way to remove a target: a token such as `-vk` is an unknown name.
 //
-// The result is the union (the OR) of the tokens.
+// The result is the union (the OR) of the tokens. The result of `none` is 0, and it is a valid
+// result. Every other value must select at least one target.
 //
 // Returns `SLANG_E_INVALID_ARG` and sets `outError` for an unknown name, an empty token, or an
-// empty result. A name that is wrong must be an error, because a silent skip would run the test
+// empty result that is not `none`. A name that is wrong must be an error, because a silent skip would run the test
 // on fewer targets than the author wants.
 SlangResult parseTestTargets(
     const UnownedStringSlice& value,

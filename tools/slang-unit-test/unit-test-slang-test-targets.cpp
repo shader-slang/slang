@@ -71,6 +71,14 @@ SLANG_UNIT_TEST(slangTestTargetListParsing)
     SLANG_CHECK(expandLabels("all-cuda+cuda") == expandLabels("all"));
     SLANG_CHECK(expandLabels("all-cuda+all-vk") == expandLabels("all"));
 
+    // `none` selects no target. It is a valid result, and it has no bit.
+    TestTargetFlags none = TestTargetFlag::AllOf;
+    String noneError;
+    SLANG_CHECK(SLANG_SUCCEEDED(parseTestTargets(UnownedStringSlice("none"), none, noneError)));
+    SLANG_CHECK(none == 0);
+    SLANG_CHECK(SLANG_SUCCEEDED(parseTestTargets(UnownedStringSlice(" none "), none, noneError)));
+    SLANG_CHECK(none == 0);
+
     // `vk` and `glsl` are two targets with one render API.
     TestTargetFlags vkAndGlsl = 0;
     String error;
@@ -94,6 +102,14 @@ SLANG_UNIT_TEST(slangTestTargetListErrors)
     SLANG_CHECK(parseError("-vk").indexOf("'-vk'") >= 0);
     SLANG_CHECK(parseError("all+-vk").indexOf("'-vk'") >= 0);
     SLANG_CHECK(parseError("vk+-cpu").indexOf("'-cpu'") >= 0);
+
+    // `none` is the whole value. A list that has it and another name is an error, and so is a
+    // list that removes every target without `none`.
+    SLANG_CHECK(parseError("none+vk").indexOf("'targets=none'") >= 0);
+    SLANG_CHECK(parseError("vk+none").indexOf("'targets=none'") >= 0);
+    SLANG_CHECK(parseError("all-none").indexOf("'none'") >= 0);
+    SLANG_CHECK(
+        parseError("all-vk-glsl-dx11-dx12-metal-cuda-cpu-wgpu-llvm").indexOf("targets=none") >= 0);
 
     // The text lists the valid names.
     SLANG_CHECK(parseError("gls").indexOf(", glsl,") >= 0);
@@ -166,6 +182,7 @@ SLANG_UNIT_TEST(slangTestTargetDefinition)
 SLANG_UNIT_TEST(slangTestTargetNames)
 {
     SLANG_CHECK(isTestTargetName(UnownedStringSlice("all")));
+    SLANG_CHECK(isTestTargetName(UnownedStringSlice("none")));
     SLANG_CHECK(isTestTargetName(UnownedStringSlice("vk")));
     SLANG_CHECK(isTestTargetName(UnownedStringSlice("llvm")));
     SLANG_CHECK(!isTestTargetName(UnownedStringSlice("non-exhaustive")));
