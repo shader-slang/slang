@@ -163,7 +163,7 @@ $}
 __magic_type(HLSL$(unsized ? "UnsizedByteAddressBuffer" : "ByteAddressBuffer")Type)
 __intrinsic_type($(unsized ? kIROp_HLSLUnsizedByteAddressBufferType : kIROp_HLSLByteAddressBufferType))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-struct $(unsized ? "__UnsizedByteAddressBuffer" : "__SizedByteAddressBuffer")
+struct $(unsized ? "__UnsizedByteAddressBuffer" : "ByteAddressBuffer")
 {
 ${
     if (unsized) {
@@ -172,7 +172,7 @@ $}
     [__readNone]
     __intrinsic_op($(kIROp_GetUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
-    __init(__SizedByteAddressBuffer buffer);
+    __init(ByteAddressBuffer buffer);
 ${
     } else {
 $}
@@ -531,7 +531,7 @@ ${
 }
 $}
 
-typealias ByteAddressBuffer = __SizedByteAddressBuffer;
+typealias __SizedByteAddressBuffer = ByteAddressBuffer;
 
 // Texture
 
@@ -6676,7 +6676,7 @@ $}
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(unsized ? "UnsizedStructuredBuffer" : "StructuredBuffer")Type)
 __intrinsic_type($(unsized ? kIROp_HLSLUnsizedStructuredBufferType : kIROp_HLSLStructuredBufferType))
-struct $(unsized ? "__UnsizedStructuredBuffer" : "__SizedStructuredBuffer")$(unsized ? "" : " : IArray<T>")
+struct $(unsized ? "__UnsizedStructuredBuffer" : "StructuredBuffer")$(unsized ? "" : " : IArray<T>")
 {
 
 ${
@@ -6686,7 +6686,7 @@ $}
     [__readNone]
     __intrinsic_op($(kIROp_GetUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
-    __init(__SizedStructuredBuffer<T, L> buffer);
+    __init(StructuredBuffer<T, L> buffer);
 ${
     } else {
 $}
@@ -6751,7 +6751,7 @@ ${
 }
 $}
 
-typealias StructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = __SizedStructuredBuffer<T, L>;
+typealias __SizedStructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = StructuredBuffer<T, L>;
 
 /**
 Represents an opaque handle to a consume structured buffer allocated in global memory.
@@ -6859,7 +6859,7 @@ static const struct {
     bool unsized;
 } kMutableByteAddressBufferCases[] =
 {
-    { kIROp_HLSLRWByteAddressBufferType, "RWByteAddressBuffer", "__SizedRWByteAddressBuffer", false },
+    { kIROp_HLSLRWByteAddressBufferType, "RWByteAddressBuffer", "RWByteAddressBuffer", false },
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer", "RasterizerOrderedByteAddressBuffer", false },
     { kIROp_HLSLUnsizedRWByteAddressBufferType, "UnsizedRWByteAddressBuffer", "__UnsizedRWByteAddressBuffer", true },
 };
@@ -6891,7 +6891,7 @@ $}
     [__readNone]
     __intrinsic_op($(kIROp_GetUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
-    __init(__SizedRWByteAddressBuffer buffer);
+    __init(RWByteAddressBuffer buffer);
 ${
     } else {
 $}
@@ -7953,7 +7953,7 @@ ${
 }
 $}
 
-typealias RWByteAddressBuffer = __SizedRWByteAddressBuffer;
+typealias __SizedRWByteAddressBuffer = RWByteAddressBuffer;
 
 ${
 static const struct {
@@ -7963,7 +7963,7 @@ static const struct {
     bool unsized;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType, "RWStructuredBuffer", "__SizedRWStructuredBuffer", false },
+    { kIROp_HLSLRWStructuredBufferType, "RWStructuredBuffer", "RWStructuredBuffer", false },
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer", "RasterizerOrderedStructuredBuffer", false },
     { kIROp_HLSLUnsizedRWStructuredBufferType, "UnsizedRWStructuredBuffer", "__UnsizedRWStructuredBuffer", true },
 };
@@ -8004,7 +8004,7 @@ $}
     [__readNone]
     __intrinsic_op($(kIROp_GetUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
-    __init(__SizedRWStructuredBuffer<T, L> buffer);
+    __init(RWStructuredBuffer<T, L> buffer);
 ${
     } else {
 $}
@@ -8087,7 +8087,7 @@ ${
 }
 $}
 
-typealias RWStructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = __SizedRWStructuredBuffer<T, L>;
+typealias __SizedRWStructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = RWStructuredBuffer<T, L>;
 
 /// @category stage_io
 __generic<T>

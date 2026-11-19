@@ -424,7 +424,8 @@ void copySizedValues(
 Conversion refers to the same storage and discards length information where it is stored separately.
 For structured buffers, the element type `T` and layout `L` must match.
 There is no reverse conversion from unsized to sized, and conversion does not change access rights: a read-only buffer cannot become read-write.
-The existing public names remain sized types with their existing behavior; they are aliases for `__SizedStructuredBuffer`, `__SizedRWStructuredBuffer`, `__SizedByteAddressBuffer`, and `__SizedRWByteAddressBuffer`, respectively.
+The existing public names remain the canonical sized types, preserving their existing behavior and names in diagnostics.
+The provisional `__SizedStructuredBuffer`, `__SizedRWStructuredBuffer`, `__SizedByteAddressBuffer`, and `__SizedRWByteAddressBuffer` names are aliases for those public types, respectively.
 
 The bundled Slang RHI CPU and CUDA resource binders currently assume that structured and byte-addressed buffers include a count.
 Do not bind these unsized types through that resource-binding path: it writes an extra count and can overwrite the following parameter.

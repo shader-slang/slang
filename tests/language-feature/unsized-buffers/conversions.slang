@@ -14,8 +14,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -wgpu -compute -output-using-type
 //TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=RESULT): -metal -compute -output-using-type
 
-// Public names remain aliases for the sized types. Conversion discards the count only on
-// pointer targets and preserves the same resource on native buffer targets.
+// Provisional __Sized names alias the existing public buffer types. Conversion discards the
+// count only on pointer targets and preserves the same resource on native buffer targets.
 //TEST_INPUT:ubuffer(data=[10 20], stride=4):name=inputValues
 StructuredBuffer<uint> inputValues;
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputValues
