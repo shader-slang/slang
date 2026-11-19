@@ -59,6 +59,12 @@ static void legalizeCall(IRCall* call)
         if (!ptrType)
             continue;
 
+        // A `T*` argument is a pointer value passed by value, so it needs no copy-in/out bridge.
+        // The bridge's loads and stores have no location, so without this skip the `nullptr` in
+        // `PointerAndCount(nullptr, 3)` would be reported only without a location.
+        if (isUserPointerType(ptrType))
+            continue;
+
         auto argOp = arg->getOp();
 
         // A by-ref `Param` and a block-local `Var` are already in the `function` address
