@@ -1,9 +1,15 @@
 // unit-test-app-manifest.cpp
 //
-// Guards for the shared longPathAware application manifest (cmake/slang-app.manifest):
-// the manifest content and the CMake wiring that attaches it (every platform the
-// unit tests run on — Linux CI never reads the file otherwise), and, on Windows,
-// the manifest actually embedded in the running executable.
+// Guards for the shared longPathAware application manifest
+// (cmake/slang-app.manifest). On every platform the unit tests run on: the
+// manifest content, and the CMake wiring that attaches it (Linux builds never
+// read the file, so drift would otherwise stay green on every Linux CI leg).
+// On Windows additionally: the manifest actually embedded in the running
+// executable's RT_MANIFEST resource.
+//
+// The tests read repo files by paths relative to the working directory; like
+// the other repo-tree-reading unit tests, they assume slang-test runs from
+// the repository root.
 
 #include "core/slang-io.h"
 #include "unit-test/slang-unit-test.h"
@@ -13,6 +19,34 @@
 #endif
 
 using namespace Slang;
+
+// Returns the text between the first occurrence of beginMarker and the next
+// endMarker after it, or an empty slice if either marker is missing.
+static UnownedStringSlice _sliceBetween(
+    const String& text,
+    const char* beginMarker,
+    const char* endMarker)
+{
+    const UnownedStringSlice begin(beginMarker);
+    const UnownedStringSlice end(endMarker);
+
+    const Index beginAt = text.indexOf(begin);
+    if (beginAt < 0)
+        return UnownedStringSlice();
+
+    const Index bodyBegin = beginAt + begin.getLength();
+    UnownedStringSlice tail(text.begin() + bodyBegin, text.end());
+    const Index endAt = tail.indexOf(end);
+    if (endAt < 0)
+        return UnownedStringSlice();
+
+    return tail.subString(0, endAt);
+}
+
+static bool _contains(const UnownedStringSlice& slice, const char* needle)
+{
+    return slice.indexOf(UnownedStringSlice(needle)) >= 0;
+}
 
 // The shared longPathAware application manifest (cmake/slang-app.manifest) is
 // only attached to targets under WIN32 AND MSVC, so no compile or link step on
@@ -29,15 +63,26 @@ SLANG_UNIT_TEST(appManifestIsDeclaredAndWired)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(manifestPath, manifest)));
     SLANG_CHECK_ABORT(manifest.contains("<longPathAware>true</longPathAware>"));
 
-    // The load-bearing wiring is the call slang_add_target makes for every
-    // executable it creates, and the WIN32 AND MSVC guard inside the helper;
-    // a bare mention of the manifest file would pass on a comment or a dead
-    // call, so anchor on the call itself.
     String slangTarget;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText("cmake/SlangTarget.cmake", slangTarget)));
-    SLANG_CHECK_ABORT(slangTarget.contains("slang_add_windows_manifest(${target})"));
-    SLANG_CHECK_ABORT(slangTarget.contains("if(WIN32 AND MSVC)"));
-    SLANG_CHECK_ABORT(slangTarget.contains("slang-app.manifest"));
+
+    // The wiring checks are scoped to the function bodies they pin, so an
+    // unrelated WIN32 AND MSVC branch or a comment mentioning the manifest
+    // cannot satisfy them, and a benign rename inside an unrelated function
+    // cannot break them.
+    //
+    // The load-bearing call is the one slang_add_target makes for every
+    // executable it creates.
+    const UnownedStringSlice addTargetBody =
+        _sliceBetween(slangTarget, "function(slang_add_target dir type)", "endfunction()");
+    SLANG_CHECK_ABORT(_contains(addTargetBody, "slang_add_windows_manifest(${target})"));
+
+    // The helper itself must still gate on the platform and attach the shared
+    // manifest.
+    const UnownedStringSlice helperBody =
+        _sliceBetween(slangTarget, "function(slang_add_windows_manifest target)", "endfunction()");
+    SLANG_CHECK_ABORT(_contains(helperBody, "if(WIN32 AND MSVC)"));
+    SLANG_CHECK_ABORT(_contains(helperBody, "slang-app.manifest"));
 
     // Executables declared with a raw add_executable opt in by calling the
     // helper themselves; guard the one such call site in the main build.
@@ -49,18 +94,20 @@ SLANG_UNIT_TEST(appManifestIsDeclaredAndWired)
 }
 
 #if SLANG_WINDOWS_FAMILY
-// slang-test, which hosts and runs these unit tests, is created through
-// slang_add_target, so it carries the shared longPathAware manifest. Finding
-// the setting in the running executable's own RT_MANIFEST resource proves the
-// embed pipeline end to end — the manifest source made it through CMake and
-// the manifest tool into the binary — without needing a long-path-enabled
-// machine. If this fails, file I/O silently breaks again for paths over
-// MAX_PATH on long-path-enabled machines.
+// The unit tests run in-process inside the executable that hosts them —
+// slang-test, or test-server when slang-test runs under -use-test-server —
+// both of which are created through slang_add_target and so carry the shared
+// longPathAware manifest. Finding the setting in the running executable's
+// own RT_MANIFEST resource proves the embed pipeline end to end — the
+// manifest source made it through CMake and the manifest tool into the
+// binary — without needing a long-path-enabled machine. If this fails, file
+// I/O silently breaks again for paths over MAX_PATH on long-path-enabled
+// machines.
 //
-// The embed itself only happens under WIN32 AND MSVC, while this test compiles
-// for any Windows toolchain, so a future non-MSVC Windows build would fail
-// here — deliberately, since such a build would otherwise silently lack
-// long-path support.
+// The embed itself only happens under WIN32 AND MSVC, while this test
+// compiles for any Windows toolchain, so a future non-MSVC Windows build
+// would fail here — deliberately, since such a build would otherwise
+// silently lack long-path support.
 SLANG_UNIT_TEST(embeddedAppManifestDeclaresLongPathAware)
 {
     HMODULE module = GetModuleHandleW(nullptr);

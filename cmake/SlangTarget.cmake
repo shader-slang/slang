@@ -15,14 +15,24 @@
 # in the main slang build that is declared with a raw add_executable does not
 # go through that path, so it must call this helper itself to opt in
 # (standalone sub-project targets such as spvdb have no SlangTarget.cmake and
-# sit outside this convention). This is for executable targets only: CMake
-# silently ignores a .manifest source on a library. The helper attaches the
-# one fixed shared manifest; it does not take a caller-supplied manifest.
-# Non-MSVC Windows toolchains (e.g. MinGW) embed no manifest here; no in-tree
-# preset or CI leg builds Windows that way, and a windres-based story would be
-# needed if one ever does.
+# sit outside this convention). This is for executable targets only — CMake
+# silently ignores a .manifest source on a library, so a misuse would look
+# like success, and the helper rejects non-executable targets at configure
+# time instead. The helper attaches the one fixed shared manifest; it does
+# not take a caller-supplied manifest. Non-MSVC Windows toolchains (e.g.
+# MinGW) embed no manifest here; no in-tree preset or CI leg builds Windows
+# that way, and a windres-based story would be needed if one ever does.
 #
 function(slang_add_windows_manifest target)
+    get_target_property(target_type ${target} TYPE)
+    if(NOT target_type STREQUAL "EXECUTABLE")
+        message(
+            SEND_ERROR
+            "slang_add_windows_manifest: '${target}' is a ${target_type}, but the longPathAware manifest is only meaningful on an executable target"
+        )
+        return()
+    endif()
+
     if(WIN32 AND MSVC)
         target_sources(
             ${target}
