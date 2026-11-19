@@ -309,13 +309,19 @@ Type* SemanticsVisitor::TryJoinTypes(
     if (left->equals(right))
         return left;
 
-    // We can join two basic types only when one is strictly better than the
-    // other: converting every input to it must cost strictly less than the
-    // reverse. When both directions cost the same and the types differ,
-    // neither type is better, and picking either one would make inference
-    // depend on the order in which constraints arrive. The join fails
-    // instead, so the solver reports conflicting requirements rather than
-    // silently guessing.
+    // Two basic types join only when one is strictly better: we return `left`
+    // when converting `right` into it costs strictly less than the reverse,
+    // `right` when the comparison goes the other way, and nothing when the
+    // costs tie. A tie has no better side, and returning either operand would
+    // let the caller's accumulated result depend on the order in which it
+    // folds constraints. Failing the join is not itself a diagnostic:
+    // same-priority constraints merge into a conflicting-requirements error,
+    // while mixed-priority constraints fall back to the caller's priority
+    // arbitration. The rule also governs element types, so composite joins
+    // (vector/scalar, vector/vector, and type packs) fail the same way when
+    // their element types tie. This deliberately differs from `unifyBaseType`,
+    // which promotes `bool` to the other operand's type for built-in
+    // operators; generic inference has no preferred side, so it fails.
     if (auto leftBasic = as<BasicExpressionType>(left))
     {
         if (auto rightBasic = as<BasicExpressionType>(right))
