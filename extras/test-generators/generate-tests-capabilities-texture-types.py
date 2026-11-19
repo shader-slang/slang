@@ -465,11 +465,11 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
             disableNegativeSimpleTestPrefix = "DISABLE_"
             testDisabledComment += f"\n// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}"
 
-    # The compute test line runs for the target that `targets=<name>` names. A disabled
-    # compute test has no line, because `DISABLE_TEST` has no effect on the COMPARE_COMPUTE command.
-    computeTestLine = ""
-    if disableComputeTestPrefix == "":
-        computeTestLine = f"//TEST:COMPARE_COMPUTE(targets={positiveComputeTestTarget}, filecheck-buffer=POSITIVE_RESULT):\n"
+    # The compute test line runs once for the target that `targets=` names. A test that has no
+    # target is always disabled, so its line has no `targets=` option.
+    computeTestTargets = ""
+    if positiveComputeTestTarget != "None":
+        computeTestTargets = f"targets={positiveComputeTestTarget}, "
 
     testStr = f"""// THIS IS A GENERATED FILE. DO NOT EDIT!
 // Instead, edit extras/test-generators/generate-tests-capabilities-texture-types.py, and
@@ -484,7 +484,8 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
 //
 {testDisabledComment}
 //{disablePositiveSimpleTestPrefix}TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target {positiveSimpleTestTarget}
-{computeTestLine}//{disableNegativeSimpleTestPrefix}TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target {negativeSimpleTestTarget}
+//{disableComputeTestPrefix}TEST:COMPARE_COMPUTE({computeTestTargets}filecheck-buffer=POSITIVE_RESULT):
+//{disableNegativeSimpleTestPrefix}TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target {negativeSimpleTestTarget}
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

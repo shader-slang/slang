@@ -12,6 +12,7 @@
 
 // Compute test disabled, see https://github.com/shader-slang/slang/issues/8787
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_3
+//DISABLE_TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=POSITIVE_RESULT):
 //DISABLE_TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer

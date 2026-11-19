@@ -13,6 +13,7 @@
 // Compute test disabled, see https://github.com/shader-slang/slang/issues/8787
 // Negative test disabled, see https://github.com/shader-slang/slang/issues/8908
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_450
+//DISABLE_TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=POSITIVE_RESULT):
 //DISABLE_TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_440
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
