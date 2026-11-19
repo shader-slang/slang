@@ -977,6 +977,18 @@ bool isPublicOrExportedFunc(IRFunc* func)
     return false;
 }
 
+/// Emit the storage-class specifier that a function's declaration and its definition must
+/// agree on: a function that is not public or exported is declared `static` to prevent
+/// linking clashes. Both the definition pass and the forward-declaration pass go through
+/// here, so the rule has one source of truth.
+void CPPSourceEmitter::emitFuncStorageSpecifier(IRFunc* func)
+{
+    if (!isPublicOrExportedFunc(func))
+    {
+        m_writer->emit("static ");
+    }
+}
+
 void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 {
     // Emit function decorations
@@ -989,11 +1001,7 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     // Deal with decorations that need
     // to be emitted as attributes
 
-    // If `func` is not public or exported, emit `static` to prevent linking clash.
-    if (!isPublicOrExportedFunc(func))
-    {
-        m_writer->emit("static ");
-    }
+    emitFuncStorageSpecifier(func);
     // We start by emitting the result type and function name.
     //
     if (IREntryPointDecoration* const entryPointDecor =
@@ -2367,6 +2375,63 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     computeEmitActions(module, actions);
 
     _emitForwardDeclarations(actions);
+
+    // The passes below emit every global (with its initializer function, for a
+    // non-constant initializer) before any function definition, so a global
+    // initializer that references a function would name it ahead of its
+    // declaration — invalid C++. Declare each function referenced from a
+    // global initializer up front; its definition still comes from the later
+    // pass. Globals with initializer code only ever appear in `actions` at
+    // `Level::Definition`, and the scan covers every instruction operand in
+    // the initializer blocks — direct calls, calls whose callee is wrapped by
+    // a specialization (resolved through its decorations, as the sibling
+    // global-init passes do), and function addresses alike.
+    {
+        // Declaration order follows first-use order so the emitted text is stable
+        // across runs.
+        OrderedHashSet<IRFunc*> funcsToDeclare;
+        for (auto action : actions)
+        {
+            if (action.level != EmitAction::Level::Definition)
+                continue;
+            auto globalVar = as<IRGlobalVar>(action.inst);
+            if (!globalVar)
+                continue;
+            for (auto block = globalVar->getFirstBlock(); block; block = block->getNextBlock())
+            {
+                for (auto inst : block->getOrdinaryInsts())
+                {
+                    for (UInt ii = 0; ii < inst->getOperandCount(); ++ii)
+                    {
+                        auto resolved = getResolvedInstForDecorations(inst->getOperand(ii));
+                        if (auto func = as<IRFunc>(resolved))
+                            funcsToDeclare.add(func);
+                    }
+                }
+            }
+        }
+        for (auto func : funcsToDeclare)
+        {
+            // `emitFuncDecl` deliberately emits nothing for target-intrinsic
+            // functions and entry points (an intrinsic call lowers to its inline
+            // text; an entry point must not be declared ahead of its
+            // attributes), so no declaration is owed for them; skipping them
+            // here also keeps a storage-class prefix from dangling in the
+            // output. A body-less callee is skipped too: the functions pass
+            // emits it as a plain declaration, and an early duplicate could
+            // disagree with that declaration's linkage (an `extern "C"`
+            // function's early declaration would need the same wrapping).
+            // A body-less callee referenced from an initializer is therefore a
+            // known limitation — that shape did not compile before this pass
+            // existed either. Only a definition-shaped declaration carries the
+            // storage specifier, and `emitFuncStorageSpecifier` is the one
+            // source of that rule.
+            if (isTargetIntrinsic(func) || asEntryPoint(func) || !func->getFirstBlock())
+                continue;
+            emitFuncStorageSpecifier(func);
+            emitForwardDeclaration(func);
+        }
+    }
 
     {
         // Output all the thread locals

@@ -5104,6 +5104,29 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
+/// Return whether any non-terminator instruction in `globalVar`'s initializer code might have
+/// side effects, so that eliminating the global would also drop an observable effect of running
+/// its initializer. Returns false for a global without initializer blocks (there is no
+/// initializer code to drop). Every initializer block ends in a terminator — a `return` in the
+/// exit block, a branch in an intermediate block — and the conservative default of
+/// `mightHaveSideEffects` flags all terminators, so skipping them is what keeps the predicate
+/// from matching every initialized global instead of only the side-effecting ones. Parameters
+/// need no explicit skip: `getOrdinaryInsts()` already excludes them.
+static bool initializerMightHaveSideEffects(IRGlobalVar* globalVar)
+{
+    for (auto block = globalVar->getFirstBlock(); block; block = block->getNextBlock())
+    {
+        for (auto inst : block->getOrdinaryInsts())
+        {
+            if (as<IRTerminatorInst>(inst))
+                continue;
+            if (inst->mightHaveSideEffects())
+                return true;
+        }
+    }
+    return false;
+}
+
 ModuleLinkingInfo::ModuleLinkingInfo(IRModule* module)
 {
     _build(module);
@@ -5134,6 +5157,12 @@ void ModuleLinkingInfo::_build(IRModule* module)
 
         if (as<IRGlobalParam>(inst))
             m_globalParams.add(inst);
+
+        if (auto globalVar = as<IRGlobalVar>(inst))
+        {
+            if (initializerMightHaveSideEffects(globalVar))
+                m_globalVarsWithSideEffectingInit.add(globalVar);
+        }
 
         bool isHLSLExported = false;
         bool isKnownBuiltin = false;
