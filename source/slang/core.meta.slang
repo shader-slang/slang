@@ -4896,6 +4896,20 @@ enum _AttributeTargets
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
 
+/// Associate a D3D12 root signature with a function, given as a string in the
+/// HLSL root-signature sub-language. The compiler accepts and reflects the
+/// string as-is; it does not validate the root-signature syntax or use it to
+/// influence binding calculation. Applications retrieve the string through the
+/// user-attribute reflection API on an entry point.
+/// @param value The root-signature string.
+/// @remarks This attribute is available in both the Slang and HLSL source
+/// dialects, so entry points written in either language can carry it.
+[__AttributeUsage(_AttributeTargets.Function)]
+struct RootSignatureAttribute
+{
+    string value;
+};
+
 /// Specify the storage format of a read-write texture. Can only be used on a texture typed struct field or global parameter.
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for a complete list of allowed format strings.
