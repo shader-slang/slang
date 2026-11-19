@@ -81,7 +81,8 @@ SLANG_UNIT_TEST(multiFileModuleCache)
             // calcCombinedPath returns, so derive the per-root subpath with the simplified
             // spelling rather than the OS-preferred delimiter.
             String path = Path::simplify(mod->getFilePath());
-            path = String("root1") + path.getUnownedSlice().tail(path.indexOf(Path::kPathDelimiter));
+            path =
+                String("root1") + path.getUnownedSlice().tail(path.indexOf(Path::kPathDelimiter));
             path.append("-module");
 
             ComPtr<slang::IBlob> serializedBlob;
