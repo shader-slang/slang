@@ -68,8 +68,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     // Vector operators. `vector<bool, N>` has no ordering operator of its own:
     // `va < vb` resolves by the implicit element conversion `vector<bool,2>` to
     // `vector<int,2>` onto the generated integer `operator<`, a pre-existing
-    // path this test pins rather than one the fix touches. The `.x` and `.y`
-    // components get different inputs.
+    // path this test pins. The `.x` and `.y` components get different inputs.
     bool2 va = bool2(a, b);
     bool2 vb = bool2(b, a);
 
