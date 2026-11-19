@@ -3844,6 +3844,10 @@ DeclRef<D> createDefaultSpecializedDeclRef(
 struct StmtLoweringVisitor;
 
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt);
+static IRInst* emitDebugLexicalBlockForScope(
+    IRGenContext* context,
+    ScopeDecl* scopeDecl,
+    SourceLoc loc);
 
 void maybeEmitDebugLine(
     IRGenContext* context,
@@ -7899,6 +7903,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlockIfNeeded(stmt);
 
         auto clause = stmt->condition;
+        // A declaration condition's scope covers the condition and both arms (the
+        // variable is visible there, like C++), so give it its own debug lexical block
+        // while the statement lowers, mirroring how a BlockStmt's scope is handled.
+        auto previousDebugScope = context->currentDebugScope;
+        auto conditionDebugScope =
+            emitDebugLexicalBlockForScope(context, clause->scopeDecl, clause->loc);
+        if (conditionDebugScope)
+        {
+            context->currentDebugScope = conditionDebugScope;
+            emitCurrentDebugScope(context);
+        }
         // A declaration condition declares its variable right before the test, in the
         // statement's condition slot, so the variable is initialized before the branch
         // and is in scope for both arms.
@@ -7992,6 +8007,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             popScopeBlock(prevScopeEndBlock, true);
 
             insertBlock(afterBlock);
+        }
+
+        if (conditionDebugScope)
+        {
+            // The statement's blocks are done; the code that follows the statement is
+            // back in the enclosing lexical scope, so emit that scope's marker into
+            // the after block before its instructions.
+            context->currentDebugScope = previousDebugScope;
+            emitCurrentDebugScope(context);
         }
 
         maybeEmitDebugLine(context, this, stmt, stmt->afterLoc);
@@ -8204,6 +8228,22 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(loopHead);
 
+        // A declaration condition's scope covers the loop head, where the variable is
+        // re-initialized before every test, and the body, where it is visible, so the
+        // whole loop lowers inside its own debug lexical block. The code after the
+        // loop returns to the enclosing scope.
+        auto previousDebugScope = context->currentDebugScope;
+        auto conditionDebugScope = stmt->condition ? emitDebugLexicalBlockForScope(
+                                                         context,
+                                                         stmt->condition->scopeDecl,
+                                                         stmt->condition->loc)
+                                                   : nullptr;
+        if (conditionDebugScope)
+        {
+            context->currentDebugScope = conditionDebugScope;
+            emitCurrentDebugScope(context);
+        }
+
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
         uint32_t coverageBranchSiteID = 0;
@@ -8260,8 +8300,18 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
 
+        if (conditionDebugScope)
+        {
+            context->currentDebugScope = previousDebugScope;
+        }
+
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
+
+        if (conditionDebugScope)
+        {
+            emitCurrentDebugScope(context);
+        }
     }
 
     void visitDoWhileStmt(DoWhileStmt* stmt)
@@ -8304,6 +8354,22 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         popScopeBlock(prevScopeEndBlock, true);
 
         insertBlock(testLabel);
+
+        // A `do`-`while` condition variable is visible in the condition only — the body
+        // runs before the condition, so the body never shares that scope (it lowered
+        // above, in the enclosing scope). Give the condition its own debug lexical
+        // block, covering just the test where the variable is declared and tested.
+        auto previousDebugScope = context->currentDebugScope;
+        auto conditionDebugScope = stmt->condition ? emitDebugLexicalBlockForScope(
+                                                         context,
+                                                         stmt->condition->scopeDecl,
+                                                         stmt->condition->loc)
+                                                   : nullptr;
+        if (conditionDebugScope)
+        {
+            context->currentDebugScope = conditionDebugScope;
+            emitCurrentDebugScope(context);
+        }
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
@@ -8379,8 +8445,18 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
         }
 
+        if (conditionDebugScope)
+        {
+            context->currentDebugScope = previousDebugScope;
+        }
+
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
+
+        if (conditionDebugScope)
+        {
+            emitCurrentDebugScope(context);
+        }
     }
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt)
@@ -9741,8 +9817,7 @@ static IRInst* maybeEmitDebugFunction(IRGenContext* context, IRInst* irFunc)
 // blocks, rather than from the control-flow statement itself.
 static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
 {
-    if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
-        stmt == context->debugFunctionBody)
+    if (stmt == context->debugFunctionBody)
         return nullptr;
     auto scopedStmt = as<ScopeStmt>(stmt);
     if (!scopedStmt || !scopedStmt->scopeDecl)
@@ -9751,18 +9826,34 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
         return nullptr;
     if (!as<BlockStmt>(stmt) && !as<ForStmt>(stmt))
         return nullptr;
-    auto source = getOrEmitDebugSource(context, stmt->loc);
+    return emitDebugLexicalBlockForScope(context, scopedStmt->scopeDecl, stmt->loc);
+}
+
+// Emit a debug lexical block for `scopeDecl` nested in the current scope, or return null
+// when debug info is off. Condition clauses own scopes that are not carried by any
+// statement (a declaration condition's scope spans the condition and, for `if` and
+// `while`, the arms), so they call this directly instead of going through
+// `maybeEmitDebugLexicalBlock`, which keys off the statement.
+static IRInst* emitDebugLexicalBlockForScope(
+    IRGenContext* context,
+    ScopeDecl* scopeDecl,
+    SourceLoc loc)
+{
+    if (context->debugInfoLevel < DebugInfoLevel::Standard || !context->currentDebugScope ||
+        !scopeDecl)
+        return nullptr;
+    auto source = getOrEmitDebugSource(context, loc);
     if (!source)
         return nullptr;
-    auto loc = _getDebugHumaneLoc(context, source, stmt->loc);
+    auto humaneLoc = _getDebugHumaneLoc(context, source, loc);
     IRBuilder builder(*context->irBuilder);
     // Keep metadata inside the generic that owns the function. Its normal clone environment
     // then remaps lexical parents and declaration scopes together with the function body.
     builder.setInsertBefore(context->irFunc);
     return builder.emitDebugLexicalBlock(
         source,
-        builder.getIntValue(builder.getUIntType(), loc.line),
-        builder.getIntValue(builder.getUIntType(), loc.column),
+        builder.getIntValue(builder.getUIntType(), humaneLoc.line),
+        builder.getIntValue(builder.getUIntType(), humaneLoc.column),
         context->currentDebugScope);
 }
 
