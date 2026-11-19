@@ -22,7 +22,7 @@ int ifConditionValue()
     return 0;
 }
 
-// The condition variable is visible in both the `then` and `else` arms.
+// The declared variable is visible in both the `then` and `else` arms.
 int ifElseVisibility()
 {
     if (int count = 0)
@@ -31,7 +31,7 @@ int ifElseVisibility()
         return count + 10;
 }
 
-// The condition variable is visible in an `else if` condition and arm.
+// The declared variable is visible in an `else if` condition and arm.
 int elseIfChain()
 {
     int x = 0;
@@ -42,7 +42,7 @@ int elseIfChain()
     return 0;
 }
 
-// The condition variable is scoped to the statement: an outer variable with the same
+// The declared variable is scoped to the statement: an outer variable with the same
 // name is shadowed only inside the statement and restored after it.
 int ifScoping()
 {

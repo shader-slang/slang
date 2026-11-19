@@ -8245,7 +8245,7 @@ ConditionClause* Parser::parseConditionClause()
         if (currentModuleDecl)
             currentModuleDecl->languageVersion = savedLanguageVersion;
 
-        // A condition declaration always has an initializer, so the parser
+        // A declaration used as a condition always has an initializer, so the parser
         // commits to the declaration form only on the `name =` shape; the
         // completion-request terms keep language-server completions resolving
         // in the right context.

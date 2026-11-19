@@ -14,7 +14,7 @@
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
-// The condition variable is scoped to the condition: the body reads the outer `c`,
+// The declared variable is scoped to the condition: the body reads the outer `c`,
 // and the outer `c` is restored after the loop.
 int doWhileConditionScope()
 {

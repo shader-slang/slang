@@ -12,7 +12,7 @@
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
-// Each iteration re-initializes the condition variable before testing it.
+// Each iteration re-initializes the declared variable before testing it.
 int whileReinitializes()
 {
     int n = 3;
@@ -22,7 +22,7 @@ int whileReinitializes()
     return sum * 10 + n;
 }
 
-// The condition variable is visible in the body; an outer variable with the same
+// The declared variable is visible in the body; an outer variable with the same
 // name is shadowed only inside the statement and restored after it.
 int whileScoping()
 {

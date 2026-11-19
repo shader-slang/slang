@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=CHECK): -lang hlsl tests/hlsl/decl-condition-errors.slang -no-codegen -warnings-disable 30081
 
 // Error cases for declaration conditions: a condition value must be convertible to
-// `bool`, and the `do`-`while` condition variable is invisible in the body (the body
+// `bool`, and the declared variable is invisible in the body (the body
 // is parsed before the condition, so the name is undefined there). The 30081 warning
 // is disabled: the `int` conditions convert to `bool` by design.
 
@@ -16,7 +16,7 @@ void main()
     {
     }
 
-    // The `do`-`while` condition variable is visible in the condition only; the body
+    // The `do`-`while` declared variable is visible in the condition only; the body
     // is parsed before the condition, so the name is undefined in the body.
     int sum = 0;
     do

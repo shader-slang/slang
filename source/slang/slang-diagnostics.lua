@@ -1641,8 +1641,8 @@ err(
 err(
     "declaration-as-condition-requires-hlsl",
     30444,
-    "a declaration cannot be used as a condition",
-    span { loc = "location", message = "a variable declaration can only be used as the condition of an `if`, `while`, or `do`-`while` statement in the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
+    "a variable declaration is not allowed as a condition",
+    span { loc = "location" }
 )
 
 err(
