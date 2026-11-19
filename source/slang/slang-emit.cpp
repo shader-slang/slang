@@ -3066,6 +3066,15 @@ Result linkAndOptimizeIR(
     SLANG_PASS(checkUnsupportedResourceLocals, codeGenContext->getTargetReq(), sink);
     if (isD3DTarget(targetRequest))
         SLANG_PASS(validateGroupSharedParamsForHLSL, targetRequest->getTargetCaps(), sink);
+    // The CPU-via-LLVM atomic check runs unconditionally, at the very end of
+    // linkAndOptimizeIR — after every pass that can still create or expose an atomic, and after
+    // validateAtomicOperations above: destination validation reports the specific E41403 first,
+    // and only destinations that pass it reach this blanket "atomics not supported" error, so
+    // the more specific diagnostic is never shadowed. It runs in minimum-optimization mode
+    // too, like checkUnsupportedResourceLocals above, because the abort it prevents happens
+    // inside the Slang process.
+    if (isCPUTargetViaLLVM(targetRequest))
+        SLANG_PASS(checkUnsupportedLLVMCPUAtomics, sink);
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
 

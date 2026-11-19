@@ -565,6 +565,47 @@ static void checkUnsupportedMetalInsts(IRModule* module, DiagnosticSink* sink)
     }
 }
 
+// Diagnose atomic operations for CPU-via-LLVM targets. The LLVM backend implements no IR atomic
+// operation, so an atomic reaching the emitter aborts code generation inside the Slang process
+// with an internal "Unsupported instruction for LLVM target!" error. Diagnosing the gap here
+// reports an ordinary error at the source location instead. The check is invoked unconditionally
+// (see slang-emit.cpp): the Metal checks in this file tolerate being skipped under
+// -minimum-slang-optimization because a failure they miss still surfaces in the downstream
+// Metal compiler, while this one guards an abort that happens inside the Slang process, so
+// minimum-optimization mode must still reject it. Like the Metal checks, we visit only
+// top-level function bodies. The one other code shape the emitter lowers — a global variable's
+// initializer block (emitGlobalInstructionCtor) — cannot hold an atomic here: an atomic in a
+// static initializer is dropped before the emit-time IR, so the scan would find nothing in it.
+// A generic that remains at this point is not
+// emitted. The Metal checks' second reason for that — unspecialized address spaces in such
+// bodies — does not apply: no address-space specialization runs on this path at all. The scan
+// covers atomic operations
+// only; barrier ops also lack emitter support and still abort until the LLVM backend implements
+// them. The findFirstUseLoc fallback mirrors the func-typed checks below: if an atomic ever
+// reaches here without its own source location, the diagnostic still points at user code.
+void checkUnsupportedLLVMCPUAtomics(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto atomic = as<IRAtomicOperation>(inst);
+                if (!atomic)
+                    continue;
+                auto loc =
+                    atomic->sourceLoc.isValid() ? atomic->sourceLoc : findFirstUseLoc(atomic);
+                sink->diagnose(
+                    Diagnostics::AtomicOperationsNotSupportedOnLlvmCpuTarget{.location = loc});
+            }
+        }
+    }
+}
+
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     if (isMetalTarget(target))

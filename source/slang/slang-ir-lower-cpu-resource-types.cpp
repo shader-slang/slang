@@ -13,16 +13,18 @@
 // ByteAddressBuffer/RWByteAddressBuffer/StructuredBuffer/RWStructuredBuffer:
 //
 //     struct LoweredType {
-//         T* data;
+//         Ptr<T, AddressSpace::UserPointer> data;
 //         size_t size;
 //     }
 //
 //     Instructions that access `LoweredType` are lowered immediately in this
-//     pass such that they index `data` as needed.
+//     pass such that they index `data` as needed. The data pointer is
+//     UserPointer — host memory, the same address space a plain `T*` gets;
+//     `lowerType` records why that address space is load-bearing.
 //
 // ConstantBufferType/ParameterBlockType:
 //
-//     typealias LoweredType = T*;
+//     typealias LoweredType = Ptr<T, AddressSpace::UserPointer>;
 //
 //     Instructions that access `LoweredType` are lowered immediately in this
 //     pass such that they access members through the pointer as needed.
@@ -38,6 +40,11 @@
 //
 //     This pass itself doesn't deal with such function calls, they should
 //     eventually be fully handled in the core module and the LLVM emitter.
+//
+//     The `void*` lowering intentionally passes no address space: these values are opaque
+//     handles, never dereferenced, and an atomic destination reached through an image is
+//     accepted by instruction shape (IRImageSubscript) before any address space is consulted,
+//     so the handle's absent address space never gates anything.
 
 namespace Slang
 {
@@ -63,6 +70,18 @@ struct ResourceTypeLoweringContext : InstPassBase
             type->getOp() == kIROp_HLSLRWStructuredBufferType)
             access = AccessQualifier::ReadWrite;
 
+        // The payload pointer of ConstantBuffer/ParameterBlock and the data pointers of the
+        // StructuredBuffer and ByteAddressBuffer families below are typed UserPointer because
+        // CPU buffer memory is host memory — the address space a plain `T*` already gets on
+        // CPU targets, which is why code generation is unaffected by the change: the LLVM
+        // emitter maps every pointer to one opaque pointer, and the later
+        // lowerBufferElementTypeToStorageType run treats a UserPointer exactly like any other
+        // user pointer. The address space still matters to validation: this pass runs
+        // immediately before validateAtomicOperations, whose isValidAtomicDest accepts
+        // UserPointer but not Generic, and no address-space specialization runs on the
+        // CPU-via-LLVM path to fix a Generic up later. The same host-memory rationale covers
+        // all three sites uniformly, including the read-only ConstantBuffer/ParameterBlock
+        // payload; the access qualifier is still recorded in the pointer type.
         switch (type->getOp())
         {
         case kIROp_ConstantBufferType:
@@ -73,7 +92,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 loweredType = builder.getPtrType(
                     as<IRType>(type->getOperand(0)),
                     access,
-                    AddressSpace::Generic,
+                    AddressSpace::UserPointer,
                     layoutType);
             }
             break;
@@ -90,7 +109,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto ptrType = builder.getPtrType(
                     bufferType->getElementType(),
                     access,
-                    AddressSpace::Generic,
+                    AddressSpace::UserPointer,
                     layoutType);
                 builder.createStructField(s, ptrKey, ptrType);
                 builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
@@ -109,7 +128,7 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto ptrType = builder.getPtrType(
                     builder.getUInt8Type(),
                     access,
-                    AddressSpace::Generic,
+                    AddressSpace::UserPointer,
                     layoutType);
                 builder.createStructField(s, ptrKey, ptrType);
                 builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
