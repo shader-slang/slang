@@ -391,6 +391,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     return false;
                 }
                 // TODO: this is one place where syntax should get cloned!
+                // The default folds through the parameter's declared type, so
+                // a specialization that omitted the argument records the same
+                // canonical `IntVal` an explicitly written argument produces.
                 if (outProperType)
                 {
                     ConstantFoldingCircularityInfo newCircularityInfo(
