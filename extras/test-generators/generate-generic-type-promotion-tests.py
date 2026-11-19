@@ -45,6 +45,10 @@ class TypeInfo:
         self.literalFmt = literalFmt
 
     def literal(self, value):
+        if self.kind == kKind_Bool:
+            # Bool has no numeric literal spelling; use testValue(), which
+            # yields `true`/`false` with the matching numeric value.
+            raise ValueError("use testValue() for bool operands")
         return self.literalFmt.format(v=value)
 
     def testValue(self, value):
@@ -75,8 +79,10 @@ coreTypes = [
 
 # 64-bit types (may require extensions on some backends)
 extendedTypes = [
-    TypeInfo("int64_t",  kKind_Signed,   kRank_Int64, 8, "int64_t({v})"),
+    TypeInfo("int64_t",  kKind_Signed,   kRank_Int64,  8, "int64_t({v})"),
     TypeInfo("uint64_t", kKind_Unsigned, kRank_Int64, 8, "uint64_t({v})"),
+    TypeInfo("intptr_t", kKind_Signed,   kRank_IntPtr, 8, "intptr_t({v})"),
+    TypeInfo("uintptr_t", kKind_Unsigned, kRank_IntPtr, 8, "uintptr_t({v})"),
     TypeInfo("double",   kKind_Float,    kRank_Int64, 8, "double({v})"),
 ]
 
@@ -89,10 +95,9 @@ def getConversionCost(fromKind, fromRank, toKind, toRank):
 
     # Bool: conversion kind Unsigned, rank Bool (lowest). Bool-to-int32 is the
     # BoolToInt special case (tag == Int); other signed targets take the
-    # unsigned-to-signed promotion; unsigned targets take the same-kind rank
-    # promotion; bool never reaches the integer-to-float gates (its rank is
-    # below Int8), and nothing converts to bool except as a general
-    # conversion.
+    # unsigned-to-signed promotion, except pointer-sized targets, which the
+    # compiler also excludes from that promotion (the pointer size might be
+    # as small as the source), so they fall to the general conversion.
     if fromKind == kKind_Bool and toKind == kKind_Signed:
         if toRank == kRank_Int32:
             return 120  # kConversionCost_BoolToInt
@@ -108,14 +113,15 @@ def getConversionCost(fromKind, fromRank, toKind, toRank):
     if fromKind == toKind:
         return 150 if toRank > fromRank else 900
 
-    # Unsigned -> Signed
+    # Unsigned -> Signed. Pointer-sized ranks on either side are excluded
+    # from both promotion flavors for the same pointer-size reason as above.
     if fromKind == kKind_Unsigned and toKind == kKind_Signed:
-        if toRank > fromRank:
-            return 200  # kConversionCost_UnsignedToSignedPromotion
-        elif toRank == fromRank:
-            return 300  # kConversionCost_SameSizeUnsignedToSignedConversion
-        else:
-            return 900
+        if toRank != kRank_IntPtr and fromRank != kRank_IntPtr:
+            if toRank > fromRank:
+                return 200  # kConversionCost_UnsignedToSignedPromotion
+            if toRank == fromRank:
+                return 300  # kConversionCost_SameSizeUnsignedToSignedConversion
+        return 900
 
     # Signed -> Unsigned
     if fromKind == kKind_Signed and toKind == kKind_Unsigned:
@@ -239,7 +245,9 @@ def generateTestFile(pairs, description, testDirectives, extraNote=""):
 // Bool pairs join with integer types (the integer side is strictly better)
 // and tie with floating-point types at equal conversion cost; the tie pairs
 // fail inference and are generated into
-// gen-generic-type-promotion-tie-rejection.slang (issue #10164).
+// gen-generic-type-promotion-tie-rejection.slang (issue #10164). Bool
+// itself therefore never appears as an inferred type here: it either loses
+// the join to an integer type or is partitioned into the rejection file.
 //
 // Excluded pairs: integer+half (E30081, CPU backend limitation) and
 // float+double (E30082 performance warning).
@@ -280,8 +288,8 @@ def generateRejectionTestFile(pairs):
 
     cases = []
     for ta, tb in pairs:
-        litA = ta.testValue(3)[0]
-        litB = tb.testValue(7)[0]
+        litA, _ = ta.testValue(3)
+        litB, _ = tb.testValue(7)
         cases.append(
             f"""\
     {{
@@ -339,9 +347,18 @@ def main():
     os.makedirs(genTestDirectory, exist_ok=True)
     os.chdir(genTestDirectory)
 
+    # Partition the full type set once: success triples feed the compute
+    # tests (core pairs, then pairs involving a 64-bit type), and tie pairs
+    # feed the rejection test, all from one inference pass.
+    allTypes = coreTypes + extendedTypes
+    allSuccess, allTies = partitionPairs(list(combinations(allTypes, 2)))
+
     # Core types: bool, int8-32, uint8-32, half, float
-    coreSuccess, coreTies = partitionPairs(list(combinations(coreTypes, 2)))
-    coreTriples = [t for t in coreSuccess if not shouldSkipPair(t[0], t[1], t[2])]
+    coreTriples = [
+        t
+        for t in allSuccess
+        if t[0] in coreTypes and t[1] in coreTypes and not shouldSkipPair(*t)
+    ]
     coreFile = "gen-generic-type-promotion-inference.slang"
     coreDirectives = [
         "//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type",
@@ -358,12 +375,11 @@ def main():
     print(f"Generated: {genTargetDirectory}{coreFile} ({len(coreTriples)} pairs)")
 
     # 64-bit type pairs: all pairs involving at least one 64-bit type
-    allTypes = coreTypes + extendedTypes
-    allPairs = list(combinations(allTypes, 2))
-    pairs64Success, pairs64Ties = partitionPairs(
-        [(a, b) for a, b in allPairs if a in extendedTypes or b in extendedTypes]
-    )
-    pairs64Triples = [t for t in pairs64Success if not shouldSkipPair(t[0], t[1], t[2])]
+    pairs64Triples = [
+        t
+        for t in allSuccess
+        if (t[0] in extendedTypes or t[1] in extendedTypes) and not shouldSkipPair(*t)
+    ]
 
     ext64File = "gen-generic-type-promotion-inference-64bit.slang"
     ext64Directives = [
@@ -371,8 +387,8 @@ def main():
     ]
     extNote = (
         "//\n"
-        "// 64-bit types (int64_t, uint64_t, double) may require extensions on GPU\n"
-        "// backends, so this test runs on CPU only.\n"
+        "// 64-bit types (int64_t, uint64_t, double, intptr_t, uintptr_t) may\n"
+        "// require extensions on GPU backends, so this test runs on CPU only.\n"
     )
     with open(ext64File, "w") as f:
         f.write(
@@ -385,8 +401,7 @@ def main():
         )
     print(f"Generated: {genTargetDirectory}{ext64File} ({len(pairs64Triples)} pairs)")
 
-    # Equal-cost ties across the full type set (both argument orders)
-    allSuccess, allTies = partitionPairs(list(combinations(allTypes, 2)))
+    # Equal-cost ties (both argument orders)
     tieFile = "gen-generic-type-promotion-tie-rejection.slang"
     with open(tieFile, "w") as f:
         f.write(generateRejectionTestFile(allTies))
