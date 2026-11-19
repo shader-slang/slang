@@ -19,4 +19,10 @@ SLANG_UNIT_TEST(appManifestDeclaresLongPathAware)
     String manifest;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(manifestPath, manifest)));
     SLANG_CHECK_ABORT(manifest.contains("<longPathAware>true</longPathAware>"));
+
+    // The embed is only wired through cmake/SlangTarget.cmake; guard that the
+    // reference has not been dropped either.
+    String slangTarget;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText("cmake/SlangTarget.cmake", slangTarget)));
+    SLANG_CHECK_ABORT(slangTarget.contains("slang-app.manifest"));
 }
