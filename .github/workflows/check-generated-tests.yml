@@ -1,0 +1,52 @@
+name: Check Generated Tests (run extras/test-generators/generate-*.py to fix)
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  check-generated-tests:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    # This job executes PR-authored Python, so give it the tree and nothing else.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      # The generators use only the Python standard library, so the job uses the
+      # Python that the runner image already has.
+      - name: Run the test generators
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          generators=(extras/test-generators/generate-*.py)
+          if [[ ${#generators[@]} -eq 0 ]]; then
+            echo "No generator found in extras/test-generators" >&2
+            exit 1
+          fi
+          for generator in "${generators[@]}"; do
+            echo "Running $generator"
+            python3 "$generator" > /dev/null
+          done
+
+      # Each generator writes into the checked-out tree. A modified, deleted or
+      # new file under tests/generated is a file that does not match its generator.
+      - name: Compare with the checked-in tests
+        run: |
+          if [[ -n "$(git status --porcelain -- tests/generated)" ]]; then
+            echo "Generated tests are out of date. Changed files:"
+            git status --porcelain -- tests/generated
+            echo
+            git --no-pager diff -- tests/generated | head -n 400
+            echo
+            echo "Do not edit a generated test by hand. Change the generator in"
+            echo "extras/test-generators, then run these commands and commit the result:"
+            echo "  for g in extras/test-generators/generate-*.py; do python3 \"\$g\"; done"
+            exit 1
+          fi
