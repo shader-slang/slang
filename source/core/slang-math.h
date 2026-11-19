@@ -214,7 +214,8 @@ SLANG_FORCE_INLINE double Int64AsDouble(int64_t value)
 // instead. `DoubleToFloatBits` is the inverse, so every Float32 NaN round-trips exactly.
 SLANG_FORCE_INLINE double FloatBitsToDouble(uint32_t bits)
 {
-    if ((bits & 0x7F800000u) == 0x7F800000u && (bits & 0x007FFFFFu) != 0)
+    bool isNaN = ((bits & 0x7F800000u) == 0x7F800000u && (bits & 0x007FFFFFu) != 0);
+    if (isNaN)
     {
         const uint64_t sign = uint64_t(bits >> 31) << 63;
         const uint64_t fraction = uint64_t(bits & 0x007FFFFFu) << 29;
@@ -231,7 +232,8 @@ SLANG_FORCE_INLINE uint32_t DoubleToFloatBits(double value)
 {
     const uint64_t bits = uint64_t(DoubleAsInt64(value));
     const uint32_t fraction = uint32_t((bits >> 29) & 0x007FFFFFu);
-    if (((bits >> 52) & 0x7FF) == 0x7FF && fraction != 0)
+    bool isNaN = (((bits >> 52) & 0x7FF) == 0x7FF && fraction != 0);
+    if (isNaN)
         return (uint32_t(bits >> 63) << 31) | 0x7F800000u | fraction;
     return uint32_t(FloatAsInt(float(value)));
 }
