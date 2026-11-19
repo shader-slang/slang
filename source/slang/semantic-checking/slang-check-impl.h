@@ -3742,8 +3742,8 @@ public:
     // Two basic types join only when one is strictly better, i.e. converting
     // the other into it costs strictly less than the reverse; an equal-cost
     // pair of distinct basic types (such as `bool` and `float`) has no better
-    // side and does not join, so inference relying on it fails rather than
-    // picking a side.
+    // side and does not join, so same-priority inference relying on it fails
+    // rather than picking a side.
     //
     // `allowEnumScalarJoin` opts in to decaying an enum to its tag type so it can
     // join with a scalar; it is enabled only for common-type/convertibility

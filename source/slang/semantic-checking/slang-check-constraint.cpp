@@ -309,19 +309,19 @@ Type* SemanticsVisitor::TryJoinTypes(
     if (left->equals(right))
         return left;
 
-    // Two basic types join only when one is strictly better: we return `left`
-    // when converting `right` into it costs strictly less than the reverse,
-    // `right` when the comparison goes the other way, and nothing when the
-    // costs tie. A tie has no better side, and returning either operand would
-    // let the caller's accumulated result depend on the order in which it
-    // folds constraints. Failing the join is not itself a diagnostic:
-    // same-priority constraints merge into a conflicting-requirements error,
-    // while mixed-priority constraints fall back to the caller's priority
-    // arbitration. The rule also governs element types, so composite joins
-    // (vector/scalar, vector/vector, and type packs) fail the same way when
-    // their element types tie. This deliberately differs from `unifyBaseType`,
-    // which promotes `bool` to the other operand's type for built-in
-    // operators; generic inference has no preferred side, so it fails.
+    // An equal-cost tie has no better side (the strictly-better rule is
+    // stated at the declaration): returning either operand would let the
+    // constraint-merging caller's accumulated result depend on the order in
+    // which it folds constraints. Failing the join is not itself a
+    // diagnostic: same-priority constraints merge into a
+    // conflicting-requirements error, mixed-priority constraints fall back
+    // to the caller's priority arbitration, and other callers treat a
+    // failed join as no new information. The rule governs element types,
+    // so composite joins (vector/scalar, vector/vector, type packs) fail
+    // the same way when their element types tie. This deliberately differs
+    // from `unifyBaseType`, which promotes `bool` to the other operand's
+    // type for built-in operators; generic inference has no preferred
+    // side, so it fails.
     if (auto leftBasic = as<BasicExpressionType>(left))
     {
         if (auto rightBasic = as<BasicExpressionType>(right))
@@ -2021,11 +2021,13 @@ private:
             return true;
         }
 
-        // Non-exact type constraints use the join path. This preserves existing
-        // common-type behavior for ordinary call inference, such as picking a
-        // type that several arguments can convert to. This is the one place an
-        // enum may decay to its tag type to join with a scalar, since here the
-        // join proposes a type both arguments will be coerced to.
+        // Non-exact type constraints use the join path. This preserves common-type
+        // behavior for ordinary call inference: the join picks a type that
+        // several arguments can convert to when one side is strictly better,
+        // and a same-priority conflict is reported when neither side is. This
+        // is the one place an enum may decay to its tag type to join with a
+        // scalar, since here the join proposes a type both arguments will be
+        // coerced to.
         auto joinType =
             m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowEnumScalarJoin*/ true);
         if (!joinType)
