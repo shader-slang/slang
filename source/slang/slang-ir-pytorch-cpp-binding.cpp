@@ -1130,6 +1130,24 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
     return hostFunc;
 }
 
+void diagnoseBodylessKernelEntryPoints(IRModule* module, DiagnosticSink* sink)
+{
+    // A '[CudaKernel]' forward declaration is legal as a declaration; whether it is ever given a
+    // body is only knowable after linking, since the definition may live elsewhere in the module.
+    // This check therefore runs post-link, once that question is settled: the CUDA/PyTorch binding
+    // passes below read a kernel's parameters from its first block, which is null for a forward
+    // declaration, so a '[CudaKernel]' still lacking a body at this point is rejected before those
+    // passes run.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func || !func->findDecoration<IRCudaKernelDecoration>())
+            continue;
+        if (!func->isDefinition())
+            sink->diagnose(Diagnostics::KernelEntryPointRequiresBody{.location = func->sourceLoc});
+    }
+}
+
 void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
 {
     List<IRFunc*> cudaKernels;
