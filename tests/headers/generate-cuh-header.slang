@@ -22,7 +22,7 @@ __extern_cpp struct Struct
 // for some reason generated before struct
 __extern_cpp groupshared float sharedMemory[4];
 
-//CHECK: __global__ void kernel(Struct {{[[:alnum:]_]+}})
+//CHECK: __global__ void kernel(Struct s_{{[0-9]+}})
 [CudaKernel]
 void kernel(Struct s)
 {
