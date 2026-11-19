@@ -133,7 +133,8 @@ struct SimplifyForEmitContext : public InstPassBase
         {
             if (inst == user)
                 break;
-            if (canInstHaveSideEffectAtAddress(func, inst, load->getPtr()))
+            if (canInstHaveSideEffectAtAddress(
+                    func, inst, load->getPtr(), MemoryEffectMode::WritesOnly, nullptr))
                 return;
         }
 
