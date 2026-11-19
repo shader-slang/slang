@@ -61,7 +61,9 @@ static FileSystemStyle _getFileSystemStyle(ISlangFileSystem* system, ComPtr<ISla
     return style;
 }
 
-// Calcuate a combined path, just using Path:: string processing
+// Calculate a combined path from a file or directory and a path, using only Path:: string
+// processing. The result is simplified: `.` and `x/..` segments are collapsed, leading `..`
+// segments are kept.
 static SlangResult _calcCombinedPath(
     SlangPathType fromPathType,
     const char* fromPath,
@@ -81,6 +83,8 @@ static SlangResult _calcCombinedPath(
             relPath = Path::combine(fromPath, path);
             break;
         }
+    default:
+        return SLANG_E_INVALID_ARG;
     }
 
     // The combined path is the spelling used for every later operation on the file (existence
@@ -90,6 +94,11 @@ static SlangResult _calcCombinedPath(
     // equivalent simplified path would fit. `Path::simplify` collapses `x/..` pairs, matching
     // what `getPath(PathKind::Simplified)` returns for the same path, and keeps leading `..`
     // segments, which cannot be resolved without an absolute base.
+    //
+    // The memory and zip file systems implement calcCombinedPath separately and keep the plain
+    // combination, but they simplify every path they look up themselves
+    // (MemoryFileSystem::_getCanonical, ZipFileSystemImpl::_getFixedPath), so a combined
+    // spelling there never reaches a file operation unsimplified either.
     relPath = Path::simplify(relPath);
 
     *pathOut = StringUtil::createStringBlob(relPath).detach();

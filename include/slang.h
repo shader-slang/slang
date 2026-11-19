@@ -1898,6 +1898,9 @@ public:                                                              \
 
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
+        The result is in simplified form: `.` and `x/..` segments are collapsed and `/` is used
+        as the separator, matching what getPath() returns for PathKind::Simplified.
+
         @param fromPathType How to interpret the from path - as a file or a directory.
         @param fromPath The from path.
         @param path Path to be determined relative to the fromPath
