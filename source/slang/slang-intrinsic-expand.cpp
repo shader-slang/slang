@@ -49,6 +49,20 @@ static String _getIntrinsicOperationName(IRCall* callInst)
     return "<unknown>";
 }
 
+bool intrinsicSkipsSplitSamplerArg(
+    const UnownedStringSlice& intrinsicText,
+    IRUse* args,
+    Int argCount)
+{
+    return intrinsicText.startsWith(toSlice("$q")) && argCount >= 2 &&
+           as<IRSamplerStateTypeBase>(args[1].get()->getDataType());
+}
+
+Index getIntrinsicPlaceholderArgIndex(Index placeholder, bool skipsSplitSamplerArg)
+{
+    return (skipsSplitSamplerArg && placeholder >= 1) ? placeholder + 1 : placeholder;
+}
+
 void IntrinsicExpandContext::emit(
     IRCall* inst,
     IRUse* args,
@@ -61,6 +75,7 @@ void IntrinsicExpandContext::emit(
     m_text = intrinsicText;
     m_callInst = inst;
     m_intrinsicInst = intrinsicInst;
+    m_skipsSplitSamplerArg = intrinsicSkipsSplitSamplerArg(intrinsicText, args, argCount);
 
     // If the intrinsic definition is a placeholder marking an operation with no
     // valid lowering for this target, emit a diagnostic rather than the bogus
@@ -365,12 +380,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
     case '9':
         {
             --cursor;
-            Index argIndex = parseNat();
-            // For a texture-only query on a combined texture-sampler that was lowered into a
-            // `{texture, sampler}` pair, skip over the injected sampler operand at index 1 so the
-            // positional output args line up. `$0` (the texture) is intentionally left unshifted.
-            if (m_skipCombinedSamplerOperand && argIndex >= 1)
-                argIndex += 1;
+            Index argIndex = getIntrinsicPlaceholderArgIndex(parseNat(), m_skipsSplitSamplerArg);
             argIndex += m_argIndexOffset;
             // Simple case: emit one of the direct arguments to the call
             SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
@@ -468,27 +478,25 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     case 'q':
         {
-            // Marker that emits nothing; used by a texture-only query (`GetDimensions`) on a
-            // combined texture-sampler. It is the mirror of `$p` below: `$p` compensates for a
-            // string numbered *with* a sampler slot that is absent, while `$q` compensates for a
-            // string numbered *without* the sampler that lowering injected.
+            // `$q` marks a texture-only operation (`Load`, `GetDimensions`) whose string is
+            // numbered as if the receiver were a plain texture. This comment is the canonical
+            // description of `$q`; other comments point here.
             //
-            // When a combined `Sampler2D`-style value is lowered into a `{texture, sampler}` pair
-            // (HLSL/Metal/WGSL/CPU; see `lowerCombinedTextureSamplers`), the lowered call gains an
-            // injected sampler operand at
-            // index 1 that a texture-only query never consumes. Without compensation the positional
-            // `$N` accessors in the query's intrinsic string would address the sampler and shift
-            // every output argument by one (see shader-slang/slang#11669). Setting this flag makes
-            // `$N` for N >= 1 skip the injected sampler so the operands line up again; `$0` (the
-            // texture) is left unshifted.
+            // A combined texture-sampler reaches the emitter in one of three shapes.
+            // `lowerCombinedTextureSamplers` rewrites the combined type as a `{texture, sampler}`
+            // struct on HLSL, Metal, WGSL and CPU-like targets. On HLSL, Metal and WGSL,
+            // `legalizeResourceTypes` (`LegalCallBuilder::addArg`) then splits that struct into
+            // two call arguments, so the call gains the sampler as argument 1. C and C++ skip the
+            // split and keep the struct, and CUDA never builds it.
             //
-            // The sampler operand is only present when the receiver was a combined texture-sampler,
-            // so we detect it by type rather than assume it: on a plain texture the operand at
-            // index 1 is the first output and the flag stays false.
-            if (m_argCount >= 2 && as<IRSamplerStateTypeBase>(m_args[1].get()->getDataType()))
-            {
-                m_skipCombinedSamplerOperand = true;
-            }
+            // When the split-out sampler is present, `emit` sets `m_skipsSplitSamplerArg` and
+            // each bare `$N` (N >= 1) reads argument N + 1; other indexed accessors such as `$TN`
+            // are not shifted. The sampler is detected by its type, which is sound because no
+            // `$q` operation declares a sampler parameter of its own. The marker emits nothing and
+            // must be the first token, because `intrinsicSkipsSplitSamplerArg` only looks there.
+            // It is the counterpart of `$p` below, which compensates for a sampler slot that is
+            // absent, and the two never appear in one string.
+            SLANG_RELEASE_ASSERT(cursor == m_text.begin() + 2);
         }
         break;
 
@@ -498,6 +506,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // then this form will pair up the t and s arguments as needed for a GLSL
             // texturing operation.
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
+            SLANG_RELEASE_ASSERT(!m_text.startsWith(toSlice("$q")));
 
             auto textureArg = m_args[0].get();
 
