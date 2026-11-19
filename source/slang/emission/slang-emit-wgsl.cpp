@@ -567,10 +567,11 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         SLANG_UNEXPECTED("'double' type emitted");
         break;
     case kIROp_Int8Type:
+        diagnoseOnce(Diagnostics::Int8NotSupportedInWgsl{.typeName = "int8_t"});
+        return;
     case kIROp_UInt8Type:
-        // There is no "[i|u]8" type in WGSL
-        SLANG_UNEXPECTED("8 bit integer type emitted");
-        break;
+        diagnoseOnce(Diagnostics::Int8NotSupportedInWgsl{.typeName = "uint8_t"});
+        return;
     case kIROp_HalfType:
         m_f16ExtensionEnabled = true;
         m_writer->emit("f16");
@@ -1104,9 +1105,13 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 default:
 
                 case BaseType::Int8:
+                    {
+                        diagnoseOnce(Diagnostics::Int8NotSupportedInWgsl{.typeName = "int8_t"});
+                        break;
+                    }
                 case BaseType::UInt8:
                     {
-                        SLANG_UNEXPECTED("8 bit integer value emitted");
+                        diagnoseOnce(Diagnostics::Int8NotSupportedInWgsl{.typeName = "uint8_t"});
                         break;
                     }
                 case BaseType::Int16:
