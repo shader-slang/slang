@@ -412,12 +412,14 @@ static T readValue(ArrayView<const void*> ptrToArgs, Count& argIndex)
 
 String StringUtil::makeStringWithFormatFromArgArray(
     const char* format,
-    ArrayView<const void*> ptrToArgs)
+    ArrayView<const void*> ptrToArgs,
+    ConstArrayView<size_t> argValueSizes)
 {
     if (!format)
     {
         return String();
     }
+    SLANG_ASSERT(argValueSizes.getCount() == ptrToArgs.getCount());
     StringBuilder builder;
     const char* ptr = format;
     Count argIndex = 0;
@@ -516,7 +518,15 @@ String StringUtil::makeStringWithFormatFromArgArray(
             case 'e':
             case 'f':
             case 'g':
-                if (isLong != 0)
+                // Select the read width from the argument's value size, not the format's length
+                // modifier: the interpreter does not promote `float` to `double`, so a plain
+                // %f/%e/%g can be handed a `double` and must read all 8 bytes, while a `float`
+                // reads 4 and promotes to `double` at the vsnprintf boundary — so %f and %lf both
+                // format the value correctly. The bounds check guards a format with more
+                // conversions than arguments (which `readValue` also tolerates); an over-run reads
+                // a `float`.
+                if (argIndex < argValueSizes.getCount() &&
+                    argValueSizes[argIndex] == sizeof(double))
                 {
                     StringUtil::appendFormat(
                         builder,

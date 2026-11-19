@@ -1036,6 +1036,7 @@ void printHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void* userData
 
     List<List<uint8_t>> args;
     List<const void*> argPtrs;
+    List<size_t> argValueSizes;
     for (uint32_t i = 1; i < inst->operandCount; ++i)
     {
         auto& arg = inst->getOperand(i);
@@ -1043,13 +1044,18 @@ void printHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void* userData
         data.setCount(arg.size);
         memcpy(data.getBuffer(), arg.getPtr(), arg.size);
         args.add(data);
+        // Record each argument's byte width so the formatter reads a float/double at its true
+        // width instead of guessing from the `l`/`L` modifier (#12964).
+        argValueSizes.add(arg.size);
     }
     for (auto& arg : args)
     {
         argPtrs.add(arg.getBuffer());
     }
-    auto result =
-        StringUtil::makeStringWithFormatFromArgArray(formatString, argPtrs.getArrayView());
+    auto result = StringUtil::makeStringWithFormatFromArgArray(
+        formatString,
+        argPtrs.getArrayView(),
+        argValueSizes.getArrayView());
     ctx->m_printCallback(result.getBuffer(), ctx->m_printCallbackUserData);
 }
 
