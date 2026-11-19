@@ -94,7 +94,6 @@ SLANG_UNIT_TEST(rootSignatureAttributeReflection)
             return 0.0.xxxx;
         }
         )rs";
-    String userSource = userSourceBody;
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
