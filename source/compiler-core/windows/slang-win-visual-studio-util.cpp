@@ -4,17 +4,16 @@
 #include "compiler-core/slang-json-value.h"
 #include "compiler-core/slang-visual-studio-compiler-util.h"
 #include "core/slang-common.h"
+#include "core/slang-platform.h"
 #include "core/slang-process-util.h"
 #include "core/slang-string-util.h"
 
 #ifdef _WIN32
-#include <shlobj.h>
 #include <windows.h>
 #endif
 
 #ifdef _MSC_VER
 #pragma comment(lib, "advapi32")
-#pragma comment(lib, "Shell32")
 #endif
 
 // The method used to invoke VS was originally inspired by some ideas in
@@ -58,17 +57,25 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
     // grow and retry rather than silently truncating a value longer than a MAX_PATH buffer.
     List<char> value;
     value.setCount(MAX_PATH);
-    DWORD size = 0;
     while (true)
     {
-        size = DWORD(value.getCount());
+        // `size` is the buffer capacity on entry to the call; on success it is the byte count
+        // copied (including the terminator when the value has one), and on ERROR_MORE_DATA it
+        // is the required size, so we grow to 1.5x the requirement.
+        DWORD size = DWORD(value.getCount());
         // https://docs.microsoft.com/en-us/windows/desktop/api/winreg/nf-winreg-regqueryvalueexa
         ret = RegQueryValueExA(key, keyName, nullptr, nullptr, (LPBYTE)value.getBuffer(), &size);
-        if (ret != ERROR_MORE_DATA)
+        if (ret == ERROR_MORE_DATA)
         {
-            break;
+            value.setCount(size + size / 2);
+            continue;
         }
-        value.setCount(size + size / 2);
+        // A REG_SZ value normally includes its terminator in the returned size; terminate
+        // unconditionally (with room made for it) so a value stored without one cannot read
+        // past the copied bytes.
+        value.setCount(size + 1);
+        value[size] = 0;
+        break;
     }
     RegCloseKey(key);
 
@@ -76,11 +83,6 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
     {
         return SLANG_FAIL;
     }
-
-    // A REG_SZ value normally includes its terminator in the returned size; terminate
-    // unconditionally so a value stored without one cannot read past the copied bytes.
-    value.setCount(size + 1);
-    value[size] = 0;
 
     outString = value.getBuffer();
     return SLANG_OK;
@@ -313,41 +315,30 @@ static SlangResult _findVersionsWithVSWhere(
 
     CommandLine cmd;
 
-    // We read the folder through its environment variables rather than SHGetFolderPathA:
+    // We look up the folder through its environment variables rather than SHGetFolderPathA:
     // SHGetFolderPathA writes into a caller-allocated MAX_PATH buffer and gives no size
-    // feedback, so a longer path would be silently truncated, while GetEnvironmentVariableA
-    // reports the required size and allows a grow-retry. `ProgramFiles(x86)` is only defined on
-    // 64-bit processes; a 32-bit process finds the same folder under `ProgramFiles`, so we fall
-    // back to that name.
+    // feedback, so a longer path would be silently truncated, while the environment lookup has
+    // no fixed bound. `ProgramFiles(x86)` is only defined on 64-bit Windows; on 32-bit Windows
+    // the same folder is `%ProgramFiles%`, so we fall back to that name (a missing variable and
+    // an empty one both leave the result empty here). A process with a stripped environment
+    // block has neither variable, in which case we fail and the caller falls back to the
+    // registry scan for finding Visual Studio installs.
     String programFilesPath;
     {
-        static const char* const envVarNames[] = {"ProgramFiles(x86)", "ProgramFiles"};
-        for (auto envVarName : envVarNames)
+        StringBuilder buffer;
+        if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("ProgramFiles(x86)"),
+                buffer)) ||
+            buffer.getLength() <= 0)
         {
-            List<char> buffer;
-            buffer.setCount(_MAX_PATH);
-            while (true)
-            {
-                const DWORD size = DWORD(buffer.getCount());
-                const DWORD res = ::GetEnvironmentVariableA(envVarName, buffer.getBuffer(), size);
-                if (res == 0)
-                {
-                    break;
-                }
-                if (res < size)
-                {
-                    programFilesPath = buffer.getBuffer();
-                    break;
-                }
-                buffer.setCount(res + 1);
-            }
-            if (programFilesPath.getLength() > 0)
-            {
-                break;
-            }
+            buffer.clear();
+            SLANG_RETURN_ON_FAIL(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("ProgramFiles"),
+                buffer));
         }
+        programFilesPath = buffer;
     }
-    if (programFilesPath.getLength() == 0)
+    if (programFilesPath.getLength() <= 0)
     {
         return SLANG_FAIL;
     }

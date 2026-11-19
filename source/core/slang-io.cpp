@@ -105,11 +105,10 @@ namespace Slang
     String tempFileName;
 
     {
-        // GetTempFileNameA/W generates a name from the temp path and accepts a buffer of
-        // MAX_PATH characters; it cannot report a required size, so there is nothing to grow
-        // into here: a temp directory longer than the legacy path limit makes the call fail
-        // regardless of this buffer's size. (The temp path lookup above grows, so only an
-        // unusually deep system temp directory reaches that limit.)
+        // GetTempFileNameW derives a name from the temp path and takes no size parameter, so
+        // there is nothing to grow into here: a temp directory longer than the legacy path limit
+        // makes the call fail regardless of this buffer's size. (The temp path lookup above
+        // grows, so only an unusually deep system temp directory reaches that limit.)
         wchar_t wideChars[MAX_PATH + 1];
 
         // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettempfilenamew

@@ -6,7 +6,6 @@
 
 #include "slang-common.h"
 #include "slang-io.h"
-#include "slang-list.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -135,29 +134,22 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 /* static */ SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
 {
-    // GetModuleFileNameW silently truncates a path that does not fit the buffer and returns the
-    // buffer size, so we grow the buffer until the returned length is smaller; a fixed _MAX_PATH
-    // buffer would report the truncated path of an executable installed in a long directory.
-    List<wchar_t> buffer;
-    buffer.setCount(_MAX_PATH);
-    while (true)
+    // The instance path is the directory holding the executable. Path::getExecutablePath
+    // already owns the grow-retry GetModuleFileNameW query, so re-implementing it here with a
+    // fixed _MAX_PATH buffer would report the truncated path of an executable installed in a
+    // long directory.
+    String pathString = Path::getExecutablePath();
+
+    if (pathString.getLength() == 0)
     {
-        const DWORD size = DWORD(buffer.getCount());
-        const DWORD res =
-            ::GetModuleFileNameW(::GetModuleHandleW(nullptr), buffer.getBuffer(), size);
-        if (res == 0)
-        {
-            return SLANG_FAIL;
-        }
-        if (res < size)
-        {
-            // We don't want the instance name, just the path to it
-            out.clear();
-            out.append(Path::getParentDirectory(String::fromWString(buffer.getBuffer())));
-            return out.getLength() > 0 ? SLANG_OK : SLANG_FAIL;
-        }
-        buffer.setCount(size + size / 2);
+        return SLANG_FAIL;
     }
+
+    // We don't want the instance name, just the path to it
+    out.clear();
+    out.append(Path::getParentDirectory(pathString));
+
+    return out.getLength() > 0 ? SLANG_OK : SLANG_FAIL;
 }
 
 /* static */ SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
