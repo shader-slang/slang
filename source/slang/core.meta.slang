@@ -1291,8 +1291,12 @@ ${
     case BaseType::Bool:
 $}
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Eql)) bool equals(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Leq)) bool lessThanOrEquals(This other);
+        // SPIR-V has no ordering comparison for Boolean operands, and GLSL and
+        // WGSL do not allow relational operators on Booleans, so the ordering
+        // of `false` and `true` is defined with the logical operators that every
+        // target supports instead of a `Less`/`Leq` on `bool`.
+        [__unsafeForceInlineEarly] bool lessThan(This other) { return !this && other; }
+        [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return !this || other; }
         [__unsafeForceInlineEarly] This shl(int other) { return __intCast<This>(__shl(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This shr(int other) { return __intCast<This>(__shr(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This bitAnd(This other) { return __intCast<This>(__and(__intCast<int>(this), __intCast<int>(other))); }
