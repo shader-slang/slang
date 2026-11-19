@@ -1,6 +1,6 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/atomic/atomicCounter.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
 //TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/atomic/atomicCounter.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer

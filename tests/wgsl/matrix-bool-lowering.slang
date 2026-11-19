@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=CHECK):-Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-Xslang -O3
 
 //TEST_INPUT:ubuffer(data=[1 0], stride=4):name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer

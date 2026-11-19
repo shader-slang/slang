@@ -1,6 +1,6 @@
 //TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl-intrinsic/atomic/atomicStorageBuffer.slang -stage compute -entry computeMain -target glsl -DTARGET_GLSL
 //TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl-intrinsic/atomic/atomicStorageBuffer.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly -DTARGET_SPIRV
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 #version 430
 
 // float2 is currently a very new extension; most hardware lacks

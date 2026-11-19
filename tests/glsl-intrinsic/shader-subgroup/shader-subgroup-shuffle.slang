@@ -8,7 +8,7 @@
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-shuffle.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 //TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DWGPU -render-feature half
 //TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DMETAL
 

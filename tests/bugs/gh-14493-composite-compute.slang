@@ -2,7 +2,7 @@
 // every observed component defined. The carried aggregate and partial array
 // updates intentionally depend on previous iterations and must remain intact.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cpu, filecheck-buffer=BUF): -entry computeMain -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cpu+cuda, filecheck-buffer=BUF): -entry computeMain -output-using-type
 //TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -output-using-type -xslang -minimum-slang-optimization
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 0.5 8.0 1.5 8.0], stride=4):name=inputBuf

@@ -3,7 +3,7 @@
 // call must resolve by rank (unranked core overloads over the rank -10 wrappers), never through the
 // deprecated generic-parameter-count tie-breaker, which the CPU run rejects as a warning-as-error.
 
-//TEST:COMPARE_COMPUTE(targets=cpu, filecheck-buffer=CHECK): -output-using-type -Xslang -experimental-feature -Xslang -warnings-as-errors -Xslang 40021
+//TEST:COMPARE_COMPUTE(targets=cpu+cuda, filecheck-buffer=CHECK): -output-using-type -Xslang -experimental-feature -Xslang -warnings-as-errors -Xslang 40021
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o boolean-mask-any-all-14613.hlsl -experimental-feature
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o boolean-mask-any-all-14613.spv -experimental-feature
 //TEST:SIMPLE: -target wgsl -entry computeMain -stage compute -o boolean-mask-any-all-14613.wgsl -experimental-feature

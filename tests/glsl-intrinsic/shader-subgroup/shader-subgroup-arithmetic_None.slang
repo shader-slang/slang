@@ -6,7 +6,7 @@
 // not testing cpp due to missing impl
 //DISABLE_TEST:SIMPLE_EX(filecheck=CHECK_CPP): -lang glsl tests/glsl-intrinsic/shader-subgroup/shader-subgroup-arithmetic_None.slang -stage compute -entry computeMain -target cpp -DTARGET_CPP
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 //TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl -xslang -DWGPU -render-feature half
 
 // Not testing because CI runners may not support Metal's intrinsics.

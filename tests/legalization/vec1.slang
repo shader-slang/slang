@@ -1,4 +1,4 @@
-//TEST(smoke):COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
+//TEST(smoke):COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK:      23
 // CHECK-NEXT: 23
