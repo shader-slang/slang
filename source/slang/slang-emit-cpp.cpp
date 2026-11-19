@@ -1373,20 +1373,16 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // Shader coverage is the client this lowering exists for,
             // and it only emits the unsigned variants (its
             // synthesized buffer element type is uint/uint64). User
-            // code does not reach it through the atomic APIs meant
-            // for it: `InterlockedAdd` and `Atomic<T>` declare
-            // capabilities that exclude the CPU target, so they are
-            // rejected before emission. `Atomic<T>.add` is the
-            // exception, because the extension that declares it does
-            // not repeat `Atomic<T>`'s `[require]`; that is also the
-            // only way the signed variants are reached.
+            // code reaches it through `Atomic<T>.add` and the
+            // `reduceAdd` and `+=` wrappers that inline to it, because
+            // the extension that declares `add` does not repeat
+            // `Atomic<T>`'s `[require]`. `InterlockedAdd` declares
+            // capabilities that exclude the CPU target, so it is
+            // rejected before emission.
             //
             // 32-bit and 64-bit integer widths are supported via the
             // matching prelude helper pair
-            // (`_slang_atomic_add_{u,i}{32,64}`). Other widths /
-            // float types fall through to the default unhandled-
-            // opcode diagnostic so the build fails loudly instead
-            // of producing bogus code.
+            // (`_slang_atomic_add_{u,i}{32,64}`).
             auto dataType = inst->getDataType();
             char const* helper;
             switch (dataType->getOp())
@@ -1404,7 +1400,8 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 helper = "_slang_atomic_add_i64";
                 break;
             default:
-                return false;
+                _diagnoseUnsupportedAtomicOperation(cast<IRAtomicOperation>(inst));
+                return true;
             }
             emitInstResultDecl(inst);
             m_writer->emit(helper);
@@ -1424,8 +1421,35 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             return true;
         }
     default:
+        if (auto atomic = as<IRAtomicOperation>(inst))
+        {
+            _diagnoseUnsupportedAtomicOperation(atomic);
+            return true;
+        }
         return false;
     }
+}
+
+// Report an atomic operation that the C++ target has no lowering for as an unsupported intrinsic,
+// naming the IR operation and its value type (for example "atomicAdd on float"). The value type is
+// the result type, except for `atomicStore`, which has no result. Capability checking does not
+// reject these operations: the `Atomic<T>` methods declared in extensions do not repeat the
+// struct's `[require]`, assignment to an `Atomic<T>` lvalue lowers directly to `atomicStore`,
+// property accessors are not capability-checked, and `lowerAppendConsumeStructuredBuffers`
+// synthesizes `atomicInc` and `atomicDec` itself. Emission output is discarded once an error is
+// reported, so no placeholder result is needed.
+void CPPSourceEmitter::_diagnoseUnsupportedAtomicOperation(IRAtomicOperation* inst)
+{
+    IRType* valueType = inst->getDataType();
+    if (auto store = as<IRAtomicStore>(inst))
+        valueType = store->getVal()->getDataType();
+
+    StringBuilder operation;
+    operation << getIROpInfo(inst->getOp()).name << " on ";
+    getTypeNameHint(operation, valueType);
+    getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+        .operation = operation.produceString(),
+        .location = inst->sourceLoc});
 }
 
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
