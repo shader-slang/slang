@@ -3625,6 +3625,13 @@ err(
     span { loc = "typeExp:Expr", message = "pointer to a managed resource is invalid, use `NativeRef<T>` instead" }
 )
 
+err(
+    "invalid-access-qualifier",
+    30409,
+    "invalid access qualifier",
+    span { loc = "expr:Expr", message = "an 'Access' value must be 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'" }
+)
+
 -- Control flow (305xx)
 
 warning(
@@ -4048,6 +4055,13 @@ err(
     30711,
     "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
     span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage; pass a 'groupshared' variable or a component of one, or declare '~param' without 'groupshared' if the function does not need thread-group-shared memory" }
+)
+
+warning(
+    "write-through-pointer-of-unknown-access",
+    30712,
+    "writing through a pointer whose access qualifier is not known; this will become an error in a future version of Slang",
+    span { loc = "expr:Expr", message = "the access qualifier of the pointer is a generic parameter, so the pointer is not known to be writable; declare the pointer with 'Access.ReadWrite' if it is written through" }
 )
 --
 -- 308xx: inheritance

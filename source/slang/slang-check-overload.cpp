@@ -297,6 +297,17 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
+bool isAccessEnumType(ASTBuilder* astBuilder, Type* type)
+{
+    return type->equals(astBuilder->getMagicEnumType("AccessQualifier"));
+}
+
+bool isAccessValueOutsideAccessEnum(Val* val)
+{
+    auto optAccessQualifier = tryGetAccessQualifierValue(val);
+    return optAccessQualifier && !isAccessEnumerator(*optAccessQualifier);
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
@@ -594,6 +605,17 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     getType(m_astBuilder, valParamRef),
                     argFoldingKind,
                     context.mode == OverloadResolveContext::Mode::JustTrying ? nullptr : getSink());
+            }
+
+            // A cast such as `(Access)3` can spell an `Access` value that is none of its
+            // enumerators. We reject it here, where every explicit argument for an `Access`
+            // parameter becomes a value, and use the error value below in its place.
+            if (val && context.mode == OverloadResolveContext::Mode::ForReal &&
+                isAccessEnumType(m_astBuilder, getType(m_astBuilder, valParamRef)) &&
+                isAccessValueOutsideAccessEnum(val))
+            {
+                getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.expr = arg});
+                val = nullptr;
             }
 
             // If any of the above checking steps fail and we don't
@@ -1101,6 +1123,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 }
                 return false;
             }
+
+            // A mutating method writes its `this` argument, as an `inout` argument would be
+            // written.
+            if (context.baseExpr && context.mode == OverloadResolveContext::Mode::ForReal)
+                maybeWarnWriteThroughPointerOfUnknownAccess(context.baseExpr);
 
             // The parameters of functions declared using traditional/legacy
             // syntax are currently exposed as mutable locals within the body
@@ -1690,21 +1717,20 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             // If the subscript decl has a setter,
                             // then the call is an l-value if base is l-value.
                             //
-                            // If Ptr<T, Access> we only need to check for ReadWrite
-                            // Access (if ReadWrite result is an LValue. By default a
-                            // Ptr<...> is Read-only (unresolved generic argument & Access::Read).
+                            // Subscripting a pointer dereferences it, so the value category
+                            // comes from the pointer's access qualifier, as it does for the
+                            // dereference built by `constructDerefExpr`. A pointer whose
+                            // access is not a known constant stays an l-value, and
+                            // `maybeWarnWriteThroughPointerOfUnknownAccess` warns on a write.
                             if (auto base = GetBaseExpr(baseExpr))
                             {
                                 if (auto ptrTypeBase = as<PtrTypeBase>(base->type))
                                 {
-                                    auto accessQualifier =
-                                        as<ConstantIntVal>(ptrTypeBase->getAccessQualifier());
-                                    if (!accessQualifier ||
-                                        AccessQualifier(accessQualifier->getValue()) ==
-                                            AccessQualifier::ReadWrite)
-                                    {
+                                    if (!applyAccessQualifierOfPtrType(
+                                            callExpr->type,
+                                            ptrTypeBase,
+                                            base))
                                         callExpr->type.isLeftValue = true;
-                                    }
                                     break;
                                 }
 
@@ -1716,15 +1742,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             }
                             // Otherwise, an accessor that does not require writable receiver
                             // storage can produce an l-value regardless of the base.
-                            auto accessorDeclRef =
-                                m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
-                            auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
-                            if (thisParamInfo &&
-                                !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
-                            {
+                            if (canWriteSubscriptWithoutWritableBase(subscriptDeclRef))
                                 callExpr->type.isLeftValue = true;
-                                break;
-                            }
+                            break;
                         }
                     }
                 }

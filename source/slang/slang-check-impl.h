@@ -89,6 +89,15 @@ Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink);
 /// Note: this currently does not include PtrTypeBase.
 Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
+/// Return true if `type` is the core module's `Access` enum, the type of the access parameter of
+/// `Ptr` and `Ref`.
+bool isAccessEnumType(ASTBuilder* astBuilder, Type* type);
+
+/// Return true if `val` is a constant access value that names none of the `Access`
+/// enumerators, as `(Access)3` does. We reject such a value where it is written as a generic
+/// argument or default, so that the error points at it.
+bool isAccessValueOutsideAccessEnum(Val* val);
+
 /// True if `containerDecl` is `moduleDecl` itself or one of its own `__include`d
 /// `FileDecl` children — i.e. a scope that belongs on `moduleDecl`'s imported surface.
 /// Used by both the `import` re-export filter (`importModuleIntoScope`) and the
@@ -2046,6 +2055,24 @@ public:
     Expr* ConstructDerefExpr(Expr* base, SourceLoc loc);
     Expr* constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc);
 
+    /// Set the value category of `type`, which denotes the storage reached by dereferencing
+    /// `ptrExpr` of pointer or reference type `ptrType`, from the access qualifier of `ptrType`,
+    /// and return true. Return false and leave `type` unchanged when the access is not a
+    /// compile-time constant, as for `Ptr<T, access>` in a generic function; a pointer and a
+    /// reference treat such an access differently, so the caller decides.
+    ///
+    /// Substitution can produce an access constant that names no `Access` enumerator after every
+    /// generic argument has been checked. Consider:
+    ///
+    ///     struct Box<let N : int> { Ptr<Item, (Access)N> p; }
+    ///     void f(Box<3> b) { uint c = b.p->count; }
+    ///
+    /// The type of `b.p` is `Ptr<Item, (Access)3>`, yet no `Access` argument was written, so
+    /// `TryCheckGenericOverloadCandidateTypes` never saw the value. The dereference is the first
+    /// place that interprets it, so we report 30409 at `ptrExpr` here and make the storage an
+    /// l-value, which keeps the error from being followed by write errors.
+    bool applyAccessQualifierOfPtrType(QualType& type, PtrTypeBase* ptrType, Expr* ptrExpr);
+
     InvokeExpr* constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments);
 
     Expr* maybeUseSynthesizedDeclForLookupResult(LookupResultItem const& item, Expr* orignalExpr);
@@ -3279,6 +3306,34 @@ public:
     /// Given an immutable `expr` used as an l-value emit a special diagnostic if it was derived
     /// from `this`.
     void maybeDiagnoseConstVariableAssignment(Expr* expr);
+
+    /// Return the type of the pointer that `expr` dereferences when `expr` is a pointer
+    /// dereference, and null otherwise. A pointer is dereferenced either by a `DerefExpr` (the
+    /// implicit dereference in `p->field` or `p.field`) or by a call to the `Ptr` subscript
+    /// (`p[i]`), which addresses the `i`-th value after the pointee. An explicit `*p` is a call
+    /// to `operator*` that returns a `Ref`, and is not reported here.
+    PtrType* getDereferencedPtrType(Expr* expr);
+
+    /// Return true if a call to the subscript `subscriptDeclRef` can be written even when its
+    /// base is not writable, because one of its `set` or `ref` accessors does not require
+    /// writable receiver storage (e.g. a `[nonmutating] ref` accessor that addresses memory
+    /// outside the receiver).
+    bool canWriteSubscriptWithoutWritableBase(DeclRef<SubscriptDecl> subscriptDeclRef);
+
+    /// Return the base of `expr`, as `container` in `container[i]`, when `expr` is a call to a
+    /// subscript that can be written only through a writable base, as a struct's `set` accessor
+    /// can, and null otherwise. Writing such a call writes its base.
+    Expr* getBaseWrittenBySubscriptCall(Expr* expr);
+
+    /// Warn if `lvalueExpr`, which is about to be written, is a dereference of a pointer whose
+    /// access qualifier is a generic parameter rather than a known value, or a member, element or
+    /// swizzle of one (e.g. `p->count = 1` or `p[0].count = 1` with `p` of type
+    /// `Ptr<Item, access>`).
+    ///
+    /// Such a write is accepted because the pointer might be writable, but the generic function
+    /// would break if it were called with a read-only pointer. We warn at the write rather than
+    /// at the dereference so that reads through the same pointer stay quiet.
+    void maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueExpr);
 
     // Figure out what type an initializer/constructor declaration
     // is supposed to return. In most cases this is just the type

@@ -281,8 +281,8 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
         // reference, whereas the `QualType` constructor does not
         // perform such unwrapping.
         //
-        openRef->type = QualType(refType);
         openRef->type.type = refType->getValueType();
+        applyAccessQualifierOfPtrType(openRef->type, refType, expr);
 
         openRef->checked = true;
         openRef->loc = expr->loc;
@@ -703,24 +703,28 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     derefExpr->type = QualType(elementType);
     derefExpr->checked = true;
 
-    if (as<PtrType>(base->type))
+    if (auto ptrType = as<PtrType>(base->type))
     {
-        // TODO(tfoley): It is not clear why this is being unconditionally
-        // set to `true` when the `Ptr` types in the core module has an
-        // `AccessQualifier` parameter that can be used to form a read-only pointer.
+        // The pointee of a `Ptr<T, Access.Read>` or `Ptr<T, Access.Immutable>` can be read but
+        // not written through the pointer, so the dereference is a read-only memory location
+        // rather than an l-value. Any member reached through it, as in `p->field`, inherits
+        // that status from this expression.
         //
-        derefExpr->type.isLeftValue = true;
+        // When the access is not a compile-time constant (e.g. `Ptr<T, access>` in a generic
+        // function), we cannot tell whether the pointer is writable, and we keep the
+        // dereference an l-value. `maybeWarnWriteThroughPointerOfUnknownAccess` then warns when
+        // such a dereference is actually written.
+        //
+        if (!applyAccessQualifierOfPtrType(derefExpr->type, ptrType, base))
+            derefExpr->type.isLeftValue = true;
     }
-    else if (as<ExplicitRefType>(base->type))
+    else if (auto refType = as<ExplicitRefType>(base->type))
     {
-        // TODO(tfoley): The code here is exploiting the ability of the
-        // `QualType` constructor to compute the correct value category
-        // for a reference type, so that we don't have to repeat that logic
-        // here. That might not be the right place for that logic to live,
-        // however, and so the code here might need updating sooner or
-        // later.
+        // A reference whose access is not a compile-time constant is neither an l-value nor a
+        // read-only memory location, as in the `QualType(Type*)` constructor.
         //
-        QualType refQualType(base->type.type);
+        QualType refQualType;
+        applyAccessQualifierOfPtrType(refQualType, refType, base);
         derefExpr->type.isLeftValue = refQualType.isLeftValue;
         derefExpr->type.isReadOnlyMemoryLocation = refQualType.isReadOnlyMemoryLocation;
     }
@@ -739,6 +743,26 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     }
 
     return derefExpr;
+}
+
+bool SemanticsVisitor::applyAccessQualifierOfPtrType(
+    QualType& type,
+    PtrTypeBase* ptrType,
+    Expr* ptrExpr)
+{
+    auto optAccessQualifier = ptrType->tryGetAccessQualifierValue();
+    if (!optAccessQualifier)
+        return false;
+
+    if (!isAccessEnumerator(*optAccessQualifier))
+    {
+        getSink()->diagnose(Diagnostics::InvalidAccessQualifier{.expr = ptrExpr});
+        type.isLeftValue = true;
+        return true;
+    }
+
+    type.applyAccessQualifier(*optAccessQualifier);
+    return true;
 }
 
 Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)
@@ -999,6 +1023,11 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                     {
                         expr->type.isLeftValue = true;
                     }
+
+                    // A read-only memory location, such as the pointee of a
+                    // `Ptr<Derived, Access.Read>`, stays one when viewed as its base type, so
+                    // that an inherited field reached through it is read-only like a direct field.
+                    expr->type.isReadOnlyMemoryLocation = bb->type.isReadOnlyMemoryLocation;
 
                     bb = expr;
                 }
@@ -3793,6 +3822,94 @@ Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
     return expr;
 }
 
+PtrType* SemanticsVisitor::getDereferencedPtrType(Expr* expr)
+{
+    if (auto derefExpr = as<DerefExpr>(expr))
+        return as<PtrType>(derefExpr->base->type.type);
+
+    if (auto invokeExpr = as<InvokeExpr>(expr))
+    {
+        auto calleeExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+        if (!calleeExpr || !calleeExpr->declRef.as<SubscriptDecl>())
+            return nullptr;
+        if (auto baseExpr = GetBaseExpr(calleeExpr))
+            return as<PtrType>(baseExpr->type.type);
+    }
+    return nullptr;
+}
+
+bool SemanticsVisitor::canWriteSubscriptWithoutWritableBase(DeclRef<SubscriptDecl> subscriptDeclRef)
+{
+    for (auto accessorDecl : subscriptDeclRef.getDecl()->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (!as<SetterDecl>(accessorDecl) && !as<RefAccessorDecl>(accessorDecl))
+            continue;
+
+        auto accessorDeclRef = m_astBuilder->getMemberDeclRef(subscriptDeclRef, accessorDecl);
+        auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+        if (thisParamInfo && !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode))
+            return true;
+    }
+    return false;
+}
+
+Expr* SemanticsVisitor::getBaseWrittenBySubscriptCall(Expr* expr)
+{
+    auto invokeExpr = as<InvokeExpr>(expr);
+    if (!invokeExpr)
+        return nullptr;
+
+    auto calleeExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!calleeExpr)
+        return nullptr;
+
+    auto subscriptDeclRef = calleeExpr->declRef.as<SubscriptDecl>();
+    if (!subscriptDeclRef || canWriteSubscriptWithoutWritableBase(subscriptDeclRef))
+        return nullptr;
+
+    return GetBaseExpr(calleeExpr);
+}
+
+void SemanticsVisitor::maybeWarnWriteThroughPointerOfUnknownAccess(Expr* lvalueExpr)
+{
+    // A dereference of a pointer whose access qualifier is not a known constant is kept an
+    // l-value, because the pointer might be writable (see `constructDerefExpr` and the `Ptr`
+    // subscript case of `CompleteOverloadCandidate`). We peel off the member, element, swizzle,
+    // parentheses and base-type cast layers of the written expression to find the dereference,
+    // so that we warn only when a write actually goes through such a pointer. The base-type
+    // cast is what member lookup inserts for an inherited field, as in `p->baseField`. A call to
+    // a subscript whose write modifies its receiver, as in `p->container[i]` with a `set`
+    // accessor, writes its base, so we continue from the base.
+    for (Expr* e = lvalueExpr; e;)
+    {
+        if (auto memberExpr = as<MemberExpr>(e))
+            e = memberExpr->baseExpression;
+        else if (auto indexExpr = as<IndexExpr>(e))
+            e = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(e))
+            e = swizzleExpr->base;
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(e))
+            e = matrixSwizzleExpr->base;
+        else if (auto parenExpr = as<ParenExpr>(e))
+            e = parenExpr->base;
+        else if (auto castToSuperTypeExpr = as<CastToSuperTypeExpr>(e))
+            e = castToSuperTypeExpr->valueArg;
+        else if (auto ptrType = getDereferencedPtrType(e))
+        {
+            if (!ptrType->tryGetAccessQualifierValue().has_value())
+            {
+                getSink()->diagnose(
+                    Diagnostics::WriteThroughPointerOfUnknownAccess{.expr = lvalueExpr});
+            }
+            return;
+        }
+        else if (auto subscriptBase = getBaseWrittenBySubscriptCall(e))
+            e = subscriptBase;
+        else
+            return;
+    }
+}
+
 void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 {
     // We will try to handle expressions of the form:
@@ -3878,6 +3995,8 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
     }
     else
     {
+        maybeWarnWriteThroughPointerOfUnknownAccess(expr->left);
+
         if (auto var =
                 findGroupSharedVariablePartlyWrittenInDifferentiatedBody(expr->left, expr->left))
         {
@@ -4521,6 +4640,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 // Replace the expression. This should make this situation
                                 // easier to detect.
                                 invoke->arguments[pp] = lValueImplicitCast;
+
+                                // The converted value is written back to the operand of the
+                                // cast after the call, so the operand is what gets written.
+                                maybeWarnWriteThroughPointerOfUnknownAccess(
+                                    implicitCastExpr->arguments[0]);
                             }
                             else if (!as<ErrorType>(argExpr->type))
                             {
@@ -4593,6 +4717,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
                                 maybeDiagnoseConstVariableAssignment(argExpr);
                             }
+                        }
+                        else if (!acceptsReadOnlyMemoryLocation)
+                        {
+                            // The argument is an l-value that the callee may write.
+                            maybeWarnWriteThroughPointerOfUnknownAccess(argExpr);
                         }
                     }
                     else
