@@ -3553,7 +3553,15 @@ bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 
 /// Auto-promote the descriptor_handle capability on the target when DescriptorHandle
 /// types are encountered, but only when no specific profile or capability was requested
-/// by the user (auto-promotion mode).
+/// by the user (auto-promotion mode). We fold the capability into the target caps the same way
+/// `TargetRequest::getTargetCaps()` folds an explicit `-capability descriptor_handle`. The join
+/// keeps only the alternative of the alias that matches the target: profile-less HLSL gains
+/// `_sm_6_6`, and every other covered target's alternative is its own target atom, so its caps
+/// don't change. That holds for targets that `getTargetCaps()` gives a target atom; a target whose
+/// caps are empty (such as `host-cpp`) receives the whole alias.
+///
+/// The result is stored on the `TargetRequest`, which every program compiled in the session
+/// shares, so the promotion persists beyond the layout query that triggered it.
 static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
 {
     if (!targetReq)
@@ -3574,12 +3582,17 @@ static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
             break;
         }
     }
-    if (!specificProfileRequested && !specificCapabilityRequested)
-    {
-        auto targetCaps = targetReq->getTargetCaps();
-        targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
-        targetReq->setTargetCaps(targetCaps);
-    }
+    if (specificProfileRequested || specificCapabilityRequested)
+        return;
+
+    auto targetCaps = targetReq->getTargetCaps();
+    CapabilitySet descriptorHandleCaps(CapabilityName::descriptor_handle);
+    // Targets outside the alias, such as `c` and the LLVM CPU path, don't support DescriptorHandle,
+    // and joining them with it would produce an invalid capability set.
+    if (targetCaps.isIncompatibleWith(descriptorHandleCaps))
+        return;
+    targetCaps.join(descriptorHandleCaps);
+    targetReq->setTargetCaps(targetCaps);
 }
 
 static bool isD3D11Target(TargetRequest*)
