@@ -197,7 +197,10 @@ function(slang_add_target dir type)
     # because the latter resolves to the directory of the caller at function
     # execution time, not to this file's directory.
     if(WIN32 AND MSVC AND type STREQUAL "EXECUTABLE")
-        target_sources(${target} PRIVATE ${slang_SOURCE_DIR}/cmake/slang-app.manifest)
+        target_sources(
+            ${target}
+            PRIVATE ${slang_SOURCE_DIR}/cmake/slang-app.manifest
+        )
     endif()
 
     #
