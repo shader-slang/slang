@@ -1582,7 +1582,8 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
 {
     switch (modifierType)
     {
-        // Allowed only on parameters and global variables.
+        // Parameter-direction and aliasing/passing-mode modifiers; at most one per
+        // declaration. (Allowed positions are enforced in isModifierAllowedOnDecl.)
     case ASTNodeType::InModifier:
         return modifierType;
     case ASTNodeType::OutModifier:
@@ -1718,15 +1719,18 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
             return true;
         [[fallthrough]];
 
-    case ASTNodeType::RefModifier:
-    case ASTNodeType::BorrowModifier:
     case ASTNodeType::GLSLBufferModifier:
     case ASTNodeType::GLSLPatchModifier:
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
                as<GLSLInterfaceBlockDecl>(decl);
 
+    case ASTNodeType::RefModifier:
+    case ASTNodeType::BorrowModifier:
     case ASTNodeType::RefReadOnlyModifier:
     case ASTNodeType::RefWriteOnlyModifier:
+        // The ref and borrow passing modes describe how an argument is passed
+        // to a parameter, and every consumer of these modifiers reads them off
+        // a `ParamDecl` only, so they are not allowed in any other position.
         return as<ParamDecl>(decl);
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
