@@ -5207,6 +5207,10 @@ semantic sv_depthlessequal
     set : float;
 }
 
+// As in HLSL, a clip or cull distance may also be declared as a `float2`, `float3` or `float4`
+// that holds one distance per component. Each backend decides how it lays these values out
+// (for SPIR-V and GLSL see `computeClipCullDistanceOffsets` in slang-ir-glsl-legalize.cpp) and
+// reports the shapes it cannot represent.
 semantic sv_clipdistance
 {
     [require(fragment)]
@@ -5214,6 +5218,15 @@ semantic sv_clipdistance
 
     [require(fragment)]
     get : float[];
+
+    [require(fragment)]
+    get : float2;
+
+    [require(fragment)]
+    get : float3;
+
+    [require(fragment)]
+    get : float4;
 
     [require(vertex)]
     [require(geometry)]
@@ -5228,6 +5241,27 @@ semantic sv_clipdistance
     [require(domain)]
     [require(mesh)]
     set : float[];
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float4;
 }
 
 semantic sv_culldistance
@@ -5238,6 +5272,15 @@ semantic sv_culldistance
     [require(fragment)]
     get : float[];
 
+    [require(fragment)]
+    get : float2;
+
+    [require(fragment)]
+    get : float3;
+
+    [require(fragment)]
+    get : float4;
+
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
@@ -5251,6 +5294,27 @@ semantic sv_culldistance
     [require(domain)]
     [require(mesh)]
     set : float[];
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float4;
 }
 
 semantic sv_target

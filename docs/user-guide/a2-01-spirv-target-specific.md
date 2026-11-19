@@ -101,6 +101,12 @@ _Note_ that `SV_DrawIndex`, `SV_FragInvocationCount`, `SV_FragSize`, `SV_PointSi
 Also _note_ that `SV_InstanceID`/`SV_VertexID` count all instances/vertices in a draw call, unlike how `InstanceIndex`/`VertexIndex` is relative to `BaseInstance`/`BaseVertex`.
 See [Using SV_InstanceID/SV_VertexID with SPIR-V target](#using-sv_instanceid-and-sv_vertexid-with-spir-v-target)
 
+## Clip and cull distances with SPIR-V target
+
+All `SV_ClipDistance<N>` values of an entry point share one `ClipDistance` array, and all `SV_CullDistance<N>` values share one `CullDistance` array. A `float2`, `float3` or `float4` value holds one distance per component, in consecutive elements. If any of the values is a vector, the values are packed in ascending semantic-index order, as DXC does: `float4 : SV_ClipDistance0` and `float2 : SV_ClipDistance1` take elements 0-3 and 4-5. If all of them are scalars, each takes the element named by its semantic index.
+
+Because the layout depends on the values an entry point declares, the stages that pass vector clip or cull distances to each other must declare the same `SV_ClipDistance<N>` / `SV_CullDistance<N>` values. A value declared as a `float` array must be the only clip (or cull) distance of its entry point, and vector values are not supported in arrayed varyings such as mesh-shader vertex outputs, hull-shader control points, and geometry or tessellation inputs.
+
 ## Using SV_InstanceID and SV_VertexID with SPIR-V target
 
 When using `SV_InstanceID` and `SV_VertexID` with SPIR-V target, it is equivalent to the difference between the index and base builtins.
