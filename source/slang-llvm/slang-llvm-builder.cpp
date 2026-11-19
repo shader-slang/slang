@@ -132,6 +132,13 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
 
     llvm::DIScope* currentLocalScope = nullptr;
 
+    // Holds the LLVM verifier's output when `finalize()` finds the module
+    // invalid; empty when the module verified clean. The `generate*()` entry
+    // points package this text as an error artifact when `finalize()` returns
+    // false, so that a verification failure fails the compilation instead of
+    // being silently dropped (and an invalid module written out).
+    std::string moduleVerifyErrors;
+
     struct VariableDebugInfo
     {
         // attached is true when the first related DebugValue has been
@@ -163,13 +170,29 @@ public:
 
     IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
 
+    // Packages the verification failure stashed in `moduleVerifyErrors` by
+    // `finalize()` as an error artifact and returns a failing result, so the
+    // caller receives the verifier's output instead of an invalid module.
+    SlangResult failWithModuleVerifyError(IArtifact** outArtifact);
+
+    // Packages a JIT setup failure (`llvm::Error` consumed here) as an error
+    // artifact prefixed with `prefix`, for the LLJIT-creation, module-add and
+    // initialization failures that would otherwise abort with no message.
+    SlangResult failWithJITError(const char* prefix, llvm::Error err, IArtifact** outArtifact);
+
     // FP mode flags are set per-instruction, and some of those instructions
     // may be coming from inline IR. This function does a pass over all relevant
     // instructions and annotates them properly for the selected FP mode.
     void addFPModeFlags();
 
     void optimize();
-    void finalize();
+
+    // Completes the module: dumps global constructors, finalizes debug info,
+    // runs the LLVM verifier and then the optimization pipeline. Returns false
+    // and leaves the verifier's output in `moduleVerifyErrors` (and the module
+    // unoptimized) when verification fails; every caller must turn that into
+    // `failWithModuleVerifyError`, or the failure is silently dropped.
+    bool finalize();
 
     // This function inserts the given LLVM IR in the global scope.
     // Uses std::string due to that being what LLVM emits and ingests.
@@ -587,6 +610,50 @@ IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic
     return artifact.detach();
 }
 
+SlangResult LLVMBuilder::failWithModuleVerifyError(IArtifact** outArtifact)
+{
+    ArtifactDiagnostic diagnostic;
+
+    diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+    // Stage::Link matches the convention of the other createErrorArtifact
+    // sites in this file, which all report late-stage builder failures.
+    diagnostic.stage = ArtifactDiagnostic::Stage::Link;
+    // The slice only borrows `moduleVerifyErrors`, which does not outlive this
+    // builder; `ArtifactDiagnostics::add` copies the text into the artifact's
+    // own allocator, keeping the diagnostic valid after the builder is gone.
+    // A failure that somehow produced no verifier output still fails loudly
+    // with a generic message rather than a blank diagnostic.
+    if (moduleVerifyErrors.empty())
+        diagnostic.text = TerminatedCharSlice("LLVM module failed verification.");
+    else
+        diagnostic.text = TerminatedCharSlice(moduleVerifyErrors.c_str());
+
+    *outArtifact = createErrorArtifact(diagnostic);
+    return SLANG_FAIL;
+}
+
+SlangResult LLVMBuilder::failWithJITError(
+    const char* prefix,
+    llvm::Error err,
+    IArtifact** outArtifact)
+{
+    // llvm::Error must be consumed before destruction; toString both formats
+    // it and marks it checked.
+    std::string errorString = llvm::toString(std::move(err));
+
+    ArtifactDiagnostic diagnostic;
+
+    StringBuilder buf;
+    buf << prefix << errorString.c_str();
+
+    diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+    diagnostic.stage = ArtifactDiagnostic::Stage::Link;
+    diagnostic.text = TerminatedCharSlice(buf.getBuffer(), buf.getLength());
+
+    *outArtifact = createErrorArtifact(diagnostic);
+    return SLANG_FAIL;
+}
+
 void LLVMBuilder::addFPModeFlags()
 {
     llvm::FastMathFlags FMF;
@@ -698,7 +765,7 @@ void LLVMBuilder::optimize()
     modulePassManager.run(*llvmModule, moduleAnalysisManager);
 }
 
-void LLVMBuilder::finalize()
+bool LLVMBuilder::finalize()
 {
     // Dump the global constructors array
     if (globalCtors.getCount() != 0)
@@ -728,11 +795,26 @@ void LLVMBuilder::finalize()
     if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
         llvmDebugBuilder->finalize();
 
-    llvm::verifyModule(*llvmModule, &llvm::errs());
+    // A module that fails verification must fail the compilation, so the
+    // verifier's output is captured here rather than printed to stderr and
+    // discarded; the `generate*()` entry points turn the returned false and
+    // this text into an error artifact. The optimization pass pipeline is also
+    // skipped for an invalid module, because running it can trip LLVM's own
+    // assertions.
+    std::string verifyErrors;
+    llvm::raw_string_ostream verifyStream(verifyErrors);
+    if (llvm::verifyModule(*llvmModule, &verifyStream))
+    {
+        verifyStream.flush();
+        moduleVerifyErrors = verifyErrors;
+        return false;
+    }
 
-    // O0 is separately handled inside `optimize()`; we need to call it in
-    // any case to make sure that `ForceInline` functions get inlined.
+    // O0 is separately handled inside `optimize()`; we need to call it at
+    // every optimization level to make sure that `ForceInline` functions get
+    // inlined.
     optimize();
+    return true;
 }
 
 void LLVMBuilder::emitGlobalLLVMIR(const std::string& textIR)
@@ -2275,7 +2357,8 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointDispatcher(LLVMInst* workGroupFunc, 
 
 SlangResult LLVMBuilder::generateAssembly(IArtifact** outArtifact)
 {
-    finalize();
+    if (!finalize())
+        return failWithModuleVerifyError(outArtifact);
 
     std::string out;
     llvm::raw_string_ostream rso(out);
@@ -2290,7 +2373,8 @@ SlangResult LLVMBuilder::generateAssembly(IArtifact** outArtifact)
 
 SlangResult LLVMBuilder::generateObjectCode(IArtifact** outArtifact)
 {
-    finalize();
+    if (!finalize())
+        return failWithModuleVerifyError(outArtifact);
 
     List<uint8_t> objectData;
     BinaryLLVMOutputStream output(objectData);
@@ -2321,7 +2405,8 @@ SlangResult LLVMBuilder::generateObjectCode(IArtifact** outArtifact)
 
 SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 {
-    finalize();
+    if (!finalize())
+        return failWithModuleVerifyError(outArtifact);
 
     std::unique_ptr<llvm::orc::LLJIT> jit;
     {
@@ -2331,24 +2416,10 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
         if (!expectJit)
         {
-            auto err = expectJit.takeError();
-
-            std::string jitErrorString;
-            llvm::raw_string_ostream jitErrorStream(jitErrorString);
-
-            jitErrorStream << err;
-
-            ArtifactDiagnostic diagnostic;
-
-            StringBuilder buf;
-            buf << "Unable to create JIT engine: " << jitErrorString.c_str();
-
-            diagnostic.severity = ArtifactDiagnostic::Severity::Error;
-            diagnostic.stage = ArtifactDiagnostic::Stage::Link;
-            diagnostic.text = TerminatedCharSlice(buf.getBuffer(), buf.getLength());
-
-            *outArtifact = createErrorArtifact(diagnostic);
-            return SLANG_FAIL;
+            return failWithJITError(
+                "Unable to create JIT engine: ",
+                expectJit.takeError(),
+                outArtifact);
         }
         jit = std::move(*expectJit);
     }
@@ -2373,12 +2444,15 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
     if (auto err = jit->addIRModule(std::move(threadSafeModule)))
     {
-        return SLANG_FAIL;
+        return failWithJITError(
+            "Unable to add LLVM module to JIT engine: ",
+            std::move(err),
+            outArtifact);
     }
 
     if (auto err = jit->initialize(jit->getMainJITDylib()))
     {
-        return SLANG_FAIL;
+        return failWithJITError("Unable to initialize JIT engine: ", std::move(err), outArtifact);
     }
     ComPtr<ISlangSharedLibrary> sharedLibrary(new LLVMJITSharedLibrary(std::move(jit)));
 

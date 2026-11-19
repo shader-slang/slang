@@ -1,6 +1,7 @@
 // slang-pass-through.cpp
 #include "slang-pass-through.h"
 
+#include "compiler-core/slang-artifact-diagnostic-util.h"
 #include "compiler-core/slang-slice-allocator.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
@@ -192,15 +193,7 @@ void reportExternalCompileError(
 
 static Severity _getDiagnosticSeverity(ArtifactDiagnostic::Severity severity)
 {
-    switch (severity)
-    {
-    case ArtifactDiagnostic::Severity::Warning:
-        return Severity::Warning;
-    case ArtifactDiagnostic::Severity::Info:
-        return Severity::Note;
-    default:
-        return Severity::Error;
-    }
+    return ArtifactDiagnosticUtil::getSinkSeverity(severity);
 }
 
 SlangResult passthroughDownstreamDiagnostics(

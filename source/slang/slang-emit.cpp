@@ -2,6 +2,7 @@
 
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-diagnostic-util.h"
 #include "compiler-core/slang-artifact-impl.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-name.h"
@@ -1473,9 +1474,6 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::HostVM:
-        case CodeGenTarget::HostLLVMIR:
-        case CodeGenTarget::HostObjectCode:
-        case CodeGenTarget::HostHostCallable:
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
@@ -1483,11 +1481,27 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
+        case CodeGenTarget::HostHostCallable:
+            // HostHostCallable takes the CPU kernel ABI only when emitting
+            // through LLVM; without -emit-cpu-via-llvm it compiles through
+            // the downstream C++ path, whose host-callable functions keep
+            // their natural signatures for direct host calls. HostObjectCode
+            // has no such non-LLVM path — isCPUTargetViaLLVM is always true
+            // for it — so it sits in the unguarded group below.
+            if (!isCPUTargetViaLLVM(targetRequest))
+                break;
+            [[fallthrough]];
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CPPHeader:
+        case CodeGenTarget::HostLLVMIR:
+        case CodeGenTarget::HostObjectCode:
         case CodeGenTarget::ShaderLLVMIR:
         case CodeGenTarget::ShaderObjectCode:
         case CodeGenTarget::ShaderHostCallable:
+            // The always-created collected uniform-params struct is what gives
+            // every CPU-ABI entry point the same parameter-block pointer the
+            // emitted dispatcher hardcodes, even for a kernel with no uniform
+            // parameters of its own.
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -2497,12 +2511,23 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
         }
         break;
+    case CodeGenTarget::HostHostCallable:
+        if (!isCPUTargetViaLLVM(targetRequest))
+            break;
+        [[fallthrough]];
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
+        // Every CPU-via-LLVM target must appear in all three CPU-ABI
+        // legalization dispatches in this function (entry-point uniform
+        // params, varying params here, explicit global context): the LLVM
+        // CPU emitter hardcodes the three-pointer kernel call, so a target
+        // missing from any one of them produces a verifier-invalid module.
         {
             SLANG_PASS(
                 legalizeEntryPointVaryingParamsForCPU,
@@ -2604,9 +2629,21 @@ Result linkAndOptimizeIR(
         SLANG_PASS(undoParameterCopy);
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderLLVMIR:
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
+        // The guard sits inside the group rather than on the Host case labels
+        // above because CUDA falls through into this body and must not be
+        // filtered by the host-target condition. The LLVM-CPU family sits
+        // below the [[fallthrough]] so it skips undoParameterCopy: that pass
+        // rewrites inout parameter copies for the pointer-style C-source
+        // targets, while this family's parameters are already legalized to
+        // the raw three-pointer ABI.
+        if (target == CodeGenTarget::HostHostCallable && !isCPUTargetViaLLVM(targetRequest))
+            break;
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
         {
@@ -2638,6 +2675,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::HostHostCallable:
         if (isCPUTargetViaLLVM(targetRequest))
             SLANG_PASS(removeRawDefaultConstructors);
         break;
@@ -4007,24 +4045,43 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     case CodeGenTarget::ShaderObjectCode:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
-            outArtifact = ComPtr<IArtifact>(artifact);
+            auto result = emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
+            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+                result,
+                artifact,
+                codeGenContext->getSink());
+            // attach adopts the emit's single returned reference (the ComPtr
+            // constructor would AddRef and leak one). Diagnostics were already
+            // reported to the sink above; callers do not read the artifact on
+            // failure, so this keeps ownership well-defined and leak-free.
+            outArtifact.attach(artifact);
+            SLANG_RETURN_ON_FAIL(result);
         }
         break;
     case CodeGenTarget::HostLLVMIR:
     case CodeGenTarget::ShaderLLVMIR:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
-            outArtifact = ComPtr<IArtifact>(artifact);
+            auto result = emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
+            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+                result,
+                artifact,
+                codeGenContext->getSink());
+            outArtifact.attach(artifact);
+            SLANG_RETURN_ON_FAIL(result);
         }
         break;
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
         {
             IArtifact* artifact = nullptr;
-            emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
-            outArtifact = ComPtr<IArtifact>(artifact);
+            auto result = emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
+            ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+                result,
+                artifact,
+                codeGenContext->getSink());
+            outArtifact.attach(artifact);
+            SLANG_RETURN_ON_FAIL(result);
         }
         break;
     }

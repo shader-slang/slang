@@ -4,14 +4,44 @@
 
 #include "slang-artifact-associated.h"
 #include "slang-artifact.h"
+#include "slang-diagnostic-sink.h"
 #include "slang-slice-allocator.h"
 
 namespace Slang
 {
 
+class DiagnosticSink;
+
 struct ArtifactDiagnosticUtil
 {
     typedef ArtifactDiagnostic::Severity Severity;
+
+    /// Map an artifact diagnostic severity onto the DiagnosticSink scale:
+    /// Info becomes a note, Warning passes through unchanged, anything
+    /// unrecognized is reported as an error. One source of truth for this
+    /// mapping — downstream-compiler reporting (slang-pass-through.cpp)
+    /// delegates here.
+    static Slang::Severity getSinkSeverity(ArtifactDiagnostic::Severity severity);
+
+    /// Report the diagnostics attached to `artifact` to `sink` when `result`
+    /// indicates a failure. Every attached diagnostic is reported verbatim,
+    /// whatever its severity — no filtering happens (current producers only
+    /// attach error-severity diagnostics, but a future producer attaching a
+    /// warning would have it echoed). Nothing happens when `result` is a
+    /// success or the artifact carries no `IArtifactDiagnostics`
+    /// representation. Downstream code generators (for example the LLVM
+    /// builder) package their failures as artifacts rather than writing to the
+    /// sink themselves, so without this step such a failure would return
+    /// without any visible message.
+    static void reportDiagnosticsOnFailure(
+        SlangResult result,
+        IArtifact* artifact,
+        DiagnosticSink* sink);
+
+    /// Report every diagnostic attached to `artifact` to `sink`, whatever its
+    /// severity. Use when the failure is signaled by the error artifact
+    /// itself rather than by a `SlangResult`.
+    static void reportDiagnostics(IArtifact* artifact, DiagnosticSink* sink);
 
     /// Given severity return as text
     static UnownedStringSlice getSeverityText(Severity severity);

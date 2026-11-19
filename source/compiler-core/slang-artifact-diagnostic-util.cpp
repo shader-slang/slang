@@ -3,11 +3,53 @@
 
 #include "core/slang-char-util.h"
 #include "core/slang-string-util.h"
+#include "slang-diagnostic-sink.h"
 
 namespace Slang
 {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArtifactDiagnosticsUtil !!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/* static */ Slang::Severity ArtifactDiagnosticUtil::getSinkSeverity(
+    ArtifactDiagnostic::Severity severity)
+{
+    switch (severity)
+    {
+    case ArtifactDiagnostic::Severity::Info:
+        return Slang::Severity::Note;
+    case ArtifactDiagnostic::Severity::Warning:
+        return Slang::Severity::Warning;
+    default:
+        return Slang::Severity::Error;
+    }
+}
+
+/* static */ void ArtifactDiagnosticUtil::reportDiagnostics(
+    IArtifact* artifact,
+    DiagnosticSink* sink)
+{
+    if (artifact)
+    {
+        auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+        if (diagnostics)
+        {
+            for (Index i = 0; i < diagnostics->getCount(); ++i)
+            {
+                auto diagnostic = diagnostics->getAt(i);
+                sink->diagnoseRaw(getSinkSeverity(diagnostic->severity), diagnostic->text);
+            }
+        }
+    }
+}
+
+/* static */ void ArtifactDiagnosticUtil::reportDiagnosticsOnFailure(
+    SlangResult result,
+    IArtifact* artifact,
+    DiagnosticSink* sink)
+{
+    if (SLANG_FAILED(result))
+        reportDiagnostics(artifact, sink);
+}
 
 /* static */ UnownedStringSlice ArtifactDiagnosticUtil::getSeverityText(Severity severity)
 {
