@@ -3,12 +3,12 @@
 // reported through the call that looks the handle up, not WGSL that Tint rejects. See
 // shader-slang/slang#13641.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DSTORAGE_TEXTURE
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DSTRUCTURED_BUFFER
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DRW_STRUCTURED_BUFFER
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DBYTE_ADDRESS_BUFFER
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CALL): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DCONSTANT_BUFFER
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CALL): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DCOMBINED
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DSTORAGE_TEXTURE
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DSTRUCTURED_BUFFER
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DRW_STRUCTURED_BUFFER
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DBYTE_ADDRESS_BUFFER
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CALL,exit-code=2): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DCONSTANT_BUFFER
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CALL,exit-code=2): -target wgsl -stage compute -entry main -capability wgsl_chromium_experimental_resource_table -DCOMBINED
 
 // The error points at the lookup in `read()`, then at the call to `read()` in `main`.
 // CHECK: error[E41400]: static assertion failed
