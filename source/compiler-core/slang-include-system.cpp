@@ -53,6 +53,13 @@ SlangResult IncludeSystem::findFile(
     // The combined spelling can contain redundant ".." segments that inflate it past the OS
     // path-length limit (MAX_PATH on Windows, PATH_MAX on POSIX) even though the simplified
     // path is short, so collapse them before handing the path to the file system.
+    //
+    // We resolve every include through this one lexically-simplified spelling: the existence
+    // check, the unique-identity lookup, and the found path handed back to the caller all see
+    // the same minimal form, so consumers such as the preprocessor can push the found path as
+    // the next include base without re-simplifying. A file system that does not implement
+    // getPath(PathKind::Simplified) keeps the unsimplified spelling, and with it the original
+    // length-limit behavior.
     combinedPath = simplifyPath(combinedPath);
 
     // This checks the path exists
