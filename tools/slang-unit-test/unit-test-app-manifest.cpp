@@ -61,7 +61,7 @@ SLANG_UNIT_TEST(appManifestIsDeclaredAndWired)
 
     String manifest;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(manifestPath, manifest)));
-    SLANG_CHECK_ABORT(manifest.contains("<longPathAware>true</longPathAware>"));
+    SLANG_CHECK_ABORT(manifest.contains("<ws2:longPathAware>true</ws2:longPathAware>"));
 
     String slangTarget;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText("cmake/SlangTarget.cmake", slangTarget)));
@@ -128,6 +128,6 @@ SLANG_UNIT_TEST(embeddedAppManifestDeclaresLongPathAware)
     SLANG_CHECK_ABORT(size != 0);
 
     String manifest(text, text + size);
-    SLANG_CHECK_ABORT(manifest.contains("<longPathAware>true</longPathAware>"));
+    SLANG_CHECK_ABORT(manifest.contains("<ws2:longPathAware>true</ws2:longPathAware>"));
 }
 #endif
