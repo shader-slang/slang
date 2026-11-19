@@ -420,9 +420,22 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    // An atomic whose result is never read does not bind it: the call is a bare statement, a
+    // texture atomic drops the `.x` that selects the result from its 4-vector, and compare-exchange
+    // drops its copy-out of the comparand. The Metal compiler warns on a temporary that is never
+    // read (-Wunused-variable) and on a discarded `.x` (-Wunused-value). Debug-info users do not
+    // count: the emitter skips debug instructions, so they never name the result.
+    bool isResultUsed = hasNonDebugUse(inst);
+    auto emitAtomicResultDecl = [&]()
+    {
+        if (isResultUsed)
+            emitInstResultDecl(inst);
+    };
+    auto emitAtomicCallEnd = [&](bool isImageOp)
+    { m_writer->emit(isImageOp && isResultUsed ? ").x;\n" : ");\n"); };
     auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
     {
-        emitInstResultDecl(inst);
+        emitAtomicResultDecl();
         bool isImageOp = false;
         if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
         {
@@ -445,10 +458,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitMemoryOrderOperand(inst->getOperand(inst->getOperandCount() - 1));
         }
-        if (isImageOp)
-            m_writer->emit(").x;\n");
-        else
-            m_writer->emit(");\n");
+        emitAtomicCallEnd(isImageOp);
     };
     switch (inst->getOp())
     {
@@ -481,7 +491,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicLoad:
         {
-            emitInstResultDecl(inst);
+            emitAtomicResultDecl();
             bool isImageOp = false;
             if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
@@ -500,10 +510,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(", ");
                 emitMemoryOrderOperand(inst->getOperand(1));
             }
-            if (isImageOp)
-                m_writer->emit(").x;\n");
-            else
-                m_writer->emit(");\n");
+            emitAtomicCallEnd(isImageOp);
             return true;
         }
     case kIROp_AtomicStore:
@@ -542,8 +549,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst));
             isImageOp = (imageSubscript != nullptr);
 
-            emitType(inst->getDataType(), getName(inst));
-            m_writer->emit(";\n{\n");
+            if (isResultUsed)
+            {
+                emitType(inst->getDataType(), getName(inst));
+                m_writer->emit(";\n");
+            }
+            m_writer->emit("{\n");
             if (isImageOp)
                 m_writer->emit("vec<");
             emitType(inst->getDataType());
@@ -574,11 +585,15 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 emitMemoryOrderOperand(inst->getOperand(4));
             }
             m_writer->emit(");\n");
-            m_writer->emit(getName(inst));
-            m_writer->emit(" = _metal_cas_comparand");
-            if (isImageOp)
-                m_writer->emit(".x");
-            m_writer->emit(";\n}\n");
+            if (isResultUsed)
+            {
+                m_writer->emit(getName(inst));
+                m_writer->emit(" = _metal_cas_comparand");
+                if (isImageOp)
+                    m_writer->emit(".x");
+                m_writer->emit(";\n");
+            }
+            m_writer->emit("}\n");
             return true;
         }
     case kIROp_AtomicAdd:
@@ -618,7 +633,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_AtomicInc:
         {
-            emitInstResultDecl(inst);
+            emitAtomicResultDecl();
             bool isImageOp = false;
             if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
@@ -638,15 +653,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(", ");
                 emitMemoryOrderOperand(inst->getOperand(1));
             }
-            if (isImageOp)
-                m_writer->emit(").x;\n");
-            else
-                m_writer->emit(");\n");
+            emitAtomicCallEnd(isImageOp);
             return true;
         }
     case kIROp_AtomicDec:
         {
-            emitInstResultDecl(inst);
+            emitAtomicResultDecl();
             bool isImageOp = false;
             if (auto imageSubscript = getAtomicImageSubscript(cast<IRAtomicOperation>(inst)))
             {
@@ -666,10 +678,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(", ");
                 emitMemoryOrderOperand(inst->getOperand(1));
             }
-            if (isImageOp)
-                m_writer->emit(").x;\n");
-            else
-                m_writer->emit(");\n");
+            emitAtomicCallEnd(isImageOp);
             return true;
         }
     case kIROp_MetalCastToDepthTexture:

@@ -2459,6 +2459,52 @@ void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
     }
 }
 
+// Emit `call`, whose result has no non-debug use, as a statement that does not bind the result,
+// and return true; return false when the caller should emit the usual `T r = call;` form. Apple's
+// Metal compiler reports a temporary that is never read (shader-slang/slang#14058). The rule for
+// every C-like target depends on the callee and the language:
+// - A call to a program function becomes a bare `f(x);` on every language but WGSL.
+// - A target intrinsic is cast to `void` on Metal, C, C++ and CUDA. Its expansion is not always a
+//   call (on Metal, `tex.Load(uv)` expands to `(tex.read(uv).x)`), and clang-based compilers
+//   report a discarded non-call or `const` builtin as an unused value.
+// - HLSL and GLSL intrinsics keep the temporary. GLSL has no `void` cast, and DXC reports a bare
+//   `tex.Load(uv);` as an unused value but not an unused temporary.
+// - WGSL keeps every temporary, because no WGSL compiler has been reported to warn on one, and a
+//   bare call to a `@must_use` builtin is an error.
+bool CLikeSourceEmitter::tryEmitDiscardedCallStmt(IRCall* call)
+{
+    if (as<IRVoidType>(call->getDataType()))
+        return false;
+
+    auto sourceLanguage = getSourceLanguage();
+    if (sourceLanguage == SourceLanguage::WGSL)
+        return false;
+
+    if (!isTargetIntrinsic(getResolvedInstForDecorations(call->getCallee())))
+    {
+        emitInstExpr(call, getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return true;
+    }
+
+    switch (sourceLanguage)
+    {
+    case SourceLanguage::C:
+    case SourceLanguage::CPP:
+    case SourceLanguage::CUDA:
+    case SourceLanguage::Metal:
+        {
+            auto prec = getInfo(EmitOp::Prefix);
+            m_writer->emit("(void)");
+            emitInstExpr(call, rightSide(getInfo(EmitOp::General), prec));
+            m_writer->emit(";\n");
+            return true;
+        }
+    default:
+        return false;
+    }
+}
+
 void CLikeSourceEmitter::emitInstExpr(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     // Try target specific impl first
@@ -3355,6 +3401,11 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     switch (inst->getOp())
     {
     default:
+        // A debug-info user never names the result, because this switch emits nothing for the
+        // `kIROp_Debug*` cases below, so a call with only such users can drop its temporary.
+        if (auto call = as<IRCall>(inst);
+            call && !hasNonDebugUse(call) && tryEmitDiscardedCallStmt(call))
+            break;
         emitInstResultDecl(inst);
         emitInstExpr(inst, getInfo(EmitOp::General));
         m_writer->emit(";\n");

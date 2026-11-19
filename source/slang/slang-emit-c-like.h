@@ -406,6 +406,8 @@ public:
 
     void emitCallExpr(IRCall* inst, EmitOpInfo outerPrec);
 
+    bool tryEmitDiscardedCallStmt(IRCall* call);
+
     void emitLiveness(IRInst* inst) { emitLivenessImpl(inst); }
 
     void emitInstExpr(IRInst* inst, EmitOpInfo const& inOuterPrec);
