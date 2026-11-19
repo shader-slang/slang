@@ -44,4 +44,27 @@ void main()
     joinArgs(false, float3(0.0f));
 /*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'bool' and 'vector<float,3>'
 */
+    joinArgs(float3(0.0f), bool3(true));
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'vector<float,3>' and 'vector<bool,3>'
+*/
+    joinArgs(bool3(true), float3(0.0f));
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements 'vector<bool,3>' and 'vector<float,3>'
+*/
+
+    // Built-in `?:`/`select` infer their type from both arms through the
+    // same join, so mixed equal-cost arms now fail overload resolution;
+    // previously one arm's type silently won.
+    bool c = true;
+    float x = select(c, 0.5f, false);
+/*CHECK: no overload for 'select' applicable to arguments of type (bool, float, bool)
+*/
+    float y = select(c, false, 0.5f);
+/*CHECK: no overload for 'select' applicable to arguments of type (bool, bool, float)
+*/
+    float p = c ? 0.5f : false;
+/*CHECK: no overload for '?:' applicable to arguments of type (bool, float, bool)
+*/
+    float q = c ? false : 0.5f;
+/*CHECK: no overload for '?:' applicable to arguments of type (bool, bool, float)
+*/
 }
