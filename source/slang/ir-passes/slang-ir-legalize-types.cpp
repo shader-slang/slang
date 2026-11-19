@@ -3733,6 +3733,87 @@ static LegalVal legalizeGlobalParam(
 static constexpr int kHasBeenAddedOrProcessedScratchBitIndex = 0;
 static constexpr int kHasBeenAddedScratchBitIndex = 1;
 
+/// Give every `simple` leaf of a decomposed `LegalVal` the source location of
+/// the original instruction it replaces, unless the leaf already has a
+/// location of its own. Leaves that are `IRConstant` instructions are skipped:
+/// constants are deduplicated module-wide and shared between use sites, so a
+/// constant must not absorb the location of any one original.
+static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& legalVal)
+{
+    switch (legalVal.flavor)
+    {
+    case LegalVal::Flavor::simple:
+        {
+            auto leaf = legalVal.getSimple();
+            if (!as<IRConstant>(leaf) && !leaf->sourceLoc.isValid())
+                leaf->sourceLoc = originalInst->sourceLoc;
+        }
+        return;
+
+    case LegalVal::Flavor::tuple:
+        for (auto element : legalVal.getTuple()->elements)
+            setSourceLocOnLegalValLeaves(originalInst, element.val);
+        return;
+
+    case LegalVal::Flavor::pair:
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getPair()->ordinaryVal);
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getPair()->specialVal);
+        return;
+
+    case LegalVal::Flavor::implicitDeref:
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getImplicitDeref());
+        return;
+
+    case LegalVal::Flavor::wrappedBuffer:
+        setSourceLocOnLegalValLeaves(originalInst, legalVal.getWrappedBuffer()->base);
+        return;
+
+    default:
+        return;
+    }
+}
+
+/// Apply the replacement bookkeeping for `originalInst` to the value that
+/// legalization produced in its place.
+///
+/// A replacement takes the original's position in the IR, so the information a
+/// user attached to the original must follow it. Every instruction making up
+/// `legalVal` receives `originalInst`'s source location unless it already has
+/// one of its own, so a diagnostic that fires on the replacement still points
+/// at the source the user wrote. A `simple` one-for-one replacement additionally
+/// receives the original's decorations, which legalization otherwise tends to
+/// drop. Consider a call that passes a struct containing a `Texture2D`: the
+/// legalizer rebuilds the call, and the rebuilt call must keep an
+/// `[IgnoreSideEffects]` decoration, because `mightHaveSideEffects` reads that
+/// decoration when deciding whether dead-code elimination may remove the
+/// call. Decorations are only transferred for the `simple` flavor, where one
+/// instruction became exactly one replacement with no rewriting beyond
+/// operands; a decomposition into multiple values has no single obvious
+/// destination for the original's decorations, so its leaves only receive the
+/// source location.
+///
+/// Replacement targets that are `IRConstant` instructions are skipped: a
+/// constant is deduplicated module-wide and shared between use sites, so it
+/// must not absorb the location or decorations of any one original (for
+/// example, the shared void value that stands in for an aborted call's
+/// result).
+static void transferSourceLocAndDecorationsToLegalizedInst(
+    IRInst* originalInst,
+    LegalVal const& legalVal)
+{
+    if (legalVal.flavor == LegalVal::Flavor::simple)
+    {
+        auto replacement = legalVal.getSimple();
+        if (replacement == originalInst || as<IRConstant>(replacement))
+            return;
+        if (!replacement->sourceLoc.isValid())
+            replacement->sourceLoc = originalInst->sourceLoc;
+        originalInst->transferDecorationsTo(replacement);
+        return;
+    }
+    setSourceLocOnLegalValLeaves(originalInst, legalVal);
+}
+
 struct IRTypeLegalizationPass
 {
     IRTypeLegalizationContext* context = nullptr;
@@ -3932,6 +4013,12 @@ struct IRTypeLegalizationPass
 
         LegalVal legalVal = legalizeInst(context, inst);
         registerLegalizedValue(context, inst, legalVal);
+
+        // The replacement inherits the original's source location and, for a
+        // one-for-one replacement, its decorations. This runs before the
+        // re-queue scan below, so any decoration moved onto the replacement is
+        // still visited as one of its children.
+        transferSourceLocAndDecorationsToLegalizedInst(inst, legalVal);
 
         // Once the instruction has been processed, we need to consider
         // whether any other instructions might now be ready to process.
