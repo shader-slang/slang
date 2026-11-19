@@ -1948,7 +1948,12 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
         // ensure bindinig is checked first.
         if (!as<GLSLOffsetLayoutAttribute>(attr))
         {
-            validateAttribute(attr, nullptr, attrTarget);
+            // We drop a `constant_id` whose id fails to check, so that the `local_size_*_id`
+            // lookup in `checkModifier` sees only ids that fold. Other qualifiers stay attached
+            // because later checks look for them: the deferred `atomic_uint` offset check, for
+            // example, reports a missing `binding` when it finds none.
+            if (!validateAttribute(attr, nullptr, attrTarget) && as<VkConstantIdAttribute>(attr))
+                attr = nullptr;
         }
     }
 
@@ -1958,6 +1963,47 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     }
 
     return attr;
+}
+
+// Return the size that the `layout(local_size_<axis> = N) in;` statements in `parentDecl` give
+// `axis`, or 1 when none does. GLSL declares a size and its specialization-constant id in
+// independent statements, so `layout(local_size_x = 32) in; layout(local_size_x_id = 18) in;`
+// makes x specializable with a default of 32, in either statement order. When several
+// statements size the axis, the last size other than 1 wins, as in the thread-group merge in
+// `validateEntryPoint`.
+static IntegerLiteralValue findGLSLLocalSizeDefault(
+    SemanticsVisitor* visitor,
+    ContainerDecl* parentDecl,
+    int axis)
+{
+    IntegerLiteralValue size = 1;
+
+    // Checking a size expression can add members to `parentDecl`, for example when it names a
+    // user-defined attribute struct, so we iterate by index.
+    for (Index memberIndex = 0; memberIndex < parentDecl->getDirectMemberDeclCount(); ++memberIndex)
+    {
+        auto emptyDecl = as<EmptyDecl>(parentDecl->getDirectMemberDecl(memberIndex));
+        auto attr = emptyDecl ? emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>() : nullptr;
+        if (!attr || !attr->args[axis] || attr->axisIsSpecConstId[axis])
+            continue;
+
+        // A size given by a specialization constant has no compile-time value, so it does not
+        // set the default; the size statement's own check accepts it the same way.
+        if (visitor->tryGetIntOrEnumSpecializationConstant(attr->args[axis]))
+            continue;
+
+        // The size statement reports a size that is not constant when its own modifiers are
+        // checked, so we fold without a sink here.
+        auto value = as<ConstantIntVal>(visitor->CheckIntegerConstantExpression(
+            visitor->CheckExpr(attr->args[axis]),
+            SemanticsVisitor::IntegerConstantExpressionCoercionType::AnyInteger,
+            nullptr,
+            SemanticsVisitor::ConstantFoldingKind::CompileTime,
+            nullptr));
+        if (value && value->getValue() != 1)
+            size = value->getValue();
+    }
+    return size;
 }
 
 Modifier* SemanticsVisitor::checkModifier(
@@ -2327,8 +2373,22 @@ Modifier* SemanticsVisitor::checkModifier(
                         // specialization constant with this ID.
                         Int specConstId = cintVal->getValue();
 
-                        for (auto member : decl->parentDecl->getDirectMemberDecls())
+                        // Sibling declarations reach `ModifiersChecked` in source order,
+                        // so a `constant_id` declared after this `layout(...) in;` still
+                        // holds an unchecked attribute unless we check it here. We bring
+                        // only variables to that state: `constant_id` applies only to
+                        // variables, and the `EmptyDecl` being checked here is itself a
+                        // sibling, which `ensureDecl` would report as a cyclic reference.
+                        auto parentDecl = decl->parentDecl;
+                        for (Index memberIndex = 0;
+                             memberIndex < parentDecl->getDirectMemberDeclCount();
+                             ++memberIndex)
                         {
+                            auto member =
+                                as<VarDeclBase>(parentDecl->getDirectMemberDecl(memberIndex));
+                            if (!member)
+                                continue;
+                            ensureDecl(member, DeclCheckState::ModifiersChecked);
                             auto constantId = member->findModifier<VkConstantIdAttribute>();
                             if (constantId)
                             {
@@ -2348,12 +2408,38 @@ Modifier* SemanticsVisitor::checkModifier(
                         if (!attr->specConstExtents[i])
                         {
                             auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
+                            specConstVarDecl->loc = attr->loc;
+                            specConstVarDecl->nameAndLoc.loc = attr->loc;
+                            // We name each implicit constant after its id because the
+                            // name feeds the global's mangled name, and two unnamed
+                            // constants would be linked as one symbol. The `$` prefix
+                            // keeps the name out of reach of user code. Reflection reports
+                            // this name, but its spelling is not a stable interface, and
+                            // `SynthesizedModifier` keeps the decl out of tooling such as
+                            // the language-server outline.
+                            specConstVarDecl->nameAndLoc.name =
+                                getName("$local_size_id_" + String(specConstId));
+                            addModifier(
+                                specConstVarDecl,
+                                getASTBuilder()->create<SynthesizedModifier>());
+                            // The lookup above re-checks `args[0]` of each sibling
+                            // `VkConstantIdAttribute`, and it reaches this implicit one when
+                            // a later axis or another `layout(...) in;` repeats the id, so the
+                            // attribute carries the id expression as well as `location`.
                             auto constantIdModifier =
                                 getASTBuilder()->create<VkConstantIdAttribute>();
+                            constantIdModifier->args.add(arg);
                             constantIdModifier->location = (int32_t)specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
+                            // The default is the size an unspecialized dispatch must see. Axes
+                            // that repeat an id share this constant, so the first one sets it.
+                            auto defaultSize = getASTBuilder()->create<IntegerLiteralExpr>();
+                            defaultSize->type = QualType(specConstVarDecl->type.type);
+                            defaultSize->value = findGLSLLocalSizeDefault(this, parentDecl, i);
+                            defaultSize->loc = attr->loc;
+                            specConstVarDecl->initExpr = defaultSize;
                             addModifier(specConstVarDecl, constantIdModifier);
-                            decl->parentDecl->addMember(specConstVarDecl);
+                            parentDecl->addMember(specConstVarDecl);
                             attr->specConstExtents[i] =
                                 DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
                         }
