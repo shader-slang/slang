@@ -75,7 +75,14 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
 
     const FormatInfo& formatInfo = getFormatInfo(format);
 
-    bool isArray = inputDesc.arrayLength > 1;
+    // InputTextureDesc::arrayLength defines the encoding: a named length means the test
+    // wants an array texture, even a single-element one, so the resource and its view match
+    // the shader-declared type on every backend. Vulkan validation reports a mismatch as
+    // VUID-vkCmdDispatch-viewType-07752 (for example a plain-cube view bound to a
+    // TextureCubeArray); the other backends get the matching array resource too. 3D inputs
+    // are never arrays — the dimension-3 arm below always builds a Texture3D and does not
+    // consult isArray.
+    bool isArray = inputDesc.arrayLength > 0;
     bool isMS = inputDesc.sampleCount > 1;
 
     textureDesc.sampleCount = inputDesc.sampleCount;

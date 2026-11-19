@@ -47,7 +47,11 @@ enum InputTextureSampleCount
 struct InputTextureDesc
 {
     int dimension = 2;
-    int arrayLength = 0;
+    int arrayLength = 0; ///< 0 means no array length was named; any positive value names an
+                         ///< explicit array, even of one element (honored for 1D, 2D, MS and
+                         ///< cube inputs; 3D inputs ignore the field). Only TEST_INPUT parsing
+                         ///< writes this field, so 0 means "unspecified" rather than
+                         ///< "explicitly not an array"; negative values are out of contract.
     bool isCube = false;
     bool isDepthTexture = false;
     bool isRWTexture = false;
