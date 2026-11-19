@@ -228,6 +228,13 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // pass runs later during code generation.
     if (m_passThrough == PassThroughMode::None)
     {
+        // Checking the specialization arguments runs semantic analysis, which allocates
+        // nodes through the thread-local "current" AST builder. The front-end's own
+        // `SLANG_AST_BUILDER_RAII` scope has already popped by this point, so without
+        // this scope a builder left behind by an earlier compilation on the same
+        // thread would silently become current.
+        SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
         m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
         if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
