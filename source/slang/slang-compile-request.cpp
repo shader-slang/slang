@@ -5,16 +5,16 @@
 #include "compiler-core/slang-artifact-util.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-type-text-util.h"
-#include "slang-ast-dump.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-emit-source-writer.h"
-#include "slang-lower-to-ir.h"
 #include "slang-markdown.h"
 #include "slang-options.h"
-#include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-serialize-container.h"
+#include "slang/ast/slang-ast-dump.h"
+#include "slang/emission/slang-emit-source-writer.h"
+#include "slang/lower-to-ir/slang-lower-to-ir.h"
+#include "slang/parser/slang-parser.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/serialization/slang-serialize-container.h"
 
 namespace Slang
 {

@@ -7,7 +7,7 @@ reference family contract** that applies to this page.
 
 Produce `docs/generated/design/ast-reference/declarations.md` — the
 per-node reference for the `Decl` family declared in
-[slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h).
+[slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h).
 
 ## Family-specific guidance
 

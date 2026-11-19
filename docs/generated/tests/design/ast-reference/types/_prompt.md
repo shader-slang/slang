@@ -282,9 +282,9 @@ in `README.md`.
 
 ## Source files you may consult for verification only
 
-- `source/slang/slang-ast-type.h`
-- `source/slang/slang-ast-base.h`
-- `source/slang/slang-ast-val.h`
+- `source/slang/ast/slang-ast-type.h`
+- `source/slang/ast/slang-ast-base.h`
+- `source/slang/ast/slang-ast-val.h`
 
 You may look at these files to confirm a type class is reachable
 through a particular surface form (e.g. that `T*` produces a

@@ -93,11 +93,11 @@ verbatim as a source comment; see for example lines 1927-1934
 - [slang-code-gen.h](../../../../source/slang/slang-code-gen.h)
   — declares `struct RequiredLoweringPassSet` (line 52), the
   40-flag record whose fields name the gates in the tables below.
-- [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
+- [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp)
   — `emitSPIRVFromIR` (line 12469) calls `legalizeIRForSPIRV`,
   iterates the forward-declared-pointer fixup loop, and emits the
   SPIR-V words.
-- [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp)
+- [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp)
   — `legalizeIRForSPIRV` (line 3433) is the top-level legalizer;
   `legalizeSPIRV` (line 3117) drives `SPIRVLegalizationContext::processModule`;
   `simplifyIRForSpirvLegalization` (line 3130) is the iterative
@@ -108,12 +108,12 @@ verbatim as a source comment; see for example lines 1927-1934
   `removeUnreachableCodeAfterDiscardForOpKill`, and
   `insertFragmentShaderInterlock` are SPIR-V-specific finalization
   steps.
-- [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp)
+- [slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp)
   — `legalizeEntryPointsForGLSL` is called for SPIR-V too despite
   its name (it predates the SPIR-V direct-emit path).
-- [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp)
+- [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp)
   — used by `legalizeLogicalAndOr` for Khronos targets.
-- [slang-ir-spirv-snippet.cpp](../../../../source/slang/slang-ir-spirv-snippet.cpp)
+- [slang-ir-spirv-snippet.cpp](../../../../source/slang/emission/slang-ir-spirv-snippet.cpp)
   — referenced by `legalizeSPIRV` for inline-asm snippet handling.
 - [slang-target-program.h](../../../../source/slang/slang-target-program.h)
   — declares the forwarding `TargetProgram::shouldEmitSPIRVDirectly`
@@ -215,23 +215,23 @@ Validation calls `validateIRModuleIfEnabled` run after most
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `linkIR` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | Direct call (not `SLANG_PASS`, line 1050); pulls in IR for imported modules. The first `calcRequiredLoweringPassSet` scan (line 1085) follows the `RequiredLoweringPassSet` reset at line 1084. |
-| 2 | `validateAndRemoveAssumeAddress` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `reqSet.assumeAddress` | Line 1087. `validate=true` for SPIR-V (the argument is `!isCPUTarget && !isCUDATarget`). The flag is set by `kIROp_AssumeAddress`. |
-| 3 | `stripDebugInfo` | [slang-ir-strip-debug-info.cpp](../../../../source/slang/slang-ir-strip-debug-info.cpp) | `reqSet.debugInfo && getDebugInfoLevel() == DebugInfoLevel::None` | Drops debug instructions when `-g0`. |
-| 4 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | (always) | |
-| 5 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | |
-| 6 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
-| 7 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Writes coverage metadata via the `ArtifactPostEmitMetadata` pointer created at line 1064. Takes a `counterByteWidth` (default `kDefaultCoverageCounterByteWidth`, overridable through `TraceCoverageCounterByteWidth`; any value other than 4 or 8 fails with `CoverageCounterWidthBytesInvalid`) and a `coverageBoolean` flag (from `TraceCoverageBoolean`, off by default). The placement options (`TraceCoverageBinding`, `TraceCoverageBindlessIndex`) are read and validated before the gate (lines 1172-1255), so a bindless index on a non-Khronos target is diagnosed even when the module has no coverage markers; SPIR-V is a Khronos target and passes that check. |
-| 8 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | (always) | |
-| 9 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
+| 1 | `linkIR` | [slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp) | (always) | Direct call (not `SLANG_PASS`, line 1050); pulls in IR for imported modules. The first `calcRequiredLoweringPassSet` scan (line 1085) follows the `RequiredLoweringPassSet` reset at line 1084. |
+| 2 | `validateAndRemoveAssumeAddress` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | `reqSet.assumeAddress` | Line 1087. `validate=true` for SPIR-V (the argument is `!isCPUTarget && !isCUDATarget`). The flag is set by `kIROp_AssumeAddress`. |
+| 3 | `stripDebugInfo` | [slang-ir-strip-debug-info.cpp](../../../../source/slang/ir-passes/slang-ir-strip-debug-info.cpp) | `reqSet.debugInfo && getDebugInfoLevel() == DebugInfoLevel::None` | Drops debug instructions when `-g0`. |
+| 4 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/ir-passes/slang-ir-transform-params-to-constref.cpp) | (always) | |
+| 5 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp) | (always) | |
+| 6 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/ir-passes/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
+| 7 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/ir-passes/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Writes coverage metadata via the `ArtifactPostEmitMetadata` pointer created at line 1064. Takes a `counterByteWidth` (default `kDefaultCoverageCounterByteWidth`, overridable through `TraceCoverageCounterByteWidth`; any value other than 4 or 8 fails with `CoverageCounterWidthBytesInvalid`) and a `coverageBoolean` flag (from `TraceCoverageBoolean`, off by default). The placement options (`TraceCoverageBinding`, `TraceCoverageBindlessIndex`) are read and validated before the gate (lines 1172-1255), so a bindless index on a non-Khronos target is diagnosed even when the module has no coverage markers; SPIR-V is a Khronos target and passes that check. |
+| 8 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-collect-global-uniforms.cpp) | (always) | |
+| 9 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-decorations.cpp) | (always) | |
 | 10 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper inside `slang-emit.cpp` (line 801). |
-| 11 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
-| 12 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
-| 13 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, SPIR-V via `default` arm) | |
-| 14 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Runs after entry-point uniform packing so the post-packing `globalScopeVarLayout` can fill in the CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata` produced by step 7. Effectively a no-op on SPIR-V (no CPU/CUDA marshaling), but the call site is shared. |
-| 15 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/slang-ir-lower-l-value-cast.cpp) | `reqSet.lValueCast` | The flag is set by `kIROp_InOutImplicitCast` / `kIROp_OutImplicitCast`, which only the front end produces. |
-| 16 | `specializeMatrixLayout` | [slang-ir-specialize-matrix-layout.cpp](../../../../source/slang/slang-ir-specialize-matrix-layout.cpp) | `reqSet.unresolvedMatrixLayout` | Line 1479. Runs before the first `simplifyIR`. The flag is set by a `kIROp_MatrixType` whose layout operand is not a literal or is `SLANG_MATRIX_LAYOUT_MODE_UNKNOWN`. |
-| 17 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | Runs early so enum casts don't block specialization. The flag is set by `kIROp_CastEnumToInt` / `kIROp_CastIntToEnum` / `kIROp_EnumCast` as well as by `kIROp_EnumType`, so a degenerate cast that outlives the last `IREnumType` still selects the pass. |
+| 11 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
+| 12 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-uniforms.cpp) | (always, SPIR-V via `default` arm) | |
+| 13 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp) | (always, SPIR-V via `default` arm) | |
+| 14 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/ir-passes/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Runs after entry-point uniform packing so the post-packing `globalScopeVarLayout` can fill in the CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata` produced by step 7. Effectively a no-op on SPIR-V (no CPU/CUDA marshaling), but the call site is shared. |
+| 15 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/ir-passes/slang-ir-lower-l-value-cast.cpp) | `reqSet.lValueCast` | The flag is set by `kIROp_InOutImplicitCast` / `kIROp_OutImplicitCast`, which only the front end produces. |
+| 16 | `specializeMatrixLayout` | [slang-ir-specialize-matrix-layout.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-matrix-layout.cpp) | `reqSet.unresolvedMatrixLayout` | Line 1479. Runs before the first `simplifyIR`. The flag is set by a `kIROp_MatrixType` whose layout operand is not a literal or is `SLANG_MATRIX_LAYOUT_MODE_UNKNOWN`. |
+| 17 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | Runs early so enum casts don't block specialization. The flag is set by `kIROp_CastEnumToInt` / `kIROp_CastIntToEnum` / `kIROp_EnumCast` as well as by `kIROp_EnumType`, so a degenerate cast that outlives the last `IREnumType` still selects the pass. |
 
 Filtered out for SPIR-V in this phase: the
 `!isKhronosTarget && reqSet.glslSSBO` branch (line 1103,
@@ -456,78 +456,78 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | `defaultIRSimplificationOptions`, line 1499. |
-| 2 | `validateUniformity` | [slang-ir-uniformity.cpp](../../../../source/slang/slang-ir-uniformity.cpp) | `getBoolOption(ValidateUniformity)` | Aborts the pipeline on error. |
-| 3 | `fuseCallsToSaturatedCooperation` | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/slang-ir-fuse-satcoop.cpp) | `!shouldPerformMinimumOptimizations` | Must run before defunctionalization. |
-| 4 | `checkAutodiffPatterns` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `reqSet.autodiff` | |
-| 5 | `diagnoseCircularConformances` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | Aborts before specialization on error. |
-| 6 | `specializeModule` | [slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) | `!isSpecializationDisabled()` | With `specOptions.lowerWitnessLookups = true`. |
-| 7 | `validateMutableGlobalVariableTypes` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | Direct call (line 1571); returns `SLANG_FAIL` if a mutable global has an invalid type. |
-| 8 | `specializeHigherOrderParameters` | [slang-ir-defunctionalization.cpp](../../../../source/slang/slang-ir-defunctionalization.cpp) | `reqSet.higherOrderFunc` | |
-| 9a | `finalizeAutoDiffPass` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1592) | Builds an `AutoDiffSharedContext`; skipped entirely for modules with no autodiff IR. Mutually exclusive with row 9b. |
-| 9b | `stripAutoDiffDecorations` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `!reqSet.autodiff` (`else` arm, line 1596) | Runs *instead of* row 9a. A module with no autodiff constructs nonetheless links the `[__AutoDiffBuiltin]` core-module types, whose `Export` / `KeepAlive` decorations would otherwise pin them past the `eliminateDeadCode` in row 11. |
-| 10 | `lowerMatrixSwizzleStores` | [slang-ir-lower-matrix-swizzle-store.cpp](../../../../source/slang/slang-ir-lower-matrix-swizzle-store.cpp) | `reqSet.matrixSwizzleStore` | |
-| 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | `deadCodeEliminationOptions`, whose `keepGlobalParamsAlive` is set from `PreserveParameters` at line 1496. |
-| 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) | (always) | |
+| 1 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | (always) | `defaultIRSimplificationOptions`, line 1499. |
+| 2 | `validateUniformity` | [slang-ir-uniformity.cpp](../../../../source/slang/ir-passes/slang-ir-uniformity.cpp) | `getBoolOption(ValidateUniformity)` | Aborts the pipeline on error. |
+| 3 | `fuseCallsToSaturatedCooperation` | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/ir-passes/slang-ir-fuse-satcoop.cpp) | `!shouldPerformMinimumOptimizations` | Must run before defunctionalization. |
+| 4 | `checkAutodiffPatterns` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `reqSet.autodiff` | |
+| 5 | `diagnoseCircularConformances` | [slang-ir-any-value-inference.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-inference.cpp) | (always) | Aborts before specialization on error. |
+| 6 | `specializeModule` | [slang-ir-specialize.cpp](../../../../source/slang/ir-passes/slang-ir-specialize.cpp) | `!isSpecializationDisabled()` | With `specOptions.lowerWitnessLookups = true`. |
+| 7 | `validateMutableGlobalVariableTypes` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | (always) | Direct call (line 1571); returns `SLANG_FAIL` if a mutable global has an invalid type. |
+| 8 | `specializeHigherOrderParameters` | [slang-ir-defunctionalization.cpp](../../../../source/slang/ir-passes/slang-ir-defunctionalization.cpp) | `reqSet.higherOrderFunc` | |
+| 9a | `finalizeAutoDiffPass` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1592) | Builds an `AutoDiffSharedContext`; skipped entirely for modules with no autodiff IR. Mutually exclusive with row 9b. |
+| 9b | `stripAutoDiffDecorations` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `!reqSet.autodiff` (`else` arm, line 1596) | Runs *instead of* row 9a. A module with no autodiff constructs nonetheless links the `[__AutoDiffBuiltin]` core-module types, whose `Export` / `KeepAlive` decorations would otherwise pin them past the `eliminateDeadCode` in row 11. |
+| 10 | `lowerMatrixSwizzleStores` | [slang-ir-lower-matrix-swizzle-store.cpp](../../../../source/slang/ir-passes/slang-ir-lower-matrix-swizzle-store.cpp) | `reqSet.matrixSwizzleStore` | |
+| 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | `deadCodeEliminationOptions`, whose `keepGlobalParamsAlive` is set from `PreserveParameters` at line 1496. |
+| 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../../source/slang/ir-passes/slang-ir-specialize.cpp) | (always) | |
 | 13 | `lowerDiffTypeInfoInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `reqSet.autodiff` | Direct call at line 1612; the helper is defined at line 897 of `slang-emit.cpp`. `DiffTypeInfo` is hoistable, so the pass must run after specialization. `kIROp_DiffTypeInfo` is itself one of the opcodes that sets the flag. |
-| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | Must run after `simplifyIR` but before `lowerOptionalType`. |
-| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
-| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Runs **after** `lowerOptionalType`: `lowerResultType` depends on accurate `getAnyValueSize()` results, which requires Optional types to be lowered first. The second `calcRequiredLoweringPassSet` scan (line 1666) follows the HLSL-only `legalizeNonVectorCompositeSelect` and the CPP-only COM / DLL switch, both filtered out. |
-| 19 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | After `calcRequiredLoweringPassSet` rebuilds gates. |
-| 20 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | `codeGenContext->removeAvailableInDownstreamIR` | |
-| 21 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | Source-level recursion never reaches this run: the same function is called once already during IR generation ([slang-lower-to-ir.cpp line 15724](../../../../source/slang/slang-lower-to-ir.cpp)), a `struct` that contains itself (directly or through an array) is rejected there with error 41001, and that call site returns immediately afterwards, before `linkAndOptimizeIR` is reached. What this pass still catches is IR that never went through the earlier call — for instance a `.slang-module` serialized under `-disable-non-essential-validations` and then handed to a SPIR-V compile. |
-| 22 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
-| 23 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
-| 24 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `reqSet.missingReturn` (under non-essential validation) | |
-| 25 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
-| 26 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | |
-| 27 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
+| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/ir-passes/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../../source/slang/ir-passes/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | Must run after `simplifyIR` but before `lowerOptionalType`. |
+| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Runs **after** `lowerOptionalType`: `lowerResultType` depends on accurate `getAnyValueSize()` results, which requires Optional types to be lowered first. The second `calcRequiredLoweringPassSet` scan (line 1666) follows the HLSL-only `legalizeNonVectorCompositeSelect` and the CPP-only COM / DLL switch, both filtered out. |
+| 19 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../../source/slang/ir-passes/slang-ir-detect-uninitialized-resources.cpp) | (always) | After `calcRequiredLoweringPassSet` rebuilds gates. |
+| 20 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/ir-passes/slang-ir-redundancy-removal.cpp) | `codeGenContext->removeAvailableInDownstreamIR` | |
+| 21 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/ir-passes/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | Source-level recursion never reaches this run: the same function is called once already during IR generation ([slang-lower-to-ir.cpp line 15724](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)), a `struct` that contains itself (directly or through an array) is rejected there with error 41001, and that call site returns immediately afterwards, before `linkAndOptimizeIR` is reached. What this pass still catches is IR that never went through the earlier call — for instance a `.slang-module` serialized under `-disable-non-essential-validations` and then handed to a SPIR-V compile. |
+| 22 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/ir-passes/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
+| 23 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/ir-passes/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
+| 24 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/ir-passes/slang-ir-missing-return.cpp) | `reqSet.missingReturn` (under non-essential validation) | |
+| 25 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/ir-passes/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
+| 26 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-inference.cpp) | (always) | |
+| 27 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/ir-passes/slang-ir-strip-legalization-insts.cpp) | (always) | |
 | 28 | `lowerSumVectorMatrixInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `reqSet.sumVectorMatrix` | Helper at line 924. `kIROp_SumVectorElements` / `kIROp_SumMatrixElements` are produced only by the autodiff transpose pass, which runs before the second `calcRequiredLoweringPassSet` scan. |
-| 29 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` | `fastIRSimplificationOptions`. |
-| 30 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization && reqSet.generics` | Alternative to row 29 in minimal-opt mode. |
-| 31 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.taggedUnion` | Sets `reqSet.reinterpret = true` if it returns `true`; when the gate is false the pass would create no reinterpret insts, so leaving `reinterpret` untouched is correct. |
-| 32 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.untaggedUnion` | Set by the tagged-union opcodes, `kIROp_UntaggedUnionType` and `kIROp_NoneTypeElement`. |
-| 33 | `lowerReinterpret` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.reinterpret` | |
-| 34 | `lowerSequentialIDTagCasts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
-| 35 | `lowerTagInsts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagOps` | Set by the tagged-union opcodes and the `kIROp_GetTagOfElementInSet` / `GetTagForSuperSet` / `GetTagForSubSet` / `GetTagForMappedSet` tag ops. |
-| 36 | `lowerTagTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagType` | Also set by `kIROp_SetTagType`. |
-| 37 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | |
-| 38 | `lowerExistentials` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
+| 29 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` | `fastIRSimplificationOptions`. |
+| 30 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `minimalOptimization && reqSet.generics` | Alternative to row 29 in minimal-opt mode. |
+| 31 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.taggedUnion` | Sets `reqSet.reinterpret = true` if it returns `true`; when the gate is false the pass would create no reinterpret insts, so leaving `reinterpret` untouched is correct. |
+| 32 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.untaggedUnion` | Set by the tagged-union opcodes, `kIROp_UntaggedUnionType` and `kIROp_NoneTypeElement`. |
+| 33 | `lowerReinterpret` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/ir-passes/slang-ir-lower-reinterpret.cpp) | `reqSet.reinterpret` | |
+| 34 | `lowerSequentialIDTagCasts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
+| 35 | `lowerTagInsts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagOps` | Set by the tagged-union opcodes and the `kIROp_GetTagOfElementInSet` / `GetTagForSuperSet` / `GetTagForSubSet` / `GetTagForMappedSet` tag ops. |
+| 36 | `lowerTagTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagType` | Also set by `kIROp_SetTagType`. |
+| 37 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | |
+| 38 | `lowerExistentials` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
 | 39 | `removeWeakUseInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper at line 1000 of `slang-emit.cpp`. |
-| 40 | `performTypeInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `!isCpuLikeTarget(artifactDesc)` (true for SPIR-V) | Returns `SLANG_FAIL` if inlining fails. |
-| 41 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | Direct call (line 1804) with `fastIRSimplificationOptions.deadCodeElimOptions`. It runs before row 42 because `performTypeInlining` leaves the inlined callee behind, and that leftover body can still hold a `getStringHash` on an unfolded parameter. |
-| 42 | `checkGetStringHashInsts` | [slang-ir-string-hash.cpp](../../../../source/slang/slang-ir-string-hash.cpp) | `!isCpuLikeTarget && shouldRunNonEssentialValidation()` | |
-| 43 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/slang-ir-lower-tuple-types.cpp) | (always) | |
-| 44 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | (always) | |
-| 45 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` | |
-| 46 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | Inlines `[__unsafeInlineEarly]` / `[ForceInline]`. |
-| 47 | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | `minimalOptimization` | Followed by row 48. |
-| 48 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization` | |
-| 49 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `defaultIRSimplificationOptions`. |
-| 50 | `threadSwitchOnConstantPhi` | [slang-ir-thread-switch-on-constant-phi.cpp](../../../../source/slang/slang-ir-thread-switch-on-constant-phi.cpp) | (always) | Line 1900. Registered outside the minimal-optimization branch so it runs at every optimization level; at `-O0` the switch selector becomes a phi through the SCCP + DCE step. When the selector is not a phi it finds nothing to thread. |
-| 51 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` | The flag is set by `kIROp_HLSLAppendStructuredBufferType` / `kIROp_HLSLConsumeStructuredBufferType`, which only the front end produces. |
-| 52 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | `getBoolOption(VulkanEmitReflection)` | |
-| 53 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | |
-| 54 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/slang-ir-legalize-vector-types.cpp) | (always) | Splits oversized / non-power-of-two vectors. |
-| 55 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | `options.shouldLegalizeExistentialAndResourceTypes` (default `true` for SPIR-V) | The gate is the disjunction with the CUDA and CPU-kernel conditions, which do not apply here. |
-| 56 | `legalizeRayTracingPayloads` | [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp) | `options.shouldLegalizeExistentialAndResourceTypes` | Line 1989. Gives empty ray / callable payloads physical storage at native interfaces before type legalization erases their logical values, and wraps non-struct D3D payloads and hit attributes. |
-| 57 | `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `reqSet.existentialTypeLayout` | |
-| 58 | `validateStructuredBufferResourceTypes` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always, inside the `shouldLegalizeExistentialAndResourceTypes` block) | Direct call; returns `SLANG_FAIL` if invalid. |
-| 59 | `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `options.shouldLegalizeExistentialAndResourceTypes` | Splits structs containing resource fields. |
-| 60 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` | Line 2078. Materializes input parameters and their assignments before the entry point is cloned. |
-| 61 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | Separates launch functions from ordinary callees before initializers are injected. |
-| 62 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | (always) | Line 2091. Unconditional for every target; the pass owns the per-target policy. It runs after resource and empty-type legalization and before row 63. |
-| 63 | `legalizeResourceGlobalVars` | [slang-ir-legalize-resource-globals.cpp](../../../../source/slang/slang-ir-legalize-resource-globals.cpp) | (always) | Line 2099. Replaces the storage of selected resource globals with locals and generated parameters before resource specialization; takes the target capabilities and `shouldRunNonEssentialValidation()`. |
-| 64 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization` | |
-| 65 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `fastIRSimplificationOptions`. Matrix types are not legalized yet; `legalizeMatrixTypes` runs later in Phase C. |
-| 66 | `lowerUntypedResourceHandleToUInt` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.untypedResourceHandle` | Line 2143; defined alongside `lowerDynamicResourceHeap` in the same file. |
-| 67 | `lowerDynamicResourceHeap` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.dynamicResourceHeap` | |
-| 68 | `specializeResourceUsage` | [slang-ir-specialize-resources.cpp](../../../../source/slang/slang-ir-specialize-resources.cpp) | (always) | |
-| 69 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always, first invocation, line 2165) | See Notable passes for the second SPIR-V-only invocation in Phase C. |
-| 70 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
-| 71 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always, line 2172) | |
+| 40 | `performTypeInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | `!isCpuLikeTarget(artifactDesc)` (true for SPIR-V) | Returns `SLANG_FAIL` if inlining fails. |
+| 41 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | Direct call (line 1804) with `fastIRSimplificationOptions.deadCodeElimOptions`. It runs before row 42 because `performTypeInlining` leaves the inlined callee behind, and that leftover body can still hold a `getStringHash` on an unfolded parameter. |
+| 42 | `checkGetStringHashInsts` | [slang-ir-string-hash.cpp](../../../../source/slang/ir-passes/slang-ir-string-hash.cpp) | `!isCpuLikeTarget && shouldRunNonEssentialValidation()` | |
+| 43 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-tuple-types.cpp) | (always) | |
+| 44 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-marshalling.cpp) | (always) | |
+| 45 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` | |
+| 46 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | (always) | Inlines `[__unsafeInlineEarly]` / `[ForceInline]`. |
+| 47 | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/ir-passes/slang-ir-sccp.cpp) | `minimalOptimization` | Followed by row 48. |
+| 48 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `minimalOptimization` | |
+| 49 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `defaultIRSimplificationOptions`. |
+| 50 | `threadSwitchOnConstantPhi` | [slang-ir-thread-switch-on-constant-phi.cpp](../../../../source/slang/ir-passes/slang-ir-thread-switch-on-constant-phi.cpp) | (always) | Line 1900. Registered outside the minimal-optimization branch so it runs at every optimization level; at `-O0` the switch selector becomes a phi through the SCCP + DCE step. When the selector is not a phi it finds nothing to thread. |
+| 51 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/ir-passes/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` | The flag is set by `kIROp_HLSLAppendStructuredBufferType` / `kIROp_HLSLConsumeStructuredBufferType`, which only the front end produces. |
+| 52 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/ir-passes/slang-ir-user-type-hint.cpp) | `getBoolOption(VulkanEmitReflection)` | |
+| 53 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-empty-array.cpp) | (always) | |
+| 54 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-vector-types.cpp) | (always) | Splits oversized / non-power-of-two vectors. |
+| 55 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-global-values.cpp) | `options.shouldLegalizeExistentialAndResourceTypes` (default `true` for SPIR-V) | The gate is the disjunction with the CUDA and CPU-kernel conditions, which do not apply here. |
+| 56 | `legalizeRayTracingPayloads` | [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp) | `options.shouldLegalizeExistentialAndResourceTypes` | Line 1989. Gives empty ray / callable payloads physical storage at native interfaces before type legalization erases their logical values, and wraps non-struct D3D payloads and hit attributes. |
+| 57 | `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | `reqSet.existentialTypeLayout` | |
+| 58 | `validateStructuredBufferResourceTypes` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | (always, inside the `shouldLegalizeExistentialAndResourceTypes` block) | Direct call; returns `SLANG_FAIL` if invalid. |
+| 59 | `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | `options.shouldLegalizeExistentialAndResourceTypes` | Splits structs containing resource fields. |
+| 60 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/ir-passes/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` | Line 2078. Materializes input parameters and their assignments before the entry point is cloned. |
+| 61 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/ir-passes/slang-ir-fix-entrypoint-callsite.cpp) | (always) | Separates launch functions from ordinary callees before initializers are injected. |
+| 62 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/ir-passes/slang-ir-explicit-global-init.cpp) | (always) | Line 2091. Unconditional for every target; the pass owns the per-target policy. It runs after resource and empty-type legalization and before row 63. |
+| 63 | `legalizeResourceGlobalVars` | [slang-ir-legalize-resource-globals.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-resource-globals.cpp) | (always) | Line 2099. Replaces the storage of selected resource globals with locals and generated parameters before resource specialization; takes the target capabilities and `shouldRunNonEssentialValidation()`. |
+| 64 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `minimalOptimization` | |
+| 65 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `fastIRSimplificationOptions`. Matrix types are not legalized yet; `legalizeMatrixTypes` runs later in Phase C. |
+| 66 | `lowerUntypedResourceHandleToUInt` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.untypedResourceHandle` | Line 2143; defined alongside `lowerDynamicResourceHeap` in the same file. |
+| 67 | `lowerDynamicResourceHeap` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.dynamicResourceHeap` | |
+| 68 | `specializeResourceUsage` | [slang-ir-specialize-resources.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-resources.cpp) | (always) | |
+| 69 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-buffer-load-arg.cpp) | (always, first invocation, line 2165) | See Notable passes for the second SPIR-V-only invocation in Phase C. |
+| 70 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/ir-passes/slang-ir-defer-buffer-load.cpp) | (always) | |
+| 71 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-arrays.cpp) | (always, line 2172) | |
 
 Filtered out for SPIR-V in this phase: the
 `CUDASource / CUDAHeader / PyTorchCppBinding` arm of the derivative-
@@ -688,52 +688,52 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` | Line 2321. For SPIR-V: `scalarizeVectorLoadStore=false`, `translateToStructuredBufferOps=true` (the `case CodeGenTarget::GLSL` / `SPIRV` / `SPIRVAssembly` arm). The flag is also set by any `IRByteAddressBufferTypeBase` type, so a buffer that no op accesses still selects the pass. |
-| 2 | `resolveTextureFormat` | [slang-ir-resolve-texture-format.cpp](../../../../source/slang/slang-ir-resolve-texture-format.cpp) | (always for SPIR-V; the switch arm matches `GLSL` / `SPIRV` / `WGSL`) | Line 2373. |
-| 3 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` | Runs after resource specialization has inlined helpers containing interpolation operations into entry points, and before varying parameters change their address representation. |
-| 4 | `legalizeEntryPointsForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp) | (always for SPIR-V; `case GLSL` / `SPIRV` / `SPIRVAssembly` arm, line 2404) | Shared with GLSL; the name predates SPIR-V direct emit. |
-| 5 | `legalizeBoolSwitchForTargetsRequiringIntSwitch` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp) | (same `GLSL` / `SPIRV` / `SPIRVAssembly` arm, line 2413) | GLSL and SPIR-V both require an integer `switch` selector, and a `switch` on a `bool` reaches here unchanged, so this rewrites it to an integer switch. It also covers a `switch` on an enum whose tag type is `bool`. The WGSL arm runs the same pass; the HLSL / Metal / CUDA / CPU arms do not. |
-| 6 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | `isD3DTarget \|\| isKhronosTarget \|\| isWGPUTarget \|\| isMetalTarget` | True for SPIR-V. |
-| 7 | `legalizeDynamicResourcesForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp) | `reqSet.dynamicResource && isKhronosTarget` | |
-| 8 | `legalizeImageSubscript` | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) | (Metal / GLSL / SPIR-V arm) | |
-| 9 | `legalizeConstantBufferLoadForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp) | (`GLSL` / `SPIRV` / `SPIRVAssembly` arm) | |
-| 10 | `legalizeDispatchMeshPayloadForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp) | (`GLSL` / `SPIRV` / `SPIRVAssembly` arm) | |
-| 11 | `introduceExplicitGlobalContext` | [slang-ir-explicit-global-context.cpp](../../../../source/slang/slang-ir-explicit-global-context.cpp) | `getBoolOption(EnableExperimentalPasses)` | Only fires under the experimental flag for SPIR-V (line 2514). |
-| 12 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | (`SPIRV` / `SPIRVAssembly` arm, line 2515) | Runs before `lowerBufferElementTypeToStorageType` on SPIR-V because it changes how that pass sees array parameters. |
-| 13 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
-| 14 | `removeRawDefaultConstructors` | [slang-ir-strip-default-construct.cpp](../../../../source/slang/slang-ir-strip-default-construct.cpp) | `shouldEmitSPIRVDirectly()` | Line 2551, in the `case CodeGenTarget::SPIRV` arm. |
-| 15 | `validateVectorsAndMatrices` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | |
-| 16 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | After resource specialization. |
-| 17 | `processLateRequireCapabilityInsts` | [slang-ir-late-require-capability.cpp](../../../../source/slang/slang-ir-late-require-capability.cpp) | `reqSet.lateRequireCapability` | The flag is set by `kIROp_LateRequireCapability`. |
-| 18 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/slang-ir-cleanup-void.cpp) | (always) | Line 2595; runs again as row 34. |
-| 19 | `performGLSLResourceReturnFunctionInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `isKhronosTarget` | Fallback inliner for resource returns. |
-| 20 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` | |
-| 21 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | |
-| 22 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
-| 23 | `legalizeUniformBufferLoad` | [slang-ir-legalize-uniform-buffer-load.cpp](../../../../source/slang/slang-ir-legalize-uniform-buffer-load.cpp) | `isKhronosTarget \|\| target == HLSL` | Line 2628. Rows 24 and 25 are nested inside this gate. |
-| 24 | `invertYOfPositionOutput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `getBoolOption(VulkanInvertY)` | |
-| 25 | `rcpWOfPositionInput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `getBoolOption(VulkanUseDxPositionW)` | |
-| 26 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always) | `loweringPolicyKind = KhronosTarget`; line 2648. |
-| 27 | `legalizeMatrixTypes` | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/slang-ir-legalize-matrix-types.cpp) | (always) | Line 2674. Rewrites int / uint / bool matrices into arrays of row vectors on SPIR-V, GLSL, WGSL and Metal. It must run after row 26, which still needs the matrix-major-ness that this pass removes. |
-| 28 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | `isKhronosTarget && emitSpirvDirectly` | Second invocation, line 2719; see Notable passes. |
-| 29 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
-| 30 | `performIntrinsicFunctionInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `emitSpirvDirectly` | |
-| 31 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | The `SLANG_PASS` call at line 2736 of `slang-emit.cpp` is unconditional. As everywhere in these tables, `(always)` describes the call site and not the outcome: the pass only rewrites an exit that leaves more than one enclosing region, and whatever it introduces is still subject to row 32's `simplifyIR` and to Phase D's simplification loop, so a module can run the pass and show no difference. |
-| 32 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`; line 2742. |
-| 33 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always; required for AD 2.0) | Line 2754. |
-| 34 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/slang-ir-cleanup-void.cpp) | (always) | Line 2760. Removes the void placeholders that empty-type legalization introduces for fields and constructor arguments. |
-| 35 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | Liveness mode gating. |
-| 36 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | Line 2794. SPIR-V-specific: `eliminateCompositeTypedPhiOnly = false`, `useRegisterAllocation = true`. |
-| 37 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | |
-| 38 | `applyGLSLLiveness` | [slang-ir-glsl-liveness.cpp](../../../../source/slang/slang-ir-glsl-liveness.cpp) | `shouldTrackLiveness() && isKhronosTarget(targetRequest)` ([slang-emit.cpp line 2822](../../../../source/slang/slang-emit.cpp)) | Khronos-targets-only pass that translates the `IRLiveRangeStart`/`IRLiveRangeEnd` markers from the previous two rows into the GLSL/SPIR-V liveness encoding. SPIR-V direct-emit and SPIR-V via-GLSL both reach this row because the gate is `isKhronosTarget`, not the direct-emit predicate. |
-| 39 | `replaceLocationIntrinsicsWithRaytracingObject` | [slang-ir-early-raytracing-intrinsic-simplification.cpp](../../../../source/slang/slang-ir-early-raytracing-intrinsic-simplification.cpp) | `isKhronosTarget && emitSpirvDirectly && reqSet.rayTracingLocationOperand` | Line 2830. The flag is set by any instruction for which `isRayTracingLocationOperand(op)` holds. |
-| 40 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | After phi elimination; line 2839. |
-| 41 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | Captures cooperative types that survive lowering. |
+| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` | Line 2321. For SPIR-V: `scalarizeVectorLoadStore=false`, `translateToStructuredBufferOps=true` (the `case CodeGenTarget::GLSL` / `SPIRV` / `SPIRVAssembly` arm). The flag is also set by any `IRByteAddressBufferTypeBase` type, so a buffer that no op accesses still selects the pass. |
+| 2 | `resolveTextureFormat` | [slang-ir-resolve-texture-format.cpp](../../../../source/slang/ir-passes/slang-ir-resolve-texture-format.cpp) | (always for SPIR-V; the switch arm matches `GLSL` / `SPIRV` / `WGSL`) | Line 2373. |
+| 3 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/ir-passes/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` | Runs after resource specialization has inlined helpers containing interpolation operations into entry points, and before varying parameters change their address representation. |
+| 4 | `legalizeEntryPointsForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp) | (always for SPIR-V; `case GLSL` / `SPIRV` / `SPIRVAssembly` arm, line 2404) | Shared with GLSL; the name predates SPIR-V direct emit. |
+| 5 | `legalizeBoolSwitchForTargetsRequiringIntSwitch` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp) | (same `GLSL` / `SPIRV` / `SPIRVAssembly` arm, line 2413) | GLSL and SPIR-V both require an integer `switch` selector, and a `switch` on a `bool` reaches here unchanged, so this rewrites it to an integer switch. It also covers a `switch` on an enum whose tag type is `bool`. The WGSL arm runs the same pass; the HLSL / Metal / CUDA / CPU arms do not. |
+| 6 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp) | `isD3DTarget \|\| isKhronosTarget \|\| isWGPUTarget \|\| isMetalTarget` | True for SPIR-V. |
+| 7 | `legalizeDynamicResourcesForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp) | `reqSet.dynamicResource && isKhronosTarget` | |
+| 8 | `legalizeImageSubscript` | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-image-subscript.cpp) | (Metal / GLSL / SPIR-V arm) | |
+| 9 | `legalizeConstantBufferLoadForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp) | (`GLSL` / `SPIRV` / `SPIRVAssembly` arm) | |
+| 10 | `legalizeDispatchMeshPayloadForGLSL` | [slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp) | (`GLSL` / `SPIRV` / `SPIRVAssembly` arm) | |
+| 11 | `introduceExplicitGlobalContext` | [slang-ir-explicit-global-context.cpp](../../../../source/slang/ir-passes/slang-ir-explicit-global-context.cpp) | `getBoolOption(EnableExperimentalPasses)` | Only fires under the experimental flag for SPIR-V (line 2514). |
+| 12 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/ir-passes/slang-ir-transform-params-to-constref.cpp) | (`SPIRV` / `SPIRVAssembly` arm, line 2515) | Runs before `lowerBufferElementTypeToStorageType` on SPIR-V because it changes how that pass sees array parameters. |
+| 13 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/ir-passes/slang-ir-strip-legalization-insts.cpp) | (always) | |
+| 14 | `removeRawDefaultConstructors` | [slang-ir-strip-default-construct.cpp](../../../../source/slang/ir-passes/slang-ir-strip-default-construct.cpp) | `shouldEmitSPIRVDirectly()` | Line 2551, in the `case CodeGenTarget::SPIRV` arm. |
+| 15 | `validateVectorsAndMatrices` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | (always) | |
+| 16 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | After resource specialization. |
+| 17 | `processLateRequireCapabilityInsts` | [slang-ir-late-require-capability.cpp](../../../../source/slang/ir-passes/slang-ir-late-require-capability.cpp) | `reqSet.lateRequireCapability` | The flag is set by `kIROp_LateRequireCapability`. |
+| 18 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/ir-passes/slang-ir-cleanup-void.cpp) | (always) | Line 2595; runs again as row 34. |
+| 19 | `performGLSLResourceReturnFunctionInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | `isKhronosTarget` | Fallback inliner for resource returns. |
+| 20 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/ir-passes/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` | |
+| 21 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | |
+| 22 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/ir-passes/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
+| 23 | `legalizeUniformBufferLoad` | [slang-ir-legalize-uniform-buffer-load.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-uniform-buffer-load.cpp) | `isKhronosTarget \|\| target == HLSL` | Line 2628. Rows 24 and 25 are nested inside this gate. |
+| 24 | `invertYOfPositionOutput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/ir-passes/slang-ir-vk-invert-y.cpp) | `getBoolOption(VulkanInvertY)` | |
+| 25 | `rcpWOfPositionInput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/ir-passes/slang-ir-vk-invert-y.cpp) | `getBoolOption(VulkanUseDxPositionW)` | |
+| 26 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp) | (always) | `loweringPolicyKind = KhronosTarget`; line 2648. |
+| 27 | `legalizeMatrixTypes` | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-matrix-types.cpp) | (always) | Line 2674. Rewrites int / uint / bool matrices into arrays of row vectors on SPIR-V, GLSL, WGSL and Metal. It must run after row 26, which still needs the matrix-major-ness that this pass removes. |
+| 28 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-buffer-load-arg.cpp) | `isKhronosTarget && emitSpirvDirectly` | Second invocation, line 2719; see Notable passes. |
+| 29 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | (always) | |
+| 30 | `performIntrinsicFunctionInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | `emitSpirvDirectly` | |
+| 31 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/ir-passes/slang-ir-eliminate-multilevel-break.cpp) | (always) | The `SLANG_PASS` call at line 2736 of `slang-emit.cpp` is unconditional. As everywhere in these tables, `(always)` describes the call site and not the outcome: the pass only rewrites an exit that leaves more than one enclosing region, and whatever it introduces is still subject to row 32's `simplifyIR` and to Phase D's simplification loop, so a module can run the pass and show no difference. |
+| 32 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`; line 2742. |
+| 33 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | (always; required for AD 2.0) | Line 2754. |
+| 34 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/ir-passes/slang-ir-cleanup-void.cpp) | (always) | Line 2760. Removes the void placeholders that empty-type legalization introduces for fields and constructor arguments. |
+| 35 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | Liveness mode gating. |
+| 36 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.cpp) | (always) | Line 2794. SPIR-V-specific: `eliminateCompositeTypedPhiOnly = false`, `useRegisterAllocation = true`. |
+| 37 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | |
+| 38 | `applyGLSLLiveness` | [slang-ir-glsl-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-liveness.cpp) | `shouldTrackLiveness() && isKhronosTarget(targetRequest)` ([slang-emit.cpp line 2822](../../../../source/slang/slang-emit.cpp)) | Khronos-targets-only pass that translates the `IRLiveRangeStart`/`IRLiveRangeEnd` markers from the previous two rows into the GLSL/SPIR-V liveness encoding. SPIR-V direct-emit and SPIR-V via-GLSL both reach this row because the gate is `isKhronosTarget`, not the direct-emit predicate. |
+| 39 | `replaceLocationIntrinsicsWithRaytracingObject` | [slang-ir-early-raytracing-intrinsic-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-early-raytracing-intrinsic-simplification.cpp) | `isKhronosTarget && emitSpirvDirectly && reqSet.rayTracingLocationOperand` | Line 2830. The flag is set by any instruction for which `isRayTracingLocationOperand(op)` holds. |
+| 40 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | (always) | After phi elimination; line 2839. |
+| 41 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/ir-passes/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | Captures cooperative types that survive lowering. |
 | 42 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `getBoolOption(EmbedDownstreamIR)` | Static helper at line 753, invoked at line 2942. |
 | 43 | `targetProgram->getOrCreateLayout` | [slang-target-program.h](../../../../source/slang/slang-target-program.h) | `target != PyTorchCppBinding && targetCaps imply descriptor_handle` | Direct call ([slang-emit.cpp line 2951](../../../../source/slang/slang-emit.cpp)); returns `SLANG_FAIL` on null. Ensures the `ProgramLayout` exists so `collectMetadata` can read `bindlessSpaceIndex` and detect bindless-resource-heap use. The Vulkan / SPIR-V `descriptor_handle` capability set selects this on the SPIR-V path. |
-| 44 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Takes `targetProgram` (line 276) and reads `targetProgram->getExistingLayout()` to set `usesBindlessResourceHeap`; fills binding / exported-function fields on `metadata`. `getExistingLayout` returns `nullptr` when no layout was built, so the bindless scan is then skipped. |
-| 45 | `checkUnsupportedResourceLocals` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | (always) | Line 2959; runs even in minimum-optimization mode so storage the target cannot represent is still rejected. |
-| 46 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | Last `SLANG_PASS` in `linkAndOptimizeIR`, line 2961. |
+| 44 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/ir-passes/slang-ir-metadata.cpp) | (always) | Takes `targetProgram` (line 276) and reads `targetProgram->getExistingLayout()` to set `usesBindlessResourceHeap`; fills binding / exported-function fields on `metadata`. `getExistingLayout` returns `nullptr` when no layout was built, so the bindless scan is then skipped. |
+| 45 | `checkUnsupportedResourceLocals` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/ir-passes/slang-ir-check-unsupported-inst.cpp) | (always) | Line 2959; runs even in minimum-optimization mode so storage the target cannot represent is still rejected. |
+| 46 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/ir-passes/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | Last `SLANG_PASS` in `linkAndOptimizeIR`, line 2961. |
 
 Filtered out for SPIR-V in this phase: the
 `CUDASource` / `CUDAHeader` / `PTX` `synthesizeActiveMask` arm;
@@ -766,9 +766,9 @@ Starts immediately after `linkAndOptimizeIR` returns to
 `emitSPIRVForEntryPointsDirectly` (line 3774 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)). The
 SPIR-V backend in `emitSPIRVFromIR` (line 12469 of
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp))
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp))
 calls the top-level `legalizeIRForSPIRV` (line 3433 of
-[slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp))
+[slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp))
 which runs the SPIR-V-specific IR passes and the iterative
 `simplifyIRForSpirvLegalization` loop. After SPIR-V word emission
 the artifact passes through the optional downstream chain in
@@ -867,31 +867,31 @@ downstream chain if emission reported an error (lines 3540-3543 of
 | # | Pass / step | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | `emitSPIRVForEntryPointsDirectly` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Wraps `linkAndOptimizeIR` + `createArtifactFromIR`. |
-| 2 | `emitSPIRVFromIR` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | The SPIR-V backend. |
-| 3 | `legalizeIRForSPIRV` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | Calls the inner steps below, rows 4 through 11. |
-| 4 | `legalizeSPIRV` → `SPIRVLegalizationContext::processModule` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | The main SPIR-V legalization driver (line 3117; `processModule` at line 2889). Per-inst dispatch includes `processAbort` for `kIROp_Abort`: it packs the format string into a `uint` array, builds an explicitly-laid-out `AbortMessage` struct (cached per payload signature in `m_abortMessageTypes`), rewrites the inst to `Abort(message)`, and ends the block with `unreachable` (the abort is a block terminator). It also rewrites descriptor-heap `ConstantBuffer<T>` loads to untyped-`Uniform` pointers and, uniquely, drains its work list a second time afterwards. Near its end it runs address-space specialization and `validateAtomicOperations`. See Notable passes. |
-| 5 | `simplifyIRForSpirvLegalization` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | Outer / inner loops carry `kMaxIterations = 8` / `kMaxFuncIterations = 16` guards, but the counters are never incremented, so termination is fixed-point-only; see the Loops section. |
-| 5a | `applySparseConditionalConstantPropagationForGlobalScope` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | (each outer iteration) | Global-scope SCCP. |
-| 5b | `peepholeOptimizeGlobalScope` | [slang-ir-peephole.cpp](../../../../source/slang/slang-ir-peephole.cpp) | (each outer iteration) | |
-| 5c | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | (each inner iteration) | Per-function SCCP. |
-| 5d | `peepholeOptimize` | [slang-ir-peephole.cpp](../../../../source/slang/slang-ir-peephole.cpp) | (each inner iteration) | |
-| 5e | `removeRedundancyInFunc` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | (each inner iteration) | |
-| 5f | `simplifyCFG` | [slang-ir-simplify-cfg.cpp](../../../../source/slang/slang-ir-simplify-cfg.cpp) | (each inner iteration) | `removeTrivialSingleIterationLoops = true`, `removeSideEffectFreeLoops = false`. |
-| 5g | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (each inner iteration) | Its result is not folded into `funcChanged`. |
-| 6 | `widenNarrowAccessChainIndices` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | Line 3398, called at line 3447 after the simplifier, whose redundancy removal can rematerialize a `GetElementPtr` from a narrow index. Casts a sub-32-bit index operand of `GetElementPtr`, `RWStructuredBufferGetElementPtr`, `MeshOutputRef` and `GetOffsetPtr` to a 32-bit integer of the same signedness, because an `OpAccessChain` index is read as signed. |
-| 7 | `removeUnreachableCodeAfterDiscardForOpKill` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | `!context->shouldEmitDiscardAsDemote()` | Line 3272; the gate is the function's own early return (line 3278). Needed for SPIR-V < 1.6 without `SPV_EXT_demote_to_helper_invocation`. |
-| 8 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | Cleans up after row 7. |
-| 9 | `buildEntryPointReferenceGraph` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | Populates `m_referencingEntryPoints`. |
-| 10 | `checkForMultiplePushConstantBlocksPerEntryPoint` | [slang-ir-check-push-constant-blocks.cpp](../../../../source/slang/slang-ir-check-push-constant-blocks.cpp) | (always) | Line 3463. Counts, per entry point, the globals legalized into a `PushConstant` variable (`isPushConstantGlobalForSPIRV`) and diagnoses more than one with E39033. It runs after the last dead-code elimination that could remove a block's only use. |
-| 11 | `insertFragmentShaderInterlock` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always; only acts on raster-ordered resources in fragment entry points) | Line 3214. |
-| 12 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | (always) | Direct call inside `emitSPIRVFromIR` (line 12511). |
-| 13 | `SPIRVEmitContext::computePreciseInsts` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Line 12518. Seeds from every `precise`-decorated value in a function body (and `precise` global parameters) and walks operands, phi arguments and stores to a fixpoint, recording each floating-point `Add` / `Sub` / `Mul` / `Div` / `FRem` / `Neg` in `m_preciseInsts`. `emitArithmetic` then decorates those with `NoContraction` even outside `-fp-mode precise`. See Notable passes. |
-| 14 | SPIR-V word emission | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Sources: `IRDebugSource` / `IRDebugBuildIdentifier` / `IRDebugCompilationUnit` first (lines 12538-12545); then optional `IRGlobalParam`s under `PreserveParameters` and optional `IRFunc`s with `IRDownstreamModuleExportDecoration` under `GenerateWholeProgram` (lines 12587-12603); then the `OpSource` instruction (via `emitSource`, line 2200, called at line 12621 — see Notable passes for `-debug-info-include-source`); then every entry point (lines 12625-12629). If no symbol was emitted, `OutputSpvIsEmpty` is diagnosed and emission fails. `kIROp_Abort` emits via `emitAbort` (line 5010): it declares `SPV_KHR_abort` / `SpvCapabilityAbortKHR` and emits `OpAbortKHR` with the packed message struct as its single operand, and is treated as a block terminator (no further insts in the block are emitted). |
-| 15 | Forward-declared pointer fixup loop | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always; loop body when `m_forwardDeclaredPointers != 0`) | See the Loops section. |
-| 16 | `diagnoseConflictingDescriptorHeapStrideOptions` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always; only diagnoses on conflict) | Direct call after the forward-pointer loop ([slang-emit-spirv.cpp line 12657](../../../../source/slang/slang-emit-spirv.cpp); the member is defined at line 7709). Re-checks the compile-API path for the `SPIRVUnifiedDescriptorHeapStride` + non-zero `SPIRVResourceHeapStride` conflict the CLI rejects at option-parse time; emits `SpirvConflictingDescriptorHeapStrideOptions`. See Notable passes. |
-| 17 | `emitSPIRVAnyExtension` / `emitSPIRVAnyCapabilities` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Emit deferred-choice extensions and capabilities (lines 12662-12663). |
-| 18 | `emitFrontMatter` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Lines 1687-1748. Emits two instructions unconditionally: `OpCapability Shader`, then `OpMemoryModel` with the module's addressing model (`Logical` unless `requirePhysicalStorageAddressing` moved it) and memory model (`GLSL450` by default, `m_memoryModel` in [slang-ir-spirv-legalize.h](../../../../source/slang/slang-ir-spirv-legalize.h)) — printing as `OpMemoryModel Logical GLSL450` on a default Vulkan compile. Two further groups are conditional: when the target capabilities imply `spvBindlessTextureNV` it requires `BindlessTextureNV`, `Int64` and `SPV_NV_bindless_texture` and emits `OpSamplerImageAddressingModeNV`; and when the legalizer switched the memory model to `Vulkan` (cooperative vector / matrix types present, or the `SPV_KHR_vulkan_memory_model` capability implied) it requires `VulkanMemoryModel` with its extension, plus `VulkanMemoryModelDeviceScope` when `spvVulkanMemoryModelDeviceScopeKHR` is implied. Called *last* (line 12665) but writing into the `Capabilities` / `MemoryModel` logical sections, so `emitPhysicalLayout` still flattens it to the front. Nothing else is unconditional front matter: `OpSource` comes from `emitSource` in step 14, and an extension such as `SPV_KHR_storage_buffer_storage_class` is requested on demand by the type needing it (line 2570, a `StorageBuffer` pointer). The `; SPIR-V` / `; Version:` lines are the disassembler rendering the module-header words written at lines 538-558, not instructions. |
-| 19 | `emitPhysicalLayout` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Line 532; called at line 12667. Produces the final word stream. |
+| 2 | `emitSPIRVFromIR` | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always) | The SPIR-V backend. |
+| 3 | `legalizeIRForSPIRV` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp) | (always) | Calls the inner steps below, rows 4 through 11. |
+| 4 | `legalizeSPIRV` → `SPIRVLegalizationContext::processModule` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp) | (always) | The main SPIR-V legalization driver (line 3117; `processModule` at line 2889). Per-inst dispatch includes `processAbort` for `kIROp_Abort`: it packs the format string into a `uint` array, builds an explicitly-laid-out `AbortMessage` struct (cached per payload signature in `m_abortMessageTypes`), rewrites the inst to `Abort(message)`, and ends the block with `unreachable` (the abort is a block terminator). It also rewrites descriptor-heap `ConstantBuffer<T>` loads to untyped-`Uniform` pointers and, uniquely, drains its work list a second time afterwards. Near its end it runs address-space specialization and `validateAtomicOperations`. See Notable passes. |
+| 5 | `simplifyIRForSpirvLegalization` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp) | (always) | Outer / inner loops carry `kMaxIterations = 8` / `kMaxFuncIterations = 16` guards, but the counters are never incremented, so termination is fixed-point-only; see the Loops section. |
+| 5a | `applySparseConditionalConstantPropagationForGlobalScope` | [slang-ir-sccp.cpp](../../../../source/slang/ir-passes/slang-ir-sccp.cpp) | (each outer iteration) | Global-scope SCCP. |
+| 5b | `peepholeOptimizeGlobalScope` | [slang-ir-peephole.cpp](../../../../source/slang/ir-passes/slang-ir-peephole.cpp) | (each outer iteration) | |
+| 5c | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/ir-passes/slang-ir-sccp.cpp) | (each inner iteration) | Per-function SCCP. |
+| 5d | `peepholeOptimize` | [slang-ir-peephole.cpp](../../../../source/slang/ir-passes/slang-ir-peephole.cpp) | (each inner iteration) | |
+| 5e | `removeRedundancyInFunc` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/ir-passes/slang-ir-redundancy-removal.cpp) | (each inner iteration) | |
+| 5f | `simplifyCFG` | [slang-ir-simplify-cfg.cpp](../../../../source/slang/ir-passes/slang-ir-simplify-cfg.cpp) | (each inner iteration) | `removeTrivialSingleIterationLoops = true`, `removeSideEffectFreeLoops = false`. |
+| 5g | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (each inner iteration) | Its result is not folded into `funcChanged`. |
+| 6 | `widenNarrowAccessChainIndices` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp) | (always) | Line 3398, called at line 3447 after the simplifier, whose redundancy removal can rematerialize a `GetElementPtr` from a narrow index. Casts a sub-32-bit index operand of `GetElementPtr`, `RWStructuredBufferGetElementPtr`, `MeshOutputRef` and `GetOffsetPtr` to a 32-bit integer of the same signedness, because an `OpAccessChain` index is read as signed. |
+| 7 | `removeUnreachableCodeAfterDiscardForOpKill` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp) | `!context->shouldEmitDiscardAsDemote()` | Line 3272; the gate is the function's own early return (line 3278). Needed for SPIR-V < 1.6 without `SPV_EXT_demote_to_helper_invocation`. |
+| 8 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | Cleans up after row 7. |
+| 9 | `buildEntryPointReferenceGraph` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp) | (always) | Populates `m_referencingEntryPoints`. |
+| 10 | `checkForMultiplePushConstantBlocksPerEntryPoint` | [slang-ir-check-push-constant-blocks.cpp](../../../../source/slang/ir-passes/slang-ir-check-push-constant-blocks.cpp) | (always) | Line 3463. Counts, per entry point, the globals legalized into a `PushConstant` variable (`isPushConstantGlobalForSPIRV`) and diagnoses more than one with E39033. It runs after the last dead-code elimination that could remove a block's only use. |
+| 11 | `insertFragmentShaderInterlock` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp) | (always; only acts on raster-ordered resources in fragment entry points) | Line 3214. |
+| 12 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/ir-passes/slang-ir-redundancy-removal.cpp) | (always) | Direct call inside `emitSPIRVFromIR` (line 12511). |
+| 13 | `SPIRVEmitContext::computePreciseInsts` | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always) | Line 12518. Seeds from every `precise`-decorated value in a function body (and `precise` global parameters) and walks operands, phi arguments and stores to a fixpoint, recording each floating-point `Add` / `Sub` / `Mul` / `Div` / `FRem` / `Neg` in `m_preciseInsts`. `emitArithmetic` then decorates those with `NoContraction` even outside `-fp-mode precise`. See Notable passes. |
+| 14 | SPIR-V word emission | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always) | Sources: `IRDebugSource` / `IRDebugBuildIdentifier` / `IRDebugCompilationUnit` first (lines 12538-12545); then optional `IRGlobalParam`s under `PreserveParameters` and optional `IRFunc`s with `IRDownstreamModuleExportDecoration` under `GenerateWholeProgram` (lines 12587-12603); then the `OpSource` instruction (via `emitSource`, line 2200, called at line 12621 — see Notable passes for `-debug-info-include-source`); then every entry point (lines 12625-12629). If no symbol was emitted, `OutputSpvIsEmpty` is diagnosed and emission fails. `kIROp_Abort` emits via `emitAbort` (line 5010): it declares `SPV_KHR_abort` / `SpvCapabilityAbortKHR` and emits `OpAbortKHR` with the packed message struct as its single operand, and is treated as a block terminator (no further insts in the block are emitted). |
+| 15 | Forward-declared pointer fixup loop | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always; loop body when `m_forwardDeclaredPointers != 0`) | See the Loops section. |
+| 16 | `diagnoseConflictingDescriptorHeapStrideOptions` | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always; only diagnoses on conflict) | Direct call after the forward-pointer loop ([slang-emit-spirv.cpp line 12657](../../../../source/slang/emission/slang-emit-spirv.cpp); the member is defined at line 7709). Re-checks the compile-API path for the `SPIRVUnifiedDescriptorHeapStride` + non-zero `SPIRVResourceHeapStride` conflict the CLI rejects at option-parse time; emits `SpirvConflictingDescriptorHeapStrideOptions`. See Notable passes. |
+| 17 | `emitSPIRVAnyExtension` / `emitSPIRVAnyCapabilities` | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always) | Emit deferred-choice extensions and capabilities (lines 12662-12663). |
+| 18 | `emitFrontMatter` | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always) | Lines 1687-1748. Emits two instructions unconditionally: `OpCapability Shader`, then `OpMemoryModel` with the module's addressing model (`Logical` unless `requirePhysicalStorageAddressing` moved it) and memory model (`GLSL450` by default, `m_memoryModel` in [slang-ir-spirv-legalize.h](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.h)) — printing as `OpMemoryModel Logical GLSL450` on a default Vulkan compile. Two further groups are conditional: when the target capabilities imply `spvBindlessTextureNV` it requires `BindlessTextureNV`, `Int64` and `SPV_NV_bindless_texture` and emits `OpSamplerImageAddressingModeNV`; and when the legalizer switched the memory model to `Vulkan` (cooperative vector / matrix types present, or the `SPV_KHR_vulkan_memory_model` capability implied) it requires `VulkanMemoryModel` with its extension, plus `VulkanMemoryModelDeviceScope` when `spvVulkanMemoryModelDeviceScopeKHR` is implied. Called *last* (line 12665) but writing into the `Capabilities` / `MemoryModel` logical sections, so `emitPhysicalLayout` still flattens it to the front. Nothing else is unconditional front matter: `OpSource` comes from `emitSource` in step 14, and an extension such as `SPV_KHR_storage_buffer_storage_class` is requested on demand by the type needing it (line 2570, a `StorageBuffer` pointer). The `; SPIR-V` / `; Version:` lines are the disassembler rendering the module-header words written at lines 538-558, not instructions. |
+| 19 | `emitPhysicalLayout` | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) | (always) | Line 532; called at line 12667. Produces the final word stream. |
 | 20 | `optimizeSPIRV` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `#if 0` (currently disabled) | Inline spirv-opt invocation inside `createArtifactFromIR` (lines 3548-3555), positioned before the downstream link/validate chain; left in for documentation, never executes. |
 | 21 | `compiler->link` (spirv-link) | (downstream tool) | `needsLink`: `!isPrecompilation && !shouldSkipDownstreamLinking && spirvFiles.getCount() > 1` | Merges the freshly emitted SPIR-V with every `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV` found in the program's IR modules. The file list is collected before the compiler is loaded (lines 3580-3614). |
 | 22 | `compiler->validate` (spirv-val) | (downstream tool) | `needsValidation`, i.e. `shouldRunSPIRVValidation(codeGenContext)` | True only when neither `SkipSPIRVValidation` nor `IncompleteLibrary` is set and the `SLANG_RUN_SPIRV_VALIDATION` env var equals exactly `"1"` (`shouldRunSPIRVValidation`, [slang-emit.cpp line 3496](../../../../source/slang/slang-emit.cpp)). |
@@ -981,8 +981,8 @@ and this paragraph accounts for all of them.
 | `getDownstreamArgs("spirv-opt")` non-empty | Forces `needsOptimization`, so the spirv-opt downstream compile runs even at `-O0`. |
 | `getOptimizationLevel() != OptimizationLevel::None` | The other disjunct of `needsOptimization`. |
 | `getBoolOption(ValidateUniformity)` | `validateUniformity`. |
-| `getMatrixLayoutMode()` (`-matrix-layout-row-major` / `-matrix-layout-column-major`) | Supplies the default layout that `specializeMatrixLayout` (Phase A step 16) fills into matrix types that left it unspecified. The emitted SPIR-V member decoration is the *transpose* of the source layout — a row-major source matrix emits `ColMajor`, a column-major one emits `RowMajor` — because what SPIR-V calls columns are what Slang calls rows ([slang-emit-spirv.cpp lines 7188-7212](../../../../source/slang/slang-emit-spirv.cpp)). |
-| `getBoolOption(PreserveParameters)` | Two effects. Phase B: it is what sets `deadCodeEliminationOptions.keepGlobalParamsAlive` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1496) — note the field defaults to `true` in `IRDeadCodeEliminationOptions`, so this assignment turns it *off* when the option is unset. Phase D: the global-inst loop in `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) lines 12587-12603) calls `ensureInst` on each `IRGlobalParam` that is still in the module, emitting it with its `Binding` / `DescriptorSet` decorations but *without* listing it in the entry point's `OpEntryPoint` interface. That loop can only re-emit a parameter that survived to emit, so any earlier removal is decisive — and an unreferenced module-scope global is not reliably preserved by the option alone: the reporting bundle saw an unreferenced second `RWStructuredBuffer` emit no `OpVariable` even at `-O0`, with or without an explicit `[[vk::binding]]`. Treat the option as keeping *surviving* parameters, not as resurrecting dead ones. |
+| `getMatrixLayoutMode()` (`-matrix-layout-row-major` / `-matrix-layout-column-major`) | Supplies the default layout that `specializeMatrixLayout` (Phase A step 16) fills into matrix types that left it unspecified. The emitted SPIR-V member decoration is the *transpose* of the source layout — a row-major source matrix emits `ColMajor`, a column-major one emits `RowMajor` — because what SPIR-V calls columns are what Slang calls rows ([slang-emit-spirv.cpp lines 7188-7212](../../../../source/slang/emission/slang-emit-spirv.cpp)). |
+| `getBoolOption(PreserveParameters)` | Two effects. Phase B: it is what sets `deadCodeEliminationOptions.keepGlobalParamsAlive` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1496) — note the field defaults to `true` in `IRDeadCodeEliminationOptions`, so this assignment turns it *off* when the option is unset. Phase D: the global-inst loop in `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) lines 12587-12603) calls `ensureInst` on each `IRGlobalParam` that is still in the module, emitting it with its `Binding` / `DescriptorSet` decorations but *without* listing it in the entry point's `OpEntryPoint` interface. That loop can only re-emit a parameter that survived to emit, so any earlier removal is decisive — and an unreferenced module-scope global is not reliably preserved by the option alone: the reporting bundle saw an unreferenced second `RWStructuredBuffer` emit no `OpVariable` even at `-O0`, with or without an explicit `[[vk::binding]]`. Treat the option as keeping *surviving* parameters, not as resurrecting dead ones. |
 | `getBoolOption(GenerateWholeProgram)` | Phase D: emits every `IRFunc` with `IRDownstreamModuleExportDecoration`. |
 | `getBoolOption(EnableExperimentalPasses)` | `introduceExplicitGlobalContext` (Phase C). |
 | `getBoolOption(VulkanEmitReflection)` | `addUserTypeHintDecorations`. |
@@ -1019,7 +1019,7 @@ and this paragraph accounts for all of them.
 
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
-| `SPIRVEmitSharedContext::shouldEmitDiscardAsDemote()` | `removeUnreachableCodeAfterDiscardForOpKill` (early return, called from `legalizeIRForSPIRV`) and the discard emit path | Negated: gates the unreachable-code removal. Returns `true` for SPIR-V ≥ 1.6 or when `SPV_EXT_demote_to_helper_invocation` is in use ([slang-ir-spirv-legalize.h line 44](../../../../source/slang/slang-ir-spirv-legalize.h)); in those cases `discard` lowers to `OpDemoteToHelperInvocation` (not a terminator) and the fix-up is unnecessary. |
+| `SPIRVEmitSharedContext::shouldEmitDiscardAsDemote()` | `removeUnreachableCodeAfterDiscardForOpKill` (early return, called from `legalizeIRForSPIRV`) and the discard emit path | Negated: gates the unreachable-code removal. Returns `true` for SPIR-V ≥ 1.6 or when `SPV_EXT_demote_to_helper_invocation` is in use ([slang-ir-spirv-legalize.h line 44](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.h)); in those cases `discard` lowers to `OpDemoteToHelperInvocation` (not a terminator) and the fix-up is unnecessary. |
 | `SPIRVEmitSharedContext::isSpirv16OrLater()` | `insertFragmentShaderInterlock` | Selects which terminator opcodes trigger the inserted `OpEndInvocationInterlockEXT`. |
 
 ## Loops in the pipeline
@@ -1030,7 +1030,7 @@ Two iterative passes execute in the SPIR-V pipeline. No other
 ### `simplifyIRForSpirvLegalization` (Phase D, step 5)
 
 Defined at line 3130 of
-[slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp).
+[slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp).
 
 - Outer loop: `while (changed && iterationCounter < kMaxIterations)`
   with `kMaxIterations = 8` and `iterationCounter` initialized to `0`.
@@ -1055,7 +1055,7 @@ Defined at line 3130 of
   only by the two global-scope passes). At this source commit
   **neither `iterationCounter` nor `funcIterationCount` is
   incremented in the loop body**
-  ([slang-ir-spirv-legalize.cpp lines 3133-3167](../../../../source/slang/slang-ir-spirv-legalize.cpp)),
+  ([slang-ir-spirv-legalize.cpp lines 3133-3167](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp)),
   so the `< kMaxIterations` / `< kMaxFuncIterations` guards never
   actually bound the loops — each inner loop terminates when its
   four reporting passes report no change, and the outer loop when
@@ -1070,7 +1070,7 @@ rely entirely on reaching a fixed point.
 ### Forward-declared pointer fixup (Phase D, step 15)
 
 Defined at lines 12638-12655 of
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp).
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp).
 
 - Form: `do { ... } while (context.m_forwardDeclaredPointers.getCount() != 0)`.
 - Each iteration drains `m_forwardDeclaredPointers`, calls
@@ -1089,7 +1089,7 @@ Defined at lines 12638-12655 of
 
 The single SPIR-V-only entry point inside `emitSPIRVFromIR`,
 defined at line 3433 of
-[slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp).
+[slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp).
 It is *not* a single pass: it sequences `legalizeSPIRV`
 (`SPIRVLegalizationContext::processModule`) followed by the
 iterative `simplifyIRForSpirvLegalization`, then
@@ -1109,13 +1109,13 @@ the construction of `PhiEliminationOptions` checks
 `eliminateCompositeTypedPhiOnly = false` and
 `useRegisterAllocation = true`. Both assignments currently restate
 the defaults declared in
-[slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+[slang-ir-eliminate-phis.h](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.h)
 (lines 13-14), so at this commit they do not change the result. With
 `eliminateCompositeTypedPhiOnly = false`, scalar phis as well as
 composite phis are given temporaries
-([slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp)
+([slang-ir-eliminate-phis.cpp](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.cpp)
 lines 458-468), and `useRegisterAllocation` invokes the
-[slang-ir-ssa-register-allocate.cpp](../../../../source/slang/slang-ir-ssa-register-allocate.cpp)
+[slang-ir-ssa-register-allocate.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-register-allocate.cpp)
 pass implicitly to coalesce SSA values into named temporaries
 before lowering. In the emitted module that shows up as an
 `OpVariable` in the `Function` storage class with an `OpStore` on
@@ -1151,7 +1151,7 @@ The comment above the chain states that for SPIR-V the address-space
 propagation happens during SPIR-V legalization, after
 `linkAndOptimizeIR`. It runs inside
 `SPIRVLegalizationContext::processModule`
-([slang-ir-spirv-legalize.cpp line 3042](../../../../source/slang/slang-ir-spirv-legalize.cpp)),
+([slang-ir-spirv-legalize.cpp line 3042](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp)),
 which calls `specializeAddressSpace` with a `SpirvAddressSpaceAssigner`.
 The `validateAtomicOperations` call that Phase C skips for SPIR-V
 (line 2342 of `slang-emit.cpp`, whose comment says it is called
@@ -1168,7 +1168,7 @@ when the only Khronos path was via GLSL, the pass lived under that
 namespace; SPIR-V direct emit reuses it because the entry-point
 shape it produces is what the backend expects in both modes. After
 legalizing each entry point, the driver (line 5196 of
-[slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp))
+[slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp))
 runs `assignRayPayloadHitObjectAttributeLocations` over the module
 and stamps the SPIR-V version recorded in the `ShaderExtensionTracker`
 onto it with `decorateModuleWithSPIRVVersion`.
@@ -1176,7 +1176,7 @@ onto it with `decorateModuleWithSPIRVVersion`.
 Two parts of that shared entry-point shape are visible in the SPIR-V
 output. First, every `SV_*` semantic is resolved by
 `getGLSLSystemValueInfo`
-([slang-ir-glsl-legalize.cpp line 447](../../../../source/slang/slang-ir-glsl-legalize.cpp)),
+([slang-ir-glsl-legalize.cpp line 447](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp)),
 a name-match chain giving each recognized semantic a `gl_*` builtin
 identity and a required type — `SV_DispatchThreadID` to
 `gl_GlobalInvocationID`, `SV_IsFrontFace` to `gl_FrontFacing`, and so
@@ -1185,7 +1185,7 @@ on. A semantic it does not recognize falls through to
 "unknown system-value semantic", so an unrecognized `SV_*` fails the
 SPIR-V compile inside this pass rather than at emit. The `gl_*` name
 is not itself emitted: `maybeEmitSystemVal`
-([slang-emit-spirv.cpp line 7864](../../../../source/slang/slang-emit-spirv.cpp))
+([slang-emit-spirv.cpp line 7864](../../../../source/slang/emission/slang-emit-spirv.cpp))
 re-derives a `BuiltIn` decoration from the same semantic name.
 
 Second, the two semantics with no 1:1 Vulkan builtin are rewritten
@@ -1198,7 +1198,7 @@ per draw while Vulkan's include the draw's base offset, so the
 subtraction is what keeps user code on HLSL semantics. In SPIR-V that
 is an `OpISub` of two builtin loads, and the `BaseVertex` /
 `BaseInstance` operands pull in `SpvCapabilityDrawParameters`
-([slang-emit-spirv.cpp lines 7875-7881](../../../../source/slang/slang-emit-spirv.cpp)).
+([slang-emit-spirv.cpp lines 7875-7881](../../../../source/slang/emission/slang-emit-spirv.cpp)).
 `SV_VulkanVertexID` / `SV_VulkanInstanceID` (lines 874 and 697) map
 straight to the bare index and are not rebased.
 
@@ -1222,7 +1222,7 @@ emitted code.
 operand followed by variadic arguments. The lowering is split across
 two stages so the message type goes through the normal deduplicated
 type-emission path. In Phase D step 4, `SPIRVLegalizationContext::processAbort`
-([slang-ir-spirv-legalize.cpp lines 2149-2284](../../../../source/slang/slang-ir-spirv-legalize.cpp))
+([slang-ir-spirv-legalize.cpp lines 2149-2284](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp))
 packs the format string (with its null terminator) into a `uint` array
 with an explicit stride, widens `bool` argument values to `uint`
 (`OpTypeBool` has no physical size), and builds an explicitly-laid-out
@@ -1232,7 +1232,7 @@ type. It rewrites the inst to `Abort(message)`, strips the trailing
 unreachable code, and terminates the block with `unreachable` because
 `OpAbortKHR` is itself a block terminator (mirroring the `discard` /
 `OpKill` treatment). At emit time (step 14), `emitAbort`
-([slang-emit-spirv.cpp line 5010](../../../../source/slang/slang-emit-spirv.cpp))
+([slang-emit-spirv.cpp line 5010](../../../../source/slang/emission/slang-emit-spirv.cpp))
 declares `SPV_KHR_abort` and `SpvCapabilityAbortKHR` and emits
 `OpAbortKHR` with the prepared message struct as its single operand.
 
@@ -1241,7 +1241,7 @@ declares `SPV_KHR_abort` and `SpvCapabilityAbortKHR` and emits
 `SPIRVLegalizationContext::processModule` gained a step that is worth
 calling out because it is the one place the legalizer drains its work
 list twice. `processConstantBufferDescriptorHeapLoads` (line 1340 of
-[slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp))
+[slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp))
 rewrites every `IRSPIRVLoadDescriptorFromHeap` whose type is an
 `IRConstantBufferType` so the fetched pointer becomes an
 `IRSPIRVUntypedPtrType` in `AddressSpace::Uniform`, marking the
@@ -1273,7 +1273,7 @@ oldResultType->getOp()`) before deciding a new pointer type is needed.
 ### Descriptor-heap array stride and the unified-stride option
 
 `getDescriptorRuntimeArrayType`
-([slang-emit-spirv.cpp line 7649](../../../../source/slang/slang-emit-spirv.cpp))
+([slang-emit-spirv.cpp line 7649](../../../../source/slang/emission/slang-emit-spirv.cpp))
 keys its cache on (element type, stride) rather than element type
 alone, and takes a caller-chosen stride. `getDescriptorHeapArrayStride`
 (line 7581) selects `SPIRVSamplerHeapStride` for sampler heaps and
@@ -1302,7 +1302,7 @@ direct emit the decoration is inert — the SPIR-V emitter derives the
 mode independently, from the var layout's `IRSystemValueSemanticAttr`
 rather than from the decoration — but the pass is shared with the
 via-GLSL path. `getDepthOutputExecutionMode`
-([slang-emit-spirv.cpp line 6168](../../../../source/slang/slang-emit-spirv.cpp))
+([slang-emit-spirv.cpp line 6168](../../../../source/slang/emission/slang-emit-spirv.cpp))
 maps `SV_DepthGreaterEqual` to `SpvExecutionModeDepthGreater` and
 `SV_DepthLessEqual` to `SpvExecutionModeDepthLess`, and
 `maybeEmitEntryPointDepthReplacingExecutionMode` (line 6240) also
@@ -1323,7 +1323,7 @@ The debug-info shape emitted in Phase D is chosen by
 `getDebugInfoLevel()`, and the choice is made partly in IR
 generation and partly in the emitter (the mapping is spelled out in
 the comment at lines 12525-12536 of
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)).
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp)).
 At `None` (`-g0`) the IR carries no debug instructions at all. At
 `Minimal` (`-g1`) it carries `IRDebugSource` and `IRDebugLine` plus
 function and compilation-unit scope metadata, and
@@ -1430,7 +1430,7 @@ declaration of the atoms themselves.
 
 SPIR-V requires integral fragment-stage inputs to be flat-qualified.
 `needFlatDecorationForBuiltinVar` (line 7351 of
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp))
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp))
 decides this. It accepts `kIROp_GlobalVar`, `kIROp_GlobalParam`, and
 `kIROp_SPIRVAsmOperandBuiltinVar`, and derives the value type two
 ways: for a pointer-typed instruction it requires the address space
@@ -1449,7 +1449,7 @@ which reach the emitter that way rather than as a global parameter
 A SPIR-V `OpSwitch` case literal must occupy the same number of
 words as the selector's type. The `kIROp_Switch` emit path (line
 5527 of
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp))
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp))
 therefore reads `getIntTypeInfo(m_targetRequest,
 switchInst->getCondition()->getDataType())` and emits each case
 literal via `SpvLiteralInteger::from64` when the selector is wider
@@ -1485,7 +1485,7 @@ struct being indexed as an explicit Base Type operand to
 ### Float-to-bool casts
 
 The float-to-bool cast path (line 9704 of
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp))
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp))
 builds the comparison against a zero constant of the *source* type.
 It uses `builder.getFloatValue(fromType, 0.0)`; constructing the
 zero with `getIntValue` produced an integer constant of a

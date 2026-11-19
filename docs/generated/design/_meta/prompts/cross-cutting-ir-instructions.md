@@ -6,7 +6,7 @@ See [_common.md](_common.md) for universal rules.
 
 Produce `docs/generated/design/cross-cutting/ir-instructions.md` — a
 catalog of the Slang IR instruction set, derived from
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua).
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua).
 
 This is a **generated reference**, not a tutorial. The deep design
 rationale lives in [../../design/ir.md](../../design/ir.md) and
@@ -20,7 +20,7 @@ look up an opcode.
 
 1. `# IR Instruction Catalog` (title)
 2. `## Source` — state that the catalog is reverse-engineered from
-   [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua); the
+   [slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua); the
    header `slang-ir-insts.h` and the FIDDLE-generated enum
    `kIROp_*` in `build/source/slang/fiddle/slang-ir-insts-enum.h.fiddle`
    are downstream of that file.
@@ -62,7 +62,7 @@ look up an opcode.
 ## Quality checklist (in addition to the universal one)
 
 - [ ] Every opcode listed appears in
-      [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua).
+      [slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua).
       Do not invent opcodes.
 - [ ] Tables are summary-level: at most a few dozen entries per family,
       with explicit notes when truncating ("...plus ~N more in this

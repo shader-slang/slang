@@ -9,9 +9,9 @@ Maintain white-box characterization coverage for Slang's generic,
 existential, and type-flow specialization pipeline. Read these sources before
 regenerating the bundle:
 
-- `source/slang/slang-ir-specialize.cpp`
-- `source/slang/slang-ir-typeflow-specialize.cpp`
-- `source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp`
+- `source/slang/ir-passes/slang-ir-specialize.cpp`
+- `source/slang/ir-passes/slang-ir-typeflow-specialize.cpp`
+- `source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp`
 - `docs/generated/design/ir-reference/generics-and-existentials.md`
 
 Preserve the existing focused tests unless a compiler change makes their

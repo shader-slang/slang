@@ -13,9 +13,9 @@
 //
 
 #include "compiler-core/slang-artifact.h"
-#include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
+#include "slang/ast/slang-ast-base.h"
 
 #include <mutex>
 #include <slang-com-helper.h>

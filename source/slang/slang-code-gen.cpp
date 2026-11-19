@@ -5,10 +5,10 @@
 #include "core/slang-type-convert-util.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
-#include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
-#include "slang-emit-metal.h"        // for `MetalExtensionTracker`
-#include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
 #include "slang-rich-diagnostics.h"
+#include "slang/emission/slang-emit-cuda.h"         // for `CUDAExtensionTracker`
+#include "slang/emission/slang-emit-metal.h"        // for `MetalExtensionTracker`
+#include "slang/emission/slang-extension-tracker.h" // for `ShaderExtensionTracker`
 
 // TODO: The "artifact" system is a scourge.
 #include "compiler-core/slang-artifact-desc-util.h"
