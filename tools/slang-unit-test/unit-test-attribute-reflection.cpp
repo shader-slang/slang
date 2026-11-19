@@ -114,11 +114,12 @@ SLANG_UNIT_TEST(rootSignatureAttributeReflection)
     SLANG_CHECK(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
-    module->findAndCheckEntryPoint(
+    SlangResult findEntryPointResult = module->findAndCheckEntryPoint(
         "main",
         SLANG_STAGE_FRAGMENT,
         entryPoint.writeRef(),
         diagnosticBlob.writeRef());
+    SLANG_CHECK(SLANG_SUCCEEDED(findEntryPointResult));
     SLANG_CHECK(entryPoint != nullptr);
 
     auto functionReflection = entryPoint->getFunctionReflection();
@@ -130,6 +131,7 @@ SLANG_UNIT_TEST(rootSignatureAttributeReflection)
 
     size_t size = 0;
     auto rootSignature = rootSignatureAttribute->getArgumentValueString(0, &size);
+    SLANG_CHECK(rootSignature != nullptr);
     UnownedStringSlice stringSlice = UnownedStringSlice(rootSignature, size);
     SLANG_CHECK(stringSlice == "DescriptorTable(SRV(t0))");
 }

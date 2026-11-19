@@ -4898,16 +4898,21 @@ attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsage
 
 /// Associate a D3D12 root signature with a function, given as a string in the
 /// HLSL root-signature sub-language. The compiler accepts and reflects the
-/// string as-is; it does not validate the root-signature syntax or use it to
-/// influence binding calculation. Applications retrieve the string through the
-/// user-attribute reflection API on an entry point.
+/// string as-is; it does not validate the root-signature syntax, use it to
+/// influence binding calculation, or emit it into generated code. The
+/// user-attribute reflection API is therefore the only way to retrieve the
+/// string; creating the root signature object from it is up to the application.
 /// @param value The root-signature string.
 /// @remarks This attribute is available in both the Slang and HLSL source
-/// dialects, so entry points written in either language can carry it.
+/// dialects. It is declared as a user-defined attribute rather than through
+/// `attribute_syntax` because the user-attribute reflection lists only
+/// include user-defined attributes. The `Function` usage target allows it on
+/// any function, but it is intended for entry points, which reflection reaches
+/// through `IEntryPoint::getFunctionReflection()`.
 [__AttributeUsage(_AttributeTargets.Function)]
 struct RootSignatureAttribute
 {
-    string value;
+    String value;
 };
 
 /// Specify the storage format of a read-write texture. Can only be used on a texture typed struct field or global parameter.
