@@ -1123,10 +1123,6 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         struct ConditionClauseWalker : ConditionClauseVisitor<ConditionClauseWalker>
         {
             SemanticsDeclReferenceVisitor* visitor;
-            void visitConditionClause(ConditionClause*)
-            {
-                SLANG_UNEXPECTED("unhandled case of condition clause");
-            }
             void visitExprConditionClause(ExprConditionClause* exprConditionClause)
             {
                 visitor->dispatchIfNotNull(exprConditionClause->expr);

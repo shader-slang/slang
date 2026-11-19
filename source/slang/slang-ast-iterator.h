@@ -611,10 +611,6 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitConditionClause(ConditionClause
     struct ConditionClauseWalker : ConditionClauseVisitor<ConditionClauseWalker>
     {
         ASTIterator* iterator;
-        void visitConditionClause(ConditionClause*)
-        {
-            SLANG_UNEXPECTED("unhandled case of condition clause");
-        }
         void visitExprConditionClause(ExprConditionClause* exprConditionClause)
         {
             iterator->visitExpr(exprConditionClause->expr);

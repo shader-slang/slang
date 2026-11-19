@@ -7897,77 +7897,50 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         context->scopeEndBlock = previous;
     }
 
-    // The result of `lowerConditionClause`: the IR value the statement branches
-    // on, the checked expression it came from, and the debug-scope state for the
-    // lexical scope the clause may have entered, which the invoking statement
-    // restores when that scope ends.
-    struct LoweredConditionClause
-    {
-        IRInst* conditionValue = nullptr;
-        Expr* checkedExpr = nullptr;
-        IRInst* conditionScope = nullptr;
-        IRInst* previousScope = nullptr;
-    };
-
-    // Lower a condition clause: lower whatever the clause itself declares (a
-    // declaration condition initializes its variable right here, before the
-    // test), then the tested value. A clause that introduces a lexical scope
-    // enters it for its debug info; the invoking statement restores the
-    // previous scope when the clause's scope ends.
-    LoweredConditionClause lowerConditionClause(ConditionClause* conditionClause)
+    // Lower a condition clause, and return the IR value the statement branches
+    // on. A declaration condition initializes its variable right here, before
+    // the test; the scope the statement pushed around its condition (the
+    // declaration's parent) gives the variable its own debug lexical block for
+    // the lowering of the condition, and the enclosing scope returns before the
+    // statement's own blocks lower.
+    IRInst* lowerConditionClause(ConditionClause* conditionClause)
     {
         struct ConditionClauseLoweringVisitor
             : ConditionClauseVisitor<ConditionClauseLoweringVisitor>
         {
             IRGenContext* context;
-            LoweredConditionClause result;
-            void visitConditionClause(ConditionClause*)
-            {
-                SLANG_UNEXPECTED("unhandled case of condition clause");
-            }
+            IRInst* conditionValue = nullptr;
             void visitExprConditionClause(ExprConditionClause* exprConditionClause)
             {
-                result.checkedExpr = exprConditionClause->expr;
-                result.conditionValue =
-                    getSimpleVal(context, lowerRValueExpr(context, result.checkedExpr));
+                conditionValue =
+                    getSimpleVal(context, lowerRValueExpr(context, exprConditionClause->expr));
             }
             void visitDeclConditionClause(DeclConditionClause* declConditionClause)
             {
-                // The declaration's parent is the scope the statement pushed
-                // around its condition, which gives the condition's variable
-                // its own debug lexical block.
-                result.previousScope = context->currentDebugScope;
-                result.conditionScope = emitDebugLexicalBlockForScope(
+                auto previousScope = context->currentDebugScope;
+                auto conditionScope = emitDebugLexicalBlockForScope(
                     context,
                     as<ScopeDecl>(declConditionClause->decl->parentDecl),
                     declConditionClause->loc);
-                if (result.conditionScope)
+                if (conditionScope)
                 {
-                    context->currentDebugScope = result.conditionScope;
+                    context->currentDebugScope = conditionScope;
                     emitCurrentDebugScope(context);
                 }
                 lowerDecl(context, declConditionClause->decl);
-                result.checkedExpr = declConditionClause->predicateExpr;
-                result.conditionValue =
-                    getSimpleVal(context, lowerRValueExpr(context, result.checkedExpr));
+                conditionValue = getSimpleVal(
+                    context,
+                    lowerRValueExpr(context, declConditionClause->predicateExpr));
+                if (conditionScope)
+                {
+                    context->currentDebugScope = previousScope;
+                }
             }
         };
         ConditionClauseLoweringVisitor visitor;
         visitor.context = context;
         visitor.dispatch(conditionClause);
-        return visitor.result;
-    }
-
-    // Restore the debug scope that a lowered condition clause entered, and emit
-    // the enclosing scope's marker so the instructions that follow are
-    // attributed to it.
-    void restoreConditionClauseScope(const LoweredConditionClause& lowered)
-    {
-        if (lowered.conditionScope)
-        {
-            context->currentDebugScope = lowered.previousScope;
-            emitCurrentDebugScope(context);
-        }
+        return visitor.conditionValue;
     }
 
     void visitIfStmt(IfStmt* stmt)
@@ -7975,14 +7948,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto lowered = lowerConditionClause(stmt->condition);
-        auto condExpr = lowered.checkedExpr;
+        auto irCond = lowerConditionClause(stmt->condition);
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
-        auto irCond = lowered.conditionValue;
-
-        maybeEmitDebugLine(context, this, stmt, condExpr->loc);
+        maybeEmitDebugLine(context, this, stmt, stmt->condition->loc);
 
         IRInst* ifInst = nullptr;
         uint32_t coverageBranchSiteID =
@@ -8000,7 +7970,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                stmt->condition->loc,
                 coverageBranchSiteID,
                 1,
                 slang::CoverageBranchArmKind::TrueArm);
@@ -8009,7 +7979,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             insertBlock(elseBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                stmt->condition->loc,
                 coverageBranchSiteID,
                 2,
                 slang::CoverageBranchArmKind::FalseArm);
@@ -8031,7 +8001,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                stmt->condition->loc,
                 coverageBranchSiteID,
                 1,
                 slang::CoverageBranchArmKind::TrueArm);
@@ -8042,7 +8012,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             insertBlock(elseBlock);
             emitBranchCoverageMarker(
                 context,
-                condExpr->loc,
+                stmt->condition->loc,
                 coverageBranchSiteID,
                 2,
                 slang::CoverageBranchArmKind::FalseArm);
@@ -8064,8 +8034,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(afterBlock);
         }
-
-        restoreConditionClauseScope(lowered);
 
         maybeEmitDebugLine(context, this, stmt, stmt->afterLoc);
 
@@ -8277,19 +8245,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(loopHead);
 
-        auto lowered = lowerConditionClause(stmt->condition);
+        auto irCondition = lowerConditionClause(stmt->condition);
+        maybeEmitDebugLine(context, this, stmt, stmt->condition->loc);
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
         uint32_t coverageBranchSiteID = 0;
         SourceLoc coverageBranchLoc;
         {
-            auto condExpr = lowered.checkedExpr;
-            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
-
-            auto irCondition = lowered.conditionValue;
-
-            coverageBranchLoc = condExpr->loc;
+            coverageBranchLoc = stmt->condition->loc;
             coverageBranchSiteID =
                 context->traceBranchCoverage ? allocateCoverageBranchSiteID(context) : 0;
 
@@ -8328,18 +8292,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
 
-        if (lowered.conditionScope)
-        {
-            context->currentDebugScope = lowered.previousScope;
-        }
-
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
-
-        if (lowered.conditionScope)
-        {
-            emitCurrentDebugScope(context);
-        }
     }
 
     void visitDoWhileStmt(DoWhileStmt* stmt)
@@ -8383,14 +8337,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(testLabel);
 
-        auto lowered = lowerConditionClause(stmt->condition);
-
+        auto irCondition = lowerConditionClause(stmt->condition);
+        maybeEmitDebugLine(context, this, stmt, stmt->condition->loc);
         {
-            auto condExpr = lowered.checkedExpr;
-            maybeEmitDebugLine(context, this, stmt, condExpr->loc);
-
-            auto irCondition = lowered.conditionValue;
-
             // One thing to be careful here is that lowering irCondition
             // may create additional blocks due to short circuiting, so
             // the block we are current inserting into is not necessarily
@@ -8426,7 +8375,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 insertBlock(loopExitBlock);
                 emitBranchCoverageMarker(
                     context,
-                    condExpr->loc,
+                    stmt->condition->loc,
                     coverageBranchSiteID,
                     2,
                     slang::CoverageBranchArmKind::FalseArm);
@@ -8435,7 +8384,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 insertBlock(mergeBlock);
                 emitBranchCoverageMarker(
                     context,
-                    condExpr->loc,
+                    stmt->condition->loc,
                     coverageBranchSiteID,
                     1,
                     slang::CoverageBranchArmKind::TrueArm);
@@ -8450,18 +8399,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
         }
 
-        if (lowered.conditionScope)
-        {
-            context->currentDebugScope = lowered.previousScope;
-        }
-
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
-
-        if (lowered.conditionScope)
-        {
-            emitCurrentDebugScope(context);
-        }
     }
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt)
