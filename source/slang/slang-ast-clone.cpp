@@ -147,6 +147,11 @@ Modifier* ASTCloner::cloneModifier(Modifier* modifier)
     return as<Modifier>(cloneSyntaxNode(modifier));
 }
 
+ConditionClause* ASTCloner::cloneConditionClause(ConditionClause* clause)
+{
+    return as<ConditionClause>(cloneSyntaxNode(clause));
+}
+
 Val* ASTCloner::rewriteVal(Val* val)
 {
     if (!val)

@@ -72,6 +72,7 @@ public:
     Expr* cloneExpr(Expr* expr);
     Stmt* cloneStmt(Stmt* stmt);
     Modifier* cloneModifier(Modifier* modifier);
+    ConditionClause* cloneConditionClause(ConditionClause* clause);
 
     Val* rewriteVal(Val* val);
     Type* rewriteType(Type* type) { return as<Type>(rewriteVal(type)); }
@@ -160,6 +161,14 @@ public:
                 // references.
                 dst = src;
             }
+        }
+        else if constexpr (std::is_base_of_v<ConditionClause, T>)
+        {
+            // A condition clause derives from SyntaxNode directly, so the default pointer
+            // handling below would share the node (and its checked predicate expression and
+            // declared variable) between the original and the clone. Deep-cloning through
+            // cloneSyntaxNode keeps the hygiene the expression form of the field always had.
+            dst = as<T>(cloneConditionClause(src));
         }
         else
         {
