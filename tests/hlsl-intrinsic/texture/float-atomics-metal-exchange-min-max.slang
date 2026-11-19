@@ -1,9 +1,9 @@
 // Metal has no floating-point texture atomics. An exchange, min or max on a float texel is
 // diagnosed exactly once, by the Metal checks in slang-ir-check-unsupported-inst.cpp.
 
-//TEST:SIMPLE(filecheck=XCHG,exit-code=-1):-target metal -entry exchangeMain -stage compute
-//TEST:SIMPLE(filecheck=MIN,exit-code=-1):-target metal -entry minMain -stage compute
-//TEST:SIMPLE(filecheck=MAX,exit-code=-1):-target metal -entry maxMain -stage compute
+//TEST:SIMPLE(filecheck=XCHG,exit-code=2):-target metal -entry exchangeMain -stage compute
+//TEST:SIMPLE(filecheck=MIN,exit-code=2):-target metal -entry minMain -stage compute
+//TEST:SIMPLE(filecheck=MAX,exit-code=2):-target metal -entry maxMain -stage compute
 
 [format("r32f")]
 globallycoherent RWTexture2D<float> t;
