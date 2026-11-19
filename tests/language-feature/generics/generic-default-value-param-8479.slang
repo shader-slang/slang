@@ -5,7 +5,9 @@
 // Regression test for https://github.com/shader-slang/slang/issues/8479
 // An unsuffixed integer literal default for a generic value parameter folded to a
 // ConstantIntVal carrying the literal's own type instead of the parameter's declared
-// type, so a global `uniform Payload` compared unequal to the spelling `Payload.Hit`:
+// type, so the element type of `y.hits` (specialized through the implicit default)
+// compared unequal to the local annotation `Payload.Hit` (specialized through the
+// solver), producing the identical-printing error:
 //   error 30019: expected an expression of type 'Payload<16>.Hit', got 'Payload<16>.Hit'
 
 struct Payload<uint32_t x = 16>
