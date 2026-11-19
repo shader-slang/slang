@@ -6,14 +6,14 @@
 // AnyValue must be large enough to hold the struct. This is inherently
 // unsatisfiable.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cpp
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl
-//TEST:SIMPLE(filecheck=CHECK_NEG,exit-code=-1): -target spirv
-//TEST:SIMPLE(filecheck=CHECK_NEG,exit-code=-1): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target glsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cpp
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target metal
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl
+//TEST:SIMPLE(filecheck=CHECK_NEG,exit-code=2): -target spirv
+//TEST:SIMPLE(filecheck=CHECK_NEG,exit-code=2): -target hlsl
 
 [anyValueSize(32)]
 interface IValue

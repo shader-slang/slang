@@ -4364,40 +4364,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     irDebugFunc,
                     irFunc);
             }
-            if (funcDebugScope)
-            {
-                emitOpDebugScope(
-                    spvBlock,
-                    nullptr,
-                    m_voidType,
-                    getNonSemanticDebugInfoExtInst(),
-                    funcDebugScope);
-
-                // For the first block only, emit a DebugLine immediately after DebugScope.
-                // This is required for debuggers like RenderDoc to be able to step into
-                // functions. Without this, parameter copying code (DebugDeclare, OpStore)
-                // appears between DebugScope and the first DebugLine, preventing the
-                // debugger from mapping the function entry point to source code.
-                if (irBlock == irFunc->getFirstBlock())
-                {
-                    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
-                    {
-                        if (auto irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc()))
-                        {
-                            emitOpDebugLine(
-                                spvBlock,
-                                nullptr,
-                                m_voidType,
-                                getNonSemanticDebugInfoExtInst(),
-                                irDebugFunc->getFile(),
-                                irDebugFunc->getLine(),
-                                irDebugFunc->getLine(),
-                                irDebugFunc->getCol(),
-                                irDebugFunc->getCol());
-                        }
-                    }
-                }
-            }
             // In addition to normal basic blocks,
             // all loops gets a header block.
             for (auto irInst : irBlock->getChildren())
@@ -4453,6 +4419,43 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 for (auto irParam : irBlock->getParams())
                 {
                     emitPhi(spvBlock, irParam);
+                }
+            }
+            // Debug scope instructions are ordinary SPIR-V instructions, so they must follow
+            // the block's OpPhi prefix. For example, a source-level if/else can merge two
+            // values into a parameter here even when both branches have debug scopes.
+            if (funcDebugScope)
+            {
+                emitOpDebugScope(
+                    spvBlock,
+                    nullptr,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    funcDebugScope);
+
+                // For the first block only, emit a DebugLine immediately after DebugScope.
+                // This is required for debuggers like RenderDoc to be able to step into
+                // functions. Without this, parameter copying code (DebugDeclare, OpStore)
+                // appears between DebugScope and the first DebugLine, preventing the
+                // debugger from mapping the function entry point to source code.
+                if (irBlock == irFunc->getFirstBlock())
+                {
+                    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                    {
+                        if (auto irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc()))
+                        {
+                            emitOpDebugLine(
+                                spvBlock,
+                                nullptr,
+                                m_voidType,
+                                getNonSemanticDebugInfoExtInst(),
+                                irDebugFunc->getFile(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getCol(),
+                                irDebugFunc->getCol());
+                        }
+                    }
                 }
             }
             for (auto irInst : irBlock->getOrdinaryInsts())
@@ -8335,21 +8338,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    bool isGlobalValueInst(IRInst* inst)
-    {
-        if (as<IRConstant>(inst))
-            return true;
-        switch (inst->getOp())
-        {
-        case kIROp_Func:
-        case kIROp_GlobalParam:
-        case kIROp_GlobalVar:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     void emitLoopHeaderBlock(IRLoop* loopInst, SpvInst* loopHeaderBlock)
     {
         bool hasBackJump = false;
@@ -8469,7 +8457,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                     SLANG_ASSERT(argStartIndex + paramIndex < branchInst->getOperandCount());
                     auto valueInst = branchInst->getOperand(argStartIndex + paramIndex);
-                    if (isGlobalValueInst(valueInst))
+                    // Module-scope operands are emitted on demand, including composite
+                    // constants such as float4(1.0) used only by this phi. Local operands
+                    // can come from a loop back edge and must keep their forward references.
+                    if (as<IRModuleInst>(valueInst->getParent()))
                         ensureInst(valueInst);
                     emitOperand(getIRInstSpvID(valueInst));
                     auto sourceBlock = as<IRBlock>(branchInst->getParent());

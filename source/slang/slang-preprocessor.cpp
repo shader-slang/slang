@@ -454,30 +454,6 @@ struct InputStreamStack
     /// Get the top stream of the input stack
     InputStream* getTopStream() { return m_top; }
 
-    /// Get the input stream that the next token would come from
-    ///
-    /// If the input stack is at its end, this will just be the top-most stream.
-    InputStream* getNextStream()
-    {
-        SLANG_ASSERT(m_top);
-        auto top = m_top;
-        for (;;)
-        {
-            auto token = top->peekToken();
-            if (token.type != TokenType::EndOfFile)
-                return top;
-
-            auto parent = top->getParent();
-            if (parent)
-            {
-                top = parent;
-                continue;
-            }
-
-            return top;
-        }
-    }
-
     SourceLoc findNextLineEnd(SourceLoc from, UInt lineCount = 1) const
     {
         auto top = m_top;
@@ -1916,22 +1892,41 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // flight (even if they were at their end) when checking if `M`
                 // was busy.
                 //
-                // In contrast, for a function-like macro invocation:
+                // In the case of a function-like macro invocation:
                 //
                 //      1 + F ( A, B, C ) + 2
                 //                        ^
                 //
-                // We will have just read in the `)` from the argument list, but
-                // we don't actually need/want to worry about any macro invocation
-                // that might have yielded the `)` token, since expanding that macro
-                // again would *not* be able to lead to a recursive case.
+                // we take the busy list of the stream that the closing `)` was read
+                // from, which is the top stream once argument parsing is done. That
+                // may differ from the stream the macro name came from. Consider:
                 //
-                // Instead, we really only care about the active stream that the
-                // next token would be read from.
+                //      #define M F
+                //      #define F(x) M
+                //      M(1)
                 //
-                auto nextStream = m_inputStreams.getNextStream();
+                // `F` is read from the expansion of `M`, but reading `(` runs past
+                // the end of that stream and pops it. The `busyMacros` computed
+                // from the name token's stream may therefore be dangling, so we
+                // need to fetch a new copy.
+                //
+                // We use the stream the `)` came from, not the stream the *next*
+                // token will come from, because the `)` may be the last token of
+                // an enclosing macro's body. Consider:
+                //
+                //      #define A() B()
+                //      #define B() A()
+                //      A()
+                //
+                // Reading the `)` of the `B()` in `A`'s body leaves `A`'s stream
+                // exhausted but still on the stack. That stream correctly lists `A`
+                // as busy. The next token comes from the file, whose list does not
+                // include `A`, so `B` would expand without `A` being busy, and we
+                // would get stuck in a cycle.
+                //
+                auto closeStream = m_inputStreams.getTopStream();
                 auto busyMacrosForFunctionLikeInvocation =
-                    nextStream->getFirstBusyMacroInvocation();
+                    closeStream->getFirstBusyMacroInvocation();
 
                 invocation->prime(busyMacrosForFunctionLikeInvocation);
                 _pushMacroInvocation(invocation);

@@ -12,7 +12,7 @@
 // Verifies `optional` is consumed on `nonempty(...)` but then rejected as
 // meaningless by the checker; CHECK asserts E30415.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl
 
 void f<each T>(expand each T t) where optional nonempty(T) {}
 

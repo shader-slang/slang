@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 note: include 'tests/preprocessor/output-includes.slang'
 note: include   'tests/preprocessor/include-a.slang.h'

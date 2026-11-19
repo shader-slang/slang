@@ -15,7 +15,7 @@
 // here selects 2026 after 2025, so it must be reported, with a note pointing
 // at the first directive.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -entry main -stage compute
 
 #lang 2025
 #lang 2026

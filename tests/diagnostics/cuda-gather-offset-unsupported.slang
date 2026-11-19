@@ -1,12 +1,12 @@
 // tex2Dgather has no offset parameter, so the Gather* overloads that take a texel offset are a
 // capability error (E36107) on the CUDA targets, as the Sample* offset overloads are (#14073).
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SEP,exit-code=-1): -target cuda -entry eSeparate -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXSEP,exit-code=-1): -target ptx -entry eSeparate -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=ALPHA,exit-code=-1): -target cuda -entry eSeparateAlpha -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMB,exit-code=-1): -target cuda -entry eCombined -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXCOMB,exit-code=-1): -target ptx -entry eCombined -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=GREEN,exit-code=-1): -target cuda -entry eCombinedGreen -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SEP,exit-code=2): -target cuda -entry eSeparate -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXSEP,exit-code=2): -target ptx -entry eSeparate -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=ALPHA,exit-code=2): -target cuda -entry eSeparateAlpha -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=COMB,exit-code=2): -target cuda -entry eCombined -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=PTXCOMB,exit-code=2): -target ptx -entry eCombined -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=GREEN,exit-code=2): -target cuda -entry eCombinedGreen -stage compute
 
 Texture2D<float4> tex;
 SamplerState samp;

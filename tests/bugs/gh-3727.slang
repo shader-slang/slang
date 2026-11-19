@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv -stage compute -entry main
 
 // CHECK: undefined identifier
 

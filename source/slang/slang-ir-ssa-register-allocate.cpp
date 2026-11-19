@@ -2,6 +2,7 @@
 #include "slang-ir-ssa-register-allocate.h"
 
 #include "slang-ir-dominators.h"
+#include "slang-ir-eliminate-phis.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-reachability.h"
 #include "slang-ir-util.h"
@@ -13,10 +14,10 @@ namespace Slang
 struct RegisterAllocateContext
 {
     OrderedDictionary<IRType*, List<RefPtr<RegisterInfo>>> mapTypeToRegisterList;
-    bool allocateForCompositeTypeOnly;
+    const PhiEliminationOptions& phiOptions;
 
-    RegisterAllocateContext(bool compositeTypeOnly)
-        : allocateForCompositeTypeOnly(compositeTypeOnly)
+    RegisterAllocateContext(const PhiEliminationOptions& options)
+        : phiOptions(options)
     {
     }
 
@@ -299,7 +300,7 @@ struct RegisterAllocateContext
         case kIROp_Param:
             if (inst->getParent() == func->getFirstBlock())
                 return false;
-            if (allocateForCompositeTypeOnly && !isCompositeType(inst->getFullType()))
+            if (!phiOptions.shouldEliminatePhiForType(inst->getFullType()))
                 return false;
             return true;
         case kIROp_UpdateElement:
@@ -325,9 +326,9 @@ struct RegisterAllocateContext
 RegisterAllocationResult allocateRegistersForFunc(
     IRGlobalValueWithCode* func,
     RefPtr<IRDominatorTree>& inOutDom,
-    bool allocateForCompositeTypeOnly)
+    const PhiEliminationOptions& phiOptions)
 {
-    RegisterAllocateContext context(allocateForCompositeTypeOnly);
+    RegisterAllocateContext context(phiOptions);
     if (context.needProcessing(func))
         return context.allocateRegisters(func, inOutDom);
     return RegisterAllocationResult();
