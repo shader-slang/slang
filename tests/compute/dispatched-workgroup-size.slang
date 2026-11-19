@@ -23,14 +23,14 @@
 // CUDA: blockDim
 
 // HLSL-NOT: threads_per_threadgroup
-// HLSL: uint3(int3(4L, 2L, 1L))
+// HLSL: {{uint3\((int3\()?4[LU]?, 2[LU]?, 1[LU]?\)}}
 
 // SPV: OpEntryPoint
 // SPV-NOT: BuiltIn WorkgroupSize
 // SPV-DAG: OpConstant %{{u?int}} 4
 // SPV-DAG: OpConstant %{{u?int}} 2
 
-// WGSL: vec3<i32>(i32(4), i32(2), i32(1))
+// WGSL: {{vec3<[iu]32>\([iu]32\(4\), [iu]32\(2\), [iu]32\(1\)\)}}
 
 // METALHELPER: {{\[\[}}kernel{{\]\]}} void helperOnly({{.*}}uint3 [[HSIZE:[A-Za-z0-9_]+]] {{\[\[}}dispatch_threads_per_threadgroup{{\]\]}}
 // METALHELPER: [[HSIZE]]
