@@ -11,7 +11,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -llvm -compute -output-using-type -xslang -matrix-layout-row-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RESULT): -vk -compute -output-using-type -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -wgpu -compute -output-using-type -xslang -matrix-layout-row-major
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=METAL-RESULT): -metal -compute -output-using-type -xslang -matrix-layout-row-major -DSKIP_DIMENSIONS=1
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=METAL-RESULT): -metal -compute -output-using-type -xslang -matrix-layout-row-major -xslang -DSKIP_DIMENSIONS=1
 
 // Element and layout types pass through generic specialization and interface witnesses.
 // Returning views through noinline helpers also exercises the prelude struct call ABI.

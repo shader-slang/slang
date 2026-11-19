@@ -32,5 +32,5 @@ void structuredCaller(StructuredBuffer<B> bbuf)
 {
     structuredConsumer(bbuf);
 //CHECK:               ^^^^ type mismatch in expression
-//CHECK:               ^^^^ expected an expression of type 'StructuredBuffer<A, DefaultDataLayout>', got 'StructuredBuffer<B, DefaultDataLayout>'
+//CHECK:               ^^^^ expected an expression of type '__SizedStructuredBuffer<A, DefaultDataLayout>', got '__SizedStructuredBuffer<B, DefaultDataLayout>'
 }

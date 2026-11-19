@@ -1,14 +1,14 @@
-//TEST:SIMPLE(filecheck=COMPILE): -target cuda -entry computeMain -stage compute -validate-ir
-//TEST:SIMPLE(filecheck=COMPILE): -target cpp -entry computeMain -stage compute -validate-ir
-//TEST:SIMPLE(filecheck=COMPILE): -target hlsl -entry computeMain -stage compute -validate-ir -O0
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -validate-ir
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -validate-ir -DUINT_FLAGS=1
-//TEST:SIMPLE(filecheck=SPIRV): -target wgsl-spirv-asm -entry computeMain -stage compute -validate-ir -DUINT_FLAGS=1
-//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -validate-ir
-//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute -validate-ir
-//TEST:SIMPLE(filecheck=COMPILE): -target llvm-shader-ir -entry computeMain -stage compute -validate-ir
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -wgpu -compute -output-using-type -xslang -DUINT_FLAGS=1
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=RESULT): -metal -compute -output-using-type
+//TEST:SIMPLE(filecheck=COMPILE): -target cuda -entry computeMain -stage compute -validate-ir -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=COMPILE): -target cpp -entry computeMain -stage compute -validate-ir -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=COMPILE): -target hlsl -entry computeMain -stage compute -validate-ir -O0 -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -validate-ir -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -validate-ir -DUINT_FLAGS=1 -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=SPIRV): -target wgsl-spirv-asm -entry computeMain -stage compute -validate-ir -DUINT_FLAGS=1 -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -validate-ir -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute -validate-ir -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=COMPILE): -target llvm-shader-ir -entry computeMain -stage compute -validate-ir -matrix-layout-column-major
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -wgpu -compute -output-using-type -xslang -DUINT_FLAGS=1 -xslang -matrix-layout-column-major
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=RESULT): -metal -compute -output-using-type -xslang -matrix-layout-column-major
 
 // Matrix and Boolean elements exercise buffer element legalization before a sized view is
 // converted to an unsized view. The resulting views must still agree about the element layout.
@@ -19,6 +19,8 @@ typealias Flag = uint;
 typealias Flag = bool;
 #endif
 
+// Column-major float2x3 stores three float2 columns without padding on every target.
+// The off-diagonal element [0][1] is 3.0 in this payload, rather than the row-major 2.0.
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0], stride=24):name=matrices
 StructuredBuffer<float2x3> matrices;
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=flags
@@ -36,7 +38,7 @@ void update(MatrixViews views, __UnsizedRWStructuredBuffer<Flag> writableFlags,
     __UnsizedRWStructuredBuffer<float> writableOutput)
 {
     writableFlags[0] = Flag(views.sized[0][0][0] > 0.0);
-    writableOutput[0] = bool(writableFlags[0]) ? views.unsized[0][1][2] : 0.0;
+    writableOutput[0] = bool(writableFlags[0]) ? views.unsized[0][0][1] : 0.0;
 }
 
 [numthreads(1, 1, 1)]
@@ -61,4 +63,4 @@ void computeMain()
 // METAL: array<packed_float2, int(3)> data
 // METAL: void update{{[_0-9]*}}(const _MatrixStorage_float2x3_ColMajornatural{{[_0-9]*}} device* views_sized{{[_0-9]*}}, const _MatrixStorage_float2x3_ColMajornatural{{[_0-9]*}} device* views_unsized{{[_0-9]*}}, bool device* writableFlags{{[_0-9]*}}, float device* writableOutput{{[_0-9]*}})
 // METALLIB: define void @computeMain
-// RESULT: 6.0
+// RESULT: 3.0

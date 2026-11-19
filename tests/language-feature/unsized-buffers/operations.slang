@@ -91,8 +91,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // METAL: atomic_fetch_add_explicit
 // METAL: outputBytes{{[_0-9]*}}[({{.*}})>>2] =
 // METALLIB: define void @computeMain
+
+// The structured result is decimal; raw byte-buffer words are printed in hexadecimal.
 // RESULT: 128
-// RESULT: 7
-// RESULT: 121
-// RESULT: 200
+// RESULT-NEXT: 7
+// RESULT-NEXT: 79
+// RESULT-NEXT: C8
 // ATOMIC-RESULT: 336
