@@ -12,8 +12,8 @@
 // for unused local variables, which could let a test pass without exercising its intended rule.
 
 #include "compiler-core/slang-diagnostic-sink.h"
-#include "slang/slang-ir-redundancy-removal.h"
-#include "slang/slang-ir-validate.h"
+#include "slang/ir-passes/slang-ir-redundancy-removal.h"
+#include "slang/ir/slang-ir-validate.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 

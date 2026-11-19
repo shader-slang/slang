@@ -70,7 +70,7 @@ pass-through compilation) or calls
    no line directives; see
    [Source-writer abstraction](#source-writer-abstraction) for what
    each mode prints) and constructs a `SourceWriter`
-   ([slang-emit-source-writer.h](../../../../source/slang/slang-emit-source-writer.h))
+   ([slang-emit-source-writer.h](../../../../source/slang/emission/slang-emit-source-writer.h))
    to buffer the emitted text, optionally with a `SourceMap`.
 2. Selects the `CLikeSourceEmitter` subclass. `CodeGenTarget::PyTorchCppBinding`
    is special-cased to `TorchCppSourceEmitter`; every other target is
@@ -85,7 +85,7 @@ pass-through compilation) or calls
    `simplifyForEmit`, then `sourceEmitter->emitModule`, which walks the
    IR and emits one declaration / function at a time. Backends consult
    the precedence helper
-   ([slang-emit-precedence.h](../../../../source/slang/slang-emit-precedence.h))
+   ([slang-emit-precedence.h](../../../../source/slang/emission/slang-emit-precedence.h))
    as they print expressions; the result is precedence-aware but not
    minimal (see
    [Operator precedence and parenthesization](#operator-precedence-and-parenthesization)).
@@ -100,16 +100,16 @@ header-backed emit helpers used by this file (C-like subclasses, LLVM,
 VM, Torch, Slang round-trip). Direct SPIR-V is not header-included here;
 it is wired via the `emitSPIRVFromIR` forward declaration (line 3218)
 and implemented in
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp).
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp).
 
 ## Backends
 
 ### HLSL
 
-[slang-emit-hlsl.h](../../../../source/slang/slang-emit-hlsl.h) /
-[slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp).
+[slang-emit-hlsl.h](../../../../source/slang/emission/slang-emit-hlsl.h) /
+[slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp).
 Emits HLSL source text.
-[slang-emit-hlsl-prelude.cpp](../../../../source/slang/slang-emit-hlsl-prelude.cpp)
+[slang-emit-hlsl-prelude.cpp](../../../../source/slang/emission/slang-emit-hlsl-prelude.cpp)
 holds the inline HLSL snippets `HLSLSourceEmitter` injects on demand
 (the 64-bit cast helper, the cooperative-vector and cooperative-matrix
 preludes) plus the name-mapping helpers described below; the shipped
@@ -134,7 +134,7 @@ in this backend implement that rule:
   `tryEmitInstExprImpl` handles `kIROp_GetEnumBarrierMemoryTypeFlags`
   and `kIROp_GetEnumBarrierSemanticFlags` by calling
   `emitNamedMemoryTypeFlagSet` / `emitNamedSemanticFlagSet`
-  ([slang-emit-hlsl-prelude.cpp](../../../../source/slang/slang-emit-hlsl-prelude.cpp)
+  ([slang-emit-hlsl-prelude.cpp](../../../../source/slang/emission/slang-emit-hlsl-prelude.cpp)
   lines 553 and 586), which validate the value and print
   `UAV_MEMORY`, `GROUP_SHARED_MEMORY`, `ALL_MEMORY`, `GROUP_SYNC`,
   `DEVICE_SCOPE`, and friends joined with `|`. `HLSLSourceEmitter::getFoldPolicy`
@@ -148,20 +148,20 @@ name and re-emits the element type as a generic argument.
 
 ### GLSL
 
-[slang-emit-glsl.h](../../../../source/slang/slang-emit-glsl.h) /
-[slang-emit-glsl.cpp](../../../../source/slang/slang-emit-glsl.cpp).
+[slang-emit-glsl.h](../../../../source/slang/emission/slang-emit-glsl.h) /
+[slang-emit-glsl.cpp](../../../../source/slang/emission/slang-emit-glsl.cpp).
 Emits GLSL source text. GLSL output is consumed by
 `source/slang-glslang/` to produce SPIR-V via Khronos `glslang` when
 the user asks for SPIR-V via GLSL.
 
 ### SPIR-V (direct)
 
-[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp).
+[slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp).
 Emits SPIR-V binary directly without going through GLSL, from
 `SPIRVEmitContext`. The opcode tables are split out into
-[slang-emit-spirv-ops.h](../../../../source/slang/slang-emit-spirv-ops.h)
+[slang-emit-spirv-ops.h](../../../../source/slang/emission/slang-emit-spirv-ops.h)
 and
-[slang-emit-spirv-ops-debug-info-ext.h](../../../../source/slang/slang-emit-spirv-ops-debug-info-ext.h).
+[slang-emit-spirv-ops-debug-info-ext.h](../../../../source/slang/emission/slang-emit-spirv-ops-debug-info-ext.h).
 
 The natively emitted blob is already a complete module, so
 `createArtifactFromIR`
@@ -181,13 +181,13 @@ preset.
 
 ### Metal
 
-[slang-emit-metal.h](../../../../source/slang/slang-emit-metal.h) /
-[slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp).
+[slang-emit-metal.h](../../../../source/slang/emission/slang-emit-metal.h) /
+[slang-emit-metal.cpp](../../../../source/slang/emission/slang-emit-metal.cpp).
 Emits Metal Shading Language. The inline builtin snippets it injects
 through `ensurePrelude` (matrix `fmod`, matrix / vector reshape,
 `simdgroup_matrix` ops, logging) are the
 `kMetalBuiltinPrelude*` strings in
-[slang-emit-metal-prelude.cpp](../../../../source/slang/slang-emit-metal-prelude.cpp).
+[slang-emit-metal-prelude.cpp](../../../../source/slang/emission/slang-emit-metal-prelude.cpp).
 `MetalSourceEmitter` does not create its `MetalExtensionTracker`; it
 retains a reference (a `RefPtr`) to the one already created on the
 `CodeGenContext`, so requirements it
@@ -198,8 +198,8 @@ downstream Metal compile.
 
 ### WGSL
 
-[slang-emit-wgsl.h](../../../../source/slang/slang-emit-wgsl.h) /
-[slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp).
+[slang-emit-wgsl.h](../../../../source/slang/emission/slang-emit-wgsl.h) /
+[slang-emit-wgsl.cpp](../../../../source/slang/emission/slang-emit-wgsl.cpp).
 Emits WGSL. It is the one backend that overrides both
 `supportsSwitchFallThrough` and `shouldEmitSwitchCaseTerminatingBreak`
 to `false`: WGSL `case` bodies never fall through, so the `break` Slang
@@ -209,8 +209,8 @@ dropped; early breaks inside a case are still emitted.
 
 ### C++
 
-[slang-emit-cpp.h](../../../../source/slang/slang-emit-cpp.h) /
-[slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp).
+[slang-emit-cpp.h](../../../../source/slang/emission/slang-emit-cpp.h) /
+[slang-emit-cpp.cpp](../../../../source/slang/emission/slang-emit-cpp.cpp).
 Emits C++ source, paired with the preludes
 [slang-cpp-prelude.h](../../../../prelude/slang-cpp-prelude.h),
 [slang-cpp-types-core.h](../../../../prelude/slang-cpp-types-core.h),
@@ -225,7 +225,7 @@ A compute entry point is not emitted as one function. The `IRFunc`
 itself becomes an internal workhorse emitted under a `_`-prefixed name
 (`_main_N`), because its signature cannot service a general-purpose
 call
-([slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)
+([slang-emit-cpp.cpp](../../../../source/slang/emission/slang-emit-cpp.cpp)
 line 1003). After the module body, three `SLANG_PRELUDE_EXPORT` shims
 are emitted around it (gated on `Stage::Compute` at line 2417), all sharing the signature
 `(varyingInput, void* entryPointParams, void* globalParams)`:
@@ -237,8 +237,8 @@ definitions, since the workhorse they call is not in the header.
 
 ### CUDA
 
-[slang-emit-cuda.h](../../../../source/slang/slang-emit-cuda.h) /
-[slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp).
+[slang-emit-cuda.h](../../../../source/slang/emission/slang-emit-cuda.h) /
+[slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp).
 Emits CUDA source. Prelude:
 [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h).
 
@@ -252,7 +252,7 @@ the pass is `collectGlobalUniformParameters`, see
 `extern "C" __constant__ GlobalParams_N SLANG_globalParams;` followed
 by a `#define` redirecting the original parameter name to
 `(&SLANG_globalParams)`
-([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)
+([slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp)
 line 421). A `RWStructuredBuffer` global therefore appears in the
 emitted CUDA as a field of `SLANG_globalParams`, not as a variable of
 its own. `emitFunctionPreambleImpl` (line 467) qualifies an entry
@@ -263,16 +263,16 @@ CUDA kernel or host decoration gets `__global__` or `__host__`
 
 ### Torch
 
-[slang-emit-torch.h](../../../../source/slang/slang-emit-torch.h) /
-[slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp).
+[slang-emit-torch.h](../../../../source/slang/emission/slang-emit-torch.h) /
+[slang-emit-torch.cpp](../../../../source/slang/emission/slang-emit-torch.cpp).
 Emits the PyTorch C++ glue used to bind Slang shaders into PyTorch
 extensions. Prelude:
 [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h).
 
 ### LLVM
 
-[slang-emit-llvm.h](../../../../source/slang/slang-emit-llvm.h) /
-[slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp).
+[slang-emit-llvm.h](../../../../source/slang/emission/slang-emit-llvm.h) /
+[slang-emit-llvm.cpp](../../../../source/slang/emission/slang-emit-llvm.cpp).
 Hands off to the JIT / native compilation path implemented in
 [source/slang-llvm/](../../../../source/slang-llvm). Which artefact it
 produces depends on the target: textual LLVM assembly for `HostLLVMIR` /
@@ -284,8 +284,8 @@ Helper header: [slang-llvm.h](../../../../prelude/slang-llvm.h).
 
 ### VM
 
-[slang-emit-vm.h](../../../../source/slang/slang-emit-vm.h) /
-[slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp).
+[slang-emit-vm.h](../../../../source/slang/emission/slang-emit-vm.h) /
+[slang-emit-vm.cpp](../../../../source/slang/emission/slang-emit-vm.cpp).
 `emitVMByteCodeForEntryPoints` builds a `VMByteCodeBuilder` from the
 linked IR — Slang's interpreter bytecode, used by the `slangi` tool and
 by `INTERPRET` tests, see [CLAUDE.md](../../../../CLAUDE.md). The
@@ -306,15 +306,15 @@ differs is the entry point reaching the emitter:
 `ByteCodeEmitter::emitEntryPoints` emits only entry points whose stage
 is `Stage::Dispatch` — the host stage `slangi` asks for — and skips
 every other stage
-([slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp) line
+([slang-emit-vm.cpp](../../../../source/slang/emission/slang-emit-vm.cpp) line
 1353). A shader-stage entry point compiled with `-target slangvm`
 therefore contributes no functions, nothing references the global
 parameter, and the diagnostic never fires.
 
 ### Slang round-trip
 
-[slang-emit-slang.h](../../../../source/slang/slang-emit-slang.h) /
-[slang-emit-slang.cpp](../../../../source/slang/slang-emit-slang.cpp)
+[slang-emit-slang.h](../../../../source/slang/emission/slang-emit-slang.h) /
+[slang-emit-slang.cpp](../../../../source/slang/emission/slang-emit-slang.cpp)
 declare `emitSlangDeclarationsForEntryPoints`, the hook for re-emitting
 Slang declarations from IR. At `source_commit` the implementation is a
 stub that produces an empty string. Its one caller is `emitHostVMCode`,
@@ -326,18 +326,18 @@ is serialized alongside the VM bytecode.
 The textual backends (HLSL, GLSL, Metal, WGSL, C++, CUDA, Torch)
 share most of their machinery:
 
-- [slang-emit-c-like.h](../../../../source/slang/slang-emit-c-like.h) /
-  [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+- [slang-emit-c-like.h](../../../../source/slang/emission/slang-emit-c-like.h) /
+  [slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
   — the base class `CLikeSourceEmitter`. It walks the IR,
   declares a virtual interface (`emitDeclaratorImpl`, `emitTypeImpl`,
   `emitOperandImpl`, ..., wrapped by the non-virtual `emitDeclarator`,
   `emitType`, `emitOperand`) for the per-target subclasses to override, and
   implements all the parts that the targets share.
-- [slang-emit-base.h](../../../../source/slang/slang-emit-base.h) /
-  [slang-emit-base.cpp](../../../../source/slang/slang-emit-base.cpp)
+- [slang-emit-base.h](../../../../source/slang/emission/slang-emit-base.h) /
+  [slang-emit-base.cpp](../../../../source/slang/emission/slang-emit-base.cpp)
   — `SourceEmitterBase`, the lowest common interface. Besides
   `CLikeSourceEmitter` it is also the base of `SPIRVEmitContext` in
-  [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
+  [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp)
   and of the SPIR-V legalization context, so the shared helpers
   (`getSpecializedValue`, `getVarLayout`, `extractBaseType`,
   `handleRequiredCapabilities`) are available on both paths. The LLVM
@@ -360,7 +360,7 @@ a module-scope temporary).
 
 ## Source-writer abstraction
 
-[slang-emit-source-writer.h](../../../../source/slang/slang-emit-source-writer.h)
+[slang-emit-source-writer.h](../../../../source/slang/emission/slang-emit-source-writer.h)
 declares `SourceWriter`, the buffer that all textual backends write
 into. Its features (visible in the header):
 
@@ -377,15 +377,15 @@ into. Its features (visible in the header):
   allocated on first use, giving `#line 12 0`, because GLSL has no
   file-name form of the directive. `None` and `SourceMap` emit no
   directive at all
-  ([slang-emit-source-writer.cpp](../../../../source/slang/slang-emit-source-writer.cpp)
+  ([slang-emit-source-writer.cpp](../../../../source/slang/emission/slang-emit-source-writer.cpp)
   lines 419 and 474).
 - A `SourceMap` companion for source-mapping debug information.
 
 ## Operator precedence and parenthesization
 
-[slang-emit-precedence.h](../../../../source/slang/slang-emit-precedence.h)
+[slang-emit-precedence.h](../../../../source/slang/emission/slang-emit-precedence.h)
 /
-[slang-emit-precedence.cpp](../../../../source/slang/slang-emit-precedence.cpp)
+[slang-emit-precedence.cpp](../../../../source/slang/emission/slang-emit-precedence.cpp)
 encode operator precedences for the textual targets, so emitted code is
 precedence-aware rather than minimally parenthesized. `maybeEmitParens`
 starts from the precedence comparison, then deliberately forces extra
@@ -396,7 +396,7 @@ combinations. Each backend asks the precedence helper before printing a
 binary or unary operator.
 
 The forcing looks at both sides of the pair
-([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+([slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
 line 760): an operand whose own operator is in that set is
 parenthesized whenever the outer context binds tighter than
 assignment, and *every* operand of an outer operator in that set is
@@ -454,13 +454,13 @@ prelude arrives as text, and that text is only an
 `slang-hlsl-prelude.h` include ever appears in emitted HLSL, and the
 `#pragma pack_matrix(...)` a reader sees at the top of it comes from
 `HLSLSourceEmitter::emitFrontMatterImpl`
-([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+([slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp)
 line 2534), not from the prelude.
 
 GLSL, Metal, WGSL, and SPIR-V have no `prelude/` header; the built-in
 vocabulary they rely on is emitted from their own backend files, as with
 the `kMetalBuiltinPrelude*` strings in
-[slang-emit-metal-prelude.cpp](../../../../source/slang/slang-emit-metal-prelude.cpp).
+[slang-emit-metal-prelude.cpp](../../../../source/slang/emission/slang-emit-metal-prelude.cpp).
 The preludes are introduced from the core-module side in
 [../cross-cutting/core-module.md](../cross-cutting/core-module.md).
 

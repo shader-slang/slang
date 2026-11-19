@@ -106,8 +106,8 @@ realizable (e.g. the exact spelling of a production, the diagnostic
 code emitted for a parse error). You may **not** mine them for
 behavioral claims that the doc does not make.
 
-- `source/slang/slang-parser.h`
-- `source/slang/slang-parser.cpp`
+- `source/slang/parser/slang-parser.h`
+- `source/slang/parser/slang-parser.cpp`
 - `source/compiler-core/slang-lexer.cpp`
 
 If you find yourself thinking "this would cover the branch at

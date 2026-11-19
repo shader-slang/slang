@@ -12,11 +12,11 @@
 // (no target code generation) and then walk the resulting `ModuleDecl`
 // directly.
 
-#include "slang/slang-ast-builder.h"
-#include "slang/slang-check-impl.h"
+#include "slang/ast/slang-ast-builder.h"
+#include "slang/ast/slang-syntax.h"
+#include "slang/semantic-checking/slang-check-impl.h"
 #include "slang/slang-mangle.h"
 #include "slang/slang-module.h"
-#include "slang/slang-syntax.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 

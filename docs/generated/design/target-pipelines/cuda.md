@@ -67,26 +67,26 @@ targets in those arms are documented on their own pages.
   per-module gate predicate it consults;
   `emitEntryPointsSourceFromIR` (line 2968) constructs the
   `CUDASourceEmitter` and emits CUDA C++ text.
-- [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)
+- [slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp)
   — `CUDASourceEmitter` implementation.
-- [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)
+- [slang-emit-cpp.cpp](../../../../source/slang/emission/slang-emit-cpp.cpp)
   — `CPPSourceEmitter` base class that `CUDASourceEmitter`
   inherits from.
-- [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+- [slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
   — shared C-like emitter base.
-- [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp)
+- [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp)
   — `lowerImmutableBufferLoadForCUDA` (line 403).
-- [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp)
+- [slang-ir-legalize-varying-params.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-varying-params.cpp)
   — `legalizeEntryPointVaryingParamsForCUDA` (line 2794) and
   `legalizeOptiXReportIntersectionsForCUDA` (line 2804).
-- [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp)
+- [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-optix-entry-point-uniforms.cpp)
   — `collectOptiXEntryPointUniformParams` (line 276).
-- [slang-ir-expand-autodiff-parameter-contexts.cpp](../../../../source/slang/slang-ir-expand-autodiff-parameter-contexts.cpp)
+- [slang-ir-expand-autodiff-parameter-contexts.cpp](../../../../source/slang/ir-passes/slang-ir-expand-autodiff-parameter-contexts.cpp)
   — `expandAutodiffParameterContexts` (line 262).
-- [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp)
+- [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp)
   — `removeTorchAndCUDAEntryPoints`, `removeTorchKernels`,
   `lowerBuiltinTypesForKernelEntryPoints`, `handleAutoBindNames`.
-- [slang-ir-synthesize-active-mask.cpp](../../../../source/slang/slang-ir-synthesize-active-mask.cpp)
+- [slang-ir-synthesize-active-mask.cpp](../../../../source/slang/ir-passes/slang-ir-synthesize-active-mask.cpp)
   — `synthesizeActiveMask`.
 - [slang-target-program.h](../../../../source/slang/slang-target-program.h)
   / [slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h)
@@ -165,22 +165,22 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `linkIR` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | Plain call at line 1050, not a `SLANG_PASS`. Its result feeds the first `calcRequiredLoweringPassSet` scan at line 1085. |
-| 2 | `validateAndRemoveAssumeAddress` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `reqSet.assumeAddress` (line 1087) | **`validate = false` for CUDA** (line 1088: `!isCPUTarget(targetRequest) && !isCUDATarget(targetRequest)`); contrast with HLSL / Metal / WGSL / SPIR-V which validate. |
-| 3 | `stripDebugInfo` | [slang-ir-strip-debug-info.cpp](../../../../source/slang/slang-ir-strip-debug-info.cpp) | `reqSet.debugInfo && DebugInfoLevel::None` (lines 1099-1100) | |
-| 4 | `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` | [slang-ir-lower-glsl-ssbo-types.cpp](../../../../source/slang/slang-ir-lower-glsl-ssbo-types.cpp) | `!isKhronosTarget && reqSet.glslSSBO` | CUDA is non-Khronos. |
-| 5 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | (always) | |
-| 6 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | |
-| 7 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
-| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | The coverage buffer is packed into `GlobalParams` for CUDA. The call (line 1351) forwards `counterByteWidth` (default `kDefaultCoverageCounterByteWidth = 8`) and `coverageBoolean` (default off). |
-| 9 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | (always) | |
-| 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
+| 1 | `linkIR` | [slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp) | (always) | Plain call at line 1050, not a `SLANG_PASS`. Its result feeds the first `calcRequiredLoweringPassSet` scan at line 1085. |
+| 2 | `validateAndRemoveAssumeAddress` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | `reqSet.assumeAddress` (line 1087) | **`validate = false` for CUDA** (line 1088: `!isCPUTarget(targetRequest) && !isCUDATarget(targetRequest)`); contrast with HLSL / Metal / WGSL / SPIR-V which validate. |
+| 3 | `stripDebugInfo` | [slang-ir-strip-debug-info.cpp](../../../../source/slang/ir-passes/slang-ir-strip-debug-info.cpp) | `reqSet.debugInfo && DebugInfoLevel::None` (lines 1099-1100) | |
+| 4 | `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` | [slang-ir-lower-glsl-ssbo-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-glsl-ssbo-types.cpp) | `!isKhronosTarget && reqSet.glslSSBO` | CUDA is non-Khronos. |
+| 5 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/ir-passes/slang-ir-transform-params-to-constref.cpp) | (always) | |
+| 6 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp) | (always) | |
+| 7 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/ir-passes/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
+| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/ir-passes/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | The coverage buffer is packed into `GlobalParams` for CUDA. The call (line 1351) forwards `counterByteWidth` (default `kDefaultCoverageCounterByteWidth = 8`) and `coverageBoolean` (default off). |
+| 9 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-collect-global-uniforms.cpp) | (always) | |
+| 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-decorations.cpp) | (always) | |
 | 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Line 801. |
-| 12 | `collectOptiXEntryPointUniformParams` | [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp) | `case CUDASource / CUDAHeader` (line 1400) | All CUDA targets (incl. final `PTX`, which runs as `CUDASource`). Replaces `collectEntryPointUniformParams`; `moveEntryPointUniformParamsToGlobalScope` and `removeTorchAndCUDAEntryPoints` are both skipped for these arms. |
-| 13 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` (line 1453) | **Material on CUDA.** Runs after entry-point uniform packing (where the coverage buffer is folded into `GlobalParams`, the struct `collectGlobalUniformParameters` builds at [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) line 145) to fill the `uniformOffset` / `uniformStride` fields of the coverage buffer's synthetic-resource record on the post-emit metadata, which the host runtime reads to bind the buffer at dispatch time. In emitted CUDA the buffer is a field of the `GlobalParams` struct that the emitter passes as `SLANG_globalParams` ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) line 428), mangled as `_slang_coverage_0` rather than the internal `__slang_coverage`; each entry is an atomic add in counting mode or a plain store of `1` under `-trace-coverage-boolean`. CUDA is one of only two targets that *diagnose* a failure here: when `tryGetCoverageUniformBindingInfo` finds no uniform layout and `isCPUTarget \|\| isCUDATarget`, the pass emits `Diagnostics::CoverageUniformLayoutUnavailable` (**`E45105`**, lines 1928-1931 of the pass file). Instrumentation is enabled by `TraceCoverage` / `TraceFunctionCoverage` / `TraceBranchCoverage` (slangc `-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`), read by `CodeGenContext::shouldTraceAnyCoverage` ([slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) line 1425-1431); `reqSet.coverageTracing` is set by the `kIROp_Increment*CoverageCounter` opcodes (slang-emit.cpp lines 614-618). |
-| 14 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/slang-ir-lower-l-value-cast.cpp) | `reqSet.lValueCast` (line 1473) | `kIROp_InOutImplicitCast` / `kIROp_OutImplicitCast` are front-end-only, so the flag cannot be a false negative. |
-| 15 | `specializeMatrixLayout` | [slang-ir-specialize-matrix-layout.cpp](../../../../source/slang/slang-ir-specialize-matrix-layout.cpp) | `reqSet.unresolvedMatrixLayout` (line 1479) | Runs before the first `simplifyIR`. The flag is set by a `kIROp_MatrixType` whose layout operand is missing or `SLANG_MATRIX_LAYOUT_MODE_UNKNOWN` (lines 662-671). |
-| 16 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` (line 1485) | The flag is also set by `kIROp_CastEnumToInt` / `kIROp_CastIntToEnum` / `kIROp_EnumCast`, so the pass still runs when constant folding removed the last live `IREnumType` but left a cast behind. |
+| 12 | `collectOptiXEntryPointUniformParams` | [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-optix-entry-point-uniforms.cpp) | `case CUDASource / CUDAHeader` (line 1400) | All CUDA targets (incl. final `PTX`, which runs as `CUDASource`). Replaces `collectEntryPointUniformParams`; `moveEntryPointUniformParamsToGlobalScope` and `removeTorchAndCUDAEntryPoints` are both skipped for these arms. |
+| 13 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/ir-passes/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` (line 1453) | **Material on CUDA.** Runs after entry-point uniform packing (where the coverage buffer is folded into `GlobalParams`, the struct `collectGlobalUniformParameters` builds at [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-collect-global-uniforms.cpp) line 145) to fill the `uniformOffset` / `uniformStride` fields of the coverage buffer's synthetic-resource record on the post-emit metadata, which the host runtime reads to bind the buffer at dispatch time. In emitted CUDA the buffer is a field of the `GlobalParams` struct that the emitter passes as `SLANG_globalParams` ([slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp) line 428), mangled as `_slang_coverage_0` rather than the internal `__slang_coverage`; each entry is an atomic add in counting mode or a plain store of `1` under `-trace-coverage-boolean`. CUDA is one of only two targets that *diagnose* a failure here: when `tryGetCoverageUniformBindingInfo` finds no uniform layout and `isCPUTarget \|\| isCUDATarget`, the pass emits `Diagnostics::CoverageUniformLayoutUnavailable` (**`E45105`**, lines 1928-1931 of the pass file). Instrumentation is enabled by `TraceCoverage` / `TraceFunctionCoverage` / `TraceBranchCoverage` (slangc `-trace-coverage`, `-trace-function-coverage`, `-trace-branch-coverage`), read by `CodeGenContext::shouldTraceAnyCoverage` ([slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) line 1425-1431); `reqSet.coverageTracing` is set by the `kIROp_Increment*CoverageCounter` opcodes (slang-emit.cpp lines 614-618). |
+| 14 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/ir-passes/slang-ir-lower-l-value-cast.cpp) | `reqSet.lValueCast` (line 1473) | `kIROp_InOutImplicitCast` / `kIROp_OutImplicitCast` are front-end-only, so the flag cannot be a false negative. |
+| 15 | `specializeMatrixLayout` | [slang-ir-specialize-matrix-layout.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-matrix-layout.cpp) | `reqSet.unresolvedMatrixLayout` (line 1479) | Runs before the first `simplifyIR`. The flag is set by a `kIROp_MatrixType` whose layout operand is missing or `SLANG_MATRIX_LAYOUT_MODE_UNKNOWN` (lines 662-671). |
+| 16 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` (line 1485) | The flag is also set by `kIROp_CastEnumToInt` / `kIROp_CastIntToEnum` / `kIROp_EnumCast`, so the pass still runs when constant folding removed the last live `IREnumType` but left a cast behind. |
 
 Filtered out for CUDA in this phase: the Host* arm of the
 `collectEntryPointUniformParams` switch and the CPP / LLVM arms
@@ -377,85 +377,85 @@ direct calls, not `SLANG_PASS` invocations.
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Line 1499, `defaultIRSimplificationOptions`. |
-| 2 | `validateUniformity` | [slang-ir-uniformity.cpp](../../../../source/slang/slang-ir-uniformity.cpp) | `getBoolOption(ValidateUniformity)` (line 1501) | |
-| 3 | `fuseCallsToSaturatedCooperation` | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/slang-ir-fuse-satcoop.cpp) | `!shouldPerformMinimumOptimizations` (line 1511) | |
-| 4 | `generateDerivativeWrappers` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `reqSet.derivativePyBindWrapper && case CUDASource / CUDAHeader / PyTorchCppBinding` (lines 1516-1521) | **CUDA/PyTorch only.** |
-| 5 | `checkAutodiffPatterns` | [slang-ir-check-differentiability.cpp](../../../../source/slang/slang-ir-check-differentiability.cpp) | `reqSet.autodiff` (line 1529) | |
-| 6 | `diagnoseCircularConformances` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | |
-| 7 | `specializeModule` | [slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) | `!isSpecializationDisabled()` (line 1556) | |
-| 8 | `specializeHigherOrderParameters` | [slang-ir-defunctionalization.cpp](../../../../source/slang/slang-ir-defunctionalization.cpp) | `reqSet.higherOrderFunc` | |
-| 9a | `finalizeAutoDiffPass` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1592) | Runs `processPairTypes`, `removeDetachInsts`, and `removeTypeAnnotations`; skipped entirely for modules with no autodiff IR. |
-| 9b | `stripAutoDiffDecorations` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `!reqSet.autodiff` (`else` arm, line 1598) | Runs *instead of* row 9a. Removes the `Export` / `HLSLExport` / `KeepAlive` pins on the linked-in `[__AutoDiffBuiltin]` core-module types so row 11's DCE can drop them. |
-| 10 | `lowerMatrixSwizzleStores` | [slang-ir-lower-matrix-swizzle-store.cpp](../../../../source/slang/slang-ir-lower-matrix-swizzle-store.cpp) | `reqSet.matrixSwizzleStore` | |
-| 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | |
-| 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) | (always) | |
-| 13 | `lowerDiffTypeInfoInsts` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1611) | Direct call at line 1612, not a `SLANG_PASS`; same flag as row 9a. |
-| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
-| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
-| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results, which requires Optional lowering first. |
-| 19 | `lowerBuiltinTypesForKernelEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line 1678) | **CUDA-arm + PyTorch arm.** Strips Slang shader types from kernel signatures. |
-| 20 | `removeTorchKernels` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line 1679) | Removes any PyTorch entry points still present. |
-| 21 | `handleAutoBindNames` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line 1680) | |
-| 22 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | |
-| 23 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | `removeAvailableInDownstreamIR` | |
-| 24 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
-| 25 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
-| 26 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
-| 27 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `shouldRunNonEssentialValidation() && reqSet.missingReturn` (lines 1693, 1699) | Called with `SLANG_LANGUAGE_VERSION_UNKNOWN` as the language-version argument. |
-| 28 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
-| 29 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | |
-| 30 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
+| 1 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | (always) | Line 1499, `defaultIRSimplificationOptions`. |
+| 2 | `validateUniformity` | [slang-ir-uniformity.cpp](../../../../source/slang/ir-passes/slang-ir-uniformity.cpp) | `getBoolOption(ValidateUniformity)` (line 1501) | |
+| 3 | `fuseCallsToSaturatedCooperation` | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/ir-passes/slang-ir-fuse-satcoop.cpp) | `!shouldPerformMinimumOptimizations` (line 1511) | |
+| 4 | `generateDerivativeWrappers` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `reqSet.derivativePyBindWrapper && case CUDASource / CUDAHeader / PyTorchCppBinding` (lines 1516-1521) | **CUDA/PyTorch only.** |
+| 5 | `checkAutodiffPatterns` | [slang-ir-check-differentiability.cpp](../../../../source/slang/ir-passes/slang-ir-check-differentiability.cpp) | `reqSet.autodiff` (line 1529) | |
+| 6 | `diagnoseCircularConformances` | [slang-ir-any-value-inference.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-inference.cpp) | (always) | |
+| 7 | `specializeModule` | [slang-ir-specialize.cpp](../../../../source/slang/ir-passes/slang-ir-specialize.cpp) | `!isSpecializationDisabled()` (line 1556) | |
+| 8 | `specializeHigherOrderParameters` | [slang-ir-defunctionalization.cpp](../../../../source/slang/ir-passes/slang-ir-defunctionalization.cpp) | `reqSet.higherOrderFunc` | |
+| 9a | `finalizeAutoDiffPass` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1592) | Runs `processPairTypes`, `removeDetachInsts`, and `removeTypeAnnotations`; skipped entirely for modules with no autodiff IR. |
+| 9b | `stripAutoDiffDecorations` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `!reqSet.autodiff` (`else` arm, line 1598) | Runs *instead of* row 9a. Removes the `Export` / `HLSLExport` / `KeepAlive` pins on the linked-in `[__AutoDiffBuiltin]` core-module types so row 11's DCE can drop them. |
+| 10 | `lowerMatrixSwizzleStores` | [slang-ir-lower-matrix-swizzle-store.cpp](../../../../source/slang/ir-passes/slang-ir-lower-matrix-swizzle-store.cpp) | `reqSet.matrixSwizzleStore` | |
+| 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | |
+| 12 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../../source/slang/ir-passes/slang-ir-specialize.cpp) | (always) | |
+| 13 | `lowerDiffTypeInfoInsts` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1611) | Direct call at line 1612, not a `SLANG_PASS`; same flag as row 9a. |
+| 14 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 15 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/ir-passes/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 16 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../../source/slang/ir-passes/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
+| 17 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results, which requires Optional lowering first. |
+| 19 | `lowerBuiltinTypesForKernelEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line 1678) | **CUDA-arm + PyTorch arm.** Strips Slang shader types from kernel signatures. |
+| 20 | `removeTorchKernels` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line 1679) | Removes any PyTorch entry points still present. |
+| 21 | `handleAutoBindNames` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp) | `case CUDASource / CUDAHeader` (line 1680) | |
+| 22 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../../source/slang/ir-passes/slang-ir-detect-uninitialized-resources.cpp) | (always) | |
+| 23 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/ir-passes/slang-ir-redundancy-removal.cpp) | `removeAvailableInDownstreamIR` | |
+| 24 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/ir-passes/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
+| 25 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/ir-passes/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
+| 26 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/ir-passes/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
+| 27 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/ir-passes/slang-ir-missing-return.cpp) | `shouldRunNonEssentialValidation() && reqSet.missingReturn` (lines 1693, 1699) | Called with `SLANG_LANGUAGE_VERSION_UNKNOWN` as the language-version argument. |
+| 28 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/ir-passes/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
+| 29 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-inference.cpp) | (always) | |
+| 30 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/ir-passes/slang-ir-strip-legalization-insts.cpp) | (always) | |
 | 31 | `lowerSumVectorMatrixInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `reqSet.sumVectorMatrix` (line 1737) | Defined in `slang-emit.cpp` (line 924). `kIROp_SumVectorElements` / `kIROp_SumMatrixElements` are produced only by the autodiff transpose pass, which runs before the line-1666 scan. |
-| 32a | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` (line 1740) | `minimalOptimization` comes from `CompilerOptionName::MinimumSlangOptimization`, read through `CompilerOptionSet::shouldPerformMinimumOptimizations()` ([slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h) line 386) and copied onto `fastIRSimplificationOptions` at lines 1493-1494; the `slangc` spelling is `-minimum-slang-optimization`. The same flag selects rows 32b, 51a-51c, 64a/64b, and Phase C row 24. |
-| 32b | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `else if (requiredLoweringPassSet.generics)` (line 1744) | Runs *instead of* row 32a in minimal-optimization mode, and only when the module had generics to specialize; otherwise neither row runs. |
-| 33 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.taggedUnion` (line 1757) | When it returns `true` it sets `reqSet.reinterpret`, which selects row 35; skipping the pass therefore also leaves `reinterpret` untouched. |
-| 34 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.untaggedUnion` (line 1763) | |
-| 35 | `lowerReinterpret` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.reinterpret` | |
-| 36 | `lowerSequentialIDTagCasts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
-| 37 | `lowerTagInsts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagOps` (line 1770) | |
-| 38 | `lowerTagTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagType` (line 1772) | |
-| 39 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | |
-| 40 | `lowerExistentials` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
-| 41 | `removeWeakUseInsts` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | (always) | |
-| 42 | `performTypeInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `!ArtifactDescUtil::isCpuLikeTarget(artifactDesc)` (line 1790) | **Runs for CUDA.** A CUDA source/header artifact is `Kind::Source` with payload `CUDA`, and the predicate accepts only `C` / `Cpp` for source kinds, so CUDA is not CPU-like. Inlines so that string calls/returns reduce to `getStringHash(stringLiteral)`. |
-| 43 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always, direct call at line 1804) | |
-| 44 | `checkGetStringHashInsts` | [slang-ir-string-hash.cpp](../../../../source/slang/slang-ir-string-hash.cpp) | `!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) && shouldRunNonEssentialValidation()` (lines 1806-1807) | **Runs for CUDA** whenever non-essential validation is enabled; verifies row 42 left every `getStringHash` operand a string literal. |
-| 45 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/slang-ir-lower-tuple-types.cpp) | (always) | |
-| 46 | `expandAutodiffParameterContexts` | [slang-ir-expand-autodiff-parameter-contexts.cpp](../../../../source/slang/slang-ir-expand-autodiff-parameter-contexts.cpp) | `target == CodeGenTarget::CUDASource \|\| isMetalTarget(target)` (line 1821) | Exposes captured autodiff parameter contexts as separate arguments of internal derivative functions. Not run for `CUDAHeader`. |
-| 47 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | (always) | |
-| 48 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` | |
-| 49 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | `case CUDASource && !targetCaps.implies(optix_coopvec)` (lines 1857-1861); **`CUDAHeader` runs it unconditionally via the `default` arm (line 1865)** | For `CUDASource` (and final `PTX`, which runs as `CUDASource`) it fires only when OptiX hardware cooperative-vector support is absent; `CUDAHeader` always runs it. |
-| 50 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
-| 51a | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 1875) | Minimal-optimization arm (call at line 1882): cleans up dead branches revealed by force-inlining so dead `static_assert`s do not falsely fire. |
-| 51b | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 1887) | Paired with row 51a. |
-| 51c | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` (else arm, line 1891) | The alternative to rows 51a/51b. |
-| 52 | `threadSwitchOnConstantPhi` | [slang-ir-thread-switch-on-constant-phi.cpp](../../../../source/slang/slang-ir-thread-switch-on-constant-phi.cpp) | (always) | Line 1900, outside the optimization-level branch, so it runs at every optimization level. |
-| 53 | `legalizeOptiXReportIntersectionsForCUDA` | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) | `target == CUDASource \|\| target == CUDAHeader` (line 1902) | Flattens the `ReportHit` attribute aggregate into scalar OptiX attribute registers; see [Notable passes](#legalizeoptixreportintersectionsforcuda). |
-| 54 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` (line 1936) | `HLSLAppendStructuredBuffer` / `HLSLConsumeStructuredBuffer` are front-end-only types, so the flag cannot be a false negative. |
-| - | *(skip)* `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp) | `default` arm of the switch at line 1941 breaks unless `isCpuLikeTarget(artifactDesc)` (line 1944) | Never reached on CUDA: the named cases are HLSL / Metal* / WGSL, and CUDA is not CPU-like, so the `reqSet.combinedTextureSamplers` test at line 1952 is not evaluated. |
-| 55 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | `getBoolOption(CompilerOptionName::VulkanEmitReflection)` (line 1957) | No CUDA-excluding gate: runs for CUDA whenever `VulkanEmitReflection` is set. |
-| 56 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | |
-| 57 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/slang-ir-legalize-vector-types.cpp) | (always) | |
-| 58 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | `target == CUDASource \|\| (isCPUTarget && isKernelTarget) \|\| shouldLegalizeExistentialAndResourceTypes` (lines 1974-1976) | **Forced for `CUDASource`** (and final `PTX`, which runs as `CUDASource`) to avoid dynamic `__device__` initialization (rejected by nvrtc); `CUDAHeader` skips it because `shouldLegalizeExistentialAndResourceTypes` is `false` for CUDA. |
-| - | *(skip)* `legalizeRayTracingPayloads` | [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | Call at line 1989 sits inside the skipped block. |
-| - | *(skip)* `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | CUDA's C++ template system handles existentials. |
-| - | *(skip)* `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | CUDA's resource handles are direct CUDA types. |
-| 59 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `!shouldLegalizeExistentialAndResourceTypes` (else branch at line 2069) | Eliminates empty types not part of the public interface. |
-| 60 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` (line 2078) | Runs before entry-point cloning so the ordinary clone contains the same input setup. |
-| 61 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | Line 2085; separates launch functions from ordinary callees before initializers are injected, which also lets later CUDA active-mask synthesis distinguish a launch from a call in divergent control flow. |
-| 62 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | (always) | Line 2091, `(targetProgram, sink)`; followed by an error-count check that returns `SLANG_FAIL`. |
-| 63 | `legalizeResourceGlobalVars` | [slang-ir-legalize-resource-globals.cpp](../../../../source/slang/slang-ir-legalize-resource-globals.cpp) | (always) | Line 2099; replaces selected mutable resource globals with locals and generated parameters; followed by an error-count check. |
-| 64a | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 2132) | Minimal-optimization arm; the mutually exclusive alternative to row 64b. |
-| 64b | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `else` arm of the same test (line 2135) | Cleans up temporaries created by specialization and type legalization. |
-| 65 | `lowerUntypedResourceHandleToUInt` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.untypedResourceHandle` (line 2143) | Ensures no untyped `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` handle survives to emit; lowers any the peephole did not already collapse to its `uint` index. |
-| 66 | `lowerDynamicResourceHeap` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.dynamicResourceHeap` (line 2146) | |
-| 67 | `specializeResourceUsage` | [slang-ir-specialize-resources.cpp](../../../../source/slang/slang-ir-specialize-resources.cpp) | (always) | |
-| 68 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always) | |
-| 69 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
-| 70 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | |
+| 32a | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` (line 1740) | `minimalOptimization` comes from `CompilerOptionName::MinimumSlangOptimization`, read through `CompilerOptionSet::shouldPerformMinimumOptimizations()` ([slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h) line 386) and copied onto `fastIRSimplificationOptions` at lines 1493-1494; the `slangc` spelling is `-minimum-slang-optimization`. The same flag selects rows 32b, 51a-51c, 64a/64b, and Phase C row 24. |
+| 32b | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `else if (requiredLoweringPassSet.generics)` (line 1744) | Runs *instead of* row 32a in minimal-optimization mode, and only when the module had generics to specialize; otherwise neither row runs. |
+| 33 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.taggedUnion` (line 1757) | When it returns `true` it sets `reqSet.reinterpret`, which selects row 35; skipping the pass therefore also leaves `reinterpret` untouched. |
+| 34 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.untaggedUnion` (line 1763) | |
+| 35 | `lowerReinterpret` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/ir-passes/slang-ir-lower-reinterpret.cpp) | `reqSet.reinterpret` | |
+| 36 | `lowerSequentialIDTagCasts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
+| 37 | `lowerTagInsts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagOps` (line 1770) | |
+| 38 | `lowerTagTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagType` (line 1772) | |
+| 39 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | |
+| 40 | `lowerExistentials` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
+| 41 | `removeWeakUseInsts` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/ir-passes/slang-ir-redundancy-removal.cpp) | (always) | |
+| 42 | `performTypeInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | `!ArtifactDescUtil::isCpuLikeTarget(artifactDesc)` (line 1790) | **Runs for CUDA.** A CUDA source/header artifact is `Kind::Source` with payload `CUDA`, and the predicate accepts only `C` / `Cpp` for source kinds, so CUDA is not CPU-like. Inlines so that string calls/returns reduce to `getStringHash(stringLiteral)`. |
+| 43 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always, direct call at line 1804) | |
+| 44 | `checkGetStringHashInsts` | [slang-ir-string-hash.cpp](../../../../source/slang/ir-passes/slang-ir-string-hash.cpp) | `!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) && shouldRunNonEssentialValidation()` (lines 1806-1807) | **Runs for CUDA** whenever non-essential validation is enabled; verifies row 42 left every `getStringHash` operand a string literal. |
+| 45 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-tuple-types.cpp) | (always) | |
+| 46 | `expandAutodiffParameterContexts` | [slang-ir-expand-autodiff-parameter-contexts.cpp](../../../../source/slang/ir-passes/slang-ir-expand-autodiff-parameter-contexts.cpp) | `target == CodeGenTarget::CUDASource \|\| isMetalTarget(target)` (line 1821) | Exposes captured autodiff parameter contexts as separate arguments of internal derivative functions. Not run for `CUDAHeader`. |
+| 47 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-marshalling.cpp) | (always) | |
+| 48 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` | |
+| 49 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/ir-passes/slang-ir-lower-coopvec.cpp) | `case CUDASource && !targetCaps.implies(optix_coopvec)` (lines 1857-1861); **`CUDAHeader` runs it unconditionally via the `default` arm (line 1865)** | For `CUDASource` (and final `PTX`, which runs as `CUDASource`) it fires only when OptiX hardware cooperative-vector support is absent; `CUDAHeader` always runs it. |
+| 50 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | (always) | |
+| 51a | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/ir-passes/slang-ir-sccp.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 1875) | Minimal-optimization arm (call at line 1882): cleans up dead branches revealed by force-inlining so dead `static_assert`s do not falsely fire. |
+| 51b | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 1887) | Paired with row 51a. |
+| 51c | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!fastIRSimplificationOptions.minimalOptimization` (else arm, line 1891) | The alternative to rows 51a/51b. |
+| 52 | `threadSwitchOnConstantPhi` | [slang-ir-thread-switch-on-constant-phi.cpp](../../../../source/slang/ir-passes/slang-ir-thread-switch-on-constant-phi.cpp) | (always) | Line 1900, outside the optimization-level branch, so it runs at every optimization level. |
+| 53 | `legalizeOptiXReportIntersectionsForCUDA` | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-varying-params.cpp) | `target == CUDASource \|\| target == CUDAHeader` (line 1902) | Flattens the `ReportHit` attribute aggregate into scalar OptiX attribute registers; see [Notable passes](#legalizeoptixreportintersectionsforcuda). |
+| 54 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/ir-passes/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` (line 1936) | `HLSLAppendStructuredBuffer` / `HLSLConsumeStructuredBuffer` are front-end-only types, so the flag cannot be a false negative. |
+| - | *(skip)* `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/ir-passes/slang-ir-lower-combined-texture-sampler.cpp) | `default` arm of the switch at line 1941 breaks unless `isCpuLikeTarget(artifactDesc)` (line 1944) | Never reached on CUDA: the named cases are HLSL / Metal* / WGSL, and CUDA is not CPU-like, so the `reqSet.combinedTextureSamplers` test at line 1952 is not evaluated. |
+| 55 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/ir-passes/slang-ir-user-type-hint.cpp) | `getBoolOption(CompilerOptionName::VulkanEmitReflection)` (line 1957) | No CUDA-excluding gate: runs for CUDA whenever `VulkanEmitReflection` is set. |
+| 56 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-empty-array.cpp) | (always) | |
+| 57 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-vector-types.cpp) | (always) | |
+| 58 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-global-values.cpp) | `target == CUDASource \|\| (isCPUTarget && isKernelTarget) \|\| shouldLegalizeExistentialAndResourceTypes` (lines 1974-1976) | **Forced for `CUDASource`** (and final `PTX`, which runs as `CUDASource`) to avoid dynamic `__device__` initialization (rejected by nvrtc); `CUDAHeader` skips it because `shouldLegalizeExistentialAndResourceTypes` is `false` for CUDA. |
+| - | *(skip)* `legalizeRayTracingPayloads` | [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | Call at line 1989 sits inside the skipped block. |
+| - | *(skip)* `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | CUDA's C++ template system handles existentials. |
+| - | *(skip)* `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | CUDA's resource handles are direct CUDA types. |
+| 59 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | `!shouldLegalizeExistentialAndResourceTypes` (else branch at line 2069) | Eliminates empty types not part of the public interface. |
+| 60 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/ir-passes/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` (line 2078) | Runs before entry-point cloning so the ordinary clone contains the same input setup. |
+| 61 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/ir-passes/slang-ir-fix-entrypoint-callsite.cpp) | (always) | Line 2085; separates launch functions from ordinary callees before initializers are injected, which also lets later CUDA active-mask synthesis distinguish a launch from a call in divergent control flow. |
+| 62 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/ir-passes/slang-ir-explicit-global-init.cpp) | (always) | Line 2091, `(targetProgram, sink)`; followed by an error-count check that returns `SLANG_FAIL`. |
+| 63 | `legalizeResourceGlobalVars` | [slang-ir-legalize-resource-globals.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-resource-globals.cpp) | (always) | Line 2099; replaces selected mutable resource globals with locals and generated parameters; followed by an error-count check. |
+| 64a | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 2132) | Minimal-optimization arm; the mutually exclusive alternative to row 64b. |
+| 64b | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `else` arm of the same test (line 2135) | Cleans up temporaries created by specialization and type legalization. |
+| 65 | `lowerUntypedResourceHandleToUInt` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.untypedResourceHandle` (line 2143) | Ensures no untyped `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` handle survives to emit; lowers any the peephole did not already collapse to its `uint` index. |
+| 66 | `lowerDynamicResourceHeap` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.dynamicResourceHeap` (line 2146) | |
+| 67 | `specializeResourceUsage` | [slang-ir-specialize-resources.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-resources.cpp) | (always) | |
+| 68 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-buffer-load-arg.cpp) | (always) | |
+| 69 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/ir-passes/slang-ir-defer-buffer-load.cpp) | (always) | |
+| 70 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-arrays.cpp) | (always) | |
 | 71 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct call (line 2178), not `SLANG_PASS`. Processes `static_assert` after specialization, when the information it needs is available. |
 
 Filtered out for CUDA in this phase: `legalizeNonVectorCompositeSelect`
@@ -552,42 +552,42 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` (line 2209) | CUDA uses **default** options (CUDA is in the `default` arm of both byte-address-buffer switches, at lines 2218 and 2294). The flag is set by `kIROp_ByteAddressBufferLoad` / `Store` and, through the `IRByteAddressBufferTypeBase` check (line 446), by any byte-address buffer type. |
-| 2 | `validateAtomicOperations` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2342) | `skipFuncParamValidation = true`. |
-| 3 | `synthesizeActiveMask` | [slang-ir-synthesize-active-mask.cpp](../../../../source/slang/slang-ir-synthesize-active-mask.cpp) | `case CUDASource / CUDAHeader / PTX` (cases at lines 2354-2356, pass at line 2358) | **CUDA-only.** Replaces implicit active-mask references with an explicit warp-mask parameter. |
-| 4 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` (line 2382) | Runs after `specializeResourceUsage`, so interpolation operations inlined into an entry point are resolved while varying parameters still have their original address representation. |
-| 5 | `legalizeEntryPointVaryingParamsForCUDA` | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) | `case CUDASource / CUDAHeader` (cases at lines 2439-2440, pass at line 2442) | **CUDA-only.** Also performs the OptiX terminate-inlining step described under [Notable passes](#legalizeentrypointvaryingparamsforcuda). |
-| 6 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (line 2460; true for CUDA) | Runs for every non-SPIR-V target with `NonUniformResourceIndexFloatMode::Textual`, before the narrower four-way `legalizeLogicalAndOr` gate. |
-| 7 | `undoParameterCopy` | [slang-ir-undo-param-copy.cpp](../../../../source/slang/slang-ir-undo-param-copy.cpp) | (CPU / CUDA / Metal arm; cases at lines 2517-2521, pass at line 2524) | Removes explicit `inout` copy-in / copy-out wrappers in favor of pass-by-pointer. |
-| 8 | `introduceExplicitGlobalContext` | [slang-ir-explicit-global-context.cpp](../../../../source/slang/slang-ir-explicit-global-context.cpp) | (same arm, reached by `[[fallthrough]]` from row 7; line 2530) | `target = CUDASource / CUDAHeader`. |
-| 9 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
-| 10 | `validateVectorsAndMatrices` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | |
-| 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | |
-| 12 | `processLateRequireCapabilityInsts` | [slang-ir-late-require-capability.cpp](../../../../source/slang/slang-ir-late-require-capability.cpp) | `reqSet.lateRequireCapability` (line 2592) | Gated on the presence of `kIROp_LateRequireCapability`; with no such inst the pass is a pure no-op and no diagnostic is lost. |
-| 13 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/slang-ir-cleanup-void.cpp) | (always) | First invocation (line 2595); the second is row 26. |
-| 14 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` | |
-| 15 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | Rare for CUDA. |
-| 16 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
-| 17 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always; pass at line 2648) | `loweringPolicyKind = Default` for CUDA. The policy is selected by a four-way branch at lines 2636-2647: `WGSL` (WGPU), `KhronosTarget`, `Metal` (when `isMetalTarget`), else `Default`. CUDA matches none of the named branches and falls through to `Default`. |
-| 18 | `legalizeMatrixTypes` | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/slang-ir-legalize-matrix-types.cpp) | (always) | Line 2674. Shared-pipeline ordering (runs after row 17 so int/uint/bool matrices are still matrices when buffer element types are lowered); CUDA is not in `targetLegalizesMatrixTypes`, so no CUDA matrix is rewritten here. |
-| 19 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | `(isCPUTarget && !isCPUTargetViaLLVM) \|\| isCUDATarget \|\| isMetalTarget` (lines 2682-2683) | Struct and array parameters to const-ref for performance; runs after row 18 because the pass does not transform matrix parameters. |
-| 20 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (line 2690; true for CUDA) | Runs after row 18 because a function returning an int/uint/bool matrix returns an array once the matrix is lowered (shared ordering; no matrix is lowered on CUDA). |
-| 21 | `lowerImmutableBufferLoadForCUDA` | [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) | `isCUDATarget(targetRequest)` (line 2724, pass at line 2726) | **CUDA-only.** Translates eligible immutable global-memory loads to `__ldg`; direct fields of the emitted `__constant__` global parameter group are excluded. |
-| 22 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
-| 23 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
-| 24 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (line 2738) | With `removeTrivialSingleIterationLoops = true`. |
-| 25 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always; line 2754) | Second invocation (the first ran in Phase B's else branch). |
-| 26 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/slang-ir-cleanup-void.cpp) | (always; line 2760) | Second invocation: empty-type legalization can introduce new void placeholders that the earlier cleanup (row 13) did not see. |
-| 27 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` (via `isEnabled(livenessMode)`, line 2782) | Inserts `IRLiveRangeStart` markers (line 2784) immediately before `eliminatePhis` (line 2794). |
-| 28 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options.** |
-| 29 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeEnd` markers (line 2800) after phi elimination. |
-| 30 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Line 2839. |
-| 31 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2914; true for CUDA) | |
-| 32 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` (lines 2930-2934) | OptiX cooperative-vector capability fires this. |
+| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` (line 2209) | CUDA uses **default** options (CUDA is in the `default` arm of both byte-address-buffer switches, at lines 2218 and 2294). The flag is set by `kIROp_ByteAddressBufferLoad` / `Store` and, through the `IRByteAddressBufferTypeBase` check (line 446), by any byte-address buffer type. |
+| 2 | `validateAtomicOperations` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2342) | `skipFuncParamValidation = true`. |
+| 3 | `synthesizeActiveMask` | [slang-ir-synthesize-active-mask.cpp](../../../../source/slang/ir-passes/slang-ir-synthesize-active-mask.cpp) | `case CUDASource / CUDAHeader / PTX` (cases at lines 2354-2356, pass at line 2358) | **CUDA-only.** Replaces implicit active-mask references with an explicit warp-mask parameter. |
+| 4 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/ir-passes/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` (line 2382) | Runs after `specializeResourceUsage`, so interpolation operations inlined into an entry point are resolved while varying parameters still have their original address representation. |
+| 5 | `legalizeEntryPointVaryingParamsForCUDA` | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-varying-params.cpp) | `case CUDASource / CUDAHeader` (cases at lines 2439-2440, pass at line 2442) | **CUDA-only.** Also performs the OptiX terminate-inlining step described under [Notable passes](#legalizeentrypointvaryingparamsforcuda). |
+| 6 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/ir-passes/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (line 2460; true for CUDA) | Runs for every non-SPIR-V target with `NonUniformResourceIndexFloatMode::Textual`, before the narrower four-way `legalizeLogicalAndOr` gate. |
+| 7 | `undoParameterCopy` | [slang-ir-undo-param-copy.cpp](../../../../source/slang/ir-passes/slang-ir-undo-param-copy.cpp) | (CPU / CUDA / Metal arm; cases at lines 2517-2521, pass at line 2524) | Removes explicit `inout` copy-in / copy-out wrappers in favor of pass-by-pointer. |
+| 8 | `introduceExplicitGlobalContext` | [slang-ir-explicit-global-context.cpp](../../../../source/slang/ir-passes/slang-ir-explicit-global-context.cpp) | (same arm, reached by `[[fallthrough]]` from row 7; line 2530) | `target = CUDASource / CUDAHeader`. |
+| 9 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/ir-passes/slang-ir-strip-legalization-insts.cpp) | (always) | |
+| 10 | `validateVectorsAndMatrices` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | (always) | |
+| 11 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | |
+| 12 | `processLateRequireCapabilityInsts` | [slang-ir-late-require-capability.cpp](../../../../source/slang/ir-passes/slang-ir-late-require-capability.cpp) | `reqSet.lateRequireCapability` (line 2592) | Gated on the presence of `kIROp_LateRequireCapability`; with no such inst the pass is a pure no-op and no diagnostic is lost. |
+| 13 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/ir-passes/slang-ir-cleanup-void.cpp) | (always) | First invocation (line 2595); the second is row 26. |
+| 14 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/ir-passes/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` | |
+| 15 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | Rare for CUDA. |
+| 16 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/ir-passes/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
+| 17 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp) | (always; pass at line 2648) | `loweringPolicyKind = Default` for CUDA. The policy is selected by a four-way branch at lines 2636-2647: `WGSL` (WGPU), `KhronosTarget`, `Metal` (when `isMetalTarget`), else `Default`. CUDA matches none of the named branches and falls through to `Default`. |
+| 18 | `legalizeMatrixTypes` | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-matrix-types.cpp) | (always) | Line 2674. Shared-pipeline ordering (runs after row 17 so int/uint/bool matrices are still matrices when buffer element types are lowered); CUDA is not in `targetLegalizesMatrixTypes`, so no CUDA matrix is rewritten here. |
+| 19 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/ir-passes/slang-ir-transform-params-to-constref.cpp) | `(isCPUTarget && !isCPUTargetViaLLVM) \|\| isCUDATarget \|\| isMetalTarget` (lines 2682-2683) | Struct and array parameters to const-ref for performance; runs after row 18 because the pass does not transform matrix parameters. |
+| 20 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (line 2690; true for CUDA) | Runs after row 18 because a function returning an int/uint/bool matrix returns an array once the matrix is lowered (shared ordering; no matrix is lowered on CUDA). |
+| 21 | `lowerImmutableBufferLoadForCUDA` | [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp) | `isCUDATarget(targetRequest)` (line 2724, pass at line 2726) | **CUDA-only.** Translates eligible immutable global-memory loads to `__ldg`; direct fields of the emitted `__constant__` global parameter group are excluded. |
+| 22 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | (always) | |
+| 23 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/ir-passes/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
+| 24 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (line 2738) | With `removeTrivialSingleIterationLoops = true`. |
+| 25 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | (always; line 2754) | Second invocation (the first ran in Phase B's else branch). |
+| 26 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/ir-passes/slang-ir-cleanup-void.cpp) | (always; line 2760) | Second invocation: empty-type legalization can introduce new void placeholders that the earlier cleanup (row 13) did not see. |
+| 27 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` (via `isEnabled(livenessMode)`, line 2782) | Inserts `IRLiveRangeStart` markers (line 2784) immediately before `eliminatePhis` (line 2794). |
+| 28 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.cpp) | (always) | **Default options.** |
+| 29 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeEnd` markers (line 2800) after phi elimination. |
+| 30 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | (always) | Line 2839. |
+| 31 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/ir-passes/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2914; true for CUDA) | |
+| 32 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/ir-passes/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` (lines 2930-2934) | OptiX cooperative-vector capability fires this. |
 | 33 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` (line 2940) | Static helper (line 753). |
-| 34 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Called as `collectMetadata(targetProgram, *metadata)` (line 2955) so metadata collection can consult the layout. When the target caps imply `descriptor_handle` (and `target != PyTorchCppBinding`), the preceding block (lines 2945-2954) forces `targetProgram->getOrCreateLayout(sink)` first; an ordinary CUDA target skips that step. |
-| 35 | `checkUnsupportedResourceLocals` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | (always) | Line 2959. Its header documents that it diagnoses only compiled D3D and Metal output, so it has no effect on CUDA. |
-| 36 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` (line 2960) | |
+| 34 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/ir-passes/slang-ir-metadata.cpp) | (always) | Called as `collectMetadata(targetProgram, *metadata)` (line 2955) so metadata collection can consult the layout. When the target caps imply `descriptor_handle` (and `target != PyTorchCppBinding`), the preceding block (lines 2945-2954) forces `targetProgram->getOrCreateLayout(sink)` first; an ordinary CUDA target skips that step. |
+| 35 | `checkUnsupportedResourceLocals` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/ir-passes/slang-ir-check-unsupported-inst.cpp) | (always) | Line 2959. Its header documents that it diagnoses only compiled D3D and Metal output, so it has no effect on CUDA. |
+| 36 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/ir-passes/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` (line 2960) | |
 
 Filtered out for CUDA in this phase: the CPU-LLVM
 `lowerCPUResourceTypes`; the GLSL / SPIR-V / WGSL / Metal / CPU
@@ -618,7 +618,7 @@ Metal pointer-lowering block (lines 2870-2906).
 Phase D begins immediately after `linkAndOptimizeIR` returns. The
 emitter dispatched here is `CUDASourceEmitter` (constructed at
 line 3063 of `slang-emit.cpp`), which inherits from
-`CPPSourceEmitter` ([slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp))
+`CPPSourceEmitter` ([slang-emit-cpp.cpp](../../../../source/slang/emission/slang-emit-cpp.cpp))
 because CUDA source is a superset of C++. The emitter walks the
 IR and writes CUDA C++ text. For `PTX`, the downstream chain
 hands the text to nvrtc (the NVIDIA runtime compiler) or the
@@ -646,13 +646,13 @@ worth knowing when reading emitted CUDA:
   The diagnostic is a **warning**, `E56005` (`'precise' qualifier
   is not supported on target 'cuda'`): `emitTempModifiers`
   diagnoses and returns without writing anything
-  ([slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)
+  ([slang-emit-cpp.cpp](../../../../source/slang/emission/slang-emit-cpp.cpp)
   line 1305-1314), so the qualifier is dropped, the temporary and
   its value are still emitted, and the compile continues.
   Only the HLSL and GLSL C-like emitters emit the qualifier.
 
 `CUDASourceEmitter` also overrides `emitFrontMatterImpl`
-([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)):
+([slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp)):
 when the floating-point mode is `FloatingPointMode::Fast` it writes
 `#define SLANG_CUDA_ENABLE_FAST_MATH 1` before the prelude, which
 gates the prelude's transcendental wrappers. For
@@ -682,11 +682,11 @@ flowchart TD
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Defined at line 2968; sets `shouldLegalizeExistentialAndResourceTypes = false` for the CUDA source language at line 3108. |
-| 2 | `new CUDASourceEmitter` | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) | `case SourceLanguage::CUDA` (line 3061) | Constructed at line 3063. |
-| 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) | (always) | Line 3092. |
+| 2 | `new CUDASourceEmitter` | [slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp) | `case SourceLanguage::CUDA` (line 3061) | Constructed at line 3063. |
+| 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp) | (always) | Line 3092. |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C (line 3112). |
-| 5 | `simplifyForEmit` | [slang-ir-simplify-for-emit.cpp](../../../../source/slang/slang-ir-simplify-for-emit.cpp) | (always) | Line 3117, immediately after `linkAndOptimizeIR` returns. |
-| 6 | `sourceEmitter->emitModule` | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) (overriding `slang-emit-cpp.cpp` and `slang-emit-c-like.cpp`) | (always) | Line 3126. Walks IR and writes CUDA C++ text; the call is bracketed by an error-count comparison that returns `SLANG_FAIL` if emit added errors. |
+| 5 | `simplifyForEmit` | [slang-ir-simplify-for-emit.cpp](../../../../source/slang/ir-passes/slang-ir-simplify-for-emit.cpp) | (always) | Line 3117, immediately after `linkAndOptimizeIR` returns. |
+| 6 | `sourceEmitter->emitModule` | [slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp) (overriding `slang-emit-cpp.cpp` and `slang-emit-c-like.cpp`) | (always) | Line 3126. Walks IR and writes CUDA C++ text; the call is bracketed by an error-count comparison that returns `SLANG_FAIL` if emit added errors. |
 | 7 | wrap text in artifact (`ArtifactUtil::createArtifactForCompileTarget` + `StringBlob::moveCreate`) | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Inside `emitEntryPointsSourceFromIR` (lines 3197-3198): wraps the emitted CUDA C++ text directly as an `IArtifact`. Not the SPIR-V-only `createArtifactFromIR` helper. |
 | 8 | `compile` (nvrtc) | (downstream) | `target == PTX` | Downstream-compile path invokes nvrtc to translate the CUDA C++ source into PTX assembly. |
 
@@ -707,17 +707,17 @@ their own emit arms and are **out of scope** for this page:
   `handleAutoBindNames`) in Phase B at lines 1670-1675
   (`removeTorchKernels` is **not** in the PyTorch arm; it runs only
   in the `CUDASource` / `CUDAHeader` arm). Emit arm
-  is `TorchCppSourceEmitter` ([slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp)),
+  is `TorchCppSourceEmitter` ([slang-emit-torch.cpp](../../../../source/slang/emission/slang-emit-torch.cpp)),
   selected at [slang-emit.cpp line
   3081](../../../../source/slang/slang-emit.cpp); it extends the
   C-like emitter family with the `TorchCppBinding` artifact style.
   It is also the only emitter that consumes `kIROp_CudaKernelLaunch`
   — produced by `IRBuilder::emitCudaKernelLaunch` from
-  [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp)
+  [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp)
   line 468 — which it writes as a `cudaLaunchKernel` call. The CUDA
   emitter never sees that opcode; its own kernel-launch syntax
   (`fn<<<a, b>>>(args)`) comes from `kIROp_DispatchKernel`
-  in [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)
+  in [slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp)
   line 1483. Two things produce that opcode: the
   `__dispatch_kernel` expression keyword — the kernel function and
   two launch sizes in parentheses, then the call argument list
@@ -742,10 +742,10 @@ their own emit arms and are **out of scope** for this page:
 
   Note the operand order. The surface is
   `__dispatch_kernel(fn, dispatchSize, threadGroupSize)`
-  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp)
+  ([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp)
   lines 3365-3379), the `IRDispatchKernel` operands are
   `baseFn, threadGroupSize, dispatchSize`
-  ([slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+  ([slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua)
   line 2893), and the emitter writes `threadGroupSize` first and
   `dispatchSize` second between the `<<<` and `>>>` — so the call
   above was written with `dispatchSize` of `uint3(32,1,1)` and
@@ -904,7 +904,7 @@ runs its own optimization loops, but those are out of scope.
 One CUDA pass does, however, host a fixed-point loop internally.
 `legalizeEntryPointVaryingParamsForCUDA` first calls
 `inlineShaderTerminatingCalleesForRayEntryPoints` (line 1876 of
-[slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp)),
+[slang-ir-legalize-varying-params.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-varying-params.cpp)),
 which runs `for (bool changed = true; changed;)` at lines
 1966-1985. Each iteration rescans the entry point's blocks,
 collects every `IRCall` whose resolved callee transitively reaches
@@ -956,7 +956,7 @@ runs `stripAutoDiffDecorations` directly — it needs no
 can then drop the unused builtins. What is skipped on that path is
 the `AutoDiffSharedContext` construction and the whole-module work
 `finalizeAutoDiffPass` performs (line 1174 of
-[slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp)):
+[slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp)):
 `processPairTypes`, `removeDetachInsts`, `removeTypeAnnotations`,
 `stripNoDiffTypeAttribute`, its own call to
 `stripAutoDiffDecorations`, and `releaseDifferentiableInterfaces`.
@@ -967,7 +967,7 @@ for the opcodes involved.
 ### `expandAutodiffParameterContexts`
 
 Defined in
-[slang-ir-expand-autodiff-parameter-contexts.cpp](../../../../source/slang/slang-ir-expand-autodiff-parameter-contexts.cpp)
+[slang-ir-expand-autodiff-parameter-contexts.cpp](../../../../source/slang/ir-passes/slang-ir-expand-autodiff-parameter-contexts.cpp)
 (line 262) and called at line 1823 of `slang-emit.cpp` for
 `CUDASource` and Metal only. Autodiff packages captured primal
 parameters into a parameter-context struct (marked with
@@ -990,12 +990,12 @@ unchanged until the optimization is validated for them.
 ### `collectOptiXEntryPointUniformParams`
 
 Defined in
-[slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp).
+[slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-optix-entry-point-uniforms.cpp).
 For OptiX programs, ray-tracing entry-point uniforms are bound
 through the Shader Binding Table (SBT) rather than as ordinary
 arguments. `collectOptiXEntryPointUniformParams` (line 276) is a
 modified copy of `collectEntryPointUniformParams` from
-[slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp):
+[slang-ir-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-uniforms.cpp):
 it walks each entry point's parameters, gathers every parameter
 that `isVaryingParameter(paramLayout)` reports as **non**-varying
 into one collected `struct` type, and rewrites each use as a
@@ -1013,7 +1013,7 @@ so none remains to move.
 ### `synthesizeActiveMask`
 
 Defined in
-[slang-ir-synthesize-active-mask.cpp](../../../../source/slang/slang-ir-synthesize-active-mask.cpp).
+[slang-ir-synthesize-active-mask.cpp](../../../../source/slang/ir-passes/slang-ir-synthesize-active-mask.cpp).
 PTX subgroup intrinsics (e.g. `__shfl_sync`, `__ballot_sync`)
 require an explicit thread-mask. This pass converts IR-level
 "active mask" references into a synthesized mask parameter that
@@ -1027,7 +1027,7 @@ inside divergent control flow.
 ### `legalizeEntryPointVaryingParamsForCUDA`
 
 Defined in
-[slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp).
+[slang-ir-legalize-varying-params.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-varying-params.cpp).
 Restructures kernel-entry-point parameter shapes so they match
 CUDA's calling convention: `gl_*` / `SV_*` semantic-bound
 varying parameters become explicit kernel arguments where
@@ -1085,7 +1085,7 @@ That path diagnoses a hit attribute that needs more than
 ### `legalizeOptiXReportIntersectionsForCUDA`
 
 Defined at line 2804 of
-[slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp);
+[slang-ir-legalize-varying-params.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-varying-params.cpp);
 it constructs a `CUDAEntryPointVaryingParamLegalizeContext` and runs
 `legalizeOptiXReportIntersections` (line 2314). The `ReportHit`
 intrinsic in
@@ -1111,7 +1111,7 @@ legalization in Phase C.
 ### `lowerBuiltinTypesForKernelEntryPoints`, `removeTorchKernels`, `handleAutoBindNames`
 
 Phase B, lines 1678-1680. All three are defined in
-[slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp)
+[slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp)
 and all three select their work by decoration, not by target, so
 on a CUDA compile with no `slangpy` bindings in the module they
 are no-ops.
@@ -1121,7 +1121,7 @@ functions carrying an `IRCudaKernelDecoration` — the `[CudaKernel]`
 attribute — and rewrites each parameter whose type is a Slang
 builtin aggregate into a plain CUDA-representable equivalent,
 using `lowerType` from
-[slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/slang-ir-lower-cuda-builtin-types.cpp)
+[slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-cuda-builtin-types.cpp)
 (vector, matrix, and struct types each have their own
 `lower*Type` entry point). It does not delete the original type:
 `LoweredBuiltinTypeInfo::convertLoweredToOriginal` is a generated
@@ -1146,7 +1146,7 @@ The rewrite touches the `ExternCpp` linkage name only, and only
 when the kernel already carries one (line 1373). That name reaches
 emitted text through the `IRExternCppDecoration` branch of
 `CLikeSourceEmitter::generateName`
-([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+([slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
 line 1251), which an entry point never reaches: the
 `IREntryPointDecoration` branch above it (line 1219) returns
 first. An `[AutoPyBindCUDA] [CudaKernel]` function compiled as the
@@ -1168,7 +1168,7 @@ into an element pointer and is likewise rewritten when its value
 type has a supported load method. Successful rewrites become CUDA's
 `__ldg` read-only-cache load, represented in the IR as
 `kIROp_CUDALDG`
-([slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp)
+([slang-ir-cuda-immutable-load.cpp](../../../../source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp)
 line 128).
 
 The second ordinary-load condition is a memory-space rule. The front end collects top-level declarations
@@ -1203,11 +1203,11 @@ the scalars listed above, `kIROp_VectorType`, `kIROp_MatrixType`,
 `kIROp_MatrixType` arm is reachable for a buffer-element matrix that
 stays a matrix: the default policy leaves a matrix unlowered when its
 layout is the default (row-major on CUDA) under Natural rules
-([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp)
+([slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp)
 lines 2698-2714), and CUDA is not a `legalizeMatrixTypes` target
 (slang-ir-legalize-matrix-types.cpp lines 18-40). Other matrices are
 wrapped in a `_MatrixStorage_*` struct (line 2915), whose CUDA builder
-([slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/slang-ir-lower-cuda-builtin-types.cpp)
+([slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-cuda-builtin-types.cpp)
 lines 150-167) holds a scalar array, so that load takes the
 `kIROp_StructType` arm. Any
 other type op falls off the end of the switch and yields an empty

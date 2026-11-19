@@ -16,7 +16,7 @@
 // core-module keywords, so the test enables -experimental-feature. The call
 // has no arguments so the checker prints the candidate.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -stage compute -entry main -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -stage compute -entry main -experimental-feature
 
 void f(__borrow int a, __ref int b, __ref_readonly int c, __ref_writeonly int d) {}
 

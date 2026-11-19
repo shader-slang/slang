@@ -13,7 +13,7 @@
 // compiled as Slang, the member function is rejected with E30443. The HLSL
 // counterpart is decl-func-trailing-const-hlsl.hlsl.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -stage compute -entry main
 
 struct S
 {

@@ -6,10 +6,8 @@
 // descriptor heaps and with the descriptor-array fallback.
 
 // CHECK: OpTypeSampler
-// CHECK: %[[S:[^ ]+]] = OpVariable %_ptr_Function_uint Function
-// CHECK: OpStore %[[S]] %uint_0
-// CHECK: OpStore %[[S]] %uint_1
-// CHECK: %[[INDEX:[^ ]+]] = OpLoad %uint %[[S]]
+// CHECK: OpBranchConditional {{[^ ]+}} %[[TRUE:[^ ]+]] %[[FALSE:[^ ]+]]
+// CHECK: %[[INDEX:[^ ]+]] = OpPhi %uint %uint_0 %[[TRUE]] %uint_1 %[[FALSE]]
 // CHECK: OpUntypedAccessChainKHR {{.*}} %slang_samplerHeap %[[INDEX]]
 // CHECK: OpImageSampleImplicitLod
 // ARRAY: OpCapability SampledImageArrayNonUniformIndexing

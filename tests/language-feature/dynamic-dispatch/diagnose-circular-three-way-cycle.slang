@@ -3,14 +3,14 @@
 // This exercises the cross-interface cycle detection with a cycle length > 2,
 // validating that hasDependencyPath correctly traces through multiple hops.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target spirv
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target glsl
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target cpp
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target metal
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target wgsl
-//TEST:SIMPLE(filecheck=NEG,exit-code=-1): -target spirv
-//TEST:SIMPLE(filecheck=NEG,exit-code=-1): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target glsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cpp
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target metal
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl
+//TEST:SIMPLE(filecheck=NEG,exit-code=2): -target spirv
+//TEST:SIMPLE(filecheck=NEG,exit-code=2): -target hlsl
 
 [anyValueSize(32)]
 interface IA

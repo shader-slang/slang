@@ -29,19 +29,19 @@ are dispatched by `CodeGenTarget` further down the pipeline.
 
 | Target group | Public `SlangCompileTarget` values | Output | Emit file(s) |
 | --- | --- | --- | --- |
-| HLSL | `SLANG_HLSL`, `SLANG_DXBC`, `SLANG_DXBC_ASM`, `SLANG_DXIL`, `SLANG_DXIL_ASM` | HLSL text plus downstream DXBC/DXIL produced via FXC / DXC | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) (DXBC/DXIL are downstream-compiled) |
-| GLSL | `SLANG_GLSL`, plus the retained-but-removed `SLANG_GLSL_VULKAN_DEPRECATED` and `SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED` enumerators | GLSL text (typically forwarded to glslang for SPIR-V) | [slang-emit-glsl.cpp](../../../../source/slang/slang-emit-glsl.cpp) |
-| SPIR-V (direct) | `SLANG_SPIRV`, `SLANG_SPIRV_ASM` | SPIR-V binary or assembly | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) |
-| Metal Shading Language | `SLANG_METAL`, `SLANG_METAL_LIB`, `SLANG_METAL_LIB_ASM` | MSL text, Metal library, Metal library assembly | [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) (`*_LIB`/`*_LIB_ASM` go through Metal's downstream tools) |
-| WGSL | `SLANG_WGSL`, `SLANG_WGSL_SPIRV`, `SLANG_WGSL_SPIRV_ASM` | WGSL text, plus SPIR-V binary/assembly produced via WGSL | [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp) |
-| C++ shader | `SLANG_CPP_SOURCE`, `SLANG_CPP_HEADER` | C++ text linked against `slang-rt`; header variant emits a declarations-only file | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp) |
+| HLSL | `SLANG_HLSL`, `SLANG_DXBC`, `SLANG_DXBC_ASM`, `SLANG_DXIL`, `SLANG_DXIL_ASM` | HLSL text plus downstream DXBC/DXIL produced via FXC / DXC | [slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp) (DXBC/DXIL are downstream-compiled) |
+| GLSL | `SLANG_GLSL`, plus the retained-but-removed `SLANG_GLSL_VULKAN_DEPRECATED` and `SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED` enumerators | GLSL text (typically forwarded to glslang for SPIR-V) | [slang-emit-glsl.cpp](../../../../source/slang/emission/slang-emit-glsl.cpp) |
+| SPIR-V (direct) | `SLANG_SPIRV`, `SLANG_SPIRV_ASM` | SPIR-V binary or assembly | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) |
+| Metal Shading Language | `SLANG_METAL`, `SLANG_METAL_LIB`, `SLANG_METAL_LIB_ASM` | MSL text, Metal library, Metal library assembly | [slang-emit-metal.cpp](../../../../source/slang/emission/slang-emit-metal.cpp) (`*_LIB`/`*_LIB_ASM` go through Metal's downstream tools) |
+| WGSL | `SLANG_WGSL`, `SLANG_WGSL_SPIRV`, `SLANG_WGSL_SPIRV_ASM` | WGSL text, plus SPIR-V binary/assembly produced via WGSL | [slang-emit-wgsl.cpp](../../../../source/slang/emission/slang-emit-wgsl.cpp) |
+| C++ shader | `SLANG_CPP_SOURCE`, `SLANG_CPP_HEADER` | C++ text linked against `slang-rt`; header variant emits a declarations-only file | [slang-emit-cpp.cpp](../../../../source/slang/emission/slang-emit-cpp.cpp) |
 | C source (declared only) | `SLANG_C_SOURCE` | No working emitter: `CodeGenTarget::CSource` maps to `SourceLanguage::C` in `slang-emit-c-like.cpp`, and the dispatcher in `emitEntryPointsSourceFromIR` has no `C` case, so it diagnoses `UnableToGenerateCodeForTarget` | none |
-| C++ host | `SLANG_HOST_CPP_SOURCE` | Host-side C++ source | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp) |
-| CUDA | `SLANG_CUDA_SOURCE`, `SLANG_PTX`, `SLANG_CUDA_OBJECT_CODE`, `SLANG_CUDA_HEADER` | CUDA text, PTX, object code, header | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) (PTX and object code via NVRTC / nvcc) |
-| Torch glue | `SLANG_CPP_PYTORCH_BINDING` | C++ PyTorch binding | [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp) |
-| CPU binaries / host-callable | `SLANG_HOST_HOST_CALLABLE`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_EXECUTABLE`, `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | LLVM-IR, object code, JIT-callable code, shared libraries, executables | [slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp) when `isCPUTargetViaLLVM`: `emitLLVMForEntryPoints` in [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) calls `emitLLVMObjectFromIR`, `emitLLVMAssemblyFromIR` or `emitLLVMJITFromIR` by target; otherwise routed to a downstream C++ compiler from [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) |
-| VM | `SLANG_HOST_VM` | Slang interpreter bytecode | [slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp) |
-| Slang round-trip | (no public target and no `CodeGenTarget` value) | Unimplemented stub: `emitSlangDeclarationsForEntryPoints` ignores its inputs and writes no source; its only caller is `emitHostVMCode` in [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | [slang-emit-slang.cpp](../../../../source/slang/slang-emit-slang.cpp) |
+| C++ host | `SLANG_HOST_CPP_SOURCE` | Host-side C++ source | [slang-emit-cpp.cpp](../../../../source/slang/emission/slang-emit-cpp.cpp) |
+| CUDA | `SLANG_CUDA_SOURCE`, `SLANG_PTX`, `SLANG_CUDA_OBJECT_CODE`, `SLANG_CUDA_HEADER` | CUDA text, PTX, object code, header | [slang-emit-cuda.cpp](../../../../source/slang/emission/slang-emit-cuda.cpp) (PTX and object code via NVRTC / nvcc) |
+| Torch glue | `SLANG_CPP_PYTORCH_BINDING` | C++ PyTorch binding | [slang-emit-torch.cpp](../../../../source/slang/emission/slang-emit-torch.cpp) |
+| CPU binaries / host-callable | `SLANG_HOST_HOST_CALLABLE`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_EXECUTABLE`, `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | LLVM-IR, object code, JIT-callable code, shared libraries, executables | [slang-emit-llvm.cpp](../../../../source/slang/emission/slang-emit-llvm.cpp) when `isCPUTargetViaLLVM`: `emitLLVMForEntryPoints` in [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) calls `emitLLVMObjectFromIR`, `emitLLVMAssemblyFromIR` or `emitLLVMJITFromIR` by target; otherwise routed to a downstream C++ compiler from [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) |
+| VM | `SLANG_HOST_VM` | Slang interpreter bytecode | [slang-emit-vm.cpp](../../../../source/slang/emission/slang-emit-vm.cpp) |
+| Slang round-trip | (no public target and no `CodeGenTarget` value) | Unimplemented stub: `emitSlangDeclarationsForEntryPoints` ignores its inputs and writes no source; its only caller is `emitHostVMCode` in [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | [slang-emit-slang.cpp](../../../../source/slang/emission/slang-emit-slang.cpp) |
 
 `SLANG_TARGET_UNKNOWN` and `SLANG_TARGET_NONE` are sentinel values
 that do not select an emit backend. `SLANG_TARGET_COUNT_OF` is the
@@ -328,14 +328,14 @@ shows through:
    With no matching arm and no `default:`, the entry point that
    reaches the function is rejected, not the switch.
 2. **Target-specific lowering passes** named by target acronym:
-   - HLSL: [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)
-   - GLSL: [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp), [slang-ir-glsl-liveness.cpp](../../../../source/slang/slang-ir-glsl-liveness.cpp)
-   - SPIR-V: [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp), [slang-ir-spirv-snippet.cpp](../../../../source/slang/slang-ir-spirv-snippet.cpp)
-   - Metal: [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp)
-   - WGSL: [slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp)
-   - CUDA: [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp), [slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/slang-ir-lower-cuda-builtin-types.cpp)
-   - Vulkan: [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp)
-   - Torch: [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp)
+   - HLSL: [slang-ir-hlsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-hlsl-legalize.cpp)
+   - GLSL: [slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp), [slang-ir-glsl-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-liveness.cpp)
+   - SPIR-V: [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp), [slang-ir-spirv-snippet.cpp](../../../../source/slang/emission/slang-ir-spirv-snippet.cpp)
+   - Metal: [slang-ir-metal-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-metal-legalize.cpp)
+   - WGSL: [slang-ir-wgsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-wgsl-legalize.cpp)
+   - CUDA: [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp), [slang-ir-lower-cuda-builtin-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-cuda-builtin-types.cpp)
+   - Vulkan: [slang-ir-vk-invert-y.cpp](../../../../source/slang/ir-passes/slang-ir-vk-invert-y.cpp)
+   - Torch: [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp)
 
 Some passes are conditional within a backend by inspecting the
 profile (e.g. an HLSL Shader Model gate). The orchestrator that
@@ -383,7 +383,7 @@ backend-registration steps):
 2. **Emit backend.** Add `slang-emit-<target>.{h,cpp}` under
    [source/slang/](../../../../source/slang). For a textual target,
    subclass `CLikeSourceEmitter` from
-   [slang-emit-c-like.h](../../../../source/slang/slang-emit-c-like.h).
+   [slang-emit-c-like.h](../../../../source/slang/emission/slang-emit-c-like.h).
 3. **Dispatchers.** Add the internal `CodeGenTarget` value in
    [slang-target.h](../../../../source/slang/slang-target.h), mapping
    it to a `SourceLanguage` in `slang-emit-c-like.cpp` where needed.
