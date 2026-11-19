@@ -7858,7 +7858,7 @@ IfStmt* Parser::parseIfStatement()
     }
     // A declaration condition introduces a scope that spans the whole statement, so it
     // closes after the `else` arm. The variable stays visible in both arms, like C++.
-    if (ifStatement->condition && ifStatement->condition->scopeDecl)
+    if (as<DeclConditionClause>(ifStatement->condition))
         PopScope();
     ifStatement->afterLoc = tokenReader.peekLoc();
 
@@ -7946,7 +7946,7 @@ WhileStmt* Parser::ParseWhileStatement()
     whileStatement->statement = parseControlFlowBody();
     // A declaration condition is visible in the body, so its scope spans the body and
     // closes with the statement.
-    if (whileStatement->condition && whileStatement->condition->scopeDecl)
+    if (as<DeclConditionClause>(whileStatement->condition))
         PopScope();
     return whileStatement;
 }
@@ -7964,7 +7964,7 @@ DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
     // The body of a `do`-`while` is parsed before the condition, so a declaration
     // condition is visible in the condition only, never in the body. Its scope
     // closes here, immediately after the condition.
-    if (doWhileStatement->condition && doWhileStatement->condition->scopeDecl)
+    if (as<DeclConditionClause>(doWhileStatement->condition))
         PopScope();
     return doWhileStatement;
 }

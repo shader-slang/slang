@@ -100,12 +100,6 @@ class ConditionClause : public SyntaxNode
     /// this is an expression naming the declared variable; semantic checking resolves it to the
     /// declaration and coerces it to `bool`, like any other condition.
     FIDDLE() Expr* predicate = nullptr;
-
-    /// The lexical scope that the condition's declaration (if any) belongs to: a
-    /// `DeclConditionClause` adds its variable to this scope, which then spans the
-    /// parts of the statement where the variable is visible. Null for a plain
-    /// expression, which declares nothing.
-    FIDDLE() ScopeDecl* scopeDecl = nullptr;
 };
 
 // A condition written as an expression, as in `if (a < b)`.
@@ -128,6 +122,11 @@ class DeclConditionClause : public ConditionClause
     /// this clause once it has parsed the whole declaration, so the variable is never
     /// left null.
     FIDDLE() VarDeclBase* decl = nullptr;
+
+    /// The lexical scope that the declared variable belongs to, spanning the parts of
+    /// the statement where the variable is visible (both arms for `if`, the body for
+    /// `while`, the condition only for `do`-`while`).
+    FIDDLE() ScopeDecl* scopeDecl = nullptr;
 };
 
 FIDDLE()

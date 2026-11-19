@@ -7903,12 +7903,16 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlockIfNeeded(stmt);
 
         auto clause = stmt->condition;
+        auto declConditionClause = as<DeclConditionClause>(clause);
         // A declaration condition's scope covers the condition and both arms (the
         // variable is visible there, like C++), so give it its own debug lexical block
         // while the statement lowers, mirroring how a BlockStmt's scope is handled.
         auto previousDebugScope = context->currentDebugScope;
-        auto conditionDebugScope =
-            emitDebugLexicalBlockForScope(context, clause->scopeDecl, clause->loc);
+        auto conditionDebugScope = declConditionClause ? emitDebugLexicalBlockForScope(
+                                                             context,
+                                                             declConditionClause->scopeDecl,
+                                                             declConditionClause->loc)
+                                                       : nullptr;
         if (conditionDebugScope)
         {
             context->currentDebugScope = conditionDebugScope;
@@ -7917,7 +7921,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // A declaration condition declares its variable right before the test, in the
         // statement's condition slot, so the variable is initialized before the branch
         // and is in scope for both arms.
-        if (auto declConditionClause = as<DeclConditionClause>(clause))
+        if (declConditionClause)
             lowerDecl(context, declConditionClause->decl);
 
         auto condExpr = clause->predicate;
@@ -8233,11 +8237,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // whole loop lowers inside its own debug lexical block. The code after the
         // loop returns to the enclosing scope.
         auto previousDebugScope = context->currentDebugScope;
-        auto conditionDebugScope = stmt->condition ? emitDebugLexicalBlockForScope(
-                                                         context,
-                                                         stmt->condition->scopeDecl,
-                                                         stmt->condition->loc)
-                                                   : nullptr;
+        auto declConditionClause = as<DeclConditionClause>(stmt->condition);
+        auto conditionDebugScope = declConditionClause ? emitDebugLexicalBlockForScope(
+                                                             context,
+                                                             declConditionClause->scopeDecl,
+                                                             declConditionClause->loc)
+                                                       : nullptr;
         if (conditionDebugScope)
         {
             context->currentDebugScope = conditionDebugScope;
@@ -8253,7 +8258,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // A declaration condition declares its variable in the condition slot, so the
             // variable is re-initialized before every test, and a `continue` (which jumps
             // to loopHead) re-runs the declaration, as in C++.
-            if (auto declConditionClause = as<DeclConditionClause>(clause))
+            if (declConditionClause)
                 lowerDecl(context, declConditionClause->decl);
 
             auto condExpr = clause->predicate;
@@ -8360,11 +8365,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // above, in the enclosing scope). Give the condition its own debug lexical
         // block, covering just the test where the variable is declared and tested.
         auto previousDebugScope = context->currentDebugScope;
-        auto conditionDebugScope = stmt->condition ? emitDebugLexicalBlockForScope(
-                                                         context,
-                                                         stmt->condition->scopeDecl,
-                                                         stmt->condition->loc)
-                                                   : nullptr;
+        auto declConditionClause = as<DeclConditionClause>(stmt->condition);
+        auto conditionDebugScope = declConditionClause ? emitDebugLexicalBlockForScope(
+                                                             context,
+                                                             declConditionClause->scopeDecl,
+                                                             declConditionClause->loc)
+                                                       : nullptr;
         if (conditionDebugScope)
         {
             context->currentDebugScope = conditionDebugScope;
@@ -8378,7 +8384,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // A declaration condition declares its variable in the condition slot, so
             // the variable is re-initialized before every test. A `continue` jumps here
             // (testLabel), so it re-runs the declaration too, which is the C++ behavior.
-            if (auto declConditionClause = as<DeclConditionClause>(clause))
+            if (declConditionClause)
                 lowerDecl(context, declConditionClause->decl);
 
             auto condExpr = clause->predicate;
