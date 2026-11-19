@@ -250,6 +250,11 @@ Type* TensorViewType::getElementType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+Type* TensorViewType::getOffsetType()
+{
+    return as<Type>(_getGenericTypeArg(this, 1));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VectorExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Type* VectorExpressionType::getElementType()
