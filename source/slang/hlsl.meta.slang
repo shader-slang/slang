@@ -12824,6 +12824,9 @@ $}
 /// accept a floating-point `T`, and only a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
 /// memory.
+/// On Metal, a 64-bit integer `T` is supported only by `InterlockedMin` and `InterlockedMax` on an
+/// unsigned type in device memory or a texture, when `original_value` is not used; any other
+/// 64-bit integer use reports error E55204.
 /// On WGSL, floating-point types are not supported.
 /// @category atomic Atomic functions
 [ForceInline]
@@ -12867,7 +12870,7 @@ $}
 ///
 /// On Metal, a floating-point `T` must be a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
-/// memory.
+/// memory. A 64-bit integer `T` is not supported on Metal and reports error E55204.
 /// On WGSL, floating-point types are not supported.
 ///
 /// On CUDA, this function maps to `atomicCAS`.

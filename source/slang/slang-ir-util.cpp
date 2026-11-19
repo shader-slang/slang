@@ -1339,6 +1339,15 @@ IRResourceTypeBase* getImageSubscriptResourceType(IRImageSubscript* subscript)
     return as<IRResourceTypeBase>(imageType);
 }
 
+bool is64BitIntegerAtomic(IRAtomicOperation* atomic, TargetRequest* target)
+{
+    // A store's result is void, so its value is the stored operand.
+    IRType* valueType = atomic->getDataType();
+    if (auto atomicStore = as<IRAtomicStore>(atomic))
+        valueType = atomicStore->getVal()->getDataType();
+    return isIntegralType(valueType) && getIntTypeInfo(target, valueType).width == 64;
+}
+
 
 IRInst* getRootBufferOrAddr(IRInst* addr)
 {
