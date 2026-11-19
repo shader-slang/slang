@@ -612,6 +612,10 @@ def SPV_KHR_ray_tracing : _spirv_1_4;
 /// [EXT]
 def SPV_KHR_ray_query : _spirv_1_0;
 
+/// Represents the SPIR-V extension for opacity micromaps.
+/// [EXT]
+def SPV_KHR_opacity_micromap : _spirv_1_4;
+
 /// Represents the SPIR-V extension for ray tracing position fetch.
 /// Should be used with either SPV_KHR_ray_query or SPV_KHR_ray_tracing.
 /// [EXT]
@@ -905,6 +909,10 @@ def spvRayTracingPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayT
 /// [EXT]
 def spvRayQueryKHR : SPV_KHR_ray_query;
 
+/// Represents the SPIR-V capability for the opacity micromap ray-query execution mode.
+/// [EXT]
+def spvRayTracingOpacityMicromapExecutionModeKHR : SPV_KHR_opacity_micromap;
+
 /// Represents the SPIR-V capability for ray query position fetch.
 /// [EXT]
 def spvRayQueryPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayQueryKHR;
@@ -1053,6 +1061,7 @@ def _GL_EXT_fragment_shader_barycentric : _GLSL_450;
 def _GL_EXT_mesh_shader : _GLSL_450;
 def _GL_EXT_nonuniform_qualifier : glsl;
 def _GL_EXT_ray_query : _GLSL_460 + glsl_spirv_1_4; // spirv_1_4 is required due to glslang bug which enables `SPV_KHR_ray_tracing` regardless of context
+def _GL_EXT_opacity_micromap_ray_query_mode : _GL_EXT_ray_query;
 def _GL_EXT_ray_tracing : _GLSL_460;
 def _GL_EXT_ray_tracing_position_fetch : _GL_EXT_ray_query; // requires _GL_EXT_ray_tracing or _GL_EXT_ray_query
 def _GL_EXT_samplerless_texture_functions : _GLSL_140;
@@ -1166,6 +1175,11 @@ alias GL_EXT_nonuniform_qualifier = _GL_EXT_nonuniform_qualifier | spvShaderNonU
 /// Represents the GL_EXT_ray_query extension.
 /// [EXT]
 alias GL_EXT_ray_query = _GL_EXT_ray_query | spvRayQueryKHR;
+
+/// Represents the GL_EXT_opacity_micromap_ray_query_mode extension.
+/// [EXT]
+alias GL_EXT_opacity_micromap_ray_query_mode = _GL_EXT_opacity_micromap_ray_query_mode
+                                            | spvRayTracingOpacityMicromapExecutionModeKHR;
 
 /// Represents the GL_EXT_ray_tracing extension.
 /// [EXT]
@@ -1436,6 +1450,9 @@ alias motionblur_nv = GL_NV_ray_tracing_motion_blur | cuda;
 /// Capabilities needed for compute-shader rayquery
 /// [Compound]
 alias rayquery = GL_EXT_ray_query | _sm_6_3 | metal;
+/// Capabilities needed to opt ray queries into opacity micromaps.
+/// [Compound]
+alias rayquery_opacity_micromap = rayquery + GL_EXT_opacity_micromap_ray_query_mode | _sm_6_9;
 /// Capabilities needed for compute-shader rayquery and motion-blur
 /// [Compound]
 alias raytracing_motionblur =  raytracing + motionblur_nv | cuda;

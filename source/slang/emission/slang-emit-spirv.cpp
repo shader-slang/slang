@@ -5445,6 +5445,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 getParentFunc(inst),
                 SpvExecutionModeQuadDerivativesKHR);
             break;
+        case kIROp_RequireRayQueryOpacityMicromap:
+            {
+                // TraceRayInline emits this operation only for a query that allows micromaps.
+                // A shared helper can serve several entry points, so apply the opt-in to each
+                // caller through the same reference graph used by other execution modes.
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_opacity_micromap"));
+                requireSPIRVCapability(SpvCapabilityRayTracingOpacityMicromapExecutionModeKHR);
+                IRBuilder builder(m_irModule);
+                requireSPIRVExecutionModeOnReferencingEntryPoints(
+                    nullptr,
+                    getParentFunc(inst),
+                    SpvExecutionModeOpacityMicromapIdKHR,
+                    builder.getBoolValue(true));
+                break;
+            }
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 result = emitOpReturn(parent, inst);
@@ -12444,7 +12459,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SpvOp execModeOp = SpvOpExecutionMode;
             if (executionMode == SpvExecutionModeLocalSizeId ||
                 executionMode == SpvExecutionModeLocalSizeHintId ||
-                executionMode == SpvExecutionModeSubgroupsPerWorkgroupId)
+                executionMode == SpvExecutionModeSubgroupsPerWorkgroupId ||
+                executionMode == SpvExecutionModeOpacityMicromapIdKHR)
             {
                 execModeOp = SpvOpExecutionModeId;
             }

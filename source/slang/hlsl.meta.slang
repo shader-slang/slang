@@ -22790,15 +22790,29 @@ typedef uint RAYQUERY_FLAG;
 /// @category raytracing
 static const RAYQUERY_FLAG RAYQUERY_FLAG_NONE = 0x00;
 
-/// Flag to specify rayquery object supports Opacity Micromaps.
+/// Allow a ray query to use opacity micromaps attached to its acceleration structure.
+/// Pass this flag as the second generic argument to `RayQuery`.
 /// @category raytracing
 static const RAYQUERY_FLAG RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS = 0x01;
 
+/// The optional second generic argument selects ray-query features independently of ray flags.
+/// For example, `RayQuery<RAY_FLAG_NONE, RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS>` enables
+/// opacity micromaps when `TraceRayInline` is called. This requires the
+/// `rayquery_opacity_micromap` capability: shader model 6.9 for HLSL, or the KHR opacity
+/// micromap execution mode for SPIR-V. GLSL uses `GL_EXT_opacity_micromap_ray_query_mode`
+/// to express the same execution mode.
+///
+/// For SPIR-V and GLSL, enabling opacity micromaps applies to every ray query in each
+/// entry point that reaches the opted-in `TraceRayInline` call, including queries whose
+/// second generic argument is `RAYQUERY_FLAG_NONE`. The application must enable the
+/// Vulkan micromap feature and attach micromaps to the acceleration structure separately.
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
 __intrinsic_type($(kIROp_RayQueryType))
-struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
+struct RayQuery<
+    let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE,
+    let rayQueryFlagsGeneric : RAYQUERY_FLAG = RAYQUERY_FLAG_NONE>
 {
     /// Initialize a new ray query in its default state.
     __intrinsic_op($(kIROp_AllocateOpaqueHandle))
@@ -22888,11 +22902,17 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         uint                            instanceInclusionMask,
         RayDesc                         ray)
     {
+        if ((rayQueryFlagsGeneric & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) != 0)
+            __requireCapability(rayquery_opacity_micromap);
+
         __target_switch
         {
         case hlsl: __intrinsic_asm ".TraceRayInline";
         case glsl:
         case spirv:
+            if ((rayQueryFlagsGeneric & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) != 0)
+                __requireRayQueryOpacityMicromap();
+
             __rayQueryInitializeEXT(
                 accelerationStructure,
                 rayFlags | rayFlagsGeneric,
@@ -22902,6 +22922,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 ray.Direction,
                 ray.TMax);
         case metal:
+            static_assert(
+                (rayQueryFlagsGeneric & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) == 0,
+                "Metal does not support opacity micromaps in ray queries");
             __reset(ray.Origin, ray.Direction, ray.TMin, ray.TMax, accelerationStructure, instanceInclusionMask, rayFlags | rayFlagsGeneric);
         }
     }
@@ -26560,8 +26583,10 @@ struct HitObject
         /// DXR 1.3 only.
     [ForceInline]
     [require(hlsl, ser_dxr_raygen)]
-    __generic<let rayFlagsGeneric : RAY_FLAG>
-    static HitObject FromRayQuery(RayQuery<rayFlagsGeneric> Query)
+    __generic<
+        let rayFlagsGeneric : RAY_FLAG,
+        let rayQueryFlagsGeneric : RAYQUERY_FLAG = RAYQUERY_FLAG_NONE>
+    static HitObject FromRayQuery(RayQuery<rayFlagsGeneric, rayQueryFlagsGeneric> Query)
     {
         __target_switch
         {
@@ -26576,9 +26601,12 @@ struct HitObject
         /// DXR 1.3 only.
     [ForceInline]
     [require(hlsl, ser_dxr_raygen)]
-    __generic<let rayFlagsGeneric : RAY_FLAG, attr_t>
+    __generic<
+        let rayFlagsGeneric : RAY_FLAG,
+        attr_t,
+        let rayQueryFlagsGeneric : RAYQUERY_FLAG = RAYQUERY_FLAG_NONE>
     static HitObject FromRayQuery(
-        RayQuery<rayFlagsGeneric> Query,
+        RayQuery<rayFlagsGeneric, rayQueryFlagsGeneric> Query,
         uint CommittedCustomHitKind,
         attr_t CommittedCustomAttribs)
     {

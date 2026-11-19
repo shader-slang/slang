@@ -39,6 +39,7 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
 
     // Early exit on instructions we are not interested in.
     if (!as<IRRequireMaximallyReconverges>(inst) && !as<IRRequireQuadDerivatives>(inst) &&
+        !as<IRRequireRayQueryOpacityMicromap>(inst) &&
         !(as<IRRequireComputeDerivative>(inst) && (m_entryPointStage == Stage::Compute)))
     {
         return;
@@ -51,6 +52,18 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
     auto entryPoints = getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
     if (entryPoints == nullptr)
         return;
+
+    if (as<IRRequireRayQueryOpacityMicromap>(inst))
+    {
+        // A query in a reachable helper enables opacity micromaps for the whole shader.
+        // The prelude set emits this redeclaration once even when multiple queries request it.
+        _requireGLSLExtension(
+            UnownedStringSlice::fromLiteral("GL_EXT_opacity_micromap_ray_query_mode"));
+        _requireGLSLVersion(ProfileVersion::GLSL_460);
+        _requireSPIRVVersion(SemanticVersion(1, 4));
+        ensurePrelude("const bool gl_EnableOpacityMicromapEXT = true;");
+        return;
+    }
 
     for (auto entryPoint : *entryPoints)
     {
@@ -3073,6 +3086,9 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     };
     switch (inst->getOp())
     {
+    case kIROp_RequireRayQueryOpacityMicromap:
+        // The shader-wide declaration was handled in beforeComputeEmitActions().
+        return true;
     case kIROp_StructuredBufferGetDimensions:
         {
             emitInstResultDecl(inst);

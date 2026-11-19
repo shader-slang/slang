@@ -2009,8 +2009,16 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_RayQueryType:
         {
+            auto rayQueryType = cast<IRRayQueryType>(type);
             m_writer->emit("RayQuery<");
-            emitSimpleValue(type->getOperand(0));
+            emitSimpleValue(rayQueryType->getRayFlags());
+            // Keep the one-argument spelling when no query flags are requested so shaders
+            // using older shader models do not need the DXR 1.2 template parameter.
+            if (getIntVal(rayQueryType->getRayQueryFlags()) != 0)
+            {
+                m_writer->emit(", ");
+                emitSimpleValue(rayQueryType->getRayQueryFlags());
+            }
             m_writer->emit(" >");
             return;
         }

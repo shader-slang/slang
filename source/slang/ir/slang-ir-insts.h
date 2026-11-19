@@ -2993,6 +2993,12 @@ struct IRRequireQuadDerivatives : IRInst
 };
 
 FIDDLE()
+struct IRRequireRayQueryOpacityMicromap : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRStaticAssert : IRInst
 {
     FIDDLE(leafInst())

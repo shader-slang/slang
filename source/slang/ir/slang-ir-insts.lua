@@ -692,7 +692,7 @@ local insts = {
 				RayQuery = {
 					-- Types
 					struct_name = "RayQueryType",
-					min_operands = 1,
+					operands = { { "rayFlags" }, { "rayQueryFlags" } },
 					hoistable = true,
 				},
 			},
@@ -1565,6 +1565,8 @@ local insts = {
 	-- Quad control execution modes.
 	{ RequireMaximallyReconverges = {} },
 	{ RequireQuadDerivatives = {} },
+	-- Opts the entry points reaching this operation into opacity micromap ray queries.
+	{ RequireRayQueryOpacityMicromap = {} },
 	-- TODO: We should consider splitting the basic arithmetic/comparison
 	-- ops into cases for signed integers, unsigned integers, and floating-point
 	-- values, to better match downstream targets that want to treat them

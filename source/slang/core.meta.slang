@@ -4172,6 +4172,11 @@ void __requireMaximallyReconverges();
 __intrinsic_op($(kIROp_RequireQuadDerivatives))
 void __requireQuadDerivatives();
 
+// Enable opacity micromaps for every entry point that reaches this operation.
+// The caller separately checks the required target capability with __requireCapability.
+__intrinsic_op($(kIROp_RequireRayQueryOpacityMicromap))
+void __requireRayQueryOpacityMicromap();
+
 //@ public:
 /// @category misc_types
 enum MemoryOrder

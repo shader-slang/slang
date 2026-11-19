@@ -2249,8 +2249,10 @@ public:
     // Adding or removing AST classes changes the sequential `ASTNodeType` values. We raise the
     // minimum supported version when those values change so older modules are rejected before
     // their node IDs can be decoded as different AST classes.
-    const static UInt k_minSupportedModuleVersion = 42;
-    const static UInt k_maxSupportedModuleVersion = 42;
+    // RayQuery types now carry both ray flags and ray-query flags. Older modules have
+    // one-operand RayQuery types, which do not satisfy the new two-operand contract.
+    const static UInt k_minSupportedModuleVersion = 43;
+    const static UInt k_maxSupportedModuleVersion = 43;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
