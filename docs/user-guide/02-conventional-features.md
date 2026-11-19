@@ -395,6 +395,7 @@ The prelude types are `UnsizedStructuredBuffer<T>`, `UnsizedRWStructuredBuffer<T
 These structs have no count field. The direct LLVM backend also represents an unsized buffer with one pointer.
 On HLSL, SPIR-V, GLSL, and WGSL targets, it uses the same native resource representation as the matching sized buffer.
 On Metal, it uses the existing device-pointer representation.
+Sized and unsized buffers remain distinct types on every target, including in generic `T is U` comparisons.
 The absence of length-query methods is the same on every target, even where the underlying native resource can report a length.
 
 A sized buffer converts implicitly to its matching unsized type. Explicit construction is also supported:

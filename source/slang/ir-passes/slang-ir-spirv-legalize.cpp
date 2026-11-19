@@ -124,15 +124,41 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     LoweredStructuredBufferTypeInfo lowerStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
     {
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(inst);
+
+        // A sized buffer and its unsized view have the same SPIR-V block representation.
+        // For example, converting StructuredBuffer<float> to __UnsizedStructuredBuffer<float>
+        // leaves the storage pointer unchanged. Share the physical block type so that conversion
+        // can be removed after type lowering, while keeping the logical IR types distinct.
+        auto representationOp = inst->getOp();
+        switch (representationOp)
+        {
+        case kIROp_HLSLUnsizedStructuredBufferType:
+            representationOp = kIROp_HLSLStructuredBufferType;
+            break;
+        case kIROp_HLSLUnsizedRWStructuredBufferType:
+            representationOp = kIROp_HLSLRWStructuredBufferType;
+            break;
+        default:
+            break;
+        }
+        IRType* representationType = inst;
+        if (representationOp != inst->getOp())
+        {
+            ShortList<IRInst*> operands;
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+                operands.add(inst->getOperand(i));
+            representationType = builder.getType(
+                representationOp,
+                (UInt)operands.getCount(),
+                operands.getArrayView().getBuffer());
+        }
         LoweredStructuredBufferTypeInfo result;
-        if (m_loweredStructuredBufferTypes.tryGetValue(inst, result))
+        if (m_loweredStructuredBufferTypes.tryGetValue(representationType, result))
             return result;
 
         auto layoutRules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetProgram, inst);
-
-        IRBuilder builder(m_sharedContext->m_irModule);
-
-        builder.setInsertBefore(inst);
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
         getSizeAndAlignment(
@@ -156,6 +182,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         switch (inst->getOp())
         {
         case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLUnsizedRWStructuredBufferType:
             nameSb << "RWStructuredBuffer";
             break;
         case kIROp_HLSLAppendStructuredBufferType:
@@ -180,7 +207,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         result.structType = structType;
         result.arrayKey = arrayKey;
         result.runtimeArrayType = arrayType;
-        m_loweredStructuredBufferTypes[inst] = result;
+        m_loweredStructuredBufferTypes[representationType] = result;
         return result;
     }
 
@@ -606,7 +633,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto memoryFlags = MemoryQualifierSetModifier::Flags::kNone;
 
                 // structured buffers in GLSL should be annotated as ReadOnly
-                if (as<IRHLSLStructuredBufferType>(structuredBufferType))
+                if (as<IRHLSLStructuredBufferType>(structuredBufferType) ||
+                    as<IRHLSLUnsizedStructuredBufferType>(structuredBufferType))
                 {
                     access = AccessQualifier::Immutable;
                     memoryFlags = MemoryQualifierSetModifier::Flags::kReadOnly;
@@ -2361,6 +2389,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     }
 
     List<IRInst*> m_instsToRemove;
+    OrderedHashSet<IRInst*> m_getUnsizedBufferInsts;
     void processWorkList()
     {
         while (workList.getCount() != 0)
@@ -2391,6 +2420,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_Call:
                 processCall(as<IRCall>(inst));
+                break;
+            case kIROp_GetUnsizedBuffer:
+                m_getUnsizedBufferInsts.add(inst);
                 break;
             case kIROp_GetElement:
                 processGetElement(as<IRGetElement>(inst));
@@ -2950,7 +2982,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto lowered = lowerStructuredBufferType(structuredBufferType);
 
                 AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
-                if (as<IRHLSLStructuredBufferType>(t))
+                if (as<IRHLSLStructuredBufferType>(t) || as<IRHLSLUnsizedStructuredBufferType>(t))
                     accessQualifier = AccessQualifier::Immutable;
 
                 t->replaceUsesWith(builder.getPtrType(
@@ -2980,6 +3012,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(t);
             builder.setInsertBefore(t);
             t->replaceUsesWith(lowered);
+        }
+
+        // Type lowering has now given each view the same physical pointer type as its source.
+        // Remove the conversion only at this boundary, after logical type specialization.
+        for (auto inst : m_getUnsizedBufferInsts)
+        {
+            auto buffer = inst->getOperand(0);
+            SLANG_RELEASE_ASSERT(inst->getDataType() == buffer->getDataType());
+            inst->replaceUsesWith(buffer);
+            inst->removeAndDeallocate();
         }
 
         // If older than spirv 1.4, we need more legalization steps due to lack of opcodes.

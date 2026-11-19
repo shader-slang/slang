@@ -1454,6 +1454,23 @@ struct ByteAddressBufferLegalizationContext
                 &index);
         }
 
+        if (byteAddressBuffer->getOp() == kIROp_GetUnsizedBuffer)
+        {
+            // A view of a byte-address buffer becomes a view of its equivalent structured
+            // buffer. Preserve the conversion so the two logical types remain distinct.
+            auto buffer =
+                getEquivalentStructuredBuffer(elementType, byteAddressBuffer->getOperand(0));
+            if (!buffer)
+                return nullptr;
+            return m_builder.emitIntrinsicInst(
+                getEquivalentStructuredBufferParamType(
+                    elementType,
+                    byteAddressBuffer->getDataType()),
+                kIROp_GetUnsizedBuffer,
+                1,
+                &buffer);
+        }
+
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
         {
             // If the code is fetching the byte-address buffer from an
@@ -1642,6 +1659,10 @@ struct ByteAddressBufferLegalizationContext
             return m_builder.getType(kIROp_HLSLStructuredBufferType, 2, typeOperands);
         case kIROp_HLSLRWByteAddressBufferType:
             return m_builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
+        case kIROp_HLSLUnsizedByteAddressBufferType:
+            return m_builder.getType(kIROp_HLSLUnsizedStructuredBufferType, 2, typeOperands);
+        case kIROp_HLSLUnsizedRWByteAddressBufferType:
+            return m_builder.getType(kIROp_HLSLUnsizedRWStructuredBufferType, 2, typeOperands);
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
             return m_builder.getType(
                 kIROp_HLSLRasterizerOrderedStructuredBufferType,

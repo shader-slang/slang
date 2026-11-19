@@ -62,12 +62,10 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         case kIROp_FieldAddress:
         case kIROp_FieldExtract:
         case kIROp_Load:
-        // A `CastDynamicResource` wraps a bindless/dynamic resource access in a
-        // concrete resource type. Like the indexing ops above, its result is
-        // suitable for specialization exactly when its underlying value (operand
-        // 0) is, so we trace through it to that base. Without this case a bindless
-        // resource argument would not be recognized as specializable.
+        // A resource conversion retains its underlying resource. Like indexing, it is
+        // suitable for specialization when its base is; the callee reconstructs the view.
         case kIROp_CastDynamicResource:
+        case kIROp_GetUnsizedBuffer:
             {
                 auto base = arg->getOperand(0);
 
@@ -647,13 +645,12 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
-        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        else if (
+            oldArg->getOp() == kIROp_CastDynamicResource ||
+            oldArg->getOp() == kIROp_GetUnsizedBuffer)
         {
-            // `CastDynamicResource` is a transparent wrapper that views a
-            // dynamic/bindless resource as a concrete resource type. It
-            // contributes nothing to the specialization key itself, so we just
-            // recurse into its underlying value (operand 0), mirroring the
-            // `Load`/`FieldAddress` cases above.
+            // Resource views are reconstructed in the callee with the original result
+            // type. Their underlying resource determines the specialization key.
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
@@ -990,11 +987,13 @@ struct FunctionParameterSpecializationContext
 
             return newVal;
         }
-        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        else if (
+            oldArg->getOp() == kIROp_CastDynamicResource ||
+            oldArg->getOp() == kIROp_GetUnsizedBuffer)
         {
             // Reconstruct the wrapper inside the specialized body: first obtain the
             // specialized value for the wrapped operand, then re-apply the
-            // `CastDynamicResource` cast over it so the specialized callee sees the
+            // resource conversion over it so the specialized callee sees the
             // same concrete resource type the original argument had.
             //
             // Decorations (including IRSPIRVNonUniformResourceDecoration) are not
@@ -1008,11 +1007,8 @@ struct FunctionParameterSpecializationContext
             auto builder = getBuilder();
             builder->setInsertInto(ioInfo.newBodyInsts);
             IRInst* newOperands[] = {newBase};
-            auto newVal = builder->emitIntrinsicInst(
-                oldArg->getFullType(),
-                kIROp_CastDynamicResource,
-                1,
-                newOperands);
+            auto newVal =
+                builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 1, newOperands);
             return newVal;
         }
         else if (auto oldCombined = as<IRMakeCombinedTextureSampler>(oldArg))

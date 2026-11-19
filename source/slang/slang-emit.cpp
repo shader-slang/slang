@@ -101,7 +101,6 @@
 #include "slang/ir-passes/slang-ir-lower-reinterpret.h"
 #include "slang/ir-passes/slang-ir-lower-result-type.h"
 #include "slang/ir-passes/slang-ir-lower-tuple-types.h"
-#include "slang/ir-passes/slang-ir-lower-unsized-buffer-types.h"
 #include "slang/ir-passes/slang-ir-metadata.h"
 #include "slang/ir-passes/slang-ir-metal-legalize.h"
 #include "slang/ir-passes/slang-ir-missing-return.h"
@@ -466,11 +465,6 @@ void calcRequiredLoweringPassSet(
     // every byte-address buffer type enables it, including rasterizer-ordered ones.
     if (as<IRByteAddressBufferTypeBase>(inst))
         result.byteAddressBuffer = true;
-    if (auto type = as<IRType>(inst))
-    {
-        if (isUnsizedBufferType(type))
-            result.unsizedBuffer = true;
-    }
 
     switch (inst->getOp())
     {
@@ -1171,12 +1165,6 @@ Result linkAndOptimizeIR(
     RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
-
-    // Native resource targets share the sized buffer representation. Establish that type
-    // identity before resource legalization; CPU and CUDA retain their prelude types.
-    if (requiredLoweringPassSet.unsizedBuffer && !isCPUTarget(targetRequest) &&
-        !isCUDATarget(targetRequest))
-        SLANG_PASS(lowerUnsizedBufferTypesToResources);
 
     if (requiredLoweringPassSet.assumeAddress)
     {
