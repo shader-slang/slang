@@ -11,5 +11,5 @@
 
 import "test-14612/../test-14612/mod14612.slang";
 //CHECK: error[E30015]
-//CHECK-NOT: ../
+//CHECK-NOT: {{\.\./}}
 //CHECK: tests/diagnostics/test-14612/mod14612.slang:5
