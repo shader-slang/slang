@@ -32,13 +32,13 @@ SLANG_UNIT_TEST(appManifestDeclaresLongPathAware)
 }
 
 #if SLANG_WINDOWS_FAMILY
-// The executables that host the unit tests (slang-test, the static unit test
-// tool) are created through slang_add_target, which attaches the shared
-// longPathAware manifest. Finding the setting in the running executable's own
-// RT_MANIFEST resource proves the embed pipeline end to end — the manifest
-// source made it through CMake and the manifest tool into the binary — without
-// needing a long-path-enabled machine. If this fails, file I/O silently breaks
-// again for paths over MAX_PATH on long-path-enabled machines.
+// slang-test, which hosts and runs these unit tests, is created through
+// slang_add_target, so it carries the shared longPathAware manifest. Finding
+// the setting in the running executable's own RT_MANIFEST resource proves the
+// embed pipeline end to end — the manifest source made it through CMake and
+// the manifest tool into the binary — without needing a long-path-enabled
+// machine. If this fails, file I/O silently breaks again for paths over
+// MAX_PATH on long-path-enabled machines.
 SLANG_UNIT_TEST(embeddedAppManifestDeclaresLongPathAware)
 {
     HMODULE module = GetModuleHandleW(nullptr);
