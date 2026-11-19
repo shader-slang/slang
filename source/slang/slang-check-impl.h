@@ -1735,6 +1735,11 @@ public:
 
     bool getAllowDroppingDerivatives() { return m_allowDroppingDerivatives; }
 
+    bool getAllowStaticReferenceToNonStaticMember()
+    {
+        return m_allowStaticReferenceToNonStaticMember;
+    }
+
     OrderedHashSet<Val*>* getCapturedPacks() { return m_capturedPacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
