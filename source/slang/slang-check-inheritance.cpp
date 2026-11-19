@@ -1,5 +1,6 @@
 // slang-check-inheritance.cpp
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-rich-diagnostics.h"
 
 // This file implements the semantic checking logic
@@ -856,6 +857,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 applyExtensionToType(&visitor, extDecl, selfType, additionalSubtypeWitness);
             if (!extDeclRef)
                 continue;
+
+            // Applying the extension makes its declared conformances part of this type. A
+            // generic extension defers its structural ray-tracing stage clause to exactly
+            // this point, so each concrete application is checked as it materializes;
+            // repeated facet computations are deduplicated by diagnoseOnce within a
+            // checking session.
+            PortableRT::checkStageRestrictionsForExtensionApplication(&visitor, extDecl, selfType);
 
             // In the case where we *do* find an extension that
             // applies to the type, we add a declared base to

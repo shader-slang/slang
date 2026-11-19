@@ -81,9 +81,9 @@ static void _checkStageImplementationType(
     // The StructDecl check rejects a class or an extension on a generic parameter T. It does not
     // reject `extension float : rt::IClosestHitShader`: float's built-in declaration is a struct.
     // The separate isCompilerBuiltinType check rejects float and other built-in types.
-    // TODO: Allow a generic extension's target T and check the concrete types it applies to.
-    // Simply skipping T here would leave those types unchecked by this rule.
-    // Tracked in https://github.com/shader-slang/slang/issues/13618.
+    // A generic extension that names its own parameter as the target does not reach this rule:
+    // its clause is deferred to checkStageRestrictionsForExtensionApplication, which validates
+    // each concrete type the extension applies to.
     if (!stageDeclRef.as<StructDecl>() || isCompilerBuiltinType)
     {
         const bool hasSourceAggregateDeclaration = stageDeclRef && !isCompilerBuiltinType;
@@ -555,17 +555,109 @@ void initializeEntryPoint(EntryPoint* entryPoint, Name* entryPointName, Type* st
 // invoke. Applying these restrictions at that point also covers a Miss listed in a schema
 // without being selected directly with `-entry Miss`.
 // A conformance to an ordinary interface, such as ITraceProgramSchema, needs no stage restrictions.
+//
+// A generic extension whose target is its own parameter cannot be validated here: the witnessed
+// type is the parameter itself, and its concrete implementations become available only when the
+// extension is applied to a type. Such an application is checked by
+// checkStageRestrictionsForExtensionApplication, so this rule still reaches every concrete type.
 void checkStageRestrictions(
     SemanticsVisitor* visitor,
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable,
-    SourceLoc conformanceLoc)
+    InheritanceDecl* inheritanceDecl)
 {
-    auto stageKind = getStageKind(superInterfaceDeclRef.getDecl());
-    if (stageKind == Stage::Unknown || !witnessTable)
+    if (!isExecutableStageInterface(superInterfaceDeclRef.getDecl()) || !witnessTable)
         return;
 
-    _checkStageImplementationType(visitor, witnessTable->witnessedType, conformanceLoc);
+    // Only a generic extension's own clause can name a bare generic parameter as the witnessed
+    // implementation: a declared conformance always names the declaring aggregate, and a
+    // concrete-target extension names its concrete target. This predicate and the target-type
+    // predicate in checkStageRestrictionsForExtensionApplication are two views of one
+    // condition — the witnessed type of the extension-clause conformance is exactly the
+    // extension's declared target type — so the two gates defer and check the same clauses.
+    if (isDeclRefTypeOf<GenericTypeParamDeclBase>(witnessTable->witnessedType))
+        return;
+
+    _checkStageImplementationType(visitor, witnessTable->witnessedType, inheritanceDecl->loc);
+}
+
+// Checks the user-defined-struct rule deferred by checkStageRestrictions for a generic
+// extension, against one concrete type the extension applies to. For example:
+//
+//     __generic<T : IMarker> extension T : rt::IClosestHitShader { ... }
+//     struct Hit : IMarker {}
+//
+// Building Hit's inheritance information applies the extension to Hit, so the stage
+// conformance comes into existence here. That single point covers every consumption surface
+// listed on checkStageRestrictionsForExtensionApplication in the header: entry selection,
+// schema lists including hit groups, subtype queries, generic specializations, and imported
+// types. The conformance exists as a fact about the program regardless of which query
+// happened to compute the facets, so the rule may be applied even when the query is
+// speculative; diagnoseOnce keeps repeated facet computations within one checking session
+// from duplicating the message.
+void checkStageRestrictionsForExtensionApplication(
+    SemanticsVisitor* visitor,
+    ExtensionDecl* extDecl,
+    Type* selfType)
+{
+    // Only a generic extension that names its own parameter as the target defers its clause
+    // check; the companion predicate in checkStageRestrictions relies on the same condition.
+    // An extension with a concrete target was already checked at its clause, which is exactly
+    // its one concrete application.
+    if (!isDeclRefTypeOf<GenericTypeParamDeclBase>(extDecl->targetType.type))
+        return;
+
+    // Facet construction also serves queries that carry no diagnostic sink, such as
+    // reflection, where a diagnostic could not be reported at all. The guard is also required
+    // for crash safety: the clause loop below runs ensureDecl, whose cyclic-reference path
+    // diagnoses unconditionally, and _checkStageImplementationType calls diagnoseOnce — both
+    // dereference the sink.
+    if (!visitor->getSink())
+        return;
+
+    // The rule validates concrete stage implementations. A type that is itself abstract — the
+    // extension's own parameter reached through another generic, an interface's associated
+    // type, or an interface's `This` — is not an implementation; its concrete instantiations
+    // are checked when their own facets are built. Types that are not declaration references
+    // (such as error types) cannot be stage implementations either, and must not cascade into
+    // a second diagnostic on top of the error that produced them. A plain interface type
+    // refines a contract rather than implementing a stage; it stays silent through the
+    // InterfaceDecl early return in _checkStageImplementationType.
+    auto selfDeclRefType = as<DeclRefType>(as<Type>(selfType->resolve()));
+    if (!selfDeclRefType)
+        return;
+    auto selfDecl = selfDeclRefType->getDeclRef().getDecl();
+    if (as<GenericTypeParamDeclBase>(selfDecl) || as<AssocTypeDecl>(selfDecl) ||
+        as<ThisTypeDecl>(selfDecl))
+        return;
+
+    // Everything this check reads is declaration identity — which parameter kind the target
+    // is, and which interface declaration each clause names — which specialization cannot
+    // change, so the unspecialized declaration carries everything it needs.
+    // The extension's own clauses name the stage interfaces its implementations must satisfy.
+    // The rule runs once per executable-stage clause only to report at a meaningful clause
+    // location; a selfType rejected by several stage clauses gets one diagnosis, deduplicated
+    // by _checkStageImplementationType's diagnoseOnce.
+    for (auto inheritanceDecl : extDecl->getMembersOfType<InheritanceDecl>())
+    {
+        // Synthesized clauses are generated by compiler machinery rather than authored
+        // source; they are not a stage contract a user wrote, so they are not checked here.
+        // (checkExtensionConformance skips them for the same reason.)
+        if (inheritanceDecl->findModifier<SynthesizedModifier>())
+            continue;
+
+        visitor->ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
+        auto baseInterfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(
+            getSup(visitor->getASTBuilder(), makeDeclRef(inheritanceDecl)));
+        if (!baseInterfaceDeclRef)
+            continue;
+        if (!isExecutableStageInterface(baseInterfaceDeclRef.getDecl()))
+            continue;
+
+        // A builtin type has no source declaration of its own, so the clause that declared the
+        // conformance is the best available location for its diagnostic.
+        _checkStageImplementationType(visitor, selfType, inheritanceDecl->loc);
+    }
 }
 
 void diagnoseDuplicateSchemaEntries(

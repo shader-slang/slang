@@ -11895,11 +11895,7 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
-    PortableRT::checkStageRestrictions(
-        this,
-        superInterfaceDeclRef,
-        witnessTable,
-        inheritanceDecl->loc);
+    PortableRT::checkStageRestrictions(this, superInterfaceDeclRef, witnessTable, inheritanceDecl);
     return witnessTable;
 }
 
