@@ -1,4 +1,32 @@
 #
+# Embed the shared longPathAware application manifest into a target, so that
+# the Windows LongPathsEnabled registry opt-in takes effect for the built
+# executable.
+#
+# On Windows 10 (1607) and later the per-machine LongPathsEnabled registry
+# opt-in only takes effect for an executable that declares longPathAware in
+# its application manifest. Without that declaration our tools still fail to
+# open or write files whose full paths exceed MAX_PATH, even on machines
+# where long paths are enabled. CMake embeds .manifest source files into
+# binaries built with the MSVC toolchain (both the VS and the Ninja
+# generators), so listing the shared manifest as a source is all it takes.
+#
+# slang_add_target calls this for every executable it creates. An executable
+# built with a raw add_executable does not go through that path, so it must
+# call this helper itself to opt in. Non-MSVC Windows toolchains (e.g.
+# MinGW) embed no manifest here; no in-tree preset or CI leg builds Windows
+# that way, and a windres-based story would be needed if one ever does.
+#
+function(slang_add_windows_manifest target)
+    if(WIN32 AND MSVC)
+        target_sources(
+            ${target}
+            PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/slang-app.manifest
+        )
+    endif()
+endfunction()
+
+#
 # A function to make target specification a little more declarative
 #
 # See the comments on the options below for usage
@@ -184,23 +212,8 @@ function(slang_add_target dir type)
     #
     # Embed a longPathAware application manifest into Windows executables.
     #
-    # On Windows 10 (1607) and later the per-machine LongPathsEnabled registry
-    # opt-in only takes effect for an executable that declares longPathAware
-    # in its application manifest. Without that declaration our tools still
-    # fail to open or write files whose full paths exceed MAX_PATH, even on
-    # machines where long paths are enabled. CMake embeds .manifest source
-    # files into binaries built with the MSVC toolchain (both the VS and the
-    # Ninja generators), so listing the shared manifest as a source covers
-    # every executable created through slang_add_target.
-    #
-    # We use ${slang_SOURCE_DIR} rather than CMAKE_CURRENT_LIST_DIR here
-    # because the latter resolves to the directory of the caller at function
-    # execution time, not to this file's directory.
-    if(WIN32 AND MSVC AND type STREQUAL "EXECUTABLE")
-        target_sources(
-            ${target}
-            PRIVATE ${slang_SOURCE_DIR}/cmake/slang-app.manifest
-        )
+    if(type STREQUAL "EXECUTABLE")
+        slang_add_windows_manifest(${target})
     endif()
 
     #
