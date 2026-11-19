@@ -138,9 +138,7 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
         (LPCSTR)symbolInLib,
         &moduleHandle);
     // GetModuleFileNameW silently truncates a path that does not fit the buffer and returns the
-    // buffer size, so we grow the buffer until the returned length is smaller. The fixed-size
-    // code this replaces detected the truncation case and returned an empty string, losing the
-    // path of a library installed in a long directory entirely.
+    // buffer size, so we grow the buffer until the returned length is smaller.
     List<wchar_t> buffer;
     buffer.setCount(1024);
     while (true)
