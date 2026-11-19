@@ -120,13 +120,23 @@ bool SharedSemanticsContext::tryGetSubtypeWitnessFromCache(
 void SharedSemanticsContext::cacheSubtypeWitness(Type* sub, Type* sup, SubtypeWitness*& outWitness)
 {
     auto pair = TypePair{sub, sup};
-    UInt subTypeGeneration = _getInheritanceInfoCacheGeneration(sub);
-    UInt superTypeGeneration = _getInheritanceInfoCacheGeneration(sup);
 
     // A zero generation means one of the endpoint inheritance entries is still
     // being recomputed. In that state we don't want to pin a subtype answer to a
     // stale or incomplete inheritance snapshot.
-    if (!subTypeGeneration || !superTypeGeneration)
+    //
+    // We test `sub` before reading the generation of `sup`, because reading it
+    // computes the inheritance of `sup`. A subtype query made while `sub` is
+    // being linearized, such as an extension's `where T : IOther<T>` checked
+    // against `sub = IOther<Z>`, would otherwise linearize an `IOther<IOther<Z>>`
+    // that nothing reads, and that linearization applies the same extension
+    // again. Witness-constraint inference avoids the same converse query for
+    // interface subjects (`tryInferOrdinaryArgsFromWitnessConstraint`).
+    UInt subTypeGeneration = _getInheritanceInfoCacheGeneration(sub);
+    if (!subTypeGeneration)
+        return;
+    UInt superTypeGeneration = _getInheritanceInfoCacheGeneration(sup);
+    if (!superTypeGeneration)
         return;
 
     SubtypeWitnessCacheEntry entry;

@@ -1798,6 +1798,31 @@ private:
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
+        // `TryJoinTypes()` treats whichever operand is an interface as the bound,
+        // so for an interface-typed `sub` it asks whether `sup` conforms to `sub`.
+        // That is the converse of a subtype constraint, and it can recurse
+        // without bound. Consider:
+        //
+        //     extension<T> T : IRec<T> where T : IOther<T> {}
+        //     struct Z : IOther<Z> {}
+        //
+        // Linearizing `Z` applies the extension to its base `IOther<Z>`, so the
+        // constraint becomes `IOther<Z> : IOther<IOther<Z>>`, and the converse
+        // query linearizes the strictly larger `IOther<IOther<Z>>`, which applies
+        // the extension again. We therefore give up inferring ordinary arguments
+        // from an interface subject's shape; the witness step below still accepts
+        // or rejects the constraint. (Proving that witness ends in
+        // `cacheSubtypeWitness`, which must not linearize `sup` either.)
+        //
+        // An equality `T == S` against a non-interface `S`, with `T` defaulted to
+        // an interface, keeps the join, because its answer `S` is the solution. An
+        // equality against an interface `sup` has the recursive shape above, and
+        // only a type-equality witness can satisfy it, so it is skipped too.
+        bool isEqualityToNonInterfaceType =
+            typeConstraintDecl->isEqualityConstraint && !isInterfaceType(sup);
+        if (isInterfaceType(sub) && !isEqualityToNonInterfaceType)
+            return WitnessConstraintInferenceResult::NoNewOrdinaryConstraint;
+
         // `TryJoinTypes()` is the existing path that compares a concrete type
         // against an interface shape and uses facet unification to append
         // ordinary constraints into `m_context.discoveredConstraints`. The
