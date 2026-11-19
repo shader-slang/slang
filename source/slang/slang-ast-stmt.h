@@ -80,17 +80,16 @@ class DeclStmt : public Stmt
     FIDDLE() DeclBase* decl = nullptr;
 };
 
-// A condition of an `if`, `while`, or `do`-`while` statement. The statement classes hold
-// this as their `condition` field; the condition's value as an expression is the `predicate`
-// field below. The clause is neither an `Expr` nor a `Stmt`, so walkers that visit
-// statements dispatch its payload by hand — the declared variable of a
-// `DeclConditionClause` first, then the predicate expression; see
-// `ASTIterator::visitConditionClause` for the pattern.
+// A condition of an `if`, `while`, or `do`-`while` statement: either the expression the
+// statement tests, or (in the HLSL dialect) a single-variable declaration whose variable
+// is the condition's value. The `if`/`while`/`do`-`while` classes hold one of these in
+// their `condition` field. Whatever the surface form, the tested value is available as the
+// `predicate` expression, already converted to `bool` after checking — a client of this
+// type never needs to look at the subclass to evaluate the condition.
 //
-// Declaration conditions are represented directly rather than desugared like the
-// `if (let ...)` idiom: lowering declares the variable in the statement's condition slot,
-// which is what gives a `continue` the C++ re-run-the-initializer behavior that a
-// statement-rewriting desugar cannot express without synthetic labels.
+// The clause is neither an `Expr` nor a `Stmt`, so it is not covered by the `Expr`/`Stmt`
+// visitor frameworks: code that walks these statements must dispatch the clause's fields
+// itself.
 FIDDLE(abstract)
 class ConditionClause : public SyntaxNode
 {
@@ -102,11 +101,10 @@ class ConditionClause : public SyntaxNode
     /// declaration and coerces it to `bool`, like any other condition.
     FIDDLE() Expr* predicate = nullptr;
 
-    /// The lexical scope introduced by the condition, when the condition declares anything
-    /// (`DeclConditionClause`); null for a plain expression. Two consumers read it: the
-    /// statement parsers test it as the signal that they own the scope and must `PopScope()`
-    /// when the declared variable goes out of scope, and lowering makes it the source of
-    /// the condition's debug lexical block.
+    /// The lexical scope that the condition's declaration (if any) belongs to: a
+    /// `DeclConditionClause` adds its variable to this scope, which then spans the
+    /// parts of the statement where the variable is visible. Null for a plain
+    /// expression, which declares nothing.
     FIDDLE() ScopeDecl* scopeDecl = nullptr;
 };
 
@@ -126,9 +124,9 @@ class DeclConditionClause : public ConditionClause
 {
     FIDDLE(...)
 
-    /// The variable that the condition declares. Always present on a `DeclConditionClause`:
-    /// the parser builds it with `CreateVarDeclForContext`, and consumers (the AST
-    /// iterator, the language-server lookup) may assume it is non-null.
+    /// The variable that the condition declares. Always present: the parser only builds
+    /// this clause once it has parsed the whole declaration, so the variable is never
+    /// left null.
     FIDDLE() VarDeclBase* decl = nullptr;
 };
 
