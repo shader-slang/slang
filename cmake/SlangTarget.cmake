@@ -12,10 +12,15 @@
 # generators), so listing the shared manifest as a source is all it takes.
 #
 # slang_add_target calls this for every executable it creates. An executable
-# built with a raw add_executable does not go through that path, so it must
-# call this helper itself to opt in. Non-MSVC Windows toolchains (e.g.
-# MinGW) embed no manifest here; no in-tree preset or CI leg builds Windows
-# that way, and a windres-based story would be needed if one ever does.
+# in the main slang build that is declared with a raw add_executable does not
+# go through that path, so it must call this helper itself to opt in
+# (standalone sub-project targets such as spvdb have no SlangTarget.cmake and
+# sit outside this convention). This is for executable targets only: CMake
+# silently ignores a .manifest source on a library. The helper attaches the
+# one fixed shared manifest; it does not take a caller-supplied manifest.
+# Non-MSVC Windows toolchains (e.g. MinGW) embed no manifest here; no in-tree
+# preset or CI leg builds Windows that way, and a windres-based story would be
+# needed if one ever does.
 #
 function(slang_add_windows_manifest target)
     if(WIN32 AND MSVC)
