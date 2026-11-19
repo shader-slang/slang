@@ -23,12 +23,18 @@ ParameterBlock<MyBlock> block2;
 
 // REFLECT: "elementVarLayout": {
 // REFLECT: "name": "b1",
-// REFLECT: "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+// REFLECT: "bindings": [
+// REFLECT: {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
+// REFLECT: {"kind": "metalArgumentBufferElement", "index": 0}
 
 // REFLECT: "name": "b2",
-// REFLECT: "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
+// REFLECT: "bindings": [
+// REFLECT: {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
+// REFLECT: {"kind": "metalArgumentBufferElement", "index": 1}
 
-// REFLECT: "binding": {"kind": "metalArgumentBufferElement", "index": 0, "count": 2}
+// REFLECT: "bindings": [
+// REFLECT: {"kind": "metalArgumentBufferElement", "index": 0, "count": 2}
+// REFLECT: {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
 
 // REFLECT: "name": "outputBuffer",
 // REFLECT-NEXT: "binding": {"kind": "constantBuffer", "index": 0{{.*}}}

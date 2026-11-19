@@ -3278,15 +3278,15 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
             ->getConstantBufferRules(context->getTargetRequest()->getOptionSet(), nullptr)
             ->GetObjectLayout(
                 ShaderParameterKind::ConstantBuffer,
-                context->layoutContext.objectLayoutOptions)
-            .getSimple();
+                context->layoutContext.objectLayoutOptions);
 
+    AtomicLayoutInfo atom = layoutInfo.getSole();
     ParameterBindingAndKindInfo info;
-    info.kind = layoutInfo.kind;
-    info.count = layoutInfo.size;
-    info.index = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Allocate(
+    info.kind = atom.kind;
+    info.count = atom.size;
+    info.index = usedRangeSet->usedResourceRanges[(int)atom.kind].Allocate(
         nullptr,
-        layoutInfo.size.getFiniteValue());
+        atom.size.getFiniteValue());
     info.space = space;
     return info;
 }
@@ -3305,12 +3305,12 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
                               varLayout->typeLayout ? varLayout->typeLayout->getType() : nullptr)
                           ->GetObjectLayout(
                               ShaderParameterKind::ConstantBuffer,
-                              context->layoutContext.objectLayoutOptions)
-                          .getSimple();
+                              context->layoutContext.objectLayoutOptions);
 
-    const auto count = layoutInfo.size.getFiniteValue();
+    AtomicLayoutInfo atom = layoutInfo.getSole();
+    const auto count = atom.size.getFiniteValue();
 
-    auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(
+    auto existingParam = usedRangeSet->usedResourceRanges[(int)atom.kind].Add(
         varLayout,
         index,
         LayoutSize{count + index});
@@ -3318,7 +3318,7 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     SLANG_ASSERT(existingParam == nullptr);
 
     ParameterBindingAndKindInfo info;
-    info.kind = layoutInfo.kind;
+    info.kind = atom.kind;
     info.count = LayoutSize{count};
     info.index = index;
     info.space = space;
