@@ -1,8 +1,8 @@
 #include "slang-ir-legalize-image-subscript.h"
 
-#include "slang/emission/slang-intrinsic-expand.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-specialize-address-space.h"
+#include "slang/emission/slang-intrinsic-expand.h"
 #include "slang/ir/slang-ir-clone.h"
 #include "slang/ir/slang-ir-insts.h"
 #include "slang/ir/slang-ir-util.h"
