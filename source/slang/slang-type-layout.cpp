@@ -4470,6 +4470,25 @@ static RefPtr<VarLayout> createStructuredBufferContentVarLayout(
     return contentVarLayout;
 }
 
+/// Computes the storage occupied by a resource reference, including its sizedness.
+///
+/// Consider `struct Views { __UnsizedStructuredBuffer<float> data; uint count; }`.
+/// On CUDA, `data` occupies one pointer. Both the resource's reported size and the
+/// placement of `count` must use that same size; otherwise reflection can disagree
+/// with the pointer representation produced by unsized-buffer lowering.
+static ObjectLayoutInfo getResourceObjectLayout(
+    TypeLayoutContext const& context,
+    ShaderParameterKind kind,
+    Type* type)
+{
+    if (isUnsizedBufferType(type) &&
+        (isCPUTarget(context.targetReq) || isCUDATarget(context.targetReq)))
+    {
+        return context.rules->GetPointerLayout(context);
+    }
+    return context.rules->GetObjectLayout(kind, context.objectLayoutOptions);
+}
+
 // Create a type layout for a structured buffer type.
 RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     TypeLayoutContext const& context,
@@ -4478,7 +4497,7 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     RefPtr<TypeLayout> elementTypeLayout)
 {
     auto rules = context.rules;
-    auto info = rules->GetObjectLayout(kind, context.objectLayoutOptions).getSimple();
+    auto info = getResourceObjectLayout(context, kind, structuredBufferType).getSimple();
 
     auto typeLayout = new StructuredBufferTypeLayout();
 
@@ -5459,10 +5478,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto structuredBufferType = as<HLSLStructuredBufferType>(type))
     {
-        auto info = rules
-                        ->GetObjectLayout(
-                            ShaderParameterKind::StructuredBuffer,
-                            context.objectLayoutOptions)
+        auto info = getResourceObjectLayout(context, ShaderParameterKind::StructuredBuffer, type)
                         .getSimple();
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
@@ -5473,11 +5489,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto rwStructuredBufferType = as<HLSLRWStructuredBufferType>(type))
     {
-        auto info = rules
-                        ->GetObjectLayout(
-                            ShaderParameterKind::MutableStructuredBuffer,
-                            context.objectLayoutOptions)
-                        .getSimple();
+        auto info =
+            getResourceObjectLayout(context, ShaderParameterKind::MutableStructuredBuffer, type)
+                .getSimple();
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
             ShaderParameterKind::MutableStructuredBuffer,
@@ -5538,10 +5552,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         as<RaytracingAccelerationStructureType>(type))
     {
         ShaderParameterKind kind = _getShaderParameterKindForResourceType(type);
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind, context.objectLayoutOptions),
-            type,
-            rules);
+        return createSimpleTypeLayout(getResourceObjectLayout(context, kind, type), type, rules);
     }
     else if (auto basicType = as<BasicExpressionType>(type))
     {

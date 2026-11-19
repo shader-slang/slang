@@ -529,6 +529,17 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         break;
     }
 
+    // Unsized buffers become one pointer on CPU/CUDA. Query their layout before
+    // the structured-buffer base class, which also includes the sized variants.
+    if (isUnsizedBufferType(type))
+    {
+        auto size = targetReq && (isCPUTarget(targetReq) || isCUDATarget(targetReq))
+                        ? builtinTypeInfo.genericPointerSize
+                        : 8;
+        *outSizeAndAlignment = IRSizeAndAlignment(size, size);
+        return SLANG_OK;
+    }
+
     // Handle StructuredBuffer types
     if (as<IRHLSLStructuredBufferTypeBase>(type))
     {

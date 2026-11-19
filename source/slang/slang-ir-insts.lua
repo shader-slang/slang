@@ -528,7 +528,9 @@ local insts = {
 					{
 						ByteAddressBufferTypeBase = {
 							{ ByteAddressBuffer = { struct_name = "HLSLByteAddressBufferType" } },
+							{ UnsizedByteAddressBuffer = { struct_name = "HLSLUnsizedByteAddressBufferType" } },
 							{ RWByteAddressBuffer = { struct_name = "HLSLRWByteAddressBufferType" } },
+							{ UnsizedRWByteAddressBuffer = { struct_name = "HLSLUnsizedRWByteAddressBufferType" } },
 							{
 								RasterizerOrderedByteAddressBuffer = {
 									struct_name = "HLSLRasterizerOrderedByteAddressBufferType",
@@ -620,7 +622,9 @@ local insts = {
 					{
 						HLSLStructuredBufferTypeBase = {
 							{ StructuredBuffer = { struct_name = "HLSLStructuredBufferType" } },
+							{ UnsizedStructuredBuffer = { struct_name = "HLSLUnsizedStructuredBufferType" } },
 							{ RWStructuredBuffer = { struct_name = "HLSLRWStructuredBufferType" } },
+							{ UnsizedRWStructuredBuffer = { struct_name = "HLSLUnsizedRWStructuredBufferType" } },
 							{
 								RasterizerOrderedStructuredBuffer = {
 									struct_name = "HLSLRasterizerOrderedStructuredBufferType",
@@ -2955,6 +2959,8 @@ local insts = {
 			},
 		},
 	},
+	-- Discard the length of a sized buffer while preserving its element type and access.
+	{ getUnsizedBuffer = { operands = { { "buffer" } } } },
 	-- Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 	{ getEquivalentStructuredBuffer = { min_operands = 1 } },
 	-- Gets a T[] pointer to the underlying data of a StructuredBuffer etc...

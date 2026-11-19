@@ -378,8 +378,22 @@ class HLSLStructuredBufferType : public HLSLStructuredBufferTypeBase
     FIDDLE(...)
 };
 
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedStructuredBufferType : public HLSLStructuredBufferType
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class HLSLRWStructuredBufferType : public HLSLStructuredBufferTypeBase
+{
+    FIDDLE(...)
+};
+
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedRWStructuredBufferType : public HLSLRWStructuredBufferType
 {
     FIDDLE(...)
 };
@@ -403,8 +417,22 @@ class HLSLByteAddressBufferType : public UntypedBufferResourceType
     FIDDLE(...)
 };
 
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedByteAddressBufferType : public HLSLByteAddressBufferType
+{
+    FIDDLE(...)
+};
+
 FIDDLE()
 class HLSLRWByteAddressBufferType : public UntypedBufferResourceType
+{
+    FIDDLE(...)
+};
+
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedRWByteAddressBufferType : public HLSLRWByteAddressBufferType
 {
     FIDDLE(...)
 };
@@ -1465,6 +1493,9 @@ class ModifiedType : public Type
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
+
+/// Returns whether the resource deliberately carries no buffer length.
+bool isUnsizedBufferType(Type* type);
 
 bool isCopyableType(Type* type);
 bool isNonCopyableType(Type* type);

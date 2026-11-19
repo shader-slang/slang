@@ -190,6 +190,14 @@ struct ByteAddressBufferLegalizationContext
 
     void processGetEquivalentStructuredBuffer(IRInst* inst)
     {
+        // On CPU and CUDA, unsized byte-address and structured buffers are pointers.
+        // Preserve this reinterpretation for resource lowering, which turns it into
+        // a pointer cast. Creating a second global resource would lose its value,
+        // for example when this buffer was obtained by converting a sized buffer.
+        if (isUnsizedBufferType(inst->getDataType()) &&
+            (isCPUTarget(m_target) || isCUDATarget(m_target)))
+            return;
+
         m_builder.setInsertBefore(inst);
 
         // We need to see what type it is to be interpreted as.
@@ -229,7 +237,7 @@ struct ByteAddressBufferLegalizationContext
         // We start by looking at the type being loaded so
         // that we can opt out if it is legal.
         //
-        if (isTypeLegalForByteAddressLoadStore(type))
+        if (isTypeLegalForByteAddressLoadStore(type, load->getOperand(0)))
             return;
 
         // If the type is one that requires legalization,
@@ -262,7 +270,19 @@ struct ByteAddressBufferLegalizationContext
         load->removeAndDeallocate();
     }
 
-    bool isTypeLegalForByteAddressLoadStore(IRType* type)
+    // Return whether accesses will become typed memory operations that require natural
+    // alignment. Consider `buffer.Load<uint64_t>(4)`: a native byte-address buffer or the
+    // CUDA prelude can implement it with unaligned loads, but a structured buffer or an
+    // unsized CPU/CUDA pointer cannot use one 64-bit dereference. Both need the existing
+    // two-word legalization before their resource operations become typed accesses.
+    bool requiresNaturalAlignment(IRInst* buffer)
+    {
+        return m_options.translateToStructuredBufferOps ||
+               (isUnsizedBufferType(buffer->getDataType()) &&
+                (isCPUTarget(m_target) || isCUDATarget(m_target)));
+    }
+
+    bool isTypeLegalForByteAddressLoadStore(IRType* type, IRInst* buffer)
     {
         // Whether or not a type is legal to use for
         // byte-address buffer load/store depends on
@@ -282,6 +302,12 @@ struct ByteAddressBufferLegalizationContext
         //
         if (auto basicType = as<IRBasicType>(type))
         {
+            // Check 64-bit accesses individually so a four-byte-aligned operation is
+            // split while an explicitly aligned access can retain its full width.
+            if (requiresNaturalAlignment(buffer) &&
+                getSameSizeUIntBaseType(basicType->getOp()) == BaseType::UInt64)
+                return false;
+
             // On targets that require translation to
             // make all load/store use `uint` values,
             // any scalar type that isn't `uint` is
@@ -941,10 +967,9 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
-            // Only split misaligned 8-byte scalar loads for targets that translate
-            // byte-address buffers into typed structured buffers. Targets that keep
-            // byte-address-buffer operations use the simple/lowerBasicTypeOps paths.
-            if (m_options.translateToStructuredBufferOps)
+            // A typed memory access needs natural alignment even when it originated
+            // from a byte-address buffer, whose location only promises four bytes.
+            if (requiresNaturalAlignment(buffer))
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_NULL_ON_FAIL(
@@ -1714,7 +1739,7 @@ struct ByteAddressBufferLegalizationContext
 
         // Types that are already legal to use don't require any processing.
         //
-        if (isTypeLegalForByteAddressLoadStore(type))
+        if (isTypeLegalForByteAddressLoadStore(type, store->getOperand(0)))
             return;
 
         // Otherwise we set up to try and emit a replacement.
@@ -1963,9 +1988,8 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
-            // Match the load path: this split is only needed when byte-address buffers
-            // are translated into typed structured buffers.
-            if (m_options.translateToStructuredBufferOps)
+            // Match the load path for buffers that become typed memory accesses.
+            if (requiresNaturalAlignment(buffer))
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));

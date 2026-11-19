@@ -10,6 +10,20 @@
 namespace Slang
 {
 
+bool isUnsizedBufferType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
+    case kIROp_HLSLUnsizedByteAddressBufferType:
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // Share the struct-field traversal while allowing callers to choose which field types disappear.
 // DCE's existing query ignores only void and nested empty structs. Payload boundaries also need
 // arrays of empty elements, but must preserve target-intrinsic types even when they have no fields.
@@ -3684,6 +3698,7 @@ bool doesOpProduceResourceContentAddress(IROp op)
     {
     case kIROp_GetStructuredBufferPtr:
     case kIROp_GetUntypedBufferPtr:
+    case kIROp_GetUnsizedBuffer:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
     case kIROp_ImageTexelPointer:
@@ -3713,6 +3728,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
+    case kIROp_GetUnsizedBuffer:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
         return isPointerToImmutableLocation(loc->getOperand(0));
@@ -3728,6 +3744,8 @@ bool isPointerToImmutableLocation(IRInst* loc)
     {
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLByteAddressBufferType:
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedByteAddressBufferType:
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
         return true;

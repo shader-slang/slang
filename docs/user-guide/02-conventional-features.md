@@ -373,6 +373,57 @@ Structured buffer types like `StructuredBuffer<T>` include an explicit element t
 Byte-addressed buffer types like `ByteAddressBuffer` do not specify any particular element type, and instead allow for values to be loaded or stored from any (suitably aligned) byte offset in the buffer.
 Both structured and byte-addressed buffers can use an _access_ to distinguish between read-only and read-write usage.
 
+##### Provisional Unsized Buffers
+
+Slang provides provisional unsized views of structured and byte-addressed buffers. Their names and API may change:
+
+| Unsized type | Matching sized type |
+|--------------|---------------------|
+| `__UnsizedStructuredBuffer<T, L>` | `StructuredBuffer<T, L>` |
+| `__UnsizedRWStructuredBuffer<T, L>` | `RWStructuredBuffer<T, L>` |
+| `__UnsizedByteAddressBuffer` | `ByteAddressBuffer` |
+| `__UnsizedRWByteAddressBuffer` | `RWByteAddressBuffer` |
+
+For structured buffers, `L` is optional and defaults to `DefaultDataLayout`, as it does for the sized types.
+Unsized buffers support loads, and their read-write variants support stores and atomics.
+Structured buffers also support indexing.
+Unsized buffers have no `GetDimensions` or `getCount` methods on any target and do not implement `IArray` or `IRWArray`.
+Pass a length separately when the algorithm needs one; the caller must ensure that accesses stay within the allocated storage.
+
+On CPU and CUDA targets, an unsized buffer is represented by a data pointer without a count field.
+On HLSL, SPIR-V, GLSL, and WGSL targets, it uses the same native resource representation as the matching sized buffer.
+On Metal, it uses the existing device-pointer representation.
+The absence of length-query methods is the same on every target, even where the underlying native resource can report a length.
+
+A sized buffer converts implicitly to its matching unsized type. Explicit construction is also supported:
+
+```slang
+void copyValues(
+    __UnsizedStructuredBuffer<float> source,
+    __UnsizedRWStructuredBuffer<float> destination,
+    uint count)
+{
+    for (uint i = 0; i < count; ++i)
+        destination[i] = source[i];
+}
+
+void copySizedValues(
+    StructuredBuffer<float> source,
+    RWStructuredBuffer<float> destination,
+    uint count)
+{
+    // Explicit construction discards the destination's length.
+    let unsizedDestination = __UnsizedRWStructuredBuffer<float>(destination);
+    // The source converts implicitly at the call boundary.
+    copyValues(source, unsizedDestination, count);
+}
+```
+
+Conversion refers to the same storage and discards length information where it is stored separately.
+For structured buffers, the element type `T` and layout `L` must match.
+There is no reverse conversion from unsized to sized, and conversion does not change access rights: a read-only buffer cannot become read-write.
+The existing public names remain sized types with their existing behavior; they are aliases for `__SizedStructuredBuffer`, `__SizedRWStructuredBuffer`, `__SizedByteAddressBuffer`, and `__SizedRWByteAddressBuffer`, respectively.
+
 ##### Constant Buffers
 
 Constant buffers (sometimes also called "uniform buffers") are typically used to pass immutable parameter data from a host application to GPU code.

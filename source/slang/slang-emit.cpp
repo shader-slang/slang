@@ -465,6 +465,11 @@ void calcRequiredLoweringPassSet(
     // every byte-address buffer type enables it, including rasterizer-ordered ones.
     if (as<IRByteAddressBufferTypeBase>(inst))
         result.byteAddressBuffer = true;
+    if (auto type = as<IRType>(inst))
+    {
+        if (isUnsizedBufferType(type))
+            result.unsizedBuffer = true;
+    }
 
     switch (inst->getOp())
     {
@@ -1165,6 +1170,13 @@ Result linkAndOptimizeIR(
     RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    // Resource targets use the same representation for sized and unsized buffers.
+    // Canonicalize these types before resource legalization and target-specific passes.
+    // CPU and CUDA retain the distinction until their buffer operations become pointer IR.
+    if (requiredLoweringPassSet.unsizedBuffer && !isCPUTarget(targetRequest) &&
+        !isCUDATarget(targetRequest))
+        SLANG_PASS(lowerUnsizedBufferTypesToResources);
 
     if (requiredLoweringPassSet.assumeAddress)
     {
@@ -2729,6 +2741,16 @@ Result linkAndOptimizeIR(
         lowerBufferElementTypeToStorageType,
         targetProgram,
         bufferElementTypeLoweringOptions);
+
+    if (requiredLoweringPassSet.unsizedBuffer && !isCPUTargetViaLLVM(targetRequest) &&
+        (isCPUTarget(targetRequest) || isCUDATarget(targetRequest)))
+    {
+        // Keep unsized buffers as resources until their physical element types are known.
+        // For example, a column-major matrix needs the same storage conversion through
+        // a sized buffer and through its unsized view. Ordinary pointers would bypass
+        // that buffer-element legalization. Byte-address accesses were legalized earlier.
+        SLANG_PASS(lowerCPUResourceTypes, codeGenContext, true);
+    }
 
     // Loading a whole struct that has an int/uint/bool matrix member copies the buffer storage
     // type into the logical type with a `CopyLogical` inst. SPIR-V has `OpCopyLogical` for it,

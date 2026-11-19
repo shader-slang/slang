@@ -5,6 +5,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-buffer-element-type.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 // This pass lowers resource types and the instructions accessing them into
@@ -19,6 +20,10 @@
 //
 //     Instructions that access `LoweredType` are lowered immediately in this
 //     pass such that they index `data` as needed.
+//
+// Unsized structured and byte-address buffers lower directly to their data
+// pointers. C++ and CUDA use this lowering only for unsized buffers, leaving
+// the sized buffer types implemented by their existing prelude wrappers.
 //
 // ConstantBufferType/ParameterBlockType:
 //
@@ -45,10 +50,16 @@ namespace Slang
 struct ResourceTypeLoweringContext : InstPassBase
 {
     CodeGenContext* codeGenContext;
+    bool onlyUnsizedBuffers;
     Dictionary<IRType*, IRType*> loweredResourceTypes;
 
-    ResourceTypeLoweringContext(CodeGenContext* codeGenContext, IRModule* inModule)
-        : InstPassBase(inModule), codeGenContext(codeGenContext)
+    ResourceTypeLoweringContext(
+        CodeGenContext* codeGenContext,
+        IRModule* inModule,
+        bool onlyUnsizedBuffers)
+        : InstPassBase(inModule)
+        , codeGenContext(codeGenContext)
+        , onlyUnsizedBuffers(onlyUnsizedBuffers)
     {
     }
 
@@ -56,11 +67,18 @@ struct ResourceTypeLoweringContext : InstPassBase
     {
         if (loweredResourceTypes.containsKey(type))
             return;
+        if (onlyUnsizedBuffers && !isUnsizedBufferType(type))
+            return;
 
         IRType* loweredType = nullptr;
+        const auto addressSpace = isCUDATarget(codeGenContext->getTargetReq())
+                                      ? AddressSpace::Global
+                                      : AddressSpace::Generic;
         AccessQualifier access = AccessQualifier::Read;
         if (type->getOp() == kIROp_HLSLRWByteAddressBufferType ||
-            type->getOp() == kIROp_HLSLRWStructuredBufferType)
+            type->getOp() == kIROp_HLSLRWStructuredBufferType ||
+            type->getOp() == kIROp_HLSLUnsizedRWByteAddressBufferType ||
+            type->getOp() == kIROp_HLSLUnsizedRWStructuredBufferType)
             access = AccessQualifier::ReadWrite;
 
         switch (type->getOp())
@@ -79,19 +97,26 @@ struct ResourceTypeLoweringContext : InstPassBase
             break;
         case kIROp_HLSLStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLUnsizedStructuredBufferType:
+        case kIROp_HLSLUnsizedRWStructuredBufferType:
             {
                 auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
                 auto layoutType =
                     getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
 
-                IRStructType* s = builder.createStructType();
-                auto ptrKey = builder.createStructKey();
-                auto sizeKey = builder.createStructKey();
                 auto ptrType = builder.getPtrType(
                     bufferType->getElementType(),
                     access,
-                    AddressSpace::Generic,
+                    addressSpace,
                     layoutType);
+                if (isUnsizedBufferType(type))
+                {
+                    loweredType = ptrType;
+                    break;
+                }
+                IRStructType* s = builder.createStructType();
+                auto ptrKey = builder.createStructKey();
+                auto sizeKey = builder.createStructKey();
                 builder.createStructField(s, ptrKey, ptrType);
                 builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
                 loweredType = s;
@@ -99,18 +124,22 @@ struct ResourceTypeLoweringContext : InstPassBase
             break;
         case kIROp_HLSLByteAddressBufferType:
         case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_HLSLUnsizedByteAddressBufferType:
+        case kIROp_HLSLUnsizedRWByteAddressBufferType:
             {
                 auto layoutType =
                     getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
 
+                auto ptrType =
+                    builder.getPtrType(builder.getUInt8Type(), access, addressSpace, layoutType);
+                if (isUnsizedBufferType(type))
+                {
+                    loweredType = ptrType;
+                    break;
+                }
                 IRStructType* s = builder.createStructType();
                 auto ptrKey = builder.createStructKey();
                 auto sizeKey = builder.createStructKey();
-                auto ptrType = builder.getPtrType(
-                    builder.getUInt8Type(),
-                    access,
-                    AddressSpace::Generic,
-                    layoutType);
                 builder.createStructField(s, ptrKey, ptrType);
                 builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
                 loweredType = s;
@@ -135,6 +164,8 @@ struct ResourceTypeLoweringContext : InstPassBase
 
     IRInst* getBufferPtr(IRBuilder& builder, IRInst* buffer)
     {
+        if (as<IRPtrType>(buffer->getDataType()))
+            return buffer;
         auto structType = cast<IRStructType>(buffer->getDataType());
         return builder.emitFieldExtract(buffer, structType->getFields().getFirst()->getKey());
     }
@@ -147,10 +178,22 @@ struct ResourceTypeLoweringContext : InstPassBase
 
     void processInst(IRBuilder& builder, IRInst* inst)
     {
+        // C++ and CUDA retain their sized prelude buffers. Only operations whose
+        // buffer became a pointer belong to this lowering on those targets.
+        if (onlyUnsizedBuffers &&
+            (inst->getOperandCount() == 0 || !as<IRPtrType>(inst->getOperand(0)->getDataType())))
+            return;
+
         IRInst* loweredInst = nullptr;
         builder.setInsertBefore(inst);
         switch (inst->getOp())
         {
+        case kIROp_GetUnsizedBuffer:
+            {
+                auto ptr = getBufferPtr(builder, inst->getOperand(0));
+                loweredInst = builder.emitCast(inst->getDataType(), ptr);
+            }
+            break;
         case kIROp_RWStructuredBufferGetElementPtr:
             {
                 auto gepInst = static_cast<IRRWStructuredBufferGetElementPtr*>(inst);
@@ -248,6 +291,12 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto bufferType = inst->getDataType();
                 auto byteBuffer = inst->getOperand(0);
 
+                if (as<IRPtrType>(bufferType))
+                {
+                    loweredInst = builder.emitCast(bufferType, getBufferPtr(builder, byteBuffer));
+                    break;
+                }
+
                 auto structType = cast<IRStructType>(bufferType);
                 auto ptrType = as<IRPtrType>(structType->getFields().getFirst()->getFieldType());
                 auto rules =
@@ -301,10 +350,59 @@ struct ResourceTypeLoweringContext : InstPassBase
     }
 };
 
-void lowerCPUResourceTypes(IRModule* module, CodeGenContext* codeGenContext)
+void lowerCPUResourceTypes(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    bool onlyUnsizedBuffers)
 {
-    ResourceTypeLoweringContext context(codeGenContext, module);
+    ResourceTypeLoweringContext context(codeGenContext, module, onlyUnsizedBuffers);
     context.processModule();
+}
+
+void lowerUnsizedBufferTypesToResources(IRModule* module)
+{
+    IRBuilder builder(module);
+    InstPassBase pass(module);
+    pass.processAllInsts(
+        [&](IRInst* inst)
+        {
+            IROp resourceOp;
+            switch (inst->getOp())
+            {
+            case kIROp_HLSLUnsizedStructuredBufferType:
+                resourceOp = kIROp_HLSLStructuredBufferType;
+                break;
+            case kIROp_HLSLUnsizedRWStructuredBufferType:
+                resourceOp = kIROp_HLSLRWStructuredBufferType;
+                break;
+            case kIROp_HLSLUnsizedByteAddressBufferType:
+                resourceOp = kIROp_HLSLByteAddressBufferType;
+                break;
+            case kIROp_HLSLUnsizedRWByteAddressBufferType:
+                resourceOp = kIROp_HLSLRWByteAddressBufferType;
+                break;
+            default:
+                return;
+            }
+            ShortList<IRInst*> operands;
+            for (UInt i = 0; i < inst->getOperandCount(); ++i)
+                operands.add(inst->getOperand(i));
+            builder.setInsertBefore(inst);
+            auto resourceType = builder.getType(
+                resourceOp,
+                operands.getCount(),
+                operands.getArrayView().getBuffer());
+            inst->replaceUsesWith(resourceType);
+        });
+    pass.processAllInsts(
+        [&](IRInst* inst)
+        {
+            if (inst->getOp() == kIROp_GetUnsizedBuffer)
+            {
+                inst->replaceUsesWith(inst->getOperand(0));
+                inst->removeAndDeallocate();
+            }
+        });
 }
 
 } // namespace Slang

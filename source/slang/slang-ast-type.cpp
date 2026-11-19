@@ -2512,6 +2512,16 @@ Val* TextureTypeBase::getFormat()
     return as<Type>(_getGenericTypeArg(this, 8));
 }
 
+bool isUnsizedBufferType(Type* type)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    return as<HLSLUnsizedStructuredBufferType>(type) ||
+           as<HLSLUnsizedRWStructuredBufferType>(type) ||
+           as<HLSLUnsizedByteAddressBufferType>(type) ||
+           as<HLSLUnsizedRWByteAddressBufferType>(type);
+}
+
 bool isCopyableType(Type* type)
 {
     return !isNonCopyableType(type);
