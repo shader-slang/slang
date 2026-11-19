@@ -11,8 +11,8 @@
 //
 
 //DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): None
-//TEST:SIMPLE(filecheck=NEGATIVE,exit-code=2): -restrictive-capability-check -entry fragMain -stage fragment -target wgsl
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): None
+//TEST:SIMPLE(diag=NEGATIVE,non-exhaustive): -restrictive-capability-check -entry fragMain -stage fragment -target wgsl
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -24,13 +24,10 @@ WTexture1DArray<float4> texHandle;
 void fragMain()
 {
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE: result code = 0
-// POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
 
-// Expect either a compilation error or warning 41012 for upgraded profile to support functionality
-// NEGATIVE: {{error[E[[:digit:]]+]}}:
+//NEGATIVE: error
 
     int ret = 0;
     texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));

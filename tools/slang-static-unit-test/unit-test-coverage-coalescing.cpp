@@ -32,7 +32,7 @@
 // table unresolved at this point and split conservatively, so they cannot
 // stand in for the no-split property 1.)
 
-#include "slang/slang-ir-coverage-instrument.h"
+#include "slang/ir-passes/slang-ir-coverage-instrument.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 

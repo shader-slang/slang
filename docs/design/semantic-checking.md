@@ -1,7 +1,7 @@
 Semantic Checking
 =================
 
-The semantic checking logic in the Slang compiler is located in `source/slang/slang-check*`.
+The semantic checking logic in the Slang compiler is located in `source/slang/semantic-checking/`.
 Semantic checking is applied in the front end after parsing, and before lowering of code to the IR.
 
 The main job of the semantic checking stage is to detect and forbid code that has errors in it.

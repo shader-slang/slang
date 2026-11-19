@@ -149,10 +149,10 @@ Use these to confirm a specific emitted token. Do **not** mine them for claims
 the doc does not state.
 
 - `source/slang/slang-emit.cpp`
-- `source/slang/slang-emit-cuda.cpp`
-- `source/slang/slang-emit-cpp.cpp`
-- `source/slang/slang-emit-c-like.cpp`
-- `source/slang/slang-ir-cuda-immutable-load.cpp`
+- `source/slang/emission/slang-emit-cuda.cpp`
+- `source/slang/emission/slang-emit-cpp.cpp`
+- `source/slang/emission/slang-emit-c-like.cpp`
+- `source/slang/ir-passes/slang-ir-cuda-immutable-load.cpp`
 
 ## Test directives
 

@@ -22,7 +22,7 @@ This page uses the `## Algorithm` heading.
 The `## Concepts` section must cover, at minimum:
 
 - `OverloadCandidate` — declared in
-  [slang-check-impl.h](../../../../source/slang/slang-check-impl.h). Cite
+  [slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h). Cite
   the `Flavor` enum values (`Func`, `Generic`, `UnspecializedGeneric`,
   `Expr`, plus whatever else is present at `source_commit`), the
   `Status` enum, and the `Flags` bit set.
@@ -31,7 +31,7 @@ The `## Concepts` section must cover, at minimum:
   that `JustTrying` performs the same checks without emitting
   diagnostics, so the checker can probe several call shapes.
 - `ConversionCost` — declared / used in
-  [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp).
+  [slang-check-conversion.cpp](../../../../source/slang/semantic-checking/slang-check-conversion.cpp).
   Cite the enum and the line range.
 - `CoercionSite` — also in `slang-check-conversion.cpp`. Cite it as
   the source-level context the cost is computed against.
@@ -41,7 +41,7 @@ The `## Concepts` section must cover, at minimum:
 
 The `## Algorithm` section must walk through the candidate filter
 pipeline in order. Each step is a sub-bullet with the function name in
-[slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
+[slang-check-overload.cpp](../../../../source/slang/semantic-checking/slang-check-overload.cpp)
 and a 1-3 sentence explanation:
 
 1. `TryCheckOverloadCandidateClassNewMatchUp` — match-up of the
@@ -79,7 +79,7 @@ A second level-2 section `## Partial generic application` covering:
 
 - `IsPartiallyAppliedGeneric` flag.
 - `PartiallyAppliedGenericExpr` (cite in
-  [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)).
+  [slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h)).
 - When the resolver returns this instead of fully resolving.
 
 A third level-2 section `## Operator overloading` covering:
@@ -87,9 +87,9 @@ A third level-2 section `## Operator overloading` covering:
 - The builtin-operator fast path. Note that the `ResolvedOperatorOverload`
   cache this prompt used to ask for **no longer exists** — it was removed
   and replaced by `convertToBuiltinArithmeticOp` and its helpers, declared
-  in [slang-check-impl.h](../../../../source/slang/slang-check-impl.h)
+  in [slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h)
   (lines 3927-3982) and defined in
-  [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp).
+  [slang-check-expr.cpp](../../../../source/slang/semantic-checking/slang-check-expr.cpp).
   The fast path lets builtin scalar/vector/matrix operators bypass general
   overload resolution, producing a `BuiltinOperatorExpr` that carries a
   `BuiltinOperationKind`. Do not describe a memoization cache.
@@ -125,10 +125,10 @@ The `## Edge cases and failure modes` section must cover:
 
 - [ ] Every `TryCheckOverloadCandidate*` function name is verified
       against
-      [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
+      [slang-check-overload.cpp](../../../../source/slang/semantic-checking/slang-check-overload.cpp)
       at `source_commit`; do not invent a step.
 - [ ] Every `OverloadCandidate::Flavor` value cited exists in
-      [slang-check-impl.h](../../../../source/slang/slang-check-impl.h).
+      [slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h).
 - [ ] The conversion-cost enum levels are listed in the same order as
       declared in `slang-check-conversion.cpp`.
 - [ ] No claim about partial-ordering or tie-breaking that is not

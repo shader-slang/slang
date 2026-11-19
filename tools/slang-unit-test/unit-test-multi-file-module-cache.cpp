@@ -77,10 +77,10 @@ SLANG_UNIT_TEST(multiFileModuleCache)
         for (int i = 0; i < session->getLoadedModuleCount(); i++)
         {
             slang::IModule* mod = session->getLoadedModule(i);
-            // A module's path is in the simplified form (always `/` separators) that
-            // calcCombinedPath returns, so derive the per-root subpath with the simplified
-            // spelling rather than the OS-preferred delimiter.
-            String path = Path::simplify(mod->getFilePath());
+            // path = root1/...
+            // The module file paths in the memory file system are "/"-separated on every
+            // platform, so split on the portable delimiter rather than the OS-canonical one.
+            String path = mod->getFilePath();
             path =
                 String("root1") + path.getUnownedSlice().tail(path.indexOf(Path::kPathDelimiter));
             path.append("-module");

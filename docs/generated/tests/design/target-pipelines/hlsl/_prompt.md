@@ -50,7 +50,7 @@ HLSL-specific on HLSL.
   `legalizeNonStructParameterToStructForHLSL` and
   `legalizeRayPayloadAccessQualifiersForHLSL`, no longer exist. Since
   #13256, `legalizeRayTracingPayloads`
-  (`source/slang/slang-ir-ray-tracing-legalize.cpp`) gives an empty
+  (`source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp`) gives an empty
   receiving payload a separate one-member struct, wraps non-struct
   arguments of native calls such as `TraceRay`, and fills shader-model
   6.7 payload access qualifiers. It does not wrap a non-struct DXR
@@ -224,13 +224,13 @@ Use these to confirm a specific HLSL emit token. Do **not** mine
 them for claims that the doc does not state.
 
 - `source/slang/slang-emit.cpp`
-- `source/slang/slang-emit-hlsl.cpp`
-- `source/slang/slang-emit-hlsl-prelude.cpp`
-- `source/slang/slang-emit-c-like.cpp`
-- `source/slang/slang-ir-hlsl-legalize.cpp`
-- `source/slang/slang-ir-wrap-structured-buffers.cpp`
-- `source/slang/slang-ir-legalize-binary-operator.cpp`
-- `source/slang/slang-ir-byte-address-legalize.cpp`
+- `source/slang/emission/slang-emit-hlsl.cpp`
+- `source/slang/emission/slang-emit-hlsl-prelude.cpp`
+- `source/slang/emission/slang-emit-c-like.cpp`
+- `source/slang/ir-passes/slang-ir-hlsl-legalize.cpp`
+- `source/slang/ir-passes/slang-ir-wrap-structured-buffers.cpp`
+- `source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp`
+- `source/slang/ir-passes/slang-ir-byte-address-legalize.cpp`
 
 ## Test directives
 

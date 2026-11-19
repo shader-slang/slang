@@ -80,14 +80,14 @@ You may look at these files to verify a claim in the doc is realizable
 through the surface language. You may **not** mine them for behaviors
 the doc does not claim.
 
-- `source/slang/slang-check-decl.cpp` (sibling-scope linking for
+- `source/slang/semantic-checking/slang-check-decl.cpp` (sibling-scope linking for
   multi-file modules and namespaces)
-- `source/slang/slang-check-stmt.cpp` (entry/clear logic for
+- `source/slang/semantic-checking/slang-check-stmt.cpp` (entry/clear logic for
   `Decl::hiddenFromLookup` inside a block)
-- `source/slang/slang-check-expr.cpp` (`addSiblingScopeForContainerDecl`)
+- `source/slang/semantic-checking/slang-check-expr.cpp` (`addSiblingScopeForContainerDecl`)
 - `source/slang/slang-session.cpp` (per-source-file `FileDecl`
   sibling chain)
-- `source/slang/slang-lookup.cpp` (lookup walk: parent + nextSibling)
+- `source/slang/semantic-checking/slang-lookup.cpp` (lookup walk: parent + nextSibling)
 
 ## Test directives
 

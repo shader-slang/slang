@@ -7,7 +7,7 @@ See [_common.md](_common.md) for the universal rules and the
 
 Produce `docs/generated/design/ir-reference/types.md` — the per-opcode
 reference for the `Type` family in
-[../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+[../../../../source/slang/ir/slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua)
 (the top-level `Type` entry starts around line 19 and runs to the
 `}` that closes its inner list).
 
@@ -38,9 +38,9 @@ reference for the `Type` family in
   `(see Lua)` and consider whether the entry deserves a `## Notable
   opcodes` callout.
 - The `AST origin` column for type opcodes typically points to the
-  ASTNodes in [slang-ast-type.h](../../../../source/slang/slang-ast-type.h)
+  ASTNodes in [slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h)
   that lower into them. Trace through
-  [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+  [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
   `lowerType*` family of helpers. For built-in scalars, the origin
   is the corresponding `BasicExpressionType` tag. When in doubt,
   write `—`.

@@ -11,7 +11,7 @@
 // Building the module by hand removes the scaffolding: place exactly two
 // functions, decorate one, run the pass, and assert which one survived.
 
-#include "slang/slang-ir-dce.h"
+#include "slang/ir-passes/slang-ir-dce.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 

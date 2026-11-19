@@ -119,7 +119,7 @@ For a focused description of exactly where line, function, and branch
 counters are inserted, with examples, see
 [`shader-coverage-counter-placement.md`](shader-coverage-counter-placement.md).
 
-1. **AST lowering** (`source/slang/slang-lower-to-ir.cpp`). Before
+1. **AST lowering** (`source/slang/lower-to-ir/slang-lower-to-ir.cpp`). Before
    source code is lowered to IR, the front-end emits semantic marker
    ops:
    - `-trace-coverage` emits `IncrementCoverageCounter` before each
@@ -143,7 +143,7 @@ counters are inserted, with examples, see
      `sourceLoc` field, so it survives `stripDebugInfo` and every IR
      transform that preserves operands (inline, clone, link).
 
-2. **IR pass** (`source/slang/slang-ir-coverage-instrument.cpp`).
+2. **IR pass** (`source/slang/ir-passes/slang-ir-coverage-instrument.cpp`).
    Runs after `linkIR` has produced the linked-program IR, and
    before `collectGlobalUniformParameters` packs globals into the
    `GlobalParams` struct. The pass:
@@ -278,17 +278,17 @@ them.
 
 | Path                                                                                  | Role                                                                                                                             |
 | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}`                                   | IR pass — synthesizes the buffer, extends program-scope layout, rewrites marker ops, writes metadata                             |
-| `source/slang/slang-ir-insts.lua`                                                     | Declares the line/function/branch coverage marker IR ops                                                                         |
-| `source/slang/slang-lower-to-ir.cpp`                                                  | Emits marker ops during AST lowering; filters structural statements for line coverage                                            |
+| `source/slang/ir-passes/slang-ir-coverage-instrument.{h,cpp}`                                   | IR pass — synthesizes the buffer, extends program-scope layout, rewrites marker ops, writes metadata                             |
+| `source/slang/ir/slang-ir-insts.lua`                                                     | Declares the line/function/branch coverage marker IR ops                                                                         |
+| `source/slang/lower-to-ir/slang-lower-to-ir.cpp`                                                  | Emits marker ops during AST lowering; filters structural statements for line coverage                                            |
 | `source/slang/slang-emit.cpp`                                                         | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` / `-trace-coverage-reserved-space` |
 | `source/slang/slang-options.cpp`                                                      | Registers the coverage tracing CLI flags                                                                                         |
 | `source/slang/slang-end-to-end-request.cpp`                                           | Writes the `.coverage-manifest.json` sidecar from slangc                                                                         |
 | `include/slang.h`                                                                     | `slang::ICoverageTracingMetadata` public interface                                                                               |
 | `source/compiler-core/slang-artifact-associated-impl.{h,cpp}`                         | `ArtifactPostEmitMetadata` implements the interface                                                                              |
 | `prelude/slang-cpp-prelude.h`                                                         | CPU-target atomic helpers (`_slang_atomic_add_u32/u64`)                                                                          |
-| `source/slang/slang-emit-cpp.cpp`                                                     | CPU emitter's `kIROp_AtomicAdd` handling                                                                                         |
-| `source/slang/slang-emit-metal.cpp`                                                   | Metal emitter's atomic handling (`atomic_fetch_add_explicit`, 32-bit `atomic_uint` only)                                         |
+| `source/slang/emission/slang-emit-cpp.cpp`                                                     | CPU emitter's `kIROp_AtomicAdd` handling                                                                                         |
+| `source/slang/emission/slang-emit-metal.cpp`                                                   | Metal emitter's atomic handling (`atomic_fetch_add_explicit`, 32-bit `atomic_uint` only)                                         |
 | `tests/language-feature/coverage/`                                                    | End-to-end tests                                                                                                                 |
 | `tools/slang-unit-test/unit-test-coverage-metal-runtime.cpp`                          | GPU execution test — validates the Metal binding contract and exact line/function/branch counter values on a real dispatch       |
 | `tools/slang-static-unit-test/unit-test-coverage-coalescing.cpp`                      | Static unit test — drives `assignCoverageCounterSlots` on hand-built IR to pin the counter-coalescing properties                 |

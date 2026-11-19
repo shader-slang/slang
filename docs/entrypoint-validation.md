@@ -23,7 +23,7 @@ diagnostics.
 ## Architecture
 
 Validation lives in `validateEntryPoint()` in
-`source/slang/slang-check-shader.cpp`. After the existing return-type checks
+`source/slang/semantic-checking/slang-check-shader.cpp`. After the existing return-type checks
 (resource types, array types), a validation pass walks each varying parameter
 type and the return type, checking them against a **data-driven rule table**.
 

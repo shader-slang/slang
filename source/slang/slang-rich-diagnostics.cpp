@@ -1,10 +1,10 @@
 #include "slang-rich-diagnostics.h"
 
 #include "compiler-core/slang-rich-diagnostics-render.h"
-#include "slang-ast-modifier.h"
-#include "slang-ast-type.h"
-#include "slang-ir.h"
 #include "slang-target.h"
+#include "slang/ast/slang-ast-modifier.h"
+#include "slang/ast/slang-ast-type.h"
+#include "slang/ir/slang-ir.h"
 
 //
 #include "slang-rich-diagnostics.cpp.fiddle"

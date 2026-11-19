@@ -20,9 +20,9 @@ Override the standard family contract for the `## Nodes` section: this
 page lists *abstract* roots, not concrete leaves. Use this structure:
 
 1. `# AST Base Reference` title.
-2. `## Source` linking [slang-ast-base.h](../../../../source/slang/slang-ast-base.h),
-   [slang-ast-forward-declarations.h](../../../../source/slang/slang-ast-forward-declarations.h),
-   and [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h).
+2. `## Source` linking [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h),
+   [slang-ast-forward-declarations.h](../../../../source/slang/ast/slang-ast-forward-declarations.h),
+   and [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h).
 3. `## Root hierarchy` — a mermaid diagram of the abstract roots
    declared in `slang-ast-base.h`:
    `NodeBase`, `SyntaxNode`, `DeclBase`, `Decl`, `ModifiableSyntaxNode`,
@@ -46,7 +46,7 @@ page lists *abstract* roots, not concrete leaves. Use this structure:
      `ModifiableSyntaxNode`), write "(no dedicated family page)".
 5. `## Support types` — short table covering the most-used
    non-node helpers from
-   [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h):
+   [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h):
    `DeclRef`, `LookupResult`, `NameLoc`, `DiagnosticInfo`-related
    helpers, `Scope`. Columns: Name, Header, Purpose. One row per type.
 6. `## See also` — bullets linking the per-family reference pages and

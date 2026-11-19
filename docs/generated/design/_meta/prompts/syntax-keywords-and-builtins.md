@@ -23,7 +23,7 @@ a specific identifier is special.
 1. `# Keywords and Built-in Syntax` (title)
 2. `## Where keywords come from` — short paragraph explaining the
    syntax-as-declaration model, citing
-   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) and the
+   [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) and the
    `meta.slang` files in the watched paths.
 3. `## Lexer-recognized keywords` — list any tokens that the lexer
    does treat specially (operators, punctuators that have dedicated
@@ -32,7 +32,7 @@ a specific identifier is special.
    not invent entries.
 4. `## Parser-registered syntax keywords` — keywords whose meaning is
    determined by `addBuiltinSyntax` / `add*Syntax` calls in
-   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp). Group
+   [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp). Group
    them by what they introduce:
    - Declaration keywords (`struct`, `class`, `enum`, `interface`,
      `extension`, `func`, `var`, `let`, `typedef`, `import`,

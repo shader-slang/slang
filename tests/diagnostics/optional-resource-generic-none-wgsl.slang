@@ -4,6 +4,17 @@
 // coupled to this fix: a default-constructed opaque handle (from `Optional<T>`
 // specialized to a resource and a `none` payload) must be rejected here too, not
 // just on SPIR-V/GLSL.
+//
+// The diagnostic points at the subscript call site, not at the `none` in the
+// getter. On WGSL the getter call is rebuilt by type legalization, and once the
+// rebuilt call carries the source location the user wrote, the inlining in the
+// post-legalization specializeResourceUsage pass attributes the cloned
+// instructions to the call site (its documented call-site-first preference)
+// instead of falling back to each cloned instruction's own location. This is
+// not the MandatoryEarlyInliningPass, which runs before target legalization.
+// The SPIR-V and GLSL siblings still pin `none`: their getter call does not go
+// through the same rebuild, so the inliner keeps falling back to the cloned
+// instruction's own location there.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl
 
@@ -14,8 +25,6 @@ struct TextureArray<T>
     __subscript() -> Optional<T>
     {
         get { return none; }
-//CHECK:             ^^^^ opaque type in local variable is not supported for Khronos targets
-//CHECK:             ^^^^ a resource or other opaque-typed value ('Texture2D') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function
     }
 }
 
@@ -26,4 +35,6 @@ TextureArray<Texture2D> textures;
 float4 fs_main() : SV_Target
 {
     return textures[].value.Load(int3(0));
+//CHECK:           ^ opaque type in local variable is not supported for Khronos targets
+//CHECK:           ^ a resource or other opaque-typed value ('Texture2D') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function
 }
