@@ -3377,7 +3377,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_Unmodified:
         break;
 
-        // Instructions that need target-specific statement emission.
+        // Insts that needs to be emitted as code blocks.
     case kIROp_CudaKernelLaunch:
     case kIROp_AtomicLoad:
     case kIROp_AtomicStore:
@@ -3400,7 +3400,6 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_CoopVecMatMulAdd:
     case kIROp_CoopVecOuterProductAccumulate:
     case kIROp_CoopVecReduceSumAccumulate:
-    case kIROp_RequireRayQueryOpacityMicromap:
         emitInstStmt(inst);
         break;
 

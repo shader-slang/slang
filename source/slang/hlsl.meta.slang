@@ -22800,8 +22800,8 @@ static const RAYQUERY_FLAG RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS = 0x01;
 [sealed]
 interface IRayQueryFeature
 {
-    // The public type carries capability requirements; this value describes the
-    // corresponding native query flags when the opaque query type is lowered.
+    // Capability requirements come from the feature type. The builtin tag lets native
+    // RayQuery lowering find this associated constant without relying on its name.
     __builtin_requirement($((int)BuiltinRequirementKind::RayQueryFlags))
     internal static const RAYQUERY_FLAG _rayQueryFlags;
 }
@@ -22851,14 +22851,14 @@ struct RayQueryFeatures<each Feature> : IRayQueryFeature
 
 /// The optional second generic argument selects ray-query feature types independently of ray flags.
 /// For example, `RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>>` enables
-/// opacity micromaps when `TraceRayInline` is called. The feature type requires the
-/// `rayquery_opacity_micromap` capability. SPIR-V uses the KHR execution mode, while GLSL
-/// expresses the same mode through `GL_EXT_opacity_micromap_ray_query_mode`.
+/// opacity micromaps through the feature type's `rayquery_opacity_micromap` capability requirement.
+/// SPIR-V uses the KHR execution mode, while GLSL expresses the same mode through
+/// `GL_EXT_opacity_micromap_ray_query_mode`.
 ///
 /// For SPIR-V and GLSL, enabling opacity micromaps applies to every ray query in each
-/// entry point that reaches the opted-in `TraceRayInline` call, including queries whose
-/// feature set is empty. The application must enable the
-/// Vulkan micromap feature and attach micromaps to the acceleration structure separately.
+/// entry point that requires the feature, including queries whose feature set is empty.
+/// The application must enable the Vulkan micromap feature and attach micromaps to the
+/// acceleration structure separately.
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
@@ -22962,9 +22962,6 @@ struct RayQuery<
         case hlsl: __intrinsic_asm ".TraceRayInline";
         case glsl:
         case spirv:
-            if ((Features._rayQueryFlags & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) != 0)
-                __requireRayQueryOpacityMicromap();
-
             __rayQueryInitializeEXT(
                 accelerationStructure,
                 rayFlags | rayFlagsGeneric,

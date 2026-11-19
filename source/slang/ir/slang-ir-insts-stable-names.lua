@@ -887,6 +887,5 @@ return {
 	["Type.TraceProgramDescriptor"] = 911,
 	["metalTraceRay"] = 912,
 	["Decoration.Artificial"] = 913,
-	["Decoration.assumeValidResourceOperands"] = 914,
-	["RequireRayQueryOpacityMicromap"] = 915
+	["Decoration.assumeValidResourceOperands"] = 914
 }

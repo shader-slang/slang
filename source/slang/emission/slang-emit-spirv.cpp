@@ -5445,21 +5445,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 getParentFunc(inst),
                 SpvExecutionModeQuadDerivativesKHR);
             break;
-        case kIROp_RequireRayQueryOpacityMicromap:
-            {
-                // TraceRayInline emits this operation only for a query that allows micromaps.
-                // A shared helper can serve several entry points, so apply the opt-in to each
-                // caller through the same reference graph used by other execution modes.
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_opacity_micromap"));
-                requireSPIRVCapability(SpvCapabilityRayTracingOpacityMicromapExecutionModeKHR);
-                IRBuilder builder(m_irModule);
-                requireSPIRVExecutionModeOnReferencingEntryPoints(
-                    nullptr,
-                    getParentFunc(inst),
-                    SpvExecutionModeOpacityMicromapIdKHR,
-                    builder.getBoolValue(true));
-                break;
-            }
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 result = emitOpReturn(parent, inst);
@@ -6722,6 +6707,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_64bit_indexing"));
             requireSPIRVCapability(SpvCapabilityShader64BitIndexingEXT);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeShader64BitIndexingEXT);
+            break;
+        case kIROp_RequireCapabilityAtomDecoration:
+            if (cast<IRRequireCapabilityAtomDecoration>(decoration)->getAtom() ==
+                CapabilityName::spvRayTracingOpacityMicromapExecutionModeKHR)
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_opacity_micromap"));
+                requireSPIRVCapability(SpvCapabilityRayTracingOpacityMicromapExecutionModeKHR);
+                IRBuilder builder(m_irModule);
+                requireSPIRVExecutionMode(
+                    nullptr,
+                    dstID,
+                    SpvExecutionModeOpacityMicromapIdKHR,
+                    builder.getBoolValue(true));
+            }
             break;
         case kIROp_SPIRVBufferBlockDecoration:
             {
