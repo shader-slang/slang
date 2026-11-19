@@ -4,7 +4,10 @@
 // decompose during type legalization into an ordinary part and a special
 // (resource) part. The opaque-handle diagnostic must remain located at the use
 // that flows through the decomposition, so diagnostics for decomposed values
-// keep pointing at user code.
+// keep pointing at user code. The uninitialized-variable warning is suppressed
+// so the test checks only the opaque-handle error; that warning covers the
+// ordinary scalar half of the struct and the opaque-handle diagnostic is a
+// separate fatal it does not touch.
 
 uniform Texture2D gTex;
 uniform SamplerState gSampler;

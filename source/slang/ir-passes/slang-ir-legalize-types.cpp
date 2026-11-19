@@ -469,6 +469,18 @@ private:
             m_call->getCallee(),
             m_args.getCount(),
             m_args.getArrayView().getBuffer());
+        // The emitted call is not always part of the returned `LegalVal`: a
+        // `none` result returns an empty value, and a `tuple` result returns
+        // only the out-arguments that receive the decomposed pieces. The
+        // post-process in `processInst` stamps only what the returned value
+        // reaches, so this rebuild site applies the replacement bookkeeping
+        // itself: the rebuilt call takes the original's place, so it carries
+        // the original's source location and decorations. For a call that
+        // ends up inside the returned value this is a harmless prefix — the
+        // post-process then finds the location already set and the original
+        // already stripped of decorations.
+        newCall->sourceLoc = m_call->sourceLoc;
+        m_call->transferDecorationsTo(newCall);
         return newCall;
     }
 };
@@ -2377,9 +2389,8 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                     inst->getOperand(1));
 
                 inst->replaceUsesWith(newInst);
-                // The original is kept unlinked until the pass's cleanup so the
-                // replacement bookkeeping in `processInst` can still read its
-                // location and decorations.
+                // Deferred removal, as in the simple-capture case above, keeps
+                // the original readable for the post-process bookkeeping.
                 inst->removeFromParent();
                 context->replacedInstructions.add(inst);
                 return LegalVal::simple(newInst);
@@ -3726,9 +3737,11 @@ static constexpr int kHasBeenAddedScratchBitIndex = 1;
 
 /// Give every `simple` leaf of a decomposed `LegalVal` the source location of
 /// the original instruction it replaces, unless the leaf already has a
-/// location of its own. Leaves that are `IRConstant` instructions are skipped:
-/// constants are deduplicated module-wide and shared between use sites, so a
-/// constant must not absorb the location of any one original.
+/// location of its own. A `none` value is expected input (a `pair` side can be
+/// empty) and simply has no leaves to locate. Leaves that are `IRConstant`
+/// instructions are skipped: constants are deduplicated module-wide and
+/// shared between use sites, so a constant must not absorb the location of any
+/// one original.
 static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& legalVal)
 {
     switch (legalVal.flavor)
@@ -3739,6 +3752,11 @@ static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& l
             if (!as<IRConstant>(leaf) && !leaf->sourceLoc.isValid())
                 leaf->sourceLoc = originalInst->sourceLoc;
         }
+        return;
+
+    case LegalVal::Flavor::none:
+        // An empty value is expected input here (a `pair` side can be
+        // empty); it has no leaves to locate.
         return;
 
     case LegalVal::Flavor::tuple:
@@ -3760,6 +3778,7 @@ static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& l
         return;
 
     default:
+        SLANG_UNEXPECTED("unhandled LegalVal flavor when setting source locations");
         return;
     }
 }
@@ -3771,38 +3790,70 @@ static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& l
 /// user attached to the original must follow it. Every instruction making up
 /// `legalVal` receives `originalInst`'s source location unless it already has
 /// one of its own, so a diagnostic that fires on the replacement still points
-/// at the source the user wrote. A `simple` one-for-one replacement additionally
+/// at the source the user wrote. A fresh one-for-one replacement additionally
 /// receives the original's decorations, which legalization otherwise tends to
 /// drop. Consider a call that passes a struct containing a `Texture2D`: the
 /// legalizer rebuilds the call, and the rebuilt call must keep an
 /// `[IgnoreSideEffects]` decoration, because `mightHaveSideEffects` reads that
 /// decoration when deciding whether dead-code elimination may remove the
-/// call. Decorations are only transferred for the `simple` flavor, where one
-/// instruction became exactly one replacement with no rewriting beyond
-/// operands; a decomposition into multiple values has no single obvious
-/// destination for the original's decorations, so its leaves only receive the
-/// source location.
+/// call.
 ///
-/// Replacement targets that are `IRConstant` instructions are skipped: a
-/// constant is deduplicated module-wide and shared between use sites, so it
-/// must not absorb the location or decorations of any one original (for
-/// example, the shared void value that stands in for an aborted call's
-/// result).
+/// The post-process only reaches instructions that appear in the returned
+/// `LegalVal`. A rebuilt call whose result legalizes to nothing (`none`) or
+/// decomposes into out-arguments (`tuple`) sits outside that value, so
+/// `LegalCallBuilder::_emitCall` applies the same bookkeeping at its own site
+/// for exactly those calls.
+///
+/// Decorations are moved, not copied, and arrive on the replacement in
+/// reverse order; the readers that consult them (`findDecoration`-style
+/// scans) are order-insensitive. They transfer only for the `simple` flavor
+/// and only when the replacement is an instruction this pass created: a
+/// decomposition into multiple values has no single obvious destination for
+/// the original's decorations, and a `simple` result can also be a
+/// pre-existing instruction forwarded through a decomposition (for example
+/// a field extract whose result is the field's existing value), which has
+/// users of its own that the original never had. Forwarded values still
+/// receive the location, because it only fills in when they have none.
+///
+/// Replacement targets that are `IRConstant` instructions are skipped
+/// entirely: a constant is deduplicated module-wide and shared between use
+/// sites, so it must not absorb the location or decorations of any one
+/// original (for example, the shared void value that stands in for an
+/// aborted call's result).
 static void transferSourceLocAndDecorationsToLegalizedInst(
+    IRTypeLegalizationContext* context,
     IRInst* originalInst,
     LegalVal const& legalVal)
 {
-    if (legalVal.flavor == LegalVal::Flavor::simple)
+    if (legalVal.flavor != LegalVal::Flavor::simple)
     {
-        auto replacement = legalVal.getSimple();
-        if (replacement == originalInst || as<IRConstant>(replacement))
-            return;
-        if (!replacement->sourceLoc.isValid())
-            replacement->sourceLoc = originalInst->sourceLoc;
-        originalInst->transferDecorationsTo(replacement);
+        setSourceLocOnLegalValLeaves(originalInst, legalVal);
         return;
     }
-    setSourceLocOnLegalValLeaves(originalInst, legalVal);
+
+    auto replacement = legalVal.getSimple();
+
+    // The legal value of an instruction that legalizes to itself is that
+    // same instruction: nothing was replaced, so there is nothing to inherit.
+    if (replacement == originalInst)
+        return;
+
+    // A constant target is a deduplicated value shared module-wide; it must
+    // not absorb any one original's location or decorations.
+    if (as<IRConstant>(replacement))
+        return;
+
+    if (!replacement->sourceLoc.isValid())
+        replacement->sourceLoc = originalInst->sourceLoc;
+
+    // A replacement already registered as another instruction's legal value
+    // was not created by this pass — it is a value forwarded through a
+    // decomposition, with users of its own, so the original's decorations
+    // must not move onto it.
+    if (context->mapValToLegalVal.containsKey(replacement))
+        return;
+
+    originalInst->transferDecorationsTo(replacement);
 }
 
 struct IRTypeLegalizationPass
@@ -4006,10 +4057,12 @@ struct IRTypeLegalizationPass
         registerLegalizedValue(context, inst, legalVal);
 
         // The replacement inherits the original's source location and, for a
-        // one-for-one replacement, its decorations. This runs before the
-        // re-queue scan below, so any decoration moved onto the replacement is
+        // fresh one-for-one replacement, its decorations — the helper's doc
+        // comment carries the full rules (constants and values forwarded
+        // through decompositions are skipped). This runs before the re-queue
+        // scan below, so any decoration moved onto the replacement is
         // still visited as one of its children.
-        transferSourceLocAndDecorationsToLegalizedInst(inst, legalVal);
+        transferSourceLocAndDecorationsToLegalizedInst(context, inst, legalVal);
 
         // Once the instruction has been processed, we need to consider
         // whether any other instructions might now be ready to process.

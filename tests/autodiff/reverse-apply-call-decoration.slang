@@ -5,7 +5,13 @@
 // rebuilds the call, and the rebuilt call must keep the decoration:
 // `mightHaveSideEffects` reads it when deciding whether dead-code elimination may
 // remove the call, so dropping it silently changes optimization behavior. Pin the
-// decoration on the rebuilt call in the post-legalization IR.
+// decoration on the rebuilt call in the post-legalization IR. Autodiff also
+// decorates the extracted primal function and its non-context parameters with
+// the same decoration, and the filecheck pattern anchors to the first occurrence
+// in the dump; the rebuilt apply call appears before the apply function's
+// definition here, so the decoration check lands on the call, and the
+// CHECK-NEXT binds it to the apply call line (a decoration elsewhere cannot
+// satisfy that pair).
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -dump-ir-after legalizeResourceTypes
 
