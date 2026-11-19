@@ -8301,7 +8301,10 @@ ConditionClause* Parser::parseConditionClause()
 // `ParseType` for the type, `parseInitDeclarator` for the name and initializer,
 // and `CompleteDecl` to attach modifiers and add the variable to the condition's
 // scope. The variable therefore gets the same checking, lookup, and lowering as
-// any other local, with no condition-specific decl kind.
+// any other local, with no condition-specific decl kind. One deliberate
+// difference from a local declaration: a condition allows only a single
+// declarator, as in C++, so `if (int a = 1, b = 2)` is diagnosed rather than
+// parsed as a declarator list.
 //
 // Consider `while (int i = n--)`. The clause we build holds the declaration of
 // `i` plus an expression that names `i`. Semantic checking brings `i` to its
@@ -8324,6 +8327,20 @@ DeclConditionClause* Parser::parseDeclConditionClause()
     clause->scopeDecl = scopeDecl;
 
     auto modifiers = ParseModifiers(this);
+
+    // A condition variable is initialized before every evaluation of the condition, so
+    // storage duration (initialize once, live for the scope) contradicts the condition
+    // rule; C++ likewise rejects storage-class specifiers in a condition. Diagnose and
+    // keep parsing, so the rest of the declaration still gets ordinary recovery.
+    for (auto modifier : modifiers)
+    {
+        if (as<HLSLStaticModifier>(modifier) || as<HLSLGroupSharedModifier>(modifier) ||
+            as<ExternModifier>(modifier))
+        {
+            sink->diagnose(Diagnostics::ConditionDeclarationStorageClass{.modifier = modifier});
+        }
+    }
+
     Expr* typeSpec = ParseType();
 
     InitDeclarator initDeclarator = parseInitDeclarator(this, kDeclaratorParseOptions_None);
@@ -8331,15 +8348,28 @@ DeclConditionClause* Parser::parseDeclConditionClause()
     declaratorInfo.typeSpec = typeSpec;
     UnwrapDeclarator(this, initDeclarator, &declaratorInfo);
 
+    // A condition deliberately allows only one declarator, like C++. A comma here is a
+    // common mistake (`if (int a = 1, b = 2)`); diagnosing it directly and skipping to
+    // the closing paren keeps recovery to one clear message instead of an unexpected-
+    // token cascade over the remaining declarators.
+    if (LookAheadToken(TokenType::Comma))
+    {
+        sink->diagnose(Diagnostics::ConditionDeclarationAllowsOneDeclarator{
+            .location = tokenReader.peekLoc()});
+        while (!tokenReader.isAtEnd() && !LookAheadToken(TokenType::RParent))
+            SkipBalancedToken(&tokenReader);
+    }
+
     VarDeclBase* varDecl = CreateVarDeclForContext(astBuilder, currentScope->containerDecl);
     CompleteVarDecl(this, varDecl, declaratorInfo);
     CompleteDecl(this, varDecl, currentScope->containerDecl, modifiers, nullptr);
     clause->decl = varDecl;
 
     // An expression that names the declared variable, like the one the
-    // `if (let ...)` desugaring builds for its binding. Checking resolves it
-    // to the declaration, and the declaration is already complete by then,
-    // because the condition is checked before the arms.
+    // `if (let ...)` desugaring builds for its binding. Checking brings the
+    // declaration to its declaration point and then sends this expression
+    // through the predicate path, which is what resolves it to the
+    // declaration; no condition-specific lookup is involved.
     VarExpr* varExpr = astBuilder->create<VarExpr>();
     varExpr->scope = currentScope;
     varExpr->loc = varDecl->getNameLoc();

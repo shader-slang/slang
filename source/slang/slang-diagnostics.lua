@@ -1646,6 +1646,20 @@ err(
 )
 
 err(
+    "condition-declaration-storage-class",
+    30445,
+    "a condition declaration cannot have a storage-class modifier",
+    span { loc = "modifier:Modifier", message = "a condition variable is re-initialized before every evaluation of the condition, so storage-class modifiers like `static` and `groupshared` cannot apply to it." }
+)
+
+err(
+    "condition-declaration-allows-one-declarator",
+    30446,
+    "a condition declaration allows only one declarator",
+    span { loc = "location", message = "as in C++, a declaration used as a condition can declare a single variable; declare additional variables before the statement." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
