@@ -3607,12 +3607,15 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 }
 
 // Compute the array type that a chain of type-position brackets denotes, e.g.
-// `int[2][4]`. Every producer of such a chain (e.g. `UnwrapDeclarator` for
-// declarations, `parseBracketTypeSuffix` and `parsePostfixTypeSuffix` for type
-// specs, `parsePostfixExpr` for expressions) nests the brackets with the first
-// source bracket innermost, because that is the order the chain is built in.
-// C and GLSL instead read a bracket chain left to right, with the first bracket
-// as the outermost dimension: `int[2][4]` denotes an array of 2 elements of
+// `int[2][4]`. Producers build such a chain in source order (`UnwrapDeclarator`
+// for declarations, `parseBracketTypeSuffix` and `parsePostfixTypeSuffix` for
+// type specs, `parsePostfixExpr` for expressions), and the invariant the
+// re-nest below relies on is that reading the chain bottom-up yields the
+// dimensions outermost to innermost: a pure type chain nests the first source
+// bracket innermost, and a mixed type-spec+declarator spelling like
+// `int[3] x[2]` puts the declarator brackets at the bottom. C and GLSL
+// instead read a bracket chain left to right, with the first bracket as the
+// outermost dimension: `int[2][4]` denotes an array of 2 elements of
 // `int[4]`, i.e. `Array<Array<int,4>,2>`, the same type a declaration
 // `int x[2][4]` gives its variable, so checking the chain cannot simply wrap
 // each node's count around the type below it (that would produce
@@ -3634,13 +3637,13 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 // is an array of three unbounded arrays, the same type the declaration
 // `int x[3][]` denotes.
 //
-// Returns nullptr when the base type does not strip down as a plain bracket
-// prefix. No constructible input is known to reach that today — the caller's
-// walk below only counts links that were themselves checked through this
-// branch, and each of those contributes exactly one array level — so this is
-// a defensive bail: if a future producer breaks that invariant, the caller
-// falls back to the legacy wrap (this bracket wrapped around the base type)
-// rather than building a nonsense type.
+// `bracketCount` is the number of chain links the caller's classification walk
+// counted; each of those links was checked through this same branch and so
+// contributed exactly one array level, which is why the strip below always
+// succeeds on shapes that reach it. Returns nullptr if the base type does not
+// strip down anyway — no constructible input is known to do that, so the
+// strip asserts in debug builds, and a release build falls back to the
+// caller's legacy wrap rather than asserting on user code.
 static Type* tryGetBracketChainArrayType(
     ASTBuilder* astBuilder,
     Type* baseType,
@@ -3652,15 +3655,41 @@ static Type* tryGetBracketChainArrayType(
     for (UInt ii = 0; ii < bracketCount; ++ii)
     {
         auto arrayType = as<ArrayExpressionType>(elementType);
+        SLANG_ASSERT(arrayType);
         if (!arrayType)
             return nullptr;
         outerCounts.add(arrayType->getElementCount());
         elementType = arrayType->getElementType();
     }
-    elementType = getArrayType(astBuilder, elementType, elementCount);
+    auto resultType = getArrayType(astBuilder, elementType, elementCount);
     for (Index jj = outerCounts.getCount() - 1; jj >= 0; --jj)
-        elementType = getArrayType(astBuilder, elementType, outerCounts[jj]);
-    return elementType;
+        resultType = getArrayType(astBuilder, resultType, outerCounts[jj]);
+    return resultType;
+}
+
+// A plain bracket chain is a run of single-argument bracket links — each
+// carrying at most one size expression, including the unsized `[]` — each
+// sitting on the next, ending at a non-bracket base. Count how many such links
+// sit below `chainLink`; set `outIsPlainBracketChain` to false if any link in
+// the run carries more than one index expression (a multi-argument bracket
+// like the `2,3` in `int[2,3][4]`), which makes the chain's already-checked
+// prefix unreliable for the re-nest.
+static UInt getBracketChainLinkCount(Expr* chainLink, bool& outIsPlainBracketChain)
+{
+    UInt bracketCount = 0;
+    for (;;)
+    {
+        auto linkIndexExpr = as<IndexExpr>(chainLink);
+        if (!linkIndexExpr)
+            return bracketCount;
+        if (linkIndexExpr->indexExprs.getCount() > 1)
+        {
+            outIsPlainBracketChain = false;
+            return bracketCount;
+        }
+        bracketCount++;
+        chainLink = linkIndexExpr->baseExpression;
+    }
 }
 
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
@@ -3737,30 +3766,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         Type* arrayType = nullptr;
         {
             // A bracket sitting on further brackets, e.g. the `[4]` in
-            // `int[2][4]`, must re-nest the chain so the first source bracket is
-            // the outermost dimension (see `tryGetBracketChainArrayType`). The
-            // "legacy wrap" this path can fall back to is the pre-existing
-            // behavior of wrapping this bracket's count around the base type,
-            // making this bracket the outermost dimension. Only a chain of
-            // single-argument brackets — each link carrying at most one size
-            // expression, including the unsized `[]` — was re-nested when its
-            // links were checked; a sub-chain with a multi-argument bracket
-            // like `int[2,3][4]` kept the legacy wrap, so it keeps it here too.
+            // `int[2][4]`, must re-nest the chain so the first source bracket
+            // is the outermost dimension (see `tryGetBracketChainArrayType`).
+            // The walk below runs over the already-checked links — the base
+            // was replaced by its checked form just above — and re-nests only
+            // a plain bracket chain; a chain containing a multi-argument
+            // bracket kept the legacy wrap (this bracket wrapped around the
+            // base type) when its links were checked, so it keeps it here too.
             bool isPlainBracketChain = true;
-            UInt bracketCount = 0;
-            for (Expr* chainLink = subscriptExpr->baseExpression;;)
-            {
-                auto linkIndexExpr = as<IndexExpr>(chainLink);
-                if (!linkIndexExpr)
-                    break;
-                if (linkIndexExpr->indexExprs.getCount() > 1)
-                {
-                    isPlainBracketChain = false;
-                    break;
-                }
-                bracketCount++;
-                chainLink = linkIndexExpr->baseExpression;
-            }
+            UInt bracketCount = getBracketChainLinkCount(
+                subscriptExpr->baseExpression,
+                isPlainBracketChain);
             if (isPlainBracketChain && bracketCount > 0)
             {
                 arrayType = tryGetBracketChainArrayType(
