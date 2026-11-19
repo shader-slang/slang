@@ -1273,19 +1273,8 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
         // DiffPair(DifferentialPtrPair<T>, T:IDifferentiablePtrType), and IR lowering would later
         // query an IDifferentiablePtrType witness table with IDifferentiable's value-pair
         // requirement keys.
-        auto makeDiffPairType = [&](Type* baseType, SubtypeWitness* baseWitness) -> Type*
-        {
-            if (baseWitness->getSup() == differentiableInterfaceType)
-                return astBuilder->getDifferentialPairType(baseType, baseWitness);
-            if (baseWitness->getSup() == differentiablePtrInterfaceType)
-                return astBuilder->getDifferentialPtrPairType(baseType, baseWitness);
-
-            SLANG_UNEXPECTED("unsupported diff witness for higher-order diff pair type");
-            UNREACHABLE_RETURN(baseType);
-        };
-
-        auto makeDiffPairWitness = [&](Type* baseType,
-                                       SubtypeWitness* baseWitness) -> SubtypeWitness*
+        auto makeElementDiffPairWitness = [&](Type* baseType,
+                                              SubtypeWitness* baseWitness) -> SubtypeWitness*
         {
             GenericDecl* pairGenericDecl = nullptr;
             InheritanceDecl* pairInheritanceDecl = nullptr;
@@ -1317,37 +1306,58 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
                 astBuilder->getMemberDeclRef(diffPairDeclRef, pairInheritanceDecl);
 
             return astBuilder->getDeclaredSubtypeWitness(
-                makeDiffPairType(baseType, baseWitness),
+                getEffectiveDiffPairType(baseType, baseWitness),
                 pairInterfaceType,
                 inheritanceDeclRef);
         };
 
-        Type* thisParamType = diffTypeInfoWitness->getThisParamType();
-        auto thisDiffWitness = diffTypeInfoWitness->getThisTypeDiffWitness();
-
-        if (thisParamType)
+        // Pairs a type pack element-wise, as `getEffectiveDiffPairType` pairs its type.
+        auto makeDiffPairWitness = [&](Type* baseType,
+                                       SubtypeWitness* baseWitness) -> SubtypeWitness*
         {
-            auto [thisParamValueType, thisParamMode] =
-                getParamInfoFromTypeWithModeWrapper(thisParamType);
-            auto differentiatedThisMode = getDifferentiatedThisParamMode(thisParamMode);
-            if (thisDiffWitness)
+            auto sup = baseWitness->getSup();
+            if (isAbstractTypePack(baseType))
             {
-                auto originalThisParamValueType = thisParamValueType;
-                auto originalThisDiffWitness = thisDiffWitness;
-                thisParamValueType =
-                    makeDiffPairType(originalThisParamValueType, originalThisDiffWitness);
-                thisDiffWitness =
-                    makeDiffPairWitness(originalThisParamValueType, originalThisDiffWitness);
+                auto eachType = astBuilder->getEachType(baseType);
+                auto eachWitness = astBuilder->getEachSubtypeWitness(eachType, sup, baseWitness);
+                return astBuilder->getExpandSubtypeWitness(
+                    getEffectiveDiffPairType(baseType, baseWitness),
+                    sup,
+                    makeElementDiffPairWitness(eachType, eachWitness));
             }
-            thisParamType =
-                getParamTypeWithModeWrapper(astBuilder, thisParamValueType, differentiatedThisMode);
-        }
+            if (auto witnessPack = as<TypePackSubtypeWitness>(baseWitness))
+            {
+                List<SubtypeWitness*> elementWitnesses;
+                for (Index i = 0; i < witnessPack->getCount(); i++)
+                {
+                    auto elementWitness = witnessPack->getWitness(i);
+                    elementWitnesses.add(
+                        makeElementDiffPairWitness(elementWitness->getSub(), elementWitness));
+                }
+                return astBuilder->getSubtypeWitnessPack(
+                    getEffectiveDiffPairType(baseType, baseWitness),
+                    sup,
+                    elementWitnesses.getArrayView());
+            }
+            return makeElementDiffPairWitness(baseType, baseWitness);
+        };
 
         SubtypeWitness* resultDiffWitness = diffTypeInfoWitness->getReturnTypeDiffWitness();
         if (resultDiffWitness)
             resultDiffWitness = makeDiffPairWitness(resultDiffWitness->getSub(), resultDiffWitness);
 
+        // The derivative is static, so the resulting witness has no separate `this` fields.
+        // When the base has a receiver, parameter 0 describes that explicit receiver; a null
+        // parameter witness means the parameter is non-differentiable. Parameter direction,
+        // including a mutating receiver's inout mode, comes from the derivative's FuncType.
         List<SubtypeWitness*> pairDiffWitnesses;
+        if (diffTypeInfoWitness->getThisParamType())
+        {
+            auto thisDiffWitness = diffTypeInfoWitness->getThisTypeDiffWitness();
+            pairDiffWitnesses.add(
+                thisDiffWitness ? makeDiffPairWitness(thisDiffWitness->getSub(), thisDiffWitness)
+                                : nullptr);
+        }
         for (UIndex ii = 0; ii < diffTypeInfoWitness->getParamTypeCount(); ii++)
         {
             auto diffWitness = diffTypeInfoWitness->getParamTypeDiffWitness(ii);
@@ -1358,8 +1368,8 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
         }
 
         return getCurrentASTBuilder()->getOrCreate<DiffTypeInfoWitness>(
-            thisParamType,
-            thisDiffWitness,
+            (Type*)nullptr,
+            (SubtypeWitness*)nullptr,
             resultDiffWitness,
             pairDiffWitnesses);
     }
