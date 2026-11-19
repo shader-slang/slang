@@ -501,6 +501,27 @@ void ContainerDecl::_insertDirectMemberDeclAtIndexForBitfieldPropertyBackingMemb
     _directMemberDecls.decls.insert(index, backingVarDecl);
 }
 
+void ContainerDecl::_insertFlattenedConstraintDeclsAfter(
+    GenericTypeConstraintDecl* original,
+    List<GenericTypeConstraintDecl*> const& splitConstraints)
+{
+    if (isUsingOnDemandDeserializationForDirectMembers())
+    {
+        SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
+    }
+
+    Index index = _directMemberDecls.decls.indexOf(original);
+    SLANG_ASSERT(index >= 0);
+
+    _invalidateLookupAccelerators();
+    for (auto splitConstraint : splitConstraints)
+    {
+        SLANG_ASSERT(splitConstraint);
+        splitConstraint->parentDecl = this;
+        _directMemberDecls.decls.insert(++index, splitConstraint);
+    }
+}
+
 //
 //
 //
