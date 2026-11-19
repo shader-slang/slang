@@ -638,18 +638,33 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
         return visitor.dispatch(expr);
     }
 
-    // A condition clause holds its payload directly (the condition value expression and,
-    // for a declaration condition, the declared variable), so it is searched here.
+    // A condition clause is searched per form, through the condition-clause
+    // visitor: an expression condition carries its expression; a declaration
+    // condition carries its declaration plus the checked value derived from it.
     bool checkConditionClause(ConditionClause* clause)
     {
         if (!clause)
             return false;
-        if (auto declConditionClause = as<DeclConditionClause>(clause))
+        struct ConditionClauseLookup : ConditionClauseVisitor<ConditionClauseLookup, bool>
         {
-            if (_findAstNodeImpl(*context, declConditionClause->decl))
-                return true;
-        }
-        return checkExpr(clause->predicate);
+            ASTLookupStmtVisitor* visitor;
+            bool visitConditionClause(ConditionClause*) { return false; }
+            bool visitExprConditionClause(ExprConditionClause* exprConditionClause)
+            {
+                return visitor->checkExpr(exprConditionClause->expr);
+            }
+            bool visitDeclConditionClause(DeclConditionClause* declConditionClause)
+            {
+                if (_findAstNodeImpl(*visitor->context, declConditionClause->decl))
+                    return true;
+                if (declConditionClause->predicateExpr)
+                    return visitor->checkExpr(declConditionClause->predicateExpr);
+                return false;
+            }
+        };
+        ConditionClauseLookup lookup;
+        lookup.visitor = this;
+        return lookup.dispatch(clause);
     }
 
     bool visitDeclStmt(DeclStmt* stmt) { return _findAstNodeImpl(*context, stmt->decl); }

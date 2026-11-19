@@ -281,26 +281,40 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     return e;
 }
 
-// Check a condition clause in place: bring its declaration to its declaration
-// point, if it has one, then check the condition value.
-//
-// Consider the HLSL `if (int count = c)`. The parser has built a
-// `DeclConditionClause` holding the declaration of `count` and an expression
-// naming `count`, so checking the clause is: check the declaration (its type
-// and initializer) at its declaration point, then send the naming expression
-// through the same `checkPredicateExpr` path as a plain expression condition,
-// which resolves it to `count` and coerces it to `bool`. A declaration
-// condition is not an `AssignExpr`, so the assignment-in-predicate check is
-// not involved.
+// Check a condition clause in place, per form. An expression condition checks
+// its expression through the ordinary predicate path. A declaration condition,
+// as in the HLSL `if (int count = c)`, first brings the declaration of `count`
+// to its declaration point, then derives the tested value from it: an
+// expression that references `count` directly (no lookup — the declaration is
+// in hand), sent through the same `checkPredicateExpr` path as any other
+// condition, which coerces it to `bool` and stores it as the clause's
+// `predicateExpr`. A declaration condition is not an `AssignExpr`, so the
+// assignment-in-predicate check is not involved.
 void SemanticsStmtVisitor::checkConditionClause(ConditionClause* clause)
 {
     if (!clause)
         return;
-    if (auto declConditionClause = as<DeclConditionClause>(clause))
+
+    struct ConditionClauseChecker : ConditionClauseVisitor<ConditionClauseChecker>
     {
-        checkDeclAtDeclarationPoint(declConditionClause->decl);
-    }
-    clause->predicate = checkPredicateExpr(clause->predicate);
+        SemanticsStmtVisitor* checker;
+        void visitConditionClause(ConditionClause*) {}
+        void visitExprConditionClause(ExprConditionClause* exprConditionClause)
+        {
+            exprConditionClause->expr = checker->checkPredicateExpr(exprConditionClause->expr);
+        }
+        void visitDeclConditionClause(DeclConditionClause* declConditionClause)
+        {
+            checker->checkDeclAtDeclarationPoint(declConditionClause->decl);
+            auto varExpr = checker->m_astBuilder->create<VarExpr>();
+            varExpr->loc = declConditionClause->decl->getNameLoc();
+            varExpr->declRef = makeDeclRef<Decl>(declConditionClause->decl);
+            declConditionClause->predicateExpr = checker->checkPredicateExpr(varExpr);
+        }
+    };
+    ConditionClauseChecker checker;
+    checker.checker = this;
+    checker.dispatch(clause);
 }
 
 void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)

@@ -608,9 +608,23 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitConditionClause(ConditionClause
 {
     if (!clause)
         return;
-    if (auto declConditionClause = as<DeclConditionClause>(clause))
-        visitDecl(declConditionClause->decl);
-    visitExpr(clause->predicate);
+    struct ConditionClauseWalker : ConditionClauseVisitor<ConditionClauseWalker>
+    {
+        ASTIterator* iterator;
+        void visitConditionClause(ConditionClause*) {}
+        void visitExprConditionClause(ExprConditionClause* exprConditionClause)
+        {
+            iterator->visitExpr(exprConditionClause->expr);
+        }
+        void visitDeclConditionClause(DeclConditionClause* declConditionClause)
+        {
+            iterator->visitDecl(declConditionClause->decl);
+            iterator->visitExpr(declConditionClause->predicateExpr);
+        }
+    };
+    ConditionClauseWalker walker;
+    walker.iterator = this;
+    walker.dispatch(clause);
 }
 template<typename CallbackFunc, typename FilterFunc>
 void ASTIterator<CallbackFunc, FilterFunc>::visitStmt(Stmt* stmt)

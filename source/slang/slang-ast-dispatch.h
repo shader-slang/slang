@@ -47,6 +47,7 @@ struct ASTNodeDispatcher<$BASE, R>
 %generateDispatcher(Slang.Decl)
 %generateDispatcher(Slang.Expr)
 %generateDispatcher(Slang.Stmt)
+%generateDispatcher(Slang.ConditionClause)
 %generateDispatcher(Slang.NodeBase)
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0

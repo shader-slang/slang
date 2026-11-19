@@ -154,6 +154,29 @@ struct ExprVisitor
 #endif // FIDDLE END
 };
 
+//
+// Condition-clause Visitors
+//
+
+template<typename Derived, typename Result = void>
+struct ConditionClauseVisitor
+{
+    Result dispatch(ConditionClause* clause)
+    {
+        return ASTNodeDispatcher<ConditionClause, Result>::dispatch(
+            clause,
+            [&](auto obj) { return _dispatchImpl(obj); });
+    }
+
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.ConditionClause)
+    % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.ConditionClause)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 7
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
+};
+
 template<typename Derived, typename Arg>
 struct ExprVisitorWithArg
 {
@@ -166,7 +189,7 @@ struct ExprVisitorWithArg
     % SLANG_VISITOR_DISPATCH_ARG_IMPL(Slang.Expr)
     % SLANG_VISITOR_VISIT_ARG_IMPL(Slang.Expr)
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 7
+#define FIDDLE_GENERATED_OUTPUT_ID 8
 #include "slang-visitor.h.fiddle"
 #endif // FIDDLE END
 };
@@ -531,7 +554,7 @@ struct StmtVisitor
     % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Stmt)
     % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Stmt)
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 8
+#define FIDDLE_GENERATED_OUTPUT_ID 9
 #include "slang-visitor.h.fiddle"
 #endif // FIDDLE END
 };
@@ -554,7 +577,7 @@ struct DeclVisitor
     % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.DeclBase)
     % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.DeclBase)
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 9
+#define FIDDLE_GENERATED_OUTPUT_ID 10
 #include "slang-visitor.h.fiddle"
 #endif // FIDDLE END
 };
@@ -571,7 +594,7 @@ struct DeclVisitorWithArg
     % SLANG_VISITOR_DISPATCH_ARG_IMPL(Slang.DeclBase)
     % SLANG_VISITOR_VISIT_ARG_IMPL(Slang.DeclBase)
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 10
+#define FIDDLE_GENERATED_OUTPUT_ID 11
 #include "slang-visitor.h.fiddle"
 #endif // FIDDLE END
 };
@@ -595,7 +618,7 @@ struct ModifierVisitor
     % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Modifier)
     % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Modifier)
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 11
+#define FIDDLE_GENERATED_OUTPUT_ID 12
 #include "slang-visitor.h.fiddle"
 #endif // FIDDLE END
 };
@@ -618,7 +641,7 @@ struct ValVisitor : TypeVisitor<Derived, TypeResult>
     % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Val)
     % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Val)
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 12
+#define FIDDLE_GENERATED_OUTPUT_ID 13
 #include "slang-visitor.h.fiddle"
 #endif // FIDDLE END
 };

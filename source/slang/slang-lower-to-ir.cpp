@@ -7924,7 +7924,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         if (declConditionClause)
             lowerDecl(context, declConditionClause->decl);
 
-        auto condExpr = clause->predicate;
+        auto condExpr = getPredicateExpr(clause);
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
@@ -8261,7 +8261,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (declConditionClause)
                 lowerDecl(context, declConditionClause->decl);
 
-            auto condExpr = clause->predicate;
+            auto condExpr = getPredicateExpr(clause);
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
@@ -8387,7 +8387,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (declConditionClause)
                 lowerDecl(context, declConditionClause->decl);
 
-            auto condExpr = clause->predicate;
+            auto condExpr = getPredicateExpr(clause);
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
             auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));

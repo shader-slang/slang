@@ -1115,16 +1115,31 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             return;
         return DeclVisitor<VisitorType>::dispatch(val);
     }
-    // A condition clause holds its payload directly (the condition value expression and,
-    // for a declaration condition, the declared variable), so it is dispatched here
-    // rather than through one of the node-base visitors.
-    void dispatchIfNotNull(ConditionClause* clause)
+    // A condition clause is dispatched per form, through the condition-clause
+    // visitor: an expression condition carries its expression; a declaration
+    // condition carries its declaration plus the checked value that semantic
+    // checking derived from it.
+    void dispatchConditionClause(ConditionClause* clause)
     {
         if (!clause)
             return;
-        if (auto declConditionClause = as<DeclConditionClause>(clause))
-            dispatchIfNotNull(declConditionClause->decl);
-        dispatchIfNotNull(clause->predicate);
+        struct ConditionClauseWalker : ConditionClauseVisitor<ConditionClauseWalker>
+        {
+            SemanticsDeclReferenceVisitor* visitor;
+            void visitConditionClause(ConditionClause*) {}
+            void visitExprConditionClause(ExprConditionClause* exprConditionClause)
+            {
+                visitor->dispatchIfNotNull(exprConditionClause->expr);
+            }
+            void visitDeclConditionClause(DeclConditionClause* declConditionClause)
+            {
+                visitor->dispatchIfNotNull(declConditionClause->decl);
+                visitor->dispatchIfNotNull(declConditionClause->predicateExpr);
+            }
+        };
+        ConditionClauseWalker walker;
+        walker.visitor = this;
+        walker.dispatch(clause);
     }
 
     // Expr Visitor
@@ -1319,7 +1334,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->condition);
+        dispatchConditionClause(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 
@@ -1360,7 +1375,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitIfStmt(IfStmt* stmt)
     {
-        dispatchIfNotNull(stmt->condition);
+        dispatchConditionClause(stmt->condition);
         dispatchIfNotNull(stmt->positiveStatement);
         dispatchIfNotNull(stmt->negativeStatement);
     }
@@ -1386,7 +1401,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitWhileStmt(WhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->condition);
+        dispatchConditionClause(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 

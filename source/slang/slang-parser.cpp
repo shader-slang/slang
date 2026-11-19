@@ -7757,7 +7757,7 @@ Stmt* Parser::parseIfLetStatement()
     tempVarExpr->scope = currentScope;
     FillPosition(tempVarExpr);
     tempVarExpr->name = tempVarDecl->getName();
-    conditionClause->predicate = constructIfLetPredicate(this, tempVarExpr);
+    conditionClause->expr = constructIfLetPredicate(this, tempVarExpr);
     ifStatement->condition = conditionClause;
 
     ReadToken(TokenType::RParent);
@@ -8318,7 +8318,7 @@ ConditionClause* Parser::parseConditionClause()
     // condition begins.
     ExprConditionClause* clause = astBuilder->create<ExprConditionClause>();
     FillPosition(clause);
-    clause->predicate = ParseExpression();
+    clause->expr = ParseExpression();
     return clause;
 }
 
@@ -8334,13 +8334,12 @@ ConditionClause* Parser::parseConditionClause()
 // declarator, as in C++, so `if (int a = 1, b = 2)` is diagnosed rather than
 // parsed as a declarator list.
 //
-// Consider `while (int i = n--)`. The clause we build holds the declaration of
-// `i` plus an expression that names `i`. Semantic checking brings `i` to its
-// declaration point, then checks the naming expression through the same
-// predicate path as a plain expression condition, so it resolves to `i` and
-// coerces to `bool`. IR lowering declares `i` in the loop's condition slot, so
-// it is initialized before each test and a `continue` re-runs the initializer,
-// which is what the C++ condition semantics require.
+// Consider `while (int i = n--)`. The clause we build holds only the declaration
+// of `i`; semantic checking brings `i` to its declaration point and derives the
+// tested value from it, coercing to `bool` like any other condition. IR lowering
+// declares `i` in the loop's condition slot, so it is initialized before each
+// test and a `continue` re-runs the initializer, which is what the C++ condition
+// semantics require.
 DeclConditionClause* Parser::parseDeclConditionClause()
 {
     DeclConditionClause* clause = astBuilder->create<DeclConditionClause>();
@@ -8393,17 +8392,9 @@ DeclConditionClause* Parser::parseDeclConditionClause()
     CompleteDecl(this, varDecl, currentScope->containerDecl, modifiers, nullptr);
     clause->decl = varDecl;
 
-    // An expression that names the declared variable, like the one the
-    // `if (let ...)` desugaring builds for its binding. Checking brings the
-    // declaration to its declaration point and then sends this expression
-    // through the predicate path, which is what resolves it to the
-    // declaration; no condition-specific lookup is involved.
-    VarExpr* varExpr = astBuilder->create<VarExpr>();
-    varExpr->scope = currentScope;
-    varExpr->loc = varDecl->getNameLoc();
-    varExpr->name = varDecl->getName();
-    clause->predicate = varExpr;
-
+    // The clause carries only the declaration; semantic checking derives the tested
+    // value from it (`DeclConditionClause::predicateExpr`), once the declaration
+    // has been checked.
     return clause;
 }
 

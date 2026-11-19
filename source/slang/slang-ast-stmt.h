@@ -83,23 +83,14 @@ class DeclStmt : public Stmt
 // A condition of an `if`, `while`, or `do`-`while` statement: either the expression the
 // statement tests, or (in the HLSL dialect) a single-variable declaration whose variable
 // is the condition's value. The `if`/`while`/`do`-`while` classes hold one of these in
-// their `condition` field. Whatever the surface form, the tested value is available as the
-// `predicate` expression, already converted to `bool` after checking — a client of this
-// type never needs to look at the subclass to evaluate the condition.
-//
-// The clause is neither an `Expr` nor a `Stmt`, so it is not covered by the `Expr`/`Stmt`
-// visitor frameworks: code that walks these statements must dispatch the clause's fields
-// itself.
+// their `condition` field. Consumers that only need the tested value — the expression the
+// statement branches on, converted to `bool` — read it with `getPredicateExpr`, which
+// hides which form the clause takes; code that must react to the forms themselves
+// dispatches them with `ConditionClauseVisitor`.
 FIDDLE(abstract)
 class ConditionClause : public SyntaxNode
 {
     FIDDLE(...)
-
-    /// The value of the condition as an expression. For an expression condition this is
-    /// the parsed expression. For a declaration condition, as in the HLSL `if (int count = c)`,
-    /// this is an expression naming the declared variable; semantic checking resolves it to the
-    /// declaration and coerces it to `bool`, like any other condition.
-    FIDDLE() Expr* predicate = nullptr;
 };
 
 // A condition written as an expression, as in `if (a < b)`.
@@ -107,6 +98,11 @@ FIDDLE()
 class ExprConditionClause : public ConditionClause
 {
     FIDDLE(...)
+
+    /// The tested expression: what the source wrote between the parentheses. Semantic
+    /// checking updates it in place with the checked expression, which names the
+    /// referenced declarations and has been converted to `bool`.
+    FIDDLE() Expr* expr = nullptr;
 };
 
 // A condition written as a single-variable declaration, as in the HLSL
@@ -127,7 +123,24 @@ class DeclConditionClause : public ConditionClause
     /// the statement where the variable is visible (both arms for `if`, the body for
     /// `while`, the condition only for `do`-`while`).
     FIDDLE() ScopeDecl* scopeDecl = nullptr;
+
+    /// The tested value, derived during semantic checking: an expression naming the
+    /// declared variable, checked and converted to `bool` like any other condition.
+    /// Null until then — the parser builds only the declaration.
+    FIDDLE() Expr* predicateExpr = nullptr;
 };
+
+// The tested value of a condition, after semantic checking has resolved names and
+// converted the value to `bool`: the checked expression for an expression condition,
+// the checked naming expression for a declaration condition. Null before checking.
+inline Expr* getPredicateExpr(ConditionClause* clause)
+{
+    if (auto exprConditionClause = as<ExprConditionClause>(clause))
+        return exprConditionClause->expr;
+    if (auto declConditionClause = as<DeclConditionClause>(clause))
+        return declConditionClause->predicateExpr;
+    return nullptr;
+}
 
 FIDDLE()
 class IfStmt : public Stmt
