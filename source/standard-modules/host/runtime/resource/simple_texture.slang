@@ -65,16 +65,43 @@ Texture2D<T> allocateReadOnlyTexture2D<T : ITexelElement>(uint width, uint heigh
     };
 }
 
-extension<T : ITexelElement> RWTexture2D<T>
+/// Returns the storage format of a texture type. A type that leaves its format unspecified
+/// (`TextureFormat.unknown`) stores the element type's natural format, so `RWTexture2D<float4>`
+/// allocates `rgba32Float` while `RWTexture2D<float4, 0, TextureFormat.rgba8Unorm>` keeps its
+/// declared format.
+[__unsafeForceInlineEarly]
+uint __textureStorageFormat<T : ITexelElement, let format : int>()
 {
-    static This alloc(uint width, uint height)
-    {
-        return allocateTexture2D<T>(width, height);
-    }
+    if (format == TextureFormat.unknown)
+        return __getHGBCNaturalTextureFormat<T>();
+    return format;
+}
+
+/// Returns whether `format` is a depth or depth/stencil format, which textures can only use as
+/// draw depth targets.
+[__unsafeForceInlineEarly]
+bool __isDepthTextureFormat<let format : int>()
+{
+    return format == TextureFormat.d32Float || format == TextureFormat.d16Unorm ||
+           format == TextureFormat.d32FloatS8Uint;
 }
 
 extension<T : ITexelElement, let format : int> RWTexture2D<T, 0, format>
 {
+    /// Allocates a graph-owned writable texture of this type, usable by dispatches, draws,
+    /// copies, and host readback.
+    static This alloc(uint width, uint height)
+    {
+        uint one = 1;
+        return hgbc_asm
+        {
+        result:
+            $$RWTexture2D<T, 0, format> = OpAllocateResource Texture Texture2D
+                $__textureStorageFormat<T, format>() DeviceLocal UnorderedAccess $$T $width $height
+                    $one 1 1 0 ShaderResource UnorderedAccess CopySource CopyDestination RenderTarget;
+        };
+    }
+
     /// Returns the dimensions of an already allocated graph-owned texture.
     uint2 getDimensions()
     {
@@ -85,16 +112,33 @@ extension<T : ITexelElement, let format : int> RWTexture2D<T, 0, format>
     }
 }
 
-extension<T : ITexelElement> Texture2D<T>
-{
-    static This alloc(uint width, uint height)
-    {
-        return allocateReadOnlyTexture2D<T>(width, height);
-    }
-}
-
 extension<T : ITexelElement, let format : int> Texture2D<T, 0, format>
 {
+    /// Allocates a graph-owned read-only texture of this type. A depth format, as in
+    /// `DepthTarget2D`, yields a depth target that clears and draws can write; any other format
+    /// yields a texture that shaders read and that copies or uploads fill.
+    static This alloc(uint width, uint height)
+    {
+        uint one = 1;
+        if (__isDepthTextureFormat<format>())
+        {
+            return hgbc_asm
+            {
+            result:
+                $$Texture2D<T, 0, format> = OpAllocateResource Texture Texture2D $format DeviceLocal
+                    DepthWrite $$T $width $height $one 1 1 0 ShaderResource DepthStencil CopySource
+                        CopyDestination;
+            };
+        }
+        return hgbc_asm
+        {
+        result:
+            $$Texture2D<T, 0, format> = OpAllocateResource Texture Texture2D
+                $__textureStorageFormat<T, format>() DeviceLocal ShaderResource $$T $width $height
+                    $one 1 1 0 ShaderResource CopySource CopyDestination RenderTarget;
+        };
+    }
+
     uint2 getDimensions()
     {
         uint width;
@@ -164,14 +208,6 @@ Texture2D<float, 0, Format> allocateDepthTarget2D<
             OpAllocateResource Texture Texture2D $Format DeviceLocal DepthWrite $$float $width
                 $height $one $MipCount 1 0 ShaderResource DepthStencil CopySource CopyDestination;
     };
-}
-
-extension DepthTarget2D
-{
-    static This alloc(uint width, uint height)
-    {
-        return allocateDepthTarget2D(width, height);
-    }
 }
 
 // Blits the complete source texture into the destination, scaling and converting formats as needed.
