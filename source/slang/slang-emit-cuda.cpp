@@ -1160,10 +1160,23 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_MakeCoopMatrixFromScalar:
         {
             StringBuilder typeSB;
-            emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB);
+            auto scalarValue = inst->getOperand(0);
+            if (SLANG_FAILED(
+                    emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB)))
+            {
+                // emitWMMAFragmentType has already diagnosed the error, and the
+                // sink error-count check at the end of emission fails the
+                // compile, so nothing emitted here reaches NVRTC.  We emit the
+                // scalar operand so the initializer slot of
+                // `Type _Sname = <expr>;` stays syntactically valid; it does
+                // not depend on the result type's name, which has already
+                // failed to emit.
+                emitOperand(scalarValue, getInfo(EmitOp::General));
+                return true;
+            }
             m_writer->emit(typeSB);
             m_writer->emit("(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            emitOperand(scalarValue, getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
@@ -1778,7 +1791,12 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     auto typeName = elementTypeSB.toString();
 
     // TODO: We should add a pass in IR to validate the coop matrix types, such that
-    // we can provide better diagnostic messages here.
+    // we can provide better diagnostic messages here.  Until then the emitter
+    // diagnoses these errors, and every caller of emitWMMAFragmentType must
+    // handle the SLANG_FAIL it returns after diagnosing.  The diagnostics below
+    // carry no location because the type inst's sourceLoc is the core module's
+    // CoopMat definition, not the user's instantiation site; threading a user
+    // location through belongs with that IR validation pass.
     if (!typeCheck(elementType->getOp(), matrixUse))
     {
         getSink()->diagnose(Diagnostics::CooperativeMatrixUnsupportedElementType{
@@ -1786,11 +1804,8 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
             .matrixUse = matrixUse == SLANG_COOPERATIVE_MATRIX_USE_A
                              ? "A"
                              : (matrixUse == SLANG_COOPERATIVE_MATRIX_USE_B ? "B" : "C")});
-        SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
-
-    outStr << "Slang_CUDA_WMMA::WmmaFragment<";
 
     FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
     if (!shape.isValid())
@@ -1801,12 +1816,11 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
             .matrixUse = matrixUse == SLANG_COOPERATIVE_MATRIX_USE_A
                              ? "A"
                              : (matrixUse == SLANG_COOPERATIVE_MATRIX_USE_B ? "B" : "C")});
-        SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
 
-    outStr << typeName << "," << shape.m << ", " << shape.n << ", " << shape.k << ", "
-           << getMatrixUseName(matrixUse) << ">";
+    outStr << "Slang_CUDA_WMMA::WmmaFragment<" << typeName << "," << shape.m << ", " << shape.n
+           << ", " << shape.k << ", " << getMatrixUseName(matrixUse) << ">";
 
     return SLANG_OK;
 }

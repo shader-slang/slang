@@ -5,6 +5,13 @@
 // int8 / uint8 / FloatE4M3 / FloatE5M2 are valid for MatrixA / MatrixB).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedType -stage compute
 
+// Test 1b: the same unsupported element type as Test 1, constructed from a
+// buffer-loaded value.  After GetLength is inlined, this exercises the same
+// emitter path as Test 1 (the prelude's GetLength default-constructs its
+// local), so it is a second regression guard for the E50000 diagnostic
+// rather than a distinct lowering path.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_TYPE, non-exhaustive): -target cuda -entry testUnsupportedTypeFromBuffer -stage compute
+
 // Test 2: invalid shape (8x16 instead of 16x16) for MatrixA on CUDA
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_SHAPE, non-exhaustive): -target cuda -entry testInvalidShape -stage compute
 
@@ -50,6 +57,15 @@ void testInvalidShape()
 {
     var mat = CoopMat<half, MemoryScope.Subgroup, 8, 16, CoopMatMatrixUse::MatrixA>(half(1.0));
     outputBuffer[0] = int32_t(mat.GetLength());
+}
+
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void testUnsupportedTypeFromBuffer()
+{
+    var mat = CoopMat<double, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>(
+        double(outputBuffer[0]));
+    outputBuffer[1] = int32_t(mat.GetLength());
 }
 
 [shader("compute")]
