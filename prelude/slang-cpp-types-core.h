@@ -471,7 +471,7 @@ struct Matrix
     }
     Matrix(T v0, T v1, T v2, T v3, T v4, T v5)
     {
-        if (COLS == 3)
+        if constexpr (COLS == 3)
         {
             rows[0][0] = v0;
             rows[0][1] = v1;
@@ -492,7 +492,7 @@ struct Matrix
     }
     Matrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7)
     {
-        if (COLS == 4)
+        if constexpr (COLS == 4)
         {
             rows[0][0] = v0;
             rows[0][1] = v1;
@@ -529,7 +529,7 @@ struct Matrix
     }
     Matrix(T v0, T v1, T v2, T v3, T v4, T v5, T v6, T v7, T v8, T v9, T v10, T v11)
     {
-        if (COLS == 4)
+        if constexpr (COLS == 4)
         {
             rows[0][0] = v0;
             rows[0][1] = v1;
