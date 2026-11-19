@@ -6,6 +6,11 @@
 // and a `continue` still jumps to the condition, so the condition initializer runs
 // before the next body pass.
 
+// The tests deliberately use non-`bool` condition types, whose conversion to `bool` is
+// exactly the feature under test, so the 30081 "implicit conversion not recommended"
+// warning (which fires for any non-`bool` condition value) is disabled rather than
+// heeded.
+
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 

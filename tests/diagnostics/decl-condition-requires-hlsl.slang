@@ -1,9 +1,10 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -no-codegen -warnings-disable 30081
 
-// The Slang dialect rejects a declaration used as a condition with a dedicated
-// diagnostic, instead of the generic unexpected-token cascade. The declaration is
-// still parsed for error recovery, so there is exactly one clear message per
-// condition.
+// The Slang dialect rejects a declaration used as a condition with one dedicated
+// diagnostic (its message plus the explanatory span annotated below), instead of a
+// cascade of unrelated parse errors. The declaration is still parsed for error
+// recovery. The 30081 warning is disabled: the test's `int` conditions convert to
+// `bool` by design, and the recovery parse reports that conversion like any other.
 
 void main()
 {
