@@ -30,27 +30,12 @@ void noInlineWrite(uint tid, groupshared uint scratch[N])
     scratch[tid] = tid + 2;
 }
 
-// `[noRefInline]` prevents calls to a function with reference parameters from being inlined, so
-// the diagnostic points at the attribute.
-//
-[noRefInline]
-/*HLSL:
- ^^^^^^^^^^^ error E30708
- ^^^^^^^^^^^ this prevents calls to the function from being inlined
-*/
-void noRefInlineWrite(uint tid, groupshared uint scratch[N])
-//HLSL:                                          ^^^^^^^ 'groupshared' parameter declared here
-{
-    scratch[tid] = tid + 3;
-}
-
 [shader("compute")]
 [numthreads(N, 1, 1)]
 void computeMain(uint3 tid : SV_GroupThreadID)
 {
     exportedWrite(tid.x, groupSharedData);
     noInlineWrite(tid.x, groupSharedData);
-    noRefInlineWrite(tid.x, groupSharedData);
     GroupMemoryBarrierWithGroupSync();
     outputBuffer[tid.x] = groupSharedData[(tid.x + 1) % N];
 }

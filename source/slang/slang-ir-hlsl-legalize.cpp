@@ -89,7 +89,13 @@ void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink)
 
 // Return the location of the modifier that prevents calls to `func` from being inlined: an
 // exporting modifier such as `export`, or `[noRefInline]`. A function without either should have
-// been inlined, so we treat it as an internal error.
+// been inlined, so we treat it as an internal error. Freshly compiled source cannot reach the
+// `[noRefInline]` arm with an ordinary function whose body is intrinsic assembly: the front end
+// restricts the attribute to intrinsic declarations, which never emit a function definition that
+// could carry a groupshared parameter. A function whose body is only `spirv_asm` can keep the
+// decoration, but on a D3D target no arm is selectable and it fails emit separately, so it still
+// cannot reach this arm. The arm remains for modules compiled by earlier compiler versions,
+// whose serialized IR can still carry the decoration on an ordinary function.
 static SourceLoc getLocationOfModifierPreventingInlining(IRFunc* func)
 {
     IRDecoration* decoration = func->findDecoration<IRHLSLExportDecoration>();

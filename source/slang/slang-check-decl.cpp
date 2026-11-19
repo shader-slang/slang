@@ -14016,6 +14016,111 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
     return newContext;
 }
 
+// A statement that may appear in an intrinsic body: intrinsic assembly text for a target
+// (`__intrinsic_asm`), or a `spirv_asm` block, whether written as a statement or as the
+// expression of a `return` (with or without redundant parentheses around the block).
+// Consider the core module's mesh-shading intrinsics, whose arms use both spellings:
+//
+//     [noRefInline]
+//     void DispatchMesh(uint3 grid, __ref Payload meshPayload)
+//     {
+//         __target_switch
+//         {
+//         case hlsl: __intrinsic_asm "DispatchMesh";
+//         case spirv: return spirv_asm { OpEmitMeshTasksEXT …; };
+//         }
+//     }
+//
+// The switch arms are statements inside the function body, not modifiers on the
+// declaration, so the check inspects the body structure and not only the modifier
+// list. The statement set is deliberately minimal — exactly what declarations that
+// carry `[noRefInline]` need today; a future intrinsic arm that needs, say,
+// `__requireCapability` alongside its assembly would have to be added here, and a
+// rejection is a loud compile error rather than a silent aliasing loss.
+//
+// Whether the expression is a `spirv_asm` block, with or without redundant
+// parentheses around it. A null expression (a bare `return;`) is rejected.
+static bool isSPIRVAsmExprIgnoringParens(Expr* expr)
+{
+    while (auto parenExpr = as<ParenExpr>(expr))
+        expr = parenExpr->base;
+    return as<SPIRVAsmExpr>(expr) != nullptr;
+}
+
+static bool isIntrinsicFuncBodyStmt(Stmt* stmt)
+{
+    if (as<IntrinsicAsmStmt>(stmt))
+        return true;
+    // An empty `{}` body parses as a `BlockStmt` whose body is an
+    // `EmptyStmt`, which falls through to the `return false` below, so the
+    // null-body guard is not reachable from parser output; like the
+    // `SeqStmt` guard it keeps the rule total (the parser builds no empty
+    // `SeqStmt`). A `case hlsl:` arm with no statements is the live null
+    // case: it gives a `TargetCaseStmt` whose body is null. All three mean
+    // the same thing: an empty body or arm still lowers to an empty
+    // definition that does reach emit, where a `__ref` parameter would get
+    // the lossy translation, so none qualifies.
+    if (auto blockStmt = as<BlockStmt>(stmt))
+        return blockStmt->body != nullptr && isIntrinsicFuncBodyStmt(blockStmt->body);
+    if (auto seqStmt = as<SeqStmt>(stmt))
+    {
+        if (seqStmt->stmts.getCount() == 0)
+            return false;
+        for (auto innerStmt : seqStmt->stmts)
+        {
+            if (!isIntrinsicFuncBodyStmt(innerStmt))
+                return false;
+        }
+        return true;
+    }
+    if (auto targetSwitchStmt = as<TargetSwitchStmt>(stmt))
+    {
+        // A `__stage_switch` is a `TargetSwitchStmt` too, and its intrinsic-asm
+        // arms equally leave no target function definition, so both are
+        // accepted here. A `default:` arm parses as a case with an empty
+        // capability name, so the loop below inspects it like any other arm,
+        // and a target switch with no cases leaves nothing intrinsic to lower.
+        if (targetSwitchStmt->targetCases.getCount() == 0)
+            return false;
+        for (auto targetCase : targetSwitchStmt->targetCases)
+        {
+            if (targetCase->body == nullptr || !isIntrinsicFuncBodyStmt(targetCase->body))
+                return false;
+        }
+        return true;
+    }
+    if (auto exprStmt = as<ExpressionStmt>(stmt))
+        return isSPIRVAsmExprIgnoringParens(exprStmt->expression);
+    if (auto returnStmt = as<ReturnStmt>(stmt))
+        return isSPIRVAsmExprIgnoringParens(returnStmt->expression);
+    return false;
+}
+
+// A function qualifies for `[noRefInline]` when it can never reach a target
+// that lacks reference syntax with a `__ref` parameter, so no emitter has to
+// approximate one. An `__intrinsic_op` modifier names one IR operation used
+// by every target. A `__target_intrinsic` modifier provides per-target text,
+// but a body under it would still serve as the catch-all definition on the
+// targets the modifier does not cover, so the body, when present, must be
+// intrinsic assembly throughout. Without either modifier the body must be
+// intrinsic assembly; a body of only `spirv_asm` keeps its definition, but
+// only on SPIR-V, which spells a reference faithfully. Rejecting a bodyless
+// declaration is a placement policy — the attribute belongs on the definition
+// that carries the intrinsic — since lowering gives a bodyless core-module
+// declaration a catch-all textual intrinsic of its own. The IR side decides
+// which functions are target intrinsics at emit time via
+// `findTargetIntrinsicDefinition` (slang-ir.cpp), which encodes the same
+// shape knowledge on the other side of lowering; the two must stay in
+// lockstep.
+static bool isIntrinsicFuncDecl(FunctionDeclBase* decl)
+{
+    if (decl->hasModifier<IntrinsicOpModifier>())
+        return true;
+    if (decl->hasModifier<TargetIntrinsicModifier>())
+        return decl->body == nullptr || isIntrinsicFuncBodyStmt(decl->body);
+    return decl->body != nullptr && isIntrinsicFuncBodyStmt(decl->body);
+}
+
 void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
     auto newContext = registerDifferentiableTypesForFunc(decl);
@@ -14074,6 +14179,31 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     }
 
     decl->body = maybeParseStmt(decl->body, newContext);
+
+    // A `[noRefInline]` function keeps its `__ref` parameters across the call
+    // boundary, and a non-intrinsic function would then reach emit with a
+    // reference parameter that targets without reference syntax (HLSL) can
+    // only approximate as `inout`, which copies and loses the aliasing `__ref`
+    // promises. The attribute is therefore only meaningful on an intrinsic
+    // declaration, which never emits a function definition. We validate it
+    // here, once the body is parsed, because the intrinsic-asm forms are body
+    // statements rather than declaration modifiers.
+    if (auto noRefInlineAttr = decl->findModifier<NoRefInlineAttribute>())
+    {
+        if (!isIntrinsicFuncDecl(decl))
+        {
+            getSink()->diagnose(Diagnostics::AttributeNotApplicable{
+                .attrName = noRefInlineAttr->getKeywordName(),
+                .attr = noRefInlineAttr});
+            // Checking continues after the error, so the rejected attribute is
+            // removed rather than kept unchecked: without it the reference
+            // parameter takes the default force-inlining path and no
+            // `IRNoRefInlineDecoration` is lowered, leaving the rest of the
+            // compile as if the attribute had not been written.
+            removeModifier(decl, noRefInlineAttr);
+        }
+    }
+
     if (const auto body = decl->body)
     {
         auto parentDecl = decl->parentDecl;

@@ -1,9 +1,10 @@
 // The decorated payload globals reach the actual SPIR-V instruction through three helpers.
 // None of the helpers is a public TraceRay or CallShader wrapper. Their branches and atomic
 // writes must survive, while ordinary empty parameters disappear from every helper signature.
-// Only the innermost dispatch needs a synthetic interface object. Finding that boundary must
-// not require inlining the helpers or propagating a physical carrier through their signatures.
-// Use __ref plus noRefInline to opt out of the pre-existing reference-parameter inliner as well.
+// Only the innermost dispatch needs a synthetic interface object. The payload parameters ride
+// through the chain by value (an empty struct has no physical representation) and the
+// innermost dispatch binds the decorated globals directly, so finding the boundary requires
+// neither inlining the helpers nor propagating a physical carrier through their signatures.
 
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -stage raygeneration -target spirv -O0 -DUSE_CALLABLE=0 -validate-ir
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -stage raygeneration -target spirv -O3 -DUSE_CALLABLE=0 -validate-ir
@@ -33,8 +34,7 @@ RaytracingAccelerationStructure scene;
 RWStructuredBuffer<uint> events;
 
 [noinline]
-[noRefInline]
-void dispatchLeaf(__ref Payload rayData, __ref Empty callableData[2], uint tag)
+void dispatchLeaf(Payload rayData, Empty callableData[2], uint tag)
 {
     InterlockedAdd(events[0], tag);
 #if USE_CALLABLE
@@ -43,7 +43,7 @@ void dispatchLeaf(__ref Payload rayData, __ref Empty callableData[2], uint tag)
     {
         OpCapability RayTracingKHR;
         OpExtension "SPV_KHR_ray_tracing";
-        OpExecuteCallableKHR $shaderIndex &callableData;
+        OpExecuteCallableKHR $shaderIndex &callablePayload;
     };
 #else
     uint flags = 0;
@@ -58,15 +58,14 @@ void dispatchLeaf(__ref Payload rayData, __ref Empty callableData[2], uint tag)
         OpCapability RayTracingKHR;
         OpExtension "SPV_KHR_ray_tracing";
         OpTraceRayKHR $scene $flags $mask $offset $offset $offset
-            $origin $tMin $direction $tMax &rayData;
+            $origin $tMin $direction $tMax &rayPayload;
     };
 #endif
     InterlockedAdd(events[1], tag);
 }
 
 [noinline]
-[noRefInline]
-void forwardMiddle(__ref Payload rayData, __ref Empty callableData[2], uint tag)
+void forwardMiddle(Payload rayData, Empty callableData[2], uint tag)
 {
     InterlockedAdd(events[2], tag);
     if ((tag & 1) != 0)
@@ -80,8 +79,7 @@ void forwardMiddle(__ref Payload rayData, __ref Empty callableData[2], uint tag)
 }
 
 [noinline]
-[noRefInline]
-void forwardOuter(__ref Payload rayData, __ref Empty callableData[2], uint tag)
+void forwardOuter(Payload rayData, Empty callableData[2], uint tag)
 {
     InterlockedAdd(events[4], tag);
     forwardMiddle(rayData, callableData, tag);

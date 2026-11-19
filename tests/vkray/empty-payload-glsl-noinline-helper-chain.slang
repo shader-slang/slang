@@ -2,7 +2,8 @@
 // Each helper retains its scalar argument, branches, and atomic writes. Only the actual
 // dispatch needs the canonical one-uint interface object. A receiving entry point must also
 // be able to forward its empty logical input through the same helpers without copying a dummy.
-// __ref plus noRefInline opts out of the separate reference-parameter inlining pass.
+// The payload parameters ride through the chain by value, so an empty payload never acquires a
+// physical copy at a helper boundary.
 
 //TEST:SIMPLE(filecheck=GLSL,TRACE): -entry main -stage raygeneration -target glsl -O0 -DUSE_CALLABLE=0 -DRECEIVER=0 -line-directive-mode none -validate-ir
 //TEST:SIMPLE(filecheck=GLSL,TRACE): -entry main -stage raygeneration -target glsl -O3 -DUSE_CALLABLE=0 -DRECEIVER=0 -line-directive-mode none -validate-ir
@@ -29,8 +30,7 @@ RaytracingAccelerationStructure scene;
 RWStructuredBuffer<uint> events;
 
 [noinline]
-[noRefInline]
-void dispatchLeaf(__ref Payload data, __ref Empty emptyArray[2], uint tag)
+void dispatchLeaf(Payload data, Empty emptyArray[2], uint tag)
 {
     InterlockedAdd(events[0], tag);
 #if USE_CALLABLE
@@ -47,8 +47,7 @@ void dispatchLeaf(__ref Payload data, __ref Empty emptyArray[2], uint tag)
 }
 
 [noinline]
-[noRefInline]
-void forwardMiddle(__ref Payload data, __ref Empty emptyArray[2], uint tag)
+void forwardMiddle(Payload data, Empty emptyArray[2], uint tag)
 {
     InterlockedAdd(events[2], tag);
     if ((tag & 1) != 0)
@@ -62,8 +61,7 @@ void forwardMiddle(__ref Payload data, __ref Empty emptyArray[2], uint tag)
 }
 
 [noinline]
-[noRefInline]
-void forwardOuter(__ref Payload data, __ref Empty emptyArray[2], uint tag)
+void forwardOuter(Payload data, Empty emptyArray[2], uint tag)
 {
     InterlockedAdd(events[4], tag);
     forwardMiddle(data, emptyArray, tag);
