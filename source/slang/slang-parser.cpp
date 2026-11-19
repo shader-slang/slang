@@ -2892,19 +2892,36 @@ static void UnwrapDeclarator(
 
                 // The chain of brackets must nest the first source bracket innermost, so that
                 // a declaration `int x[2][4]` denotes the same type as the type expression
-                // `int[2][4]` when it is checked (C and GLSL read a bracket chain left to
-                // right, first bracket outermost). The declarator chain is processed
+                // `int[2][4]` when it is checked: `visitIndexExpr` re-nests a chain of
+                // type-position brackets with the first source bracket outermost (C and GLSL
+                // read a bracket chain left to right), and it can only do that if every
+                // producer hands it the same chain shape. The declarator chain is processed
                 // outermost-first, i.e. the LAST source bracket is folded first, so an
                 // earlier bracket folds below the brackets already folded instead of
                 // wrapping them. Wrapping on top stays correct when the type so far is not
                 // a bracket chain, e.g. `int* p[2]` folds to `int*[2]`, not `(int[2])*`.
+                // This also covers a type spec that is itself a bracket chain: `int[3] x[2]`
+                // splices the declarator bracket at the bottom of the type spec's chain, so
+                // the combined chain reads left to right and `x` is an array of 2 `int[3]`s.
+                //
+                // The splice mutates a pre-existing node (it overwrites the bottom
+                // bracket's `baseExpression`), which the legacy wrap never did. That is
+                // safe because a declarator's typeSpec chain is unwrapped exactly once,
+                // and in a multi-declarator group (`int x[2][4], y[2][4];`) every
+                // declaration restarts from a fresh `SharedTypeExpr` wrapper around the
+                // shared type spec, which fails the `as<IndexExpr>` test above and so
+                // shields the shared chain from ever being spliced into. Note the branch
+                // asymmetry: the else branch reassigns `ioInfo->typeSpec` to the new node,
+                // while the splice branch leaves it at the existing chain top, since the
+                // new node lands at the bottom.
                 if (auto existingArrayTypeExpr = as<IndexExpr>(ioInfo->typeSpec))
                 {
                     while (auto lowerArrayTypeExpr =
                                as<IndexExpr>(existingArrayTypeExpr->baseExpression))
                         existingArrayTypeExpr = lowerArrayTypeExpr;
-                    arrayTypeExpr->baseExpression = existingArrayTypeExpr->baseExpression;
-                    existingArrayTypeExpr->baseExpression = arrayTypeExpr;
+                    auto innermostBracketExpr = existingArrayTypeExpr;
+                    arrayTypeExpr->baseExpression = innermostBracketExpr->baseExpression;
+                    innermostBracketExpr->baseExpression = arrayTypeExpr;
                 }
                 else
                 {
@@ -5444,11 +5461,11 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     // not parseInitDeclarator, because a typedef takes no initializer or semantics.
     //
     // UnwrapDeclarator folds the declarator suffixes onto the base type with C
-    // array-variable semantics: `typedef int m[A][B];` yields Array<Array<int, B>, A> -- the
-    // same type as the variable `int m[A][B];`. For a single dimension that equals the
-    // leading form `typedef int[N] arr;`; for multiple dimensions the trailing form is the
-    // transpose of the leading form (which wraps left-to-right), so the two are not
-    // interchangeable beyond one dimension.
+    // array-variable semantics: `typedef int m[A][B];` yields Array<Array<int, B>, A> --
+    // the same type as the variable `int m[A][B];`. The leading form `typedef int[A][B] m;`
+    // denotes the same type: both spellings read their bracket chain left to right, with
+    // the first bracket as the outermost dimension, so the two are interchangeable for
+    // any number of dimensions.
     DeclaratorInfo declaratorInfo;
     declaratorInfo.typeSpec = type.exp;
     auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
