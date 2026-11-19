@@ -687,6 +687,11 @@ SourceLoc findFirstUseLoc(IRInst* inst)
     return inst->sourceLoc;
 }
 
+SourceLoc getDiagnosticSourceLoc(IRInst* inst)
+{
+    return inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+}
+
 IRInst* hoistValueFromGeneric(
     IRBuilder& inBuilder,
     IRInst* value,

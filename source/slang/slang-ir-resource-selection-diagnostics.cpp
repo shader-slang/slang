@@ -65,6 +65,13 @@ void diagnoseResourceSelectionDispatch(CodeGenContext* codeGenContext, IRInst* o
     // We choose the diagnostic before `specializeResourceSelections` copies the original operation
     // into branches. We identify participation requirements without proving that every required
     // invocation takes the same branch, so both warnings describe a possible change in behavior.
+    //
+    // The consumer's own location is the producer-side guarantee (the legalizer copies it onto
+    // every instruction it rebuilds); getDiagnosticSourceLoc is the diagnostics-side defense for
+    // the consumers that still reach this pass without one — instructions synthesized with no
+    // location to copy, such as a combined texture-sampler or a call whose original was itself
+    // synthesized location-less. Those report the first located use instead of the exact
+    // operation, which still points at relevant user code.
     auto dependence =
         calculateResourceOperationControlFlowDependence(codeGenContext, originalConsumer);
     switch (dependence)
@@ -74,13 +81,13 @@ void diagnoseResourceSelectionDispatch(CodeGenContext* codeGenContext, IRInst* o
     case ResourceOperationControlFlowDependence::Derivative:
         codeGenContext->getSink()->diagnose(
             Diagnostics::ResourceSelectionIntroducesConditionalDerivative{
-                .location = originalConsumer->sourceLoc,
+                .location = getDiagnosticSourceLoc(originalConsumer),
             });
         return;
     case ResourceOperationControlFlowDependence::Unknown:
         codeGenContext->getSink()->diagnose(
             Diagnostics::ResourceSelectionIntroducesConditionalUnknownOperation{
-                .location = originalConsumer->sourceLoc,
+                .location = getDiagnosticSourceLoc(originalConsumer),
             });
         return;
     }

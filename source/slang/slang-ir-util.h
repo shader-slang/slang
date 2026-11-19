@@ -386,6 +386,11 @@ bool isWrapperType(IRInst* inst);
 
 SourceLoc findFirstUseLoc(IRInst* inst);
 
+/// Return the best location for diagnosing `inst`: its own source location when valid, else
+/// its first located use (unlike getDiagnosticPos, which walks parents). Returns an invalid
+/// location when neither exists, so a diagnostic still reports without a location.
+SourceLoc getDiagnosticSourceLoc(IRInst* inst);
+
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)
 {
     while (inst)
