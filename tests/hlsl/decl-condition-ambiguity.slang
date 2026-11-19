@@ -1,10 +1,9 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -source-language hlsl -output-using-type -xslang -Wno-30081
 
-// The declaration-condition trial must not misfire on expression conditions that begin
-// like a type, and must still admit the modifier form. The tests deliberately use
-// non-`bool` condition types, whose conversion to `bool` is exactly the feature under
-// test, so the 30081 "implicit conversion not recommended" warning is disabled rather
-// than heeded.
+// Expression conditions that begin like a type still parse as expressions, and the
+// modifier form still parses as a declaration. The tests use non-`bool` condition
+// types, whose conversion to `bool` is exactly the feature under test, so the 30081
+// "implicit conversion not recommended" warning is disabled rather than heeded.
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;

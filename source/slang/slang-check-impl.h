@@ -4622,7 +4622,9 @@ private:
     bool isGLSLOperatorScope();
 };
 
-struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>
+struct SemanticsStmtVisitor : public SemanticsVisitor,
+                              StmtVisitor<SemanticsStmtVisitor>,
+                              ConditionClauseVisitor<SemanticsStmtVisitor>
 {
     SemanticsStmtVisitor(SemanticsContext const& outer)
         : SemanticsVisitor(outer)
@@ -4635,6 +4637,15 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     // Check a condition clause in place.
     void checkConditionClause(ConditionClause* clause);
+
+    // Check one form of a condition clause; a form that is not recognized
+    // cannot occur, since the parser only builds the two forms above.
+    void visitConditionClause(ConditionClause*)
+    {
+        SLANG_UNEXPECTED("unhandled case of condition clause");
+    }
+    void visitExprConditionClause(ExprConditionClause* exprConditionClause);
+    void visitDeclConditionClause(DeclConditionClause* declConditionClause);
 
     Stmt* findOuterStmtWithLabel(Name* label);
 

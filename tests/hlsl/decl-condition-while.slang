@@ -1,10 +1,10 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -source-language hlsl -output-using-type -xslang -Wno-30081
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -source-language hlsl -output-using-type -xslang -Wno-30081
 
-// An HLSL-dialect declaration used as a `while` condition follows C++ rules: the
-// declaration runs before each test, and the variable is visible in the body.
+// A declaration used as a `while` condition has its declaration run before each test,
+// and the variable is visible in the body.
 
-// The tests deliberately use non-`bool` condition types, whose conversion to `bool` is
+// The tests use non-`bool` condition types, whose conversion to `bool` is
 // exactly the feature under test, so the 30081 "implicit conversion not recommended"
 // warning (which fires for any non-`bool` condition value) is disabled rather than
 // heeded.

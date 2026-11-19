@@ -7921,7 +7921,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             IRGenContext* context;
             LoweredConditionClause result;
-            void visitConditionClause(ConditionClause*) {}
+            void visitConditionClause(ConditionClause*)
+            {
+                SLANG_UNEXPECTED("unhandled case of condition clause");
+            }
             void visitExprConditionClause(ExprConditionClause* exprConditionClause)
             {
                 result.checkedExpr = exprConditionClause->expr;
@@ -7930,10 +7933,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
             void visitDeclConditionClause(DeclConditionClause* declConditionClause)
             {
+                // The declaration's parent is the scope the statement pushed
+                // around its condition, which gives the condition's variable
+                // its own debug lexical block.
                 result.previousScope = context->currentDebugScope;
                 result.conditionScope = emitDebugLexicalBlockForScope(
                     context,
-                    declConditionClause->scopeDecl,
+                    as<ScopeDecl>(declConditionClause->decl->parentDecl),
                     declConditionClause->loc);
                 if (result.conditionScope)
                 {

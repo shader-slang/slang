@@ -646,7 +646,11 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
         struct ConditionClauseLookup : ConditionClauseVisitor<ConditionClauseLookup, bool>
         {
             ASTLookupStmtVisitor* visitor;
-            bool visitConditionClause(ConditionClause*) { return false; }
+            bool visitConditionClause(ConditionClause*)
+            {
+                SLANG_UNEXPECTED("unhandled case of condition clause");
+                return false;
+            }
             bool visitExprConditionClause(ExprConditionClause* exprConditionClause)
             {
                 return visitor->checkExpr(exprConditionClause->expr);

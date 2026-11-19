@@ -4,6 +4,7 @@
 #include "slang-ast-base.h"
 #include "slang-ast-expr.h"
 #include "slang-ast-print.h"
+#include "slang-ast-stmt.h"
 #include "slang-ast-type.h"
 #include "slang-check-impl.h"
 
@@ -159,5 +160,15 @@ String SpecializationArg::toString()
     return String();
 }
 
+
+Expr* getPredicateExpr(ConditionClause* clause)
+{
+    if (auto exprConditionClause = as<ExprConditionClause>(clause))
+        return exprConditionClause->expr;
+    if (auto declConditionClause = as<DeclConditionClause>(clause))
+        return declConditionClause->predicateExpr;
+    SLANG_UNEXPECTED("unhandled case of condition clause");
+    return nullptr;
+}
 
 } // namespace Slang

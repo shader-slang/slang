@@ -4,7 +4,7 @@
 // A declaration condition in a differentiable loop lowers the declaration into the
 // loop's condition slot, which the differentiable-loop machinery (here `[ForceUnroll]`,
 // the same attribute any differentiable loop needs) treats like any other loop-local
-// variable. The tests deliberately use a non-`bool` condition type, whose conversion
+// variable. The tests use a non-`bool` condition type, whose conversion
 // to `bool` is exactly the feature under test, so the 30081 "implicit conversion not
 // recommended" warning is disabled rather than heeded.
 

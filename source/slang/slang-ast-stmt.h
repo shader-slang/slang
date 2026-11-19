@@ -80,13 +80,11 @@ class DeclStmt : public Stmt
     FIDDLE() DeclBase* decl = nullptr;
 };
 
-// A condition of an `if`, `while`, or `do`-`while` statement: either the expression the
-// statement tests, or (in the HLSL dialect) a single-variable declaration whose variable
-// is the condition's value. The `if`/`while`/`do`-`while` classes hold one of these in
-// their `condition` field. Consumers that only need the tested value — the expression the
-// statement branches on, converted to `bool` — read it with `getPredicateExpr`, which
-// hides which form the clause takes; code that must react to the forms themselves
-// dispatches them with `ConditionClauseVisitor`.
+// A condition of a statement that tests one, in either an expression or a
+// declaration form. Any client that only needs the tested value can read it
+// with `getPredicateExpr`, which hides which form the clause takes; code that
+// must handle each form in its own way dispatches the clause with
+// `ConditionClauseVisitor`.
 FIDDLE(abstract)
 class ConditionClause : public SyntaxNode
 {
@@ -104,10 +102,9 @@ class ExprConditionClause : public ConditionClause
     FIDDLE() Expr* expr = nullptr;
 };
 
-// A condition written as a single-variable declaration, as in the HLSL
-// `if (int count = c)`. The declared variable is visible in the condition itself and in the
-// statement's arms for `if` and `while`. For `do`-`while` the body runs before the condition,
-// so the variable is visible in the condition only.
+// A condition written as a single-variable declaration, as in `if (int count = c)`.
+// The declared variable is visible in the condition, and wherever the statement that
+// owns the condition keeps its scope open.
 FIDDLE()
 class DeclConditionClause : public ConditionClause
 {
@@ -118,25 +115,13 @@ class DeclConditionClause : public ConditionClause
     /// left null.
     FIDDLE() VarDeclBase* decl = nullptr;
 
-    /// The lexical scope that the declared variable belongs to, spanning the parts of
-    /// the statement where the variable is visible (both arms for `if`, the body for
-    /// `while`, the condition only for `do`-`while`).
-    FIDDLE() ScopeDecl* scopeDecl = nullptr;
-
     /// The tested value, derived during semantic checking; null until then.
     FIDDLE() Expr* predicateExpr = nullptr;
 };
 
 // The tested value of a condition clause, after semantic checking; null before
 // checking.
-inline Expr* getPredicateExpr(ConditionClause* clause)
-{
-    if (auto exprConditionClause = as<ExprConditionClause>(clause))
-        return exprConditionClause->expr;
-    if (auto declConditionClause = as<DeclConditionClause>(clause))
-        return declConditionClause->predicateExpr;
-    return nullptr;
-}
+Expr* getPredicateExpr(ConditionClause* clause);
 
 FIDDLE()
 class IfStmt : public Stmt

@@ -207,7 +207,7 @@ void SemanticsVisitor::dispatchStmt(Stmt* stmt, SemanticsContext const& context)
     SemanticsStmtVisitor visitor(context);
     SLANG_EXCEPTION_TRY
     {
-        visitor.dispatch(stmt);
+        visitor.StmtVisitor<SemanticsStmtVisitor>::dispatch(stmt);
     }
 #if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException&)

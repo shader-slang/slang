@@ -281,33 +281,26 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     return e;
 }
 
-// Check a condition clause in place.
 void SemanticsStmtVisitor::checkConditionClause(ConditionClause* clause)
 {
     SLANG_ASSERT(clause);
+    ConditionClauseVisitor<SemanticsStmtVisitor>::dispatch(clause);
+}
 
-    struct ConditionClauseChecker : ConditionClauseVisitor<ConditionClauseChecker>
-    {
-        SemanticsStmtVisitor* checker;
-        void visitConditionClause(ConditionClause*) {}
-        void visitExprConditionClause(ExprConditionClause* exprConditionClause)
-        {
-            exprConditionClause->expr = checker->checkPredicateExpr(exprConditionClause->expr);
-        }
-        void visitDeclConditionClause(DeclConditionClause* declConditionClause)
-        {
-            checker->checkDeclAtDeclarationPoint(declConditionClause->decl);
-            // The tested value references the checked declaration directly, so
-            // no lookup is involved in deriving it.
-            auto varExpr = checker->m_astBuilder->create<VarExpr>();
-            varExpr->loc = declConditionClause->decl->getNameLoc();
-            varExpr->declRef = makeDeclRef<Decl>(declConditionClause->decl);
-            declConditionClause->predicateExpr = checker->checkPredicateExpr(varExpr);
-        }
-    };
-    ConditionClauseChecker checker;
-    checker.checker = this;
-    checker.dispatch(clause);
+void SemanticsStmtVisitor::visitExprConditionClause(ExprConditionClause* exprConditionClause)
+{
+    exprConditionClause->expr = checkPredicateExpr(exprConditionClause->expr);
+}
+
+void SemanticsStmtVisitor::visitDeclConditionClause(DeclConditionClause* declConditionClause)
+{
+    checkDeclAtDeclarationPoint(declConditionClause->decl);
+    // The tested value references the checked declaration directly, so no
+    // lookup is involved in deriving it.
+    auto varExpr = m_astBuilder->create<VarExpr>();
+    varExpr->loc = declConditionClause->decl->getNameLoc();
+    varExpr->declRef = makeDeclRef<Decl>(declConditionClause->decl);
+    declConditionClause->predicateExpr = checkPredicateExpr(varExpr);
 }
 
 void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)

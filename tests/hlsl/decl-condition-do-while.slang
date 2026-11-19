@@ -1,12 +1,12 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -source-language hlsl -output-using-type -xslang -Wno-30081
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -source-language hlsl -output-using-type -xslang -Wno-30081
 
-// An HLSL-dialect declaration used as a `do`-`while` condition is scoped to the
-// condition itself (the body runs before the condition, so it never sees the variable),
-// and a `continue` still jumps to the condition, so the condition initializer runs
-// before the next body pass.
+// A declaration used as a `do`-`while` condition is scoped to the condition itself
+// (the body is parsed before the condition, so it never sees the variable), and a
+// `continue` jumps to the condition, so the condition initializer runs before the
+// next body pass.
 
-// The tests deliberately use non-`bool` condition types, whose conversion to `bool` is
+// The tests use non-`bool` condition types, whose conversion to `bool` is
 // exactly the feature under test, so the 30081 "implicit conversion not recommended"
 // warning (which fires for any non-`bool` condition value) is disabled rather than
 // heeded.

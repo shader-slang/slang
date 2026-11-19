@@ -267,9 +267,12 @@ public:
     DoWhileStmt* ParseDoWhileStatement(Stmt* body);
     // Parse a condition clause.
     ConditionClause* parseConditionClause();
-    // Parse a condition clause that consists of a declaration. The caller has already
-    // committed to the declaration form; disambiguation is handled by
-    // `parseConditionClause()`.
+    // Parse a condition clause that consists of a declaration.
+    //
+    // For example, in `if (int count = c) {}`, the condition clause consists of the
+    // declaration `int count = c`. This operation assumes that the caller has
+    // already determined that a declaration is expected; disambiguation of
+    // different cases of condition clause is handled by `parseConditionClause()`.
     DeclConditionClause* parseDeclConditionClause();
     CatchStmt* ParseDoCatchStatement(Stmt* body);
     Stmt* ParseDoStatement();
@@ -7725,9 +7728,7 @@ Stmt* Parser::parseIfLetStatement()
     ReadToken("if");
     ReadToken(TokenType::LParent);
 
-    // Capture the clause position at the start of the condition, matching
-    // `parseConditionClause`; a condition clause's `loc` names where the
-    // condition begins, not where its last token landed.
+    // A condition clause's `loc` names where the condition begins.
     ExprConditionClause* conditionClause = astBuilder->create<ExprConditionClause>();
     FillPosition(conditionClause);
 
@@ -7845,6 +7846,7 @@ IfStmt* Parser::parseIfStatement()
     FillPosition(ifStatement);
     ReadToken("if");
     ReadToken(TokenType::LParent);
+    pushScopeAndSetParent(astBuilder->create<ScopeDecl>());
     ifStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     ifStatement->positiveStatement = parseControlFlowBody(ifStatement);
@@ -7853,8 +7855,7 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = parseControlFlowBody(ifStatement);
     }
-    if (as<DeclConditionClause>(ifStatement->condition))
-        PopScope();
+    PopScope();
     ifStatement->afterLoc = tokenReader.peekLoc();
 
     return ifStatement;
@@ -7936,11 +7937,11 @@ WhileStmt* Parser::ParseWhileStatement()
     FillPosition(whileStatement);
     ReadToken("while");
     ReadToken(TokenType::LParent);
+    pushScopeAndSetParent(astBuilder->create<ScopeDecl>());
     whileStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     whileStatement->statement = parseControlFlowBody();
-    if (as<DeclConditionClause>(whileStatement->condition))
-        PopScope();
+    PopScope();
     return whileStatement;
 }
 
@@ -7951,11 +7952,11 @@ DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
     doWhileStatement->statement = body;
     ReadToken("while");
     ReadToken(TokenType::LParent);
+    pushScopeAndSetParent(astBuilder->create<ScopeDecl>());
     doWhileStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
-    if (as<DeclConditionClause>(doWhileStatement->condition))
-        PopScope();
+    PopScope();
     return doWhileStatement;
 }
 
@@ -8219,21 +8220,21 @@ TypeExp Parser::ParseTypeExp()
 
 // Parse the condition of an `if`, `while`, or `do`-`while` statement.
 //
-// Parse a condition clause.
 ConditionClause* Parser::parseConditionClause()
 {
     if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
-        // Decide between a declaration condition and an expression with a
-        // trial parse on a shadow parser and sink, so a failed trial cannot
-        // leak diagnostics into the real compile.
+        // A declaration condition and an expression condition are told apart
+        // with a trial parse on a shadow parser and sink, so a failed trial
+        // cannot leak diagnostics into the real compile.
         DiagnosticSink trialSink(sink->getSourceManager(), nullptr);
         Parser trialParser(*this);
         trialParser.sink = &trialSink;
 
-        // The trial shares the `ModuleDecl` with the real parser, so restore the
-        // language version around the trial: parsing modifiers can upgrade a
-        // legacy module, and a failed trial must leave no state behind.
+        // The trial shares the `ModuleDecl` with the real parser, so the parser
+        // restores the language version around the trial: parsing modifiers can
+        // upgrade a legacy module, and a failed trial must leave no state
+        // behind.
         auto currentModuleDecl = getCurrentModuleDecl();
         auto savedLanguageVersion =
             currentModuleDecl ? currentModuleDecl->languageVersion : SLANG_LANGUAGE_VERSION_DEFAULT;
@@ -8244,9 +8245,10 @@ ConditionClause* Parser::parseConditionClause()
         if (currentModuleDecl)
             currentModuleDecl->languageVersion = savedLanguageVersion;
 
-        // A condition declaration must have an initializer, so commit to the
-        // declaration form only on the `name =` shape; the completion-request
-        // terms keep language-server completions resolving in the right context.
+        // A condition declaration always has an initializer, so the parser
+        // commits to the declaration form only on the `name =` shape; the
+        // completion-request terms keep language-server completions resolving
+        // in the right context.
         bool isDeclCondition = trialSink.getErrorCount() == 0 &&
                                !trialParser.hasSeenCompletionToken &&
                                (trialParser.LookAheadToken(TokenType::Identifier) ||
@@ -8263,52 +8265,28 @@ ConditionClause* Parser::parseConditionClause()
             return parseDeclConditionClause();
         }
 
-        // Not a declaration: the trial only touched the shadow parser, so this
-        // parser is still at the start of the condition.
+        // Not a declaration: the trial only touched the shadow parser, so the
+        // real parser is still at the start of the condition.
     }
 
-    // Capture the clause position at the start of the condition, like
-    // `parseDeclConditionClause` does: the clause's `loc` names where the
-    // condition begins.
-    ExprConditionClause* clause = astBuilder->create<ExprConditionClause>();
-    FillPosition(clause);
-    clause->expr = ParseExpression();
-    return clause;
+    // The clause's `loc` names where the condition begins.
+    ExprConditionClause* exprConditionClause = astBuilder->create<ExprConditionClause>();
+    FillPosition(exprConditionClause);
+    exprConditionClause->expr = ParseExpression();
+    return exprConditionClause;
 }
 
 // Parse a condition clause that consists of a declaration.
-//
-// For example, in `if (int count = c) {}`, the condition clause consists of the
-// declaration `int count = c`. This operation assumes that the caller has
-// already determined that a declaration is expected; disambiguation of different
-// cases of condition clause is handled by `parseConditionClause()`.
-//
-// This operation pushes a new scope to contain the declaration, and it is then
-// the responsibility of the parsing logic that invoked this operation to pop
-// that scope at the right time.
 DeclConditionClause* Parser::parseDeclConditionClause()
 {
     DeclConditionClause* clause = astBuilder->create<DeclConditionClause>();
     FillPosition(clause);
 
-    ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
-    pushScopeAndSetParent(scopeDecl);
-    clause->scopeDecl = scopeDecl;
-
+    // The declaration lands in the scope the invoking statement pushed around
+    // its condition, so the variable is visible exactly where that statement
+    // keeps the scope open (both arms of an `if`, the body of a `while`, and
+    // only the condition of a `do`-`while`).
     auto modifiers = ParseModifiers(this);
-
-    // A condition variable is re-initialized before every evaluation, which
-    // contradicts storage duration, so storage-class modifiers are rejected
-    // as in C++ (and diagnosed here rather than at checking, where the
-    // condition context is no longer known).
-    for (auto modifier : modifiers)
-    {
-        if (as<HLSLStaticModifier>(modifier) || as<HLSLGroupSharedModifier>(modifier) ||
-            as<ExternModifier>(modifier))
-        {
-            sink->diagnose(Diagnostics::ConditionDeclarationStorageClass{.modifier = modifier});
-        }
-    }
 
     Expr* typeSpec = ParseType();
 
@@ -8316,16 +8294,6 @@ DeclConditionClause* Parser::parseDeclConditionClause()
     DeclaratorInfo declaratorInfo;
     declaratorInfo.typeSpec = typeSpec;
     UnwrapDeclarator(this, initDeclarator, &declaratorInfo);
-
-    // A condition allows only one declarator, as in C++; diagnose the comma
-    // directly and recover to the closing paren.
-    if (LookAheadToken(TokenType::Comma))
-    {
-        sink->diagnose(Diagnostics::ConditionDeclarationAllowsOneDeclarator{
-            .location = tokenReader.peekLoc()});
-        while (!tokenReader.isAtEnd() && !LookAheadToken(TokenType::RParent))
-            SkipBalancedToken(&tokenReader);
-    }
 
     VarDeclBase* varDecl = CreateVarDeclForContext(astBuilder, currentScope->containerDecl);
     CompleteVarDecl(this, varDecl, declaratorInfo);
