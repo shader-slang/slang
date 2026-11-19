@@ -214,6 +214,22 @@ void specializeStageSwitch(IRModule* module)
     {
         f.first->removeAndDeallocate();
     }
+
+    // A function that no entry point reaches, such as a `[CudaDeviceExport]` function the kernel
+    // does not call, has no stage to specialize to, so its stage switches take their `default:`
+    // case. Leaving `GetCurrentStage` in place would reach emit, which has no lowering for it.
+    for (auto func : stageSpecificFunctions)
+    {
+        if (!mapFuncToStageSpecializedFunc.containsKey(func) &&
+            !func->findDecoration<IREntryPointDecoration>() &&
+            !func->findDecoration<IRCudaKernelDecoration>())
+        {
+            specializeFuncToStage(
+                Stage::Unknown,
+                as<IRGlobalValueWithCode>(func),
+                mapFuncToStageSpecializedFunc);
+        }
+    }
 }
 
 } // namespace Slang
