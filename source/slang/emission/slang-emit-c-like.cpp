@@ -550,8 +550,19 @@ void CLikeSourceEmitter::_emitSwizzleAssignmentPerElement(IRInst* inst)
 
 bool CLikeSourceEmitter::_doesTargetSupportSwizzleAssignment()
 {
-    return !isCPUTarget(getTargetReq()) && !isCUDATarget(getTargetReq()) &&
-           !isWGPUTarget(getTargetReq());
+    auto targetReq = getTargetReq();
+
+    // Some targets aren't implemented to be able to emit swizzled assignments directly,
+    // so we explicitly exclude those:
+    if (isCPUTarget(targetReq))
+        return false;
+    if (isCUDATarget(targetReq))
+        return false;
+    if (isWGPUTarget(targetReq))
+        return false;
+
+    // By default, we assume that all other targets support swizzled stores and sets.
+    return true;
 }
 
 bool CLikeSourceEmitter::_isSwizzleAssignmentSpelledPerElement(IRInst* inst)
