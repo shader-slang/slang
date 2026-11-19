@@ -863,7 +863,7 @@ public:
     {
     }
     ImmutableHashedString(String&& str)
-        : slice(_Move(str)), hashCode(str.getHashCode())
+        : slice(_Move(str)), hashCode(slice.getHashCode())
     {
     }
     ImmutableHashedString(const ImmutableHashedString& other) = default;
