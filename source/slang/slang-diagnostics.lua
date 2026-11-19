@@ -6414,7 +6414,7 @@ warning(
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 
--- Metal, WGSL or CUDA (56101-56115)
+-- Metal, WGSL or CUDA (56101-56118)
 
 err(
     "resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal",
@@ -6505,6 +6505,20 @@ warning(
     56115,
     "'WaveSize(~waveSize:int)' cannot be honored on target '~target', whose wave size is always ~targetWaveSize:int; the attribute will be ignored",
     span { loc = "location", message = "the entry point runs with ~targetWaveSize:int-lane waves, so code that assumes ~waveSize:int lanes per wave computes wrong results" }
+)
+
+err(
+    "cuda-surface-format-conversion-unavailable",
+    56117,
+    "CUDA surface access cannot convert this texture's format",
+    span { loc = "location", message = "this write to a texel is lowered to a CUDA surface ~access:String that converts between the texture's [format(...)] and its element type, which the CUDA prelude does not do correctly. It converts on read only from 'r16f', 'rg16f' and 'rgba16f', and has no converting read for array textures." }
+)
+
+err(
+    "cuda-surface-shape-unsupported",
+    56118,
+    "writes through a subscript of this texture shape are not supported on CUDA",
+    span { loc = "location", message = "this write to a texel is lowered to CUDA surface calls, which Slang spells only for 1D, 2D and 3D textures and 1D and 2D array textures." }
 )
 
 -- SPIRV (57001-57007)

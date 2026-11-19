@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
 // Metal lacks RWTexture GFX backend support. 
 // Due to this, Metal compute test is disabled
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
@@ -9,12 +10,16 @@
 //METAL-NOT: error[E41404]
 //METALLIB: @computeMain
 
+//PTX: .entry
+//PTX: sust
+
 //CUDA: CUsurfObject outputTexture1D_{{[0-9]+}};
 //CUDA: CUsurfObject outputTexture2D_{{[0-9]+}};
 //CUDA: CUsurfObject outputTexture3D_{{[0-9]+}};
-//CUDA: globalParams_{{[0-9]+}}->outputTexture1D_{{[0-9]+}}[{{.*}}]
-//CUDA: globalParams_{{[0-9]+}}->outputTexture2D_{{[0-9]+}}[{{.*}}]
-//CUDA: globalParams_{{[0-9]+}}->outputTexture3D_{{[0-9]+}}[{{.*}}]
+//CUDA: surf1Dwrite<{{.*}}>
+//CUDA: surf2Dwrite<{{.*}}>
+//CUDA: surf3Dwrite<{{.*}}>
+//CUDA: surf2DLayeredwrite<{{.*}}>
 //CUDA: surf1Dread<{{.*}}>
 //CUDA: surf2Dread<{{.*}}>
 //CUDA: surf3Dread<{{.*}}>
