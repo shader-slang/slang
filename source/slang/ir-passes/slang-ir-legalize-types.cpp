@@ -469,14 +469,6 @@ private:
             m_call->getCallee(),
             m_args.getCount(),
             m_args.getArrayView().getBuffer());
-        // A rebuilt instruction takes the place of the original in the IR, so it must carry the
-        // source location the user wrote. Diagnostics that fire after legalization (for example,
-        // the resource-selection warnings) report that location; without it they can at best
-        // report a use of the call rather than the call site itself. The same replacement rule
-        // holds on the legalizer's other rebuild paths (the generic recreate in legalizeInst,
-        // printf, cooperative-matrix element functors, and abort), each of which copies the
-        // location the same way.
-        newCall->sourceLoc = m_call->sourceLoc;
         return newCall;
     }
 };
@@ -829,10 +821,7 @@ static LegalVal legalizeLoad(IRTypeLegalizationContext* context, LegalVal legalP
     }
 }
 
-static LegalVal legalizePrintf(
-    IRTypeLegalizationContext* context,
-    IRInst* inst,
-    ArrayView<LegalVal> args)
+static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<LegalVal> args)
 {
     ShortList<IRInst*> legalArgs;
     for (auto arg : args)
@@ -856,7 +845,6 @@ static LegalVal legalizePrintf(
         kIROp_Printf,
         (UInt)legalArgs.getCount(),
         legalArgs.getArrayView().getBuffer());
-    newPrintf->sourceLoc = inst->sourceLoc;
     return LegalVal::simple(newPrintf);
 }
 
@@ -937,8 +925,6 @@ static LegalVal legalizeAbort(
         kIROp_Abort,
         (UInt)legalArgs.getCount(),
         legalArgs.getArrayView().getBuffer());
-    newAbort->sourceLoc = originalInst->sourceLoc;
-    originalInst->transferDecorationsTo(newAbort);
     return LegalVal::simple(newAbort);
 }
 
@@ -2192,7 +2178,7 @@ static LegalVal legalizeInst(
         result = legalizeUnconditionalBranch(context, args, (IRUnconditionalBranch*)inst);
         break;
     case kIROp_Printf:
-        result = legalizePrintf(context, inst, args);
+        result = legalizePrintf(context, args);
         break;
     case kIROp_Abort:
         result = legalizeAbort(context, inst, args);
@@ -2368,9 +2354,12 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                         inst->getFullType(),
                         legalArg.getSimple(),
                         inst->getOperand(1));
-                    newInst->sourceLoc = inst->sourceLoc;
                     inst->replaceUsesWith(newInst);
-                    inst->removeAndDeallocate();
+                    // The original is kept unlinked until the pass's cleanup so the
+                    // replacement bookkeeping in `processInst` can still read its
+                    // location and decorations.
+                    inst->removeFromParent();
+                    context->replacedInstructions.add(inst);
                     return LegalVal::simple(newInst);
                 }
                 break;
@@ -2387,9 +2376,12 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                     inst->getOperand(0),
                     inst->getOperand(1));
 
-                newInst->sourceLoc = inst->sourceLoc;
                 inst->replaceUsesWith(newInst);
-                inst->removeAndDeallocate();
+                // The original is kept unlinked until the pass's cleanup so the
+                // replacement bookkeeping in `processInst` can still read its
+                // location and decorations.
+                inst->removeFromParent();
+                context->replacedInstructions.add(inst);
                 return LegalVal::simple(newInst);
             }
         case LegalVal::Flavor::pair:
@@ -2514,7 +2506,6 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
                 inst->getOp(),
                 argCount,
                 newArgs.getArrayView().getBuffer());
-            newInst->sourceLoc = inst->sourceLoc;
             inst->replaceUsesWith(newInst);
             inst->removeFromParent();
             context->replacedInstructions.add(inst);
