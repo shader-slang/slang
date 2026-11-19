@@ -468,6 +468,9 @@ Extensions
 `GL_EXT_nonuniform_qualifier`
 > Represents the GL_EXT_nonuniform_qualifier extension.
 
+`GL_EXT_opacity_micromap_ray_query_mode`
+> Represents the GL_EXT_opacity_micromap_ray_query_mode extension.
+
 `GL_EXT_ray_query`
 > Represents the GL_EXT_ray_query extension.
 
@@ -684,6 +687,9 @@ Extensions
 
 `SPV_KHR_non_semantic_info`
 > Represents the SPIR-V extension for non-semantic information.
+
+`SPV_KHR_opacity_micromap`
+> Represents the SPIR-V extension for opacity micromaps.
 
 `SPV_KHR_physical_storage_buffer`
 > Represents the SPIR-V extension for physical storage buffer (the KHR-promoted name for
@@ -918,6 +924,9 @@ Extensions
 
 `spvRayTracingMotionBlurNV`
 > Represents the SPIR-V capability for ray tracing motion blur.
+
+`spvRayTracingOpacityMicromapExecutionModeKHR`
+> Represents the SPIR-V capability for the opacity micromap ray-query execution mode.
 
 `spvRayTracingPositionFetchKHR`
 > Represents the SPIR-V capability for ray tracing position fetch.
@@ -1394,6 +1403,9 @@ Compound Capabilities
 > `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
 > this with plain ray query alone, and a sphere-only caller cannot reach the
 > LSS accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
+
+`rayquery_opacity_micromap`
+> Capabilities needed to opt ray queries into opacity micromaps.
 
 `rayquery_position`
 > Collection of capabilities for rayquery + ray_tracing_position_fetch.

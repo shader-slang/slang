@@ -1608,6 +1608,15 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
             requireQuadControlExtensions();
             attributes.quadDerivatives = true;
         }
+        else if (auto requirement = as<IRRequireCapabilityAtomDecoration>(decoration))
+        {
+            if (requirement->getAtom() == CapabilityName::_GL_EXT_opacity_micromap_ray_query_mode)
+            {
+                _requireRayQuery();
+                _requireGLSLExtension(UnownedStringSlice("GL_EXT_opacity_micromap_ray_query_mode"));
+                ensurePrelude("const bool gl_EnableOpacityMicromapEXT = true;");
+            }
+        }
 
         switch (stage)
         {

@@ -692,7 +692,7 @@ local insts = {
 				RayQuery = {
 					-- Types
 					struct_name = "RayQueryType",
-					min_operands = 1,
+					operands = { { "rayFlags" }, { "rayQueryFlags" } },
 					hoistable = true,
 				},
 			},

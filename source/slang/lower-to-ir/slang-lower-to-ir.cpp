@@ -2927,6 +2927,63 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
+    // Project the standard-library RayQuery's feature policy into its native IR flags.
+    // Consider `RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>>`.
+    // Generic checking keeps the feature type and its IRayQueryFeature witness in the
+    // declaration reference so capability checking and generic inference see the policy.
+    // Here, the builtin requirement identifies the native flag value in that witness.
+    // Normal witness lookup also preserves a symbolic value inside a generic helper,
+    // which later specialization resolves through the same conformance.
+    IRType* lowerRayQueryType(DeclRefType* type)
+    {
+        auto astBuilder = context->astBuilder;
+        auto flagsRequirement =
+            as<VarDeclBase>(astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+                BuiltinRequirementKind::RayQueryFlags));
+        SLANG_RELEASE_ASSERT(flagsRequirement);
+        SLANG_RELEASE_ASSERT(as<InterfaceDecl>(flagsRequirement->parentDecl));
+
+        IntVal* rayFlags = nullptr;
+        Type* featuresType = nullptr;
+        SubtypeWitness* featuresWitness = nullptr;
+        SubstitutionSet(type->getDeclRef())
+            .forEachSubstitutionArg(
+                [&](Val* arg)
+                {
+                    if (auto intVal = as<IntVal>(arg))
+                    {
+                        SLANG_RELEASE_ASSERT(!rayFlags);
+                        rayFlags = intVal;
+                    }
+                    else if (auto witness = as<SubtypeWitness>(arg))
+                    {
+                        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(witness->getSup());
+                        SLANG_RELEASE_ASSERT(
+                            interfaceDeclRef.getDecl() == flagsRequirement->parentDecl);
+                        SLANG_RELEASE_ASSERT(!featuresWitness);
+                        featuresWitness = witness;
+                    }
+                    else
+                    {
+                        SLANG_RELEASE_ASSERT(as<Type>(arg) && !featuresType);
+                        featuresType = as<Type>(arg);
+                    }
+                });
+        SLANG_RELEASE_ASSERT(rayFlags && featuresType && featuresWitness);
+        SLANG_RELEASE_ASSERT(featuresWitness->getSub()->equals(featuresType));
+
+        auto queryFlags = WitnessLookupIntVal::tryFold(
+            astBuilder,
+            featuresWitness,
+            flagsRequirement,
+            flagsRequirement->type);
+        SLANG_RELEASE_ASSERT(as<IntVal>(queryFlags));
+        IRInst* operands[] = {
+            lowerSimpleVal(context, rayFlags),
+            lowerSimpleVal(context, queryFlags)};
+        return getBuilder()->getType(kIROp_RayQueryType, SLANG_COUNT_OF(operands), operands);
+    }
+
     // Lower a type where the type declaration being referenced is assumed
     // to be an intrinsic type, which can thus be lowered to a simple IR
     // type with the appropriate opcode.
@@ -2938,6 +2995,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             type->getDeclRef().getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
+        if (op == kIROp_RayQueryType && isFromCoreModule(type->getDeclRef().getDecl()))
+        {
+            // The standard library owns the typed feature policy. User declarations with
+            // __intrinsic_type(RayQuery) already describe native numeric operands directly.
+            return lowerRayQueryType(type);
+        }
+
         List<IRInst*> operands;
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
@@ -15281,26 +15345,40 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
-// Preserve the execution mode required by an entry point's checked capabilities.
+// Preserve execution modes required by an entry point's checked capabilities.
 // Consider a generic entry point specialized with a type that requires
-// `spvShader64BitIndexingEXT`. Its requirement is known only after specialization, so the
-// selected program's layout IR must carry the decoration. The source-module producer also
-// uses this helper so serialized entry points retain requirements known before specialization.
-static void lowerEntryPointShader64BitIndexingRequirement(
+// `rayquery_opacity_micromap`. Its requirement is known only after specialization, so the
+// selected program's layout IR carries the target-specific capability atoms to emission.
+// The source-module producer also uses this helper so serialized entry points retain
+// requirements known before specialization, even if optimization removes the feature's uses.
+static void lowerEntryPointExecutionModeRequirements(
     IRBuilder* builder,
     IRInst* entryPointInst,
     CapabilitySet const& caps)
 {
+    HashSet<CapabilityAtom> emittedAtoms;
     // Membership in any target alternative is sufficient. `implies()` would require the atom
     // in every alternative and miss functions that support other targets as well as SPIR-V.
     for (auto atomSet : caps.getAtomSets())
     {
         for (auto atomVal : atomSet)
         {
-            if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
+            auto atom = asAtom(atomVal);
+            switch (atom)
             {
-                builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(entryPointInst);
-                return;
+            case CapabilityAtom::spvShader64BitIndexingEXT:
+                if (emittedAtoms.add(atom))
+                    builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(entryPointInst);
+                break;
+            case CapabilityAtom::spvRayTracingOpacityMicromapExecutionModeKHR:
+            case CapabilityAtom::_GL_EXT_opacity_micromap_ray_query_mode:
+                if (emittedAtoms.add(atom))
+                    builder->addRequireCapabilityAtomDecoration(
+                        entryPointInst,
+                        (CapabilityName)atom);
+                break;
+            default:
+                break;
             }
         }
     }
@@ -15368,10 +15446,7 @@ static void lowerFrontEndEntryPointToIR(
     // With capability checking disabled the declaration's set is null, which denotes no
     // inferred requirements.
     auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements;
-    lowerEntryPointShader64BitIndexingRequirement(
-        builder,
-        instToDecorate,
-        CapabilitySet{inferredCaps});
+    lowerEntryPointExecutionModeRequirements(builder, instToDecorate, CapabilitySet{inferredCaps});
 }
 
 static void lowerProgramEntryPointToIR(
@@ -16591,7 +16666,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // shared by several specializations with different capability requirements.
         SLANG_RELEASE_ASSERT(entryPointLayout->inferredCapabilityRequirements);
         CapabilitySet set{entryPointLayout->inferredCapabilityRequirements};
-        lowerEntryPointShader64BitIndexingRequirement(builder, irFunc, set);
+        lowerEntryPointExecutionModeRequirements(builder, irFunc, set);
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)

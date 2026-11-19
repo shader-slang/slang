@@ -6708,6 +6708,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             requireSPIRVCapability(SpvCapabilityShader64BitIndexingEXT);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeShader64BitIndexingEXT);
             break;
+        case kIROp_RequireCapabilityAtomDecoration:
+            if (cast<IRRequireCapabilityAtomDecoration>(decoration)->getAtom() ==
+                CapabilityName::spvRayTracingOpacityMicromapExecutionModeKHR)
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_opacity_micromap"));
+                ensureAnyExtensionDeclaration(
+                    {UnownedStringSlice("SPV_KHR_ray_query"),
+                     UnownedStringSlice("SPV_KHR_ray_tracing")});
+                requireSPIRVCapability(SpvCapabilityRayTracingOpacityMicromapExecutionModeKHR);
+                IRBuilder builder(m_irModule);
+                requireSPIRVExecutionMode(
+                    nullptr,
+                    dstID,
+                    SpvExecutionModeOpacityMicromapIdKHR,
+                    builder.getBoolValue(true));
+            }
+            break;
         case kIROp_SPIRVBufferBlockDecoration:
             {
                 emitOpDecorate(
@@ -12444,7 +12461,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SpvOp execModeOp = SpvOpExecutionMode;
             if (executionMode == SpvExecutionModeLocalSizeId ||
                 executionMode == SpvExecutionModeLocalSizeHintId ||
-                executionMode == SpvExecutionModeSubgroupsPerWorkgroupId)
+                executionMode == SpvExecutionModeSubgroupsPerWorkgroupId ||
+                executionMode == SpvExecutionModeOpacityMicromapIdKHR)
             {
                 execModeOp = SpvOpExecutionModeId;
             }

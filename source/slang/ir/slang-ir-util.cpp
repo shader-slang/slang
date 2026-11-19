@@ -1111,11 +1111,11 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << ">";
         break;
     case kIROp_RayQueryType:
-        // The first operand is the ray-flags value (RayQueryType has min_operands == 1, so
-        // getOperand(0) is in bounds); include it so `RayQuery<flags>` instantiations that differ
-        // only in flags get distinct names.
+        // Both flag domains distinguish query types, even though SPIR-V uses one opaque type.
         sb << "RayQuery<";
-        getTypeNameHint(sb, type->getOperand(0));
+        getTypeNameHint(sb, as<IRRayQueryType>(type)->getRayFlags());
+        sb << ",";
+        getTypeNameHint(sb, as<IRRayQueryType>(type)->getRayQueryFlags());
         sb << ">";
         break;
     case kIROp_CoopVectorType:

@@ -6182,6 +6182,13 @@ bool SemanticsVisitor::doesVarMatchRequirement(
 
     for (auto modifier : requiredMemberDeclRef.getDecl()->modifiers)
     {
+        // A builtin marker identifies the requirement itself, not a property of its
+        // implementation. For example, IRayQueryFeature._rayQueryFlags owns the
+        // RayQueryFlags role, while each feature supplies an ordinary static constant.
+        // Repeating the marker would register the implementation as the requirement.
+        if (as<BuiltinRequirementModifier>(modifier))
+            continue;
+
         bool found = false;
         for (auto satisfyingModifier : satisfyingMemberDeclRef.getDecl()->modifiers)
         {
