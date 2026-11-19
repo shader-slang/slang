@@ -4426,6 +4426,13 @@ standalone_note(
     span { loc = "location" }
 )
 
+err(
+    "accessor-requires-writable-base",
+    40027,
+    "cannot invoke this accessor: its receiver does not provide the writable storage it requires",
+    span { loc = "location", message = "the accessor may write through its receiver, whose storage does not permit writes" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,
