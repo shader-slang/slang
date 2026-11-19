@@ -195,6 +195,12 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 
     for (auto rr : layout->getOffsetAttrs())
     {
+        // As in the SPIR-V emitter, a parameter group's own binding adds its container's
+        // offset. Metal bindings have no space, so only the index is adjusted.
+        UInt index = rr->getOffset();
+        if (auto containerAttr =
+                findParameterGroupContainerOffsetAttr(layout, rr->getResourceKind()))
+            index += containerAttr->getOffset();
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
@@ -202,7 +208,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
                 as<IRTextureBufferType>(textureOrSamplerType))
             {
                 m_writer->emit(" [[texture(");
-                m_writer->emit(rr->getOffset());
+                m_writer->emit(index);
                 m_writer->emit(")]]");
             }
             break;
@@ -216,7 +222,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
                 as<IRRaytracingAccelerationStructureType>(paramType))
             {
                 m_writer->emit(" [[buffer(");
-                m_writer->emit(rr->getOffset());
+                m_writer->emit(index);
                 m_writer->emit(")]]");
             }
             break;
@@ -224,7 +230,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             if (as<IRSamplerStateTypeBase>(textureOrSamplerType))
             {
                 m_writer->emit(" [[sampler(");
-                m_writer->emit(rr->getOffset());
+                m_writer->emit(index);
                 m_writer->emit(")]]");
             }
             break;

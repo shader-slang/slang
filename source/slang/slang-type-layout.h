@@ -964,9 +964,11 @@ public:
     // The layout of the "container" part itself.
     // E.g., for a constant buffer, this would reflect
     // the resource usage of the container, without
-    // the element type factored in. All of the offsets
-    // for this variable should be zero, but it is included
-    // for completeness.
+    // the element type factored in. The offsets for this
+    // variable are zero except for the default constant
+    // buffer of the global scope, whose binding is recorded
+    // here (see `generateParameterBindings`); the binding of
+    // a group itself is its variable's offset plus these.
     RefPtr<VarLayout> containerVarLayout;
 
     // A variable layout for the element of the container.

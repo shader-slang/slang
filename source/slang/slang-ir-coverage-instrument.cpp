@@ -218,24 +218,33 @@ static void collectUsedBindingsFromVarLayout(
     if (auto registerSpaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
         localSpace += registerSpaceAttr->getOffset();
 
+    // A parameter group's resources are reserved below through its container (the group's own
+    // buffer) and its element (the contents). Reserving the group's whole range at the
+    // variable's offset would assume the container sits at offset zero, which does not hold
+    // for the global scope's default constant buffer (see `generateParameterBindings`).
+    auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout);
+
     if (auto offsetAttr = varLayout->findOffsetAttr(kind))
     {
         localBinding += offsetAttr->getOffset();
         localSpace += offsetAttr->getSpace();
 
-        bool isUnbounded = false;
-        UInt count = getResourceCount(typeLayout, kind, isUnbounded);
-        // If a layout carries an explicit resource-kind offset but
-        // its type layout does not expose a finite size, reserve the
-        // base slot rather than pretending the offset is unused.
-        if (count == 0)
-            count = 1;
-        if (isUnsizedArrayResourceSource(source))
-            isUnbounded = true;
-        addUsedBindingRange(outRanges, localSpace, localBinding, count, isUnbounded, source);
+        if (!groupLayout)
+        {
+            bool isUnbounded = false;
+            UInt count = getResourceCount(typeLayout, kind, isUnbounded);
+            // If a layout carries an explicit resource-kind offset but
+            // its type layout does not expose a finite size, reserve the
+            // base slot rather than pretending the offset is unused.
+            if (count == 0)
+                count = 1;
+            if (isUnsizedArrayResourceSource(source))
+                isUnbounded = true;
+            addUsedBindingRange(outRanges, localSpace, localBinding, count, isUnbounded, source);
+        }
     }
 
-    if (auto groupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+    if (groupLayout)
     {
         UInt elementSpace = localSpace;
         if (auto subElementSpaceAttr =
