@@ -309,7 +309,13 @@ Type* SemanticsVisitor::TryJoinTypes(
     if (left->equals(right))
         return left;
 
-    // We can join two basic types by picking the "better" of the two
+    // We can join two basic types only when one is strictly better than the
+    // other: converting every input to it must cost strictly less than the
+    // reverse. When both directions cost the same and the types differ,
+    // neither type is better, and picking either one would make inference
+    // depend on the order in which constraints arrive. The join fails
+    // instead, so the solver reports conflicting requirements rather than
+    // silently guessing.
     if (auto leftBasic = as<BasicExpressionType>(left))
     {
         if (auto rightBasic = as<BasicExpressionType>(right))
@@ -317,13 +323,12 @@ Type* SemanticsVisitor::TryJoinTypes(
             auto costConvertRightToLeft = getConversionCost(leftBasic, right);
             auto costConvertLeftToRight = getConversionCost(rightBasic, left);
 
-            // Return the one that had lower conversion cost.
+            // Return the one that had strictly lower conversion cost.
             if (costConvertRightToLeft > costConvertLeftToRight)
                 return right;
-            else
-            {
+            if (costConvertLeftToRight > costConvertRightToLeft)
                 return left;
-            }
+            return nullptr;
         }
 
         // We can also join a vector and a scalar
