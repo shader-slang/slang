@@ -7,13 +7,10 @@
 // CHECK_SPIRV-DAG: OpVariable {{.*}} Input {{.*}} Location 1
 // CHECK_SPIRV-DAG: OpVariable {{.*}} Output {{.*}} Location 0
 
-// CHECK_GLSL: layout(location = 0)
-// CHECK_GLSL-NEXT: in
-// CHECK_GLSL: layout(location = 1)
-// CHECK_GLSL-NEXT: in
-// CHECK_GLSL: layout(std140) uniform
-// CHECK_GLSL: layout(location = 0)
-// CHECK_GLSL-NEXT: out
+// CHECK_GLSL-DAG: layout(location = 0){{[[:space:]]+}}in vec3 a_position
+// CHECK_GLSL-DAG: layout(location = 1){{[[:space:]]+}}in vec4 a_color
+// CHECK_GLSL-DAG: layout(std140) uniform
+// CHECK_GLSL-DAG: layout(location = 0){{[[:space:]]+}}out vec4 {{.*}}v_color
 // CHECK_GLSL: void main
 
 #version 330 core
