@@ -527,6 +527,14 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
+// True if `inst` may change or observe the value at `addr`: either through a side effect that
+// affects that memory, or by being a resource-content read (a dedicated load op, or a plain
+// load of a resource-content address) that can read it. A "true" answer therefore does not
+// imply a write; a caller that only cares about writes must supply its own narrower check
+// rather than assume this predicate reports side effects alone. The converse is equally
+// true: "false" does not imply the value was not read — a plain `load` of ordinary memory
+// returns false even when it reads exactly `addr`; the callers that need read-sensitivity
+// intercept plain loads themselves (see the dead-store scan).
 // `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
 // in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
 // Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per

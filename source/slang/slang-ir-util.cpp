@@ -1362,7 +1362,8 @@ IRInst* getRootBufferOrAddr(IRInst* addr)
 enum class AddressAliasingClass
 {
     Unknown,
-    UserPointer,      // A user pointer into global memory
+    UserPointer,      // A user pointer; its provenance is untracked, so it may refer to any
+                      // addressable memory (a var, or the contents of a resource).
     Var,              // A thread-local or groupshared var.
     ConstantBuffer,   // A constant buffer or parameter block.
     BoundBuffer,      // A bound buffer.
@@ -1424,25 +1425,25 @@ bool canAddrClassesAlias(AddressAliasingClass c1, AddressAliasingClass c2)
     if (c1 == AddressAliasingClass::Unknown || c2 == AddressAliasingClass::Unknown)
         return true;
 
+    // A user pointer can refer to any addressable memory: `__getAddress(buf[i])`
+    // and `&buf[i]` produce a user pointer into the contents of a bound or
+    // bindless resource (including one nested in a constant buffer), while
+    // `__getAddress(v)` produces one to a var. The provenance of a user
+    // pointer is not tracked through parameters, so we conservatively treat
+    // it as possibly aliasing every other class. Every consumer of this
+    // function only skips work when the answer is "no alias", so a
+    // conservative answer can only remove an optimization, never enable a
+    // miscompile.
+    if (c1 == AddressAliasingClass::UserPointer || c2 == AddressAliasingClass::UserPointer)
+        return true;
+
     switch (c1)
     {
-    case AddressAliasingClass::Unknown:
-        return true;
-    case AddressAliasingClass::UserPointer:
     case AddressAliasingClass::Var:
-        // A users pointer or var can only alias with another
-        // object that is either a user pointer or var.
+        // A var can only alias with another var; a pair involving a user pointer was
+        // answered by the early return above.
         //
-        // Generally, a var should never alias with anything else that isn't a var,
-        // if we never allow the user to take address of a local var.
-        // We don't allow taking addresses of a local var on most GPU targets, but
-        // we currently do expose an internal intrinsic to do so when targeting CPU.
-        // We should consider disallowing this across the board, or enable more aggresive
-        // criteria when targeting GPU backends.
-        // For now we stay conservative and just report true even when addr1 is var and
-        // addr2 is not rooted from a var.
-        //
-        return c2 == AddressAliasingClass::UserPointer || c2 == AddressAliasingClass::Var;
+        return c2 == AddressAliasingClass::Var;
     case AddressAliasingClass::BoundBuffer:
     case AddressAliasingClass::BoundTexture:
         // A bound resource can only alias with another
@@ -1682,6 +1683,83 @@ static bool isCallerExclusiveRoot(IRGlobalValueWithCode* func, IRInst* root)
     return false;
 }
 
+// True if `inst`'s read of resource contents may observe the memory at `addr`.
+//
+// `inst` is an op in `doesOpReadResourceContents` (operand 0 naming the resource it reads),
+// or a plain `kIROp_Load` whose pointer operand roots at an op in
+// `doesOpProduceResourceContentAddress` (operand 0 then being the address into the resource);
+// any other load is not a resource-content read and observes nothing through this path. The
+// plain-load shape is recognized here, from the load's own pointer, so the classification has
+// one source of truth. The pointer is deliberately walked with `getRootAddr`: the
+// `getRootBufferOrAddr` used for the resource root below traces *past* an
+// `RWStructuredBufferGetElementPtr` to its buffer handle when the handle traces through to a
+// global parameter, so it can fail to see the producer op this classification is looking for.
+//
+// Consider this example:
+//
+//     RWStructuredBuffer<float> buf;
+//     [noinline] float f(float* p, float v)
+//     {
+//         *p = v;             // store through a user pointer into `buf`
+//         float s = buf.Load(0); // reads the element `p` points to
+//         *p = 2.0f;
+//         return s;
+//     }
+//
+// A resource-content load reads memory that lives outside the IR's pointer model: the load
+// names a resource and an index, not a pointer, so an aliasing scan that only compares pointer
+// operands sees nothing to compare and would treat the load as pure. The read can only observe
+// `addr`, though, when `addr` may reach the contents of the resource `inst` reads, which we
+// decide from root identity and class-level aliasing alone. Unlike
+// `canAddressesPotentiallyAlias`, this check deliberately takes no `func` and no `target` and
+// applies no access-chain refinement: a resource-content load names no access chain to compare
+// against, and function- or target-scoped facts do not change whether an address can reach
+// resource contents.
+//
+static bool canResourceContentReadObserveAddress(IRInst* inst, IRInst* addr)
+{
+    SLANG_ASSERT(doesOpReadResourceContents(inst->getOp()) || inst->getOp() == kIROp_Load);
+
+    if (inst->getOp() == kIROp_Load &&
+        !doesOpProduceResourceContentAddress(getRootAddr(inst->getOperand(0))->getOp()))
+        return false;
+
+    auto addrRoot = getRootBufferOrAddr(addr);
+    auto addrClass = getAliasingClass(addrRoot);
+
+    // Var memory is compiler-allocated (function scope or groupshared) and never overlaps the
+    // contents of a resource, so a resource-content load cannot observe it.
+    //
+    if (addrClass == AddressAliasingClass::Var)
+        return false;
+
+    auto resourceRoot = getRootBufferOrAddr(inst->getOperand(0));
+
+    // The same root names the very memory `inst` reads — most simply when `addr` is the
+    // address of the load itself — so the read observes it. For a dedicated
+    // `buf.Load(i)` the buffer operand reaches this check as the handle load itself, so the
+    // same-root arm is the element-pointer spellings' protection: a constant buffer that
+    // nests an `RWStructuredBuffer` can root both an element pointer into that buffer and the
+    // pointer of a plain load of it at the same constant-buffer global parameter, whose class
+    // alone (`ConstantBuffer` cannot alias with anything) would wrongly report no overlap. When
+    // the nested buffer's handle instead is not traced through to the global parameter, the
+    // `canAddrClassesAlias` check below still answers conservatively through its `Unknown`
+    // class — which is how the dedicated-op spelling is in fact answered.
+    //
+    if (addrRoot == resourceRoot)
+        return true;
+
+    auto resourceClass = getAliasingClass(resourceRoot);
+    if (!canAddrClassesAlias(addrClass, resourceClass))
+        return false;
+
+    // For the remaining class pairs the roots alone do not decide overlap: a user pointer's
+    // provenance, for example, is unknown, and `DescriptorHandle` pairs may name the same
+    // bindless resource, so we answer conservatively.
+    //
+    return true;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
@@ -1811,6 +1889,23 @@ bool canInstHaveSideEffectAtAddress(
     default:
         // Default behavior is that any insts that have side effect may affect `addr`.
         if (inst->mightHaveSideEffects())
+            return true;
+        // The resource-content load ops that reach this line are side-effect free, yet they
+        // can observe a store whose address may reach the contents of the resource they read
+        // (see `canResourceContentReadObserveAddress`).
+        if (doesOpReadResourceContents(inst->getOp()) &&
+            canResourceContentReadObserveAddress(inst, addr))
+            return true;
+        // A plain `load` of a resource-content address is also side-effect free, and it
+        // observes the same contents. No current consumer needs this arm for correctness: the
+        // dead-store scan intercepts plain loads itself with finer, access-chain-aware
+        // precision before this predicate runs, and the direct consumers ask only about
+        // changes, for which a read answer merely forgoes an optimization. The arm exists so
+        // the predicate's documented contract — "may change or observe" — is not silently
+        // violated for future callers; the write/read split that restores the write-only
+        // consumers' precision arrives with the memory-effect-mode rework of this predicate.
+        if (inst->getOp() == kIROp_Load &&
+            canResourceContentReadObserveAddress(inst, addr))
             return true;
         break;
     }

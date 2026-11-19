@@ -8,12 +8,13 @@ struct Bottom
 
     float bottomGetValue(int index)
     {
-        // RWStructuredBuffer is considered to not alias with anything else.
-        // this write should not prevent deferring loading bigArray.
-        gOther[0] = 100;
-        // this write should not prevent deferring loading bigArray.
+        // Groupshared and static var writes cannot reach the memory a user
+        // pointer refers to on non-CPU targets, so they do not prevent
+        // deferring loading bigArray. A write into a bound resource is covered
+        // by buffer-load-defer-aliasing-user-pointer.slang instead: a user
+        // pointer can refer to the contents of a bound resource, so that write
+        // conservatively does prevent the deferral.
         gSharedVar = 1;
-        // this write should not prevent deferring loading bigArray.
         gStaticVar = 2;
 
         // We should return the value from bigArray from a previously loaded value of `this`.
@@ -28,7 +29,6 @@ struct Root
 }
 
 uniform Root* gRoot;
-uniform RWStructuredBuffer<int> gOther;
 static int gStaticVar;
 groupshared int gSharedVar;
 
