@@ -5,6 +5,7 @@
 #include "core/slang-char-util.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-memory-arena.h"
+#include "core/slang-signal.h"
 #include "core/slang-string-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name-convention-util.h"
@@ -993,5 +994,13 @@ void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnosti
 #endif
     sink.getBlobIfNeeded(outDiagnostics);
 }
+
+#if !SLANG_HAS_EXCEPTIONS
+void outputAbortCompilationDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
+{
+    sink.diagnoseRaw(Severity::Error, getLastSignalMessage());
+    sink.getBlobIfNeeded(outDiagnostics);
+}
+#endif
 
 } // namespace Slang

@@ -2,6 +2,7 @@
 #include "slang-parameter-binding.h"
 
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-signal.h"
 #include "slang-compiler.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
@@ -4846,9 +4847,11 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
     // Layout construction still walks shared linkage-owned front-end state, so serialize it with
-    // other component-type front-end operations.
-    std::lock_guard<std::recursive_mutex> lock(
-        m_program->getLinkage()->getComponentTypeOperationMutex());
+    // other component-type front-end operations. The lock spans abort-capable compilation
+    // (generateParameterBindings, createIRModuleForLayout), so in a build without exceptions it
+    // must be an AbortRecoveryLock: a plain lock_guard would be stranded by the longjmp that
+    // recovers an AbortCompilation, permanently blocking every other thread on the linkage.
+    AbortRecoveryLock lock(m_program->getLinkage()->getComponentTypeOperationMutex());
 
     m_targetReq->getTargetCaps();
     m_targetReq->getHLSLToVulkanLayoutOptions();

@@ -4,6 +4,7 @@
 #include "compiler-core/slang-pretty-writer.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-signal.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
@@ -1934,7 +1935,18 @@ void EndToEndCompileRequest::setAllowGLSLInput(bool value)
 
 SlangResult EndToEndCompileRequest::compile()
 {
+    // `res` is assigned between the SLANG_EXCEPTION_TRY_RECOVERY setjmp and the longjmp that an
+    // AbortCompilation can make in a no-exceptions build, so it is indeterminate once the jump
+    // lands. The only write inside the guarded region is `res = executeActions()`, which cannot
+    // complete if the abort fires inside it, so `res` is still SLANG_FAIL at the moment of the
+    // jump. The recovery branch overwrites it on the reported-nothing path; on the path where a
+    // diagnostic already exists it deliberately keeps that pre-set failure result — and reading
+    // it back is exactly what only a `volatile` local guarantees.
+#if SLANG_HAS_EXCEPTIONS
     SlangResult res = SLANG_FAIL;
+#else
+    volatile SlangResult res = SLANG_FAIL;
+#endif
     double downstreamStartTime = 0.0;
     double totalStartTime = 0.0;
 
@@ -1946,15 +1958,14 @@ SlangResult EndToEndCompileRequest::compile()
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,
     // and report them to the user nicely (rather than just crash their
-    // application). Internally Slang currently uses exceptions for this.
-    //
-    // TODO: Consider using `setjmp()`-style escape so that we can work
-    // with applications that disable exceptions.
+    // application). Internally Slang currently uses exceptions for this, and
+    // a build without exceptions recovers AbortCompilation at this boundary
+    // through the SLANG_EXCEPTION_TRY_RECOVERY escape below.
     //
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
@@ -2000,6 +2011,25 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
         res = SLANG_E_ABORT;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        // Mirrors the catch (const AbortCompilationException&) arm above: an abort that already
+        // produced a diagnostic is an ordinary compilation failure and keeps the `SLANG_FAIL`
+        // result; an abort with no diagnostic at all is Slang giving up on its own and is
+        // reported as an internal error.
+        if (getSink()->getErrorCount() == 0)
+        {
+            // No exception object exists in this configuration, so the type name the exceptions
+            // arm derives with typeid() is replaced by the signal's own name.
+            getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exceptionType = "AbortCompilation",
+                .exceptionMessage = getLastSignalMessage()});
+            res = SLANG_E_ABORT;
+        }
+        // The jump abandoned any in-progress imports along with their RAII bookkeeping.
+        getLinkage()->resetModulesBeingImported();
     }
 #endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();

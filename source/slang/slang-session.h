@@ -488,6 +488,26 @@ private:
     // Any modules currently being imported will be listed here
     ModuleBeingImportedRAII* m_modulesBeingImported = nullptr;
 
+public:
+    /// Drops the record of in-progress module imports. Recovery code at an API boundary calls
+    /// this when an aborted compilation skipped the stack-allocated `ModuleBeingImportedRAII`
+    /// destructors: the longjmp out of an in-progress import leaves the list head pointing into
+    /// abandoned stack frames, so it must be cleared before the boundary returns.
+    ///
+    /// The reset is sound at the innermost recovery branch because a module import only ever
+    /// runs inside a module-load boundary: the entries it drops belong to frames the jump
+    /// crossed. One nested case bends that claim: while importing module A, an abort inside A's
+    /// own import of module B recovers at B's load boundary, whose reset also drops A's
+    /// still-live entry — the consequence is limited to suspending recursive-import detection
+    /// for A until A's RAII destructor restores a consistent head. MSVC with exceptions enabled
+    /// runs the crossed frames' destructors during the jump, so the list may already be
+    /// consistent here; the reset is then the same mild suspension for any live outer entries.
+    /// The resets at the compile, link and getTargetArtifact boundaries are defensive: their own
+    /// paths run imports only through the load boundaries, which reset first, so they normally
+    /// see an empty list.
+    void resetModulesBeingImported() { m_modulesBeingImported = nullptr; }
+
+private:
     /// Is the given module in the middle of being imported?
     bool isBeingImported(Module* module);
 

@@ -6,6 +6,7 @@
 #include "compiler-core/slang-artifact-impl.h"
 #include "core/slang-char-util.h"
 #include "core/slang-memory-file-system.h"
+#include "core/slang-signal.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lookup.h"
@@ -466,8 +467,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     ISlangBlob** outDiagnostics)
 {
     // Specialization still walks and mutates linkage-owned front-end state, so keep it
-    // serialized with other component-type front-end operations.
-    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+    // serialized with other component-type front-end operations. The locked region spans
+    // abort-capable semantic work (CheckTerm on user code) and this method is reachable below
+    // EndToEndCompileRequest::compile()'s recovery boundary, so in a build without exceptions
+    // the lock must be an AbortRecoveryLock: a plain lock_guard would be stranded by the longjmp
+    // that recovers an AbortCompilation, permanently blocking every other thread on the linkage.
+    AbortRecoveryLock lock(getLinkage()->getComponentTypeOperationMutex());
 
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
@@ -545,7 +550,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
 
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         auto linked = fillRequirements(this);
         if (!linked)
@@ -568,6 +573,14 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
     catch (...)
     {
         outputExceptionDiagnostic(sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        // The jump abandoned any in-progress imports along with their RAII bookkeeping.
+        getLinkage()->resetModulesBeingImported();
+        outputAbortCompilationDiagnostic(sink, outDiagnostics);
         return SLANG_FAIL;
     }
 #endif
@@ -778,7 +791,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             return artifact.get();
         }
     }
-    SLANG_EXCEPTION_TRY
+    SLANG_EXCEPTION_TRY_RECOVERY
     {
         // If the user hasn't specified any entry points, then we should
         // discover all entrypoints that are defined in linked modules, and
@@ -856,6 +869,29 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             sink.diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
+            sink.getBlobIfNeeded(outDiagnostics);
+        }
+        return nullptr;
+    }
+#else
+    SLANG_EXCEPTION_ABORT_RECOVERY
+    {
+        // This boundary has no AbortCompilation catch arm and no sink of its own before the
+        // guard, so this branch mirrors its generic `catch (const Exception&)` arm instead:
+        // build a fresh sink (a local created in the recovery branch has no setjmp exposure),
+        // report, and return failure. The jump abandoned any in-progress imports along with
+        // their RAII bookkeeping.
+        getLinkage()->resetModulesBeingImported();
+        if (outDiagnostics && !*outDiagnostics)
+        {
+            DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+            applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
+            applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+            // No exception object exists in this configuration, so the type name the exceptions
+            // arm derives with typeid() is replaced by the signal's own name.
+            sink.diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exceptionType = "AbortCompilation",
+                .exceptionMessage = getLastSignalMessage()});
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;
