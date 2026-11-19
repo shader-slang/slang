@@ -1598,6 +1598,44 @@ static bool tryGetCoverageUniformBindingInfo(
     return false;
 }
 
+// Fail loudly when `markerOps` violates the precondition documented on
+// `assignCoverageCounterSlots` (each block's markers contiguous and in
+// instruction order). The coalescer's own debug assert catches only some
+// same-block reorderings and compiles out of optimized builds, and never
+// checks contiguity; an unchecked violation silently assigns wrong slots, so
+// this validator is a release assert.
+static void validateMarkerOrderingPrecondition(List<IRInst*> const& markerOps)
+{
+    HashSet<IRInst*> completedBlocks;
+    IRInst* currentBlock = nullptr;
+    IRInst* previousInBlock = nullptr;
+    for (auto markerOp : markerOps)
+    {
+        IRInst* block = markerOp->getParent();
+        if (block != currentBlock)
+        {
+            SLANG_RELEASE_ASSERT(!completedBlocks.contains(block));
+            if (currentBlock)
+                completedBlocks.add(currentBlock);
+            currentBlock = block;
+        }
+        else
+        {
+            bool inOrder = false;
+            for (auto inst = previousInBlock->getNextInst(); inst; inst = inst->getNextInst())
+            {
+                if (inst == markerOp)
+                {
+                    inOrder = true;
+                    break;
+                }
+            }
+            SLANG_RELEASE_ASSERT(inOrder);
+        }
+        previousInBlock = markerOp;
+    }
+}
+
 } // anonymous namespace
 
 // Defined at namespace scope, outside the anonymous namespace that holds its
@@ -1610,6 +1648,8 @@ void assignCoverageCounterSlots(
     List<bool>& outEmitsProbe,
     UInt& outCounterCount)
 {
+    validateMarkerOrderingPrecondition(markerOps);
+
     CoverageFunctionExitAnalysis exitAnalysis;
 
     outSlots.setCount(markerOps.getCount());
