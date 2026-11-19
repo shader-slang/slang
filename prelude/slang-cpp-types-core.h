@@ -666,9 +666,9 @@ struct Matrix
     SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
 // Bool matrices instantiate the integer operator set, mirroring
-// SLANG_INT_VECTOR_OPS(bool) for vectors; operators such as `+` and `*` on
-// bool matrices cannot arise from valid Slang source (the checker rejects
-// arithmetic on bool before emit), so those entries are inert.
+// SLANG_INT_VECTOR_OPS(bool) for vectors; the checker promotes arithmetic on
+// bool matrices to int, so entries such as `+` and `*` never appear in
+// emitted code.
 SLANG_INT_MATRIX_OPS(bool)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(int8_t)

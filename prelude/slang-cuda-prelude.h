@@ -1339,8 +1339,8 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL Matrix<T, ROWS, COLS> makeMatrix(
     SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
 // Mirrors the C++ prelude: bool matrices use the integer operator set the way
-// bool vectors do; arithmetic entries are inert because the checker rejects
-// arithmetic on bool before emit.
+// bool vectors do; the checker promotes arithmetic on bool matrices to int,
+// so the arithmetic entries never appear in emitted code.
 SLANG_INT_MATRIX_OPS(bool)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(uint)
