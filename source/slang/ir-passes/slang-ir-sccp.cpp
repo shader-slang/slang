@@ -378,9 +378,16 @@ struct SCCPContext
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
-                resultVal = getBuilder()->getFloatValue(
-                    type,
-                    (IRFloatingPointValue)irConstant->value.floatVal);
+                {
+                    IRFloatingPointValue value = irConstant->value.floatVal;
+                    // A conversion between floating-point types quiets a signaling NaN at run
+                    // time, so the folded conversion does too. `getFloatValue` keeps the bits of
+                    // a `float` or `double` NaN, so set the quiet bit here. Bit 51 is the quiet
+                    // bit of a double, and of a `float` NaN held as one.
+                    if (type->getOp() != irConstant->getDataType()->getOp() && Math::IsNaN(value))
+                        value = Int64AsDouble(DoubleAsInt64(value) | (int64_t(1) << 51));
+                    resultVal = getBuilder()->getFloatValue(type, value);
+                }
                 break;
             case kIROp_IntLit:
             case kIROp_BoolLit:
@@ -879,8 +886,9 @@ struct SCCPContext
         {
         case kIROp_FloatType:
             {
-                float fval = (float)c0->value.floatVal;
-                memcpy(&sourceValueBits, &fval, sizeof(fval));
+                // A `float` literal is read back by its bits; a `(float)` cast would quiet a
+                // signaling NaN.
+                sourceValueBits = DoubleToFloatBits(c0->value.floatVal);
                 break;
             }
         case kIROp_DoubleType:
@@ -932,9 +940,9 @@ struct SCCPContext
             break;
         case kIROp_FloatType:
             {
-                uint32_t val = (uint32_t)sourceValueBits;
-                float floatVal = IntAsFloat((int)val);
-                resultVal = getBuilder()->getFloatValue(type, floatVal);
+                // Widening the bits through a `float` would quiet a signaling NaN.
+                resultVal =
+                    getBuilder()->getFloatValue(type, FloatBitsToDouble((uint32_t)sourceValueBits));
             }
             break;
         case kIROp_DoubleType:

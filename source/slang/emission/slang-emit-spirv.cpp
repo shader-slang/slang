@@ -1138,7 +1138,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_FloatType:
             {
                 if (auto fval = as<IRFloatLit>(inst))
-                    return SpvLiteralBits::from32(FloatAsInt((float)fval->getValue()));
+                    return SpvLiteralBits::from32(DoubleToFloatBits(fval->getValue()));
                 break;
             }
         case kIROp_FloatE4M3Type:
@@ -1248,10 +1248,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(DoubleAsInt64(val))));
             break;
         case kIROp_FloatType:
-            result = emitOpConstant(
-                inst,
-                type,
-                SpvLiteralBits::from32(uint32_t(FloatAsInt(float(val)))));
+            result = emitOpConstant(inst, type, SpvLiteralBits::from32(DoubleToFloatBits(val)));
             break;
         case kIROp_HalfType:
             result = emitOpConstant(
