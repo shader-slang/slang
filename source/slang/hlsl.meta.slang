@@ -6393,7 +6393,9 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 
 // Atomic Reduction intrinsics (void return).
 // These are in-place atomic operations that don't return the old value.
-// On CUDA, they map to the `red` PTX instruction which is faster than `atom`.
+// On CUDA, they map to the `red` PTX instruction, which is faster than `atom`, except that `red`
+// has no floating-point min/max: float min/max use an integer atomic on their bit pattern that ptxas
+// turns into `red`, double an integer atomic, and half a compare-and-swap loop.
 // On other targets, they fall back to the corresponding atomic operations (ignoring return value).
 
 /// Atomic add reduction. On CUDA, uses PTX `red.add` instruction.
@@ -6452,7 +6454,9 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
     }
 }
 
-/// Atomic min reduction. On CUDA, uses PTX `red.min` instruction.
+/// Atomic min reduction. On CUDA, uses PTX `red.min` instruction for integer types. `float` uses an
+/// integer atomic on its bit pattern that ptxas turns into `red`, so a NaN stored concurrently by an
+/// exchange can survive; `double` uses an integer atomic and `half` a compare-and-swap loop.
 /// @param val The target memory location.
 /// @param value The value to compare.
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
@@ -6468,7 +6472,9 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
     }
 }
 
-/// Atomic max reduction. On CUDA, uses PTX `red.max` instruction.
+/// Atomic max reduction. On CUDA, uses PTX `red.max` instruction for integer types. `float` uses an
+/// integer atomic on its bit pattern that ptxas turns into `red`, so a NaN stored concurrently by an
+/// exchange can survive; `double` uses an integer atomic and `half` a compare-and-swap loop.
 /// @param val The target memory location.
 /// @param value The value to compare.
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
@@ -12824,7 +12830,7 @@ $}
 /// accept a floating-point `T`, and only a 32-bit `float` in device memory, such as a
 /// `RWStructuredBuffer` element or a device pointer, not a texture, a `RWBuffer` or `groupshared`
 /// memory.
-/// On WGSL, floating-point types are not supported.
+/// On WGSL, floating-point types are not supported.$(atomicOp.slangCallSuffix[0] == 'M' ? " On CUDA, floating-point min and max follow the SPIR-V `OpAtomicFMinEXT`/`OpAtomicFMaxEXT` rules: a NaN operand is ignored, a stored NaN is replaced, and either zero may win; `half` requires SM 7.0." : "")
 /// @category atomic Atomic functions
 [ForceInline]
 __glsl_version(430)
