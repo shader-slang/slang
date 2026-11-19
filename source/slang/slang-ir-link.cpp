@@ -529,6 +529,24 @@ IRGlobalVar* cloneGlobalVarImpl(
 /// that selected requirement, so preserve its capability and execution-mode decorations when
 /// choosing the source module's function body or specializing a generic body.
 ///
+/// Entry-point validation can also add attributes after a module was lowered. Consider this
+/// GLSL compute shader, loaded as a module and then validated by
+/// `findAndCheckEntryPoint("computeMain", ...)` because it has no `[shader]` attribute:
+///
+///     layout(local_size_x = 16) in;
+///     void computeMain() { ... }
+///
+/// `validateEntryPoint` lifts the `layout(...) in;` declaration onto `computeMain` as a
+/// `NumThreadsAttribute` (and `early_fragment_tests` / `derivative_group_*NV` likewise), but
+/// the module's IR for `computeMain` was generated before that. `createIRModuleForLayout`
+/// lowers the entry point's declaration with `emitDeclRef` after validation, so only its copy
+/// carries `kIROp_NumThreadsDecoration`, `kIROp_EarlyDepthStencilDecoration` and the
+/// derivative-group decorations. The AST gained these attributes after the module's IR was
+/// generated, and the layout IR is the only IR lowered from the updated declaration. The best
+/// definition's own decoration always wins, and a lift
+/// runs only when the function has no such attribute yet, so filling in a missing decoration
+/// from the layout IR cannot replace a different value.
+///
 /// This function scans through all the `originalValues` that were considered for `clonedInst`,
 /// and copies over any decorations that are allowed to come from a non-"best" definition.
 /// For a given decoration opcode, only one such decoration will ever be copied, except that
@@ -573,6 +591,10 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
         case kIROp_Shader64BitIndexingDecoration:
+        case kIROp_NumThreadsDecoration:
+        case kIROp_EarlyDepthStencilDecoration:
+        case kIROp_DerivativeGroupQuadDecoration:
+        case kIROp_DerivativeGroupLinearDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);
