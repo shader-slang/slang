@@ -122,8 +122,38 @@ void legalizeStore(
             {
                 auto originalValue = builder.emitImageLoad(vector4Type, loadParams);
                 auto index = getElementPtr->getIndex();
-                newValue =
-                    builder.emitSwizzleSet(vector4Type, originalValue, legalizedStore, 1, &index);
+                if (as<IRIntLit>(index))
+                {
+                    newValue =
+                        builder
+                            .emitSwizzleSet(vector4Type, originalValue, legalizedStore, 1, &index);
+                }
+                else
+                {
+                    // The component index is a runtime value, but swizzles can only carry
+                    // compile-time lane indices. Consider `t[coord][channel] = v` with `channel`
+                    // read from a cbuffer: we build the updated texel one lane at a time, taking
+                    // the stored value on the lane the runtime index selects and the previously
+                    // loaded texel on every other lane. An out-of-range index matches no lane, so
+                    // the store leaves the texel unchanged.
+                    Array<IRInst*, 4> lanes;
+                    for (UInt lane = 0; lane < 4; lane++)
+                    {
+                        auto oldLane = builder.emitSwizzle(vectorBaseType, originalValue, 1, &lane);
+                        auto laneValue = builder.getIntValue(index->getDataType(), lane);
+                        IRInst* equalArgs[] = {index, laneValue};
+                        auto isTargetLane = builder.emitIntrinsicInst(
+                            builder.getBoolType(),
+                            kIROp_Eql,
+                            2,
+                            equalArgs);
+                        IRInst* selectArgs[] = {isTargetLane, legalizedStore, oldLane};
+                        lanes.add(
+                            builder.emitIntrinsicInst(vectorBaseType, kIROp_Select, 3, selectArgs));
+                    }
+                    newValue =
+                        builder.emitMakeVector(vector4Type, lanes.getCount(), lanes.getBuffer());
+                }
             }
             else
             {
