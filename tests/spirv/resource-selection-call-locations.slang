@@ -12,7 +12,8 @@
 // plain-texture control never goes through that rebuild and must keep its located warning
 // unchanged. The tuple-result variant pins the same rule for a call whose result type
 // decomposes into an out-argument: that call is deliberately outside the rebuilt call's
-// `LegalVal`, and the location must still follow it. The location pins sit next to the anchored call sites (FileCheck
+// `LegalVal`, and the location must still follow it. The location pins sit next to the
+// anchored call sites (FileCheck
 // `[[# @LINE+N]]` expressions, columns literal) so edits above cannot desynchronize them.
 // The GLSL library expresses implicit sampling as a textual target intrinsic, so its
 // conservative classification yields the unknown-requirement warning instead of the

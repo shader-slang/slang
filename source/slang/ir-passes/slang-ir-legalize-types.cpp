@@ -472,13 +472,14 @@ private:
         // The emitted call is not always part of the returned `LegalVal`: a
         // `none` result returns an empty value, and a `tuple` result returns
         // only the out-arguments that receive the decomposed pieces. The
-        // post-process in `processInst` stamps only what the returned value
-        // reaches, so this rebuild site applies the replacement bookkeeping
-        // itself: the rebuilt call takes the original's place, so it carries
-        // the original's source location and decorations. For a call that
-        // ends up inside the returned value this is a harmless prefix — the
-        // post-process then finds the location already set and the original
-        // already stripped of decorations.
+        // replacement bookkeeping in `processInst` stamps only what the
+        // returned value reaches, so this rebuild site applies it itself:
+        // the rebuilt call takes the original's place, so it carries the
+        // original's source location and decorations. For a call that ends
+        // up inside the returned value this is a redundant first
+        // application that the bookkeeping in `processInst` then makes a
+        // no-op (the location is already set, the original already
+        // stripped of decorations).
         newCall->sourceLoc = m_call->sourceLoc;
         m_call->transferDecorationsTo(newCall);
         return newCall;
@@ -772,11 +773,17 @@ static LegalVal legalizeUnconditionalBranch(
             SLANG_UNIMPLEMENTED_X("Unknown legalized val flavor.");
         }
     }
-    context->builder->emitIntrinsicInst(
+    auto newBranch = context->builder->emitIntrinsicInst(
         nullptr,
         branchInst->getOp(),
         newArgs.getCount(),
         newArgs.getArrayView().getBuffer());
+    // The rebuilt terminator sits outside the returned (empty) value, so it
+    // carries the replacement bookkeeping itself, like a call whose result
+    // was discarded: the original terminator's decorations — for example the
+    // loop pragmas that the loop-unroll pass reads — must survive onto it.
+    newBranch->sourceLoc = branchInst->sourceLoc;
+    branchInst->transferDecorationsTo(newBranch);
     return LegalVal();
 }
 
@@ -2390,7 +2397,7 @@ static LegalVal legalizeCoopMatMapElementIFunc(
 
                 inst->replaceUsesWith(newInst);
                 // Deferred removal, as in the simple-capture case above, keeps
-                // the original readable for the post-process bookkeeping.
+                // the original readable for the replacement bookkeeping.
                 inst->removeFromParent();
                 context->replacedInstructions.add(inst);
                 return LegalVal::simple(newInst);
@@ -2922,10 +2929,6 @@ static LegalVal declareSimpleVar(
             auto globalParam = builder->createGlobalParam(type);
             globalParam->removeFromParent();
             globalParam->insertBefore(context->insertBeforeGlobal);
-            // The new parameter replaces part of the original global parameter, which is the
-            // instruction we insert before, so it keeps that parameter's source location for
-            // diagnostics that later passes report about it.
-            globalParam->sourceLoc = context->insertBeforeGlobal->sourceLoc;
 
             // Add originating entry point decoration if original global param
             // comes from an entry point parameter. This is required in cases where the global
@@ -3735,13 +3738,13 @@ static LegalVal legalizeGlobalParam(
 static constexpr int kHasBeenAddedOrProcessedScratchBitIndex = 0;
 static constexpr int kHasBeenAddedScratchBitIndex = 1;
 
-/// Give every `simple` leaf of a decomposed `LegalVal` the source location of
-/// the original instruction it replaces, unless the leaf already has a
-/// location of its own. A `none` value is expected input (a `pair` side can be
-/// empty) and simply has no leaves to locate. Leaves that are `IRConstant`
-/// instructions are skipped: constants are deduplicated module-wide and
-/// shared between use sites, so a constant must not absorb the location of any
-/// one original.
+/// Give every non-constant `simple` leaf of a decomposed `LegalVal` the source
+/// location of the original instruction it replaces, unless the leaf already
+/// has a location of its own. Constants are deduplicated module-wide and
+/// shared between use sites, so a constant must not absorb the location of
+/// any one original. An empty (`none`) value is expected input — an empty
+/// `pair` side, or a rebuild whose result carries nothing — and has no leaves
+/// to locate.
 static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& legalVal)
 {
     switch (legalVal.flavor)
@@ -3755,8 +3758,6 @@ static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& l
         return;
 
     case LegalVal::Flavor::none:
-        // An empty value is expected input here (a `pair` side can be
-        // empty); it has no leaves to locate.
         return;
 
     case LegalVal::Flavor::tuple:
@@ -3784,42 +3785,30 @@ static void setSourceLocOnLegalValLeaves(IRInst* originalInst, LegalVal const& l
 }
 
 /// Apply the replacement bookkeeping for `originalInst` to the value that
-/// legalization produced in its place.
+/// legalization produced in its place. "Replacement bookkeeping" is this
+/// pass's term for transferring the original's source location (only if the
+/// target has none) and, for a fresh one-for-one replacement, its
+/// decorations.
 ///
-/// A replacement takes the original's position in the IR, so the information a
-/// user attached to the original must follow it. Every instruction making up
-/// `legalVal` receives `originalInst`'s source location unless it already has
-/// one of its own, so a diagnostic that fires on the replacement still points
-/// at the source the user wrote. A fresh one-for-one replacement additionally
-/// receives the original's decorations, which legalization otherwise tends to
-/// drop. Consider a call that passes a struct containing a `Texture2D`: the
-/// legalizer rebuilds the call, and the rebuilt call must keep an
-/// `[IgnoreSideEffects]` decoration, because `mightHaveSideEffects` reads that
-/// decoration when deciding whether dead-code elimination may remove the
-/// call.
+/// What happens depends on the value's shape: a `simple` replacement that is
+/// a distinct, non-constant instruction receives the location and — unless
+/// it is a value forwarded through a decomposition — the original's
+/// decorations; a composite value (`pair`, `tuple`, `implicitDeref`,
+/// `wrappedBuffer`) only has the location stamped on its `simple` leaves,
+/// because a decomposition into multiple values has no single obvious
+/// destination for the original's decorations. Consider a call that passes
+/// a struct containing a `Texture2D`: the legalizer rebuilds the call, and
+/// the rebuilt call must keep an `[IgnoreSideEffects]` decoration, because
+/// `mightHaveSideEffects` reads that decoration when deciding whether
+/// dead-code elimination may remove the call.
 ///
-/// The post-process only reaches instructions that appear in the returned
-/// `LegalVal`. A rebuilt call whose result legalizes to nothing (`none`) or
-/// decomposes into out-arguments (`tuple`) sits outside that value, so
-/// `LegalCallBuilder::_emitCall` applies the same bookkeeping at its own site
-/// for exactly those calls.
-///
-/// Decorations are moved, not copied, and arrive on the replacement in
-/// reverse order; the readers that consult them (`findDecoration`-style
-/// scans) are order-insensitive. They transfer only for the `simple` flavor
-/// and only when the replacement is an instruction this pass created: a
-/// decomposition into multiple values has no single obvious destination for
-/// the original's decorations, and a `simple` result can also be a
-/// pre-existing instruction forwarded through a decomposition (for example
-/// a field extract whose result is the field's existing value), which has
-/// users of its own that the original never had. Forwarded values still
-/// receive the location, because it only fills in when they have none.
-///
-/// Replacement targets that are `IRConstant` instructions are skipped
-/// entirely: a constant is deduplicated module-wide and shared between use
-/// sites, so it must not absorb the location or decorations of any one
-/// original (for example, the shared void value that stands in for an
-/// aborted call's result).
+/// The bookkeeping here only reaches instructions that appear in the
+/// returned `LegalVal`. Rebuilds whose product sits outside that value
+/// apply it at their own site: `LegalCallBuilder::_emitCall` for calls
+/// whose result legalizes to nothing (`none`) or decomposes into
+/// out-arguments (`tuple`), and `legalizeUnconditionalBranch` for rebuilt
+/// terminators (their decorations include loop pragmas that the
+/// loop-unroll pass reads).
 static void transferSourceLocAndDecorationsToLegalizedInst(
     IRTypeLegalizationContext* context,
     IRInst* originalInst,
@@ -3846,13 +3835,17 @@ static void transferSourceLocAndDecorationsToLegalizedInst(
     if (!replacement->sourceLoc.isValid())
         replacement->sourceLoc = originalInst->sourceLoc;
 
-    // A replacement already registered as another instruction's legal value
-    // was not created by this pass — it is a value forwarded through a
-    // decomposition, with users of its own, so the original's decorations
+    // A replacement that was itself already processed as an original (the
+    // work list legalizes operands before users, so anything this pass did
+    // not create carries that registration) is a value forwarded through a
+    // decomposition, with users of its own — the original's decorations
     // must not move onto it.
     if (context->mapValToLegalVal.containsKey(replacement))
         return;
 
+    // Decorations are moved, not copied, and arrive on the replacement in
+    // reverse order; the readers that consult them (`findDecoration`-style
+    // scans) are order-insensitive.
     originalInst->transferDecorationsTo(replacement);
 }
 
@@ -4056,12 +4049,13 @@ struct IRTypeLegalizationPass
         LegalVal legalVal = legalizeInst(context, inst);
         registerLegalizedValue(context, inst, legalVal);
 
-        // The replacement inherits the original's source location and, for a
-        // fresh one-for-one replacement, its decorations — the helper's doc
-        // comment carries the full rules (constants and values forwarded
-        // through decompositions are skipped). This runs before the re-queue
-        // scan below, so any decoration moved onto the replacement is
-        // still visited as one of its children.
+        // The replacement bookkeeping (see
+        // `transferSourceLocAndDecorationsToLegalizedInst` above for its
+        // full rules) runs before the re-queue scan below: a decoration is
+        // itself an instruction whose operands may need legalization, and
+        // one that misses the scan would keep stale operand references into
+        // instructions the pass removes. Running first keeps a moved
+        // decoration visible to the scan as a child of the replacement.
         transferSourceLocAndDecorationsToLegalizedInst(context, inst, legalVal);
 
         // Once the instruction has been processed, we need to consider
