@@ -127,7 +127,7 @@ def getWgslTests():
     backend = {
         "name" : "wgsl",
         "versions" : [
-            ("1.0", "wgsl", "-wgpu")
+            ("1.0", "wgsl", "wgpu")
         ]
     }
 
@@ -186,8 +186,8 @@ def getMetalTests():
         "versions" : [
             ("1.0", None, None), # unsupported by Slang
             ("2.0", None, None), # unsupported by Slang
-            ("2.3", "metal -profile metallib_2_3", "-mtl"),
-            ("2.4", "metal -profile metallib_2_4", "-mtl"),
+            ("2.3", "metal -profile metallib_2_3", "metal"),
+            ("2.4", "metal -profile metallib_2_4", "metal"),
         ]
     }
 
@@ -239,19 +239,7 @@ def getMetalTests():
     return (backend, tests)
 
 
-def getComputeTestTargetName(renderTestArguments):
-    """Returns the name of the `targets=` option of `slang-test` for the arguments of `render-test`."""
-    arguments = renderTestArguments.split()
-    if "-vk" in arguments:
-        return "glsl" if "-emit-spirv-via-glsl" in arguments else "vk"
-    names = {"-wgpu": "wgpu", "-mtl": "metal"}
-    for argument in arguments:
-        if argument in names:
-            return names[argument]
-    raise ValueError(f"No target of slang-test for the arguments: {renderTestArguments}")
-
-
-def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
+def getGlslTests(nameSuffix, simpleTarget, computeTestTarget):
 
     backend = {
         "name" : f"glsl{nameSuffix}",
@@ -261,15 +249,15 @@ def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
             ("120", None, None), # unsupported by Slang
             ("130", None, None), # unsupported by Slang
             ("140", None, None), # unsupported by Slang
-            ("150", f"{simpleTarget} -profile glsl_150", f"-vk {vkTargetAdditionalFlags}"),
-            ("330", f"{simpleTarget} -profile glsl_330", f"-vk {vkTargetAdditionalFlags}"),
-            ("400", f"{simpleTarget} -profile glsl_400", f"-vk {vkTargetAdditionalFlags}"),
-            ("410", f"{simpleTarget} -profile glsl_410", f"-vk {vkTargetAdditionalFlags}"),
-            ("420", f"{simpleTarget} -profile glsl_420", f"-vk {vkTargetAdditionalFlags}"),
-            ("430", f"{simpleTarget} -profile glsl_430", f"-vk {vkTargetAdditionalFlags}"),
-            ("440", f"{simpleTarget} -profile glsl_440", f"-vk {vkTargetAdditionalFlags}"),
-            ("450", f"{simpleTarget} -profile glsl_450", f"-vk {vkTargetAdditionalFlags}"),
-            ("460", f"{simpleTarget} -profile glsl_460", f"-vk {vkTargetAdditionalFlags}"),
+            ("150", f"{simpleTarget} -profile glsl_150", computeTestTarget),
+            ("330", f"{simpleTarget} -profile glsl_330", computeTestTarget),
+            ("400", f"{simpleTarget} -profile glsl_400", computeTestTarget),
+            ("410", f"{simpleTarget} -profile glsl_410", computeTestTarget),
+            ("420", f"{simpleTarget} -profile glsl_420", computeTestTarget),
+            ("430", f"{simpleTarget} -profile glsl_430", computeTestTarget),
+            ("440", f"{simpleTarget} -profile glsl_440", computeTestTarget),
+            ("450", f"{simpleTarget} -profile glsl_450", computeTestTarget),
+            ("460", f"{simpleTarget} -profile glsl_460", computeTestTarget),
         ]
     }
 
@@ -481,7 +469,7 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
     # compute test has no line, because `DISABLE_TEST` has no effect on the COMPARE_COMPUTE command.
     computeTestLine = ""
     if disableComputeTestPrefix == "":
-        computeTestLine = f"//TEST:COMPARE_COMPUTE(targets={getComputeTestTargetName(positiveComputeTestTarget)}, filecheck-buffer=POSITIVE_RESULT):\n"
+        computeTestLine = f"//TEST:COMPARE_COMPUTE(targets={positiveComputeTestTarget}, filecheck-buffer=POSITIVE_RESULT):\n"
 
     testStr = f"""// THIS IS A GENERATED FILE. DO NOT EDIT!
 // Instead, edit extras/test-generators/generate-tests-capabilities-texture-types.py, and
@@ -564,7 +552,7 @@ def main():
 
     generateTests(getWgslTests())
     generateTests(getMetalTests())
-    generateTests(getGlslTests('-vk', 'glsl', '-emit-spirv-via-glsl'))
+    generateTests(getGlslTests(nameSuffix='-vk', simpleTarget='glsl', computeTestTarget='glsl'))
 
 
 if __name__ == "__main__":
