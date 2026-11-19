@@ -80,6 +80,17 @@ class DeclStmt : public Stmt
     FIDDLE() DeclBase* decl = nullptr;
 };
 
+// A condition of an `if`, `while`, or `do`-`while` statement. The statement classes hold
+// this as their `condition` field; the condition's value as an expression is the `predicate`
+// field below. The clause is neither an `Expr` nor a `Stmt`, so walkers that visit
+// statements dispatch its payload by hand — the declared variable of a
+// `DeclConditionClause` first, then the predicate expression; see
+// `ASTIterator::visitConditionClause` for the pattern.
+//
+// Declaration conditions are represented directly rather than desugared like the
+// `if (let ...)` idiom: lowering declares the variable in the statement's condition slot,
+// which is what gives a `continue` the C++ re-run-the-initializer behavior that a
+// statement-rewriting desugar cannot express without synthetic labels.
 FIDDLE(abstract)
 class ConditionClause : public SyntaxNode
 {
@@ -92,9 +103,10 @@ class ConditionClause : public SyntaxNode
     FIDDLE() Expr* predicate = nullptr;
 
     /// The lexical scope introduced by the condition, when the condition declares anything
-    /// (`DeclConditionClause`). Statement checking and lookup work through the scopes that the
-    /// parser captures into expressions, so consumers only need this field to find the
-    /// declaration's owning scope for tooling and debug info. It is null for a plain expression.
+    /// (`DeclConditionClause`); null for a plain expression. Two consumers read it: the
+    /// statement parsers test it as the signal that they own the scope and must `PopScope()`
+    /// when the declared variable goes out of scope, and lowering makes it the source of
+    /// the condition's debug lexical block.
     FIDDLE() ScopeDecl* scopeDecl = nullptr;
 };
 
@@ -114,7 +126,9 @@ class DeclConditionClause : public ConditionClause
 {
     FIDDLE(...)
 
-    /// The variable that the condition declares.
+    /// The variable that the condition declares. Always present on a `DeclConditionClause`:
+    /// the parser builds it with `CreateVarDeclForContext`, and consumers (the AST
+    /// iterator, the language-server lookup) may assume it is non-null.
     FIDDLE() VarDeclBase* decl = nullptr;
 };
 

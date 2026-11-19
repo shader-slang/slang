@@ -7728,6 +7728,12 @@ Stmt* Parser::parseIfLetStatement()
     ReadToken("if");
     ReadToken(TokenType::LParent);
 
+    // Capture the clause position at the start of the condition, matching
+    // `parseConditionClause`; a condition clause's `loc` names where the
+    // condition begins, not where its last token landed.
+    ExprConditionClause* conditionClause = astBuilder->create<ExprConditionClause>();
+    FillPosition(conditionClause);
+
     // parse 'let var = X as Y'
     ReadToken("let");
     auto identifierToken = ReadToken(TokenType::Identifier);
@@ -7751,10 +7757,8 @@ Stmt* Parser::parseIfLetStatement()
     tempVarExpr->scope = currentScope;
     FillPosition(tempVarExpr);
     tempVarExpr->name = tempVarDecl->getName();
-    ExprConditionClause* conditionClause = astBuilder->create<ExprConditionClause>();
-    FillPosition(conditionClause);
     conditionClause->predicate = constructIfLetPredicate(this, tempVarExpr);
-    ifStatement->predicate = conditionClause;
+    ifStatement->condition = conditionClause;
 
     ReadToken(TokenType::RParent);
 
@@ -7854,7 +7858,7 @@ IfStmt* Parser::parseIfStatement()
     }
     // A declaration condition introduces a scope that spans the whole statement, so it
     // closes after the `else` arm. The variable stays visible in both arms, like C++.
-    if (ifStatement->predicate && ifStatement->predicate->scopeDecl)
+    if (ifStatement->condition && ifStatement->condition->scopeDecl)
         PopScope();
     ifStatement->afterLoc = tokenReader.peekLoc();
 
@@ -8249,7 +8253,9 @@ ConditionClause* Parser::parseConditionClause()
         // We might be looking at a declaration condition, or at an expression
         // that starts with a name, and we need to figure out which. We'll
         // solve this with backtracking, like `ParseStatement` does for
-        // declarations in statement position.
+        // declarations in statement position. A `::` leading token counts as
+        // name-like too, so a globally qualified declaration such as
+        // `if (::MyType x = e)` can take the declaration path.
         //
         // The trial parses with a shadow parser and sink, the same setup
         // `tryParseGenericApp` uses, so a failed trial cannot leak diagnostics
@@ -8261,11 +8267,31 @@ ConditionClause* Parser::parseConditionClause()
         Parser trialParser(*this);
         trialParser.sink = &trialSink;
 
+        // The trial parser shares the `ModuleDecl` with the real parser, and parsing
+        // modifiers can upgrade a legacy module to language version 2025 (a `public`
+        // at the start of the condition reaches that path). A failed trial must leave
+        // no observable state behind, so restore the version after the trial; when the
+        // trial does commit to a declaration, `parseDeclConditionClause` re-parses
+        // the modifiers on the real parser and performs the upgrade for real.
+        auto currentModuleDecl = getCurrentModuleDecl();
+        auto savedLanguageVersion =
+            currentModuleDecl ? currentModuleDecl->languageVersion : SLANG_LANGUAGE_VERSION_DEFAULT;
+
         // Modifiers can precede the type in a declaration condition, as in
         // `if (const int count = ...)`, so the trial parses them too.
         ParseModifiers(&trialParser);
         _parseInfixTypeExpr(&trialParser, false);
 
+        if (currentModuleDecl)
+            currentModuleDecl->languageVersion = savedLanguageVersion;
+
+        // Commit only to the `name =` shape. The `CompletionRequest` disjunct
+        // serves the language server: a completion issued where the variable
+        // name would go (`if (int <COMPLETE>`) commits to the declaration
+        // path so completion resolves in that context, while a completion
+        // seen anywhere inside the trial's type (`!hasSeenCompletionToken`)
+        // abandons the trial so the completion is not resolved against a
+        // half-guessed type.
         bool isDeclCondition = trialSink.getErrorCount() == 0 &&
                                !trialParser.hasSeenCompletionToken &&
                                (trialParser.LookAheadToken(TokenType::Identifier) ||
@@ -8287,10 +8313,12 @@ ConditionClause* Parser::parseConditionClause()
         // the condition.
     }
 
-    Expr* expr = ParseExpression();
+    // Capture the clause position at the start of the condition, like
+    // `parseDeclConditionClause` does: the clause's `loc` names where the
+    // condition begins.
     ExprConditionClause* clause = astBuilder->create<ExprConditionClause>();
     FillPosition(clause);
-    clause->predicate = expr;
+    clause->predicate = ParseExpression();
     return clause;
 }
 
