@@ -460,7 +460,12 @@ struct InliningPassBase
             if (op == kIROp_Nop)
             {
                 SLANG_RELEASE_ASSERT(call->getArgCount() >= 1);
-                call->replaceUsesWith(call->getArg(0));
+                // Calls to intrinsic-op functions survive lowering when they are minted
+                // indirectly, e.g. an interface requirement dispatched through a witness
+                // table; the mandatory-early inlining pass resolves them here.
+                auto result =
+                    retypeIdentityIntrinsicResult(&builder, call->getArg(0), call->getFullType());
+                call->replaceUsesWith(result);
             }
             else
             {

@@ -292,6 +292,34 @@ bool isResourceType(IRType* type);
 /// of these types is an opaque handle that only dedicated operations can use.
 bool isImageSamplerOrAccelerationStructureType(IRType* type);
 
+/// Return whether `fromType` and `toType` are both fixed-size basic types of equal byte
+/// size. Only target-independent sizes are compared, so callers can use this predicate
+/// at lowering time, where no target is available to compare a target-dependent size
+/// against; types whose size depends on the target, and types no layout rule can size,
+/// do not qualify. A fresh size table (see its comment in the .cpp) is used because the
+/// existing width helpers encode only integer widths in bits (`maybeGetIntTypeWidth`)
+/// or only floating-point properties.
+bool isSameSizeFixedBasicTypePair(IRType* fromType, IRType* toType);
+
+/// Return the value that substitutes an `__intrinsic_op(0)` (identity) call whose
+/// operand is `operand` and whose declared result type is `declaredType`.
+///
+/// The identity operation still honors the call's declared result type when that type
+/// re-describes the operand's bits, as in `__intrinsic_op(0) int get()` on an
+/// `__intrinsic_type(UInt)` struct: we return a bit-cast of the operand to the declared
+/// type, which keeps the bit pattern (though not necessarily the numeric value)
+/// unchanged.
+///
+/// Every other shape keeps the operand as lowered. The declared type may play a
+/// different role than the operand's type (`Ptr` to `Ref` for `operator*`, `Ref` to
+/// `Ptr` for `operator&`), where a bit-cast is not a bit-reinterpret at all. Pairs
+/// outside this contract — vectors, size-mismatched scalars, `bool`, target-sized
+/// integers, and types no layout rule can size — also keep the operand as lowered,
+/// preserving the historical pass-through. Vector re-typings remain a known, unfixed
+/// case, reachable only through fully generic identity declarations such as
+/// `__slang_noop_cast` (`__intrinsic_type` never names a vector type).
+IRInst* retypeIdentityIntrinsicResult(IRBuilder* builder, IRInst* operand, IRType* declaredType);
+
 /// Test for opaque values or invalid recursion in the by-value storage of `type`.
 ///
 /// Examines struct fields, array elements, and tuple elements. On a match, assigns the
