@@ -327,7 +327,25 @@ public:
         m_totalCompileTime += time;
     }
 
+    /// Return slang-llvm for this global session, loading it on the first call. Parallel backend
+    /// jobs may call this concurrently. The result is null if slang-llvm cannot be loaded; a
+    /// failed load is not cached, so a later call tries again.
     ISlangSharedLibrary* getOrLoadSlangLLVM();
+
+    /// Return the mutex that serializes the slang-llvm calls that write LLVM's process-wide state:
+    /// the target registry (`llvm::InitializeAll*`) and the command-line option storage
+    /// (`llvm::cl::ParseCommandLineOptions`). LLVM does not synchronize that state, so one mutex
+    /// serves every global session in the process. We take it in libslang rather than in
+    /// slang-llvm so that it also protects prebuilt slang-llvm binaries.
+    ///
+    /// The type-layout query takes this mutex while it holds the linkage's component-type
+    /// operation mutex, so code that holds this mutex calls only into slang-llvm and never back
+    /// into Slang. The mutex serializes the writers only: later LLVM code generation reads the
+    /// same state without it. After the first initialization in a process the calls write back
+    /// the same values, as long as concurrent jobs pass the same `-Xllvm` options. The C++
+    /// downstream compiler in slang-llvm initializes the native target in its own `_initLLVM`
+    /// without this mutex, so that path is not covered.
+    static std::mutex& getLLVMProcessStateMutex();
 
     ComPtr<ISlangSharedLibraryLoader>
         m_sharedLibraryLoader; ///< The shared library loader (never null)
@@ -342,6 +360,10 @@ public:
     Name* m_completionTokenName = nullptr; ///< The name of a completion request token.
 
     ComPtr<ISlangSharedLibrary> m_slangLLVM = nullptr; ///< slang-llvm, loaded on-demand.
+    // Guards m_slangLLVM, which several backend threads can race to load. The member is set at
+    // most once and never reset, so the pointer that getOrLoadSlangLLVM returns stays valid after
+    // the lock is released.
+    std::mutex m_slangLLVMMutex;
 
     /// For parsing command line options
     CommandOptions m_commandOptions;
