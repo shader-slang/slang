@@ -807,33 +807,57 @@ SLANG_UNIT_TEST(fileSystem)
     }
 }
 
-// The combined path from calcCombinedPath is the spelling every later file operation (existence
-// check, unique identity, loading) sees, so both combine branches must return the simplified
-// form: `.` and `x/..` segments collapse, while leading `..` segments are kept because they
-// cannot be resolved without an absolute base. This pins the contract on every platform,
-// including Windows where an inflated spelling can exceed the legacy ~260-character path limit.
+// The ISlangFileSystemExt contract for calcCombinedPath promises the simplified combined path
+// (the spelling every later file operation sees: `.` and `x/..` segments collapse, `/` is the
+// separator, leading `..` segments are kept) and an SLANG_E_INVALID_ARG failure for an invalid
+// path type, from every implementation. Pin both across the OS, memory and zip file systems on
+// every platform — including Windows, where an inflated spelling can exceed the legacy
+// ~260-character path limit — so the contract cannot drift between implementations.
 SLANG_UNIT_TEST(calcCombinedPathProducesSimplifiedPaths)
 {
-    ISlangFileSystemExt* fileSystem = OSFileSystem::getExtSingleton();
-
-    auto checkCombined = [&](SlangPathType fromPathType,
-                             const char* fromPath,
-                             const char* path,
-                             const char* expected)
+    List<ISlangFileSystemExt*> fileSystems;
     {
-        ComPtr<ISlangBlob> combinedBlob;
-        SLANG_CHECK(SLANG_SUCCEEDED(
-            fileSystem->calcCombinedPath(fromPathType, fromPath, path, combinedBlob.writeRef())));
-        const String combined(StringUtil::getString(combinedBlob));
-        SLANG_CHECK(combined == expected);
-    };
+        ComPtr<ISlangMutableFileSystem> memoryFileSystem;
+        SLANG_CHECK(SLANG_SUCCEEDED(_createFileSystem(FileSystemType::Memory, memoryFileSystem)));
+        fileSystems.add(memoryFileSystem.get());
+        memoryFileSystem.detach();
+    }
+    {
+        ComPtr<ISlangMutableFileSystem> zipFileSystem;
+        SLANG_CHECK(SLANG_SUCCEEDED(_createFileSystem(FileSystemType::Zip, zipFileSystem)));
+        fileSystems.add(zipFileSystem.get());
+        zipFileSystem.detach();
+    }
+    fileSystems.add(OSFileSystem::getExtSingleton());
 
-    checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../x.slang", "a/x.slang");
-    checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "./x.slang", "a/b/x.slang");
-    checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../../x.slang", "x.slang");
-    checkCombined(SLANG_PATH_TYPE_FILE, "c.slang", "../x.slang", "../x.slang");
-    checkCombined(SLANG_PATH_TYPE_DIRECTORY, "a/b/../b", "f.slang", "a/b/f.slang");
-    checkCombined(SLANG_PATH_TYPE_DIRECTORY, "", "x.slang", "x.slang");
+    for (auto fileSystem : fileSystems)
+    {
+        auto checkCombined = [&](SlangPathType fromPathType,
+                                 const char* fromPath,
+                                 const char* path,
+                                 const char* expected)
+        {
+            ComPtr<ISlangBlob> combinedBlob;
+            SLANG_CHECK(SLANG_SUCCEEDED(
+                fileSystem
+                    ->calcCombinedPath(fromPathType, fromPath, path, combinedBlob.writeRef())));
+            const String combined(StringUtil::getString(combinedBlob));
+            SLANG_CHECK(combined == expected);
+        };
+
+        checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../x.slang", "a/x.slang");
+        checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "./x.slang", "a/b/x.slang");
+        checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../../x.slang", "x.slang");
+        checkCombined(SLANG_PATH_TYPE_FILE, "c.slang", "../x.slang", "../x.slang");
+        checkCombined(SLANG_PATH_TYPE_DIRECTORY, "a/b/../b", "f.slang", "a/b/f.slang");
+        checkCombined(SLANG_PATH_TYPE_DIRECTORY, "", "x.slang", "x.slang");
+        // Both delimiters split a path and the simplified form always joins with `/`.
+        checkCombined(SLANG_PATH_TYPE_FILE, "a\\b\\c.slang", "..\\x.slang", "a/x.slang");
+
+        ComPtr<ISlangBlob> combinedBlob;
+        SLANG_CHECK(SLANG_FAILED(
+            fileSystem->calcCombinedPath((SlangPathType)999, "a", "b", combinedBlob.writeRef())));
+    }
 }
 
 // Loads a ZIP and then modifies it so miniz must take ownership of the Slang-owned input buffer.

@@ -95,10 +95,10 @@ static SlangResult _calcCombinedPath(
     // what `getPath(PathKind::Simplified)` returns for the same path, and keeps leading `..`
     // segments, which cannot be resolved without an absolute base.
     //
-    // The memory and zip file systems implement calcCombinedPath separately and keep the plain
-    // combination, but they simplify every path they look up themselves
-    // (MemoryFileSystem::_getCanonical, ZipFileSystemImpl::_getFixedPath), so a combined
-    // spelling there never reaches a file operation unsimplified either.
+    // The `x/..` resolution is lexical by design: `x` collapses to its written parent even
+    // when it is a symlink or does not exist, which is the same lexical form the include
+    // handling and `getPath(PathKind::Simplified)` establish, and it keeps the combined path
+    // independent of file system state.
     relPath = Path::simplify(relPath);
 
     *pathOut = StringUtil::createStringBlob(relPath).detach();
