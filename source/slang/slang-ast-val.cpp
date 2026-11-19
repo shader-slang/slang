@@ -2112,6 +2112,48 @@ void TypeCastIntVal::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
+// Convert `value` to the representation of the scalar `baseType`, truncating and sign- or
+// zero-extending it as a cast to that type does (e.g. `int(0x1FFFFFFFF)` is -1). Returns false
+// when `baseType` is neither an integer type nor `bool`.
+static bool _tryConvertIntegerValueToBaseType(BaseType baseType, IntegerLiteralValue& value)
+{
+    switch (baseType)
+    {
+    case BaseType::Int:
+        value = (int)value;
+        return true;
+    case BaseType::UInt:
+        value = (unsigned int)value;
+        return true;
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+        value = (Int64)value;
+        return true;
+    case BaseType::UInt64:
+    case BaseType::UIntPtr:
+        value = (UInt64)value;
+        return true;
+    case BaseType::Int16:
+        value = (int16_t)value;
+        return true;
+    case BaseType::UInt16:
+        value = (uint16_t)value;
+        return true;
+    case BaseType::Int8:
+        value = (int8_t)value;
+        return true;
+    case BaseType::UInt8:
+        value = (uint8_t)value;
+        return true;
+    case BaseType::Bool:
+        // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
+        value = (value != 0);
+        return true;
+    default:
+        return false;
+    }
+}
+
 Val* TypeCastIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
@@ -2119,57 +2161,20 @@ Val* TypeCastIntVal::tryFoldImpl(
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    auto convertValue = [&](BasicExpressionType* baseType, IntegerLiteralValue& resultValue) -> bool
-    {
-        switch (baseType->getBaseType())
-        {
-        case BaseType::Int:
-            resultValue = (int)resultValue;
-            return true;
-        case BaseType::UInt:
-            resultValue = (unsigned int)resultValue;
-            return true;
-        case BaseType::Int64:
-        case BaseType::IntPtr:
-            resultValue = (Int64)resultValue;
-            return true;
-        case BaseType::UInt64:
-        case BaseType::UIntPtr:
-            resultValue = (UInt64)resultValue;
-            return true;
-        case BaseType::Int16:
-            resultValue = (int16_t)resultValue;
-            return true;
-        case BaseType::UInt16:
-            resultValue = (uint16_t)resultValue;
-            return true;
-        case BaseType::Int8:
-            resultValue = (int8_t)resultValue;
-            return true;
-        case BaseType::UInt8:
-            resultValue = (uint8_t)resultValue;
-            return true;
-        case BaseType::Bool:
-            // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
-            resultValue = (resultValue != 0);
-            return true;
-        default:
-            return false;
-        }
-    };
     if (auto c = as<ConstantIntVal>(base))
     {
         IntegerLiteralValue resultValue = c->getValue();
         auto baseType = as<BasicExpressionType>(resultType);
         if (baseType)
         {
-            if (!convertValue(baseType, resultValue))
+            if (!_tryConvertIntegerValueToBaseType(baseType->getBaseType(), resultValue))
                 return nullptr;
         }
         else if (auto enumDecl = isEnumType(resultType))
         {
             baseType = as<BasicExpressionType>(enumDecl->tagType);
-            if (!baseType || !convertValue(baseType, resultValue))
+            if (!baseType ||
+                !_tryConvertIntegerValueToBaseType(baseType->getBaseType(), resultValue))
                 return nullptr;
         }
         return astBuilder->getIntVal(resultType, resultValue);
@@ -2292,6 +2297,14 @@ UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
         return toSlice("&&");
     case BuiltinOperationKind::Or:
         return toSlice("||");
+    case BuiltinOperationKind::Min:
+        return toSlice("min");
+    case BuiltinOperationKind::Max:
+        return toSlice("max");
+    case BuiltinOperationKind::Abs:
+        return toSlice("abs");
+    case BuiltinOperationKind::Clamp:
+        return toSlice("clamp");
     case BuiltinOperationKind::Unknown:
         break;
     }
@@ -2356,6 +2369,38 @@ BuiltinOperationKind getBuiltinOperationKindFromString(
     return BuiltinOperationKind::Unknown;
 }
 
+Index getBuiltinOperationArity(BuiltinOperationKind op)
+{
+    switch (op)
+    {
+    case BuiltinOperationKind::Neg:
+    case BuiltinOperationKind::BitNot:
+    case BuiltinOperationKind::Not:
+    case BuiltinOperationKind::Abs:
+        return 1;
+    case BuiltinOperationKind::Conditional:
+    case BuiltinOperationKind::Clamp:
+        return 3;
+    default:
+        return 2;
+    }
+}
+
+bool canConstantFoldBuiltinIntegerFunction(BuiltinOperationKind op, Type* resultType)
+{
+    auto basicType = as<BasicExpressionType>(resultType);
+    if (!basicType)
+        return false;
+    const auto& info = BaseTypeInfo::getInfo(basicType->getBaseType());
+    if (!(info.flags & BaseTypeInfo::Flag::Integer))
+        return false;
+    // The targets disagree on `abs` of an unsigned value: SPIR-V (`SAbs`) and LLVM (`llvm.abs`)
+    // read the operand as signed, while the C++ and CUDA preludes return it unchanged.
+    if (op == BuiltinOperationKind::Abs && !(info.flags & BaseTypeInfo::Flag::Signed))
+        return false;
+    return true;
+}
+
 void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
 {
     auto args = getArgs();
@@ -2372,6 +2417,24 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
             args[index]->toText(out);
         }
     };
+    switch (getOp())
+    {
+    case BuiltinOperationKind::Min:
+    case BuiltinOperationKind::Max:
+    case BuiltinOperationKind::Abs:
+    case BuiltinOperationKind::Clamp:
+        out << getBuiltinOperationOpText(getOp()) << "(";
+        for (Index i = 0; i < args.getCount(); i++)
+        {
+            if (i != 0)
+                out << ", ";
+            args[i]->toText(out);
+        }
+        out << ")";
+        return;
+    default:
+        break;
+    }
     if (getOp() == BuiltinOperationKind::Conditional && args.getCount() == 3)
     {
         argToText(0);
@@ -2395,6 +2458,57 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
+// Fold `min`/`max`/`abs`/`clamp` on concrete operands of the scalar integer type `resultType`.
+// An earlier fold can leave an operand outside the range of its type (`0u - 1u` folds to -1), so
+// each operand is first converted to `resultType` and then compared with that type's signedness,
+// as the target computes it: `min(0u - 1u, 5u)` is 5, and `abs` of the most negative value wraps
+// back to itself. Returns false when `canConstantFoldBuiltinIntegerFunction` rejects the call.
+static bool _tryFoldBuiltinIntegerFunction(
+    Type* resultType,
+    BuiltinOperationKind op,
+    List<ConstantIntVal*> const& args,
+    IntegerLiteralValue& out)
+{
+    if (!canConstantFoldBuiltinIntegerFunction(op, resultType))
+        return false;
+    const BaseType baseType = as<BasicExpressionType>(resultType)->getBaseType();
+    const bool isSigned = (BaseTypeInfo::getInfo(baseType).flags & BaseTypeInfo::Flag::Signed) != 0;
+
+    IntegerLiteralValue v[3] = {};
+    SLANG_ASSERT(args.getCount() <= 3);
+    for (Index i = 0; i < args.getCount(); i++)
+    {
+        v[i] = args[i]->getValue();
+        if (!_tryConvertIntegerValueToBaseType(baseType, v[i]))
+            return false;
+    }
+
+    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
+    auto isLess = [&](IntegerLiteralValue a, IntegerLiteralValue b)
+    { return isSigned ? (a < b) : ((UInt)a < (UInt)b); };
+    auto max = [&](IntegerLiteralValue a, IntegerLiteralValue b) { return isLess(a, b) ? b : a; };
+    auto min = [&](IntegerLiteralValue a, IntegerLiteralValue b) { return isLess(b, a) ? b : a; };
+
+    switch (op)
+    {
+    case BuiltinOperationKind::Min:
+        out = min(v[0], v[1]);
+        return true;
+    case BuiltinOperationKind::Max:
+        out = max(v[0], v[1]);
+        return true;
+    case BuiltinOperationKind::Clamp:
+        out = min(max(v[0], v[1]), v[2]);
+        return true;
+    case BuiltinOperationKind::Abs:
+        out = (v[0] < 0) ? (IntegerLiteralValue)(UInt(0) - (UInt)v[0]) : v[0];
+        return _tryConvertIntegerValueToBaseType(baseType, out);
+    default:
+        SLANG_UNEXPECTED("not a builtin integer function in _tryFoldBuiltinIntegerFunction");
+        UNREACHABLE_RETURN(false);
+    }
+}
+
 Val* BuiltinOperationIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
@@ -2415,11 +2529,7 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     // Reject a malformed node whose argument count does not match the operation's arity, so a
     // unary op never reads a missing second operand and a binary op never folds with a
     // defaulted one.
-    const bool isUnary =
-        (op == BuiltinOperationKind::Neg || op == BuiltinOperationKind::BitNot ||
-         op == BuiltinOperationKind::Not);
-    const Index expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
-    if (constArgs.getCount() != expectedArgs)
+    if (constArgs.getCount() != getBuiltinOperationArity(op))
         return nullptr;
 
     const IntegerLiteralValue a0 = constArgs[0]->getValue();
@@ -2507,6 +2617,13 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
         break;
     case BuiltinOperationKind::Conditional:
         r = (a0 != 0) ? a1 : a2;
+        break;
+    case BuiltinOperationKind::Min:
+    case BuiltinOperationKind::Max:
+    case BuiltinOperationKind::Abs:
+    case BuiltinOperationKind::Clamp:
+        if (!_tryFoldBuiltinIntegerFunction(resultType, op, constArgs, r))
+            return nullptr;
         break;
     default:
         return nullptr;

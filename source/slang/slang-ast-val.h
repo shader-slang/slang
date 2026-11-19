@@ -216,6 +216,11 @@ class TypeCastIntVal : public IntVal
 // `getBuiltinOperationKindFromString`) are declared in slang-ast-support-types.h, since they are
 // shared with the AST-level `BuiltinOperatorExpr` node.
 
+// Whether a call to the builtin integer function `op` (`min`/`max`/`abs`/`clamp`) whose result
+// has type `resultType` is a compile-time constant: the type must be a builtin integer type, and
+// `abs` must be signed, since the targets compute `abs` of an unsigned value differently.
+bool canConstantFoldBuiltinIntegerFunction(BuiltinOperationKind op, Type* resultType);
+
 // A compile-time integer that is the result of a builtin operator applied to operands that
 // are not all concrete yet (e.g. `N / 2` for a generic value parameter `N`). It identifies the
 // operator by a `BuiltinOperationKind` enum rather than a resolved operator `DeclRef`, so it is
