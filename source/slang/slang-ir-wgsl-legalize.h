@@ -9,6 +9,6 @@ class TargetProgram;
 
 void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
-void specializeAddressSpaceForWGSL(IRModule* module);
+void specializeAddressSpaceForWGSL(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang
