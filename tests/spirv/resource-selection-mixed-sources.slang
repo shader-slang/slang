@@ -29,21 +29,20 @@ cbuffer Parameters { uint index; uint otherIndex; };
 
 // The selected descriptor index is computed inside the branch, while the sample coordinates
 // are computed after the merge. We require both values to remain available at the sample.
-// We follow the branch-only index through its ordinary merge slot into the array access.
+// We follow the branch-only index through its ordinary phi into the array access.
 // Both samples must use the coordinate computed after that merge and rejoin one result block.
 // BRANCH: %[[CONDITION:[^ ]+]] = OpFOrdGreaterThan %bool{{( |$)}}
 // BRANCH: OpSelectionMerge %[[INDEX_MERGE:[^ ]+]] None
 // BRANCH: OpBranchConditional %[[CONDITION]] %[[COMPUTE:[^ ]+]] %[[DEFAULT:[^ ]+]]{{( |$)}}
 // BRANCH: %[[COMPUTE]] = OpLabel
 // BRANCH: %[[INDEX:[^ ]+]] = OpUMod %uint {{[^ ]+}} %uint_4{{( |$)}}
-// BRANCH: OpStore %[[INDEX_SLOT:[^ ]+]] %[[INDEX]]{{( |$)}}
 // BRANCH-NOT: OpLabel
 // BRANCH: OpBranch %[[INDEX_MERGE]]{{( |$)}}
 // BRANCH: %[[DEFAULT]] = OpLabel
-// BRANCH: OpStore %[[INDEX_SLOT]] %uint_0{{( |$)}}
 // BRANCH-NOT: OpLabel
 // BRANCH: OpBranch %[[INDEX_MERGE]]{{( |$)}}
 // BRANCH: %[[INDEX_MERGE]] = OpLabel
+// BRANCH: %[[FINAL_INDEX:[^ ]+]] = OpPhi %uint %[[INDEX]] %[[COMPUTE]] %uint_0 %[[DEFAULT]]{{( |$)}}
 // BRANCH: %[[USE_SINGLE:[^ ]+]] = OpLogicalNot %bool %[[CONDITION]]{{( |$)}}
 // BRANCH: %coordinate = OpFAdd %v2float{{( |$)}}
 // BRANCH: OpSelectionMerge %[[RESULT_MERGE:[^ ]+]] None
@@ -57,7 +56,6 @@ cbuffer Parameters { uint index; uint otherIndex; };
 // BRANCH-NOT: OpLabel
 // BRANCH: OpBranch %[[RESULT_MERGE]]{{( |$)}}
 // BRANCH: %[[ARRAY]] = OpLabel
-// BRANCH: %[[FINAL_INDEX:[^ ]+]] = OpLoad %uint %[[INDEX_SLOT]]{{( |$)}}
 // BRANCH: %[[ARRAY_PTR:[^ ]+]] = OpAccessChain {{[^ ]+}} %firstTextures %[[FINAL_INDEX]]{{( |$)}}
 // BRANCH: %[[ARRAY_SAMPLER_PTR:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %uint_0{{( |$)}}
 // BRANCH: %[[ARRAY_IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %[[ARRAY_PTR]]{{( |$)}}

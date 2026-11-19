@@ -18,22 +18,19 @@ SamplerState samplers[8];
 Texture2D<float4> texture;
 cbuffer Ubo { uint i; int j; uint count; uint64_t wide; };
 
-// PHI: OpTypePointer Function %uint{{( |$)}}
 // PHI: %[[UV:[^ ]+]] = OpLoad %v2float %uv{{( |$)}}
 // PHI: %[[X:[^ ]+]] = OpCompositeExtract %float %[[UV]] 0
 // PHI: %[[CONDITION:[^ ]+]] = OpFOrdLessThan %bool %[[X]] %float_0_5{{( |$)}}
 // PHI: OpSelectionMerge %[[MERGE:[^ ]+]] None
 // PHI: OpBranchConditional %[[CONDITION]] %[[THEN:[^ ]+]] %[[ELSE:[^ ]+]]{{( |$)}}
 // PHI: %[[THEN]] = OpLabel
-// PHI: OpStore %s %uint_0{{( |$)}}
 // PHI: OpBranch %[[MERGE]]{{( |$)}}
 // PHI: %[[ELSE]] = OpLabel
 // PHI: %[[INPUT_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %Ubo %int_0{{( |$)}}
 // PHI: %[[INPUT:[^ ]+]] = OpLoad %uint %[[INPUT_POINTER]]{{( |$)}}
-// PHI: OpStore %s %[[INPUT]]{{( |$)}}
 // PHI: OpBranch %[[MERGE]]{{( |$)}}
 // PHI: %[[MERGE]] = OpLabel
-// PHI: %[[PHI_INDEX:[^ ]+]] = OpLoad %uint %s{{( |$)}}
+// PHI: %[[PHI_INDEX:[^ ]+]] = OpPhi %uint %uint_0 %[[THEN]] %[[INPUT]] %[[ELSE]]{{( |$)}}
 // PHI: %[[POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[PHI_INDEX]]{{( |$)}}
 // PHI: %[[SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[POINTER]]{{( |$)}}
 // PHI: %[[IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %texture{{( |$)}}
@@ -65,8 +62,15 @@ float4 mixedSelect(float2 uv : TEXCOORD) : SV_TARGET
     return texture.SampleLevel(s, uv, 0);
 }
 
-// LOOP: OpTypePointer Function %uint{{( |$)}}
-// LOOP: OpLoopMerge
+// The header phi preserves index zero for an empty loop and the last selected index otherwise.
+// Follow both the index and induction value around the back edge before checking the final sample.
+// LOOP: OpFunction
+// LOOP: %[[ENTRY:[^ ]+]] = OpLabel
+// LOOP: OpBranch %[[HEADER:[^ ]+]]{{( |$)}}
+// LOOP: %[[HEADER]] = OpLabel
+// LOOP: %[[CARRIED_INDEX:[^ ]+]] = OpPhi %uint %[[NEXT_INDEX:[^ ]+]] %[[BACKEDGE:[^ ]+]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP: %[[K:[^ ]+]] = OpPhi %uint %[[NEXT_K:[^ ]+]] %[[BACKEDGE]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP: OpLoopMerge %[[EXIT:[^ ]+]] %[[BACKEDGE]] None
 // LOOP: %[[UV:[^ ]+]] = OpLoad %v2float %uv{{( |$)}}
 // LOOP: %[[X:[^ ]+]] = OpCompositeExtract %float %[[UV]] 0
 // LOOP: %[[CONDITION:[^ ]+]] = OpFOrdLessThan %bool %[[X]] %float_0_5{{( |$)}}
@@ -75,28 +79,35 @@ float4 mixedSelect(float2 uv : TEXCOORD) : SV_TARGET
 // LOOP: %[[THEN]] = OpLabel
 // LOOP: %[[J_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %Ubo %int_1{{( |$)}}
 // LOOP: %[[J:[^ ]+]] = OpLoad %int %[[J_POINTER]]{{( |$)}}
-// LOOP: %[[K:[^ ]+]] = OpLoad %uint %k{{( |$)}}
 // LOOP: %[[SIGNED_K:[^ ]+]] = OpBitcast %int %[[K]]{{( |$)}}
 // LOOP: %[[SUM:[^ ]+]] = OpIAdd %int %[[J]] %[[SIGNED_K]]{{( |$)}}
 // LOOP: %[[CONVERTED:[^ ]+]] = OpBitcast %uint %[[SUM]]{{( |$)}}
-// LOOP: OpStore %s %[[CONVERTED]]{{( |$)}}
 // LOOP: OpBranch %[[MERGE]]{{( |$)}}
 // LOOP: %[[ELSE]] = OpLabel
 // LOOP: %[[I_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %Ubo %int_0{{( |$)}}
 // LOOP: %[[I:[^ ]+]] = OpLoad %uint %[[I_POINTER]]{{( |$)}}
-// LOOP: OpStore %s %[[I]]{{( |$)}}
 // LOOP: OpBranch %[[MERGE]]{{( |$)}}
 // LOOP: %[[MERGE]] = OpLabel
-// LOOP: %[[LOOP_INDEX:[^ ]+]] = OpLoad %uint %s{{( |$)}}
-// LOOP: %[[POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[LOOP_INDEX]]{{( |$)}}
+// LOOP: %[[NEXT_INDEX]] = OpPhi %uint %[[CONVERTED]] %[[THEN]] %[[I]] %[[ELSE]]{{( |$)}}
+// LOOP: %[[NEXT_K]] = OpIAdd %uint %[[K]] %uint_1{{( |$)}}
+// LOOP: OpBranch %[[BACKEDGE]]{{( |$)}}
+// LOOP: %[[BACKEDGE]] = OpLabel
+// LOOP: OpBranch %[[HEADER]]{{( |$)}}
+// LOOP: %[[EXIT]] = OpLabel
+// LOOP: %[[POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[CARRIED_INDEX]]{{( |$)}}
 // LOOP: %[[SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[POINTER]]{{( |$)}}
 // LOOP: %[[IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %texture{{( |$)}}
 // LOOP: %[[PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} %[[IMAGE]] %[[SAMPLER]]{{( |$)}}
 // LOOP: OpImageSampleExplicitLod {{[^ ]+}} %[[PAIR]]{{( |$)}}
 // SPIR-V optimization places the false arm before the true arm. We check the same input values
 // and common merge in that order rather than assuming the text order determines the selected arm.
-// LOOP-OPT: OpTypePointer Function %uint{{( |$)}}
-// LOOP-OPT: OpLoopMerge
+// LOOP-OPT: OpFunction
+// LOOP-OPT: %[[ENTRY:[^ ]+]] = OpLabel
+// LOOP-OPT: OpBranch %[[HEADER:[^ ]+]]{{( |$)}}
+// LOOP-OPT: %[[HEADER]] = OpLabel
+// LOOP-OPT: %[[CARRIED_INDEX:[^ ]+]] = OpPhi %uint %[[NEXT_INDEX:[^ ]+]] %[[BACKEDGE:[^ ]+]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP-OPT: %[[K:[^ ]+]] = OpPhi %uint %[[NEXT_K:[^ ]+]] %[[BACKEDGE]] %uint_0 %[[ENTRY]]{{( |$)}}
+// LOOP-OPT: OpLoopMerge %[[EXIT:[^ ]+]] %[[BACKEDGE]] None
 // LOOP-OPT: %[[UV:[^ ]+]] = OpLoad %v2float %uv{{( |$)}}
 // LOOP-OPT: %[[X:[^ ]+]] = OpCompositeExtract %float %[[UV]] 0
 // LOOP-OPT: %[[CONDITION:[^ ]+]] = OpFOrdLessThan %bool %[[X]] %float_0_5{{( |$)}}
@@ -105,20 +116,22 @@ float4 mixedSelect(float2 uv : TEXCOORD) : SV_TARGET
 // LOOP-OPT: %[[ELSE]] = OpLabel
 // LOOP-OPT: %[[I_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %Ubo %int_0{{( |$)}}
 // LOOP-OPT: %[[I:[^ ]+]] = OpLoad %uint %[[I_POINTER]]{{( |$)}}
-// LOOP-OPT: OpStore %s %[[I]]{{( |$)}}
 // LOOP-OPT: OpBranch %[[MERGE]]{{( |$)}}
 // LOOP-OPT: %[[THEN]] = OpLabel
 // LOOP-OPT: %[[J_POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %Ubo %int_1{{( |$)}}
 // LOOP-OPT: %[[J:[^ ]+]] = OpLoad %int %[[J_POINTER]]{{( |$)}}
-// LOOP-OPT: %[[K:[^ ]+]] = OpLoad %uint %k{{( |$)}}
 // LOOP-OPT: %[[SIGNED_K:[^ ]+]] = OpBitcast %int %[[K]]{{( |$)}}
 // LOOP-OPT: %[[SUM:[^ ]+]] = OpIAdd %int %[[J]] %[[SIGNED_K]]{{( |$)}}
 // LOOP-OPT: %[[CONVERTED:[^ ]+]] = OpBitcast %uint %[[SUM]]{{( |$)}}
-// LOOP-OPT: OpStore %s %[[CONVERTED]]{{( |$)}}
 // LOOP-OPT: OpBranch %[[MERGE]]{{( |$)}}
 // LOOP-OPT: %[[MERGE]] = OpLabel
-// LOOP-OPT: %[[LOOP_INDEX:[^ ]+]] = OpLoad %uint %s{{( |$)}}
-// LOOP-OPT: %[[POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[LOOP_INDEX]]{{( |$)}}
+// LOOP-OPT: %[[NEXT_INDEX]] = OpPhi %uint %[[CONVERTED]] %[[THEN]] %[[I]] %[[ELSE]]{{( |$)}}
+// LOOP-OPT: %[[NEXT_K]] = OpIAdd %uint %[[K]] %uint_1{{( |$)}}
+// LOOP-OPT: OpBranch %[[BACKEDGE]]{{( |$)}}
+// LOOP-OPT: %[[BACKEDGE]] = OpLabel
+// LOOP-OPT: OpBranch %[[HEADER]]{{( |$)}}
+// LOOP-OPT: %[[EXIT]] = OpLabel
+// LOOP-OPT: %[[POINTER:[^ ]+]] = OpAccessChain {{[^ ]+}} %samplers %[[CARRIED_INDEX]]{{( |$)}}
 // LOOP-OPT: %[[SAMPLER:[^ ]+]] = OpLoad {{[^ ]+}} %[[POINTER]]{{( |$)}}
 // LOOP-OPT: %[[IMAGE:[^ ]+]] = OpLoad {{[^ ]+}} %texture{{( |$)}}
 // LOOP-OPT: %[[PAIR:[^ ]+]] = OpSampledImage {{[^ ]+}} %[[IMAGE]] %[[SAMPLER]]{{( |$)}}

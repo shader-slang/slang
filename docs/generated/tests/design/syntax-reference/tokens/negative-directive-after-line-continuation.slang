@@ -14,7 +14,7 @@
 // leading  is an ordinary Pound token and the parser rejects it. CHECK
 // asserts the unexpected-token code E20001 rather than a macro expansion.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target cpp -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target cpp -entry main -stage compute
 
 int a = 1; #define FOO 2
 //CHECK: E20001

@@ -24,7 +24,7 @@ and similar.
   "platform-launch", "value packs / each", "string hashing").
 - For each opcode in this page, the `AST origin` is often a specific
   lowering helper in
-  [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp),
+  [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp),
   an IR pass, or an `__intrinsic_op` declaration in the core module.
   **Name the actual producer** — the retired catch-all `(synthesized)`
   is not acceptable, and an opcode nothing in `source/` constructs is

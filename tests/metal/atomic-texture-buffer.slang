@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=METAL_FLOAT,exit-code=-1): -target metal -stage compute -entry computeMain -DFLOAT
+//TEST:SIMPLE(filecheck=METAL_FLOAT,exit-code=2): -target metal -stage compute -entry computeMain -DFLOAT
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 // Test framework does not support RWBuffer

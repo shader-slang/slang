@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1): -target hlsl -entry main -profile sm_5_0
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl -entry main -profile sm_5_0
 // CHECK: error[E36116]
 struct RayPayload
 {

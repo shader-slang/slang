@@ -32,7 +32,7 @@ also the target of the `Grammar` column on every family page.
 ## Family taxonomy
 
 The diagram below is the root hierarchy declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h); the
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h); the
 per-family pages cover the concrete leaves under each root.
 
 ```mermaid
@@ -54,7 +54,7 @@ Three properties of this hierarchy are worth fixing in mind before
 reading a family page:
 
 - **Every root in the diagram is declared in
-  [slang-ast-base.h](../../../../source/slang/slang-ast-base.h)** — including
+  [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)** — including
   `Decl`, `Expr`, `Stmt`, `Type`, `Modifier`, and `Val`. No family page
   owns its own root class; the per-family header declares only the
   descendants. `Decl` itself is `FIDDLE(abstract)`, and the abstract
@@ -101,13 +101,13 @@ Where each root is documented:
 
 | Page | Family root | Owning header | Approx. concrete classes |
 | --- | --- | --- | --- |
-| [base.md](base.md) | the abstract roots above | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) | (roots and support types only) |
-| [declarations.md](declarations.md) | `Decl`, `DeclBase` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) | ~65 |
-| [expressions.md](expressions.md) | `Expr` | [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h) | ~95 |
-| [statements.md](statements.md) | `Stmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) | ~30 |
-| [types.md](types.md) | `Type` (itself a `Val`) | [slang-ast-type.h](../../../../source/slang/slang-ast-type.h) | ~125 |
-| [values.md](values.md) | `Val` (non-`Type`) | [slang-ast-val.h](../../../../source/slang/slang-ast-val.h) | ~60 |
-| [modifiers.md](modifiers.md) | `Modifier` (incl. `AttributeBase`) | [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h) | ~270 |
+| [base.md](base.md) | the abstract roots above | [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h) | (roots and support types only) |
+| [declarations.md](declarations.md) | `Decl`, `DeclBase` | [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h) | ~65 |
+| [expressions.md](expressions.md) | `Expr` | [slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h) | ~95 |
+| [statements.md](statements.md) | `Stmt` | [slang-ast-stmt.h](../../../../source/slang/ast/slang-ast-stmt.h) | ~30 |
+| [types.md](types.md) | `Type` (itself a `Val`) | [slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h) | ~125 |
+| [values.md](values.md) | `Val` (non-`Type`) | [slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h) | ~60 |
+| [modifiers.md](modifiers.md) | `Modifier` (incl. `AttributeBase`) | [slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h) | ~270 |
 
 Each count is the number of `FIDDLE()`-declared concrete classes in that
 owning header at the `source_commit` in this file's front-matter, rounded

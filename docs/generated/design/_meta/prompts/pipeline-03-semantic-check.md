@@ -36,14 +36,14 @@ overload resolution, or interface conformance.
    [02-parse-ast.md](02-parse-ast.md) and
    [../../design/parsing.md](../../design/parsing.md).
 5. `## Name lookup and `DeclRef`` — short paragraph; cite
-   [slang-ast-decl-ref.cpp](../../../../source/slang/slang-ast-decl-ref.cpp)
+   [slang-ast-decl-ref.cpp](../../../../source/slang/ast/slang-ast-decl-ref.cpp)
    and [../../design/decl-refs.md](../../design/decl-refs.md) as
    further reading.
 6. `## Generic specialization and constraints` — overview only; the
    deep details live in
    [../../design/interfaces.md](../../design/interfaces.md).
 7. `## Synthesizing implicit code` — how
-   [slang-ast-synthesis.cpp](../../../../source/slang/slang-ast-synthesis.cpp)
+   [slang-ast-synthesis.cpp](../../../../source/slang/ast/slang-ast-synthesis.cpp)
    adds default conformance witnesses, generated members, etc.
 8. `## Failure modes` — diagnostics and recovery; link
    [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md).

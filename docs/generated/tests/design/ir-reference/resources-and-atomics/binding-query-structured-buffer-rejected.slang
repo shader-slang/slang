@@ -12,7 +12,7 @@
 // The doc says the register queries accept only two resource kinds, so
 // any other resource is a type mismatch rather than an unsupported query.
 
-//TEST:SIMPLE(filecheck=DIAG,exit-code=-1):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=DIAG,exit-code=2):-target hlsl -stage compute -entry main
 
 RWStructuredBuffer<uint> outBuf;
 StructuredBuffer<uint> sb;

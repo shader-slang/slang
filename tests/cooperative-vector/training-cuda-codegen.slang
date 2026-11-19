@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec -entry computeMain -stage compute
-
+//TEST:SIMPLE(filecheck=PTX): -target ptx -capability optix_coopvec -entry computeMain -stage compute
+// PTX output requires NVRTC to find the OptiX headers for a compute stage (issue #14557).
+// PTX: .entry computeMain
 // CHECK: optixCoopVecOuterProductAccumulate({{.*}}, {{.*}}, (CUdeviceptr)(&({{.*}})), int(0), 32U)
 // CHECK: optixCoopVecReduceSumAccumulate({{.*}}, (CUdeviceptr)(&({{.*}})), int(0))
 

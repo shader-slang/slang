@@ -3,7 +3,7 @@
 // so these cases must compile without opaque local storage. Neither pass can legalize the
 // `SubpassInput` result of `selSubpass`, which must still reach the opaque-storage diagnostic.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target spirv -entry main -stage fragment
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target spirv -entry main -stage fragment
 
 Texture2D<float> t0, t1;
 SamplerState s0, s1;

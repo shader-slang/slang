@@ -475,6 +475,29 @@ void WinProcess::kill(int32_t returnCode)
                     &securityAttributes,
                     bufferSize));
             }
+            else
+            {
+                // The caller asked us to leave the child's stderr alone, so the child writes to
+                // our stderr. `STARTF_USESTDHANDLES` below makes CreateProcess take `hStdError`
+                // literally, so a null handle there gives the child no stderr and drops
+                // everything it writes. We therefore hand it an inheritable duplicate of our own
+                // stderr, because the handle we hold is not necessarily inheritable. If we have no
+                // stderr (for example, a process started without a console), the child has none
+                // either.
+                const HANDLE parentStdErr = GetStdHandle(STD_ERROR_HANDLE);
+                if (parentStdErr && parentStdErr != INVALID_HANDLE_VALUE)
+                {
+                    const HANDLE process = GetCurrentProcess();
+                    DuplicateHandle(
+                        process,
+                        parentStdErr,
+                        process,
+                        childStdErrWrite.writeRef(),
+                        0,
+                        TRUE,
+                        DUPLICATE_SAME_ACCESS);
+                }
+            }
             if (flags & Process::Flag::UnreadableStdin)
             {
                 // Hand the child a write-only NUL handle as its stdin, so reads from it error out

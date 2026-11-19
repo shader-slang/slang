@@ -12,7 +12,7 @@
 // The doc states that targets that cannot resolve a register and space,
 // such as CUDA, reject the query with E81111.
 
-//TEST:SIMPLE(filecheck=DIAG,exit-code=-1):-target cuda -stage compute -entry main
+//TEST:SIMPLE(filecheck=DIAG,exit-code=2):-target cuda -stage compute -entry main
 
 RWStructuredBuffer<uint> outBuf;
 SamplerState samp;
