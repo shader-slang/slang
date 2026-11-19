@@ -63,32 +63,32 @@ used the feature", not as an optimization hint.
 - [slang-code-gen.h](../../../../source/slang/slang-code-gen.h) —
   declares `RequiredLoweringPassSet` (the `reqSet.*` gates) and
   `CodeGenContext`.
-- [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+- [slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp)
   — `HLSLSourceEmitter` implementation.
-- [slang-emit-hlsl-prelude.cpp](../../../../source/slang/slang-emit-hlsl-prelude.cpp)
+- [slang-emit-hlsl-prelude.cpp](../../../../source/slang/emission/slang-emit-hlsl-prelude.cpp)
   — `HLSLSourceEmitter` members that map IR constructs to HLSL
   *named* constants and type spellings:
   `emitWorkGraphRecordType` (line 539) plus its
   `getWorkGraphRecordTypeName` table (line 509), and
   `emitNamedMemoryTypeFlagSet` / `emitNamedSemanticFlagSet`
   (lines 553 and 586).
-- [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+- [slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
   — shared C-like emitter base class.
-- [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)
+- [slang-ir-hlsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-hlsl-legalize.cpp)
   — HLSL-only validation helper `validateBarrierFlagsForHLSL`
   (line 67). The three HLSL ray-payload legalizers that used to
   live here (`legalizeNonStructParameterToStructForHLSL`,
   `legalizeEmptyRayPayloadsForHLSL`,
   `legalizeRayPayloadAccessQualifiersForHLSL`) no longer exist; the
   file defines nothing else.
-- [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp)
+- [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp)
   — `legalizeRayTracingPayloads` (line 884), the single pass that
   now handles empty ray payloads, non-struct D3D payloads and hit
   attributes, and SM 6.7 payload access qualifiers for D3D
   targets. This file is not among the manifest's watched paths.
-- [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/slang-ir-wrap-structured-buffers.cpp)
+- [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/ir-passes/slang-ir-wrap-structured-buffers.cpp)
   — `wrapStructuredBuffersOfMatrices`, the HLSL-only structured-buffer-of-matrices wrapper.
-- [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp)
+- [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp)
   — `legalizeLogicalAndOr` runs for HLSL.
 - [slang-target-program.h](../../../../source/slang/slang-target-program.h)
   / [slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h)
@@ -153,24 +153,24 @@ see the conditional-gates table below for the full set.)
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `linkIR` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | |
-| 2 | `validateAndRemoveAssumeAddress` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `reqSet.assumeAddress` (line 1087) | Call at line 1090, after the first `calcRequiredLoweringPassSet` scan (line 1085); the flag is set by `kIROp_AssumeAddress`. Its `validate` argument is `!isCPUTarget && !isCUDATarget` (line 1089), so HLSL passes `true`. |
-| 3 | `stripDebugInfo` | [slang-ir-strip-debug-info.cpp](../../../../source/slang/slang-ir-strip-debug-info.cpp) | `reqSet.debugInfo && DebugInfoLevel::None` (line 1099) | |
-| 4 | `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` | [slang-ir-lower-glsl-ssbo-types.cpp](../../../../source/slang/slang-ir-lower-glsl-ssbo-types.cpp) | `!isKhronosTarget && reqSet.glslSSBO` (line 1103) | HLSL is non-Khronos. |
-| 5 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | (always) | |
-| 6 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | |
-| 7 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
-| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Receives a counter byte-width (`TraceCoverageCounterByteWidth`, default uint64 via `kDefaultCoverageCounterByteWidth`; only 4 or 8 are valid — anything else raises `CoverageCounterWidthBytesInvalid`, **E45114**) and a boolean-coverage flag (`TraceCoverageBoolean`, off by default, spelled `-trace-coverage-boolean`), both resolved inside the `reqSet.coverageTracing` block that opens at line 1256; the pass call itself is at line 1351. A bindless-index request on a non-Khronos target such as HLSL fails with `CoverageBindlessTargetNotSupported` before the gate is tested (lines 1172-1254). The `slangc` spelling of the width option is `-trace-coverage-counter-width`, which takes *bits* (32 or 64) and stores the corresponding byte width; the CLI parser rejects any other bit count as **E45113** before the byte width reaches this block, so E45114 is reachable only from a host that sets the API option directly. |
-| 9 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | (always) | |
-| 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
-| 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper (line 801); call at line 1376. The call is unconditional but the body returns immediately unless one of the fp16 / fp32 / fp64 denormal modes is something other than `FloatingPointDenormalMode::Any` (lines 810-813). The `FpDenormalPreserve` / `FpDenormalFlushToZero` decorations it then attaches to entry points are consumed only by the SPIR-V emitter ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) lines 6568 and 6586); nothing in the HLSL emitter reads them, so they leave no marker in emitted HLSL text. |
-| 12 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
-| 13 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
-| 14 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, HLSL via `default` arm) | |
-| 15 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Post-packing pass that fills CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata`. No-op for HLSL in practice. |
-| 16 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/slang-ir-lower-l-value-cast.cpp) | `reqSet.lValueCast` (line 1473) | Flag is set by `kIROp_InOutImplicitCast` / `kIROp_OutImplicitCast` (line 653); previously unconditional. |
-| 17 | `specializeMatrixLayout` | [slang-ir-specialize-matrix-layout.cpp](../../../../source/slang/slang-ir-specialize-matrix-layout.cpp) | `reqSet.unresolvedMatrixLayout` (line 1479) | Fills in the default matrix layout where the source left it unspecified; runs before specialization and before `lowerEnumType`, which erases the `MatrixLayoutMode` type it looks for. The flag is set by a `kIROp_MatrixType` whose layout operand is not a literal or is `SLANG_MATRIX_LAYOUT_MODE_UNKNOWN` (line 669). |
-| 18 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` (line 1485) | |
+| 1 | `linkIR` | [slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp) | (always) | |
+| 2 | `validateAndRemoveAssumeAddress` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | `reqSet.assumeAddress` (line 1087) | Call at line 1090, after the first `calcRequiredLoweringPassSet` scan (line 1085); the flag is set by `kIROp_AssumeAddress`. Its `validate` argument is `!isCPUTarget && !isCUDATarget` (line 1089), so HLSL passes `true`. |
+| 3 | `stripDebugInfo` | [slang-ir-strip-debug-info.cpp](../../../../source/slang/ir-passes/slang-ir-strip-debug-info.cpp) | `reqSet.debugInfo && DebugInfoLevel::None` (line 1099) | |
+| 4 | `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` | [slang-ir-lower-glsl-ssbo-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-glsl-ssbo-types.cpp) | `!isKhronosTarget && reqSet.glslSSBO` (line 1103) | HLSL is non-Khronos. |
+| 5 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/ir-passes/slang-ir-transform-params-to-constref.cpp) | (always) | |
+| 6 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp) | (always) | |
+| 7 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/ir-passes/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
+| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/ir-passes/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Receives a counter byte-width (`TraceCoverageCounterByteWidth`, default uint64 via `kDefaultCoverageCounterByteWidth`; only 4 or 8 are valid — anything else raises `CoverageCounterWidthBytesInvalid`, **E45114**) and a boolean-coverage flag (`TraceCoverageBoolean`, off by default, spelled `-trace-coverage-boolean`), both resolved inside the `reqSet.coverageTracing` block that opens at line 1256; the pass call itself is at line 1351. A bindless-index request on a non-Khronos target such as HLSL fails with `CoverageBindlessTargetNotSupported` before the gate is tested (lines 1172-1254). The `slangc` spelling of the width option is `-trace-coverage-counter-width`, which takes *bits* (32 or 64) and stores the corresponding byte width; the CLI parser rejects any other bit count as **E45113** before the byte width reaches this block, so E45114 is reachable only from a host that sets the API option directly. |
+| 9 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-collect-global-uniforms.cpp) | (always) | |
+| 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-decorations.cpp) | (always) | |
+| 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper (line 801); call at line 1376. The call is unconditional but the body returns immediately unless one of the fp16 / fp32 / fp64 denormal modes is something other than `FloatingPointDenormalMode::Any` (lines 810-813). The `FpDenormalPreserve` / `FpDenormalFlushToZero` decorations it then attaches to entry points are consumed only by the SPIR-V emitter ([slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) lines 6568 and 6586); nothing in the HLSL emitter reads them, so they leave no marker in emitted HLSL text. |
+| 12 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
+| 13 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/ir-passes/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
+| 14 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/ir-passes/slang-ir-pytorch-cpp-binding.cpp) | (always, HLSL via `default` arm) | |
+| 15 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/ir-passes/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Post-packing pass that fills CPU/CUDA uniform-marshaling fields on the coverage `ArtifactPostEmitMetadata`. No-op for HLSL in practice. |
+| 16 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/ir-passes/slang-ir-lower-l-value-cast.cpp) | `reqSet.lValueCast` (line 1473) | Flag is set by `kIROp_InOutImplicitCast` / `kIROp_OutImplicitCast` (line 653); previously unconditional. |
+| 17 | `specializeMatrixLayout` | [slang-ir-specialize-matrix-layout.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-matrix-layout.cpp) | `reqSet.unresolvedMatrixLayout` (line 1479) | Fills in the default matrix layout where the source left it unspecified; runs before specialization and before `lowerEnumType`, which erases the `MatrixLayoutMode` type it looks for. The flag is set by a `kIROp_MatrixType` whose layout operand is not a literal or is `SLANG_MATRIX_LAYOUT_MODE_UNKNOWN` (line 669). |
+| 18 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` (line 1485) | |
 
 Filtered out for HLSL in this phase: the CUDA / CUDAHeader arm of
 the entry-point-param switch
@@ -331,84 +331,84 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Line 1499; `defaultIRSimplificationOptions`. |
-| 2 | `validateUniformity` | [slang-ir-uniformity.cpp](../../../../source/slang/slang-ir-uniformity.cpp) | `getBoolOption(ValidateUniformity)` (line 1501) | |
-| 3 | `fuseCallsToSaturatedCooperation` | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/slang-ir-fuse-satcoop.cpp) | `!shouldPerformMinimumOptimizations` (line 1511) | |
-| 4 | `checkAutodiffPatterns` | [slang-ir-check-differentiability.cpp](../../../../source/slang/slang-ir-check-differentiability.cpp) | `reqSet.autodiff` (line 1529) | |
-| 5 | `diagnoseCircularConformances` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | Line 1552. |
-| 6 | `specializeModule` | [slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) | `!isSpecializationDisabled()` (line 1556) | |
-| 7 | `validateMutableGlobalVariableTypes` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | Direct call at line 1571, not `SLANG_PASS`; `linkAndOptimizeIR` returns `SLANG_FAIL` when it reports an error. |
-| 8 | `specializeHigherOrderParameters` | [slang-ir-defunctionalization.cpp](../../../../source/slang/slang-ir-defunctionalization.cpp) | `reqSet.higherOrderFunc` (line 1574) | |
-| 9 | `finalizeAutoDiffPass` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1592) | Exactly one of this row and the next always runs. |
-| 10 | `stripAutoDiffDecorations` | [slang-ir-autodiff.cpp](../../../../source/slang/slang-ir-autodiff.cpp) | `!reqSet.autodiff` (the `else` arm at line 1598) | Removes the autodiff-only decorations that would otherwise pin `[__AutoDiffBuiltin]` types alive through DCE. |
-| 11 | `lowerMatrixSwizzleStores` | [slang-ir-lower-matrix-swizzle-store.cpp](../../../../source/slang/slang-ir-lower-matrix-swizzle-store.cpp) | `reqSet.matrixSwizzleStore` (line 1600) | |
-| 12 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | Line 1602. |
-| 13 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../../source/slang/slang-ir-specialize.cpp) | (always) | Line 1604. |
+| 1 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | (always) | Line 1499; `defaultIRSimplificationOptions`. |
+| 2 | `validateUniformity` | [slang-ir-uniformity.cpp](../../../../source/slang/ir-passes/slang-ir-uniformity.cpp) | `getBoolOption(ValidateUniformity)` (line 1501) | |
+| 3 | `fuseCallsToSaturatedCooperation` | [slang-ir-fuse-satcoop.cpp](../../../../source/slang/ir-passes/slang-ir-fuse-satcoop.cpp) | `!shouldPerformMinimumOptimizations` (line 1511) | |
+| 4 | `checkAutodiffPatterns` | [slang-ir-check-differentiability.cpp](../../../../source/slang/ir-passes/slang-ir-check-differentiability.cpp) | `reqSet.autodiff` (line 1529) | |
+| 5 | `diagnoseCircularConformances` | [slang-ir-any-value-inference.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-inference.cpp) | (always) | Line 1552. |
+| 6 | `specializeModule` | [slang-ir-specialize.cpp](../../../../source/slang/ir-passes/slang-ir-specialize.cpp) | `!isSpecializationDisabled()` (line 1556) | |
+| 7 | `validateMutableGlobalVariableTypes` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | (always) | Direct call at line 1571, not `SLANG_PASS`; `linkAndOptimizeIR` returns `SLANG_FAIL` when it reports an error. |
+| 8 | `specializeHigherOrderParameters` | [slang-ir-defunctionalization.cpp](../../../../source/slang/ir-passes/slang-ir-defunctionalization.cpp) | `reqSet.higherOrderFunc` (line 1574) | |
+| 9 | `finalizeAutoDiffPass` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `reqSet.autodiff` (line 1592) | Exactly one of this row and the next always runs. |
+| 10 | `stripAutoDiffDecorations` | [slang-ir-autodiff.cpp](../../../../source/slang/ir-passes/slang-ir-autodiff.cpp) | `!reqSet.autodiff` (the `else` arm at line 1598) | Removes the autodiff-only decorations that would otherwise pin `[__AutoDiffBuiltin]` types alive through DCE. |
+| 11 | `lowerMatrixSwizzleStores` | [slang-ir-lower-matrix-swizzle-store.cpp](../../../../source/slang/ir-passes/slang-ir-lower-matrix-swizzle-store.cpp) | `reqSet.matrixSwizzleStore` (line 1600) | |
+| 12 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | Line 1602. |
+| 13 | `finalizeSpecialization` | [slang-ir-specialize.cpp](../../../../source/slang/ir-passes/slang-ir-specialize.cpp) | (always) | Line 1604. |
 | 14 | `lowerDiffTypeInfoInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 897) | `reqSet.autodiff` (line 1611) | Direct call, not `SLANG_PASS`. Defined locally in `slang-emit.cpp`, not in `slang-ir-autodiff.cpp`. |
-| 15 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../../source/slang/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
-| 16 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
-| 17 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../../source/slang/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
-| 18 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../../source/slang/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
-| 19 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results. |
-| 20 | `legalizeNonVectorCompositeSelect` | [slang-ir-legalize-composite-select.cpp](../../../../source/slang/slang-ir-legalize-composite-select.cpp) | `reqSet.nonVectorCompositeSelect && target == HLSL` (lines 1639, 1643) | **HLSL-only.** Rewrites selects with struct/array results into if/else with a merge parameter; matrix results are skipped. |
-| 21 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | Line 1686. |
-| 22 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | `removeAvailableInDownstreamIR` (line 1688) | |
-| 23 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` (line 1693) | |
-| 24 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
-| 25 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
-| 26 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `shouldRunNonEssentialValidation() && reqSet.missingReturn` | |
-| 27 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
-| 28 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | Line 1719. |
-| 29 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | Line 1728. |
+| 15 | `lowerConditionalType` | [slang-ir-lower-conditional-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-conditional-type.cpp) | `reqSet.conditionalType` | |
+| 16 | `lowerReinterpretOptional` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/ir-passes/slang-ir-lower-reinterpret.cpp) | `reqSet.optionalType` | |
+| 17 | `checkForOptionalNoneUsage` | [slang-ir-check-optional-none-usage.cpp](../../../../source/slang/ir-passes/slang-ir-check-optional-none-usage.cpp) | `shouldRunNonEssentialValidation()` | |
+| 18 | `lowerOptionalType` | [slang-ir-lower-optional-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-optional-type.cpp) | `reqSet.optionalType` | |
+| 19 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Runs **after** `lowerOptionalType`: depends on accurate `getAnyValueSize()` results. |
+| 20 | `legalizeNonVectorCompositeSelect` | [slang-ir-legalize-composite-select.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-composite-select.cpp) | `reqSet.nonVectorCompositeSelect && target == HLSL` (lines 1639, 1643) | **HLSL-only.** Rewrites selects with struct/array results into if/else with a merge parameter; matrix results are skipped. |
+| 21 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../../source/slang/ir-passes/slang-ir-detect-uninitialized-resources.cpp) | (always) | Line 1686. |
+| 22 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/ir-passes/slang-ir-redundancy-removal.cpp) | `removeAvailableInDownstreamIR` (line 1688) | |
+| 23 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/ir-passes/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` (line 1693) | |
+| 24 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/ir-passes/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
+| 25 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/ir-passes/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
+| 26 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/ir-passes/slang-ir-missing-return.cpp) | `shouldRunNonEssentialValidation() && reqSet.missingReturn` | |
+| 27 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/ir-passes/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
+| 28 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-inference.cpp) | (always) | Line 1719. |
+| 29 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/ir-passes/slang-ir-strip-legalization-insts.cpp) | (always) | Line 1728. |
 | 30 | `lowerSumVectorMatrixInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `reqSet.sumVectorMatrix` (line 1737) | Static helper (line 924). Flag set by `kIROp_SumVectorElements` / `kIROp_SumMatrixElements` (line 657). |
-| 31 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (line 1740) | `fastIRSimplificationOptions`. |
-| 32 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization && reqSet.generics` (the `else if` arm at line 1744) | Mutually exclusive with the row above; in minimal-optimization mode with no generics in the module, neither runs. |
-| 33 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.taggedUnion` (line 1757) | When it reports that it lowered something, the caller sets `reqSet.reinterpret = true` (line 1760) so row 35 below fires — the one place a gate flag is written by a pass result rather than by a scan. |
-| 34 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.untaggedUnion` (line 1763) | Newly gated. |
-| 35 | `lowerReinterpret` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.reinterpret` (line 1766) | |
-| 36 | `lowerSequentialIDTagCasts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | Line 1769. |
-| 37 | `lowerTagInsts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagOps` (line 1770) | Newly gated. |
-| 38 | `lowerTagTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagType` (line 1772) | Newly gated. |
-| 39 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | Line 1775. |
-| 40 | `lowerExistentials` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | Line 1777. |
-| 41 | `removeWeakUseInsts` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | (always) | Line 1780. |
-| 42 | `performTypeInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `!isCpuLikeTarget` (true for HLSL; line 1790) | |
-| 43 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | Direct call at line 1804, not `SLANG_PASS`, with `fastIRSimplificationOptions.deadCodeElimOptions`. |
-| 44 | `checkGetStringHashInsts` | [slang-ir-string-hash.cpp](../../../../source/slang/slang-ir-string-hash.cpp) | `!isCpuLikeTarget && shouldRunNonEssentialValidation()` (lines 1806-1807) | |
-| 45 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/slang-ir-lower-tuple-types.cpp) | (always) | Line 1814. |
-| 46 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | (always) | Line 1826. |
-| 47 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` (line 1845) | |
-| - | *(skip)* `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | HLSL is the explicit `case HLSL: break;` arm at line 1855. | DXC handles cooperative vectors directly. |
-| 48 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | Line 1869. |
-| 49 | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 1875) | Minimal-optimization branch (pass call at line 1882); cleans up dead branches revealed by force-inlining before `static_assert` checks. |
-| 50 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `fastIRSimplificationOptions.minimalOptimization` | Minimal-optimization branch (line 1887); paired with the SCCP pass above. |
-| 51 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (the `else` arm at line 1891) | Full simplification when not in minimal-optimization mode. |
-| 52 | `threadSwitchOnConstantPhi` | [slang-ir-thread-switch-on-constant-phi.cpp](../../../../source/slang/slang-ir-thread-switch-on-constant-phi.cpp) | (always) | Line 1900, immediately after the SCCP / `simplifyIR` choice above. |
-| 53 | `validateBarrierFlagsForHLSL` | [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp) | `(target == HLSL \|\| isD3DTarget) && reqSet.barrierFlagValidation` (lines 1915-1916) | **HLSL/D3D only.** Diagnostic-only; `linkAndOptimizeIR` returns `SLANG_FAIL` at line 1920 if it reported an error. |
-| - | *(skip)* `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` (line 1936) is false for HLSL. | HLSL has native types. The `reqSet` conjunct only spares other targets a module walk. |
-| 54 | `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp) | `reqSet.combinedTextureSamplers` (HLSL arm at lines 1941-1953) | |
-| 55 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | `getBoolOption(VulkanEmitReflection)` (line 1957) | Rare for HLSL; only when Vulkan-style reflection is requested. |
-| 56 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | Line 1963. |
-| 57 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/slang-ir-legalize-vector-types.cpp) | (always) | Line 1965. |
-| 58 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | `shouldLegalizeExistentialAndResourceTypes` (default `true`; lines 1974-1976) | |
-| 59 | `legalizeRayTracingPayloads` | [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp) | `shouldLegalizeExistentialAndResourceTypes` (line 1982) | Line 1989. Returns immediately unless the target is D3D or Khronos (line 887), so for HLSL it always does work. Replaces the former `legalizeEmptyRayPayloadsForHLSL`, `legalizeNonStructParameterToStructForHLSL` and `legalizeRayPayloadAccessQualifiersForHLSL` rows. |
-| 60 | `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `reqSet.existentialTypeLayout` (line 2034) | Runs after row 59, which gives empty payloads and non-struct D3D payloads their physical storage before type legalization can erase the logical empty values. |
-| 61 | `validateStructuredBufferResourceTypes` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | Direct call at line 2041, not `SLANG_PASS`. |
-| 62 | `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always) | Line 2055. |
-| 63 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` (line 2078) | Moved here from Phase C. Runs after resource-type legalization, before `fixEntryPointCallsites`. |
-| 64 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | Line 2085. Moved here from Phase C. Separates entry-point launch bodies from ordinary callees before initializers are injected. |
-| 65 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | (always) | Line 2091. Now unconditional; it owns the per-target policy. For HLSL (`isInitializerRequiredByTarget`, lines 99-130 of that file) its policy keeps initializers except for global array-typed and `CoopVector`-typed variables; separately, resource globals selected for per-invocation replacement are always extracted, and `ActualGlobal` storage is never (`shouldExtractInitializer`, lines 133-149). |
-| 66 | `legalizeResourceGlobalVars` | [slang-ir-legalize-resource-globals.cpp](../../../../source/slang/slang-ir-legalize-resource-globals.cpp) | (always) | Line 2099. Replaces the storage of selected mutable file- or namespace-scope `static` resource globals (marked by `IRFileOrNamespaceScopeMutableVarDecoration`) with entry-point locals and generated parameters. |
-| 67 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization` (the `if` arm at line 2132) | `deadCodeEliminationOptions`. |
-| 68 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (the `else` arm at line 2135) | `fastIRSimplificationOptions`. Mutually exclusive with the row above. |
-| 69 | `lowerUntypedResourceHandleToUInt` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.untypedResourceHandle` (line 2143) | Guarantees no untyped `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` handle survives to emit: lowers any that peephole did not already collapse to its underlying `uint` index. |
-| 70 | `lowerDynamicResourceHeap` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.dynamicResourceHeap` (line 2146) | |
-| 71 | `specializeResourceUsage` | [slang-ir-specialize-resources.cpp](../../../../source/slang/slang-ir-specialize-resources.cpp) | (always) | Line 2158. |
-| 72 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always) | Line 2165. |
-| 73 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | Line 2168. |
-| 74 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | Line 2172. |
+| 31 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (line 1740) | `fastIRSimplificationOptions`. |
+| 32 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `minimalOptimization && reqSet.generics` (the `else if` arm at line 1744) | Mutually exclusive with the row above; in minimal-optimization mode with no generics in the module, neither runs. |
+| 33 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.taggedUnion` (line 1757) | When it reports that it lowered something, the caller sets `reqSet.reinterpret = true` (line 1760) so row 35 below fires — the one place a gate flag is written by a pass result rather than by a scan. |
+| 34 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.untaggedUnion` (line 1763) | Newly gated. |
+| 35 | `lowerReinterpret` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/ir-passes/slang-ir-lower-reinterpret.cpp) | `reqSet.reinterpret` (line 1766) | |
+| 36 | `lowerSequentialIDTagCasts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | Line 1769. |
+| 37 | `lowerTagInsts` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagOps` (line 1770) | Newly gated. |
+| 38 | `lowerTagTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | `reqSet.tagType` (line 1772) | Newly gated. |
+| 39 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | Line 1775. |
+| 40 | `lowerExistentials` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | Line 1777. |
+| 41 | `removeWeakUseInsts` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/ir-passes/slang-ir-redundancy-removal.cpp) | (always) | Line 1780. |
+| 42 | `performTypeInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | `!isCpuLikeTarget` (true for HLSL; line 1790) | |
+| 43 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | Direct call at line 1804, not `SLANG_PASS`, with `fastIRSimplificationOptions.deadCodeElimOptions`. |
+| 44 | `checkGetStringHashInsts` | [slang-ir-string-hash.cpp](../../../../source/slang/ir-passes/slang-ir-string-hash.cpp) | `!isCpuLikeTarget && shouldRunNonEssentialValidation()` (lines 1806-1807) | |
+| 45 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/ir-passes/slang-ir-lower-tuple-types.cpp) | (always) | Line 1814. |
+| 46 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/ir-passes/slang-ir-any-value-marshalling.cpp) | (always) | Line 1826. |
+| 47 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` (line 1845) | |
+| - | *(skip)* `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/ir-passes/slang-ir-lower-coopvec.cpp) | HLSL is the explicit `case HLSL: break;` arm at line 1855. | DXC handles cooperative vectors directly. |
+| 48 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | (always) | Line 1869. |
+| 49 | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/ir-passes/slang-ir-sccp.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line 1875) | Minimal-optimization branch (pass call at line 1882); cleans up dead branches revealed by force-inlining before `static_assert` checks. |
+| 50 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `fastIRSimplificationOptions.minimalOptimization` | Minimal-optimization branch (line 1887); paired with the SCCP pass above. |
+| 51 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (the `else` arm at line 1891) | Full simplification when not in minimal-optimization mode. |
+| 52 | `threadSwitchOnConstantPhi` | [slang-ir-thread-switch-on-constant-phi.cpp](../../../../source/slang/ir-passes/slang-ir-thread-switch-on-constant-phi.cpp) | (always) | Line 1900, immediately after the SCCP / `simplifyIR` choice above. |
+| 53 | `validateBarrierFlagsForHLSL` | [slang-ir-hlsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-hlsl-legalize.cpp) | `(target == HLSL \|\| isD3DTarget) && reqSet.barrierFlagValidation` (lines 1915-1916) | **HLSL/D3D only.** Diagnostic-only; `linkAndOptimizeIR` returns `SLANG_FAIL` at line 1920 if it reported an error. |
+| - | *(skip)* `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/ir-passes/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` (line 1936) is false for HLSL. | HLSL has native types. The `reqSet` conjunct only spares other targets a module walk. |
+| 54 | `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/ir-passes/slang-ir-lower-combined-texture-sampler.cpp) | `reqSet.combinedTextureSamplers` (HLSL arm at lines 1941-1953) | |
+| 55 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/ir-passes/slang-ir-user-type-hint.cpp) | `getBoolOption(VulkanEmitReflection)` (line 1957) | Rare for HLSL; only when Vulkan-style reflection is requested. |
+| 56 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-empty-array.cpp) | (always) | Line 1963. |
+| 57 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-vector-types.cpp) | (always) | Line 1965. |
+| 58 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-global-values.cpp) | `shouldLegalizeExistentialAndResourceTypes` (default `true`; lines 1974-1976) | |
+| 59 | `legalizeRayTracingPayloads` | [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp) | `shouldLegalizeExistentialAndResourceTypes` (line 1982) | Line 1989. Returns immediately unless the target is D3D or Khronos (line 887), so for HLSL it always does work. Replaces the former `legalizeEmptyRayPayloadsForHLSL`, `legalizeNonStructParameterToStructForHLSL` and `legalizeRayPayloadAccessQualifiersForHLSL` rows. |
+| 60 | `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | `reqSet.existentialTypeLayout` (line 2034) | Runs after row 59, which gives empty payloads and non-struct D3D payloads their physical storage before type legalization can erase the logical empty values. |
+| 61 | `validateStructuredBufferResourceTypes` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | (always) | Direct call at line 2041, not `SLANG_PASS`. |
+| 62 | `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | (always) | Line 2055. |
+| 63 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/ir-passes/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` (line 2078) | Moved here from Phase C. Runs after resource-type legalization, before `fixEntryPointCallsites`. |
+| 64 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/ir-passes/slang-ir-fix-entrypoint-callsite.cpp) | (always) | Line 2085. Moved here from Phase C. Separates entry-point launch bodies from ordinary callees before initializers are injected. |
+| 65 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/ir-passes/slang-ir-explicit-global-init.cpp) | (always) | Line 2091. Now unconditional; it owns the per-target policy. For HLSL (`isInitializerRequiredByTarget`, lines 99-130 of that file) its policy keeps initializers except for global array-typed and `CoopVector`-typed variables; separately, resource globals selected for per-invocation replacement are always extracted, and `ActualGlobal` storage is never (`shouldExtractInitializer`, lines 133-149). |
+| 66 | `legalizeResourceGlobalVars` | [slang-ir-legalize-resource-globals.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-resource-globals.cpp) | (always) | Line 2099. Replaces the storage of selected mutable file- or namespace-scope `static` resource globals (marked by `IRFileOrNamespaceScopeMutableVarDecoration`) with entry-point locals and generated parameters. |
+| 67 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | `minimalOptimization` (the `if` arm at line 2132) | `deadCodeEliminationOptions`. |
+| 68 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (the `else` arm at line 2135) | `fastIRSimplificationOptions`. Mutually exclusive with the row above. |
+| 69 | `lowerUntypedResourceHandleToUInt` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.untypedResourceHandle` (line 2143) | Guarantees no untyped `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` handle survives to emit: lowers any that peephole did not already collapse to its underlying `uint` index. |
+| 70 | `lowerDynamicResourceHeap` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/ir-passes/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.dynamicResourceHeap` (line 2146) | |
+| 71 | `specializeResourceUsage` | [slang-ir-specialize-resources.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-resources.cpp) | (always) | Line 2158. |
+| 72 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-buffer-load-arg.cpp) | (always) | Line 2165. |
+| 73 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/ir-passes/slang-ir-defer-buffer-load.cpp) | (always) | Line 2168. |
+| 74 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/ir-passes/slang-ir-specialize-arrays.cpp) | (always) | Line 2172. |
 | 75 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct call (not `SLANG_PASS`) at line 2178; defined at line 700. Processes `static_assert` after specialization. |
-| 76 | `wrapStructuredBuffersOfMatrices` | [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/slang-ir-wrap-structured-buffers.cpp) | `case HLSL` (lines 2180-2182; pass call at line 2191) | **HLSL-only.** Wraps structured buffers whose element type is a matrix so that the `#pragma pack_matrix` directive applies. |
+| 76 | `wrapStructuredBuffersOfMatrices` | [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/ir-passes/slang-ir-wrap-structured-buffers.cpp) | `case HLSL` (lines 2180-2182; pass call at line 2191) | **HLSL-only.** Wraps structured buffers whose element type is a matrix so that the `#pragma pack_matrix` directive applies. |
 
 Filtered out for HLSL in this phase: the CUDA-derivative-wrapper
 arm; PyTorch / CUDA passes; CPP/HostCPP arms
@@ -520,41 +520,41 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` (line 2205) | Pass call at line 2321. HLSL options: defaults except `useBitCastFromUInt = true` if `profile.getFamily() == DX && profile.getVersion() <= DX_5_0` (fxc/early DXC), set in the `case CodeGenTarget::HLSL` arm of the second options switch at lines 2294-2315. The flag is set by any `IRByteAddressBufferTypeBase` type or `kIROp_ByteAddressBufferLoad` / `Store` (lines 446 and 576). |
-| 2 | `validateAtomicOperations` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2342) | Called with `skipFuncParamValidation = true`. |
-| 3 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` (line 2382) | |
-| 4 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (line 2460) | `NonUniformResourceIndexFloatMode::Textual` for the `NonUniformResourceIndex(...)` HLSL intrinsic: the marker is kept as a call in the emitted text rather than lowered away, so a user-written `textures[NonUniformResourceIndex(idx)].Sample(samp, uv)` reaches DXC with the wrapper intact. No stage restricts the idiom — `NonUniformResourceIndex` is declared `[require(glsl_hlsl_spirv, nonuniformqualifier)]` and `[require(cpp_cuda_metal_wgsl)]` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (lines 15057-15059) and the pass gate is only `!isSPIRV(target)`. |
-| 5 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | `isD3DTarget \|\| isKhronosTarget \|\| isWGPUTarget \|\| isMetalTarget` (lines 2465-2467; HLSL qualifies as `isD3DTarget`) | DXC short-circuit-evaluates `&&` and `\|\|` on scalars only. |
-| 6 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | Line 2542. |
-| 7 | `validateVectorsAndMatrices` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | Line 2571. |
-| 8 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | (always) | Line 2581. |
-| 9 | `processLateRequireCapabilityInsts` | [slang-ir-late-require-capability.cpp](../../../../source/slang/slang-ir-late-require-capability.cpp) | `reqSet.lateRequireCapability` (line 2592) | Flag set by `kIROp_LateRequireCapability` (line 660); previously unconditional. |
-| 10 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/slang-ir-cleanup-void.cpp) | (always) | Line 2595. |
-| 11 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` (line 2609) | |
-| 12 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` (line 2617) | |
-| 13 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` (line 2623) | |
-| 14 | `legalizeUniformBufferLoad` | [slang-ir-legalize-uniform-buffer-load.cpp](../../../../source/slang/slang-ir-legalize-uniform-buffer-load.cpp) | `isKhronosTarget \|\| target == HLSL` (line 2626) | Call at line 2628. |
-| 15 | `invertYOfPositionOutput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `(isKhronosTarget \|\| HLSL) && VulkanInvertY` (lines 2626, 2629) | Rare for HLSL; for cross-API porting workflows. |
-| 16 | `rcpWOfPositionInput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `(isKhronosTarget \|\| HLSL) && VulkanUseDxPositionW` (lines 2626, 2631) | |
-| 17 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always) | Line 2648; `loweringPolicyKind = Default` — HLSL falls through the WGPU / Khronos / Metal chain at lines 2636-2646 to the `else`. |
-| 18 | `legalizeMatrixTypes` | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/slang-ir-legalize-matrix-types.cpp) | (always) | Line 2674; moved here from Phase B so that it runs after row 17, which needs the matrix-major-ness information the pass discards. A no-op for HLSL, which is not a matrix-legalizing target (lines 22-40 and 757-758 of that file). |
-| 19 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (line 2690; true for HLSL) | DXC disallows array return values. |
-| 20 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | Line 2729. |
-| 21 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | Line 2736. |
-| 22 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (line 2738) | With `removeTrivialSingleIterationLoops = true`. |
-| 23 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always) | Line 2754. This is HLSL's only `legalizeEmptyTypes` invocation; the two earlier calls in Phase B are Metal-only and CPU/CUDA-only. |
-| 24 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/slang-ir-cleanup-void.cpp) | (always) | Line 2760, second invocation. |
-| 25 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` (line 2771) | Call at line 2784. Inserts `IRLiveRangeStart` markers immediately before `eliminatePhis` so the explicit temporaries it introduces inherit live-range start positions. |
-| 26 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | Line 2794. **Default options.** The `PhiEliminationOptions` overrides at lines 2789-2793 apply only when `isKhronosTarget && emitSpirvDirectly`, and they assign the same two values as the defaults (`eliminateCompositeTypedPhiOnly = false`, `useRegisterAllocation = true`), so HLSL and the direct-SPIR-V path run the same configuration. |
-| 27 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Call at line 2800. Inserts `IRLiveRangeEnd` markers after phi elimination, paired with the range-start markers added in row 25. |
-| 28 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Line 2839. |
-| 29 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2914) | Line 2922. |
-| 30 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps` implies `cooperative_matrix` or `cooperative_vector` (call at line 2936) | HLSL exposes cooperative matrices via DXR / DXC extensions. |
+| 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` (line 2205) | Pass call at line 2321. HLSL options: defaults except `useBitCastFromUInt = true` if `profile.getFamily() == DX && profile.getVersion() <= DX_5_0` (fxc/early DXC), set in the `case CodeGenTarget::HLSL` arm of the second options switch at lines 2294-2315. The flag is set by any `IRByteAddressBufferTypeBase` type or `kIROp_ByteAddressBufferLoad` / `Store` (lines 446 and 576). |
+| 2 | `validateAtomicOperations` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2342) | Called with `skipFuncParamValidation = true`. |
+| 3 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/ir-passes/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` (line 2382) | |
+| 4 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/ir-passes/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (line 2460) | `NonUniformResourceIndexFloatMode::Textual` for the `NonUniformResourceIndex(...)` HLSL intrinsic: the marker is kept as a call in the emitted text rather than lowered away, so a user-written `textures[NonUniformResourceIndex(idx)].Sample(samp, uv)` reaches DXC with the wrapper intact. No stage restricts the idiom — `NonUniformResourceIndex` is declared `[require(glsl_hlsl_spirv, nonuniformqualifier)]` and `[require(cpp_cuda_metal_wgsl)]` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (lines 15057-15059) and the pass gate is only `!isSPIRV(target)`. |
+| 5 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-binary-operator.cpp) | `isD3DTarget \|\| isKhronosTarget \|\| isWGPUTarget \|\| isMetalTarget` (lines 2465-2467; HLSL qualifies as `isD3DTarget`) | DXC short-circuit-evaluates `&&` and `\|\|` on scalars only. |
+| 6 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/ir-passes/slang-ir-strip-legalization-insts.cpp) | (always) | Line 2542. |
+| 7 | `validateVectorsAndMatrices` | [slang-ir-validate.cpp](../../../../source/slang/ir/slang-ir-validate.cpp) | (always) | Line 2571. |
+| 8 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/ir-passes/slang-ir-dce.cpp) | (always) | Line 2581. |
+| 9 | `processLateRequireCapabilityInsts` | [slang-ir-late-require-capability.cpp](../../../../source/slang/ir-passes/slang-ir-late-require-capability.cpp) | `reqSet.lateRequireCapability` (line 2592) | Flag set by `kIROp_LateRequireCapability` (line 660); previously unconditional. |
+| 10 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/ir-passes/slang-ir-cleanup-void.cpp) | (always) | Line 2595. |
+| 11 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/ir-passes/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` (line 2609) | |
+| 12 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` (line 2617) | |
+| 13 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/ir-passes/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` (line 2623) | |
+| 14 | `legalizeUniformBufferLoad` | [slang-ir-legalize-uniform-buffer-load.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-uniform-buffer-load.cpp) | `isKhronosTarget \|\| target == HLSL` (line 2626) | Call at line 2628. |
+| 15 | `invertYOfPositionOutput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/ir-passes/slang-ir-vk-invert-y.cpp) | `(isKhronosTarget \|\| HLSL) && VulkanInvertY` (lines 2626, 2629) | Rare for HLSL; for cross-API porting workflows. |
+| 16 | `rcpWOfPositionInput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/ir-passes/slang-ir-vk-invert-y.cpp) | `(isKhronosTarget \|\| HLSL) && VulkanUseDxPositionW` (lines 2626, 2631) | |
+| 17 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp) | (always) | Line 2648; `loweringPolicyKind = Default` — HLSL falls through the WGPU / Khronos / Metal chain at lines 2636-2646 to the `else`. |
+| 18 | `legalizeMatrixTypes` | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-matrix-types.cpp) | (always) | Line 2674; moved here from Phase B so that it runs after row 17, which needs the matrix-major-ness information the pass discards. A no-op for HLSL, which is not a matrix-legalizing target (lines 22-40 and 757-758 of that file). |
+| 19 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (line 2690; true for HLSL) | DXC disallows array return values. |
+| 20 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/ir-passes/slang-ir-inline.cpp) | (always) | Line 2729. |
+| 21 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/ir-passes/slang-ir-eliminate-multilevel-break.cpp) | (always) | Line 2736. |
+| 22 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` (line 2738) | With `removeTrivialSingleIterationLoops = true`. |
+| 23 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/ir-passes/slang-ir-legalize-types.cpp) | (always) | Line 2754. This is HLSL's only `legalizeEmptyTypes` invocation; the two earlier calls in Phase B are Metal-only and CPU/CUDA-only. |
+| 24 | `cleanUpVoidType` | [slang-ir-cleanup-void.cpp](../../../../source/slang/ir-passes/slang-ir-cleanup-void.cpp) | (always) | Line 2760, second invocation. |
+| 25 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` (line 2771) | Call at line 2784. Inserts `IRLiveRangeStart` markers immediately before `eliminatePhis` so the explicit temporaries it introduces inherit live-range start positions. |
+| 26 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.cpp) | (always) | Line 2794. **Default options.** The `PhiEliminationOptions` overrides at lines 2789-2793 apply only when `isKhronosTarget && emitSpirvDirectly`, and they assign the same two values as the defaults (`eliminateCompositeTypedPhiOnly = false`, `useRegisterAllocation = true`), so HLSL and the direct-SPIR-V path run the same configuration. |
+| 27 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/ir-passes/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Call at line 2800. Inserts `IRLiveRangeEnd` markers after phi elimination, paired with the range-start markers added in row 25. |
+| 28 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | (always) | Line 2839. |
+| 29 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/ir-passes/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (line 2914) | Line 2922. |
+| 30 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/ir-passes/slang-ir-metadata.cpp) | `targetCaps` implies `cooperative_matrix` or `cooperative_vector` (call at line 2936) | HLSL exposes cooperative matrices via DXR / DXC extensions. |
 | 31 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` (line 2940) | |
-| 32 | `getOrCreateLayout` | [slang-target-program.h](../../../../source/slang/slang-target-program.h) (defined in [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)) | `target != PyTorchCppBinding && targetCaps` imply `descriptor_handle` (call at line 2951) | Ensures the program layout exists before `collectMetadata` reads it; fires for HLSL when the target capabilities imply `descriptor_handle`. Returns `SLANG_FAIL` if layout creation fails. |
-| 33 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Line 2955. Takes `targetProgram` as its first argument, so it can consult the program layout when emitting descriptor-handle metadata. |
-| 34 | `checkUnsupportedResourceLocals` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | (always) | Line 2959. |
-| 35 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` (line 2960) | Last pass in `linkAndOptimizeIR`. |
+| 32 | `getOrCreateLayout` | [slang-target-program.h](../../../../source/slang/slang-target-program.h) (defined in [slang-parameter-binding.cpp](../../../../source/slang/layout-and-binding/slang-parameter-binding.cpp)) | `target != PyTorchCppBinding && targetCaps` imply `descriptor_handle` (call at line 2951) | Ensures the program layout exists before `collectMetadata` reads it; fires for HLSL when the target capabilities imply `descriptor_handle`. Returns `SLANG_FAIL` if layout creation fails. |
+| 33 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/ir-passes/slang-ir-metadata.cpp) | (always) | Line 2955. Takes `targetProgram` as its first argument, so it can consult the program layout when emitting descriptor-handle metadata. |
+| 34 | `checkUnsupportedResourceLocals` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/ir-passes/slang-ir-check-unsupported-inst.cpp) | (always) | Line 2959. |
+| 35 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/ir-passes/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` (line 2960) | Last pass in `linkAndOptimizeIR`. |
 
 Filtered out for HLSL in this phase: `synthesizeActiveMask` (CUDA
 only); `resolveTextureFormat` (GLSL / SPIR-V / WGSL only);
@@ -568,7 +568,7 @@ only); `resolveTextureFormat` (GLSL / SPIR-V / WGSL only);
 `legalizeConstantBufferLoadForGLSL` and
 `legalizeDispatchMeshPayloadForGLSL` (GLSL/SPIR-V only);
 `legalizeBoolSwitchForTargetsRequiringIntSwitch`
-([slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp),
+([slang-ir-glsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-glsl-legalize.cpp),
 called at line 2413 for GLSL/SPIR-V and line 2451 for WGSL) — those
 targets require an integer `switch` selector, whereas HLSL accepts a
 `switch` on a `bool` directly, so no rewrite is needed;
@@ -645,11 +645,11 @@ flowchart TD
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Line 2968. |
-| 2 | `new HLSLSourceEmitter` | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) | `case SourceLanguage::HLSL` (line 3055) | Constructed at line 3058. |
-| 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) | (always) | Line 3092. |
+| 2 | `new HLSLSourceEmitter` | [slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp) | `case SourceLanguage::HLSL` (line 3055) | Constructed at line 3058. |
+| 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp) | (always) | Line 3092. |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Line 3112. Runs Phases A-C. |
-| 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Line 3117. |
-| 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ HLSL overrides in `slang-emit-hlsl.cpp`) | (always) | Line 3126. Walks IR and writes HLSL text; the named-constant spellings it writes come from `slang-emit-hlsl-prelude.cpp`. |
+| 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/ir-passes/slang-ir-ssa-simplification.cpp) | (always) | Line 3117. |
+| 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp) (+ HLSL overrides in `slang-emit-hlsl.cpp`) | (always) | Line 3126. Walks IR and writes HLSL text; the named-constant spellings it writes come from `slang-emit-hlsl-prelude.cpp`. |
 | 7 | `createArtifactForCompileTarget` | [slang-artifact-util.cpp](../../../../source/compiler-core/slang-artifact-util.cpp) | (always) | Defined at line 45; called at line 3197 of `emitEntryPointsSourceFromIR`; wraps the HLSL text as an `IArtifact`. (`createArtifactFromIR` is the SPIR-V-direct helper and is not on the HLSL path.) |
 | 8 | `_emitEntryPoints` (intermediate recursion) | [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) | `target == DXILAssembly \|\| target == DXBytecodeAssembly` | Lines 1103-1116: runs first, as the outer call, re-entering `_emitEntryPoints` on the binary intermediate (`DXIL` / `DXBytecode`). |
 | 9 | `compile` (DXC) | (downstream) | `target == DXIL` (line 1176) | Reached via `emitWithDownstreamForEntryPoints` (dispatched at line 1181), which first generates HLSL through a nested context (rows 1-7, line 538) after `_getDefaultSourceForTarget` maps the target to `CodeGenTarget::HLSL`. DXC is the default for SM 6.0+; output is DXIL bytecode. |
@@ -672,7 +672,7 @@ order at lines 3160-3190 of
 matter, then the language prelude, then `emitPreModule`, then the
 module code. So every HLSL artifact opens with whatever
 `HLSLSourceEmitter::emitFrontMatterImpl`
-([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+([slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp)
 line 2534) wrote:
 
 - A `#pragma pack_matrix(...)` directive, always, whose argument
@@ -695,13 +695,13 @@ translation unit, `findMacroValue` looks up `NV_SHADER_EXTN_SLOT` and
 attaches an `NVAPISlotModifier` to the `ModuleDecl`
 ([slang-compile-request.h](../../../../source/slang/slang-compile-request.h)
 lines 315-366), which lowering turns into the `IRNVAPISlotDecoration`
-([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+([slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 lines 15562-15564). So the user-level surface is a `#define NV_SHADER_EXTN_SLOT u3`
 in the shader, or the equivalent `-D` on the command line — not an
 attribute. `IRNVAPIMagicDecoration` is narrower still and has no
 spelling at all: the checker attaches `NVAPIMagicModifier` to exactly
 one thing, a module-scope variable *named* `g_NvidiaExt`
-([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+([slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp)
 lines 3135-3137), which is how a user-supplied NVAPI header's own declaration
 is recognised so the prelude's version can take its place.
 
@@ -749,7 +749,7 @@ and the emitter reconstructs the spelling. Three instances of that
 pattern are worth knowing when reading emitter output:
 
 - **Entry-point attributes.** `emitEntryPointAttributesImpl`
-  ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+  ([slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp)
   line 428) writes `[shader("<stageName>")]` for DX profiles at
   shader model 6.1 or newer, and unconditionally for the `node`
   stage (line 437) — a node entry point always needs the attribute
@@ -762,7 +762,7 @@ pattern are worth knowing when reading emitter output:
   `IRNodeMaxDispatchGridDecoration`, where the operands genuinely
   are integers.
 - **Work-graph record types.** `emitWorkGraphRecordType`
-  ([slang-emit-hlsl-prelude.cpp](../../../../source/slang/slang-emit-hlsl-prelude.cpp)
+  ([slang-emit-hlsl-prelude.cpp](../../../../source/slang/emission/slang-emit-hlsl-prelude.cpp)
   line 539) emits the HLSL type name followed by an optional
   `<ElementType>` argument. The opcode → name table is
   `getWorkGraphRecordTypeName` (line 509) and covers ten record
@@ -775,16 +775,16 @@ pattern are worth knowing when reading emitter output:
   is an internal error (`SLANG_UNEXPECTED`) rather than a silent
   fallback. The dispatch into this helper is the record-type arm of
   `emitSimpleTypeImpl` at
-  [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+  [slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp)
   lines 1868-1880.
 - **Barrier flag sets.** `tryEmitInstExprImpl`
-  ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+  ([slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp)
   line 1133) handles `kIROp_GetEnumBarrierMemoryTypeFlags` and
   `kIROp_GetEnumBarrierSemanticFlags` (lines 1176-1195) by reading
   the constant behind the operand with `getBarrierFlagValueInst`
   and delegating to `emitNamedMemoryTypeFlagSet` /
   `emitNamedSemanticFlagSet`
-  ([slang-emit-hlsl-prelude.cpp](../../../../source/slang/slang-emit-hlsl-prelude.cpp)
+  ([slang-emit-hlsl-prelude.cpp](../../../../source/slang/emission/slang-emit-hlsl-prelude.cpp)
   lines 553 and 586). Those write the all-bits shorthand
   (`ALL_MEMORY`, `REORDER`) when the value matches it exactly, and
   otherwise a `|`-joined list of per-bit names from
@@ -808,7 +808,7 @@ pattern are worth knowing when reading emitter output:
 The helpers `getBarrierFlagValueInst` and
 `isValidBarrierMemoryTypeFlags` that both the validation pass and
 the emitter share live in
-[slang-ir-util-hlsl.cpp](../../../../source/slang/slang-ir-util-hlsl.cpp).
+[slang-ir-util-hlsl.cpp](../../../../source/slang/ir-passes/slang-ir-util-hlsl.cpp).
 The `node` stage itself — the `node` capability atom and the
 `Node` profile stage that make these attributes reachable — is
 described in
@@ -901,8 +901,8 @@ honored.
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
 | `profile.getFamily() == ProfileFamily::DX && profile.getVersion() <= ProfileVersion::DX_5_0` | `case CodeGenTarget::HLSL` arm of the second `legalizeByteAddressBufferOps` options switch (lines 2294-2315) | Sets `useBitCastFromUInt = true` for fxc / early-DXC profiles, since they lack templated `.Load<T>` on byte-address buffers. |
-| `profile.getFamily() == ProfileFamily::DX && profile.getVersion() >= ProfileVersion::DX_6_7` | `requiresPayloadAccessQualifiers` in [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp) (lines 76-84), consulted at the end of `legalizeRayTracingPayloads` (line 928) | Selects the default payload access-qualifier fill. Shader model 6.7 requires every member of a `[raypayload]` struct to carry both a `read(...)` and a `write(...)` qualifier. |
-| `profile.getVersion() >= ProfileVersion::DX_6_1 \|\| stage == Stage::Node` | `emitEntryPointAttributesImpl` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) line 437) | Selects whether `[shader("<stage>")]` is emitted at all. A `node` entry point always gets it, independent of the declared profile version. The `node` disjunct is defensive rather than reachable: the public `node` stage atom is `_node + _sm_6_8`, so a capability-checked node compile is already at shader model 6.8 and the version test decides first. Do not go looking for a sub-6.1 node compile. |
+| `profile.getFamily() == ProfileFamily::DX && profile.getVersion() >= ProfileVersion::DX_6_7` | `requiresPayloadAccessQualifiers` in [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp) (lines 76-84), consulted at the end of `legalizeRayTracingPayloads` (line 928) | Selects the default payload access-qualifier fill. Shader model 6.7 requires every member of a `[raypayload]` struct to carry both a `read(...)` and a `write(...)` qualifier. |
+| `profile.getVersion() >= ProfileVersion::DX_6_1 \|\| stage == Stage::Node` | `emitEntryPointAttributesImpl` ([slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp) line 437) | Selects whether `[shader("<stage>")]` is emitted at all. A `node` entry point always gets it, independent of the declared profile version. The `node` disjunct is defensive rather than reachable: the public `node` stage atom is `_node + _sm_6_8`, so a capability-checked node compile is already at shader model 6.8 and the version test decides first. Do not go looking for a sub-6.1 node compile. |
 
 ### Context predicates and capability gates
 
@@ -918,7 +918,7 @@ honored.
 
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
-| `isD3DTarget(targetRequest)` | Lines 1915 and 2465 of `slang-emit.cpp`; also inside `legalizeRayTracingPayloads` (lines 79, 202, 666, 700, 806 and 887 of [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp)) | Gates `validateBarrierFlagsForHLSL`, `legalizeLogicalAndOr`, and the D3D arms of `legalizeRayTracingPayloads` (native-call adaptation, parameter wrapping, the `raypayload` decoration on the dummy struct, and the qualifier fill). |
+| `isD3DTarget(targetRequest)` | Lines 1915 and 2465 of `slang-emit.cpp`; also inside `legalizeRayTracingPayloads` (lines 79, 202, 666, 700, 806 and 887 of [slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp)) | Gates `validateBarrierFlagsForHLSL`, `legalizeLogicalAndOr`, and the D3D arms of `legalizeRayTracingPayloads` (native-call adaptation, parameter wrapping, the `raypayload` decoration on the dummy struct, and the qualifier fill). |
 | `target == CodeGenTarget::HLSL` | Lines 1643, 1855, 1915, 1936, 1947, 2182, 2296 and 2626 | Gates `legalizeNonVectorCompositeSelect`, the skip of `lowerCooperativeVectors`, `validateBarrierFlagsForHLSL`, the skip of `lowerAppendConsumeStructuredBuffers`, `lowerCombinedTextureSamplers`, `wrapStructuredBuffersOfMatrices`, the byte-address-buffer `useBitCastFromUInt` decision, and `legalizeUniformBufferLoad`. |
 
 ## Loops in the pipeline
@@ -975,7 +975,7 @@ module contains a `kIROp_GetEnumBarrierMemoryTypeFlags` or
 neighbours in Phase B it does not transform the IR: it checks each
 barrier flag operand against `isValidBarrierMemoryTypeFlags` /
 `isValidBarrierSemanticFlags` from
-[slang-ir-util-hlsl.cpp](../../../../source/slang/slang-ir-util-hlsl.cpp)
+[slang-ir-util-hlsl.cpp](../../../../source/slang/ir-passes/slang-ir-util-hlsl.cpp)
 and reports a diagnostic for a set that has no HLSL named-constant
 spelling: **E31117** (`invalid 'BarrierMemoryTypeFlags' value`) for
 the memory-type arm and **E31116**
@@ -997,7 +997,7 @@ Phase B row 59, called at line 1989 of `slang-emit.cpp` inside the
 `shouldLegalizeExistentialAndResourceTypes` block, before
 `legalizeExistentialTypeLayout` and `legalizeResourceTypes`. The
 implementation is `legalizeRayTracingPayloads` (line 884) in
-[slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp),
+[slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp),
 which is not among this page's watched paths. It returns
 immediately unless the target is D3D or Khronos (line 887); for
 HLSL it takes the D3D arm. An empty logical payload may vanish
@@ -1102,7 +1102,7 @@ The wrapping applies in three places.
 
 Historical name; the behaviour is now the final step of
 `legalizeRayTracingPayloads` (lines 928-937 of
-[slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/slang-ir-ray-tracing-legalize.cpp)),
+[slang-ir-ray-tracing-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-ray-tracing-legalize.cpp)),
 gated on `requiresPayloadAccessQualifiers` (lines 76-84): the target
 must be a D3D target and the effective profile must be in the DX
 family at shader model 6.7 or newer. The profile is resolved with
@@ -1146,7 +1146,7 @@ so the `#pragma` applies correctly.
 The wrapper struct is synthesized without a name hint, so it picks
 up the emitter's fallback name for an unnamed instruction — `_S`
 followed by the instruction id
-([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+([slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
 lines 1290-1292). That is what a reader should look for:
 `RWStructuredBuffer<float4x4> outBuf;` reaches the emitted HLSL as a
 `struct _S<N> { float4x4 _S<M>; };` declaration followed by
@@ -1160,7 +1160,7 @@ a different pass. A matrix reached through a *buffer* element type
 is rewritten by `lowerBufferElementTypeToStorageType` (Phase C row
 17) into a storage struct with a single `data` field, whose name is
 built at
-[slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp)
+[slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp)
 lines 2915-2924 as
 `_MatrixStorage_<element><R>x<C>[_ColMajor][_logical]<layoutRule>`,
 carrying the emitter's uniquing suffix like any other name hint. On
@@ -1190,7 +1190,7 @@ load, which HLSL has no direct syntax for.
 The rewrite *is* visible in the emitted text. `kIROp_MakeStruct` is
 folded only when `isInnerGlobalAggregate` holds and otherwise gets
 `FoldPolicy::Never`
-([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+([slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
 lines 1580-1592), so the function-local recombined struct cannot be
 folded into its use; it materialises as a local declaration whose
 initializer is the brace-list written at lines 3058-3075, named by the same `_S<N>`
@@ -1243,13 +1243,13 @@ the array with `emitMakeArray` (lines 291-337).
 
 What lands in the HLSL text is decided later, in
 `tryEmitInstExprImpl`
-([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+([slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp)
 lines 1262-1289), and the operand shape is what selects the form:
 
 - A scalar `bool` `And` / `Or` takes the `as<IRBasicType>` early
   return and falls through to the shared C-like path, which writes
   the infix `&&` / `||`
-  ([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+  ([slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
   lines 2729-2741). There is no portable Slang spelling that reaches
   this arm: a scalar `a && b` is lowered to short-circuit control flow
   long before emit, so `bool r = a && b;` comes out as an `if` / `else`
@@ -1300,7 +1300,7 @@ operands pushed back onto the worklist.
 The first two repairs share an insertion point,
 `entryBlock->getFirstOrdinaryInst()` (line 116), and an `IRVar` is
 on the emitter's never-fold list
-([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+([slang-emit-c-like.cpp](../../../../source/slang/emission/slang-emit-c-like.cpp)
 lines 1513-1522), so both surface in the emitted HLSL the same way:
 a local declaration lifted to the top of the function body, ahead
 of the loop that computes the value, with the loop body assigning

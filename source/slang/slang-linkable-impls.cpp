@@ -1,8 +1,8 @@
 // slang-linkable-impls.cpp
 #include "slang-linkable-impls.h"
 
-#include "slang-lower-to-ir.h" // for `generateIRForTypeConformance`
 #include "slang-mangle.h"
+#include "slang/lower-to-ir/slang-lower-to-ir.h" // for `generateIRForTypeConformance`
 
 namespace Slang
 {

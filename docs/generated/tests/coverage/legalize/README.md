@@ -12,8 +12,8 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 ## Intent
 
 White-box characterization tests for the entry-point / varying-parameter
-legalizers: `source/slang/slang-ir-glsl-legalize.cpp` and
-`source/slang/slang-ir-legalize-varying-params.cpp`. They pin the **current
+legalizers: `source/slang/ir-passes/slang-ir-glsl-legalize.cpp` and
+`source/slang/ir-passes/slang-ir-legalize-varying-params.cpp`. They pin the **current
 observed legalization** of CLI-reachable entry-point parameter shapes, not a
 spec.
 

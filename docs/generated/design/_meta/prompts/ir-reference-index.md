@@ -38,7 +38,7 @@ Audience: a developer who just opened
 
    Counts are approximate: count `struct_name = "..."` entries plus
    bare opcode entries that fall into the family in
-   [../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua).
+   [../../../../source/slang/ir/slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua).
    Round to the nearest ten and prefix with `~`.
 
 5. `## How AST nodes lower to IR` — three or four sentences pointing

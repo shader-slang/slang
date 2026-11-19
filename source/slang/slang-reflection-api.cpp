@@ -2,14 +2,14 @@
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
-#include "slang-check-impl.h"
-#include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-deprecated.h"
-#include "slang-lookup.h"
-#include "slang-syntax.h"
-#include "slang-type-layout.h"
 #include "slang.h"
+#include "slang/ast/slang-syntax.h"
+#include "slang/layout-and-binding/slang-type-layout.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/semantic-checking/slang-check.h"
+#include "slang/semantic-checking/slang-lookup.h"
 
 
 // Don't signal errors for stuff we don't implement here,

@@ -7,11 +7,11 @@ reference family contract**.
 
 Produce `docs/generated/design/ast-reference/types.md` — the per-node
 reference for the `Type` family declared in
-[slang-ast-type.h](../../../../source/slang/slang-ast-type.h).
+[slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h).
 
 `Type` is internally a subhierarchy of `Val` (see
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h) and
-[slang-ast-val.h](../../../../source/slang/slang-ast-val.h)). The
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h) and
+[slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h)). The
 `## Family hierarchy` section must make this relationship explicit:
 `NodeBase -> Val -> Type -> <concrete types>`.
 

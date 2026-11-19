@@ -24,12 +24,12 @@ The page uses the `## Algorithm` heading.
 The `## Concepts` section must cover, at minimum:
 
 - The four lookup entry points in
-  [slang-lookup.h](../../../../source/slang/slang-lookup.h): `lookUp`,
+  [slang-lookup.h](../../../../source/slang/semantic-checking/slang-lookup.h): `lookUp`,
   `lookUpMember`, `lookUpDirectAndTransparentMembers`, and
   `refineLookup` (or whatever the four actual entry points are at
   `source_commit`).
 - `LookupRequest` — declared in
-  [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h).
+  [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h).
 - `LookupResult` — the multi-item container in
   `slang-ast-support-types.h`.
 - `LookupResultItem` — the single result, including its `declRef`.
@@ -81,7 +81,7 @@ Cover `lookUpMember(Type*, Name*)`. Explain:
 ### Transparent members
 
 Explain the `TransparentModifier` (declared in
-[slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h)) and
+[slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h)) and
 `ContainerDecl::getTransparentDirectMemberDecls`. Use the typical
 example pattern — a field tagged transparent injects its own members
 into the parent. Cite the call site in `slang-lookup.cpp` that drives
@@ -105,7 +105,7 @@ Cover, in this order:
 
 1. **Block-local shadowing.** The
    `Decl::hiddenFromLookup` flag (cite its declaration in
-   [slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) toggled
+   [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)) toggled
    on entry to a `BlockStmt` and cleared as the checker walks past
    each `DeclStmt`. The `ConsiderAllLocalNamesInScope` option overrides
    this for keyword-shadowing detection.
@@ -153,7 +153,7 @@ The `## Edge cases and failure modes` section must cover:
 
 - [ ] Every named `LookupMask`, `LookupOptions`, and `Breadcrumb::Kind`
       value is present in
-      [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
+      [slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h)
       at `source_commit`.
 - [ ] Every algorithm step cites the controlling function in
       `slang-lookup.cpp`.
