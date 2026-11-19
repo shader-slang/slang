@@ -1,4 +1,47 @@
 #
+# Embed the shared longPathAware application manifest into a target, so that
+# the Windows LongPathsEnabled registry opt-in takes effect for the built
+# executable.
+#
+# On Windows 10 (1607) and later the per-machine LongPathsEnabled registry
+# opt-in only takes effect for an executable that declares longPathAware in
+# its application manifest. Without that declaration our tools still fail to
+# open or write files whose full paths exceed MAX_PATH, even on machines
+# where long paths are enabled. CMake embeds .manifest source files into
+# binaries built with the MSVC toolchain (both the VS and the Ninja
+# generators), so listing the shared manifest as a source is all it takes.
+#
+# slang_add_target calls this for every executable it creates. An executable
+# in the main slang build that is declared with a raw add_executable does not
+# go through that path, so it must call this helper itself to opt in
+# (standalone sub-project targets such as spvdb have no SlangTarget.cmake and
+# sit outside this convention). This is for executable targets only — CMake
+# silently ignores a .manifest source on a library, so a misuse would look
+# like success, and the helper rejects non-executable targets at configure
+# time instead. The helper attaches the one fixed shared manifest; it does
+# not take a caller-supplied manifest. Non-MSVC Windows toolchains (e.g.
+# MinGW) embed no manifest here; no in-tree preset or CI leg builds Windows
+# that way, and a windres-based story would be needed if one ever does.
+#
+function(slang_add_windows_manifest target)
+    get_target_property(target_type ${target} TYPE)
+    if(NOT target_type STREQUAL "EXECUTABLE")
+        message(
+            SEND_ERROR
+            "slang_add_windows_manifest: '${target}' is a ${target_type}, but the longPathAware manifest is only meaningful on an executable target"
+        )
+        return()
+    endif()
+
+    if(WIN32 AND MSVC)
+        target_sources(
+            ${target}
+            PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/slang-app.manifest
+        )
+    endif()
+endfunction()
+
+#
 # A function to make target specification a little more declarative
 #
 # See the comments on the options below for usage
@@ -179,6 +222,13 @@ function(slang_add_target dir type)
                 INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
                 INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
         )
+    endif()
+
+    #
+    # Embed a longPathAware application manifest into Windows executables.
+    #
+    if(type STREQUAL "EXECUTABLE")
+        slang_add_windows_manifest(${target})
     endif()
 
     #
