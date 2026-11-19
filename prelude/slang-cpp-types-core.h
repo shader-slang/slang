@@ -626,7 +626,7 @@ struct Matrix
         Matrix<T, R, C> result;                                 \
         for (int i = 0; i < R; i++)                             \
             for (int j = 0; j < C; j++)                         \
-                result[i].rows[i][j] = op thisVal.rows[i][j];   \
+                result.rows[i][j] = op thisVal.rows[i][j];      \
         return result;                                          \
     }
 
@@ -661,6 +661,7 @@ struct Matrix
     SLANG_MATRIX_BINARY_COMPARE_OP(T, <=) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, ==) \
     SLANG_MATRIX_BINARY_COMPARE_OP(T, !=)
+SLANG_INT_MATRIX_OPS(bool)
 SLANG_INT_MATRIX_OPS(int)
 SLANG_INT_MATRIX_OPS(int8_t)
 SLANG_INT_MATRIX_OPS(int16_t)
