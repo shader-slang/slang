@@ -3,14 +3,23 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -DNO_ATOMICS=1
-//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -validate-ir -DNO_ATOMICS=1
+//TEST:SIMPLE(filecheck=WGSL-SPIRV): -target wgsl-spirv-asm -entry computeMain -stage compute -validate-ir -DNO_ATOMICS=1
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute -validate-ir
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -wgpu -compute -output-using-type -xslang -DNO_ATOMICS=1
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=ATOMIC-RESULT): -metal -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=ATOMIC-RESULT): -vk -compute -output-using-type
 
 // Unsized buffers retain native resources where the target provides them. On CUDA and CPU,
 // the four fields use prelude structs that each contain a data pointer without a count.
+//TEST_INPUT:ubuffer(data=[10], stride=4):name=inputValues
 __UnsizedStructuredBuffer<uint> inputValues;
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputValues
 __UnsizedRWStructuredBuffer<uint> outputValues;
+//TEST_INPUT:ubuffer(data=[0 100 200], stride=4):name=inputBytes
 __UnsizedByteAddressBuffer inputBytes;
+//TEST_INPUT:ubuffer(data=[7 0 0], stride=4):out,name=outputBytes
 __UnsizedRWByteAddressBuffer outputBytes;
 
 void addOne(inout uint value)
@@ -63,8 +72,27 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // GLSL: buffer
 // GLSL: atomicAdd
 
-// WGSL: var<storage
+// WGSL-DAG: @binding(0) @group(0) var<storage, read> inputValues{{[_0-9]*}} : array<u32>;
+// WGSL-DAG: @binding(1) @group(0) var<storage, read_write> outputValues{{[_0-9]*}} : array<u32>;
+// WGSL-DAG: @binding(2) @group(0) var<storage, read> inputBytes{{[_0-9]*}} : array<u32>;
+// WGSL-DAG: @binding(3) @group(0) var<storage, read_write> outputBytes{{[_0-9]*}} : array<u32>;
 // WGSL: fn computeMain
+// WGSL: inputBytes{{[_0-9]*}}[({{.*}})/4]
+// WGSL: outputValues{{[_0-9]*}}[{{.*}}] = inputValues{{[_0-9]*}}[
+// WGSL: outputBytes{{[_0-9]*}}[({{.*}})/4] = outputValues{{[_0-9]*}}[
+// WGSL-SPIRV: OpEntryPoint GLCompute
 
-// METAL: device
+// METAL-DAG: const uint device* inputValues{{[_0-9]*}}
+// METAL-DAG: uint device* outputValues{{[_0-9]*}}
+// METAL-DAG: const uint32_t device* inputBytes{{[_0-9]*}}
+// METAL-DAG: uint32_t device* outputBytes{{[_0-9]*}}
+// METAL: void computeMain
+// METAL: inputBytes{{[_0-9]*}}[({{.*}})>>2]
 // METAL: atomic_fetch_add_explicit
+// METAL: outputBytes{{[_0-9]*}}[({{.*}})>>2] =
+// METALLIB: define void @computeMain
+// RESULT: 128
+// RESULT: 7
+// RESULT: 121
+// RESULT: 200
+// ATOMIC-RESULT: 336

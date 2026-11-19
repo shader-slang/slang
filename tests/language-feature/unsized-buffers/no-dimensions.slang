@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target metal
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl
 //TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target cuda
 
 void invalidQueries(

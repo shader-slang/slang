@@ -2,6 +2,8 @@
 //TEST(compute,64-bit):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -output-using-type
 //TEST(compute,64-bit):COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -compute -output-using-type
 
+// This test exercises the CPU/CUDA/LLVM prelude ABI with buffers embedded as raw addresses.
+// Metal/WGSL use native resource bindings instead, covered by operations.slang.
 // Supply a parameter payload containing buffer addresses directly. The pointer uniforms
 // use the test runner's ordinary-data binding path; the RHI resource-binding path currently
 // assumes that every raw buffer also has a count. The payload has no room for such counts:

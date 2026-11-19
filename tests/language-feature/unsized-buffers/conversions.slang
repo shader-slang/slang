@@ -3,12 +3,16 @@
 //TEST:SIMPLE(filecheck=COMPILE): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=COMPILE): -target wgsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=COMPILE): -target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -validate-ir -O0
+//TEST:SIMPLE(filecheck=SPIRV): -target wgsl-spirv-asm -entry computeMain -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -validate-ir -O0
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute -validate-ir
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -cpu -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -cuda -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -llvm -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RESULT): -vk -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -wgpu -compute -output-using-type
+//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=RESULT): -metal -compute -output-using-type
 
 // Public names remain aliases for the sized types. Conversion discards the count only on
 // pointer targets and preserves the same resource on native buffer targets.
@@ -64,6 +68,23 @@ void computeMain()
 // CPP: computeMain
 // SPIRV: OpEntryPoint GLCompute
 // GLSL: void main()
+
+// Native targets preserve the resources, access rights, and byte addressing through conversion.
+// WGSL-DAG: @binding(0) @group(0) var<storage, read> inputValues{{[_0-9]*}} : array<u32>;
+// WGSL-DAG: @binding(1) @group(0) var<storage, read_write> outputValues{{[_0-9]*}} : array<u32>;
+// WGSL-DAG: @binding(2) @group(0) var<storage, read> inputBytes{{[_0-9]*}} : array<u32>;
+// WGSL-DAG: @binding(3) @group(0) var<storage, read_write> outputBytes{{[_0-9]*}} : array<u32>;
+// WGSL: inputValues{{[_0-9]*}}[{{.*}}] + inputBytes{{[_0-9]*}}[({{.*}})/4]
+// WGSL: outputBytes{{[_0-9]*}}[({{.*}})/4] =
+// WGSL: outputValues{{[_0-9]*}}[{{.*}}] = outputBytes{{[_0-9]*}}[({{.*}})/4]
+// WGSL: fn computeMain()
+// METAL: void update{{[_0-9]*}}(const uint device* readValues{{[_0-9]*}}, uint device* writeValues{{[_0-9]*}}, const uint32_t device* readBytes{{[_0-9]*}}, uint32_t device* writeBytes{{[_0-9]*}}, uint index{{[_0-9]*}})
+// METAL: readValues{{[_0-9]*}}[{{.*}}] + as_type<uint>(readBytes{{[_0-9]*}}[({{.*}})>>2])
+// METAL: writeBytes{{[_0-9]*}}[({{.*}})>>2] =
+// METAL: *(writeValues{{[_0-9]*}}+{{.*}}) = as_type<uint>(writeBytes{{[_0-9]*}}[({{.*}})>>2])
+// METAL: void computeMain(const uint device* inputValues{{[_0-9]*}} {{\[\[}}buffer(0){{\]\]}}, uint device* outputValues{{[_0-9]*}} {{\[\[}}buffer(1){{\]\]}}, const uint32_t device* inputBytes{{[_0-9]*}} {{\[\[}}buffer(2){{\]\]}}, uint32_t device* outputBytes{{[_0-9]*}} {{\[\[}}buffer(3){{\]\]}})
+// METALLIB: define void @computeMain
+
 // RESULT: 225
 // RESULT: 445
 // RESULT: 114

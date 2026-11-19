@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target metal
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2): -target wgsl
 
 // Conversion cannot reconstruct a missing count or grant write access to a read-only resource.
 void invalidConversions(

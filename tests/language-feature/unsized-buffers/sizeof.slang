@@ -4,6 +4,9 @@
 //TEST(compute,64-bit):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -output-using-type
 //TEST(compute,64-bit):COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -compute -output-using-type
 
+// __sizeOf and __alignOf are available only on CPU/CUDA/LLVM. This test checks
+// their pointer-only prelude ABI; native Metal/WGSL resource bindings have no such query.
+
 struct PointerBuffers
 {
     __UnsizedStructuredBuffer<uint> values;
