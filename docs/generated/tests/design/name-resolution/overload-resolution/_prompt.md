@@ -127,9 +127,9 @@ Secondary (allowed citations; use sparingly):
 
 ## Source files you may consult for verification only
 
-- `source/slang/slang-check-overload.cpp`
-- `source/slang/slang-check-impl.h`
-- `source/slang/slang-check-conversion.cpp`
+- `source/slang/semantic-checking/slang-check-overload.cpp`
+- `source/slang/semantic-checking/slang-check-impl.h`
+- `source/slang/semantic-checking/slang-check-conversion.cpp`
 - `source/slang/slang-diagnostics.lua`
 
 ## Test directives

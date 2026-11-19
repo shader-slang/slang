@@ -20,11 +20,11 @@
 #include "slang-compiler-fwd.h"
 #include "slang-diagnostics.h"
 #include "slang-module.h"
-#include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-session.h"
 #include "slang-translation-unit.h"
+#include "slang/preprocessor/slang-preprocessor.h"
 
 namespace Slang
 {

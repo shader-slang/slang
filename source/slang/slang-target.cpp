@@ -4,7 +4,7 @@
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
-#include "slang-type-layout.h"
+#include "slang/layout-and-binding/slang-type-layout.h"
 
 namespace Slang
 {

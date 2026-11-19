@@ -80,14 +80,14 @@ diagnostic message text). You may **not** mine them for behavioral
 claims that the doc does not make.
 
 - `source/slang/slang-check.cpp`
-- `source/slang/slang-check-decl.cpp`
-- `source/slang/slang-check-expr.cpp`
-- `source/slang/slang-check-stmt.cpp`
-- `source/slang/slang-check-type.cpp`
-- `source/slang/slang-check-overload.cpp`
-- `source/slang/slang-check-conversion.cpp`
-- `source/slang/slang-check-inheritance.cpp`
-- `source/slang/slang-check-modifier.cpp`
+- `source/slang/semantic-checking/slang-check-decl.cpp`
+- `source/slang/semantic-checking/slang-check-expr.cpp`
+- `source/slang/semantic-checking/slang-check-stmt.cpp`
+- `source/slang/semantic-checking/slang-check-type.cpp`
+- `source/slang/semantic-checking/slang-check-overload.cpp`
+- `source/slang/semantic-checking/slang-check-conversion.cpp`
+- `source/slang/semantic-checking/slang-check-inheritance.cpp`
+- `source/slang/semantic-checking/slang-check-modifier.cpp`
 - `source/slang/slang-diagnostics.lua` (for diagnostic codes and
   message text)
 

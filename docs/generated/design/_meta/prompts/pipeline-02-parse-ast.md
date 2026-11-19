@@ -16,7 +16,7 @@ debugging a parse error.
 2. `## Inputs and outputs` — token array in, AST root out.
 3. `## Parser`:
    - File pointer
-     ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp)).
+     ([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp)).
    - Recursive-descent design, with a note that arbitrary lookahead is
      possible because tokens are pre-collected.
    - The two-stage parsing strategy (decl scan, then deferred body
@@ -30,7 +30,7 @@ debugging a parse error.
    - The hierarchy rooted at the classes declared in the
      `slang-ast-*.h` watched paths. Identify the top-level base
      (`NodeBase` or equivalent — verify in
-     [slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) and
+     [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h)) and
      the major child families (Decl, Expr, Stmt, Type, Modifier, Val).
    - The role of `ASTBuilder` (allocation, hash-consing of types).
    - Note that AST nodes use C++ RTTI / `as<>()` casting and that node
@@ -41,7 +41,7 @@ debugging a parse error.
    the disambiguation strategy. Link to the deeper treatment in
    [../../design/parsing.md](../../design/parsing.md).
 6. `## Modifier parsing` — how modifiers attach to declarations
-   ([slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h)).
+   ([slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h)).
 7. `## Failure modes` — error-recovery strategy and how parse errors
    become diagnostics
    (link [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)).

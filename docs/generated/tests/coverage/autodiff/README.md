@@ -10,7 +10,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 # Tests for coverage/autodiff
 
 White-box characterization tests targeting under-exercised branches in the
-automatic-differentiation IR passes: `source/slang/slang-ir-autodiff-fwd.cpp`
+automatic-differentiation IR passes: `source/slang/ir-passes/slang-ir-autodiff-fwd.cpp`
 (~35% covered, forward-mode transcription), `slang-ir-autodiff-transpose.cpp`
 (~25%, reverse-mode transpose), and `slang-ir-autodiff-primal-hoist.cpp` (~44%,
 primal checkpointing / loop-state hoisting). These pin the compiler's _current
@@ -47,15 +47,15 @@ locally-validating vehicle.
 
 | Test                                                                                     | What it pins                                                                                                                                           | covers=                                         |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| [`fwd-square-emits-fwd-derivative-fn.slang`](fwd-square-emits-fwd-derivative-fn.slang)   | `__fwd_diff` over `x*x` emits forward-derivative fn `s_fwd_f_0` and a `DiffPair_float_0` struct with `primal_0`/`differential_0` fields (HLSL + CUDA). | source/slang/slang-ir-autodiff-fwd.cpp          |
-| [`fwd-ifelse-branch-derivative.slang`](fwd-ifelse-branch-derivative.slang)               | `__fwd_diff` over an if/else propagates the tangent through the taken branch: primal 8, tangent 12 at x=2 for `x*x*x`.                                 | source/slang/slang-ir-autodiff-fwd.cpp          |
-| [`fwd-vector-dot-tangent.slang`](fwd-vector-dot-tangent.slang)                           | `__fwd_diff` over `dot(v,v)` with a float3 tangent yields primal 14, directional derivative 12.                                                        | source/slang/slang-ir-autodiff-fwd.cpp          |
-| [`bwd-square-emits-bwd-prop-fn.slang`](bwd-square-emits-bwd-prop-fn.slang)               | `__bwd_diff` over `x*x` emits backward-propagation fn `s_bwdProp_f_0` and callable-context struct `s_bwdCallableCtx_f_0` (HLSL).                       | source/slang/slang-ir-autodiff-transpose.cpp    |
-| [`bwd-ifelse-branch-grad.slang`](bwd-ifelse-branch-grad.slang)                           | `__bwd_diff` over an if/else reverses the taken branch: gradient 12 at x=2 for `x*x*x` with seed 1.0.                                                  | source/slang/slang-ir-autodiff-transpose.cpp    |
-| [`bwd-nested-call-grad.slang`](bwd-nested-call-grad.slang)                               | `__bwd_diff` differentiates through a nested call `g(x)+x` (g=x\*x): chain-rule gradient 7 at x=3.                                                     | source/slang/slang-ir-autodiff-transpose.cpp    |
-| [`bwd-struct-field-grads.slang`](bwd-struct-field-grads.slang)                           | `__bwd_diff` over an `IDifferentiable` struct `f(s)=s.a*s.b` accumulates per-field gradients (a=5, b=2) into the struct Differential.                  | source/slang/slang-ir-autodiff-transpose.cpp    |
-| [`bwd-for-loop-maxiters-grad.slang`](bwd-for-loop-maxiters-grad.slang)                   | `__bwd_diff` over a `[MaxIters(3)]` accumulating loop hoists loop-carried primal state and yields gradient 12 (6x at x=2).                             | source/slang/slang-ir-autodiff-primal-hoist.cpp |
-| [`bwd-loop-emits-reverse-prop-context.slang`](bwd-loop-emits-reverse-prop-context.slang) | `__bwd_diff` over a bounded loop emits `s_bwdProp_poly_0`, context struct `s_bwdCallableCtx_poly_0`, and a re-emitted reverse loop (`for(;;)`) (HLSL). | source/slang/slang-ir-autodiff-primal-hoist.cpp |
+| [`fwd-square-emits-fwd-derivative-fn.slang`](fwd-square-emits-fwd-derivative-fn.slang)   | `__fwd_diff` over `x*x` emits forward-derivative fn `s_fwd_f_0` and a `DiffPair_float_0` struct with `primal_0`/`differential_0` fields (HLSL + CUDA). | source/slang/ir-passes/slang-ir-autodiff-fwd.cpp          |
+| [`fwd-ifelse-branch-derivative.slang`](fwd-ifelse-branch-derivative.slang)               | `__fwd_diff` over an if/else propagates the tangent through the taken branch: primal 8, tangent 12 at x=2 for `x*x*x`.                                 | source/slang/ir-passes/slang-ir-autodiff-fwd.cpp          |
+| [`fwd-vector-dot-tangent.slang`](fwd-vector-dot-tangent.slang)                           | `__fwd_diff` over `dot(v,v)` with a float3 tangent yields primal 14, directional derivative 12.                                                        | source/slang/ir-passes/slang-ir-autodiff-fwd.cpp          |
+| [`bwd-square-emits-bwd-prop-fn.slang`](bwd-square-emits-bwd-prop-fn.slang)               | `__bwd_diff` over `x*x` emits backward-propagation fn `s_bwdProp_f_0` and callable-context struct `s_bwdCallableCtx_f_0` (HLSL).                       | source/slang/ir-passes/slang-ir-autodiff-transpose.cpp    |
+| [`bwd-ifelse-branch-grad.slang`](bwd-ifelse-branch-grad.slang)                           | `__bwd_diff` over an if/else reverses the taken branch: gradient 12 at x=2 for `x*x*x` with seed 1.0.                                                  | source/slang/ir-passes/slang-ir-autodiff-transpose.cpp    |
+| [`bwd-nested-call-grad.slang`](bwd-nested-call-grad.slang)                               | `__bwd_diff` differentiates through a nested call `g(x)+x` (g=x\*x): chain-rule gradient 7 at x=3.                                                     | source/slang/ir-passes/slang-ir-autodiff-transpose.cpp    |
+| [`bwd-struct-field-grads.slang`](bwd-struct-field-grads.slang)                           | `__bwd_diff` over an `IDifferentiable` struct `f(s)=s.a*s.b` accumulates per-field gradients (a=5, b=2) into the struct Differential.                  | source/slang/ir-passes/slang-ir-autodiff-transpose.cpp    |
+| [`bwd-for-loop-maxiters-grad.slang`](bwd-for-loop-maxiters-grad.slang)                   | `__bwd_diff` over a `[MaxIters(3)]` accumulating loop hoists loop-carried primal state and yields gradient 12 (6x at x=2).                             | source/slang/ir-passes/slang-ir-autodiff-primal-hoist.cpp |
+| [`bwd-loop-emits-reverse-prop-context.slang`](bwd-loop-emits-reverse-prop-context.slang) | `__bwd_diff` over a bounded loop emits `s_bwdProp_poly_0`, context struct `s_bwdCallableCtx_poly_0`, and a re-emitted reverse loop (`for(;;)`) (HLSL). | source/slang/ir-passes/slang-ir-autodiff-primal-hoist.cpp |
 
 ## Unreachable gaps
 

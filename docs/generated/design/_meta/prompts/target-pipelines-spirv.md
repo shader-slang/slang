@@ -54,9 +54,9 @@ Four phases, each its own diagram + ordered table:
   `linkAndOptimizeIR`'s caller-side wrapping, then
   `createArtifactFromIR` (line ~2910) which invokes
   `emitSPIRVFromIR` (line ~11104 of
-  [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp))
+  [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp))
   including `legalizeIRForSPIRV` (line 2935 of
-  [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp))
+  [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp))
   with `simplifyIRForSpirvLegalization` (the iterative loop), the
   forward-declared-pointer fixup loop, and the conditional
   spirv-link / spirv-val downstream chain.
@@ -124,11 +124,11 @@ Cover exactly two loops:
   (bound 8) plus inner `while (funcChanged && funcIterationCount <
   kMaxFuncIterations)` (bound 16) in
   `simplifyIRForSpirvLegalization` (line 2709 of
-  [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp)).
+  [slang-ir-spirv-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-spirv-legalize.cpp)).
 - The `do { ... } while
   (m_forwardDeclaredPointers.getCount() != 0)` loop in
   `emitSPIRVFromIR` (around line 11265 of
-  [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)).
+  [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp)).
 
 Note explicitly that no other loops execute IR passes for SPIR-V.
 

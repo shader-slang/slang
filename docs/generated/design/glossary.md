@@ -45,7 +45,7 @@ explicitly.
 **abstract syntax tree** `[General]`
 : A tree representation of the syntactic structure of source code,
   produced by the parser. In Slang, AST nodes derive from `NodeBase`
-  declared in [slang-ast-base.h](../../../source/slang/slang-ast-base.h)
+  declared in [slang-ast-base.h](../../../source/slang/ast/slang-ast-base.h)
   and split into the `Decl`, `Expr`, `Stmt`, `Type`, and `Modifier`
   families.
 
@@ -54,7 +54,7 @@ explicitly.
 
 **ASTBuilder** `[Slang]`
 : The allocator and hash-consing helper used to construct AST nodes,
-  declared in [slang-ast-builder.h](../../../source/slang/slang-ast-builder.h).
+  declared in [slang-ast-builder.h](../../../source/slang/ast/slang-ast-builder.h).
   It owns the arena that AST nodes live in for the lifetime of a
   compile and deduplicates structural values such as types.
 
@@ -96,7 +96,7 @@ explicitly.
 : An `unsigned int` score used by overload resolution to compare
   candidates' implicit-conversion chains. Each named conversion has a
   `kConversionCost_*` level in
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h);
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h);
   overload checking sums the per-argument costs into
   `conversionCostSum` in `slang-check-overload.cpp`, while
   `getImplicitConversionCostWithKnownArg` only adjusts the cost of one
@@ -127,7 +127,7 @@ explicitly.
 **dead-code elimination** `[General]`
 : A transformation that removes instructions whose results are never
   used, and unreachable blocks. Implemented in
-  [slang-ir-dce.cpp](../../../source/slang/slang-ir-dce.cpp) and run
+  [slang-ir-dce.cpp](../../../source/slang/ir-passes/slang-ir-dce.cpp) and run
   multiple times during `linkAndOptimizeIR`.
 
   See: [pipeline/05-ir-passes.md](pipeline/05-ir-passes.md)
@@ -137,7 +137,7 @@ explicitly.
 : A reference to a declaration together with the generic specialization
   needed to refer to it in a specific context. The underlying node is
   `DeclRefBase`, a `Val` declared in
-  [slang-ast-base.h](../../../source/slang/slang-ast-base.h); most
+  [slang-ast-base.h](../../../source/slang/ast/slang-ast-base.h); most
   checker code handles the typed `DeclRef<T>` wrapper instead. The type system carries decl-refs rather than bare declarations so that
   generic instantiation is uniform with ordinary name lookup. Decl-refs
   are produced by name resolution (see
@@ -149,7 +149,7 @@ explicitly.
 : The monotonically increasing ladder of how much semantic checking has
   been applied to one declaration, declared as an `enum class ... :
   uint8_t` at
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h)
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h)
   line 478. In order the rungs are `Unchecked`,
   `ReadyForParserLookup`, `ModifiersChecked`, `ScopesWired`,
   `SignatureChecked`, `ReadyForReference`, `ReadyForLookup`,
@@ -166,7 +166,7 @@ explicitly.
 **decoration** `[Slang]`
 : A non-essential annotation attached to another IR instruction, encoded
   as a child instruction whose opcode is in the `Decoration` family of
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua). The
+  [slang-ir-insts.lua](../../../source/slang/ir/slang-ir-insts.lua). The
   C++ wrapper structs conventionally end in `Decoration`, but the
   opcode names do not uniformly do so — `branch`, `loopControl`, and
   `public` are all in the family. Decorations carry information such
@@ -265,7 +265,7 @@ explicitly.
 **fossil format** `[Slang]`
 : The memory-mappable binary serialization format used for compiled
   modules, defined in
-  [slang-fossil.h](../../../source/slang/slang-fossil.h). A pointer
+  [slang-fossil.h](../../../source/slang/serialization/slang-fossil.h). A pointer
   inside fossilized data is a `FossilizedPtr`, a 32-bit offset relative
   to the pointer's own address, so a fossilized object graph is
   traversable directly once the file is mapped, with **no**
@@ -273,14 +273,14 @@ explicitly.
   chunk contains, so the two formats nest rather than compete. The IR
   payload carries its own `serializationVersion`, checked against
   `kSupportedSerializationVersion` (2 at `source_commit`) in
-  [slang-serialize-ir.cpp](../../../source/slang/slang-serialize-ir.cpp).
+  [slang-serialize-ir.cpp](../../../source/slang/serialization/slang-serialize-ir.cpp).
 
   See: [cross-cutting/serialization.md](cross-cutting/serialization.md)
 
 **hoistable instruction** `[Slang]`
 : An IR instruction whose value depends only on its operands, marked
   `hoistable = true` in
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua). Such
+  [slang-ir-insts.lua](../../../source/slang/ir/slang-ir-insts.lua). Such
   instructions are deduplicated and hoisted as far toward the module
   scope of an `IRModule` as their operands allow — module scope when
   nothing constrains them, otherwise the innermost parent that defines
@@ -305,7 +305,7 @@ explicitly.
 **intermediate representation** `[General]`
 : A compiler's internal program form between the source AST and the
   emitted target code. Slang has a custom SSA-style IR (not LLVM)
-  defined in [slang-ir.h](../../../source/slang/slang-ir.h); essentially
+  defined in [slang-ir.h](../../../source/slang/ir/slang-ir.h); essentially
   all optimization and legalization happens at this level.
 
   See: [pipeline/04-ast-to-ir.md](pipeline/04-ast-to-ir.md)
@@ -314,7 +314,7 @@ explicitly.
 **IRBuilder** `[Slang]`
 : The API used to construct IR instructions during AST-to-IR lowering
   and during IR transformations, declared in
-  [slang-ir.h](../../../source/slang/slang-ir.h). It owns an insertion
+  [slang-ir.h](../../../source/slang/ir/slang-ir.h). It owns an insertion
   point and hoists hoistable instructions as far toward module scope as
   operand and result-type visibility permits: `addHoistableInst` starts
   at the module and merges in the parent of each operand and of the
@@ -327,7 +327,7 @@ explicitly.
 : A non-essential annotation attached to an IR instruction —
   things like name hints, layout, binding indices, target intrinsics, or
   loop hints. Decoration opcodes live in the `Decoration` family of
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua), with wrapper structs conventionally named `*Decoration`, and are
+  [slang-ir-insts.lua](../../../source/slang/ir/slang-ir-insts.lua), with wrapper structs conventionally named `*Decoration`, and are
   preserved through optimization unless explicitly dropped. Synonym:
   `decoration`. The full per-opcode catalog is in
   [ir-reference/decorations.md](ir-reference/decorations.md).
@@ -347,7 +347,7 @@ explicitly.
 
 **IRInst** `[Slang]`
 : The base class for every IR node, declared in
-  [slang-ir.h](../../../source/slang/slang-ir.h). An `IRInst` carries an
+  [slang-ir.h](../../../source/slang/ir/slang-ir.h). An `IRInst` carries an
   opcode (`kIROp_*`), a type, a list of operand uses, optional
   decorations, and an intrusive position in a parent (function, block,
   or module). The complete opcode catalog grouped by family lives in
@@ -362,7 +362,7 @@ explicitly.
   the unit of linking and serialization. Its module version
   (`m_version`) must fall in the inclusive range
   `k_minSupportedModuleVersion`..`k_maxSupportedModuleVersion` declared
-  in [slang-ir.h](../../../source/slang/slang-ir.h), which is 37..37 at
+  in [slang-ir.h](../../../source/slang/ir/slang-ir.h), which is 37..37 at
   `source_commit`. The `module` opcode and the
   other module-structure opcodes are tabulated in
   [ir-reference/structure.md](ir-reference/structure.md).
@@ -374,9 +374,9 @@ explicitly.
 : The integer enum tag identifying every IR instruction opcode (e.g.
   `kIROp_Add`, `kIROp_StructType`, `kIROp_NameHintDecoration`).
   The `enum IROp : int32_t` is declared in
-  [slang-ir-insts-enum.h](../../../source/slang/slang-ir-insts-enum.h),
+  [slang-ir-insts-enum.h](../../../source/slang/ir/slang-ir-insts-enum.h),
   but none of its enumerators are written by hand: the build expands
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) into
+  [slang-ir-insts.lua](../../../source/slang/ir/slang-ir-insts.lua) into
   `slang-ir-insts-enum.h.fiddle` under `build/source/slang/fiddle/`,
   which that header includes. The opcode is stored in `IRInst::m_op`
   and read via `IRInst::getOp()`; downstream casts (`as<IRFoo>()`,
@@ -390,14 +390,14 @@ explicitly.
 **layout IR module** `[Slang]`
 : A per-target IR module produced by
   `TargetProgram::createIRModuleForLayout` in
-  [slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp)
+  [slang-lower-to-ir.cpp](../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
   whose only contents are `IRLayoutDecoration`s on stub
   `IRGlobalVar` and entry-point `IRFunc` instances for one
   specific target's layout rules. The layout IR module is a
   sibling of the executable per-translation-unit IR module: it
   is cached on `TargetProgram::m_irModuleForLayout`, is never itself
   the module that `linkAndOptimizeIR` optimizes — `linkIR` in
-  [slang-ir-link.cpp](../../../source/slang/slang-ir-link.cpp) adds it to
+  [slang-ir-link.cpp](../../../source/slang/ir-passes/slang-ir-link.cpp) adds it to
   its input module list so layouts can be attached to the linked
   program — and carries no function bodies for user-defined functions.
   Entry-point stubs also receive an
@@ -451,7 +451,7 @@ explicitly.
   super-type witness was applied), `ThisExpr` (a member of an enclosing
   type is reached through an implicit `this` expression), `ThisType` (a
   member of an enclosing type is reached through its `This` type). Declared in
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h).
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h).
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)
 
@@ -460,9 +460,9 @@ explicitly.
   are `type`, `Function`, `Value`, `Attribute`, `SyntaxDecl`,
   `Semantic`; the `Default` combination is the one used by the parser
   and most checker entry points. Declared as `LookupMask` in
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h);
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h);
   applied by `DeclPassesLookupMask` in
-  [slang-lookup.cpp](../../../source/slang/slang-lookup.cpp).
+  [slang-lookup.cpp](../../../source/slang/semantic-checking/slang-lookup.cpp).
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)
 
@@ -471,7 +471,7 @@ explicitly.
   flags include `IgnoreBaseInterfaces`, `Completion`, `NoDeref`,
   `ConsiderAllLocalNamesInScope`, `IgnoreInheritance`,
   `IgnoreTransparentMembers`. Declared as `LookupOptions` in
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h).
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h).
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)
 
@@ -480,16 +480,16 @@ explicitly.
   multiple `LookupResultItem` entries, each carrying a decl-ref and a
   breadcrumb chain describing how it was reached. `LookupResult` is
   defined in
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h);
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h);
   it is produced by the entry points in
-  [slang-lookup.h](../../../source/slang/slang-lookup.h).
+  [slang-lookup.h](../../../source/slang/semantic-checking/slang-lookup.h).
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)
 
 **lower-to-IR** `[Slang]`
 : The pipeline stage that walks a type-checked AST and emits Slang IR,
   driven by `generateIRForTranslationUnit` in
-  [slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp).
+  [slang-lower-to-ir.cpp](../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp).
   It runs once per `TranslationUnitRequest` and produces the per-module
   IR that the pre-link mandatory passes then process.
 
@@ -507,7 +507,7 @@ explicitly.
   `irOperands`, so the type's identity is purely an IR opcode with no C++
   subclass behind it.
   Both modifiers are declared in
-  [slang-ast-modifier.h](../../../source/slang/slang-ast-modifier.h)
+  [slang-ast-modifier.h](../../../source/slang/ast/slang-ast-modifier.h)
   (lines 647 and 671); a declaration may carry both.
 
   See: [cross-cutting/core-module.md](cross-cutting/core-module.md),
@@ -516,7 +516,7 @@ explicitly.
 **mandatory optimization pass** `[Slang]`
 : An IR pass belonging to the target-independent pre-link
   mandatory-processing region of `generateIRForTranslationUnit` (in
-  [slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp)),
+  [slang-lower-to-ir.cpp](../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)),
   which runs on every per-translation-unit IR module before the module
   is cached on `Module::m_irModule` and pulled into `linkAndOptimizeIR`
   by `linkIR`. Its unconditional core is the Phase B lowering passes
@@ -547,7 +547,7 @@ explicitly.
 : The transformation that replaces a generic function with one
   specialized copy per concrete type argument set, eliminating runtime
   type parameters. Slang's specialization pass in
-  [slang-ir-specialize.cpp](../../../source/slang/slang-ir-specialize.cpp)
+  [slang-ir-specialize.cpp](../../../source/slang/ir-passes/slang-ir-specialize.cpp)
   and the `Specialize` IR opcode drive this.
 
   See: [pipeline/05-ir-passes.md](pipeline/05-ir-passes.md)
@@ -568,7 +568,7 @@ explicitly.
 **no producer at HEAD** `[Slang]`
 : The phrase the IR-reference pages put in an opcode's AST-origin column
   when the opcode is declared in
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) —
+  [slang-ir-insts.lua](../../../source/slang/ir/slang-ir-insts.lua) —
   sometimes with an `IRBuilder` helper, a wrapper struct, a stable name,
   and even a consumer in a backend emitter — but nothing anywhere in the
   tree constructs it at `source_commit`. It is a verified finding about
@@ -589,9 +589,9 @@ explicitly.
   by ranking them on parameter compatibility, conversion cost, and
   generic specificity. Slang's implementation builds `OverloadCandidate`
   records and filters them through a multi-stage pipeline in
-  [slang-check-overload.cpp](../../../source/slang/slang-check-overload.cpp).
+  [slang-check-overload.cpp](../../../source/slang/semantic-checking/slang-check-overload.cpp).
   A fast path, `convertToBuiltinArithmeticOp` in
-  [slang-check-expr.cpp](../../../source/slang/slang-check-expr.cpp),
+  [slang-check-expr.cpp](../../../source/slang/semantic-checking/slang-check-expr.cpp),
   rewrites supported builtin operators on scalar, vector, and matrix
   operands to a `BuiltinOperatorExpr` carrying the resolved
   `BuiltinOperationKind`; unsupported cases, including matrix operands
@@ -605,7 +605,7 @@ explicitly.
 **parent instruction** `[Slang]`
 : An IR instruction that owns a list of child instructions, marked
   `parent = true` in
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua). Examples:
+  [slang-ir-insts.lua](../../../source/slang/ir/slang-ir-insts.lua). Examples:
   `module` (children: hoistable values, global vars, functions),
   `func` (children: blocks), `block` (children: parameters and
   ordinary instructions), `StructType` / `ClassType` /
@@ -621,7 +621,7 @@ explicitly.
 **parser** `[General]`
 : The compiler stage that consumes tokens and produces an AST. Slang's
   parser is a recursive-descent parser in
-  [slang-parser.cpp](../../../source/slang/slang-parser.cpp) extended by
+  [slang-parser.cpp](../../../source/slang/parser/slang-parser.cpp) extended by
   the syntax-decl mechanism.
 
   See: [pipeline/02-parse-ast.md](pipeline/02-parse-ast.md)
@@ -631,7 +631,7 @@ explicitly.
 : A still-generic intermediate that overload resolution produces when
   it picks a `GenericDecl` whose type arguments are not all known yet.
   Represented by `PartiallyAppliedGenericExpr` in
-  [slang-ast-expr.h](../../../source/slang/slang-ast-expr.h); the
+  [slang-ast-expr.h](../../../source/slang/ast/slang-ast-expr.h); the
   remaining type parameters are deduced when the partial value is
   invoked or used in a context that supplies them.
 
@@ -639,7 +639,7 @@ explicitly.
 
 **prelink** `[Slang]`
 : The early, target-independent link step: `prelinkIR`
-  ([slang-ir-link.cpp](../../../source/slang/slang-ir-link.cpp)), called
+  ([slang-ir-link.cpp](../../../source/slang/ir-passes/slang-ir-link.cpp)), called
   from `generateIRForTranslationUnit`, pulls exactly one category of
   external symbol into a translation unit's IR — cross-module functions
   carrying `[__unsafeForceInlineEarly]`, whose bodies must be present
@@ -663,7 +663,7 @@ explicitly.
 **preprocessor** `[General]`
 : A stage that handles `#include`, macros, and conditional compilation
   before parsing proper. Slang's preprocessor is in
-  [slang-preprocessor.cpp](../../../source/slang/slang-preprocessor.cpp);
+  [slang-preprocessor.cpp](../../../source/slang/preprocessor/slang-preprocessor.cpp);
   it works on a token stream emitted by the lexer.
 
   See: [pipeline/01-lex-preprocess.md](pipeline/01-lex-preprocess.md)
@@ -681,7 +681,7 @@ explicitly.
 : A top-down parsing technique in which each non-terminal of the
   grammar is implemented as a function that consumes tokens and
   recursively calls peers. Slang uses recursive descent throughout
-  [slang-parser.cpp](../../../source/slang/slang-parser.cpp).
+  [slang-parser.cpp](../../../source/slang/parser/slang-parser.cpp).
 
   See: [pipeline/02-parse-ast.md](pipeline/02-parse-ast.md)
   External: https://en.wikipedia.org/wiki/Recursive_descent_parser
@@ -727,14 +727,14 @@ explicitly.
 : A node in the lexical chain that maps names to the declarations
   defined in one block, declaration body, or generic header. The
   `Scope` struct in
-  [slang-ast-base.h](../../../source/slang/slang-ast-base.h) carries a
+  [slang-ast-base.h](../../../source/slang/ast/slang-ast-base.h) carries a
   `containerDecl` pointer plus `parent` and `nextSibling` links; the
   parser builds the chain on the fly and stores it on the AST so the
   checker can re-walk it. Chains that span files or modules — a
   namespace reopened elsewhere, or one pulled in by `using` — are
   stitched together later, at the `DeclCheckState::ScopesWired` step
   (declared in
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h)),
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h)),
   which sits between `ModifiersChecked` and `SignatureChecked` so
   sibling wiring is complete before any signature is checked.
 
@@ -758,7 +758,7 @@ explicitly.
   shadowing implicitly by stopping unqualified lookup at the first
   scope that yields a match, and additionally via per-decl markers —
   `Decl::hiddenFromLookup` and the `_prevInContainerWithSameName`
-  chain in [slang-ast-base.h](../../../source/slang/slang-ast-base.h) —
+  chain in [slang-ast-base.h](../../../source/slang/ast/slang-ast-base.h) —
   that prune earlier declarations in the same container.
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)
@@ -791,7 +791,7 @@ explicitly.
 : The IR transformation that resolves generic parameters and
   existential witnesses into concrete types and values, primarily
   via the `Specialize` opcode and
-  [slang-ir-specialize.cpp](../../../source/slang/slang-ir-specialize.cpp).
+  [slang-ir-specialize.cpp](../../../source/slang/ir-passes/slang-ir-specialize.cpp).
   The result is a monomorphic IR ready for backend-specific lowering.
   The opcodes consumed and produced by specialization
   (`specialize`, `lookupWitness`, `MakeExistential`,
@@ -824,7 +824,7 @@ explicitly.
   statement and type-specifier parsers. The extensible part does:
   `__init` and its neighbours come from the C++ `g_parseSyntaxEntries`
   table of `SyntaxParseInfo` in
-  [slang-parser.cpp](../../../source/slang/slang-parser.cpp), which
+  [slang-parser.cpp](../../../source/slang/parser/slang-parser.cpp), which
   `populateBaseLanguageModule` installs into the base-language module.
 
   See: [syntax-reference/keywords-and-builtins.md](syntax-reference/keywords-and-builtins.md)
@@ -868,7 +868,7 @@ explicitly.
 **terminator instruction** `[Slang]`
 : The last instruction in an `IRBlock`; it decides what runs next
   (or that nothing does). Members of the `TerminatorInst` family in
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) —
+  [slang-ir-insts.lua](../../../source/slang/ir/slang-ir-insts.lua) —
   `return_val`, `yield`, `unconditionalBranch`, `loop`,
   `conditionalBranch`, `ifElse`, `throw`, `tryCall`, `switch`,
   `targetSwitch`, `GenericAsm`, `missingReturn`, `unreachable`, and
@@ -901,7 +901,7 @@ explicitly.
   declared there. Anonymous `cbuffer` contents and unnamed namespaces
   are the canonical examples; lookup recurses through transparent
   members in `_lookUpDirectAndTransparentMembers` in
-  [slang-lookup.cpp](../../../source/slang/slang-lookup.cpp) and records
+  [slang-lookup.cpp](../../../source/slang/semantic-checking/slang-lookup.cpp) and records
   a `Breadcrumb::Member` step for each one traversed.
 
   See: [name-resolution/lookup.md](name-resolution/lookup.md)
@@ -928,13 +928,13 @@ explicitly.
   onto each scope it appears in. The three levels — `Public`,
   `Internal`, `Private`; the default is `Internal` — are the
   `DeclVisibility` enum in
-  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h),
+  [slang-ast-support-types.h](../../../source/slang/ast/slang-ast-support-types.h),
   expressed in source by the `public`/`internal`/`private` keywords
   (modeled by `VisibilityModifier` subclasses in
-  [slang-ast-modifier.h](../../../source/slang/slang-ast-modifier.h)),
+  [slang-ast-modifier.h](../../../source/slang/ast/slang-ast-modifier.h)),
   and enforced both at the lookup boundary and during overload
   resolution by `isDeclVisibleFromScope` in
-  [slang-check-expr.cpp](../../../source/slang/slang-check-expr.cpp).
+  [slang-check-expr.cpp](../../../source/slang/semantic-checking/slang-check-expr.cpp).
 
   See: [name-resolution/visibility.md](name-resolution/visibility.md)
 
@@ -959,11 +959,11 @@ explicitly.
   specific base) that adds named accessors so callers write
   `inst->getVal()` instead of `inst->getOperand(0)`. Every opcode gets
   one, but only some are written by hand in
-  [slang-ir-insts.h](../../../source/slang/slang-ir-insts.h) — that file
+  [slang-ir-insts.h](../../../source/slang/ir/slang-ir-insts.h) — that file
   spells out a struct when it needs members the generator cannot derive,
   such as accessors that interpret an optional trailing operand. For
   every other opcode, `getAllOtherInstStructsData()` in
-  [slang-ir.h.lua](../../../source/slang/slang-ir.h.lua) drives a FIDDLE
+  [slang-ir.h.lua](../../../source/slang/ir/slang-ir.h.lua) drives a FIDDLE
   template that emits the whole struct into
   `build/source/slang/fiddle/slang-ir-insts.h.fiddle`. Either way the
   `FIDDLE(leafInst())` / `FIDDLE(baseInst())` expansion supplies

@@ -369,12 +369,12 @@ working on repro handling. Inputs are validated before use.
 **Compiler Pipeline**:
 
 - **Lexer** (`source/compiler-core/slang-lexer.cpp`): Tokenizes source code
-- **Preprocessor** (`source/slang/slang-preprocessor.cpp`): Handles #include, macros, conditionals
-- **Parser** (`source/slang/slang-parser.cpp`): Recursive descent parser producing AST
+- **Preprocessor** (`source/slang/preprocessor/slang-preprocessor.cpp`): Handles #include, macros, conditionals
+- **Parser** (`source/slang/parser/slang-parser.cpp`): Recursive descent parser producing AST
 - **Semantic Checker** (`source/slang/slang-check.cpp`): Type checking, name resolution, validation
-- **IR Generation** (`source/slang/slang-lower-to-ir.cpp`): Converts AST to Slang IR
-- **IR Passes** (`source/slang/slang-ir-*.cpp`): Optimization and lowering passes
-- **Code Emission** (`source/slang/slang-emit-*.cpp`): Target-specific code generation
+- **IR Generation** (`source/slang/lower-to-ir/slang-lower-to-ir.cpp`): Converts AST to Slang IR
+- **IR Passes** (`source/slang/ir-passes/slang-ir-*.cpp`): Optimization and lowering passes
+- **Code Emission** (`source/slang/emission/slang-emit-*.cpp`): Target-specific code generation
 
 **Key Directories**:
 
@@ -417,17 +417,17 @@ working on repro handling. Inputs are validated before use.
 ### Adding New Language Features
 
 1. Update lexer for new tokens (`source/compiler-core/slang-lexer.cpp`)
-2. Extend parser for new syntax (`source/slang/slang-parser.cpp`)
-3. Add semantic analysis (`source/slang/slang-check-*.cpp`)
-4. Implement IR generation (`source/slang/slang-ir-*.cpp`)
-5. Add code generation for each target backend (`source/slang/slang-emit-*.cpp`)
+2. Extend parser for new syntax (`source/slang/parser/slang-parser.cpp`)
+3. Add semantic analysis (`source/slang/semantic-checking/slang-check-*.cpp`)
+4. Implement IR generation (`source/slang/lower-to-ir/slang-lower-to-ir.cpp`)
+5. Add code generation for each target backend (`source/slang/emission/slang-emit-*.cpp`)
 6. Write comprehensive tests under `tests/`
 
 ### Common Development Tasks
 
-- **Adding an IR instruction**: Update the Lua definition files in `source/slang/slang-ir-insts.lua`, then regenerate
+- **Adding an IR instruction**: Update the Lua definition files in `source/slang/ir/slang-ir-insts.lua`, then regenerate
 - **Adding a built-in function**: Add to appropriate module in `prelude/`
-- **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
+- **Adding a new target**: Implement new emitter in `source/slang/emission/slang-emit-*.cpp`
 
 ### Capability Atoms Documentation
 
@@ -544,7 +544,7 @@ Use the `/repro-remix` skill or see `extras/repro-remix.md`.
 
 ### Language Server
 
-- Language Server Protocol implementation in `source/slang/slang-language-server.cpp`
+- Language Server Protocol implementation in `source/slang/language-server/slang-language-server.cpp`
 - Supports IntelliSense, completion, diagnostics, formatting
 - Used by VS Code and Visual Studio extensions
 

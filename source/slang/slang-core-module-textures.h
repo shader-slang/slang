@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/slang-string.h"
-#include "slang-ir.h"
 #include "slang-type-system-shared.h"
+#include "slang/ir/slang-ir.h"
 
 namespace Slang
 {

@@ -6,11 +6,11 @@
 #include "compiler-core/slang-artifact-impl.h"
 #include "core/slang-char-util.h"
 #include "core/slang-memory-file-system.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
-#include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-rich-diagnostics.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/semantic-checking/slang-lookup.h"
 
 namespace Slang
 {

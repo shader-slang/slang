@@ -82,8 +82,8 @@ for behavioral claims that the doc does not make.
 - `source/compiler-core/slang-token.h`
 - `source/compiler-core/slang-token.cpp`
 - `source/compiler-core/slang-token-defs.h`
-- `source/slang/slang-preprocessor.h`
-- `source/slang/slang-preprocessor.cpp`
+- `source/slang/preprocessor/slang-preprocessor.h`
+- `source/slang/preprocessor/slang-preprocessor.cpp`
 
 If you find yourself thinking "this would cover the branch at
 `slang-preprocessor.cpp:NNNN`", stop and re-read the doc.
