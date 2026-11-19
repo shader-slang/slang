@@ -2,6 +2,7 @@
 
 #include "slang-capability.h"
 #include "slang-ir-extract-value-from-type.h"
+#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
@@ -272,6 +273,38 @@ struct BitCastLoweringContext
         }
     }
 
+    // Rewrite `inst`, a `BitCast` out of `handleType` on a non-bindless target, into a read of the
+    // handle's integer value with `CastDescriptorHandleToUInt2` (or `CastDescriptorHandleToUInt64`
+    // for a `uint64_t` handle under `spvBindlessTextureNV`), followed by a `BitCast` from it when
+    // the destination type differs. Byte-wise lowering would read the handle as one 64-bit leaf,
+    // which WGSL cannot express and GLSL truncates to the low word.
+    void lowerBitCastFromDescriptorHandle(IRInst* inst, IRDescriptorHandleType* handleType)
+    {
+        auto targetReq = targetProgram->getTargetReq();
+        bool hasBindlessTextureNV =
+            targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV);
+        bool isUInt64 = isDescriptorHandleRepresentedAsUInt64(handleType, hasBindlessTextureNV);
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        IRType* valueType = isUInt64 ? (IRType*)builder.getUInt64Type()
+                                     : (IRType*)builder.getVectorType(builder.getUIntType(), 2);
+        IRInst* operand = inst->getOperand(0);
+        IRInst* value = builder.emitIntrinsicInst(
+            valueType,
+            isUInt64 ? kIROp_CastDescriptorHandleToUInt64 : kIROp_CastDescriptorHandleToUInt2,
+            1,
+            &operand);
+        IRInst* result = value;
+        if (!isTypeEqual(valueType, inst->getDataType()))
+        {
+            result = builder.emitBitCast(inst->getDataType(), value);
+            addToWorkList(result);
+        }
+        inst->replaceUsesWith(result);
+        inst->removeAndDeallocate();
+    }
+
     void processBitCast(IRInst* inst)
     {
         auto operand = inst->getOperand(0);
@@ -421,7 +454,6 @@ struct BitCastLoweringContext
         {
             return;
         }
-
         if (fromTypeSize.size != toTypeSize.size)
         {
             sink->diagnose(Diagnostics::NotEqualBitCastSize{
@@ -431,6 +463,26 @@ struct BitCastLoweringContext
                 .toSize = toTypeSize.size,
                 .location = inst->sourceLoc,
             });
+            // Lowering a handle source further would queue a second mismatched `BitCast` from the
+            // handle's integer value and report the same error again.
+            if (as<IRDescriptorHandleType>(fromType))
+                return;
+        }
+
+        // `readObject` cannot rebuild a handle from bytes, so a cast into a bare handle is left
+        // for the target to emit. `diagnoseBitCastsToDescriptorHandle` has rejected the user's
+        // casts into a handle except a resource cast to its own handle on a bindless target; the
+        // rest come from AnyValue marshalling and byte-address-buffer legalization. The latter's
+        // `uint64_t` round trip on WGSL and Metal is not expressible on those targets and is a
+        // separate legalization gap. On a bindless target a cast out of a bare handle is likewise
+        // left for the target.
+        if (as<IRDescriptorHandleType>(toType))
+            return;
+        if (auto handleType = as<IRDescriptorHandleType>(fromType))
+        {
+            if (!areResourceTypesBindlessOnTarget(targetProgram->getTargetReq()))
+                lowerBitCastFromDescriptorHandle(inst, handleType);
+            return;
         }
 
         // Enumerate all fields in to-type and obtain its value from operand object.
@@ -449,6 +501,35 @@ void lowerBitCast(IRModule* module, TargetProgram* targetProgram, DiagnosticSink
     context.targetProgram = targetProgram;
     context.sink = sink;
     context.processModule();
+}
+
+void diagnoseBitCastsToDescriptorHandle(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
+{
+    const bool isBindlessTarget = areResourceTypesBindlessOnTarget(targetProgram->getTargetReq());
+    InstPassBase pass(module);
+    pass.processInstsOfType<IRInst>(
+        kIROp_BitCast,
+        [&](IRInst* inst)
+        {
+            auto fromType = inst->getOperand(0)->getDataType();
+            auto toType = inst->getDataType();
+            if (isTypeEqual(fromType, toType) || !containsDescriptorHandleType(toType))
+                return;
+            // On a bindless target a handle is its resource, so casting a resource to its own
+            // handle type has the same meaning everywhere it is accepted.
+            if (auto handleType = as<IRDescriptorHandleType>(toType);
+                isBindlessTarget && handleType &&
+                isTypeEqual(fromType, handleType->getResourceType()))
+                return;
+            sink->diagnose(Diagnostics::BitCastToDescriptorHandle{
+                .fromType = fromType,
+                .toType = toType,
+                .location = inst->sourceLoc,
+            });
+        });
 }
 
 } // namespace Slang
