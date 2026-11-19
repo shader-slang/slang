@@ -18,7 +18,7 @@ int sumGeneric<let NR : int, let NC : int>(int[NR][NC] a)
     return s;
 }
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 // Both nested-constructor spellings from the issue.
@@ -56,6 +56,19 @@ static const int L3[2][3][4] = int[2][3][4](
 // `int MIX[2][3]`.
 static const int[3] MIX[2] = { { 41, 42, 43 }, { 44, 45, 46 } };
 
+// A multi-declarator group with a bracket-chain type spec: each declarator
+// folds its own chain, and the shared type spec must stay untouched (the
+// group loop restarts each declaration from the SharedTypeExpr wrapper).
+static const int[3] GA[2] = { { 51, 52, 53 }, { 54, 55, 56 } },
+                  GB[2] = { { 57, 58, 59 }, { 60, 61, 62 } };
+
+// A combined spelling with two declarator brackets splices twice below the
+// type spec's own bracket, exercising the splice loop and a two-link re-nest:
+// `int[3] MIX3[2][4]` is 2 arrays of 4 arrays of 3 ints, like `int MIX3[2][4][3]`.
+static const int[3] MIX3[2][4] = {
+    { { 1, 2, 3 }, { 4, 5, 6 }, { 7, 8, 9 }, { 10, 11, 12 } },
+    { { 13, 14, 15 }, { 16, 17, 18 }, { 19, 20, 21 }, { 22, 23, 24 } }};
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -71,13 +84,14 @@ void computeMain()
     outputBuffer[8] = sumGeneric(A); // CHECK: 36
     outputBuffer[9] = L3[1][2][3];   // CHECK: 24
     outputBuffer[10] = MIX[1][0];   // CHECK: 44
+    outputBuffer[11] = GA[1][0] + GB[1][0]; // CHECK: 114
+    outputBuffer[12] = MIX3[1][3][2];       // CHECK: 24
 }
 
-// The backend filechecks pin that a type-position-declared 2x4 array reaches
-// codegen with the right layout: the constants 7 and 15 flow through B (a
-// type-position copy of A) and E (brace initialization), and land in the
-// buffer positions their C-order element addresses imply. The nested
-// constructors themselves (LUT, LUT2, C, F, L3) are pinned by the CPU CHECKs.
+// The backend filechecks pin that type-position element addressing folds to
+// the same constants the CPU CHECKs see: the addresses B[1][2] and E[1][0]
+// evaluate to 7 and 15, which reach codegen with those values (a transposed
+// reading would produce different constants or different buffer slots).
 //SPV: %int_7 = OpConstant %int 7
 //SPV: %int_15 = OpConstant %int 15
 //GLSL: _data[uint(2)] = 7;
