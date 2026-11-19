@@ -2,7 +2,9 @@
 
 // The GLSL dialect rejects a declaration used as a condition with the same dedicated
 // diagnostic as the Slang dialect (the acceptance is HLSL-flavored-dialect only).
-// The declaration is still parsed for error recovery.
+// The declaration is still parsed for error recovery. The 30081 warning is disabled:
+// the `int` condition converts to `bool` by design, and the recovery parse reports
+// that conversion like any other.
 
 void main()
 {
