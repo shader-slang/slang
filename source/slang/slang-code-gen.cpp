@@ -1321,6 +1321,7 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
     case CodeGenTarget::HostVM:
     case CodeGenTarget::HostObjectCode:
