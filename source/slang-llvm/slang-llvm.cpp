@@ -757,6 +757,19 @@ SlangResult LLVMDownstreamCompiler::compile(
         {
             opts.FastMath = true;
         }
+        else if (options.floatingPointMode == DownstreamCompileOptions::FloatingPointMode::Precise)
+        {
+            // The in-process equivalent of the `-ffp-contract=off` flag the downstream
+            // gcc/clang driver passes in precise mode (slang-gcc-compiler-util.cpp):
+            // keep the embedded front end from contracting `a*b+c` into an FMA on
+            // hosts whose base ISA has FMA (e.g. AArch64). The emitted source
+            // carries `#pragma STDC FP_CONTRACT OFF` for the same request, but this
+            // setting holds for anything the embedded Clang compiles under precise
+            // options, independent of the source's own pragmas. Default mode
+            // intentionally keeps clang's language default, mirroring the downstream
+            // driver, which passes no fp-contract flag in Default mode.
+            opts.DefaultFPContractMode = clang::LangOptions::FPM_Off;
+        }
     }
 
     {

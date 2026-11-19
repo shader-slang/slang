@@ -603,6 +603,42 @@ CPPSourceEmitter::CPPSourceEmitter(const Desc& desc)
     m_hasString = (artifactDesc.style == ArtifactStyle::Host);
 }
 
+void CPPSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
+{
+    Super::emitFrontMatterImpl(targetReq);
+
+    // Precise mode must leave a trace in the emitted source: the C++ compiler
+    // that compiles it (clang by default with `-ffp-contract=on`, GCC with
+    // `-ffp-contract=fast`) is otherwise free to contract `a*b+c` into an FMA
+    // and change the result. `#pragma STDC FP_CONTRACT OFF` is the standard
+    // file-scope way to forbid that, and front matter is emitted ahead of the
+    // prelude, so the pragma covers the whole module. The guard admits exactly
+    // the compilers that honor the pragma: clang and its relatives (which
+    // define `__clang__`). GCC documents FP_CONTRACT as not implemented in
+    // every current release — it ignores the pragma and warns
+    // `-Wunknown-pragmas` under `-Wall` — so GCC consumers see no pragma and
+    // must pass `-ffp-contract=off` themselves. MSVC is excluded because it
+    // does not contract under its default `/fp:precise`, and its handling of
+    // unknown STDC pragmas is not verified, so we keep the pragma away from it
+    // rather than risk a diagnostic in every Windows build that includes our
+    // output. Header artifacts carry the pragma as well: their inline module
+    // definitions need the guarantee, and extending it to the rest of the
+    // including translation unit is the conservative direction for a global
+    // precise-mode request (the CUDA fast-math front-matter define reaches
+    // header artifacts the same way). The CPP source-language gate keeps CUDA
+    // output unchanged: nvcc never defines `__clang__`, but clang's CUDA mode
+    // does, so without the gate a clang-CUDA compile of precise-mode output
+    // would pick up the pragma and change CUDA codegen behavior the CUDA
+    // target does not promise.
+    if (getSourceLanguage() == SourceLanguage::CPP &&
+        getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Precise)
+    {
+        m_writer->emit("#if defined(__clang__)\n");
+        m_writer->emit("#pragma STDC FP_CONTRACT OFF\n");
+        m_writer->emit("#endif\n");
+    }
+}
+
 void CPPSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
 {
     // For use the CPP-specific emitType implementation
