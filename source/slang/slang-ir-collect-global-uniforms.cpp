@@ -267,9 +267,12 @@ struct CollectGlobalUniformParametersContext
             SLANG_ASSERT(globalParam);
 
             // The new structure field will need to have whatever decorations
-            // had been put on the global parameter (notably including any name hint)
+            // had been put on the global parameter (notably including any name hint),
+            // and its location, so that later diagnostics about the field still
+            // point at the parameter the user declared.
             //
             globalParam->transferDecorationsTo(fieldKey);
+            fieldKey->sourceLoc = globalParam->sourceLoc;
 
             // Now we can add a field to the `GlobalParams` type that
             // will stand in for the parameter: it will have the key we

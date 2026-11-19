@@ -319,6 +319,7 @@ SourceLoc findBestSourceLocFromUses(IRInst* inst)
 
     return inst->sourceLoc;
 }
+
 // Helper wrapper function around isResourceType that checks if the given
 // type is a pointer to a resource type or a physical storage buffer.
 bool isPointerToResourceType(IRType* type)
@@ -1414,6 +1415,11 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             newElementType = context->getBuilder()->getIntType();
             break;
         default:
+            // The element legalized to a split form (a tuple, pair, implicit deref or
+            // wrapped buffer), which this pass cannot store in a buffer element. The old buffer
+            // type is kept only so that the hook's caller can stop before any load from it is
+            // rewritten; see `handleStructuredBufferWithSplitElement`.
+            context->handleStructuredBufferWithSplitElement(bufferType);
             return LegalType::simple(bufferType);
         }
         ShortList<IRInst*> operands;
