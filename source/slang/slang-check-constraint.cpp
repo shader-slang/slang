@@ -303,7 +303,7 @@ Type* SemanticsVisitor::TryJoinTypes(
     GenericInferenceContext* constraints,
     QualType left,
     QualType right,
-    bool allowEnumScalarJoin)
+    bool allowCommonTypeJoins)
 {
     // Easy case: they are the same type!
     if (left->equals(right))
@@ -361,14 +361,14 @@ Type* SemanticsVisitor::TryJoinTypes(
         }
     }
 
-    // For common-type inference (see `allowEnumScalarJoin`), an enum joins with a
-    // scalar by decaying to its tag type. We only *nominate* the tag type as the
-    // candidate common type; overload applicability (the normal coercion path)
-    // remains the sole arbiter of whether each arm actually converts to it.
-    // Enum-with-enum is intentionally unhandled: two enums share no natural
-    // scalar to decay to.
-    if (allowEnumScalarJoin)
+    // The joins below only *nominate* a candidate common type (see
+    // `allowCommonTypeJoins` in slang-check-impl.h); overload applicability (the
+    // normal coercion path) remains the sole arbiter of whether each argument
+    // actually converts to it.
+    if (allowCommonTypeJoins)
     {
+        // An enum joins with a scalar by decaying to its tag type. Enum-with-enum
+        // is intentionally unhandled: two enums share no natural scalar to decay to.
         if (as<BasicExpressionType>(right))
         {
             if (auto leftEnumDeclRef = isDeclRefTypeOf<EnumDecl>(left))
@@ -378,7 +378,7 @@ Type* SemanticsVisitor::TryJoinTypes(
                         constraints,
                         QualType(tagType, left.isLeftValue),
                         right,
-                        allowEnumScalarJoin);
+                        allowCommonTypeJoins);
             }
         }
         if (as<BasicExpressionType>(left))
@@ -390,9 +390,18 @@ Type* SemanticsVisitor::TryJoinTypes(
                         constraints,
                         left,
                         QualType(tagType, right.isLeftValue),
-                        allowEnumScalarJoin);
+                        allowCommonTypeJoins);
             }
         }
+
+        // `nullptr` joins with a pointer type as that pointer type, matching the
+        // only conversion `_coerce` defines for `NullPtrType` (NullPtr -> PtrType in
+        // slang-check-conversion.cpp). For example, with `int* p`, `c ? p : nullptr`
+        // infers `T = int*` for `operator?:<T>(bool, T, T)`.
+        if (as<PtrType>(left) && as<NullPtrType>(right))
+            return left;
+        if (as<NullPtrType>(left) && as<PtrType>(right))
+            return right;
     }
 
     // HACK: trying to work trait types in here...
@@ -2012,11 +2021,11 @@ private:
 
         // Non-exact type constraints use the join path. This preserves existing
         // common-type behavior for ordinary call inference, such as picking a
-        // type that several arguments can convert to. This is the one place an
-        // enum may decay to its tag type to join with a scalar, since here the
-        // join proposes a type both arguments will be coerced to.
+        // type that several arguments can convert to. This is the one caller that
+        // enables `allowCommonTypeJoins`, since here the join proposes a type
+        // both arguments will be coerced to.
         auto joinType =
-            m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowEnumScalarJoin*/ true);
+            m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowCommonTypeJoins*/ true);
         if (!joinType)
         {
             // If no join exists, priority decides whether a newer constraint

@@ -1896,7 +1896,27 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
     case kIROp_Select:
         {
-            m_writer->emit("_slang_select(");
+            // A scalar-condition select names the IR result type, as in
+            // `_slang_select<int32_t *>(c, p, nullptr)`, rather than let C++ deduce `T`
+            // in `_slang_select(bool, T, T)` from the emitted operands. The operands'
+            // C++ types can differ from their shared IR type: a null pointer literal
+            // is emitted as a bare `nullptr` (`std::nullptr_t`), and it stays bare
+            // because a null `Ptr<void>` is also the IR's type-erased null, stored
+            // into function-pointer and other pointer-like slots.
+            //
+            // Vector conditions keep deduction. Only the scalar overload has the
+            // `T _slang_select(bool, T, T)` shape: the C++ prelude's vector template
+            // is parameterized on the element type, and CUDA's vector overloads are
+            // non-templates. A matrix condition never reaches here, because the core
+            // module splits it into vector-condition selects for non-HLSL targets.
+            m_writer->emit("_slang_select");
+            if (!as<IRVectorType>(inst->getOperand(0)->getDataType()))
+            {
+                m_writer->emit("<");
+                emitType(inst->getFullType());
+                m_writer->emit(">");
+            }
+            m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
