@@ -4153,6 +4153,24 @@ $(type_info.return_type) $(type_info.method_name)(
     IRType* getType(IROp op);
     IRType* getType(IROp op, IRInst* operand0);
 
+    /// Constructs an ordinary RO/RW structured buffer with an explicit sizedness operand.
+    /// A null layout becomes DefaultBufferLayout. Preserve any lowered generic witnesses in
+    /// trailingOperands; they follow the element, layout, and sizedness operands.
+    IRType* getStructuredBufferType(
+        IROp op,
+        IRType* elementType,
+        IRType* dataLayout,
+        bool isUnsized = false,
+        UInt trailingOperandCount = 0,
+        IRInst* const* trailingOperands = nullptr);
+
+    /// Constructs an ordinary RO/RW byte-address buffer with explicit sizedness.
+    IRType* getByteAddressBufferType(IROp op, bool isUnsized = false);
+
+    /// Rebuilds an ordinary structured or byte-address buffer with the requested sizedness,
+    /// preserving its element, layout, and any generic witness operands.
+    IRType* getBufferTypeWithSizedness(IRType* type, bool isUnsized);
+
     /// Create an empty basic block.
     ///
     /// The created block will not be inserted into the current

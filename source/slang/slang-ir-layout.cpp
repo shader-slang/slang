@@ -529,8 +529,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         break;
     }
 
-    // Unsized buffers become one pointer on CPU/CUDA. Query their layout before
-    // the structured-buffer base class, which also includes the sized variants.
+    // Unsized CPU/CUDA prelude buffers contain only their data pointer.
     if (isUnsizedBufferType(type))
     {
         auto size = targetReq && (isCPUTarget(targetReq) || isCUDATarget(targetReq))

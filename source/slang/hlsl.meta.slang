@@ -161,7 +161,7 @@ ${
 for (bool unsized : { false, true }) {
 $}
 __magic_type(HLSL$(unsized ? "UnsizedByteAddressBuffer" : "ByteAddressBuffer")Type)
-__intrinsic_type($(unsized ? kIROp_HLSLUnsizedByteAddressBufferType : kIROp_HLSLByteAddressBufferType))
+__intrinsic_type($(kIROp_HLSLByteAddressBufferType))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
 struct $(unsized ? "__UnsizedByteAddressBuffer" : "__SizedByteAddressBuffer")
 {
@@ -6675,7 +6675,7 @@ for (bool unsized : { false, true }) {
 $}
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(unsized ? "UnsizedStructuredBuffer" : "StructuredBuffer")Type)
-__intrinsic_type($(unsized ? kIROp_HLSLUnsizedStructuredBufferType : kIROp_HLSLStructuredBufferType))
+__intrinsic_type($(kIROp_HLSLStructuredBufferType))
 struct $(unsized ? "__UnsizedStructuredBuffer" : "__SizedStructuredBuffer")$(unsized ? "" : " : IArray<T>")
 {
 
@@ -6861,7 +6861,7 @@ static const struct {
 {
     { kIROp_HLSLRWByteAddressBufferType, "RWByteAddressBuffer", "__SizedRWByteAddressBuffer", false },
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer", "RasterizerOrderedByteAddressBuffer", false },
-    { kIROp_HLSLUnsizedRWByteAddressBufferType, "UnsizedRWByteAddressBuffer", "__UnsizedRWByteAddressBuffer", true },
+    { kIROp_HLSLRWByteAddressBufferType, "UnsizedRWByteAddressBuffer", "__UnsizedRWByteAddressBuffer", true },
 };
 for(auto item : kMutableByteAddressBufferCases) {
 $}
@@ -7260,7 +7260,7 @@ ${
         {"Xor", "xor"},
         {"Exchange", "exchange"}
     };
-    if (item.op == kIROp_HLSLRWByteAddressBufferType || item.unsized)
+    if (item.op == kIROp_HLSLRWByteAddressBufferType)
     {
 $}
 
@@ -7296,13 +7296,7 @@ $}
         __target_switch
         {
         case hlsl: __intrinsic_asm "($3 = NvInterlockedAddFp32($0, $1, $2))";
-${
-    if (!item.unsized) {
-$}
         case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))";
-${
-    }
-$}
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<float>(this);
@@ -7318,13 +7312,7 @@ $}
     {
         __target_switch
         {
-${
-    if (!item.unsized) {
-$}
         case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<double>($1), $2))";
-${
-    }
-$}
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<double>(this);
@@ -7501,13 +7489,7 @@ $}
     {
         __target_switch
         {
-${
-    if (!item.unsized) {
-$}
         case cuda: __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))";
-${
-    }
-$}
         case hlsl:
             __intrinsic_asm ".InterlockedCompareExchange64";
         default:
@@ -7983,7 +7965,7 @@ static const struct {
 {
     { kIROp_HLSLRWStructuredBufferType, "RWStructuredBuffer", "__SizedRWStructuredBuffer", false },
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer", "RasterizerOrderedStructuredBuffer", false },
-    { kIROp_HLSLUnsizedRWStructuredBufferType, "UnsizedRWStructuredBuffer", "__UnsizedRWStructuredBuffer", true },
+    { kIROp_HLSLRWStructuredBufferType, "UnsizedRWStructuredBuffer", "__UnsizedRWStructuredBuffer", true },
 };
 for(auto item : kMutableStructuredBufferCases) {
 $}

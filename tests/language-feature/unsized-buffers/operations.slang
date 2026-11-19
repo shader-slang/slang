@@ -7,7 +7,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 
 // Unsized buffers retain native resources where the target provides them. On CUDA and CPU,
-// the four fields must each contain only a pointer, without a count or a wrapper object.
+// the four fields use prelude structs that each contain a data pointer without a count.
 __UnsizedStructuredBuffer<uint> inputValues;
 __UnsizedRWStructuredBuffer<uint> outputValues;
 __UnsizedByteAddressBuffer inputBytes;
@@ -39,17 +39,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 
 // CUDA: struct GlobalParams
-// CUDA: uint{{.*}}* inputValues
-// CUDA: uint{{.*}}* outputValues
-// CUDA: uchar{{.*}}* inputBytes
-// CUDA: uchar{{.*}}* outputBytes
+// CUDA: UnsizedStructuredBuffer<uint{{ *}}> inputValues
+// CUDA: UnsizedRWStructuredBuffer<uint{{ *}}> outputValues
+// CUDA: UnsizedByteAddressBuffer inputBytes
+// CUDA: UnsizedRWByteAddressBuffer outputBytes
 // CUDA: atomicAdd
 
 // CPP: struct GlobalParams
-// CPP: uint32_t{{.*}}* inputValues
-// CPP: uint32_t{{.*}}* outputValues
-// CPP: uint8_t{{.*}}* inputBytes
-// CPP: uint8_t{{.*}}* outputBytes
+// CPP: UnsizedStructuredBuffer<uint32_t{{ *}}> inputValues
+// CPP: UnsizedRWStructuredBuffer<uint32_t{{ *}}> outputValues
+// CPP: UnsizedByteAddressBuffer inputBytes
+// CPP: UnsizedRWByteAddressBuffer outputBytes
 
 // HLSL-DAG: StructuredBuffer<uint{{ *}}> inputValues
 // HLSL-DAG: RWStructuredBuffer<uint{{ *}}> outputValues

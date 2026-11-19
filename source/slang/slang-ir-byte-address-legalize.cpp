@@ -190,10 +190,9 @@ struct ByteAddressBufferLegalizationContext
 
     void processGetEquivalentStructuredBuffer(IRInst* inst)
     {
-        // On CPU and CUDA, unsized byte-address and structured buffers are pointers.
-        // Preserve this reinterpretation for resource lowering, which turns it into
-        // a pointer cast. Creating a second global resource would lose its value,
-        // for example when this buffer was obtained by converting a sized buffer.
+        // Unsized CPU/CUDA buffers reinterpret their data member through prelude
+        // methods or LLVM resource lowering. Creating another global resource would
+        // lose a local value, such as a view obtained by converting a sized buffer.
         if (isUnsizedBufferType(inst->getDataType()) &&
             (isCPUTarget(m_target) || isCUDATarget(m_target)))
             return;
@@ -237,7 +236,7 @@ struct ByteAddressBufferLegalizationContext
         // We start by looking at the type being loaded so
         // that we can opt out if it is legal.
         //
-        if (isTypeLegalForByteAddressLoadStore(type, load->getOperand(0)))
+        if (isTypeLegalForByteAddressLoadStore(type))
             return;
 
         // If the type is one that requires legalization,
@@ -270,19 +269,15 @@ struct ByteAddressBufferLegalizationContext
         load->removeAndDeallocate();
     }
 
-    // Return whether accesses will become typed memory operations that require natural
-    // alignment. Consider `buffer.Load<uint64_t>(4)`: a native byte-address buffer or the
-    // CUDA prelude can implement it with unaligned loads, but a structured buffer or an
-    // unsized CPU/CUDA pointer cannot use one 64-bit dereference. Both need the existing
-    // two-word legalization before their resource operations become typed accesses.
-    bool requiresNaturalAlignment(IRInst* buffer)
+    // Typed structured-buffer and LLVM accesses require natural alignment. For example,
+    // Load<uint64_t>(4) needs two word accesses; the prelude handles that byte alignment
+    // inside its methods instead.
+    bool requiresNaturalAlignment()
     {
-        return m_options.translateToStructuredBufferOps ||
-               (isUnsizedBufferType(buffer->getDataType()) &&
-                (isCPUTarget(m_target) || isCUDATarget(m_target)));
+        return m_options.translateToStructuredBufferOps || isCPUTargetViaLLVM(m_target);
     }
 
-    bool isTypeLegalForByteAddressLoadStore(IRType* type, IRInst* buffer)
+    bool isTypeLegalForByteAddressLoadStore(IRType* type)
     {
         // Whether or not a type is legal to use for
         // byte-address buffer load/store depends on
@@ -304,7 +299,7 @@ struct ByteAddressBufferLegalizationContext
         {
             // Check 64-bit accesses individually so a four-byte-aligned operation is
             // split while an explicitly aligned access can retain its full width.
-            if (requiresNaturalAlignment(buffer) &&
+            if (requiresNaturalAlignment() &&
                 getSameSizeUIntBaseType(basicType->getOp()) == BaseType::UInt64)
                 return false;
 
@@ -969,7 +964,7 @@ struct ByteAddressBufferLegalizationContext
         {
             // A typed memory access needs natural alignment even when it originated
             // from a byte-address buffer, whose location only promises four bytes.
-            if (requiresNaturalAlignment(buffer))
+            if (requiresNaturalAlignment())
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_NULL_ON_FAIL(
@@ -1644,9 +1639,17 @@ struct ByteAddressBufferLegalizationContext
             // The basic `*ByteAddressBuffer` types map directly to the
             // `*StructuredBuffer<elementType>` cases.
         case kIROp_HLSLByteAddressBufferType:
-            return m_builder.getType(kIROp_HLSLStructuredBufferType, 2, typeOperands);
+            return m_builder.getStructuredBufferType(
+                kIROp_HLSLStructuredBufferType,
+                elementType,
+                m_builder.getDefaultBufferLayoutType(),
+                isUnsizedBufferType(byteAddressBufferType));
         case kIROp_HLSLRWByteAddressBufferType:
-            return m_builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
+            return m_builder.getStructuredBufferType(
+                kIROp_HLSLRWStructuredBufferType,
+                elementType,
+                m_builder.getDefaultBufferLayoutType(),
+                isUnsizedBufferType(byteAddressBufferType));
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
             return m_builder.getType(
                 kIROp_HLSLRasterizerOrderedStructuredBufferType,
@@ -1739,7 +1742,7 @@ struct ByteAddressBufferLegalizationContext
 
         // Types that are already legal to use don't require any processing.
         //
-        if (isTypeLegalForByteAddressLoadStore(type, store->getOperand(0)))
+        if (isTypeLegalForByteAddressLoadStore(type))
             return;
 
         // Otherwise we set up to try and emit a replacement.
@@ -1989,7 +1992,7 @@ struct ByteAddressBufferLegalizationContext
         else if (auto basicType = as<IRBasicType>(type))
         {
             // Match the load path for buffers that become typed memory accesses.
-            if (requiresNaturalAlignment(buffer))
+            if (requiresNaturalAlignment())
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));

@@ -1,8 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -compute -output-using-type
 
 // Byte-address loads and stores require only four-byte alignment for uint64_t. Converting to
-// an unsized view must preserve this contract even though the view itself is only a pointer.
+// an unsized view must preserve this contract when it omits the byte count.
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4):name=inputBytes
 ByteAddressBuffer inputBytes;
 //TEST_INPUT:ubuffer(data=[111 0 0 444], stride=4):name=outputBytes

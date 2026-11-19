@@ -4474,8 +4474,7 @@ static RefPtr<VarLayout> createStructuredBufferContentVarLayout(
 ///
 /// Consider `struct Views { __UnsizedStructuredBuffer<float> data; uint count; }`.
 /// On CUDA, `data` occupies one pointer. Both the resource's reported size and the
-/// placement of `count` must use that same size; otherwise reflection can disagree
-/// with the pointer representation produced by unsized-buffer lowering.
+/// placement of `count` must use that same size to match the one-pointer prelude struct.
 static ObjectLayoutInfo getResourceObjectLayout(
     TypeLayoutContext const& context,
     ShaderParameterKind kind,

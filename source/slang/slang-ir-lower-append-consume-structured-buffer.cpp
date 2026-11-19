@@ -34,17 +34,20 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 
     builder.addDecoration(elementBufferKey, kIROp_CounterBufferDecoration, counterBufferKey);
 
-    IRInst* operands[2] = {elementType, type->getDataLayout()};
-    auto elementBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, 2, operands);
+    auto elementBufferType = builder.getStructuredBufferType(
+        kIROp_HLSLRWStructuredBufferType,
+        elementType,
+        type->getDataLayout());
 
     // Synthesize the counter with an atomic element type up front: it is only ever accessed
     // through the atomic increment/decrement below, so `Atomic<int>` is its true element type.
     // Encoding that here keeps the fact in one place, rather than leaving a later pass to
     // recover it from the access pattern.
     auto counterElementType = builder.getType(kIROp_AtomicType, builder.getIntType());
-    operands[0] = counterElementType;
-    operands[1] = builder.getType(kIROp_DefaultBufferLayoutType);
-    auto counterBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, 2, operands);
+    auto counterBufferType = builder.getStructuredBufferType(
+        kIROp_HLSLRWStructuredBufferType,
+        counterElementType,
+        builder.getDefaultBufferLayoutType());
 
     builder.createStructField(structType, elementBufferKey, elementBufferType);
     builder.createStructField(structType, counterBufferKey, counterBufferType);

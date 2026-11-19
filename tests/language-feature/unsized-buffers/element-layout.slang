@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=COMPILE): -target cuda -entry computeMain -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=COMPILE): -target cpp -entry computeMain -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=COMPILE): -target hlsl -entry computeMain -stage compute -validate-ir -O0
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=COMPILE): -target wgsl -entry computeMain -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=COMPILE): -target llvm-shader-ir -entry computeMain -stage compute -validate-ir

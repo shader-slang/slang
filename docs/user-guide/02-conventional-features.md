@@ -377,12 +377,12 @@ Both structured and byte-addressed buffers can use an _access_ to distinguish be
 
 Slang provides provisional unsized views of structured and byte-addressed buffers. Their names and API may change:
 
-| Unsized type | Matching sized type |
-|--------------|---------------------|
-| `__UnsizedStructuredBuffer<T, L>` | `StructuredBuffer<T, L>` |
+| Unsized type                        | Matching sized type        |
+| ----------------------------------- | -------------------------- |
+| `__UnsizedStructuredBuffer<T, L>`   | `StructuredBuffer<T, L>`   |
 | `__UnsizedRWStructuredBuffer<T, L>` | `RWStructuredBuffer<T, L>` |
-| `__UnsizedByteAddressBuffer` | `ByteAddressBuffer` |
-| `__UnsizedRWByteAddressBuffer` | `RWByteAddressBuffer` |
+| `__UnsizedByteAddressBuffer`        | `ByteAddressBuffer`        |
+| `__UnsizedRWByteAddressBuffer`      | `RWByteAddressBuffer`      |
 
 For structured buffers, `L` is optional and defaults to `DefaultDataLayout`, as it does for the sized types.
 Unsized buffers support loads, and their read-write variants support stores and atomics.
@@ -390,7 +390,9 @@ Structured buffers also support indexing.
 Unsized buffers have no `GetDimensions` or `getCount` methods on any target and do not implement `IArray` or `IRWArray`.
 Pass a length separately when the algorithm needs one; the caller must ensure that accesses stay within the allocated storage.
 
-On CPU and CUDA targets, an unsized buffer is represented by a data pointer without a count field.
+In generated C++ and CUDA code, an unsized buffer uses a prelude struct containing only a data pointer, with the same size and alignment as that pointer.
+The prelude types are `UnsizedStructuredBuffer<T>`, `UnsizedRWStructuredBuffer<T>`, `UnsizedByteAddressBuffer`, and `UnsizedRWByteAddressBuffer`.
+These structs have no count field. The direct LLVM backend also represents an unsized buffer with one pointer.
 On HLSL, SPIR-V, GLSL, and WGSL targets, it uses the same native resource representation as the matching sized buffer.
 On Metal, it uses the existing device-pointer representation.
 The absence of length-query methods is the same on every target, even where the underlying native resource can report a length.
@@ -423,6 +425,11 @@ Conversion refers to the same storage and discards length information where it i
 For structured buffers, the element type `T` and layout `L` must match.
 There is no reverse conversion from unsized to sized, and conversion does not change access rights: a read-only buffer cannot become read-write.
 The existing public names remain sized types with their existing behavior; they are aliases for `__SizedStructuredBuffer`, `__SizedRWStructuredBuffer`, `__SizedByteAddressBuffer`, and `__SizedRWByteAddressBuffer`, respectively.
+
+The bundled Slang RHI CPU and CUDA resource binders currently assume that structured and byte-addressed buffers include a count.
+Do not bind these unsized types through that resource-binding path: it writes an extra count and can overwrite the following parameter.
+Bind a sized resource and convert it inside the shader, or supply the single data pointer as ordinary parameter data at the reflected offset.
+When supplying a pointer directly, keep the allocation alive and use an address accessible to the target device.
 
 ##### Constant Buffers
 

@@ -435,6 +435,8 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                     SourceWriter writer(sourceManager, LineDirectiveMode::None, nullptr);
                     m_writer = &writer;
 
+                    if (isUnsizedBufferType(type))
+                        m_writer->emit("Unsized");
                     m_writer->emit(prefix);
 
                     // TODO(JS).
@@ -443,6 +445,8 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                     UInt operandCount = type->getOperandCount();
                     if (as<IRHLSLStructuredBufferTypeBase>(type))
                         operandCount = 1;
+                    else if (as<IRByteAddressBufferTypeBase>(type))
+                        operandCount = 0;
 
                     if (operandCount)
                     {
@@ -1434,14 +1438,13 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
     {
     case kIROp_GetUnsizedBuffer:
         {
-            // Sized buffers are prelude wrappers on C++ and CUDA; their data member
-            // is the entire unsized representation. The cast also changes a raw
-            // buffer's uint pointer into the byte pointer used by pointer lowering.
-            m_writer->emit("((");
+            // Both forms are prelude aggregates. The unsized value retains only
+            // the data field, whose physical element type was legalized together
+            // with the sized source before emission.
             emitType(inst->getDataType());
-            m_writer->emit(")(");
+            m_writer->emit("{(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(").data)");
+            m_writer->emit(").data}");
             return true;
         }
     default:

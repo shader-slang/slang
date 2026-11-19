@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=COMPILE): -target cuda -entry computeMain -stage compute -validate-ir
-//TEST:SIMPLE(filecheck=COMPILE): -target cpp -entry computeMain -stage compute -validate-ir
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute -validate-ir -O0
+//TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute -validate-ir -O0
 //TEST:SIMPLE(filecheck=COMPILE): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
@@ -7,6 +7,7 @@
 //TEST:SIMPLE(filecheck=COMPILE): -target metal -entry computeMain -stage compute
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -cpu -compute -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -llvm -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RESULT): -vk -compute -output-using-type
 
 // Public names remain aliases for the sized types. Conversion discards the count only on
@@ -20,6 +21,7 @@ ByteAddressBuffer inputBytes;
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):name=outputBytes
 RWByteAddressBuffer outputBytes;
 
+[noinline]
 void update(
     __UnsizedStructuredBuffer<uint> readValues,
     __UnsizedRWStructuredBuffer<uint> writeValues,
@@ -56,6 +58,10 @@ void computeMain()
 }
 
 // COMPILE: computeMain
+// CUDA: void update{{.*}}(UnsizedStructuredBuffer<uint{{ *}}>{{.*}}UnsizedRWStructuredBuffer<uint{{ *}}>{{.*}}UnsizedByteAddressBuffer{{.*}}UnsizedRWByteAddressBuffer
+// CUDA: computeMain
+// CPP: void update{{.*}}(UnsizedStructuredBuffer<uint32_t{{ *}}>{{.*}}UnsizedRWStructuredBuffer<uint32_t{{ *}}>{{.*}}UnsizedByteAddressBuffer{{.*}}UnsizedRWByteAddressBuffer
+// CPP: computeMain
 // SPIRV: OpEntryPoint GLCompute
 // GLSL: void main()
 // RESULT: 225

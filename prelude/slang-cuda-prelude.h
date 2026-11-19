@@ -2956,6 +2956,27 @@ struct RWStructuredBuffer : StructuredBuffer<T>
     }
 };
 
+// Unsized buffers carry only their data pointer. Their extent is supplied by the caller.
+// Like StructuredBuffer, the read-only wrapper uses mutable pointers and references because
+// generated pointer temporaries omit const. Slang enforces read-only access before emission.
+template<typename T>
+struct UnsizedStructuredBuffer
+{
+    SLANG_CUDA_CALL T& operator[](size_t index) const { return data[index]; }
+    SLANG_CUDA_CALL T& Load(size_t index) const { return data[index]; }
+
+    T* data;
+};
+
+template<typename T>
+struct UnsizedRWStructuredBuffer
+{
+    SLANG_CUDA_CALL T& operator[](size_t index) const { return data[index]; }
+    SLANG_CUDA_CALL T& Load(size_t index) const { return data[index]; }
+
+    T* data;
+};
+
 // Missing  Load(_In_  int  Location, _Out_ uint Status);
 struct ByteAddressBuffer
 {
@@ -3362,6 +3383,70 @@ struct RWByteAddressBuffer
     size_t sizeInBytes; //< Must be multiple of 4
 };
 
+
+struct UnsizedByteAddressBuffer
+{
+    template<typename T>
+    SLANG_CUDA_CALL T Load(size_t index) const
+    {
+        // Byte offsets may be four-byte aligned even when T needs greater alignment.
+        T value;
+        memcpy(&value, ((const char*)data) + index, sizeof(T));
+        return value;
+    }
+    SLANG_CUDA_CALL uint32_t Load(size_t index) const { return Load<uint32_t>(index); }
+    SLANG_CUDA_CALL uint2 Load2(size_t index) const { return Load<uint2>(index); }
+    SLANG_CUDA_CALL uint3 Load3(size_t index) const { return Load<uint3>(index); }
+    SLANG_CUDA_CALL uint4 Load4(size_t index) const { return Load<uint4>(index); }
+
+    template<typename T>
+    SLANG_CUDA_CALL UnsizedStructuredBuffer<T> asStructuredBuffer() const
+    {
+        return UnsizedStructuredBuffer<T>{(T*)data};
+    }
+
+    const uint32_t* data;
+};
+
+struct UnsizedRWByteAddressBuffer
+{
+    template<typename T>
+    SLANG_CUDA_CALL T Load(size_t index) const
+    {
+        return UnsizedByteAddressBuffer{data}.Load<T>(index);
+    }
+    SLANG_CUDA_CALL uint32_t Load(size_t index) const { return Load<uint32_t>(index); }
+    SLANG_CUDA_CALL uint2 Load2(size_t index) const { return Load<uint2>(index); }
+    SLANG_CUDA_CALL uint3 Load3(size_t index) const { return Load<uint3>(index); }
+    SLANG_CUDA_CALL uint4 Load4(size_t index) const { return Load<uint4>(index); }
+
+    template<typename T>
+    SLANG_CUDA_CALL void Store(size_t index, const T& value) const
+    {
+        memcpy(((char*)data) + index, &value, sizeof(T));
+    }
+    SLANG_CUDA_CALL void Store(size_t index, uint32_t value) const
+    {
+        Store<uint32_t>(index, value);
+    }
+    SLANG_CUDA_CALL void Store2(size_t index, uint2 value) const { Store<uint2>(index, value); }
+    SLANG_CUDA_CALL void Store3(size_t index, uint3 value) const { Store<uint3>(index, value); }
+    SLANG_CUDA_CALL void Store4(size_t index, uint4 value) const { Store<uint4>(index, value); }
+
+    template<typename T>
+    SLANG_CUDA_CALL T* _getPtrAt(size_t index) const
+    {
+        return (T*)(((char*)data) + index);
+    }
+
+    template<typename T>
+    SLANG_CUDA_CALL UnsizedRWStructuredBuffer<T> asStructuredBuffer() const
+    {
+        return UnsizedRWStructuredBuffer<T>{(T*)data};
+    }
+
+    uint32_t* data;
+};
 
 // ---------------------- Wave --------------------------------------
 

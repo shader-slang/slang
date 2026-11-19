@@ -2,6 +2,7 @@
 //TEST(64-bit):SIMPLE(filecheck=COMPILE): -target cpp -entry computeMain -stage compute
 //TEST(compute,64-bit):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -output-using-type
 //TEST(compute,64-bit):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -output-using-type
+//TEST(compute,64-bit):COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -compute -output-using-type
 
 struct PointerBuffers
 {
