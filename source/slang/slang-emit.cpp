@@ -98,6 +98,7 @@
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-lower-unsized-buffer-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
