@@ -18,4 +18,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     u8Buf[dispatchThreadID.x] = uint8_t(7);
     i8Buf[dispatchThreadID.y] = int8_t(7);
+
+    // A second literal of each width must not produce a duplicate error.
+    u8Buf[dispatchThreadID.z] = uint8_t(9);
+    i8Buf[dispatchThreadID.x] = int8_t(9);
 }
