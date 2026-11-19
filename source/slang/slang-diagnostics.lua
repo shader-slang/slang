@@ -6483,7 +6483,7 @@ err(
     "int8-not-supported-in-wgsl",
     56110,
     "8-bit integers not supported in WGSL",
-    span { loc = "location", message = "8-bit integer type '~typeName' is not supported by the WGSL backend." }
+    span { loc = "location", message = "8-bit integer type '~typeName' is not supported by the WGSL backend." }  -- Raised at emit time, where no source location is available
 )
 
 err(
