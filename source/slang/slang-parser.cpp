@@ -8266,7 +8266,8 @@ ConditionClause* Parser::parseConditionClause()
         ParseModifiers(&trialParser);
         _parseInfixTypeExpr(&trialParser, false);
 
-        bool isDeclCondition = trialSink.getErrorCount() == 0 && !trialParser.hasSeenCompletionToken &&
+        bool isDeclCondition = trialSink.getErrorCount() == 0 &&
+                               !trialParser.hasSeenCompletionToken &&
                                (trialParser.LookAheadToken(TokenType::Identifier) ||
                                 trialParser.LookAheadToken(TokenType::CompletionRequest)) &&
                                trialParser.LookAheadToken(TokenType::OpAssign, 1);
@@ -8275,8 +8276,8 @@ ConditionClause* Parser::parseConditionClause()
         {
             if (getSourceLanguage() != SourceLanguage::HLSL)
             {
-                sink->diagnose(
-                    Diagnostics::DeclarationAsConditionRequiresHlsl{.location = tokenReader.peekLoc()});
+                sink->diagnose(Diagnostics::DeclarationAsConditionRequiresHlsl{
+                    .location = tokenReader.peekLoc()});
             }
             return parseDeclConditionClause();
         }
