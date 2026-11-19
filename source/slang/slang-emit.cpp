@@ -61,6 +61,7 @@
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-late-require-capability.h"
 #include "slang-ir-layout.h"
@@ -98,7 +99,6 @@
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-tuple-types.h"
-#include "slang-ir-lower-unsized-buffer-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
@@ -1098,6 +1098,57 @@ void removeWeakUseInsts(IRModule* module)
     {
         weakUse->removeAndDeallocate();
     }
+}
+
+/// Replaces unsized buffer IR types with their sized counterparts on non-CPU/CUDA targets.
+/// For example, HLSL emits StructuredBuffer<T> for both, while Metal emits device pointers.
+/// Sized-to-unsized conversion becomes an identity on these targets. CPU/CUDA must retain
+/// distinct types because their unsized buffers omit the count field.
+static void lowerUnsizedBufferTypesToResources(IRModule* module)
+{
+    IRBuilder builder(module);
+    InstPassBase pass(module);
+    pass.processAllInsts(
+        [&](IRInst* inst)
+        {
+            IROp resourceOp;
+            switch (inst->getOp())
+            {
+            case kIROp_HLSLUnsizedStructuredBufferType:
+                resourceOp = kIROp_HLSLStructuredBufferType;
+                break;
+            case kIROp_HLSLUnsizedRWStructuredBufferType:
+                resourceOp = kIROp_HLSLRWStructuredBufferType;
+                break;
+            case kIROp_HLSLUnsizedByteAddressBufferType:
+                resourceOp = kIROp_HLSLByteAddressBufferType;
+                break;
+            case kIROp_HLSLUnsizedRWByteAddressBufferType:
+                resourceOp = kIROp_HLSLRWByteAddressBufferType;
+                break;
+            default:
+                return;
+            }
+            ShortList<IRInst*> operands;
+            for (UInt i = 0; i < inst->getOperandCount(); ++i)
+                operands.add(inst->getOperand(i));
+            builder.setInsertBefore(inst);
+            auto resourceType = builder.getType(
+                resourceOp,
+                operands.getCount(),
+                operands.getArrayView().getBuffer());
+            inst->replaceUsesWith(resourceType);
+        });
+    pass.processAllInsts(
+        [&](IRInst* inst)
+        {
+            if (inst->getOp() == kIROp_GetUnsizedBuffer)
+            {
+                SLANG_ASSERT(inst->getDataType() == inst->getOperand(0)->getDataType());
+                inst->replaceUsesWith(inst->getOperand(0));
+                inst->removeAndDeallocate();
+            }
+        });
 }
 
 Result linkAndOptimizeIR(
