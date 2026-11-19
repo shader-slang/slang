@@ -1038,12 +1038,6 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
 {
     SLANG_UNUSED(target);
 
-    enum SideEffectBehavior
-    {
-        Warn = 0,
-        Allow = 1,
-    };
-
     // For now, we have only 1 check to see if methods that have side-effects
     // are marked with prefer-recompute
     //
@@ -1062,10 +1056,10 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
                     continue;
 
                 auto preferRecomputeDecor = func->findDecoration<IRPreferRecomputeDecoration>();
-                auto sideEffectBehavior =
-                    as<IRIntLit>(preferRecomputeDecor->getOperand(0))->getValue();
+                auto behaviorLit = as<IRIntLit>(preferRecomputeDecor->getOperand(0));
+                SLANG_RELEASE_ASSERT(behaviorLit);
 
-                if (sideEffectBehavior == SideEffectBehavior::Allow)
+                if ((SideEffectBehavior)behaviorLit->getValue() == SideEffectBehavior::Allow)
                     continue;
 
                 // Find function name. (don't diagnose on nameless functions)
