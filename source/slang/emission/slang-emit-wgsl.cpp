@@ -1103,6 +1103,8 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 switch (type->getBaseType())
                 {
                 default:
+                    SLANG_UNEXPECTED("unhandled base type for IntLit in WGSL emission");
+                    break;
 
                 case BaseType::Int8:
                     {
