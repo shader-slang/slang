@@ -44,6 +44,10 @@ void Lexer::initialize(
     SLANG_RELEASE_ASSERT(tokenPool);
     m_tokenPool = tokenPool;
     m_mode = LexerMode::Normal;
+    // Reinitialization can select a different pool. We discard its borrowed
+    // pointers while retaining only the capacity of the lexer's own buffers.
+    m_leadingTrivia.clear();
+    m_trailingTrivia.clear();
 
     auto content = sourceView->getContent();
 
@@ -255,7 +259,7 @@ static int _readCodePoint(
 /// Returns the code point `offset` logical positions ahead, or `kEOF` at the view's end.
 ///
 /// Requires `offset >= 0`. Lookahead leaves the cursor and diagnostics unchanged.
-static int _peek(Lexer* lexer, int offset = 0)
+static int _peekSlow(Lexer* lexer, int offset)
 {
     RawByteCursor cursor{lexer->m_cursor, lexer->m_end};
     bool hasLineSplice = false;
@@ -271,7 +275,7 @@ static int _peek(Lexer* lexer, int offset = 0)
 ///
 /// Failed UTF-8 decoding yields a recovery space. Diagnostics obey lexer suppression and limits.
 /// Removed line splices are recorded for the current lexeme's logical spelling.
-static int _advance(Lexer* lexer)
+static int _advanceSlow(Lexer* lexer)
 {
     RawByteCursor cursor{lexer->m_cursor, lexer->m_end};
     bool hasLineSplice = false;
@@ -280,6 +284,45 @@ static int _advance(Lexer* lexer)
     if (hasLineSplice)
         lexer->m_hasLineSpliceInCurrentLexeme = true;
     return result;
+}
+
+// We can return an ordinary ASCII byte without setting up the full decoder.
+// NUL and EOF need its end-of-input handling, a backslash may begin a splice,
+// and non-ASCII bytes need UTF-8 decoding or validation.
+static SLANG_FORCE_INLINE bool _canReadAsciiCodePointDirectly(int rawByte)
+{
+    if (rawByte <= 0)
+        return false;
+    if (rawByte >= 0x80)
+        return false;
+    return rawByte != '\\';
+}
+
+// Most scanner decisions inspect the immediately following ASCII character.
+// We handle that case directly and retain logical code-point lookahead for
+// offsets or bytes that require the full decoder's input handling.
+static SLANG_FORCE_INLINE int _peek(Lexer* lexer, int offset = 0)
+{
+    if (offset != 0)
+        return _peekSlow(lexer, offset);
+    const int rawByte = _peekRawByte(lexer);
+    if (_canReadAsciiCodePointDirectly(rawByte))
+        return rawByte;
+    return _peekSlow(lexer, 0);
+}
+
+// Consuming an ordinary ASCII character only advances the byte cursor. We
+// select a diagnostic sink and update splice state only on the full path,
+// because an ordinary ASCII byte cannot require either operation.
+static SLANG_FORCE_INLINE int _advance(Lexer* lexer)
+{
+    const int rawByte = _peekRawByte(lexer);
+    if (_canReadAsciiCodePointDirectly(rawByte))
+    {
+        ++lexer->m_cursor;
+        return rawByte;
+    }
+    return _advanceSlow(lexer);
 }
 
 static void _handleNewLine(Lexer* lexer)
@@ -2458,6 +2501,72 @@ static bool _isAtStartOfTrivia(Lexer* lexer)
     return false;
 }
 
+// We measure an escaped newline starting at `cursor`, or return zero if none starts there.
+// A backslash followed by CRLF or LFCR occupies three bytes; one followed by a lone
+// CR or LF occupies two. The caller supplies a nonempty remaining physical span.
+static Index _getEscapedNewLineLength(const char* cursor, const char* end)
+{
+    SLANG_ASSERT(cursor < end);
+    if (*cursor != '\\')
+        return 0;
+    if (cursor + 1 == end)
+        return 0;
+
+    const auto newline = cursor[1];
+    if (newline != '\r')
+    {
+        if (newline != '\n')
+            return 0;
+    }
+
+    if (end - cursor > 2)
+    {
+        if ((newline ^ cursor[2]) == ('\r' ^ '\n'))
+            return 3;
+    }
+    return 2;
+}
+
+UnownedStringSlice Lexer::_getScrubbedLogicalSpelling(UnownedStringSlice physicalSpelling)
+{
+    SLANG_ASSERT(physicalSpelling.getLength() > 0);
+    // Scrubbing can only shorten the spelling. Reserving its physical length
+    // lets us write the complete logical spelling without further growth checks.
+    const auto requiredCapacity = size_t(physicalSpelling.getLength());
+    const auto oldCapacity = m_scrubbingBuffer.getCapacityInBytes();
+    if (requiredCapacity > oldCapacity)
+    {
+        auto capacity = requiredCapacity;
+        // Geometric growth amortizes allocations across longer lexemes. If
+        // doubling would overflow, the exact required capacity is sufficient.
+        if (oldCapacity <= std::numeric_limits<size_t>::max() / 2)
+        {
+            if (capacity < oldCapacity * 2)
+                capacity = oldCapacity * 2;
+        }
+        // Earlier results have already been copied into their pools.
+        m_scrubbingBuffer.allocate(capacity);
+        SLANG_RELEASE_ASSERT(m_scrubbingBuffer.getData());
+    }
+
+    auto begin = static_cast<char*>(m_scrubbingBuffer.getData());
+    auto writeCursor = begin;
+    for (auto cursor = physicalSpelling.begin(); cursor < physicalSpelling.end();)
+    {
+        const auto spliceLength = _getEscapedNewLineLength(cursor, physicalSpelling.end());
+        if (spliceLength)
+        {
+            cursor += spliceLength;
+            continue;
+        }
+        *writeCursor++ = *cursor++;
+    }
+
+    // The caller supplies an explicit-length view to the pool, which copies it
+    // before another read can overwrite these bytes. No terminator is needed here.
+    return UnownedStringSlice(begin, writeCursor);
+}
+
 Lexeme Lexer::readLexeme()
 {
     // Recognition uses logical characters, but we retain the complete byte span
@@ -2497,40 +2606,14 @@ Lexeme Lexer::readLexeme()
         break;
     }
 
-    // We only allocate a temporary logical spelling when recognition crossed a
-    // splice. The pool then stores a stable copy and interns the full lexical state.
+    // A boundary splice has empty logical spelling. Internal splices use the
+    // lexer's scratch buffer; ordinary lexemes use their physical bytes directly.
     const UnownedStringSlice physicalSpelling(textBegin, m_cursor);
     auto logicalSpelling = physicalSpelling;
-    StringBuilder scrubbed;
     if (kind == TokenType::EscapedNewLine)
-    {
         logicalSpelling = UnownedStringSlice();
-    }
     else if (m_hasLineSpliceInCurrentLexeme)
-    {
-        for (auto cursor = textBegin; cursor < m_cursor;)
-        {
-            if (*cursor == '\\')
-            {
-                if (cursor + 1 < m_cursor)
-                {
-                    const auto next = cursor[1];
-                    if (next == '\r' || next == '\n')
-                    {
-                        cursor += 2;
-                        if (cursor < m_cursor)
-                        {
-                            if ((next ^ *cursor) == ('\r' ^ '\n'))
-                                ++cursor;
-                        }
-                        continue;
-                    }
-                }
-            }
-            scrubbed.appendChar(*cursor++);
-        }
-        logicalSpelling = scrubbed.getUnownedSlice();
-    }
+        logicalSpelling = _getScrubbedLogicalSpelling(physicalSpelling);
 
     Name* name = nullptr;
     if (m_namePool)
@@ -2546,7 +2629,12 @@ Token Lexer::readToken()
     // Each trivia item belongs to one cluster. Leading trivia includes blank
     // lines left after the preceding token's first trailing newline; EOF is a
     // normal zero-width token that can own that remaining trivia.
-    List<const LexemeObj*> leading;
+
+    // We reuse the pointer buffers across reads. The pool copies their
+    // contents on a miss before the next read can overwrite the buffers.
+    m_leadingTrivia.clear();
+    m_trailingTrivia.clear();
+    auto& leading = m_leadingTrivia;
     while (_isAtStartOfTrivia(this))
         leading.add(readLexeme().getObject());
     const auto rawToken = readLexeme().as<RawToken>();
@@ -2554,7 +2642,7 @@ Token Lexer::readToken()
 
     // We stop immediately after the first explicit newline. Embedded newlines
     // do not split a block comment, and escaped newlines do not end directives.
-    List<const LexemeObj*> trailing;
+    auto& trailing = m_trailingTrivia;
     if (rawToken.getTypeTag() != TokenType::EndOfFile)
     {
         while (_isAtStartOfTrivia(this))

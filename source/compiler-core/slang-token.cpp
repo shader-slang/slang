@@ -23,8 +23,13 @@ struct TokenPool::Impl
 
         HashCode getHashCode() const
         {
-            auto hash = combineHash(Slang::getHashCode(kind), physicalSpelling.getHashCode());
-            hash = combineHash(hash, logicalSpelling.getHashCode());
+            // Equal spellings contribute their bytes once. The distinction remains
+            // explicit even if just one spelling is empty; equality still compares both.
+            const bool hasDistinctPhysicalSpelling = physicalSpelling != logicalSpelling;
+            auto hash = combineHash(Slang::getHashCode(kind), logicalSpelling.getHashCode());
+            hash = combineHash(hash, HashCode(hasDistinctPhysicalSpelling));
+            if (hasDistinctPhysicalSpelling)
+                hash = combineHash(hash, physicalSpelling.getHashCode());
             return combineHash(hash, Slang::getHashCode(name));
         }
         bool operator==(const LexemeKey& other) const

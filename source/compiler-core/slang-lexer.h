@@ -2,6 +2,7 @@
 #define SLANG_LEXER_H
 
 #include "core/slang-basic.h"
+#include "core/slang-blob.h"
 #include "slang-diagnostic-sink.h"
 
 namespace Slang
@@ -324,6 +325,20 @@ struct Lexer
     // current lexeme. `readLexeme()` resets the flag before recognition and uses it
     // to decide whether to build a logical spelling with those bytes removed.
     bool m_hasLineSpliceInCurrentLexeme = false;
+
+private:
+    /// Removes escaped newlines into reusable storage owned by this lexer.
+    ///
+    /// Requires a nonempty physical spelling.
+    /// The returned bytes remain valid until the next scrub or destruction.
+    UnownedStringSlice _getScrubbedLogicalSpelling(UnownedStringSlice physicalSpelling);
+
+    ScopedAllocation m_scrubbingBuffer;
+
+    // These arrays borrow objects from the selected pool. Reads and reinitialization
+    // reset their counts; only their pointer-storage capacity survives those operations.
+    List<const LexemeObj*> m_leadingTrivia;
+    List<const LexemeObj*> m_trailingTrivia;
 };
 
 
