@@ -1537,7 +1537,14 @@ warning(
     "potentially-aliased-out-parameter",
     30051,
     "potentially aliased argument to a parameter that may be written",
-    span { loc = "firstArg:Expr", message = "argument for '~direction1:ParamPassingMode' parameter '~param1:Name' may alias argument for '~direction2:ParamPassingMode' parameter '~param2:Name'; passing the same value to both may produce undefined behavior" }
+    span { loc = "firstArg:Expr", message = "argument for '~direction1:ParamPassingMode' parameter '~param1:Name' may alias argument for '~direction2:ParamPassingMode' parameter '~param2:Name'; passing overlapping storage to both may produce undefined behavior" }
+)
+
+warning(
+    "potentially-aliased-receiver-parameter",
+    30134,
+    "argument may alias the receiver of a call that may write the aliased storage",
+    span { loc = "receiver:Expr", message = "argument for '~direction:ParamPassingMode' parameter '~param:Name' may alias the receiver of the call, passed '~receiverDirection:ParamPassingMode'; passing overlapping storage to both may produce undefined behavior" }
 )
 
 err(

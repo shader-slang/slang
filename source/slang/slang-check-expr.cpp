@@ -4155,6 +4155,16 @@ static Expr* _peelCastsAndParens(Expr* expr)
                 continue;
             }
         }
+        // An upcast to a base type names the same storage as its operand,
+        // so member lookup's `CastToSuperTypeExpr` wrapper (built when a
+        // method inherited from a base type is called on a derived value)
+        // is transparent here. The node is a plain `Expr`, not a
+        // `TypeCastExpr`, which is why it needs its own case.
+        if (auto superCast = as<CastToSuperTypeExpr>(expr))
+        {
+            expr = superCast->valueArg;
+            continue;
+        }
         if (auto parenExpr = as<ParenExpr>(expr))
         {
             expr = parenExpr->base;
@@ -4164,13 +4174,13 @@ static Expr* _peelCastsAndParens(Expr* expr)
     }
 }
 
-// Check whether two expressions refer to the same storage location by
-// comparing their structure in lockstep. Handles the receiver object (`this` == `this`), bare
+// Check whether two expressions name the same storage location by comparing
+// their structure in lockstep. Handles the receiver object (`this` == `this`), bare
 // variable / static-member references, member
 // accesses (s.x == s.x, but not s.x == s.y), and subscripts with matching
 // constant indices (arr[0] == arr[0], but not arr[0] == arr[1]). Returns
 // false for anything it can't prove equal.
-static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
+static bool _exprsHaveIdenticalAccessPath(Expr* a, Expr* b)
 {
     a = _peelCastsAndParens(a);
     b = _peelCastsAndParens(b);
@@ -4200,7 +4210,7 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
             return false;
         if (aMember->declRef.getDecl() != bMember->declRef.getDecl())
             return false;
-        return _exprsDefinitelyAlias(aMember->baseExpression, bMember->baseExpression);
+        return _exprsHaveIdenticalAccessPath(aMember->baseExpression, bMember->baseExpression);
     }
 
     // Same bare declaration reference: a bare variable (VarExpr) or static
@@ -4228,10 +4238,86 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
         auto bLit = as<IntegerLiteralExpr>(bIndex->indexExprs[0]);
         if (!aLit || !bLit || aLit->value != bLit->value)
             return false;
-        return _exprsDefinitelyAlias(aIndex->baseExpression, bIndex->baseExpression);
+        return _exprsHaveIdenticalAccessPath(aIndex->baseExpression, bIndex->baseExpression);
     }
 
     return false;
+}
+
+// Check whether the storage `path` names is inside the storage `prefix` names:
+// the two access paths agree on every step of `prefix`, and `path` may continue
+// below it. Consider `s.mutInoutField(s.v)`: the receiver names `s` while the
+// argument names `s.v`, a member of that same storage.
+//
+// The walk below proves containment one step at a time. The shared path is
+// matched by `_exprsHaveIdenticalAccessPath`, which compares constant indices
+// only, so a dynamic index inside the shared path is never provable — while an
+// extension step's index is unconstrained, because any element of `prefix`'s
+// storage overlaps `prefix`: `arr` aliases `arr[i]` even at runtime.
+//
+// A member step extends the path only when the member is a plain field. A
+// property is mediated by accessors and, for the value-semantics modes this
+// warning covers, lowering binds an argument naming it through a temporary
+// rather than a subobject of the base, so it ends the proof (a property with a
+// `__ref` accessor may bind real interior storage — a conservative miss, like
+// every other stop here). A `DerefMemberExpr` names storage *pointed to* by its
+// base, not storage inside it. A member naming a `CallableDecl` — a method
+// reference used as a value — names no storage at all.
+//
+// An index step extends the path only when its base is an array, vector, or
+// matrix, whose elements live inside the base's storage; indexing through a
+// pointer or a buffer is a deref, and a user type's subscript is
+// accessor-mediated like a property.
+//
+// Every other shape — a call, a swizzle — stops the walk. Swizzles deserve a
+// word: a single-component swizzle of an l-value vector does name component
+// storage inside it (lowering emits an element address), but the proof does
+// not compare swizzle component sets, so single-component swizzles are a
+// conservative miss rather than an impossibility; multi-component swizzles
+// genuinely bind through temporaries and must stay silent.
+//
+// Re-peeling at each level is safe because `_peelCastsAndParens` is
+// idempotent: a peeled expression has no cast or parenthesis at its root.
+static bool _exprIsAccessPathPrefix(Expr* prefix, Expr* path)
+{
+    prefix = _peelCastsAndParens(prefix);
+    for (;;)
+    {
+        path = _peelCastsAndParens(path);
+        if (!prefix || !path)
+            return false;
+
+        if (_exprsHaveIdenticalAccessPath(prefix, path))
+            return true;
+
+        if (auto pathMember = as<MemberExpr>(path))
+        {
+            auto memberDecl = pathMember->declRef.getDecl();
+            if (as<DerefMemberExpr>(pathMember) || as<PropertyDecl>(memberDecl) ||
+                as<CallableDecl>(memberDecl))
+                return false;
+            path = pathMember->baseExpression;
+        }
+        else if (auto pathIndex = as<IndexExpr>(path))
+        {
+            auto baseType = pathIndex->baseExpression->type.type;
+            if (!(as<ArrayExpressionType>(baseType) || as<VectorExpressionType>(baseType) ||
+                  as<MatrixExpressionType>(baseType)))
+                return false;
+            path = pathIndex->baseExpression;
+        }
+        else
+            return false;
+    }
+}
+
+// Check whether two expressions refer to overlapping storage: either the same
+// location, or a location contained in the other — one access path identical to,
+// or a prefix of, the other's (`s` vs `s`, `s` vs `s.v`, `arr[0]` vs
+// `arr[0].x`). Returns false for anything it can't prove.
+static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
+{
+    return _exprIsAccessPathPrefix(a, b) || _exprIsAccessPathPrefix(b, a);
 }
 
 /// Return whether a parameter of mode `mode` may be a reference to its argument's storage during
@@ -4282,10 +4368,11 @@ static bool _mayAliasedArgumentsInterfere(ParamPassingMode first, ParamPassingMo
            doesParamPassingModeIndicateWritableStorage(second);
 }
 
-void SemanticsVisitor::_checkAliasedOutArguments(
+void SemanticsVisitor::_checkPotentiallyAliasedArguments(
     InvokeExpr* invoke,
     FuncType* funcType,
-    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+    List<DeclRef<ParamDecl>> const& paramDeclRefs,
+    std::optional<std::pair<Expr*, ParamPassingMode>> receiver)
 {
     // Operator expressions (compound assignments like `a += a`, prefix/postfix
     // `++a`, etc.) desugar into function calls with `inout` parameters but have
@@ -4298,11 +4385,12 @@ void SemanticsVisitor::_checkAliasedOutArguments(
     Index paramCount = funcType->getParamCount();
     Index checkCount = Math::Min(argCount, paramCount);
 
-    // For each pair of arguments, check if they refer to the same storage
+    // For each pair of arguments, check if they refer to overlapping storage
     // and their parameters' modes let the aliasing interfere. We compare
     // expressions structurally: bare variables (a == a), member accesses
     // (s.x == s.x but not s.x == s.y), and constant-index subscripts
-    // (arr[0] == arr[0] but not arr[0] == arr[1]).
+    // (arr[0] == arr[0] but not arr[0] == arr[1]), as well as an access path
+    // that is a prefix of the other (s vs s.v).
     for (Index i = 0; i < checkCount; ++i)
     {
         const auto iMode = funcType->getParamPassingMode(i);
@@ -4316,7 +4404,7 @@ void SemanticsVisitor::_checkAliasedOutArguments(
             if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
                 continue;
 
-            // Both arguments refer to the same variable. Put a parameter that
+            // Both arguments refer to overlapping storage. Put a parameter that
             // may be written first in the diagnostic for clarity.
             const bool iMayBeWritten = doesParamPassingModeIndicateWritableStorage(iMode);
             Index first = iMayBeWritten ? i : j;
@@ -4337,6 +4425,41 @@ void SemanticsVisitor::_checkAliasedOutArguments(
                 .firstArg = invoke->arguments[first]});
             break; // One warning per outer index i is enough.
         }
+    }
+
+    // The receiver of a method call is reference-like storage whose effective
+    // mode comes from the method declaration: a `[mutating]` or `[__ref]`
+    // receiver may be written through, exactly like an `inout` or `__ref`
+    // parameter, while a plain method on a non-copyable type is effectively
+    // borrowed (`BorrowIn`) and follows the borrow rules like a `__borrow`
+    // parameter. The receiver is the base of the callee expression rather than
+    // an entry of `invoke->arguments`, so compare it against each argument
+    // here, under the same mode rules as for explicit arguments: a receiver
+    // whose effective mode is `in` (a `[nonmutating]` method, or a plain
+    // method on a copyable type) never warns, and a `__ref` receiver paired
+    // with a `__ref` argument has opted into reference semantics.
+    if (!receiver)
+        return;
+
+    for (Index j = 0; j < checkCount; ++j)
+    {
+        const auto jMode = funcType->getParamPassingMode(j);
+        if (!_mayAliasedArgumentsInterfere(receiver->second, jMode))
+            continue;
+
+        if (!_exprsDefinitelyAlias(receiver->first, invoke->arguments[j]))
+            continue;
+
+        Name* paramName = nullptr;
+        if (paramDeclRefs.getCount() > j)
+            paramName = paramDeclRefs[j].getName();
+
+        getSink()->diagnose(Diagnostics::PotentiallyAliasedReceiverParameter{
+            .direction = jMode,
+            .param = paramName,
+            .receiverDirection = receiver->second,
+            .receiver = receiver->first});
+        break; // One warning per call is enough.
     }
 }
 
@@ -4620,9 +4743,34 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
-            // Warn when the same storage is passed to two parameters that may both be references
-            // to it, and at least one may write it (issue #10699).
-            _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
+            // Warn when overlapping storage is passed to two parameters that may both be
+            // references to it, and at least one may write it (issue #10699). The
+            // receiver of a method call joins the comparison as one more storage the
+            // call may read or write: it is the base of the callee expression, never an
+            // entry of `invoke->arguments`, and its passing mode comes from the method
+            // declaration rather than the `FuncType` (issue #13758). The receiver pair
+            // is set together or not at all; the skip cases are described at the
+            // `GetBaseExpr` call below.
+            std::optional<std::pair<Expr*, ParamPassingMode>> receiver;
+            if (callableDeclRef)
+            {
+                if (auto thisParamInfo = findEffectiveThisParamInfo(callableDeclRef))
+                {
+                    // The receiver is the base of the callee expression. A deref
+                    // callee (`p->method()`) carries a `DerefExpr`-wrapped pointer
+                    // as its base, which the structural alias proof cannot see
+                    // through, so such calls skip the receiver pair — a missed
+                    // warning, never a wrong one. A callee expression with no
+                    // base, such as a method value obtained through a
+                    // callable-as-type lookup, skips the pair too. The pair is
+                    // set together or not at all.
+                    if (Expr* baseExpr = GetBaseExpr(invoke->functionExpr))
+                    {
+                        receiver = std::make_pair(baseExpr, thisParamInfo->mode);
+                    }
+                }
+            }
+            _checkPotentiallyAliasedArguments(invoke, funcType, paramDeclRefs, receiver);
             checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
