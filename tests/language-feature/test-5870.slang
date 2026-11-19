@@ -7,8 +7,8 @@
 // the opposite order from a declaration `int x[2][4]`. Both spellings
 // must denote `Array<Array<int,4>, 2>` (issue #5870).
 
-// Generic and specialization-constant counts ride through the type-position
-// re-nesting verbatim: `int[NR][NC]` means the same as `int x[NR][NC]`.
+// Generic counts ride through the type-position re-nesting verbatim:
+// `int[NR][NC]` means the same as `int x[NR][NC]`.
 int sumGeneric<let NR : int, let NC : int>(int[NR][NC] a)
 {
     int s = 0;
@@ -18,7 +18,7 @@ int sumGeneric<let NR : int, let NC : int>(int[NR][NC] a)
     return s;
 }
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 // Both nested-constructor spellings from the issue.
@@ -39,6 +39,23 @@ static const int G[3] = int[](1, 2, 3);
 static const int E[2][2] = { { 13, 14 }, { 15, 16 } };
 static const int F[2][4] = Array<Array<int, 4>, 2>(TOP, BOT);
 
+// A 3-deep asymmetric chain: `L3[1][2][3]` is out of range under any
+// non-identity permutation of (2,3,4), so the CHECK pins the exact order.
+static const int L3[2][3][4] = int[2][3][4](
+    int[3][4](
+        int[4](1, 2, 3, 4),
+        int[4](5, 6, 7, 8),
+        int[4](9, 10, 11, 12)),
+    int[3][4](
+        int[4](13, 14, 15, 16),
+        int[4](17, 18, 19, 20),
+        int[4](21, 22, 23, 24)));
+
+// A type spec that is itself a bracket chain combines with declarator brackets
+// into one left-to-right chain: `int[3] MIX[2]` is 2 arrays of 3 ints, like
+// `int MIX[2][3]`.
+static const int[3] MIX[2] = { { 41, 42, 43 }, { 44, 45, 46 } };
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -52,10 +69,15 @@ void computeMain()
     outputBuffer[6] = E[1][0];    // CHECK: 15
     outputBuffer[7] = F[0][2];    // CHECK: 1
     outputBuffer[8] = sumGeneric(A); // CHECK: 36
+    outputBuffer[9] = L3[1][2][3];   // CHECK: 24
+    outputBuffer[10] = MIX[1][0];   // CHECK: 44
 }
 
-// The nested constructors must survive codegen with the right values:
-// 7 and 15 only reach the output through B and E.
+// The backend filechecks pin that a type-position-declared 2x4 array reaches
+// codegen with the right layout: the constants 7 and 15 flow through B (a
+// type-position copy of A) and E (brace initialization), and land in the
+// buffer positions their C-order element addresses imply. The nested
+// constructors themselves (LUT, LUT2, C, F, L3) are pinned by the CPU CHECKs.
 //SPV: %int_7 = OpConstant %int 7
 //SPV: %int_15 = OpConstant %int 15
 //GLSL: _data[uint(2)] = 7;
