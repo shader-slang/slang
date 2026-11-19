@@ -6713,6 +6713,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 CapabilityName::spvRayTracingOpacityMicromapExecutionModeKHR)
             {
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_opacity_micromap"));
+                ensureAnyExtensionDeclaration(
+                    {UnownedStringSlice("SPV_KHR_ray_query"),
+                     UnownedStringSlice("SPV_KHR_ray_tracing")});
                 requireSPIRVCapability(SpvCapabilityRayTracingOpacityMicromapExecutionModeKHR);
                 IRBuilder builder(m_irModule);
                 requireSPIRVExecutionMode(

@@ -1,9 +1,9 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -profile spirv_1_4 -capability rayquery -restrictive-capability-check -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -profile sm_6_5 -restrictive-capability-check -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=METAL): -target metal -entry main -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry main -profile spirv_1_4 -capability rayquery -restrictive-capability-check -no-codegen -DUSE_IMPORTED_HELPER
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -profile sm_6_5 -restrictive-capability-check -no-codegen -DUSE_IMPORTED_HELPER
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=METAL): -target metal -entry main -no-codegen -DUSE_IMPORTED_HELPER
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SPIRV,exit-code=2): -target spirv -entry main -profile spirv_1_4 -capability rayquery -restrictive-capability-check -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=HLSL,exit-code=2): -target hlsl -entry main -profile sm_6_5 -restrictive-capability-check -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=METAL,exit-code=2): -target metal -entry main -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=SPIRV,exit-code=2): -target spirv -entry main -profile spirv_1_4 -capability rayquery -restrictive-capability-check -no-codegen -DUSE_IMPORTED_HELPER
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=HLSL,exit-code=2): -target hlsl -entry main -profile sm_6_5 -restrictive-capability-check -no-codegen -DUSE_IMPORTED_HELPER
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=METAL,exit-code=2): -target metal -entry main -no-codegen -DUSE_IMPORTED_HELPER
 //TEST:SIMPLE(filecheck=OK): -target spirv -entry main -profile spirv_1_4 -capability rayquery_opacity_micromap -restrictive-capability-check -no-codegen -DUSE_IMPORTED_HELPER
 //TEST:SIMPLE(filecheck=OK): -target hlsl -entry main -profile sm_6_9 -restrictive-capability-check -no-codegen -DUSE_IMPORTED_HELPER
 //TEST:SIMPLE(filecheck=OK): -target metal -entry main -no-codegen -DUSE_EMPTY_FEATURES

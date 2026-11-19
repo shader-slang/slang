@@ -26,6 +26,6 @@ void test()
     let lam2 = (int a) => {
         q.Abort();
 //diag: ^ non-copyable type captured
-//diag: ^ cannot capture non-copyable type 'RayQuery<0>' in a lambda expression.
+//diag: ^ cannot capture non-copyable type 'RayQuery<0, RayQueryFeatures<>>' in a lambda expression.
     };
 }

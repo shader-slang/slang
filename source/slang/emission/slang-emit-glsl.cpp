@@ -1612,9 +1612,8 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
         {
             if (requirement->getAtom() == CapabilityName::_GL_EXT_opacity_micromap_ray_query_mode)
             {
+                _requireRayQuery();
                 _requireGLSLExtension(UnownedStringSlice("GL_EXT_opacity_micromap_ray_query_mode"));
-                _requireGLSLVersion(ProfileVersion::GLSL_460);
-                _requireSPIRVVersion(SemanticVersion(1, 4));
                 ensurePrelude("const bool gl_EnableOpacityMicromapEXT = true;");
             }
         }

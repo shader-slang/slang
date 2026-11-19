@@ -1493,6 +1493,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayTracingKHR` 
 * `spvRayTracingPositionFetchKHR` 
 * `spvRayQueryKHR` 
+* `spvRayTracingOpacityMicromapExecutionModeKHR` 
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderEXT` 
 * `spvShaderInvocationReorderNV` 
@@ -1595,6 +1596,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_mesh_shader` : enables the GL_EXT_mesh_shader extension 
 * `GL_EXT_nonuniform_qualifier` : enables the GL_EXT_nonuniform_qualifier extension 
 * `GL_EXT_ray_query` : enables the GL_EXT_ray_query extension 
+* `GL_EXT_opacity_micromap_ray_query_mode` : enables the GL_EXT_opacity_micromap_ray_query_mode extension 
 * `GL_EXT_ray_tracing` : enables the GL_EXT_ray_tracing extension 
 * `GL_EXT_ray_tracing_position_fetch_ray_tracing` : enables the GL_EXT_ray_tracing_position_fetch_ray_tracing extension 
 * `GL_EXT_ray_tracing_position_fetch_ray_query` : enables the GL_EXT_ray_tracing_position_fetch_ray_query extension 
@@ -1658,6 +1660,7 @@ A capability describes an optional feature that a target may or may not support.
 * `ser_nv` 
 * `motionblur_nv` 
 * `rayquery` 
+* `rayquery_opacity_micromap` 
 * `raytracing_motionblur` 
 * `ser_motion` 
 * `ser_nv_motion` 
