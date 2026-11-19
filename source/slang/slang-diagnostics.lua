@@ -129,6 +129,7 @@ local fatal = helpers.fatal
 -- exists for the third group and can be bound here when a diagnostic needs it.
 local extra = helpers.extra
 local pedantic = helpers.pedantic
+local all = helpers.all
 
 --
 -- 0xxxx - Command line and interaction with host platform APIs.
@@ -4049,6 +4050,29 @@ err(
     "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
     span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage; pass a 'groupshared' variable or a component of one, or declare '~param' without 'groupshared' if the function does not need thread-group-shared memory" }
 )
+
+-- An `out` or `inout` parameter requires exclusive access to its argument for the duration of
+-- the call: the callee may implement the parameter by copying in and out of the argument's
+-- storage, so writes through other aliases during the call are lost. A reference parameter
+-- (`__ref`, `__ref_writeonly`, or `groupshared`, which implies `__ref`) gives no such
+-- guarantee, so forwarding one to an `out`/`inout` parameter at a call inside the callee is a
+-- mismatch the signatures alone reveal, and a local temporary restores the guarantee. (A
+-- `__ref_readonly` parameter is listed among the reference kinds for completeness, but it can
+-- never reach this warning as an `out`/`inout` argument: it is not an l-value, so the
+-- existing argument checks reject it first.) The warning sits in the opt-in `all` group, and
+-- its subject is always a by-reference parameter of the enclosing function: a `groupshared`
+-- *variable* passed directly is not diagnosed — that spelling holds the retired E30709/E30710
+-- policy line, which removed warnings that guessed about barrier synchronization — while a
+-- forwarded by-reference parameter states only the signature-level fact that its storage may
+-- be aliased, which is true whatever the barriers say.
+warning(
+    "passing-non-exclusive-memory-to-exclusive-parameter",
+    30712,
+    "passing non-exclusive memory ('~refParam:Name') to a function ('~callee:Name') that requires exclusive access",
+    span { loc = "arg:Expr", message = "parameter '~param:Name' requires exclusive access to its argument for the duration of the call, but reference parameter '~refParam:Name' does not guarantee that; bounce the value through a local temporary if this is what you want" },
+    all
+)
+
 --
 -- 308xx: inheritance
 --

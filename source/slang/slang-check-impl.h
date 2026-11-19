@@ -4216,6 +4216,11 @@ public:
         FuncType* funcType,
         DeclRef<CallableDecl> calleeDeclRef,
         List<DeclRef<ParamDecl>> const& paramDeclRefs);
+    void checkNonExclusiveArguments(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        DeclRef<CallableDecl> calleeDeclRef,
+        List<DeclRef<ParamDecl>> const& paramDeclRefs);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

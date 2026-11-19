@@ -4624,6 +4624,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // to it, and at least one may write it (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, paramDeclRefs);
             checkGroupSharedPartialWritesByCall(invoke, funcType, callableDeclRef, paramDeclRefs);
+            checkNonExclusiveArguments(invoke, funcType, callableDeclRef, paramDeclRefs);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7943,6 +7944,36 @@ void SemanticsVisitor::checkArgumentOfGroupSharedParam(ParamDecl* paramIn, Expr*
             .arg = argIn});
 }
 
+// Return the by-reference parameter of the enclosing function that `arg` names, or null if
+// `arg` names anything else. A reference parameter (`__ref`, `__ref_readonly`,
+// `__ref_writeonly`, or `groupshared`, which implies `__ref`) is a name in the callee for
+// storage the caller may also access through aliases, so whatever storage the caller passed,
+// the callee has no guarantee that the parameter is exclusive. The other parameter kinds that
+// name caller storage are correctly not reference parameters: an `inout` or `out` parameter's
+// caller guarantees it exclusive access (which covers a nested call), a `__borrow` (or its
+// legacy alias `__constref`) parameter's caller guarantees it is unmodified for the duration,
+// and an `in` parameter is a copy.
+// Projections such as `a[0]` or `s.f` name a part of that storage, so
+// `getSubExpressionDeterminingAddressSpace` walks them to the parameter; the caller peels any
+// l-value-coercion wrapper first, so the walk never needs to look through a cast. The walk
+// deliberately stops at shapes that name no part of the parameter's storage — a multi-element
+// swizzle materializes a temporary (which is exactly the bounce the warning recommends), and a
+// member reached through a pointer carries the pointer's own address space — so such
+// arguments stay silent, like the walk's other stop cases documented on the helper itself.
+// The walk resolves the declaration, dropping any substitution on the declaration reference;
+// only the parameter's name and passing mode are read from it, and neither depends on the
+// substitution.
+static ParamDecl* findForwardedReferenceParamDecl(Expr* arg)
+{
+    auto varExpr = as<VarExpr>(getSubExpressionDeterminingAddressSpace(arg));
+    if (!varExpr)
+        return nullptr;
+    auto paramDecl = as<ParamDecl>(varExpr->declRef.getDecl());
+    if (!paramDecl)
+        return nullptr;
+    return isByReferenceParamPassingMode(getParamPassingMode(paramDecl)) ? paramDecl : nullptr;
+}
+
 // An argument of a call that the call writes back to the caller's storage when it returns: the
 // argument of an `out` or `inout` parameter, or the receiver of a `[mutating]` method, whose
 // implicit `this` is an `inout` parameter.
@@ -8220,6 +8251,92 @@ void SemanticsVisitor::checkGroupSharedPartialWritesByCall(
                 .modeLocation = reason.modeLocation,
                 .mutatingLocation = reason.mutatingLocation,
                 .methodLocation = reason.methodLocation});
+        });
+}
+
+// Report W30712 for each argument that `invoke` writes back to storage the enclosing function
+// does not have exclusive access to. An `out` or `inout` parameter, and the implicit `this`
+// of a method the callee may modify (a `[mutating]` method, a `set` accessor, or a method
+// written in HLSL source, where methods are mutating by default), require exclusivity: the
+// callee may copy out of the argument's storage when it returns, discarding writes made
+// through other aliases during the call. A by-reference parameter of the enclosing function
+// does not guarantee exclusivity, so forwarding one is a mismatch the signatures alone
+// reveal. Consider this example:
+//
+//     void inner(inout int x) { x += 1; }
+//     void viaRef(__ref int y) { inner(y); }
+//
+// `inner` may copy in and out of `y`'s storage, so a write that another alias of `y` makes
+// during the call is lost, and a bounce through a local temporary restores the guarantee.
+//
+// `forEachWrittenBackArgument` enumerates exactly the arguments the call writes back — the
+// `out`/`inout` parameters (with an l-value-coerced argument judged by the storage it writes
+// back to, not the conversion wrapper) and the receiver of a method with a mutable effective
+// `this` — so the check reuses it rather than re-deriving that inventory. Three call shapes
+// are deliberately outside the check. Operator expressions (`r += 1`, `++r`) desugar into
+// calls whose mutating operand parameter is `inout`, but writing through a reference that
+// way is the normal, well-defined use of one (`_checkAliasedOutArguments` skips them for the
+// same reason). A call through a value of function type has no parameter declarations to name
+// in the diagnostic. And a reference parameter of an interface type never reaches the check:
+// calling a method through one is dynamically dispatched, and existing rules reject a
+// dynamically dispatched call on a `__ref` parameter outright, so there is no valid call for
+// the check to see; a generic `__ref T` receiver keeps its parameter type and warns.
+//
+// A `groupshared` *variable* passed directly (`inner(g[i])`) stays silent while a
+// `groupshared` *parameter* forwarded on warns. The operative distinction is what each
+// warning claims: the retired E30709/E30710 warnings asserted that passing
+// thread-group-shared storage to an `out`/`inout` parameter was wrong, which barrier-
+// synchronized code disproves, so they were removed rather than guessing about barriers.
+// This warning asserts only what the signature says — a by-reference parameter's storage may
+// be aliased — which is true whether or not barriers synchronize the aliases, and the author,
+// who can see the barriers, can judge it as an advisory. The direct-argument spelling stays
+// silent to hold the retired policy line.
+//
+// An argument that already failed to check is
+// skipped, and one that is not an l-value is left to the `ArgumentExpectedLvalue` diagnostic,
+// so this warning does not pile onto a reported error. `calleeDeclRef` names the invoked
+// function and is valid whenever the visitor below diagnoses: a named argument reaches it
+// only with a parameter declaration, which comes from the callee's declaration, and the
+// receiver branch of `forEachWrittenBackArgument` requires the callee declaration itself.
+void SemanticsVisitor::checkNonExclusiveArguments(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    DeclRef<CallableDecl> calleeDeclRef,
+    List<DeclRef<ParamDecl>> const& paramDeclRefs)
+{
+    if (as<OperatorExpr>(invoke))
+        return;
+
+    forEachWrittenBackArgument(
+        this,
+        invoke,
+        funcType,
+        calleeDeclRef,
+        paramDeclRefs,
+        [&](WrittenBackArgument const& written)
+        {
+            // A receiver has no parameter declaration to name; the implicit `this` is what
+            // carries the `inout` mode. A call through a value of function type has no
+            // parameter declarations at all, and nothing to name in the diagnostic. Every
+            // non-receiver path that reaches the diagnostic below therefore has a parameter
+            // declaration, which is what `written.param->getName()` relies on.
+            if (!written.isReceiver && !written.param)
+                return;
+
+            SLANG_ASSERT(written.isReceiver || written.param);
+
+            if (!written.storage->type.isLeftValue)
+                return;
+
+            auto forwardedParam = findForwardedReferenceParamDecl(written.storage);
+            if (!forwardedParam)
+                return;
+
+            getSink()->diagnose(Diagnostics::PassingNonExclusiveMemoryToExclusiveParameter{
+                .refParam = forwardedParam->getName(),
+                .callee = calleeDeclRef.getName(),
+                .param = written.isReceiver ? getName("this") : written.param->getName(),
+                .arg = written.arg});
         });
 }
 
