@@ -12,25 +12,16 @@ namespace Slang
 
 bool isUnsizedBufferType(IRType* type)
 {
-    UInt operandIndex;
     switch (type->getOp())
     {
-    case kIROp_HLSLStructuredBufferType:
-    case kIROp_HLSLRWStructuredBufferType:
-        operandIndex = kStructuredBufferIsUnsizedOperandIndex;
-        break;
-    case kIROp_HLSLByteAddressBufferType:
-    case kIROp_HLSLRWByteAddressBufferType:
-        SLANG_RELEASE_ASSERT(type->getOperandCount() == 1);
-        operandIndex = kByteAddressBufferIsUnsizedOperandIndex;
-        break;
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
+    case kIROp_HLSLUnsizedByteAddressBufferType:
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
+        return true;
     default:
         return false;
     }
-    SLANG_RELEASE_ASSERT(type->getOperandCount() > operandIndex);
-    auto flag = as<IRBoolLit>(type->getOperand(operandIndex));
-    SLANG_RELEASE_ASSERT(flag);
-    return flag->getValue();
 }
 
 // Share the struct-field traversal while allowing callers to choose which field types disappear.
@@ -3753,6 +3744,8 @@ bool isPointerToImmutableLocation(IRInst* loc)
     {
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLByteAddressBufferType:
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedByteAddressBufferType:
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
         return true;

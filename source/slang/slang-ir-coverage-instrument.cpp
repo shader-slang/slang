@@ -726,10 +726,8 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     // driver that ultimately runs the SPIR-V/PTX, and that's the only
     // thing that decides whether 64-bit shader atomics are usable.
     IRType* counterElementType = getCoverageCounterElementType(builder, counterByteWidth);
-    auto bufferType = builder.getStructuredBufferType(
-        kIROp_HLSLRWStructuredBufferType,
-        counterElementType,
-        builder.getDefaultBufferLayoutType());
+    IRInst* typeOperands[2] = {counterElementType, builder.getType(kIROp_DefaultBufferLayoutType)};
+    auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
 
     // Bindless form: the global becomes an UNBOUNDED array of buffers, so
     // one (space, binding) covers every shader in the pipeline and each

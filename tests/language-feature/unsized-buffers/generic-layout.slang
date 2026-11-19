@@ -4,6 +4,7 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry computeMain -stage compute -validate-ir -O0 -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -cpu -compute -output-using-type -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -cuda -compute -output-using-type -xslang -matrix-layout-row-major
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=RESULT): -llvm -compute -output-using-type -xslang -matrix-layout-row-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=RESULT): -vk -compute -output-using-type -xslang -matrix-layout-row-major
 
 // Element and layout types pass through generic specialization and interface witnesses.

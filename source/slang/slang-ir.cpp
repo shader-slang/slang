@@ -2968,65 +2968,6 @@ IRType* IRBuilder::getType(IROp op, IRInst* operand0)
     return getType(op, 1, &operand0);
 }
 
-IRType* IRBuilder::getStructuredBufferType(
-    IROp op,
-    IRType* elementType,
-    IRType* dataLayout,
-    bool isUnsized,
-    UInt trailingOperandCount,
-    IRInst* const* trailingOperands)
-{
-    SLANG_RELEASE_ASSERT(
-        op == kIROp_HLSLStructuredBufferType || op == kIROp_HLSLRWStructuredBufferType);
-    SLANG_RELEASE_ASSERT(elementType && (!trailingOperandCount || trailingOperands));
-    ShortList<IRInst*> operands;
-    operands.add(elementType);
-    operands.add(dataLayout ? dataLayout : getDefaultBufferLayoutType());
-    SLANG_ASSERT(operands.getCount() == kStructuredBufferIsUnsizedOperandIndex);
-    operands.add(getBoolValue(isUnsized));
-    for (UInt i = 0; i < trailingOperandCount; ++i)
-        operands.add(trailingOperands[i]);
-    return getType(op, operands.getCount(), operands.getArrayView().getBuffer());
-}
-
-IRType* IRBuilder::getByteAddressBufferType(IROp op, bool isUnsized)
-{
-    SLANG_RELEASE_ASSERT(
-        op == kIROp_HLSLByteAddressBufferType || op == kIROp_HLSLRWByteAddressBufferType);
-    return getType(op, getBoolValue(isUnsized));
-}
-
-IRType* IRBuilder::getBufferTypeWithSizedness(IRType* type, bool isUnsized)
-{
-    // Querying the flag also checks the required operand schema before we rebuild it.
-    const bool wasUnsized = isUnsizedBufferType(type);
-    switch (type->getOp())
-    {
-    case kIROp_HLSLStructuredBufferType:
-    case kIROp_HLSLRWStructuredBufferType:
-        {
-            if (wasUnsized == isUnsized)
-                return type;
-            ShortList<IRInst*> trailingOperands;
-            for (UInt i = kStructuredBufferIsUnsizedOperandIndex + 1; i < type->getOperandCount();
-                 ++i)
-                trailingOperands.add(type->getOperand(i));
-            return getStructuredBufferType(
-                type->getOp(),
-                (IRType*)type->getOperand(0),
-                (IRType*)type->getOperand(1),
-                isUnsized,
-                trailingOperands.getCount(),
-                trailingOperands.getArrayView().getBuffer());
-        }
-    case kIROp_HLSLByteAddressBufferType:
-    case kIROp_HLSLRWByteAddressBufferType:
-        return getByteAddressBufferType(type->getOp(), isUnsized);
-    default:
-        SLANG_UNEXPECTED("Expected an ordinary structured or byte-address buffer type.");
-    }
-}
-
 IRBasicType* IRBuilder::getBasicType(BaseType baseType)
 {
     return (IRBasicType*)getType(IROp((UInt)kIROp_FirstBasicType + (UInt)baseType));

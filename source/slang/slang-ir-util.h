@@ -287,8 +287,7 @@ bool hasGenericAssemblyImplementation(IRFunc* func);
 bool isResourceType(IRType* type);
 
 /// Returns whether the buffer type omits length metadata on pointer-based targets.
-/// Ordinary RO/RW buffer types must contain the explicit boolean sizedness operand.
-/// Other types return false. Native resource targets erase this distinction during lowering.
+/// Native resource targets erase this distinction during unsized-buffer lowering.
 bool isUnsizedBufferType(IRType* type);
 
 /// Return whether `type` is itself a texture or storage image, a sampler, a combined

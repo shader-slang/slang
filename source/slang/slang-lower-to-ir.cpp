@@ -2949,27 +2949,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
                 });
-        switch (op)
-        {
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLRWStructuredBufferType:
-            // The checked source type carries (T, L, layoutWitness...). Insert sizedness
-            // before the witness tail so generic L retains its original conformance proof.
-            SLANG_RELEASE_ASSERT(operands.getCount() >= 2);
-            return getBuilder()->getStructuredBufferType(
-                op,
-                (IRType*)operands[0],
-                (IRType*)operands[1],
-                isUnsizedBufferType(type),
-                UInt(operands.getCount() - 2),
-                operands.getBuffer() + 2);
-        case kIROp_HLSLByteAddressBufferType:
-        case kIROp_HLSLRWByteAddressBufferType:
-            SLANG_RELEASE_ASSERT(operands.getCount() == 0);
-            return getBuilder()->getByteAddressBufferType(op, isUnsizedBufferType(type));
-        default:
-            break;
-        }
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),

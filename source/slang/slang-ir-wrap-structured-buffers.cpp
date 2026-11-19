@@ -105,15 +105,8 @@ struct WrapStructuredBuffersContext
         // replacing one type A with another type B globally, and doing
         // so could affect any type that in turn referenced A...
         //
-        // Wrapping changes only the element; retain layout, sizedness, and generic witnesses.
-        ShortList<IRInst*> operands;
-        for (UInt i = 0; i < oldStructuredBufferType->getOperandCount(); ++i)
-            operands.add(oldStructuredBufferType->getOperand(i));
-        operands[0] = wrapperStruct;
-        auto newStructuredBufferType = builder->getType(
-            oldStructuredBufferType->getOp(),
-            operands.getCount(),
-            operands.getArrayView().getBuffer());
+        auto newStructuredBufferType =
+            builder->getType(oldStructuredBufferType->getOp(), wrapperStruct);
         oldStructuredBufferType->replaceUsesWith(newStructuredBufferType);
 
         // Any values that used our old structured bufer type

@@ -264,11 +264,6 @@ struct UnsizedByteAddressBuffer
         memcpy(&value, ((const char*)data) + index, sizeof(T));
         return value;
     }
-    uint32_t Load(size_t index) const { return Load<uint32_t>(index); }
-    uint2 Load2(size_t index) const { return Load<uint2>(index); }
-    uint3 Load3(size_t index) const { return Load<uint3>(index); }
-    uint4 Load4(size_t index) const { return Load<uint4>(index); }
-
     template<typename T>
     UnsizedStructuredBuffer<T> asStructuredBuffer() const
     {
@@ -285,21 +280,11 @@ struct UnsizedRWByteAddressBuffer
     {
         return UnsizedByteAddressBuffer{data}.Load<T>(index);
     }
-    uint32_t Load(size_t index) const { return Load<uint32_t>(index); }
-    uint2 Load2(size_t index) const { return Load<uint2>(index); }
-    uint3 Load3(size_t index) const { return Load<uint3>(index); }
-    uint4 Load4(size_t index) const { return Load<uint4>(index); }
-
     template<typename T>
     void Store(size_t index, const T& value) const
     {
         memcpy(((char*)data) + index, &value, sizeof(T));
     }
-    void Store(size_t index, uint32_t value) const { Store<uint32_t>(index, value); }
-    void Store2(size_t index, uint2 value) const { Store<uint2>(index, value); }
-    void Store3(size_t index, uint3 value) const { Store<uint3>(index, value); }
-    void Store4(size_t index, uint4 value) const { Store<uint4>(index, value); }
-
     template<typename T>
     UnsizedRWStructuredBuffer<T> asStructuredBuffer() const
     {

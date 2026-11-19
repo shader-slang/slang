@@ -73,6 +73,7 @@ struct RequiredLoweringPassSet
     bool rayTracingLocationOperand = false;
     bool glslSSBO;
     bool byteAddressBuffer;
+    bool unsizedBuffer;
     bool dynamicResource;
     bool dynamicResourceHeap;
     bool untypedResourceHandle;

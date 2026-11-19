@@ -9,53 +9,6 @@
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(irBufferSizednessPreservesGenericOperands)
-{
-    StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder fixture(env.getSessionImpl());
-    IRBuilder builder(fixture.getModule());
-    builder.setInsertInto(fixture.getModule());
-
-    // Generic element/layout arguments are type-valued instructions, not concrete type nodes.
-    // Changing sizedness must preserve them and the layout's conformance witness unchanged.
-    auto elementType = (IRType*)builder.emitGlobalGenericParam(builder.getTypeKind());
-    auto layoutType = (IRType*)builder.emitGlobalGenericParam(builder.getTypeKind());
-    auto layoutInterface = builder.createInterfaceType(0, nullptr);
-    IRInst* witness = builder.emitGlobalGenericParam(builder.getWitnessTableType(layoutInterface));
-    for (auto op : {kIROp_HLSLStructuredBufferType, kIROp_HLSLRWStructuredBufferType})
-    {
-        auto sized =
-            builder.getStructuredBufferType(op, elementType, layoutType, false, 1, &witness);
-        auto unsized = builder.getBufferTypeWithSizedness(sized, true);
-        SLANG_CHECK(!isUnsizedBufferType(sized));
-        SLANG_CHECK(isUnsizedBufferType(unsized));
-        SLANG_CHECK(sized != unsized && sized->getOp() == unsized->getOp());
-        SLANG_CHECK(unsized->getOperandCount() == 4);
-        SLANG_CHECK(unsized->getOperand(0) == elementType);
-        SLANG_CHECK(unsized->getOperand(1) == layoutType);
-        SLANG_CHECK(unsized->getOperand(3) == witness);
-        SLANG_CHECK(builder.getBufferTypeWithSizedness(unsized, false) == sized);
-        SLANG_CHECK(
-            builder.getStructuredBufferType(op, elementType, layoutType, true, 1, &witness) ==
-            unsized);
-        SLANG_CHECK(
-            builder.getStructuredBufferType(op, elementType, nullptr) ==
-            builder.getStructuredBufferType(op, elementType, builder.getDefaultBufferLayoutType()));
-    }
-
-    for (auto op : {kIROp_HLSLByteAddressBufferType, kIROp_HLSLRWByteAddressBufferType})
-    {
-        auto sized = builder.getByteAddressBufferType(op);
-        auto unsized = builder.getBufferTypeWithSizedness(sized, true);
-        SLANG_CHECK(!isUnsizedBufferType(sized));
-        SLANG_CHECK(isUnsizedBufferType(unsized));
-        SLANG_CHECK(sized != unsized && sized->getOp() == unsized->getOp());
-        SLANG_CHECK(unsized->getOperandCount() == 1);
-        SLANG_CHECK(builder.getByteAddressBufferType(op, true) == unsized);
-        SLANG_CHECK(builder.getBufferTypeWithSizedness(unsized, false) == sized);
-    }
-}
-
 SLANG_UNIT_TEST(irStructEmptyPreservesDceSemantics)
 {
     StaticUnitTestEnv env(unitTestContext);
@@ -133,13 +86,11 @@ SLANG_UNIT_TEST(irEmptyTypePreservesOpaqueRepresentations)
     auto empty = builder.createStructType();
     auto intrinsic = builder.createStructType();
     builder.addTargetIntrinsicDecoration(intrinsic, CapabilitySet(), UnownedStringSlice("opaque"));
+    IRInst* bufferOperands[] = {empty, builder.getDefaultBufferLayoutType()};
     IRType* nonemptyTypes[] = {
         builder.getPtrType(empty),
         builder.getType(kIROp_SamplerStateType),
-        builder.getStructuredBufferType(
-            kIROp_HLSLStructuredBufferType,
-            empty,
-            builder.getDefaultBufferLayoutType()),
+        builder.getType(kIROp_HLSLStructuredBufferType, 2, bufferOperands),
         builder.getType(kIROp_EmptyNodeInputType),
         builder.getType(kIROp_DispatchNodeInputRecordType, empty),
         intrinsic,

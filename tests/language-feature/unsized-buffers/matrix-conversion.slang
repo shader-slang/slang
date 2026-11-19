@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -output-using-type -xslang -matrix-layout-column-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -output-using-type -xslang -matrix-layout-column-major
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -compute -output-using-type -xslang -matrix-layout-column-major
 //TEST(compute,vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -output-using-type -xslang -matrix-layout-column-major
 
 // An unsized view must preserve its source buffer's physical matrix layout. Using asymmetric

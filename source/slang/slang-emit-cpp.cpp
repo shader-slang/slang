@@ -212,6 +212,14 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
     case kIROp_HLSLByteAddressBufferType:
         return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
+    case kIROp_HLSLUnsizedStructuredBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedStructuredBuffer");
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedRWStructuredBuffer");
+    case kIROp_HLSLUnsizedByteAddressBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedByteAddressBuffer");
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedRWByteAddressBuffer");
     case kIROp_SamplerStateType:
         return UnownedStringSlice::fromLiteral("SamplerState");
     case kIROp_SamplerComparisonStateType:
@@ -435,8 +443,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                     SourceWriter writer(sourceManager, LineDirectiveMode::None, nullptr);
                     m_writer = &writer;
 
-                    if (isUnsizedBufferType(type))
-                        m_writer->emit("Unsized");
                     m_writer->emit(prefix);
 
                     // TODO(JS).
@@ -445,8 +451,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
                     UInt operandCount = type->getOperandCount();
                     if (as<IRHLSLStructuredBufferTypeBase>(type))
                         operandCount = 1;
-                    else if (as<IRByteAddressBufferTypeBase>(type))
-                        operandCount = 0;
 
                     if (operandCount)
                     {

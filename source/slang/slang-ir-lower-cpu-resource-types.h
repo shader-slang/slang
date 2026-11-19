@@ -16,4 +16,10 @@ struct CodeGenContext;
 /// struct with only the data pointer, matching the C++ prelude representation.
 void lowerCPUResourceTypes(IRModule* module, CodeGenContext* codeGenContext);
 
+/// Map unsized buffers to the existing resource types on targets where both have
+/// the same representation. For example, HLSL uses `StructuredBuffer<T>` for both
+/// forms, while Metal uses a device pointer for both. Sized-to-unsized conversion
+/// is an identity operation on these targets.
+void lowerUnsizedBufferTypesToResources(IRModule* module);
+
 } // namespace Slang

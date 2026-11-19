@@ -1639,17 +1639,9 @@ struct ByteAddressBufferLegalizationContext
             // The basic `*ByteAddressBuffer` types map directly to the
             // `*StructuredBuffer<elementType>` cases.
         case kIROp_HLSLByteAddressBufferType:
-            return m_builder.getStructuredBufferType(
-                kIROp_HLSLStructuredBufferType,
-                elementType,
-                m_builder.getDefaultBufferLayoutType(),
-                isUnsizedBufferType(byteAddressBufferType));
+            return m_builder.getType(kIROp_HLSLStructuredBufferType, 2, typeOperands);
         case kIROp_HLSLRWByteAddressBufferType:
-            return m_builder.getStructuredBufferType(
-                kIROp_HLSLRWStructuredBufferType,
-                elementType,
-                m_builder.getDefaultBufferLayoutType(),
-                isUnsizedBufferType(byteAddressBufferType));
+            return m_builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
             return m_builder.getType(
                 kIROp_HLSLRasterizerOrderedStructuredBufferType,

@@ -1478,12 +1478,6 @@ struct IRHLSLStructuredBufferTypeBase : IRBuiltinGenericType
     IRType* getDataLayout() { return getOperandCount() > 1 ? (IRType*)getOperand(1) : nullptr; }
 };
 
-// Ordinary RO/RW buffers encode sizedness independently of their element storage layout.
-// Structured types have (element, layout, isUnsized, witnesses...), while byte-address
-// types have (isUnsized). Append, consume, and rasterizer-ordered types keep their schemas.
-constexpr UInt kStructuredBufferIsUnsizedOperandIndex = 2;
-constexpr UInt kByteAddressBufferIsUnsizedOperandIndex = 0;
-
 
 FIDDLE()
 struct IRHLSLPatchType : IRType
@@ -2254,8 +2248,7 @@ public:
     //
     // Adding or removing AST classes changes the sequential `ASTNodeType` values. We raise the
     // minimum supported version when those values change so older modules are rejected before
-    // their node IDs can be decoded as different AST classes. Incompatible changes to existing
-    // IR operand schemas, such as adding the buffer sizedness operand, also raise this minimum.
+    // their node IDs can be decoded as different AST classes.
     const static UInt k_minSupportedModuleVersion = 43;
     const static UInt k_maxSupportedModuleVersion = 43;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);

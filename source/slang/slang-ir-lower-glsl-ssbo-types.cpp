@@ -86,10 +86,8 @@ static void lowerArrayLikeSSBOs(IRModule* module)
     for (const auto& [ssbo, info] : arrayLikeSSBOTypes)
     {
         builder.setInsertAfter(ssbo);
-        const auto sb = builder.getStructuredBufferType(
-            kIROp_HLSLRWStructuredBufferType,
-            info.elementType,
-            ssbo->getDataLayout());
+        IRInst* operands[2] = {info.elementType, ssbo->getDataLayout()};
+        const auto sb = builder.getType(kIROp_HLSLRWStructuredBufferType, 2, operands);
         ssbo->replaceUsesWith(sb);
         ssbo->removeAndDeallocate();
 
@@ -178,10 +176,8 @@ static void lowerStructLikeSSBOs(IRModule* module)
     for (const auto& [ssbo, info] : structLikeSSBOTypes)
     {
         builder.setInsertAfter(ssbo);
-        const auto sb = builder.getStructuredBufferType(
-            kIROp_HLSLRWStructuredBufferType,
-            info.backingStruct,
-            builder.getDefaultBufferLayoutType());
+        IRInst* operands = info.backingStruct;
+        const auto sb = builder.getType(kIROp_HLSLRWStructuredBufferType, 1, &operands);
 
         ssbo->replaceUsesWith(sb);
         ssbo->removeAndDeallocate();

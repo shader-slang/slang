@@ -374,36 +374,6 @@ struct PeepholeContext : InstPassBase
 
         switch (inst->getOp())
         {
-        case kIROp_HLSLStructuredBufferType:
-        case kIROp_HLSLRWStructuredBufferType:
-        case kIROp_HLSLByteAddressBufferType:
-        case kIROp_HLSLRWByteAddressBufferType:
-            {
-                if (!targetProgram || isPrelinking)
-                    break;
-                auto target = targetProgram->getTargetReq();
-                auto type = cast<IRType>(inst);
-                if (isCPUTarget(target) || isCUDATarget(target) || !isUnsizedBufferType(type))
-                    break;
-
-                // Native resource targets have one representation for both size modes.
-                // Establish that type identity before resource specialization and SPIR-V
-                // storage-struct construction, so converting a buffer preserves its type.
-                IRBuilder builder(module);
-                builder.setInsertBefore(inst);
-                inst->replaceUsesWith(builder.getBufferTypeWithSizedness(type, false));
-                maybeRemoveOldInst(inst);
-                changed = true;
-            }
-            break;
-        case kIROp_GetUnsizedBuffer:
-            if (inst->getDataType() == inst->getOperand(0)->getDataType())
-            {
-                inst->replaceUsesWith(inst->getOperand(0));
-                maybeRemoveOldInst(inst);
-                changed = true;
-            }
-            break;
         case kIROp_AlignOf:
         case kIROp_SizeOf:
             {
