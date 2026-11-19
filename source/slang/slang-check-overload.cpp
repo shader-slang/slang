@@ -538,7 +538,15 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                 else
                 {
                     // Otherwise, the generic decl had better provide a default value
-                    // or this reference is ill-formed.
+                    // or this reference is ill-formed. The folded default is then
+                    // canonicalized to the parameter's declared type — the same
+                    // form an explicitly written argument produces — so the
+                    // omitted argument records the one canonical `IntVal`. This
+                    // is the only default fold left in play for a nested generic
+                    // application: the constraint solver that re-folds defaults
+                    // with their types only runs for outermost generics, so an
+                    // untyped fold here would survive into the candidate's
+                    // substitution.
                     ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
                     ConstantFoldingCircularityInfo newCircularityInfo(valParamRef, nullptr);
                     auto defaultVal = tryConstantFoldExpr(
@@ -549,6 +557,23 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     {
                         maybeReportGeneralError();
                         return false;
+                    }
+                    auto paramType = getType(m_astBuilder, valParamRef);
+                    if (defaultVal->getType() != paramType)
+                    {
+                        if (auto folded = as<IntVal>(TypeCastIntVal::tryFoldImpl(
+                                m_astBuilder,
+                                paramType,
+                                defaultVal,
+                                nullptr)))
+                        {
+                            defaultVal = folded;
+                        }
+                        else
+                        {
+                            defaultVal =
+                                as<IntVal>(m_astBuilder->getTypeCastIntVal(paramType, defaultVal));
+                        }
                     }
                     checkedArgs.add(defaultVal);
                     continue;
