@@ -3606,44 +3606,16 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
     }
 }
 
-// Compute the array type that a chain of type-position brackets denotes, e.g.
-// `int[2][4]`. Producers build such a chain in source order (`UnwrapDeclarator`
-// for declarations, `parseBracketTypeSuffix` and `parsePostfixTypeSuffix` for
-// type specs, `parsePostfixExpr` for expressions), and the invariant the
-// re-nest below relies on is that reading the chain bottom-up yields the
-// dimensions outermost to innermost: a pure type chain nests the first source
-// bracket innermost, and a mixed type-spec+declarator spelling like
-// `int[3] x[2]` puts the declarator brackets at the bottom. C and GLSL
-// instead read a bracket chain left to right, with the first bracket as the
-// outermost dimension: `int[2][4]` denotes an array of 2 elements of
-// `int[4]`, i.e. `Array<Array<int,4>,2>`, the same type a declaration
-// `int x[2][4]` gives its variable, so checking the chain cannot simply wrap
-// each node's count around the type below it (that would produce
-// `Array<Array<int,2>,4>`).
-//
-// Consider `int[2][4]`: the checker reaches the `[4]` node last, after
-// `int[2]` has already resolved to `Array<int,2>`. Since every prefix of the
-// chain resolves through this same logic, that base type is a correctly nested
-// array built from the atom and the counts below, so we can recover those
-// counts by stripping exactly `bracketCount` array levels off it, outermost
-// first. We then re-fold the dimensions: this node's own count innermost,
-// followed by the stripped counts from innermost to outermost, which makes the
-// first source bracket the outermost dimension. The counts are reused
-// verbatim, so generic and specialization-constant sizes survive unchanged,
-// and an unsized bracket keeps meaning an unbounded dimension: an unsized
-// array's element count is the `kUnsizedArrayMagicLength` IntVal that
-// `ASTBuilder::getArrayType` canonicalizes null counts into, and it rides
-// through `outerCounts` and the re-fold like any other count, so `int[3][]`
-// is an array of three unbounded arrays, the same type the declaration
-// `int x[3][]` denotes.
-//
-// `bracketCount` is the number of chain links the caller's classification walk
-// counted; each of those links was checked through this same branch and so
-// contributed exactly one array level, which is why the strip below always
-// succeeds on shapes that reach it. Returns nullptr if the base type does not
-// strip down anyway — no constructible input is known to do that, so the
-// strip asserts in debug builds, and a release build falls back to the
-// caller's legacy wrap rather than asserting on user code.
+// Re-nest a chain of type-position brackets the way GLSL reads it: the first
+// source bracket is the outermost dimension, so `int[2][4]` denotes
+// `Array<Array<int,4>,2>`, the same type the declaration `int x[2][4]` gives
+// its variable. The links below this node were each checked through this same
+// re-nesting, so `baseType` carries one array level per counted link: strip
+// exactly `bracketCount` levels off it, then re-fold with this node's own count
+// innermost and the stripped counts from inner to outer. Counts are reused
+// verbatim, so generic and unsized sizes ride through unchanged. Returns
+// nullptr when the base type does not strip down that way; the strip asserts
+// in debug builds, and a release build falls back to the caller's plain wrap.
 static Type* tryGetBracketChainArrayType(
     ASTBuilder* astBuilder,
     Type* baseType,
@@ -3667,13 +3639,12 @@ static Type* tryGetBracketChainArrayType(
     return resultType;
 }
 
-// A plain bracket chain is a run of single-argument bracket links — each
-// carrying at most one size expression, including the unsized `[]` — each
-// sitting on the next, ending at a non-bracket base. Count how many such links
-// sit below `chainLink`; set `outIsPlainBracketChain` to false if any link in
-// the run carries more than one index expression (a multi-argument bracket
-// like the `2,3` in `int[2,3][4]`), which makes the chain's already-checked
-// prefix unreliable for the re-nest.
+// A plain bracket chain is a run of single-argument bracket links (each
+// carrying at most one size expression, including the unsized `[]`), each
+// sitting on the next. Count how many such links sit below `chainLink`; set
+// `outIsPlainBracketChain` to false if any link carries more than one index
+// expression (a multi-argument bracket like the `2,3` in `int[2,3][4]`), whose
+// checked prefix cannot be stripped reliably.
 static UInt getBracketChainLinkCount(Expr* chainLink, bool& outIsPlainBracketChain)
 {
     UInt bracketCount = 0;
@@ -3764,15 +3735,14 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
 
         Type* arrayType = nullptr;
+        if (getShared()->isGLSLSourceLanguage())
         {
-            // A bracket sitting on further brackets, e.g. the `[4]` in
-            // `int[2][4]`, must re-nest the chain so the first source bracket
-            // is the outermost dimension (see `tryGetBracketChainArrayType`).
-            // The walk below runs over the already-checked links — the base
-            // was replaced by its checked form just above — and re-nests only
-            // a plain bracket chain; a chain containing a multi-argument
-            // bracket kept the legacy wrap (this bracket wrapped around the
-            // base type) when its links were checked, so it keeps it here too.
+            // GLSL reads a type-expression bracket chain left to right, with the
+            // first bracket as the outermost dimension, like a C declaration:
+            // `int[2][4]` is an array of 2 `int[4]`s. Slang and HLSL instead bind
+            // the last bracket outermost (`specification/types-array.md`, group
+            // (2): `ElementType[M][N]` equals the trailing `varName[N][M]`), which
+            // the plain wrap below already implements, so only GLSL re-nests.
             bool isPlainBracketChain = true;
             UInt bracketCount = getBracketChainLinkCount(
                 subscriptExpr->baseExpression,

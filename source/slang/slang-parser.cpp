@@ -2837,15 +2837,13 @@ static InitDeclarator parseInitDeclarator(Parser* parser, DeclaratorParseOptions
 }
 
 // Fold a parsed declarator's pointer/array suffixes onto the base type in `ioInfo->typeSpec` and
-// copy out its name. Pointer suffixes wrap the base type on top; array suffixes splice below any
-// bracket chain already folded (see the array case for why that order is load-bearing) and only
-// wrap on top when the type so far is not a bracket chain. This is the single point every C-style
-// declarator (variable, parameter, typedef, property, and function) passes through on its way to a
-// declaration, so it is where the `operator <op>` name rule is enforced: an operator name is only
-// legal for a function, so unless `allowOperatorName` is set (only the traditional-function
-// branch opts in), an operator-named declarator is diagnosed here. Enforcing at this one
-// chokepoint means the variable, parameter, typedef, and property cases are all rejected by
-// construction, with no per-kind check to keep in sync.
+// copy out its name. This is the single point every C-style declarator (variable, parameter,
+// typedef, property, and function) passes through on its way to a declaration, so it is where the
+// `operator <op>` name rule is enforced: an operator name is only legal for a function, so unless
+// `allowOperatorName` is set (only the traditional-function branch opts in), an operator-named
+// declarator is diagnosed here. Enforcing at this one chokepoint means the variable, parameter,
+// typedef, and property cases are all rejected by construction, with no per-kind check to keep in
+// sync.
 static void UnwrapDeclarator(
     Parser* parser,
     RefPtr<Declarator> declarator,
@@ -2892,38 +2890,21 @@ static void UnwrapDeclarator(
                 if (arrayDeclarator->elementCountExpr)
                     arrayTypeExpr->indexExprs.add(arrayDeclarator->elementCountExpr);
 
-                // The chain of brackets must nest the first source bracket innermost, so that
-                // a declaration `int x[2][4]` denotes the same type as the type expression
-                // `int[2][4]` when it is checked: `visitIndexExpr` re-nests a chain of
-                // type-position brackets with the first source bracket outermost (C and GLSL
-                // read a bracket chain left to right), and it can only do that if every
-                // producer hands it the same chain shape. The outermost declarator node —
-                // the LAST source bracket — is processed first, so an earlier bracket folds
-                // below the brackets already folded instead of wrapping them. Wrapping on
-                // top stays correct when the type so far is not a bracket chain, e.g.
-                // `int* p[2]` folds to `int*[2]`, not `(int[2])*`. This also covers a type
-                // spec that is itself a bracket chain: `int[3] x[2]` splices the declarator
-                // bracket at the bottom of the type spec's chain, so the combined chain
-                // reads left to right and `x` is an array of 2 `int[3]`s.
-                //
-                // The splice mutates a pre-existing node (it overwrites the bottom
-                // bracket's `baseExpression`), which the legacy wrap never did. That is
-                // safe because a declarator's typeSpec chain is unwrapped exactly once,
-                // and in a multi-declarator group (`int x[2][4], y[2][4];`) every
-                // declaration restarts from a fresh `SharedTypeExpr` wrapper around the
-                // shared type spec, which fails the `as<IndexExpr>` test above and so
-                // shields the shared chain from ever being spliced into. Note the branch
-                // asymmetry: the else branch reassigns `ioInfo->typeSpec` to the new node,
-                // while the splice branch leaves it at the existing chain top, since the
-                // new node lands at the bottom.
-                if (auto chainTopExpr = as<IndexExpr>(ioInfo->typeSpec))
+                // GLSL reads a declaration's brackets left to right, first bracket
+                // outermost, and the checker's GLSL re-nest expects the chain to
+                // carry them that way (first source bracket innermost, like every
+                // other chain producer). Slang and HLSL declarations instead keep
+                // the plain wrap, which their checker turns into the
+                // last-bracket-outermost type reading the spec defines.
+                if (parser->getSourceLanguage() == SourceLanguage::GLSL &&
+                    as<IndexExpr>(ioInfo->typeSpec))
                 {
-                    auto bottomBracketExpr = chainTopExpr;
-                    while (auto lowerBracketExpr = as<IndexExpr>(bottomBracketExpr->baseExpression))
-                        bottomBracketExpr = lowerBracketExpr;
-                    // Splice below the bottom bracket: the new node takes over the atom
-                    // first, then the bottom bracket is re-pointed at the new node — the
-                    // order preserves the atom link before it is overwritten.
+                    // Splice below the bottom bracket; the chain top is unchanged.
+                    // The walk descends to the bottom before the new node takes over
+                    // the atom link, since the assignment order preserves it.
+                    auto bottomBracketExpr = as<IndexExpr>(ioInfo->typeSpec);
+                    while (as<IndexExpr>(bottomBracketExpr->baseExpression))
+                        bottomBracketExpr = as<IndexExpr>(bottomBracketExpr->baseExpression);
                     arrayTypeExpr->baseExpression = bottomBracketExpr->baseExpression;
                     bottomBracketExpr->baseExpression = arrayTypeExpr;
                 }
@@ -4026,11 +4007,6 @@ static DeclBase* ParseDeclaratorDecl(
 
     for (;;)
     {
-        // Restarting from the SharedTypeExpr wrapper every iteration is what
-        // lets UnwrapDeclarator's array splice mutate the folded chain safely:
-        // the wrapper fails the splice's as<IndexExpr> test, so the shared type
-        // spec below it is never spliced into, and each declarator folds its
-        // own nodes.
         declaratorInfo.typeSpec = sharedTypeSpec;
         UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
 
@@ -5470,11 +5446,11 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     // not parseInitDeclarator, because a typedef takes no initializer or semantics.
     //
     // UnwrapDeclarator folds the declarator suffixes onto the base type with C
-    // array-variable semantics: `typedef int m[A][B];` yields Array<Array<int, B>, A> --
-    // the same type as the variable `int m[A][B];`. The leading form `typedef int[A][B] m;`
-    // denotes the same type: both spellings read their bracket chain left to right, with
-    // the first bracket as the outermost dimension, so the two are interchangeable for
-    // any number of dimensions.
+    // array-variable semantics: `typedef int m[A][B];` yields Array<Array<int, B>, A> -- the
+    // same type as the variable `int m[A][B];`. For a single dimension that equals the
+    // leading form `typedef int[N] arr;`; for multiple dimensions the trailing form is the
+    // transpose of the leading form (which wraps left-to-right), so the two are not
+    // interchangeable beyond one dimension.
     DeclaratorInfo declaratorInfo;
     declaratorInfo.typeSpec = type.exp;
     auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);

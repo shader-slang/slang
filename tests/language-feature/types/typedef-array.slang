@@ -2,9 +2,7 @@
 
 // Regression test for shader-slang/slang#11567: a C-style trailing-array typedef
 // `typedef <type> <name>[N];` should parse and produce the same array-typed alias
-// as the leading-array form `typedef <type>[N] <name>;`. Both forms read their
-// bracket chain left to right, first bracket outermost, so they are
-// interchangeable for any number of dimensions.
+// as the leading-array form `typedef <type>[N] <name>;` (for a single dimension).
 
 // Trailing-array form (the bug): bracket comes AFTER the alias name.
 typedef int Arr2[2];
@@ -15,11 +13,6 @@ typedef int[3] Arr3;
 // Multi-dimensional trailing-array form (non-square, C array-variable semantics:
 // `int m[2][3]` is Array<Array<int,3>,2>, so `m[1][2]` is the last element).
 typedef int Mat2x3[2][3];
-
-// Multi-dimensional leading-array form — the same type as Mat2x3, since both
-// spellings now read first-bracket-outermost (they were transposes of each
-// other before the fix for #5870).
-typedef int[2][3] Mat2x3Leading;
 
 // 3-D trailing typedef array, used below to confirm a typedef array and a plain
 // variable array declaration of the same shape have identical element semantics.
@@ -32,7 +25,7 @@ typedef int Cube[2][2][2];
 typedef int Unsized[];
 typedef int* IntPtr;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -72,12 +65,4 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
                     eq = 0;
     // CHECK: 1
     outputBuffer[3] = eq; // typedef array == variable array decl, element-wise
-
-    // The leading-form alias denotes the same type as the trailing form: it
-    // accepts the same [2][3]-shaped brace initializer, and the same
-    // last-element address works. A transposed reading would reject the
-    // initializer or index out of range.
-    Mat2x3Leading ml = { { 6, 7, 8 }, { 9, 10, 11 } };
-    // CHECK: 17
-    outputBuffer[4] = ml[0][0] + ml[1][2]; // multi-dim leading alias
 }
