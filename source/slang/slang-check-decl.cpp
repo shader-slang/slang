@@ -1319,7 +1319,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        dispatchIfNotNull(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 
@@ -1360,7 +1360,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitIfStmt(IfStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        dispatchIfNotNull(stmt->condition);
         dispatchIfNotNull(stmt->positiveStatement);
         dispatchIfNotNull(stmt->negativeStatement);
     }
@@ -1386,7 +1386,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitWhileStmt(WhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        dispatchIfNotNull(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 

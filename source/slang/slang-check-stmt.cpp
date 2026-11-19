@@ -309,7 +309,7 @@ void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    checkConditionClause(stmt->predicate);
+    checkConditionClause(stmt->condition);
     subContext.checkStmt(stmt->statement);
     checkLoopInDifferentiableFunc(stmt);
 }
@@ -578,7 +578,7 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
 {
     WithOuterStmt subContext(this, stmt);
-    checkConditionClause(stmt->predicate);
+    checkConditionClause(stmt->condition);
     subContext.checkStmt(stmt->positiveStatement);
     subContext.checkStmt(stmt->negativeStatement);
 }
@@ -658,7 +658,7 @@ void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
     generateUniqueIDForStmt(stmt);
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
-    checkConditionClause(stmt->predicate);
+    checkConditionClause(stmt->condition);
     subContext.checkStmt(stmt->statement);
     checkLoopInDifferentiableFunc(stmt);
 }

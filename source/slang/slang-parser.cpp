@@ -7844,7 +7844,7 @@ IfStmt* Parser::parseIfStatement()
     FillPosition(ifStatement);
     ReadToken("if");
     ReadToken(TokenType::LParent);
-    ifStatement->predicate = parseConditionClause();
+    ifStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     ifStatement->positiveStatement = parseControlFlowBody(ifStatement);
     if (LookAheadToken("else"))
@@ -7937,12 +7937,12 @@ WhileStmt* Parser::ParseWhileStatement()
     FillPosition(whileStatement);
     ReadToken("while");
     ReadToken(TokenType::LParent);
-    whileStatement->predicate = parseConditionClause();
+    whileStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     whileStatement->statement = parseControlFlowBody();
     // A declaration condition is visible in the body, so its scope spans the body and
     // closes with the statement.
-    if (whileStatement->predicate && whileStatement->predicate->scopeDecl)
+    if (whileStatement->condition && whileStatement->condition->scopeDecl)
         PopScope();
     return whileStatement;
 }
@@ -7954,13 +7954,13 @@ DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
     doWhileStatement->statement = body;
     ReadToken("while");
     ReadToken(TokenType::LParent);
-    doWhileStatement->predicate = parseConditionClause();
+    doWhileStatement->condition = parseConditionClause();
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
     // The body of a `do`-`while` is parsed before the condition, so a declaration
     // condition is visible in the condition only, never in the body. Its scope
     // closes here, immediately after the condition.
-    if (doWhileStatement->predicate && doWhileStatement->predicate->scopeDecl)
+    if (doWhileStatement->condition && doWhileStatement->condition->scopeDecl)
         PopScope();
     return doWhileStatement;
 }

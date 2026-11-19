@@ -7898,7 +7898,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto clause = stmt->predicate;
+        auto clause = stmt->condition;
         // A declaration condition declares its variable right before the test, in the
         // statement's condition slot, so the variable is initialized before the branch
         // and is in scope for both arms.
@@ -8208,7 +8208,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         uint32_t coverageBranchSiteID = 0;
         SourceLoc coverageBranchLoc;
-        if (auto clause = stmt->predicate)
+        if (auto clause = stmt->condition)
         {
             // A declaration condition declares its variable in the condition slot, so the
             // variable is re-initialized before every test, and a `continue` (which jumps
@@ -8307,7 +8307,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
-        if (auto clause = stmt->predicate)
+        if (auto clause = stmt->condition)
         {
             // A declaration condition declares its variable in the condition slot, so
             // the variable is re-initialized before every test. A `continue` jumps here

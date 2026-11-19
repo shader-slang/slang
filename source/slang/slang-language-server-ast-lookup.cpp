@@ -682,7 +682,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        if (checkConditionClause(stmt->predicate))
+        if (checkConditionClause(stmt->condition))
             return true;
         return dispatchIfNotNull(stmt->statement);
     }
@@ -725,7 +725,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitIfStmt(IfStmt* stmt)
     {
-        if (checkConditionClause(stmt->predicate))
+        if (checkConditionClause(stmt->condition))
             return true;
         if (dispatchIfNotNull(stmt->positiveStatement))
             return true;
@@ -755,7 +755,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitWhileStmt(WhileStmt* stmt)
     {
-        if (checkConditionClause(stmt->predicate))
+        if (checkConditionClause(stmt->condition))
             return true;
         return dispatchIfNotNull(stmt->statement);
     }

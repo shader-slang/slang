@@ -122,7 +122,7 @@ FIDDLE()
 class IfStmt : public Stmt
 {
     FIDDLE(...)
-    FIDDLE() ConditionClause* predicate = nullptr;
+    FIDDLE() ConditionClause* condition = nullptr;
     FIDDLE() Stmt* positiveStatement = nullptr;
     FIDDLE() Stmt* negativeStatement = nullptr;
     FIDDLE() SourceLoc afterLoc;
@@ -273,7 +273,7 @@ FIDDLE()
 class WhileStmt : public LoopStmt
 {
     FIDDLE(...)
-    FIDDLE() ConditionClause* predicate = nullptr;
+    FIDDLE() ConditionClause* condition = nullptr;
     FIDDLE() Stmt* statement = nullptr;
 };
 
@@ -282,7 +282,7 @@ class DoWhileStmt : public LoopStmt
 {
     FIDDLE(...)
     FIDDLE() Stmt* statement = nullptr;
-    FIDDLE() ConditionClause* predicate = nullptr;
+    FIDDLE() ConditionClause* condition = nullptr;
 };
 
 // A compile-time, range-based `for` loop, which will not appear in the output code

@@ -414,7 +414,7 @@ struct ASTIterator
         void visitDoWhileStmt(DoWhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitConditionClause(stmt->predicate);
+            iterator->visitConditionClause(stmt->condition);
             dispatchIfNotNull(stmt->statement);
         }
 
@@ -465,7 +465,7 @@ struct ASTIterator
         void visitIfStmt(IfStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitConditionClause(stmt->predicate);
+            iterator->visitConditionClause(stmt->condition);
             dispatchIfNotNull(stmt->positiveStatement);
             dispatchIfNotNull(stmt->negativeStatement);
         }
@@ -505,7 +505,7 @@ struct ASTIterator
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
-            iterator->visitConditionClause(stmt->predicate);
+            iterator->visitConditionClause(stmt->condition);
             dispatchIfNotNull(stmt->statement);
         }
 
