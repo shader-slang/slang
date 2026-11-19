@@ -1,8 +1,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target wgsl -stage compute -entry computeMain
 
 // Test that int8_t and uint8_t types emit diagnostics only once per type to prevent duplicates.
-// diagnoseOnce keys on diagnostic ID plus message, so each type name reports one error no
-// matter how many declarations use it.
+// diagnoseOnce keys on diagnostic ID + location + message; at emit time the location is
+// constant, so each type name reports one error per entry-point emission no matter how
+// many declarations use it.
 
 //CHECK: 8-bit integers not supported in WGSL
 //CHECK: 8-bit integer type 'uint8_t' is not supported by the WGSL backend.

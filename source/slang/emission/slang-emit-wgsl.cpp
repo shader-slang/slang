@@ -566,8 +566,9 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         // There is no "f64" type in WGSL
         SLANG_UNEXPECTED("'double' type emitted");
         break;
-    // WGSL has no 8-bit integer type: we report the error and emit no type text, and the
-    // diagnostic fails compilation before the malformed output can be consumed.
+    // WGSL has no 8-bit integer type: we report the error and emit no type text. The
+    // error-count check after emitModule in slang-emit.cpp fails compilation on any
+    // recorded diagnostic, so the malformed output is never consumed.
     case kIROp_Int8Type:
         diagnoseOnce(Diagnostics::Int8NotSupportedInWgsl{.typeName = "int8_t"});
         return;
@@ -1108,8 +1109,9 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     SLANG_UNEXPECTED("unhandled base type for IntLit in WGSL emission");
                     break;
 
-                // We report the error and emit no literal text; the diagnostic fails
-                // compilation before the malformed output can be consumed.
+                // We report the error and emit no literal text: the break exits the whole
+                // IntLit case with no further emission, and the error-count check in
+                // slang-emit.cpp fails compilation before the output can be consumed.
                 case BaseType::Int8:
                     {
                         diagnoseOnce(Diagnostics::Int8NotSupportedInWgsl{.typeName = "int8_t"});

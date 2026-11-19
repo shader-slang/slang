@@ -3,6 +3,9 @@
 // Test that 8-bit literals kept at their own width reach WGSL literal emission and are
 // rejected once per type. Only an 8-bit-typed buffer keeps the literal from widening to
 // int and constant-folding, so these stores exercise the literal-emission rejection path.
+// diagnoseOnce keys on diagnostic ID + location + message, and emit-time locations are
+// constant, so the buffer declarations and the literals of one type all share one key:
+// the test pins "no abort and exactly two rich diagnostics", not which arm produced them.
 
 //CHECK: 8-bit integers not supported in WGSL
 //CHECK: 8-bit integer type 'uint8_t' is not supported by the WGSL backend.
