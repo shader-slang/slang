@@ -1,0 +1,469 @@
+# Known slang-test failures on the h-slang branch.
+#
+# The list keeps current failures visible so that new ones stand out; remove an entry once its
+# test passes again. Pass it alongside the upstream lists, for example:
+#
+#   slang-test -use-test-server -server-count 1 -expected-failure-list tests/expected-failure-h-slang.txt
+#
+# Collected on 2026-11-19 at h-slang 032aa41c5, plus the WebGPU raster fixes committed with this
+# list (none of the listed tests exercise them), from a complete Windows RelWithDebInfo build
+# (Vulkan, D3D12, D3D11, WebGPU through Dawn, CPU; no CUDA). Each entry failed both in a full run
+# and in a separate rerun. LLVM-backend tests ("(llvm)") are not listed: this build pairs the
+# h-slang compiler with a prebuilt slang-llvm from an upstream release, so their failures reflect
+# that version mismatch rather than h-slang itself.
+
+# Crashes the compiler or the test server (the test-server connection is lost). Includes the
+# WGSL varying-legalization crash in nested-varying-input and entry-point-legalization. (41 tests)
+slang-unit-test-tool/coverageTracingMetadata.internal
+slang-unit-test-tool/isParameterLocationUsedReflectionMetal.internal
+tests/bugs/link-time-constant-array-size-main.slang.2
+tests/cooperative-vector/array.slang.1
+tests/cooperative-vector/inout.slang.1
+tests/diagnostics/abort-unsupported-arg-shapes.slang
+tests/glsl-intrinsic/system-values-draw-parameters.slang.3
+tests/language-feature/dynamic-dispatch/concrete-impl-as-varying.slang.3
+tests/language-feature/dynamic-dispatch/concrete-impl-as-varying.slang.4
+tests/language-feature/dynamic-dispatch/concrete-impl-as-varying.slang.8
+tests/language-feature/dynamic-dispatch/concrete-impl-as-varying.slang.9
+tests/language-feature/generics/mock-tile-shape-pack-ops.slang
+tests/metal/entry-point-uniform-vertex-struct-output.slang
+tests/metal/fragment-out-param.slang.6
+tests/metal/nested-struct-fragment-input.slang.1
+tests/metal/nested-struct-fragment-input.slang.3
+tests/metal/nested-struct-fragment-output.slang.1
+tests/metal/nested-struct-fragment-output.slang.3
+tests/metal/nested-struct-multi-entry-point-vertex.slang
+tests/metal/nested-struct-multi-entry-point-vertex.slang.2
+tests/metal/nested-struct-multi-entry-point-vertex.slang.4
+tests/metal/nested-struct-multi-entry-point-vertex.slang.5
+tests/metal/nested-struct-multi-entry-point-vertex.slang.6
+tests/metal/nested-struct-multi-entry-point-vertex.slang.7
+tests/metal/simple-vertex-position-out-struct.slang
+tests/metal/simple-vertex-position-return-struct.slang
+tests/metal/stage-in-2.slang.2
+tests/metal/stage-in-2.slang.3
+tests/metal/stage-in.slang
+tests/metal/sv_target-complex-1.slang
+tests/metal/sv_target-complex-1.slang.2
+tests/metal/sv_target-complex-1.slang.3
+tests/metal/sv_target-complex-2.slang
+tests/metal/sv_target-complex-2.slang.2
+tests/metal/sv_target-complex-2.slang.3
+tests/spirv/debug-var-generic-param.slang
+tests/spirv/sv-vulkan-instance-vertex-id.slang.2
+tests/wgsl/entry-point-legalization.slang
+tests/wgsl/entry-point-legalization.slang.1
+tests/wgsl/nested-varying-input.slang
+tests/wgsl/nested-varying-input.slang.1
+
+# InternalError: "no outer func at use site for global". (85 tests)
+tests/autodiff/cuda-expand-param-context-live.slang.2
+tests/bugs/13306/resources.hlsl.2
+tests/bugs/legalize-defuse-no-zero-init.slang
+tests/compute/atomics-invalid-dest-type.slang
+tests/compute/interface-qualifiers/lang-2026-implicit-some.slang.3
+tests/compute/interface-qualifiers/some-and-dyn-vardecl-uses.slang.4
+tests/cross-compile/precise-keyword-targets.slang.2
+tests/cross-compile/precise-keyword-targets.slang.8
+tests/diagnostics/division-by-matrix.slang
+tests/diagnostics/func-type-unsupported-array.slang.1
+tests/diagnostics/func-type-unsupported-local-variable.slang.2
+tests/diagnostics/func-type-unsupported-on-kernel-target.slang.2
+tests/diagnostics/func-type-unsupported-write-only-global.slang.1
+tests/diagnostics/missing-return-target.slang.5
+tests/diagnostics/unsupported-target-intrinsic-metal.slang
+tests/functional/codegen.slang.4
+tests/glsl/builtin-inside-generics.slang.3
+tests/hlsl-intrinsic/packed/pack-unpack-float.slang.2
+tests/hlsl-intrinsic/system-values-draw-parameters.slang.3
+tests/hlsl-intrinsic/texture/float-atomics.slang.2
+tests/hlsl-intrinsic/vector-dot-int-unroll.slang.1
+tests/hlsl/texture-sample-operator.slang.2
+tests/language-feature/coverage/coverage-counter-width-metal-cap.slang
+tests/language-feature/coverage/coverage-function-branch-backend-atomics.slang.2
+tests/language-feature/descriptor-handle/desc-handle-3.slang
+tests/language-feature/dynamic-dispatch/constantbuffer-interface-compilation.slang.4
+tests/language-feature/dynamic-dispatch/descriptor-handle-dynamic-dispatch.slang.1
+tests/language-feature/dynamic-dispatch/diagnose-circular-pointer-breaks-cycle.slang.5
+tests/language-feature/dynamic-dispatch/diagnose-entry-point-interface-in-struct.slang.2
+tests/language-feature/dynamic-dispatch/entry-point-interface-param.slang.4
+tests/language-feature/dynamic-dispatch/global-interface-param.slang.5
+tests/language-feature/dynamic-dispatch/parameterblock-interface.slang.6
+tests/language-feature/dynamic-dispatch/structuredbuffer-interface-compilation.slang.3
+tests/language-feature/generics/generic-minmax-native-vector-codegen-11075.slang.3
+tests/language-feature/higher-order-functions/functype-kernel-target-specialized.slang.2
+tests/language-feature/interfaces/enum-bool-switch.slang.6
+tests/language-feature/switch-fallthrough/fallthrough-target-legalization.slang.3
+tests/metal/atomic-intrinsics.slang
+tests/metal/atomic-texture-buffer.slang
+tests/metal/atomic-texture-buffer.slang.1
+tests/metal/atomic-texture-texture1d.slang
+tests/metal/atomic-texture-texture2d.slang
+tests/metal/atomic-texture-texture3d.slang
+tests/metal/barrier.slang
+tests/metal/byte-address-buffer.slang
+tests/metal/float-literal-suffix.slang
+tests/metal/groupshared.slang
+tests/metal/math-scalar.slang
+tests/metal/math-vector.slang
+tests/metal/matrix-storage-packed-layout.slang
+tests/metal/matrix-storage-packed-layout.slang.1
+tests/metal/matrix-storage-packed-layout.slang.2
+tests/metal/metal-pointer-params.slang
+tests/metal/nested-struct-fragment-input.slang
+tests/metal/out-param.slang
+tests/metal/pointer-in-buffer-array-field.slang
+tests/metal/pointer-in-buffer-array-load.slang
+tests/metal/pointer-in-buffer-field-store.slang
+tests/metal/pointer-in-buffer-large-array.slang
+tests/metal/pointer-in-buffer-mixed-matrix.slang
+tests/metal/pointer-in-buffer-multidim-array.slang
+tests/metal/pointer-in-buffer-offset-ptr.slang
+tests/metal/pointer-in-paramblock-multilevel.slang
+tests/metal/pointer-in-storage-buffer-elem-ptr.slang
+tests/metal/pointer-in-storage-buffer-load.slang
+tests/metal/pointer-in-storage-buffer-read-write.slang
+tests/metal/pointer-in-storage-buffer-struct.slang
+tests/metal/pointer-in-storage-buffer.slang
+tests/metal/pointer-literals.slang
+tests/metal/pointer-no-lowering-local.slang
+tests/metal/ray-query-intrinsics.slang
+tests/metal/sampler-array.slang
+tests/metal/simple-compute.slang.2
+tests/metal/simple-task.slang
+tests/metal/test_buffer.slang
+tests/metal/test_descriptor_handle.slang
+tests/metal/texture.slang
+tests/metal/thread_position_in_threadgroup.slang
+tests/metal/thread_position_in_threadgroup.slang.1
+tests/metal/uniform-combined-sampler-array-binding.slang
+tests/metal/uniform-unsized-resource-array-unbound.slang
+tests/metal/vector-argument-buffer-layout.slang
+tests/numerics/builtin-conversions.slang.4
+tests/numerics/codegen.slang.8
+tests/spirv/specialization-constant.slang
+
+# Assert in slang-ir-autodiff-fwd.cpp:
+# diffCalleeType->getParamCount() == origCall->getArgCount(). (28 tests)
+tests/autodiff/autodiff-higher-order-generic.slang
+tests/autodiff/bwd-fwd-out-inout-pair.slang (cpu)
+tests/autodiff/custom-diff-fwd-diff.slang (dx11)
+tests/autodiff/custom-diff-fwd-diff.slang.2 syn (wgpu)
+tests/autodiff/custom-diff-fwd-diff.slang.3 syn (dx12)
+tests/autodiff/diff-ptr-type-custom.slang (vk)
+tests/autodiff/high-order-backward-diff-1.slang (cpu)
+tests/autodiff/high-order-backward-diff-1.slang.1 (dx11)
+tests/autodiff/high-order-backward-diff-1.slang.2 (vk)
+tests/autodiff/high-order-backward-diff-1.slang.4 syn (wgpu)
+tests/autodiff/high-order-backward-diff-1.slang.6 syn (dx12)
+tests/autodiff/high-order-backward-diff-2.slang (cpu)
+tests/autodiff/high-order-backward-diff-2.slang.1 (dx11)
+tests/autodiff/high-order-backward-diff-2.slang.2 (vk)
+tests/autodiff/high-order-backward-diff-2.slang.4 syn (wgpu)
+tests/autodiff/high-order-backward-diff-2.slang.6 syn (dx12)
+tests/autodiff/high-order-builtins-1.slang (cpu)
+tests/autodiff/high-order-builtins-1.slang.1 (dx11)
+tests/autodiff/high-order-builtins-1.slang.2 (vk)
+tests/autodiff/high-order-builtins-1.slang.4 syn (wgpu)
+tests/autodiff/high-order-builtins-1.slang.6 syn (dx12)
+tests/autodiff/high-order-builtins-2.slang (cpu)
+tests/autodiff/high-order-builtins-2.slang.1 (dx11)
+tests/autodiff/high-order-builtins-2.slang.2 (vk)
+tests/autodiff/high-order-builtins-2.slang.4 syn (wgpu)
+tests/autodiff/high-order-builtins-2.slang.6 syn (dx12)
+tests/autodiff/high-order-forward-diff-simple.slang (dx11)
+tests/autodiff/high-order-forward-diff-simple.slang.1 (vk)
+
+# Assert in slang-ir.cpp. (1 tests)
+tests/spirv/byte-address-buffer-with-branch-struct.slang (vk)
+
+# InternalError: "non-simple operand(s)!". (14 tests)
+tests/language-feature/generics/pack-branch-recursive-node-layout.slang
+tests/neural/activation-coopmat-vector-test.slang (vk)
+tests/neural/basic-coopmat-vector-test.slang (vk)
+tests/neural/basic-coopmat-vector-test.slang.5
+tests/neural/basic-coopmat-vector-tiled-layout-test.slang (vk)
+tests/neural/basic-coopmat-vector-tiled-layout-test.slang.1 (vk)
+tests/neural/bias-sum-reduce.slang.1 (vk)
+tests/neural/fflayer-wavetangled-vector-test.slang (vk)
+tests/neural/fflayer-wavetangled-vector-test.slang.1 (vk)
+tests/neural/fflayer-wavetangled-vector-test.slang.4 (vk)
+tests/neural/fflayer-wavetangled-vector-test.slang.6 (vk)
+tests/neural/fflayer-wavetangled-vector-test.slang.8
+tests/neural/fflayer-wavetangled-vector-tiled-test.slang (vk)
+tests/neural/vector-autodiff-subscript.slang (vk)
+
+# InternalError: unhandled use of a mesh output parameter. (4 tests)
+tests/pipeline/rasterization/mesh/dead-loop.slang.1 (vk)
+tests/pipeline/rasterization/mesh/simple.slang (vk)
+tests/pipeline/rasterization/mesh/task-groupshared.slang.1 (vk)
+tests/pipeline/rasterization/mesh/task-simple.slang.1 (vk)
+
+# Unimplemented feature: unexpected IR opcode during code emit. (12 tests)
+tests/autodiff/cuda-kernel-export.slang.1
+tests/language-feature/dynamic-dispatch/dynamic-specialization-4.slang (dx11)
+tests/language-feature/dynamic-dispatch/dynamic-specialization-4.slang.3 syn (wgpu)
+tests/language-feature/dynamic-dispatch/dynamic-specialization-4.slang.4 syn (dx12)
+tests/language-feature/dynamic-dispatch/generic-struct-with-interface-field.slang (dx11)
+tests/language-feature/dynamic-dispatch/generic-struct-with-interface-field.slang.3 (cpu)
+tests/language-feature/dynamic-dispatch/generic-struct-with-interface-field.slang.6 syn (wgpu)
+tests/language-feature/dynamic-dispatch/generic-struct-with-interface-field.slang.7 syn (dx12)
+tests/language-feature/tuple/tuple-expand.slang (dx11)
+tests/language-feature/tuple/tuple-expand.slang.2 syn (wgpu)
+tests/language-feature/tuple/tuple-expand.slang.3 syn (dx12)
+tests/optimization/buffer-load-defer-user-pointer.slang.2
+
+# static_assert condition is not a compile-time constant. (2 tests)
+tests/standard-library/runtime/resource/bindless-textures.slang
+tests/standard-library/runtime/resource/bindless-textures.slang.1
+
+# Ambiguous reference to a global resource declaration. (4 tests)
+tests/language-feature/descriptor-handle/byte-address-buffer-handle.slang
+tests/slang-extension/dynamic-resource-gl.slang.1
+tests/spirv/nonuniform-bindless-resource-fn-arg.slang
+tests/spirv/nonuniform-resource-operands.slang
+
+# The test program throws an unhandled exception at run time. (22 tests)
+tests/autodiff/associatedtype-nondiff-interface-view-bwd.slang (dx12)
+tests/autodiff/associatedtype-nondiff-interface-view-bwd.slang.1 (vk)
+tests/autodiff/coopvec-exp10.slang (cpu)
+tests/autodiff/coopvec-exp10.slang.1 (vk)
+tests/autodiff/coopvec-subscript-double.slang (cpu)
+tests/autodiff/coopvec-subscript.slang (vk)
+tests/autodiff/coopvec-subscript.slang.2 (cpu)
+tests/autodiff/coopvec.slang (vk)
+tests/autodiff/coopvec.slang.2 (cpu)
+tests/autodiff/existential-generic-interface-backward.slang.1 (vk)
+tests/compute/compile-time-loop.slang.4 syn (wgpu)
+tests/compute/constexpr.slang.2 (wgpu)
+tests/compute/discard-stmt.slang.3 syn (wgpu)
+tests/compute/texture-sampling-no-1d-arrays.slang.4 syn (wgpu)
+tests/cooperative-vector/array.slang (vk)
+tests/cooperative-vector/inout.slang (vk)
+tests/cooperative-vector/out.slang (vk)
+tests/cooperative-vector/parameter.slang (vk)
+tests/cooperative-vector/return.slang (vk)
+tests/cooperative-vector/struct.slang (vk)
+tests/cooperative-vector/subscript-in-func.slang (vk)
+tests/numerics/differentiable-cooperative-vector-runtime.slang (cpu)
+
+# Output no longer matches the test's CHECK lines (mostly Metal, generated capability,
+# and CUDA code-generation tests). (159 tests)
+tests/autodiff/autodiff-higher-order-struct.slang
+tests/autodiff/bwd-fwd-out-projection.slang.1 (cpu)
+tests/autodiff/cuda-expand-param-context-live.slang.3
+tests/bugs/gh-4131.slang
+tests/bugs/gh-4818-1.slang
+tests/bugs/metal-return-value-lost.slang
+tests/bugs/parameter-block-resource-type.slang
+tests/compute/byte-address-buffer-aligned.slang.2
+tests/compute/logic-no-short-circuit-evaluation.slang.4
+tests/compute/nonuniformres-as-function-parameter.slang.1
+tests/compute/nonuniformres-as-function-parameter.slang.2
+tests/compute/struct-autodiff-default-init.slang.2
+tests/cooperative-matrix/bfloat16.slang (vk)
+tests/cpu-program/dll-import-func-ptr-host-cpp.slang
+tests/cuda/optix-cluster.slang.1
+tests/cuda/optix-direct-callable.slang
+tests/cuda/optix-geometry-index.slang.4
+tests/cuda/optix-geometry-index.slang.5
+tests/cuda/optix-geometry-index.slang.6
+tests/cuda/optix-get-attributes-mixed.slang.1
+tests/cuda/optix-hit-attributes.slang.1
+tests/cuda/optix-ignore-hit.slang.1
+tests/cuda/optix-intrinsics-comprehensive.slang.1
+tests/cuda/optix-multilevel-traversal.slang.1
+tests/cuda/optix-ser.slang.1
+tests/cuda/raygeneration.slang.1
+tests/cuda/report-hit-portable.slang.1
+tests/cuda/static-const-array-nested.slang.3
+tests/cuda/swizzle-base-fold.slang
+tests/cuda/swizzle-base-fold.slang.1
+tests/generated/capabilities/texture/types/gen-types-metal-depthtexture2d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-depthtexture2darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-depthtexture2dms.slang
+tests/generated/capabilities/texture/types/gen-types-metal-depthtexture2dmsarray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-depthtexturecube.slang
+tests/generated/capabilities/texture/types/gen-types-metal-depthtexturecubearray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rasterizerorderedtexture1d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rasterizerorderedtexture1darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rasterizerorderedtexture2d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rasterizerorderedtexture2darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rasterizerorderedtexture3d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rwtexture1d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rwtexture1darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rwtexture2d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rwtexture2darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-rwtexture3d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-texture1d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-texture1darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-texture2d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-texture2darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-texture3d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-texturecube.slang
+tests/generated/capabilities/texture/types/gen-types-metal-texturecubearray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-wtexture1d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-wtexture1darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-wtexture2d.slang
+tests/generated/capabilities/texture/types/gen-types-metal-wtexture2darray.slang
+tests/generated/capabilities/texture/types/gen-types-metal-wtexture3d.slang
+tests/glsl-intrinsic/point-coord.slang.2
+tests/glsl/layout-qualifier-exprs.slang.1
+tests/hgbc/generic-pack-type-reflection-name.slang
+tests/hgbc/host-integer-bitcast-math.slang.1
+tests/hgbc/validation-error-source-location.slang
+tests/hlsl-intrinsic/matrix-cast-to-vector.slang (dx12)
+tests/hlsl-intrinsic/matrix-cast-to-vector.slang.1 (dx12)
+tests/hlsl-intrinsic/min-max-builtin-arithmetic-shaped.slang.12
+tests/hlsl-intrinsic/quad-control/quad-control-frag.slang.3
+tests/hlsl-intrinsic/scalar-bf16.slang (vk)
+tests/hlsl-intrinsic/shader-execution-reordering/hit-object-invoke-2arg-spirv.slang.6
+tests/hlsl-intrinsic/shader-execution-reordering/hit-object-invoke-2arg-spirv.slang.8
+tests/hlsl-intrinsic/shader-execution-reordering/hit-object-invoke-nvapi-error.slang
+tests/hlsl-intrinsic/subgroup-quad.slang.3
+tests/hlsl-intrinsic/wave-prefix-sum-fp16.slang.4
+tests/hlsl/raster-order-resource.slang.1
+tests/language-feature/constructors/class-new-single-arg-targets.slang.1
+tests/language-feature/coverage/coverage-counter-width-metal-cap.slang.1
+tests/language-feature/coverage/coverage-counter-width-metal-cap.slang.2
+tests/language-feature/descriptor-handle/gh-13070-descriptor-heap-direct-combined-sampler-nv-ext.slang
+tests/language-feature/descriptor-handle/gh-13070-descriptor-heap-handle-diagnostic-plain-nv.slang
+tests/language-feature/descriptor-handle/gh-13070-descriptor-heap-handle-diagnostic.slang
+tests/language-feature/function-calls/forceinline-basic-block-inline-order.slang
+tests/language-feature/function-calls/forceinline-basic-block.slang
+tests/language-feature/function-calls/forceinline-multiple-blocks.slang
+tests/language-feature/function-calls/forceinline-multiple-cases.slang
+tests/language-feature/function-calls/forceinline-restore-caller-scope-multiblock.slang
+tests/language-feature/function-calls/forceinline-restore-caller-scope.slang
+tests/language-feature/generics/nested-gen-value-param-inference-2.slang.3 syn (wgpu)
+tests/language-feature/generics/nested-gen-value-param-inference.slang.3 syn (wgpu)
+tests/language-feature/higher-order-functions/functype-kernel-target-specialized.slang.4
+tests/llvm/debug-lexical-scope.slang
+tests/llvm/enum-bool-switch.slang
+tests/llvm/printf.slang
+tests/metal/8bit-vector-types.slang
+tests/metal/append-structured-buffer.slang.1
+tests/metal/cbuffer-pointer-levels.slang
+tests/metal/cbuffer-vector-native-layout.slang
+tests/metal/cbuffer-vector-native-layout.slang.1
+tests/metal/descriptor-handle-dynamic-dispatch.slang
+tests/metal/entry-point-descriptor-handle-buffer.slang
+tests/metal/matrix-bool-lowering.slang
+tests/metal/matrix-integer-lowering.slang
+tests/metal/matrix-negate.slang
+tests/metal/matrix-negation-precedence.slang
+tests/metal/multi-entry-point-params.slang
+tests/metal/nested-parameter-block-reflection.slang
+tests/metal/nested-struct-fragment-output.slang
+tests/metal/noinline.slang
+tests/metal/parameter-block.slang
+tests/metal/pointer-in-buffer-array-field-extract.slang
+tests/metal/pointer-in-buffer-array-to-function.slang
+tests/metal/pointer-in-buffer-mixed-resource.slang
+tests/metal/pointer-in-buffer-mixed.slang
+tests/metal/pointer-in-buffer-multidim-array-extract.slang
+tests/metal/pointer-in-buffer-nested-struct.slang
+tests/metal/pointer-in-buffer-preexisting-ulong.slang
+tests/metal/pointer-in-buffer-ptr-to-struct.slang
+tests/metal/pointer-in-buffer-rwbuf-alias.slang
+tests/metal/pointer-in-buffer-struct-return.slang
+tests/metal/pointer-in-buffer-struct.slang
+tests/metal/pointer-in-storage-buffer-single-level.slang
+tests/metal/pointer-no-lowering-groupshared.slang
+tests/metal/printf.slang
+tests/metal/simple-compute.slang
+tests/metal/stage-in-2.slang
+tests/metal/subpass-input-forceinline-helper.slang
+tests/metal/subpass-input-ms.slang
+tests/metal/subpass-input-two-entry-points.slang
+tests/metal/subpass-input-two-entry-points.slang.1
+tests/metal/subpass-input-types.slang
+tests/metal/subpass-input-with-varying.slang
+tests/metal/subpass-input.slang
+tests/metal/system-val-conversion.slang.1
+tests/metal/texture-binding-index.slang
+tests/metal/texture-binding-index.slang.1
+tests/metal/texture-multisample.slang
+tests/metal/texture-sampler-less.slang
+tests/metal/texture-store-vector.slang
+tests/metal/threadgroup-size.slang
+tests/metal/uniform-resource-array-binding.slang
+tests/metal/vector-get-element-ptr.slang
+tests/metal/vector-storage-packed-layout.slang
+tests/metal/vector-storage-packed-layout.slang.1
+tests/neural/outerproduct-accumulate-test-arbitrary-size.slang (vk)
+tests/neural/outerproduct-accumulate-tiled-test-arbitrary-size.slang (vk)
+tests/numerics/vector-dot-product.slang.3
+tests/optimization/buffer-store-defer.slang
+tests/pipeline/ray-tracing/trace-ray-inline.slang.2
+tests/slang-extension/dynamic-resource-gl.slang
+tests/spirv/byte-address-buffer-preserve-params.slang
+tests/spirv/byte-address-buffer-preserve-params.slang.1
+tests/spirv/debug-info-user-init-this-noncopyable.slang
+tests/spirv/debug-scope-restore-serialized.slang.1
+tests/spirv/debug-structured-buffer-member-name.slang
+tests/spirv/debug-var-void-argument.slang
+tests/spirv/descriptor-heap-rw-struct-buffer-load.slang
+tests/spirv/explicit-context-validation-builtin-vertex-glsl.slang
+tests/standard-library/runtime/core/format-specs-string-equality.slang
+tests/vkray/nonstruct-hit-attributes.slang
+tests/wgsl/explicit-binding.slang
+
+# Render tests that produce no comparable output. (8 tests)
+tests/bugs/texture2d-gather.hlsl.3 syn (wgpu)
+tests/render/cross-compile-entry-point.slang.2 syn (wgpu)
+tests/render/cross-compile0.hlsl.2 syn (wgpu)
+tests/render/imported-parameters.hlsl.2 syn (wgpu)
+tests/render/multiple-stage-io-locations-without-user-semantics.slang (wgpu)
+tests/render/multiple-stage-io-locations.slang.3 syn (wgpu)
+tests/render/nointerpolation.hlsl.3 syn (wgpu)
+tests/render/render0.hlsl.3 syn (wgpu)
+
+# Other failures: diagnostic differences, unit tests, and miscellaneous mismatches. (41 tests)
+gfx-unit-test-tool/hgvmEventsLambdaLocations.internal
+slang-unit-test-tool/bindlessSpaceMetadataNativeHandleCasts.internal
+slang-unit-test-tool/parallelGenericEntryPointCompile.internal
+slang-unit-test-tool/spirvValidationAcceptingValidatorReportsNothing.internal
+slang-unit-test-tool/spirvValidationRejectionStillDiagnosesValidationFailure.internal
+slang-unit-test-tool/spirvValidationUnavailableDiagnosesMissingValidator.internal
+slang-unit-test-tool/testServerLossHealthyRunIsUnaffected.internal
+slang-unit-test-tool/testServerLossInnocentTestIsNotBlamed.internal
+slang-unit-test-tool/testServerProtocolErrorInnocentTestIsNotBlamed.internal
+tests/autodiff/high-order-diff-operator.slang (dx11)
+tests/autodiff/high-order-diff-operator.slang.1 (vk)
+tests/autodiff/high-order-diff-operator.slang.4 syn (wgpu)
+tests/autodiff/high-order-diff-operator.slang.5 syn (dx12)
+tests/bindings/hlsl-to-vulkan-combined.hlsl
+tests/bindings/hlsl-to-vulkan-shift-implicit.hlsl
+tests/bindings/hlsl-to-vulkan-shift.hlsl
+tests/bindings/targets-and-uavs-structure.hlsl
+tests/compute/empty-struct2.slang.3 syn (wgpu)
+tests/compute/generic-interface-method.slang (dx11)
+tests/compute/generic-interface-method.slang.1 (cpu)
+tests/compute/generic-interface-method.slang.3 syn (wgpu)
+tests/compute/generic-interface-method.slang.5 syn (dx12)
+tests/diagnostics/rich-diag-no-source.slang
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.1
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.2
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.3
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.4
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.5
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.6
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.7
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.8
+tests/diagnostics/structuredbuffer-resource-parameter-block.slang.9
+tests/hlsl-intrinsic/classify-float.slang.1 (dx11)
+tests/language-feature/generics/variadic-output-arguments.slang.2
+tests/language-feature/types/opaque/inout-param-opaque-type.slang.3 syn (wgpu)
+tests/language-feature/types/opaque/out-param-opaque-type.slang.3 syn (wgpu)
+tests/optimization/buffer-store-defer.slang.2
+tests/pipeline/ray-tracing/acceleration-structure-in-compute-nv.slang
+tests/pipeline/ray-tracing/acceleration-structure-in-compute.slang
+tests/reflection/texture-resource-type.slang
+
+# Known host/device difference: CUDA does not mask shift amounts. HGVM host code and HLSL mask a
+# 32-bit shift amount to five bits, so `x << 32` is `x`, but Slang's CUDA output emits a raw C++
+# shift and PTX returns zero. Masking in the CUDA backend would change existing CUDA shader
+# behavior, so the difference is documented instead. (1 test)
+tests/standard-library/hgbc/host-device-math-consistency.slang.1
