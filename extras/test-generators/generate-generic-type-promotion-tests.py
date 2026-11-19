@@ -2,8 +2,10 @@
 
 """
 Generates generic type promotion inference tests covering all scalar type pair
-combinations. The generated test validates both the arithmetic result and the
-inferred type identity for each pair.
+combinations. The generated compute tests validate both the arithmetic result
+and the inferred type identity for each pair whose types join; pairs whose
+types tie at equal conversion cost are generated into a diagnostic test that
+asserts inference fails (issue #10164).
 
 Run from the repository root:
     python3 extras/test-generators/generate-generic-type-promotion-tests.py
@@ -25,6 +27,7 @@ kRank_Int32 = 3
 kRank_IntPtr = 4
 kRank_Int64 = 5
 
+kKind_Bool = "bool"
 kKind_Signed = "signed"
 kKind_Unsigned = "unsigned"
 kKind_Float = "float"
@@ -44,12 +47,22 @@ class TypeInfo:
     def literal(self, value):
         return self.literalFmt.format(v=value)
 
+    def testValue(self, value):
+        """(source literal, numeric value) for an operand in a generated case.
+
+        Bool has no numeric literal spelling, so any nonzero value becomes
+        `true` (1) and zero becomes `false` (0)."""
+        if self.kind == kKind_Bool:
+            return ("true" if value else "false", 1 if value else 0)
+        return (self.literal(value), value)
+
     def isInteger(self):
         return self.kind in (kKind_Signed, kKind_Unsigned)
 
 
 # Core scalar types (supported on both VK and CPU)
 coreTypes = [
+    TypeInfo("bool",     kKind_Bool,     kRank_Bool, 1, "{v}"),
     TypeInfo("int8_t",   kKind_Signed,   kRank_Int8,  1, "int8_t({v})"),
     TypeInfo("int16_t",  kKind_Signed,   kRank_Int16, 2, "int16_t({v})"),
     TypeInfo("int32_t",  kKind_Signed,   kRank_Int32, 4, "{v}"),
@@ -73,6 +86,23 @@ def getConversionCost(fromKind, fromRank, toKind, toRank):
 
     if fromKind == toKind and fromRank == toRank:
         return 0  # same type
+
+    # Bool: conversion kind Unsigned, rank Bool (lowest). Bool-to-int32 is the
+    # BoolToInt special case (tag == Int); other signed targets take the
+    # unsigned-to-signed promotion; unsigned targets take the same-kind rank
+    # promotion; bool never reaches the integer-to-float gates (its rank is
+    # below Int8), and nothing converts to bool except as a general
+    # conversion.
+    if fromKind == kKind_Bool and toKind == kKind_Signed:
+        if toRank == kRank_Int32:
+            return 120  # kConversionCost_BoolToInt
+        if toRank != kRank_IntPtr:
+            return 200  # kConversionCost_UnsignedToSignedPromotion
+        return 900  # kConversionCost_GeneralConversion
+    if toKind == kKind_Bool:
+        return 900  # kConversionCost_GeneralConversion
+    if fromKind == kKind_Bool and toKind == kKind_Unsigned:
+        return 150  # kConversionCost_RankPromotion
 
     # Same kind: rank promotion (150) or demotion (900)
     if fromKind == toKind:
@@ -104,18 +134,22 @@ def getConversionCost(fromKind, fromRank, toKind, toRank):
 
 def inferType(typeA, typeB):
     """Determine which type T is inferred when both types constrain the same
-    generic parameter. Mirrors TryJoinTypes in slang-check-constraint.cpp."""
+    generic parameter. Mirrors TryJoinTypes in slang-check-constraint.cpp:
+    the strictly cheaper conversion direction wins, and an equal-cost tie
+    between distinct types has no better side, so inference fails."""
 
     # cost to convert B to A
     costBtoA = getConversionCost(typeB.kind, typeB.rank, typeA.kind, typeA.rank)
     # cost to convert A to B
     costAtoB = getConversionCost(typeA.kind, typeA.rank, typeB.kind, typeB.rank)
 
-    # TryJoinTypes: "if (costConvertRightToLeft > costConvertLeftToRight) return right;"
+    # TryJoinTypes: "if (costConvertRightToLeft > costConvertLeftToRight)
+    # return right;"
     if costBtoA > costAtoB:
         return typeB
-    else:
+    if costAtoB > costBtoA:
         return typeA
+    return None  # equal cost: no better side, inference fails
 
 
 def getTypeCode(t):
@@ -123,13 +157,12 @@ def getTypeCode(t):
     return t.sizeof if t.kind == kKind_Unsigned else -t.sizeof
 
 
-def shouldSkipPair(ta, tb):
-    """Skip pairs that produce compiler warnings or backend errors:
+def shouldSkipPair(ta, tb, inferred):
+    """Skip success pairs that produce compiler warnings or backend errors:
     - Integer + half -> T=half: E30081 'implicit conversion not recommended'
       and CPU backend cannot convert half<->int.
     - float + double -> T=double: E30082 'implicit float-to-double conversion'
       warns about performance."""
-    inferred = inferType(ta, tb)
     if inferred.name == "half":
         if ta.isInteger() or tb.isInteger():
             return True
@@ -139,22 +172,31 @@ def shouldSkipPair(ta, tb):
     return False
 
 
-def filterPairs(pairs):
-    """Remove pairs that are known to be problematic."""
-    return [(a, b) for a, b in pairs if not shouldSkipPair(a, b)]
+def partitionPairs(pairs):
+    """Split pairs into success cases (the types join; a triple with the
+    inferred type) and tie pairs (equal cost; inference fails)."""
+    success = []
+    ties = []
+    for a, b in pairs:
+        inferred = inferType(a, b)
+        if inferred is None:
+            ties.append((a, b))
+        else:
+            success.append((a, b, inferred))
+    return success, ties
 
 
 def generateTestBody(pairs):
-    """Generate the computeMain body for a list of (TypeInfo, TypeInfo) pairs."""
+    """Generate the computeMain body for a list of (TypeInfo, TypeInfo, inferred) triples."""
 
     lines = []
     lines.append("    int idx = 0;")
 
-    for i, (ta, tb) in enumerate(pairs):
-        inferred = inferType(ta, tb)
+    for i, (ta, tb, inferred) in enumerate(pairs):
         code = getTypeCode(inferred)
-        litA = ta.literal(3)
-        litB = tb.literal(7)
+        litA, valA = ta.testValue(3)
+        litB, valB = tb.testValue(7)
+        expected = valA + valB
 
         lines.append("")
         lines.append(
@@ -164,7 +206,7 @@ def generateTestBody(pairs):
         lines.append(f"        {ta.name} a = {litA};")
         lines.append(f"        {tb.name} b = {litB};")
         lines.append(f"        outputBuffer[idx++] = int(add(a, b));")
-        lines.append(f"        // CHECK: 10")
+        lines.append(f"        // CHECK: {expected}")
         lines.append(f"        outputBuffer[idx++] = getInferredTypeCode(a, b);")
         lines.append(f"        // CHECK: {code}")
         lines.append(f"    }}")
@@ -173,7 +215,7 @@ def generateTestBody(pairs):
 
 
 def generateTestFile(pairs, description, testDirectives, extraNote=""):
-    """Generate a complete test file for the given pairs."""
+    """Generate a complete compute test file for the given success triples."""
 
     bufferSize = len(pairs) * 2
     body = generateTestBody(pairs)
@@ -194,8 +236,10 @@ def generateTestFile(pairs, description, testDirectives, extraNote=""):
 // identity (getInferredTypeCode). The type code encodes sizeof(T) with sign:
 //   positive = unsigned type, negative = signed or float type.
 //
-// Bool promotion is not tested due to non-deterministic inference behavior
-// tracked in issue #10164.
+// Bool pairs join with integer types (the integer side is strictly better)
+// and tie with floating-point types at equal conversion cost; the tie pairs
+// fail inference and are generated into
+// gen-generic-type-promotion-tie-rejection.slang (issue #10164).
 //
 // Excluded pairs: integer+half (E30081, CPU backend limitation) and
 // float+double (E30082 performance warning).
@@ -229,13 +273,65 @@ void computeMain()
 """
 
 
+def generateRejectionTestFile(pairs):
+    """Generate a diagnostic test asserting that equal-cost tie pairs fail
+    inference with a conflicting-requirements diagnostic naming the two
+    types in argument order."""
+
+    cases = []
+    for ta, tb in pairs:
+        litA = ta.testValue(3)[0]
+        litB = tb.testValue(7)[0]
+        cases.append(
+            f"""\
+    {{
+        {ta.name} a = {litA};
+        {tb.name} b = {litB};
+        joinArgs(a, b);
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements '{ta.name}' and '{tb.name}'
+*/
+        joinArgs(b, a);
+/*CHECK: cannot deduce generic argument for 'T': conflicting requirements '{tb.name}' and '{ta.name}'
+*/
+    }}"""
+        )
+    body = "\n\n".join(cases)
+
+    return f"""\
+// THIS IS A GENERATED FILE. DO NOT EDIT!
+// Instead, edit extras/test-generators/generate-generic-type-promotion-tests.py
+// and regenerate by running:
+//
+//     python3 extras/test-generators/generate-generic-type-promotion-tests.py
+//
+// Equal-cost ties: generic parameter promotion inference.
+// Tests {len(pairs)} type pair combinations in both argument orders.
+//
+// Each pair's conversion costs tie in both directions, so neither type is
+// better and inference fails instead of picking a side (issue #10164).
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+
+void joinArgs<T>(T a, T b)
+{{
+}}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main()
+{{
+{body}
+}}
+"""
+
+
 def main():
     if len(sys.argv) != 1:
         print("Generates generic type promotion inference tests for all scalar type pairs")
         print("")
         print("Generated files:")
-        print("  gen-generic-type-promotion-inference.slang       (core types)")
-        print("  gen-generic-type-promotion-inference-64bit.slang (64-bit types)")
+        print("  gen-generic-type-promotion-inference.slang          (core types)")
+        print("  gen-generic-type-promotion-inference-64bit.slang    (64-bit types)")
+        print("  gen-generic-type-promotion-tie-rejection.slang      (equal-cost ties)")
         sys.exit(1)
 
     slangTopDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -243,8 +339,9 @@ def main():
     os.makedirs(genTestDirectory, exist_ok=True)
     os.chdir(genTestDirectory)
 
-    # Core types: int8-32, uint8-32, half, float
-    corePairs = filterPairs(list(combinations(coreTypes, 2)))
+    # Core types: bool, int8-32, uint8-32, half, float
+    coreSuccess, coreTies = partitionPairs(list(combinations(coreTypes, 2)))
+    coreTriples = [t for t in coreSuccess if not shouldSkipPair(t[0], t[1], t[2])]
     coreFile = "gen-generic-type-promotion-inference.slang"
     coreDirectives = [
         "//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type",
@@ -253,19 +350,20 @@ def main():
     with open(coreFile, "w") as f:
         f.write(
             generateTestFile(
-                corePairs,
+                coreTriples,
                 "Generic type promotion inference: core scalar types (8-32 bit)",
                 coreDirectives,
             )
         )
-    print(f"Generated: {genTargetDirectory}{coreFile} ({len(corePairs)} pairs)")
+    print(f"Generated: {genTargetDirectory}{coreFile} ({len(coreTriples)} pairs)")
 
     # 64-bit type pairs: all pairs involving at least one 64-bit type
     allTypes = coreTypes + extendedTypes
     allPairs = list(combinations(allTypes, 2))
-    pairs64 = filterPairs(
+    pairs64Success, pairs64Ties = partitionPairs(
         [(a, b) for a, b in allPairs if a in extendedTypes or b in extendedTypes]
     )
+    pairs64Triples = [t for t in pairs64Success if not shouldSkipPair(t[0], t[1], t[2])]
 
     ext64File = "gen-generic-type-promotion-inference-64bit.slang"
     ext64Directives = [
@@ -279,13 +377,20 @@ def main():
     with open(ext64File, "w") as f:
         f.write(
             generateTestFile(
-                pairs64,
+                pairs64Triples,
                 "Generic type promotion inference: 64-bit scalar types",
                 ext64Directives,
                 extraNote=extNote,
             )
         )
-    print(f"Generated: {genTargetDirectory}{ext64File} ({len(pairs64)} pairs)")
+    print(f"Generated: {genTargetDirectory}{ext64File} ({len(pairs64Triples)} pairs)")
+
+    # Equal-cost ties across the full type set (both argument orders)
+    allSuccess, allTies = partitionPairs(list(combinations(allTypes, 2)))
+    tieFile = "gen-generic-type-promotion-tie-rejection.slang"
+    with open(tieFile, "w") as f:
+        f.write(generateRejectionTestFile(allTies))
+    print(f"Generated: {genTargetDirectory}{tieFile} ({len(allTies)} pairs)")
 
 
 if __name__ == "__main__":
