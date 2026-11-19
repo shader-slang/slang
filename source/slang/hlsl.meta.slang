@@ -22802,6 +22802,7 @@ interface IRayQueryFeature
 {
     // The public type carries capability requirements; this value describes the
     // corresponding native query flags when the opaque query type is lowered.
+    __builtin_requirement($((int)BuiltinRequirementKind::RayQueryFlags))
     internal static const RAYQUERY_FLAG _rayQueryFlags;
 }
 
@@ -22862,9 +22863,8 @@ struct RayQueryFeatures<each Feature> : IRayQueryFeature
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
 // Keep Features in the source type so normal capability checking sees the selected policies.
-// The explicit intrinsic operands lower their native flags without erasing that type information
-// through an alias to a numeric query type before capability checking and generic inference.
-__intrinsic_type($(kIROp_RayQueryType), rayFlagsGeneric, Features._rayQueryFlags)
+// Lowering projects the feature requirement to native flags only when creating the IR type.
+__intrinsic_type($(kIROp_RayQueryType))
 struct RayQuery<
     let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE,
     Features : IRayQueryFeature = RayQueryFeatures<>>

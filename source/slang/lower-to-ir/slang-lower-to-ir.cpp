@@ -2927,6 +2927,63 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
     }
 
+    // Project the standard-library RayQuery's feature policy into its native IR flags.
+    // Consider `RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>>`.
+    // Generic checking keeps the feature type and its IRayQueryFeature witness in the
+    // declaration reference so capability checking and generic inference see the policy.
+    // Here, the builtin requirement identifies the native flag value in that witness.
+    // Normal witness lookup also preserves a symbolic value inside a generic helper,
+    // which later specialization resolves through the same conformance.
+    IRType* lowerRayQueryType(DeclRefType* type)
+    {
+        auto astBuilder = context->astBuilder;
+        auto flagsRequirement =
+            as<VarDeclBase>(astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+                BuiltinRequirementKind::RayQueryFlags));
+        SLANG_RELEASE_ASSERT(flagsRequirement);
+        SLANG_RELEASE_ASSERT(as<InterfaceDecl>(flagsRequirement->parentDecl));
+
+        IntVal* rayFlags = nullptr;
+        Type* featuresType = nullptr;
+        SubtypeWitness* featuresWitness = nullptr;
+        SubstitutionSet(type->getDeclRef())
+            .forEachSubstitutionArg(
+                [&](Val* arg)
+                {
+                    if (auto intVal = as<IntVal>(arg))
+                    {
+                        SLANG_RELEASE_ASSERT(!rayFlags);
+                        rayFlags = intVal;
+                    }
+                    else if (auto witness = as<SubtypeWitness>(arg))
+                    {
+                        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(witness->getSup());
+                        SLANG_RELEASE_ASSERT(
+                            interfaceDeclRef.getDecl() == flagsRequirement->parentDecl);
+                        SLANG_RELEASE_ASSERT(!featuresWitness);
+                        featuresWitness = witness;
+                    }
+                    else
+                    {
+                        SLANG_RELEASE_ASSERT(as<Type>(arg) && !featuresType);
+                        featuresType = as<Type>(arg);
+                    }
+                });
+        SLANG_RELEASE_ASSERT(rayFlags && featuresType && featuresWitness);
+        SLANG_RELEASE_ASSERT(featuresWitness->getSub()->equals(featuresType));
+
+        auto queryFlags = WitnessLookupIntVal::tryFold(
+            astBuilder,
+            featuresWitness,
+            flagsRequirement,
+            flagsRequirement->type);
+        SLANG_RELEASE_ASSERT(as<IntVal>(queryFlags));
+        IRInst* operands[] = {
+            lowerSimpleVal(context, rayFlags),
+            lowerSimpleVal(context, queryFlags)};
+        return getBuilder()->getType(kIROp_RayQueryType, SLANG_COUNT_OF(operands), operands);
+    }
+
     // Lower a type where the type declaration being referenced is assumed
     // to be an intrinsic type, which can thus be lowered to a simple IR
     // type with the appropriate opcode.
@@ -2938,42 +2995,24 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             type->getDeclRef().getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
-        List<IRInst*> operands;
-        SubstitutionSet substitutions(type->getDeclRef());
-        if (intrinsicTypeModifier->operandExprs.getCount())
+        if (op == kIROp_RayQueryType && isFromCoreModule(type->getDeclRef().getDecl()))
         {
-            // Consider this declaration:
-            //
-            // __intrinsic_type(RayQuery, flags, Features._rayQueryFlags)
-            // struct Query<let flags : uint, Features : IRayQueryFeature> {}
-            //
-            // checkModifier retains both operands as checked integer values. Substituting
-            // the Query specialization resolves the feature's associated constant through
-            // its witness, so the IR type receives flags rather than a feature type and witness.
-            // The same semantic value path handles literals and dependent expressions.
-            SLANG_RELEASE_ASSERT(
-                intrinsicTypeModifier->operandVals.getCount() ==
-                intrinsicTypeModifier->operandExprs.getCount());
-            for (auto operandVal : intrinsicTypeModifier->operandVals)
-            {
-                SLANG_RELEASE_ASSERT(operandVal);
-                auto specializedVal = operandVal->substitute(context->astBuilder, substitutions);
-                auto irOperand = lowerSimpleVal(context, specializedVal);
-                SLANG_RELEASE_ASSERT(irOperand);
-                operands.add(irOperand);
-            }
+            // The standard library owns the typed feature policy. User declarations with
+            // __intrinsic_type(RayQuery) already describe native numeric operands directly.
+            return lowerRayQueryType(type);
         }
-        else
-        {
-            // Without explicit operands, use the intrinsic declaration's generic arguments.
-            substitutions.forEachSubstitutionArg(
+
+        List<IRInst*> operands;
+        // If there are any substitutions attached to the declRef,
+        // add them as operands of the IR type.
+        SubstitutionSet(type->getDeclRef())
+            .forEachSubstitutionArg(
                 [&](Val* arg)
                 {
                     auto argVal = lowerVal(context, arg).val;
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
                 });
-        }
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),

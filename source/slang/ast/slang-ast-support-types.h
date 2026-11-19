@@ -2060,7 +2060,7 @@ FIDDLE() namespace Slang
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 
-    /// The kind of a builtin interface requirement that can be automatically synthesized.
+    /// The role of a builtin interface requirement recognized by the compiler.
     enum class BuiltinRequirementKind
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
@@ -2104,6 +2104,8 @@ FIDDLE() namespace Slang
         BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
                                    ///< conformance (witness that the backward-callable context type
                                    ///< conforms to `IBwdCallable`)
+
+        RayQueryFlags, ///< The `IRayQueryFeature._rayQueryFlags` native flag requirement.
     };
 
     enum class FunctionDifferentiableLevel
