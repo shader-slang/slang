@@ -77,10 +77,11 @@ SLANG_UNIT_TEST(multiFileModuleCache)
         for (int i = 0; i < session->getLoadedModuleCount(); i++)
         {
             slang::IModule* mod = session->getLoadedModule(i);
-            // path = root1/...
-            String path = mod->getFilePath();
-            path = String("root1") +
-                   path.getUnownedSlice().tail(path.indexOf(Path::kOSCanonicalPathDelimiter));
+            // A module's path is in the simplified form (always `/` separators) that
+            // calcCombinedPath returns, so derive the per-root subpath with the simplified
+            // spelling rather than the OS-preferred delimiter.
+            String path = Path::simplify(mod->getFilePath());
+            path = String("root1") + path.getUnownedSlice().tail(path.indexOf(Path::kPathDelimiter));
             path.append("-module");
 
             ComPtr<slang::IBlob> serializedBlob;
