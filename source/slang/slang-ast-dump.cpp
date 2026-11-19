@@ -478,17 +478,33 @@ struct ASTDumpContext
     }
 
 
-    void dump(const QualType& qualType)
+    void dump(const ExprInfo& info)
     {
-        if (qualType.isLeftValue)
+        switch (info.valueCategory)
         {
-            m_writer->emit("lvalue ");
+        case ExprValueCategory::Value:
+            m_writer->emit("value ");
+            break;
+        case ExprValueCategory::StorageLocation:
+            m_writer->emit("storage ");
+            break;
+        case ExprValueCategory::MemoryLocation:
+            m_writer->emit("memory ");
+            break;
         }
-        else
+        switch (info.access)
         {
-            m_writer->emit("rvalue ");
+        case ExprAccess::ReadOnly:
+            m_writer->emit("readonly ");
+            break;
+        case ExprAccess::WriteOnly:
+            m_writer->emit("writeonly ");
+            break;
+        case ExprAccess::ReadWrite:
+            m_writer->emit("readwrite ");
+            break;
         }
-        dump(qualType.type);
+        dump(info.type);
     }
 
     void dump(const ParamInfo& info)

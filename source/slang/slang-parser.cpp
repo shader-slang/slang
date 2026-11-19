@@ -1801,7 +1801,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
         auto paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
         paramTypeExpr->loc = paramDecl->loc;
         paramTypeExpr->base.type = paramType;
-        paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
+        paramTypeExpr->type = ExprInfo(parser->astBuilder->getTypeType(paramType));
 
         paramConstraint->sub = TypeExp(paramTypeExpr);
         paramConstraint->sup = parser->ParseTypeExp();
@@ -2398,7 +2398,7 @@ static void parseOptionalGenericConstraints(
                 SharedTypeExpr* typeExpr = parser->astBuilder->create<SharedTypeExpr>();
                 typeExpr->loc = decl->loc;
                 typeExpr->base.type = paramType;
-                typeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
+                typeExpr->type = ExprInfo(parser->astBuilder->getTypeType(paramType));
 
                 paramConstraint->sub = TypeExp(typeExpr);
             }

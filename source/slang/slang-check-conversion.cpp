@@ -670,7 +670,7 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
     const List<Expr*>& coercedArgs)
 {
     auto* varExpr = getASTBuilder()->create<VarExpr>();
-    varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
+    varExpr->type = (ExprInfo)getASTBuilder()->getTypeType(toType);
     varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
     varExpr->loc = loc;
     varExpr->checked = true;
@@ -1056,7 +1056,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
                 defaultConstructExpr->loc = fromInitializerListExpr->loc;
-                defaultConstructExpr->type = QualType(toType);
+                defaultConstructExpr->type = ExprInfo(toType);
 
                 *outToExpr = defaultConstructExpr;
                 return true;
@@ -1158,7 +1158,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             {
                 auto toMakeArrayFromElementExpr = m_astBuilder->create<MakeArrayFromElementExpr>();
                 toMakeArrayFromElementExpr->loc = fromInitializerListExpr->loc;
-                toMakeArrayFromElementExpr->type = QualType(toType);
+                toMakeArrayFromElementExpr->type = ExprInfo(toType);
                 if (outToExpr)
                     *outToExpr = toMakeArrayFromElementExpr;
                 return true;
@@ -1250,7 +1250,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
                 defaultConstructExpr->loc = fromInitializerListExpr->loc;
-                defaultConstructExpr->type = QualType(toType);
+                defaultConstructExpr->type = ExprInfo(toType);
                 if (outToExpr)
                     *outToExpr = defaultConstructExpr;
                 return true;
@@ -1388,7 +1388,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     {
         auto toInitializerListExpr = m_astBuilder->create<InitializerListExpr>();
         toInitializerListExpr->loc = fromInitializerListExpr->loc;
-        toInitializerListExpr->type = QualType(toType);
+        toInitializerListExpr->type = ExprInfo(toType);
         toInitializerListExpr->args = coercedArgs;
 
         // Wrap initalizer list args if we're creating a non-differentiable struct within a
@@ -1752,7 +1752,7 @@ bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
     Expr** outToExpr,
-    QualType fromType,
+    ExprInfo fromType,
     Expr* fromExpr,
     DiagnosticSink* sink,
     ConversionCost* outCost,
@@ -1991,8 +1991,7 @@ bool SemanticsVisitor::_coerce(
         auto toBase = toModified ? toModified->getBase() : toType;
         //
         auto fromModified = as<ModifiedType>(fromType);
-        auto fromBase =
-            fromModified ? QualType(fromModified->getBase(), fromType.isLeftValue) : fromType;
+        auto fromBase = fromModified ? fromType.withType(fromModified->getBase()) : fromType;
 
 
         if (toModified || fromModified)
@@ -2121,7 +2120,7 @@ bool SemanticsVisitor::_coerce(
         if (outToExpr)
         {
             auto* defaultExpr = getASTBuilder()->create<DefaultConstructExpr>();
-            defaultExpr->type = QualType(toType);
+            defaultExpr->type = ExprInfo(toType);
             *outToExpr = defaultExpr;
         }
         return true;
@@ -2182,7 +2181,7 @@ bool SemanticsVisitor::_coerce(
                 innerVarDecl->checkState = DeclCheckState::DefinitionChecked;
 
                 auto innerVarExpr = getASTBuilder()->create<VarExpr>();
-                innerVarExpr->type = QualType(fromInner);
+                innerVarExpr->type = ExprInfo(fromInner);
                 innerVarExpr->loc = fromExpr ? fromExpr->loc : SourceLoc();
                 innerVarExpr->declRef = makeDeclRef(innerVarDecl);
 
@@ -2192,7 +2191,7 @@ bool SemanticsVisitor::_coerce(
                     site,
                     toInner,
                     nullptr,
-                    QualType(fromInner),
+                    ExprInfo(fromInner),
                     innerVarExpr,
                     nullptr,
                     &innerCost,
@@ -2222,7 +2221,7 @@ bool SemanticsVisitor::_coerce(
                             site,
                             toInner,
                             &innerCoercedExpr,
-                            QualType(fromInner),
+                            ExprInfo(fromInner),
                             innerVarExpr,
                             sink,
                             nullptr,
@@ -2235,7 +2234,7 @@ bool SemanticsVisitor::_coerce(
 
                         auto castExpr = getASTBuilder()->create<CastOptionalExpr>();
                         castExpr->loc = fromExpr->loc;
-                        castExpr->type = QualType(toType);
+                        castExpr->type = ExprInfo(toType);
                         castExpr->checked = true;
                         castExpr->valueArg = fromExpr;
                         castExpr->innerVarDecl = innerVarDecl;
@@ -2297,7 +2296,7 @@ bool SemanticsVisitor::_coerce(
                     site,
                     toType,
                     outToExpr ? &convertedExpr : nullptr,
-                    QualType(tagType),
+                    ExprInfo(tagType),
                     tagExpr,
                     sink,
                     &innerCost,
@@ -2428,12 +2427,16 @@ bool SemanticsVisitor::_coerce(
             // to pass a value of a derived `struct` type into methods that
             // expect a value of its base type.
             //
-            if (fromExpr && fromExpr->type.isLeftValue)
+            if (fromExpr && fromExpr->type.isWritableStorageLocation())
             {
                 // If toType is an interface type, we need to wrap the original
                 // expression into a MakeExistential, and the result of
-                // MakeExistential is not an l-value.
-                (*outToExpr)->type.isLeftValue = !isInterfaceType(toType);
+                // MakeExistential is a pure value.
+                if (!isInterfaceType(toType))
+                {
+                    (*outToExpr)->type.valueCategory = fromExpr->type.valueCategory;
+                    (*outToExpr)->type.access = fromExpr->type.access;
+                }
             }
         }
         if (outCost)
@@ -2460,11 +2463,14 @@ bool SemanticsVisitor::_coerce(
             if (outToExpr)
             {
                 *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, fromIsToWitness);
-                // Type-equality casts preserve l-value status since the
+                // Type-equality casts preserve the value category and access since the
                 // types are structurally equivalent (e.g., T.Differential == T
                 // via a where clause).
                 if (fromExpr)
-                    (*outToExpr)->type.isLeftValue = fromExpr->type.isLeftValue;
+                {
+                    (*outToExpr)->type.valueCategory = fromExpr->type.valueCategory;
+                    (*outToExpr)->type.access = fromExpr->type.access;
+                }
             }
             if (outCost)
                 *outCost = 0;
@@ -2501,9 +2507,9 @@ bool SemanticsVisitor::_coerce(
         {
             // TODO(tfoley): The logic here effectively assumes that any
             // parameter-group type is read-only, because we are not
-            // setting the `isLeftValue` flag of the `QualType` based
+            // setting the value category of the `ExprInfo` based
             // on the type of the container. That is, a `StorageBuffer<X>`
-            // and a `ConstantBuffer<X>` would both derive the `QualType`
+            // and a `ConstantBuffer<X>` would both derive the `ExprInfo`
             // of the dereferenced expression from `X` alone, and ignore
             // that one of these should yield an l-value and the other
             // shouldn't.
@@ -2515,7 +2521,7 @@ bool SemanticsVisitor::_coerce(
             //
             derefExpr = m_astBuilder->create<DerefExpr>();
             derefExpr->base = fromExpr;
-            derefExpr->type = QualType(fromElementType);
+            derefExpr->type = ExprInfo(fromElementType);
             derefExpr->checked = true;
             // The recursive coercion below diagnoses against this synthesized
             // dereference, so it must carry the operand's source location.
@@ -2562,15 +2568,15 @@ bool SemanticsVisitor::_coerce(
         // Depending on whether the result of the coercion would be an l-value
         // or not, we may need to restrict the source to be an l-value.
         //
-        // TODO(tfoley): Here we are again hijacking the `QualType` constructor
+        // TODO(tfoley): Here we are again hijacking the `ExprInfo` constructor
         // to do the direct work. It's still not clear where this logic should
         // live. In the longer run, I'm hopeful that we will get rid of
         // the explicit `Ref` type entirely (since it was a design mistake to
         // begin with), and thus not have to deal with the miserable mess that
         // it pushes back on various parts of the compiler.
         //
-        auto qualRefType = QualType(refType);
-        if (qualRefType.isLeftValue && !fromExpr->type.isLeftValue)
+        auto qualRefType = ExprInfo(refType);
+        if (qualRefType.isWritableStorageLocation() && !fromExpr->type.isWritableStorageLocation())
         {
             // The result type would be an l-value, but the source isn't,
             // so there is no way to support the conversion.
@@ -3014,10 +3020,11 @@ bool SemanticsVisitor::_coerce(
                 }
             }
         }
-        if (fromType.isLeftValue)
+        if (fromType.isWritableStorageLocation())
         {
-            // If we are implicitly casting the type of an l-value, we need to impose additional
-            // cost.
+            // Converting a writable storage location through an initializer needs a
+            // temporary that is converted back after a call writes to it, so we charge
+            // more for it.
             cost += kConversionCost_LValueCast;
         }
         if (outCost)
@@ -3218,7 +3225,7 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
         VarExpr* expr = m_astBuilder->create<VarExpr>();
         expr->loc = fromExpr->loc;
         expr->declRef = m_astBuilder->getMemberDeclRef(lambdaStruct, synStaticFunc);
-        expr->type = QualType(toFuncType);
+        expr->type = ExprInfo(toFuncType);
         expr->checked = true;
         *outToExpr = expr;
     }
@@ -3227,7 +3234,7 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
 
 bool SemanticsVisitor::canCoerce(
     Type* toType,
-    QualType fromType,
+    ExprInfo fromType,
     Expr* fromExpr,
     ConversionCost* outCost)
 {
@@ -3242,6 +3249,9 @@ bool SemanticsVisitor::canCoerce(
     BasicTypeKeyPair cacheKey;
     cacheKey.type1 = makeBasicTypeKey(toType);
     cacheKey.type2 = makeBasicTypeKey(fromType, fromExpr);
+    const ConversionCostKey moduleCacheKey = {
+        TypePair{toType, fromType.type},
+        fromType.isWritableStorageLocation()};
 
     if (cacheKey.isValid())
     {
@@ -3257,7 +3267,7 @@ bool SemanticsVisitor::canCoerce(
 
     // If this type pair isn't covered by the global cache, use
     // the cache that is local to the module.
-    if (getShared()->m_typeConversionCostCache.tryGetValue(TypePair{toType, fromType.type}, cost))
+    if (getShared()->m_typeConversionCostCache.tryGetValue(moduleCacheKey, cost))
     {
         if (outCost)
             *outCost = cost;
@@ -3268,9 +3278,7 @@ bool SemanticsVisitor::canCoerce(
     // Store "impossible" to conversion cost cache to prevent infinite recursion in case
     // checking for coercion between toType and fromType requires checking itself again via
     // extensions/overloads.
-    getShared()->m_typeConversionCostCache.add(
-        TypePair{toType, fromType.type},
-        kConversionCost_Impossible);
+    getShared()->m_typeConversionCostCache.add(moduleCacheKey, kConversionCost_Impossible);
 
     // If there was no suitable entry in the cache,
     // then we fall back to the general-purpose
@@ -3299,11 +3307,11 @@ bool SemanticsVisitor::canCoerce(
     if (shouldAddToGlobalCache)
     {
         typeCheckingCache->conversionCostCache[cacheKey] = cost;
-        getShared()->m_typeConversionCostCache.remove(TypePair{toType, fromType.type});
+        getShared()->m_typeConversionCostCache.remove(moduleCacheKey);
     }
     else
     {
-        getShared()->m_typeConversionCostCache[TypePair{toType, fromType.type}] = cost;
+        getShared()->m_typeConversionCostCache[moduleCacheKey] = cost;
     }
 
     return rs;
@@ -3326,7 +3334,7 @@ Expr* SemanticsVisitor::CreateImplicitCastExpr(Type* toType, Expr* fromExpr)
 
     castExpr->loc = fromExpr->loc;
     castExpr->functionExpr = typeExpr;
-    castExpr->type = QualType(toType);
+    castExpr->type = ExprInfo(toType);
     castExpr->arguments.add(fromExpr);
     return castExpr;
 }
@@ -3335,7 +3343,7 @@ Expr* SemanticsVisitor::createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, 
 {
     CastToSuperTypeExpr* expr = m_astBuilder->create<CastToSuperTypeExpr>();
     expr->loc = fromExpr->loc;
-    expr->type = QualType(toType);
+    expr->type = ExprInfo(toType);
     expr->valueArg = fromExpr;
     expr->witnessArg = witness;
     return expr;
@@ -3406,7 +3414,7 @@ Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)
 {
     ModifierCastExpr* expr = m_astBuilder->create<ModifierCastExpr>();
     expr->loc = fromExpr->loc;
-    expr->type = QualType(toType);
+    expr->type = ExprInfo(toType);
     expr->valueArg = fromExpr;
     return expr;
 }
@@ -3469,18 +3477,7 @@ bool SemanticsVisitor::canConvertImplicitly(ConversionCost conversionCost)
     return true;
 }
 
-bool SemanticsVisitor::canConvertImplicitly(Type* toType, QualType fromType)
-{
-    auto conversionCost = getConversionCost(toType, fromType);
-
-    // Is the conversion cheap enough to be done implicitly?
-    if (canConvertImplicitly(conversionCost))
-        return false;
-
-    return true;
-}
-
-ConversionCost SemanticsVisitor::getConversionCost(Type* toType, QualType fromType)
+ConversionCost SemanticsVisitor::getConversionCost(Type* toType, ExprInfo fromType)
 {
     ConversionCost conversionCost = kConversionCost_Impossible;
     if (!canCoerce(toType, fromType, nullptr, &conversionCost))

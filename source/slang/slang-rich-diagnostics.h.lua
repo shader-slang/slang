@@ -46,7 +46,7 @@ end
 local cpp_type_map = {
 	string = "String",
 	type = "Type*",
-	qualtype = "QualType",
+	exprinfo = "ExprInfo",
 	int = "int64_t",
 	name = "Name*",
 	decl = "Decl*",

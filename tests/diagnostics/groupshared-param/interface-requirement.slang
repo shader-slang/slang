@@ -1,10 +1,11 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target hlsl -entry computeMain -stage compute
 
-// A method's reference parameter must have the same access (read-write or read-only) as the
-// interface requirement's (E38108). It satisfies the requirement directly only if it also refers
-// to storage in the same address space (shader-slang/slang#10641). When only the address space
-// differs, or the method has an extra defaulted parameter, a synthesized witness forwards the
-// requirement's parameters to the method, which works where the forwarding call type-checks: a
+// A method's reference parameter must not need more access than the interface requirement's
+// grants (E38108): a read-only method can satisfy a read-write requirement, but a read-write
+// method cannot satisfy a read-only one. It satisfies the requirement directly only if it has the
+// same access and refers to storage in the same address space (shader-slang/slang#10641).
+// Otherwise, a synthesized witness forwards the requirement's parameters to the method, which
+// works where the forwarding call type-checks: a
 // `groupshared` argument can be passed to a `__ref` parameter, but a `__ref` argument cannot be
 // passed to a `groupshared` one (E30711). The witness's parameters keep the requirement's
 // `groupshared` and `const`.
@@ -24,7 +25,7 @@ struct SharedForRef : IRef
 //diag:  ^ interface requirement mismatch
 }
 
-// --- Rejected: the access differs ---
+// --- Rejected: the method needs more access than the requirement grants ---
 
 interface IReadOnly
 {
@@ -39,21 +40,18 @@ struct WriterForReadOnly : IReadOnly
 //diag:                     ^ parameter 'a' direction 'ref' does not match interface requirement 'ref_readonly'.
 }
 
+// --- Accepted: the same qualifiers, a `__ref` parameter for a `groupshared` requirement, a
+// read-only parameter for a read-write requirement, and an extra defaulted parameter ---
+
 interface ISharedWrite
 {
     void touch(groupshared uint a[8]);
-//diag:  ^^^^^ see interface requirement declaration of 'touch'
 }
 
 struct ReadsOnly : ISharedWrite
 {
     void touch(const groupshared uint a[8]) {}
-//diag:                               ^ E38108
-//diag:                               ^ parameter 'a' direction 'ref_readonly' does not match interface requirement 'ref'.
 }
-
-// --- Accepted: the same qualifiers, a `__ref` parameter for a `groupshared` requirement, and an
-// extra defaulted parameter ---
 
 interface IShared
 {

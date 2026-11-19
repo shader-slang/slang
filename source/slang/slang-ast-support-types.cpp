@@ -43,31 +43,28 @@ KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
     return KnownBuiltinDeclName::COUNT;
 }
 
-QualType::QualType(Type* type)
-    : type(type), isLeftValue(false)
+ExprInfo getExprInfoOfRefTarget(ExplicitRefType* refType)
 {
-    if (auto refType = as<ExplicitRefType>(type))
+    auto valueType = refType->getValueType();
+
+    // A reference whose access is not a compile-time constant permits no access that we can
+    // prove, so we treat the place it refers to as a read-only pure value.
+    auto optAccessQualifier = refType->tryGetAccessQualifierValue();
+    if (!optAccessQualifier)
+        return ExprInfo(valueType);
+
+    switch (*optAccessQualifier)
     {
-        if (auto optAccessQualifier = refType->tryGetAccessQualifierValue())
-        {
-            auto accessQualifier = *optAccessQualifier;
-            switch (accessQualifier)
-            {
-            case AccessQualifier::ReadWrite:
-                isLeftValue = true;
-                break;
+    case AccessQualifier::ReadWrite:
+        return ExprInfo(valueType, ExprValueCategory::MemoryLocation, ExprAccess::ReadWrite);
 
-            case AccessQualifier::Read:
-            case AccessQualifier::Immutable:
-                isLeftValue = false;
-                isReadOnlyMemoryLocation = true;
-                break;
+    case AccessQualifier::Read:
+    case AccessQualifier::Immutable:
+        return ExprInfo(valueType, ExprValueCategory::MemoryLocation, ExprAccess::ReadOnly);
 
-            default:
-                SLANG_UNEXPECTED("unhandled access qualifier");
-                break;
-            }
-        }
+    default:
+        SLANG_UNEXPECTED("unhandled access qualifier");
+        UNREACHABLE_RETURN(ExprInfo(valueType));
     }
 }
 

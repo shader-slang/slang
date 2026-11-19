@@ -440,7 +440,7 @@ void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
         sb << "<null>";
 }
 
-void printDiagnosticArg(StringBuilder& sb, QualType const& type)
+void printDiagnosticArg(StringBuilder& sb, ExprInfo const& type)
 {
     if (type.type)
         type.type->toText(sb);
@@ -1006,13 +1006,19 @@ ParamInfo getEffectiveThisParamInfo(ASTBuilder* astBuilder, DeclRef<Decl> declRe
     return *result;
 }
 
-bool isThisExprWritable(DeclRef<CallableDecl> callableDeclRef, ParamInfo const& thisParamInfo)
+ExprInfo getExprInfoOfThisExpr(
+    DeclRef<CallableDecl> callableDeclRef,
+    ParamInfo const& thisParamInfo)
 {
-    if (doesParamPassingModeIndicateWritableStorage(thisParamInfo.mode))
-        return true;
-
-    return callableDeclRef.is<SetterDecl>() &&
-           isDeclRefTypeOf<ClassDecl>(unwrapModifiedType(thisParamInfo.type));
+    if (callableDeclRef.is<SetterDecl>() &&
+        isDeclRefTypeOf<ClassDecl>(unwrapModifiedType(thisParamInfo.type)))
+    {
+        return ExprInfo(
+            thisParamInfo.type,
+            ExprValueCategory::MemoryLocation,
+            ExprAccess::ReadWrite);
+    }
+    return getExprInfoOfParamReference(thisParamInfo.type, thisParamInfo.mode);
 }
 
 bool doesTypeHaveNoDiffModifier(Type* type)

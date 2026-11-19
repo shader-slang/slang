@@ -261,7 +261,7 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
                     auto unificationResult = TryUnifyTypes(
                         *constraints,
                         UnificationOptions(),
-                        QualType(facet->getType()),
+                        ExprInfo(facet->getType()),
                         interfaceType);
 
                     if (unificationResult)
@@ -275,7 +275,7 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
                     auto unificationResult = TryUnifyTypes(
                         *constraints,
                         UnificationOptions(),
-                        QualType(witnessKV.first),
+                        ExprInfo(witnessKV.first),
                         interfaceType);
                     if (unificationResult)
                         return type;
@@ -301,8 +301,8 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
 
 Type* SemanticsVisitor::TryJoinTypes(
     GenericInferenceContext* constraints,
-    QualType left,
-    QualType right,
+    ExprInfo left,
+    ExprInfo right,
     bool allowEnumScalarJoin)
 {
     // Easy case: they are the same type!
@@ -346,8 +346,8 @@ Type* SemanticsVisitor::TryJoinTypes(
             // Try to join the element types
             auto joinElementType = TryJoinTypes(
                 constraints,
-                QualType(leftVector->getElementType(), left.isLeftValue),
-                QualType(rightVector->getElementType(), right.isLeftValue));
+                left.withType(leftVector->getElementType()),
+                right.withType(rightVector->getElementType()));
             if (!joinElementType)
                 return nullptr;
 
@@ -376,7 +376,7 @@ Type* SemanticsVisitor::TryJoinTypes(
                 if (auto tagType = getTagType(m_astBuilder, leftEnumDeclRef))
                     return TryJoinTypes(
                         constraints,
-                        QualType(tagType, left.isLeftValue),
+                        left.withType(tagType),
                         right,
                         allowEnumScalarJoin);
             }
@@ -389,7 +389,7 @@ Type* SemanticsVisitor::TryJoinTypes(
                     return TryJoinTypes(
                         constraints,
                         left,
-                        QualType(tagType, right.isLeftValue),
+                        right.withType(tagType),
                         allowEnumScalarJoin);
             }
         }
@@ -425,8 +425,8 @@ Type* SemanticsVisitor::TryJoinTypes(
             {
                 auto joinedType = TryJoinTypes(
                     constraints,
-                    QualType(leftTypePack->getElementType(i), left.isLeftValue),
-                    QualType(rightTypePack->getElementType(i), right.isLeftValue));
+                    left.withType(leftTypePack->getElementType(i)),
+                    right.withType(rightTypePack->getElementType(i)));
                 if (!joinedType)
                     return nullptr;
                 joinedTypes.add(joinedType);
@@ -899,7 +899,7 @@ struct ArgInfo
     bool isConstrainedForOverloadRanking() const { return m_constrainedForOverloadRanking; }
     void markConstrainedForOverloadRanking() { m_constrainedForOverloadRanking = true; }
 
-    ShortList<QualType, 8>& getTypeConstraints()
+    ShortList<ExprInfo, 8>& getTypeConstraints()
     {
         SLANG_ASSERT(
             m_state == ArgState::DefaultSubstitutionArg || m_state == ArgState::SolvedOrdinaryArg ||
@@ -911,7 +911,7 @@ private:
     ArgState m_state = ArgState::DefaultSubstitutionArg;
     Val* m_substitutedDefaultArg = nullptr;
     ConstraintPriority m_priority = ConstraintPriority::Default;
-    ShortList<QualType, 8> m_typeConstraints;
+    ShortList<ExprInfo, 8> m_typeConstraints;
     bool m_constrainedForOverloadRanking = false;
 };
 
@@ -1804,7 +1804,7 @@ private:
         // witness solver does not interpret failure here as proof failure; the
         // normal witness step below remains responsible for accepting optional
         // constraints or rejecting required ones.
-        auto joinedSub = m_visitor->TryJoinTypes(&m_context, QualType(sub), QualType(sup));
+        auto joinedSub = m_visitor->TryJoinTypes(&m_context, ExprInfo(sub), ExprInfo(sup));
 
         // Joining can also produce a better subject type. For `sqrt(1)`, call
         // inference first solves `T` as `int`, then the source constraint
@@ -1850,8 +1850,8 @@ private:
         if (m_visitor->TryUnifyTypes(
                 m_context,
                 unificationOptions,
-                QualType(constraintDecl->sub.type),
-                QualType(joinedSub)))
+                ExprInfo(constraintDecl->sub.type),
+                ExprInfo(joinedSub)))
         {
             return JoinedSubtypeInferenceResult::AddedConstraint;
         }
@@ -1905,7 +1905,7 @@ private:
         if (!isPack)
             types.setCount(1);
 
-        QualType* ptype = nullptr;
+        ExprInfo* ptype = nullptr;
         if (isPack)
         {
             types.setCount(Math::Max(types.getCount(), c.indexInPack + 1));
@@ -1919,8 +1919,8 @@ private:
         // The constraint value must be a type at this point. It may have come
         // directly from call-site inference, or from substituting a dependent
         // value like `T.A`.
-        QualType& type = *ptype;
-        auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
+        ExprInfo& type = *ptype;
+        auto cType = ExprInfo(as<Type>(c.val), c.valueCategory, c.access);
         SLANG_RELEASE_ASSERT(cType);
 
         // The first type constraint initializes the accumulated type. Ordinary type
@@ -1987,10 +1987,10 @@ private:
 
     // Combine a new inferred type with the current type argument.
     bool mergeTypeConstraint(
-        QualType& ioType,
+        ExprInfo& ioType,
         ConstraintPriority currentPriority,
         SolverConstraint const& c,
-        QualType cType)
+        ExprInfo cType)
     {
         // Equality constraints are direct answers such as `T = int` or
         // `U = T.A`. Same-priority equality constraints must agree exactly;
@@ -2006,7 +2006,7 @@ private:
                 return true;
             if (!ioType->equals(cType))
                 return false;
-            ioType = QualType(ioType.type, ioType.isLeftValue || cType.isLeftValue);
+            ioType = mergeExprInfoOfTypeConstraints(ioType, cType, ioType.type);
             return true;
         }
 
@@ -2031,11 +2031,31 @@ private:
                 return false;
         }
 
-        // Preserve l-value information from either side because a joined type
-        // used later for parameter checking must still remember whether any
-        // source constraint required l-value treatment.
-        ioType = QualType(joinType, ioType.isLeftValue || cType.isLeftValue);
+        ioType = mergeExprInfoOfTypeConstraints(ioType, cType, joinType);
         return true;
+    }
+
+    // Get the info of the type `mergedType` that merges two constraints with infos `a` and `b`.
+    //
+    // Consider this example:
+    //
+    // ```
+    // void f<T>(T b, inout T a);
+    // uint u; int i;
+    // f(u, i);
+    // ```
+    //
+    // The use of `T` for `a` is bound to the writable storage location `i`, and the use for `b`
+    // is a pure value. We keep the info of a writable storage location when either side has one,
+    // so that later joins and conversion costs still see that the inferred type is written back
+    // to storage, which biases the join toward `int`.
+    static ExprInfo mergeExprInfoOfTypeConstraints(
+        ExprInfo const& a,
+        ExprInfo const& b,
+        Type* mergedType)
+    {
+        auto const& info = a.isWritableStorageLocation() ? a : b;
+        return info.withType(mergedType);
     }
 
     // Solve one ordinary constraint for a generic value-pack argument.
@@ -3510,9 +3530,9 @@ bool SemanticsVisitor::TryUnifyVals(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
     Val* fst,
-    bool fstLVal,
+    ExprInfo const& fstOuterInfo,
     Val* snd,
-    bool sndLVal)
+    ExprInfo const& sndOuterInfo)
 {
     // if both values are types, then unify types
     if (auto fstType = as<Type>(fst))
@@ -3522,8 +3542,8 @@ bool SemanticsVisitor::TryUnifyVals(
             return TryUnifyTypes(
                 constraints,
                 unificationOptions,
-                QualType(fstType, fstLVal),
-                QualType(sndType, sndLVal));
+                fstOuterInfo.withType(fstType),
+                sndOuterInfo.withType(sndType));
         }
     }
 
@@ -3691,9 +3711,9 @@ bool SemanticsVisitor::tryUnifyDeclRef(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
     DeclRefBase* fst,
-    bool fstIsLVal,
+    ExprInfo const& fstOuterInfo,
     DeclRefBase* snd,
-    bool sndIsLVal)
+    ExprInfo const& sndOuterInfo)
 {
     if (fst == snd)
         return true;
@@ -3709,18 +3729,18 @@ bool SemanticsVisitor::tryUnifyDeclRef(
         constraints,
         unificationOptions,
         fstGen,
-        fstIsLVal,
+        fstOuterInfo,
         sndGen,
-        sndIsLVal);
+        sndOuterInfo);
 }
 
 bool SemanticsVisitor::tryUnifyGenericAppDeclRef(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
     GenericAppDeclRef* fst,
-    bool fstIsLVal,
+    ExprInfo const& fstOuterInfo,
     GenericAppDeclRef* snd,
-    bool sndIsLVal)
+    ExprInfo const& sndOuterInfo)
 {
     SLANG_ASSERT(fst);
     SLANG_ASSERT(snd);
@@ -3741,9 +3761,9 @@ bool SemanticsVisitor::tryUnifyGenericAppDeclRef(
                 constraints,
                 unificationOptions,
                 fstGen->getArgs()[aa],
-                fstIsLVal,
+                fstOuterInfo,
                 sndGen->getArgs()[aa],
-                sndIsLVal))
+                sndOuterInfo))
         {
             okay = false;
         }
@@ -3753,7 +3773,13 @@ bool SemanticsVisitor::tryUnifyGenericAppDeclRef(
     auto fstBase = fst->getBase();
     auto sndBase = snd->getBase();
 
-    if (!tryUnifyDeclRef(constraints, unificationOptions, fstBase, fstIsLVal, sndBase, sndIsLVal))
+    if (!tryUnifyDeclRef(
+            constraints,
+            unificationOptions,
+            fstBase,
+            fstOuterInfo,
+            sndBase,
+            sndOuterInfo))
     {
         okay = false;
     }
@@ -3765,7 +3791,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
     GenericTypeParamDeclBase* typeParamDecl,
-    QualType type)
+    ExprInfo type)
 {
     // Record one ordinary type-argument fact discovered by unification. Equality
     // unification records an exact answer; ordinary call inference records a
@@ -3778,7 +3804,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
         priority,
         getOrdinaryArgMergeMode(unificationOptions),
         unificationOptions.indexInTypePack,
-        type.isLeftValue));
+        type));
 
     return true;
 }
@@ -3899,8 +3925,8 @@ bool SemanticsVisitor::TryUnifyFuncTypesByStructuralMatch(
 bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
-    QualType fst,
-    QualType snd)
+    ExprInfo fst,
+    ExprInfo snd)
 {
     if (auto sndDeclRefType = as<DeclRefType>(snd))
     {
@@ -3985,13 +4011,7 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
 
             // next we need to unify the substitutions applied
             // to each declaration reference.
-            if (!tryUnifyDeclRef(
-                    constraints,
-                    unificationOptions,
-                    fstDeclRef,
-                    fst.isLeftValue,
-                    sndDeclRef,
-                    snd.isLeftValue))
+            if (!tryUnifyDeclRef(constraints, unificationOptions, fstDeclRef, fst, sndDeclRef, snd))
             {
                 return false;
             }
@@ -4043,8 +4063,8 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
                 if (!TryUnifyTypes(
                         constraints,
                         unificationOptions,
-                        QualType(typePack->getElementType(i), fst.isLeftValue),
-                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                        fst.withType(typePack->getElementType(i)),
+                        snd.withType(sndTypePack->getElementType(i))))
                     return false;
             }
             return true;
@@ -4056,8 +4076,8 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
 bool SemanticsVisitor::TryUnifyConjunctionType(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
-    QualType fst,
-    QualType snd)
+    ExprInfo fst,
+    ExprInfo snd)
 {
     // When the conjunction is on the left, every conjunct must satisfy the
     // right-hand type: `(A & B)` against `T` records facts from both `A` and `B`.
@@ -4069,12 +4089,12 @@ bool SemanticsVisitor::TryUnifyConjunctionType(
         return TryUnifyTypes(
                    constraints,
                    unificationOptions,
-                   QualType(fstAndType->getLeft(), fst.isLeftValue),
+                   fst.withType(fstAndType->getLeft()),
                    snd) &&
                TryUnifyTypes(
                    constraints,
                    unificationOptions,
-                   QualType(fstAndType->getRight(), fst.isLeftValue),
+                   fst.withType(fstAndType->getRight()),
                    snd);
     }
     else if (auto sndAndType = as<AndType>(snd))
@@ -4083,12 +4103,12 @@ bool SemanticsVisitor::TryUnifyConjunctionType(
                    constraints,
                    unificationOptions,
                    fst,
-                   QualType(sndAndType->getLeft(), snd.isLeftValue)) ||
+                   snd.withType(sndAndType->getLeft())) ||
                TryUnifyTypes(
                    constraints,
                    unificationOptions,
                    fst,
-                   QualType(sndAndType->getRight(), snd.isLeftValue));
+                   snd.withType(sndAndType->getRight()));
     }
     else
         return false;
@@ -4098,8 +4118,7 @@ bool SemanticsVisitor::tryAddOptionalIntParamConstraintIfUnconstrained(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
     IntVal* param,
-    IntVal* arg,
-    bool paramIsLVal)
+    IntVal* arg)
 {
     SLANG_UNUSED(unificationOptions);
 
@@ -4134,9 +4153,7 @@ bool SemanticsVisitor::tryAddOptionalIntParamConstraintIfUnconstrained(
         intParamDecl,
         arg,
         ConstraintPriority::Optional,
-        SolverConstraint::OrdinaryArgMergeMode::Exact,
-        0,
-        paramIsLVal));
+        SolverConstraint::OrdinaryArgMergeMode::Exact));
     return true;
 }
 
@@ -4170,15 +4187,15 @@ struct FlattenedTypeRangePair
     }
 };
 
-// Convert one flattened tuple/pack mapping span back into the `QualType` used
+// Convert one flattened tuple/pack mapping span back into the `ExprInfo` used
 // by recursive unification. If the opposite side is pack-shaped, a span like
 // `[A, B]` must stay bundled as a type pack; otherwise the span represents one
 // ordinary type.
-QualType makeQualTypeForFlattenedTypeRange(
+ExprInfo makeExprInfoForFlattenedTypeRange(
     ASTBuilder* astBuilder,
     const FlattenedTypeRange& range,
     ShortList<Type*>& typeList,
-    bool isLeftValue,
+    ExprInfo const& packInfo,
     Type* otherType)
 {
     // When the opposite side is a pack parameter or expansion, the mapped span
@@ -4187,13 +4204,13 @@ QualType makeQualTypeForFlattenedTypeRange(
     {
         auto typesView = makeArrayView(&typeList[range.index], range.count);
         auto typePack = astBuilder->getTypePack(typesView);
-        return QualType(typePack, isLeftValue);
+        return packInfo.withType(typePack);
     }
 
     // Non-pack mappings are valid only for a single element; the caller already
-    // asserted the mapping cardinality before asking for a `QualType`.
+    // asserted the mapping cardinality before asking for an `ExprInfo`.
     SLANG_ASSERT(range.count == 1);
-    return QualType(typeList[range.index], isLeftValue);
+    return packInfo.withType(typeList[range.index]);
 }
 
 // Flatten a type-pack-shaped value into the sequence used by recursive type
@@ -4238,7 +4255,7 @@ static bool computeTypePackUnificationMapping(
     ShortList<FlattenedTypeRangePair>& outMapping)
 {
     // The flattened arrays are owned by the caller because later recursive
-    // unification needs to turn each mapping span back into a `QualType`.
+    // unification needs to turn each mapping span back into an `ExprInfo`.
     ShortList<Type*>& firstTypes = outFlattenedFirst;
     ShortList<Type*>& secondTypes = outFlattenedSecond;
 
@@ -4375,8 +4392,8 @@ static bool computeTypePackUnificationMapping(
 bool SemanticsVisitor::TryUnifyTypes(
     GenericInferenceContext& constraints,
     UnificationOptions unificationOptions,
-    QualType fst,
-    QualType snd)
+    ExprInfo fst,
+    ExprInfo snd)
 {
     if (!fst)
         return false;
@@ -4409,7 +4426,7 @@ bool SemanticsVisitor::TryUnifyTypes(
     // Pack-shaped values may need a structural mapping before recursive
     // unification. For example, a single expansion can correspond to several
     // concrete elements on the other side, so compute spans first and then
-    // convert each span back into the `QualType` shape expected by recursion.
+    // convert each span back into the `ExprInfo` shape expected by recursion.
     ShortList<FlattenedTypeRangePair> typeMapping;
     ShortList<Type*> flattenedFirst;
     ShortList<Type*> flattenedSecond;
@@ -4425,19 +4442,19 @@ bool SemanticsVisitor::TryUnifyTypes(
             SLANG_ASSERT(mapping.first.count > 0 && mapping.second.count > 0);
             SLANG_ASSERT(mapping.first.count == 1 || mapping.second.count == 1);
 
-            // Rebuild each span into the `QualType` shape that preserves whether
+            // Rebuild each span into the `ExprInfo` shape that preserves whether
             // the opposite side expects a scalar type or a pack-shaped value.
-            QualType firstArg = makeQualTypeForFlattenedTypeRange(
+            ExprInfo firstArg = makeExprInfoForFlattenedTypeRange(
                 m_astBuilder,
                 mapping.first,
                 flattenedFirst,
-                fst.isLeftValue,
+                fst,
                 flattenedSecond[mapping.second.index]);
-            QualType secondArg = makeQualTypeForFlattenedTypeRange(
+            ExprInfo secondArg = makeExprInfoForFlattenedTypeRange(
                 m_astBuilder,
                 mapping.second,
                 flattenedSecond,
-                snd.isLeftValue,
+                snd,
                 flattenedFirst[mapping.first.index]);
 
             // Recursive unification may discover ordinary solver constraints
@@ -4460,8 +4477,8 @@ bool SemanticsVisitor::TryUnifyTypes(
                 if (!TryUnifyTypes(
                         constraints,
                         unificationOptions,
-                        QualType(fstTypePack->getElementType(i), fst.isLeftValue),
-                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                        fst.withType(fstTypePack->getElementType(i)),
+                        snd.withType(sndTypePack->getElementType(i))))
                     return false;
             }
             return true;
@@ -4475,8 +4492,8 @@ bool SemanticsVisitor::TryUnifyTypes(
                 if (!TryUnifyTypes(
                         constraints,
                         subUnificationOptions,
-                        QualType(fstTypePack->getElementType(i), fst.isLeftValue),
-                        QualType(sndExpandType->getPatternType(), snd.isLeftValue)))
+                        fst.withType(fstTypePack->getElementType(i)),
+                        snd.withType(sndExpandType->getPatternType())))
                     return false;
             }
             return true;
@@ -4494,8 +4511,8 @@ bool SemanticsVisitor::TryUnifyTypes(
                 if (!TryUnifyTypes(
                         constraints,
                         subUnificationOptions,
-                        QualType(fstExpandType->getPatternType(), fst.isLeftValue),
-                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                        fst.withType(fstExpandType->getPatternType()),
+                        snd.withType(sndTypePack->getElementType(i))))
                     return false;
             }
             return true;
@@ -4566,13 +4583,12 @@ bool SemanticsVisitor::TryUnifyTypes(
                 constraints,
                 unificationOptions,
                 fstVectorType->getElementCount(),
-                m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1),
-                fst.isLeftValue);
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1));
             return TryUnifyTypes(
                 constraints,
                 unificationOptions,
-                QualType(fstVectorType->getElementType(), fst.isLeftValue),
-                QualType(sndScalarType, snd.isLeftValue));
+                fst.withType(fstVectorType->getElementType()),
+                snd.withType(sndScalarType));
         }
     }
 
@@ -4584,13 +4600,12 @@ bool SemanticsVisitor::TryUnifyTypes(
                 constraints,
                 unificationOptions,
                 sndVectorType->getElementCount(),
-                m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1),
-                snd.isLeftValue);
+                m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1));
             return TryUnifyTypes(
                 constraints,
                 unificationOptions,
-                QualType(fstScalarType, fst.isLeftValue),
-                QualType(sndVectorType->getElementType(), snd.isLeftValue));
+                fst.withType(fstScalarType),
+                snd.withType(sndVectorType->getElementType()));
         }
     }
 
@@ -4598,14 +4613,14 @@ bool SemanticsVisitor::TryUnifyTypes(
         return TryUnifyTypes(
             constraints,
             unificationOptions,
-            QualType(fstUniformParamGroupType->getElementType(), fst.isLeftValue),
+            fst.withType(fstUniformParamGroupType->getElementType()),
             snd);
     if (auto sndUniformParamGroupType = as<UniformParameterGroupType>(snd))
         return TryUnifyTypes(
             constraints,
             unificationOptions,
             fst,
-            QualType(sndUniformParamGroupType->getElementType(), snd.isLeftValue));
+            snd.withType(sndUniformParamGroupType->getElementType()));
 
     // Each T can coerce with any DeclRefType.
     if (auto eachSnd = as<EachType>(snd))
@@ -4659,8 +4674,8 @@ bool SemanticsVisitor::TryUnifyTypes(
         return TryUnifyTypes(
             constraints,
             unificationOptions,
-            QualType(fstModifiedType ? fstModifiedType->getBase() : fst.type, fst.isLeftValue),
-            QualType(sndModifiedType ? sndModifiedType->getBase() : snd.type, snd.isLeftValue));
+            fst.withType(fstModifiedType ? fstModifiedType->getBase() : fst.type),
+            snd.withType(sndModifiedType ? sndModifiedType->getBase() : snd.type));
     }
     return false;
 }

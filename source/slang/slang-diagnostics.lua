@@ -1428,7 +1428,7 @@ err(
     "type mismatch in expression",
     span {
         loc = "expr:Expr",
-        message = "expected an expression of type '~expectedType:Type', got '~actualType:QualType'",
+        message = "expected an expression of type '~expectedType:Type', got '~actualType:ExprInfo'",
     }
 )
 
@@ -1761,7 +1761,7 @@ err(
     "concrete-argument-to-output-interface",
     30077,
     "concrete type passed to interface-typed output parameter",
-    span { loc = "location", message = "argument passed to parameter '~paramName' is of concrete type '~argType:QualType', but interface-typed output parameters require interface-typed arguments. To allow passing a concrete type to this function, you can replace '~paramType:Type ~paramName' with a generic 'T ~paramName' and a 'where T : ~paramType:Type' constraint." }
+    span { loc = "location", message = "argument passed to parameter '~paramName' is of concrete type '~argType:ExprInfo', but interface-typed output parameters require interface-typed arguments. To allow passing a concrete type to this function, you can replace '~paramType:Type ~paramName' with a generic 'T ~paramName' and a 'where T : ~paramType:Type' constraint." }
 )
 
 standalone_note(
@@ -1902,7 +1902,7 @@ err(
     "expected-array-expression",
     30020,
     "expected an array expression",
-    span { loc = "expr:Expr", message = "expected an array expression, got '~actualType:QualType'" }
+    span { loc = "expr:Expr", message = "expected an array expression, got '~actualType:ExprInfo'" }
 )
 
 

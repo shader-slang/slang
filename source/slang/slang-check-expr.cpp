@@ -203,17 +203,19 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             ExtractExistentialValueExpr* openedValue =
                 m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;
-            openedValue->type = QualType(openedType);
+            openedValue->type = ExprInfo(openedType);
             openedValue->originalExpr = expr;
             openedValue->checked = true;
-            // The result of opening an existential is an l-value
-            // if the original existential is an l-value.
+            // The result of opening an existential is writable storage
+            // if the original existential is writable storage.
             //
-            if (expr->type.isLeftValue)
+            if (expr->type.isWritableStorageLocation())
             {
-                // Marking the opened value as an l-value is the easy part.
+                // Marking the opened value as writable storage is the easy part. It is
+                // not a memory location, because it is a copy of the original value.
                 //
-                openedValue->type.isLeftValue = true;
+                openedValue->type.valueCategory = ExprValueCategory::StorageLocation;
+                openedValue->type.access = ExprAccess::ReadWrite;
 
                 // The more challenging bit is that in this case the `maybeMoveTemp()`
                 // operation will have copied the original existential value into
@@ -269,20 +271,7 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
         auto openRef = m_astBuilder->create<OpenRefExpr>();
         openRef->innerExpr = expr;
 
-        // TODO(tfoley): The `QualType` constructor has its own
-        // logic to determine the value category (e.g., whether
-        // or not something is an l-value) when it is passed
-        // a `Ref` type. It is unclear whether both this code
-        // *and* that code are required, or if we can consolidate
-        // the two.
-        //
-        // Note that here we change the actual `Type*` stored in
-        // the `QualType` to be the underlying value type of the
-        // reference, whereas the `QualType` constructor does not
-        // perform such unwrapping.
-        //
-        openRef->type = QualType(refType);
-        openRef->type.type = refType->getValueType();
+        openRef->type = getExprInfoOfRefTarget(refType);
 
         openRef->checked = true;
         openRef->loc = expr->loc;
@@ -464,6 +453,88 @@ static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     return true;
 }
 
+ExprInfo SemanticsVisitor::getExprInfoOfMember(
+    Expr* baseExpr,
+    DeclRef<Decl> memberDeclRef,
+    ExprInfo const& memberInfo)
+{
+    auto const& baseInfo = baseExpr->type;
+
+    // A property is mediated through its accessors. It is writable when it has a setter or ref
+    // accessor that it may call on this base: any such accessor works on a writable base, and
+    // on another base the first such accessor must not require writable receiver storage.
+    //
+    // A writable property is an abstract storage location. If it has a ref accessor, that
+    // accessor yields the address of the value, so the property can be used wherever a memory
+    // location is required and we treat it as one.
+    if (auto propertyDecl = as<PropertyDecl>(memberDeclRef.getDecl()))
+    {
+        bool isWritable = false;
+        const bool hasRefAccessor = propertyDecl->getMembersOfType<RefAccessorDecl>().isNonEmpty();
+        for (auto accessor : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+        {
+            if (!as<SetterDecl>(accessor) && !as<RefAccessorDecl>(accessor))
+                continue;
+            if (baseInfo.isWritableStorageLocation())
+            {
+                isWritable = true;
+            }
+            else
+            {
+                auto accessorDeclRef = m_astBuilder->getMemberDeclRef(memberDeclRef, accessor);
+                auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
+                isWritable = thisParamInfo &&
+                             !doesParamPassingModeIndicateWritableStorage(thisParamInfo->mode);
+            }
+            break;
+        }
+        ExprInfo result = memberInfo;
+        if (!isWritable)
+        {
+            result.valueCategory = ExprValueCategory::Value;
+            result.access = ExprAccess::ReadOnly;
+        }
+        else
+        {
+            result.valueCategory = hasRefAccessor ? ExprValueCategory::MemoryLocation
+                                                  : ExprValueCategory::StorageLocation;
+            result.access = ExprAccess::ReadWrite;
+        }
+        return result;
+    }
+
+    // A GLSL buffer interface block provides mutable memory even though its parameter
+    // expression is not writable. A member of a mutable block is writable unless it is
+    // read-only on this target.
+    if (!baseInfo.isWritableStorageLocation() && isMutableGLSLBufferBlockVarExpr(baseExpr) &&
+        !memberInfo.hasReadOnlyOnTarget)
+    {
+        ExprInfo result = memberInfo;
+        result.valueCategory = ExprValueCategory::MemoryLocation;
+        result.access = ExprAccess::ReadWrite;
+        return result;
+    }
+
+    // A mutable field is part of its base, so it has the base's value category and access.
+    // An immutable field, such as a `let` field, is a read-only pure value on any base.
+    if (as<VarDeclBase>(memberDeclRef.getDecl()) && memberInfo.isWritableStorageLocation())
+    {
+        ExprInfo result = memberInfo;
+        result.valueCategory = baseInfo.valueCategory;
+        result.access = baseInfo.access;
+        return result;
+    }
+
+    // Any other member, such as a method, is described by its own declaration on a writable
+    // base, and is a pure value otherwise.
+    if (baseInfo.isWritableStorageLocation())
+        return memberInfo;
+    ExprInfo result = memberInfo;
+    result.valueCategory = ExprValueCategory::Value;
+    result.access = ExprAccess::ReadOnly;
+    return result;
+}
+
 DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     DeclRef<Decl> declRef,
     Expr* baseExpr,
@@ -597,72 +668,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
                 expr->type = m_astBuilder->getErrorType();
             }
 
-            const bool isFieldWritableThroughWritableBase =
-                expr->type.isLeftValue && as<VarDeclBase>(declRef.getDecl());
-
-            // The member's `QualType` supplies its own l-value status. An ordinary instance
-            // member additionally requires an l-value base. Buffer accesses and property
-            // accessors have the separate rules below when the base is not an l-value.
-            if (!baseExpr->type.isLeftValue)
-            {
-                // A GLSL buffer interface block provides mutable storage even though its
-                // parameter expression is not an l-value. The member is writable only when
-                // the block is mutable and the member is not read-only on this target.
-                expr->type.isLeftValue = isMutableGLSLBufferBlockVarExpr(baseExpr) &&
-                                         (expr->type.hasReadOnlyOnTarget == false);
-
-                // A property may be writable without a writable base. We inspect its first
-                // setter or ref accessor to determine whether it requires writable receiver
-                // storage.
-                if (!expr->type.isLeftValue)
-                {
-                    if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
-                    {
-                        bool isLValue = false;
-                        for (auto member : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
-                        {
-                            if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
-                            {
-                                auto accessorDeclRef =
-                                    m_astBuilder->getMemberDeclRef(declRef, member);
-                                auto thisParamInfo = findEffectiveThisParamInfo(accessorDeclRef);
-                                if (thisParamInfo && !doesParamPassingModeIndicateWritableStorage(
-                                                         thisParamInfo->mode))
-                                {
-                                    isLValue = true;
-                                }
-                                break;
-                            }
-                        }
-                        expr->type.isLeftValue = isLValue;
-                    }
-                }
-            }
-            else
-            {
-                // A writable base alone is insufficient for a property: assigning the
-                // property requires a setter or ref accessor. A getter-only property is read-only.
-                if (auto propertyDecl = as<PropertyDecl>(declRef.getDecl()))
-                {
-                    bool isLValue = false;
-                    for (auto member : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
-                    {
-                        if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
-                        {
-                            isLValue = true;
-                            break;
-                        }
-                    }
-                    expr->type.isLeftValue = isLValue;
-                }
-            }
-
-            // A field of a read-only memory location is part of that location, provided the
-            // field would be writable through a writable base. A property is excluded because
-            // its accessors do not name a memory location.
-            expr->type.isReadOnlyMemoryLocation = !expr->type.isLeftValue &&
-                                                  baseExpr->type.isReadOnlyMemoryLocation &&
-                                                  isFieldWritableThroughWritableBase;
+            expr->type = getExprInfoOfMember(baseExpr, declRef, expr->type);
             return expr;
         }
     }
@@ -686,7 +692,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     }
 }
 
-Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc)
+Expr* SemanticsVisitor::constructDerefExpr(Expr* base, Type* elementType, SourceLoc loc)
 {
     if (auto resPtrType = as<DescriptorHandleType>(base->type))
     {
@@ -700,42 +706,29 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     auto derefExpr = m_astBuilder->create<DerefExpr>();
     derefExpr->loc = loc;
     derefExpr->base = base;
-    derefExpr->type = QualType(elementType);
+    derefExpr->type = ExprInfo(elementType);
     derefExpr->checked = true;
 
     if (as<PtrType>(base->type))
     {
         // TODO(tfoley): It is not clear why this is being unconditionally
-        // set to `true` when the `Ptr` types in the core module has an
+        // treated as read-write when the `Ptr` types in the core module has an
         // `AccessQualifier` parameter that can be used to form a read-only pointer.
         //
-        derefExpr->type.isLeftValue = true;
+        derefExpr->type.valueCategory = ExprValueCategory::MemoryLocation;
+        derefExpr->type.access = ExprAccess::ReadWrite;
     }
-    else if (as<ExplicitRefType>(base->type))
+    else if (auto refType = as<ExplicitRefType>(base->type))
     {
-        // TODO(tfoley): The code here is exploiting the ability of the
-        // `QualType` constructor to compute the correct value category
-        // for a reference type, so that we don't have to repeat that logic
-        // here. That might not be the right place for that logic to live,
-        // however, and so the code here might need updating sooner or
-        // later.
-        //
-        QualType refQualType(base->type.type);
-        derefExpr->type.isLeftValue = refQualType.isLeftValue;
-        derefExpr->type.isReadOnlyMemoryLocation = refQualType.isReadOnlyMemoryLocation;
+        derefExpr->type = getExprInfoOfRefTarget(refType).withType(elementType);
     }
     else if (isImmutableBufferType(base->type))
     {
-        derefExpr->type.isLeftValue = false;
         derefExpr->type.isWriteOnly = false;
     }
     else
     {
-        derefExpr->type.isLeftValue = base->type.isLeftValue;
-        derefExpr->type.isLeftValue = base->type.isLeftValue;
-        derefExpr->type.isReadOnlyMemoryLocation = base->type.isReadOnlyMemoryLocation;
-        derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
-        derefExpr->type.isWriteOnly = base->type.isWriteOnly;
+        derefExpr->type = base->type.withType(elementType);
     }
 
     return derefExpr;
@@ -940,7 +933,7 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
 {
     if (!item.declRef)
     {
-        originalExpr->type = QualType(m_astBuilder->getErrorType());
+        originalExpr->type = ExprInfo(m_astBuilder->getErrorType());
         return originalExpr;
     }
 
@@ -995,9 +988,10 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
                     // TODO: make sure we believe there are no
                     // issues here.
                     //
-                    if (bb && bb->type.isLeftValue)
+                    if (bb && bb->type.isWritableStorageLocation())
                     {
-                        expr->type.isLeftValue = true;
+                        expr->type.valueCategory = bb->type.valueCategory;
+                        expr->type.access = bb->type.access;
                     }
 
                     bb = expr;
@@ -1130,7 +1124,7 @@ Expr* SemanticsVisitor::createLookupResultExpr(
         auto overloadedExpr = m_astBuilder->create<OverloadedExpr>();
         overloadedExpr->name = name;
         overloadedExpr->loc = loc;
-        overloadedExpr->type = QualType(m_astBuilder->getOverloadedType());
+        overloadedExpr->type = ExprInfo(m_astBuilder->getOverloadedType());
         overloadedExpr->base = baseExpr;
         overloadedExpr->lookupResult2 = lookupResult;
         overloadedExpr->originalExpr = originalExpr;
@@ -2351,7 +2345,7 @@ Expr* SemanticsVisitor::CreateErrorExpr(Expr* expr)
     {
         expr = m_astBuilder->create<IncompleteExpr>();
     }
-    expr->type = QualType(m_astBuilder->getErrorType());
+    expr->type = ExprInfo(m_astBuilder->getErrorType());
     return expr;
 }
 
@@ -3492,11 +3486,12 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     auto intTargetType = getMatchingIntType(indexExpr->type.type);
     indexExpr = coerce(CoercionSite::Argument, intTargetType, indexExpr, getSink());
 
-    subscriptExpr->type = QualType(elementType);
+    subscriptExpr->type = ExprInfo(elementType);
 
-    // TODO(tfoley): need to be more careful about this stuff
-    subscriptExpr->type.isLeftValue = baseExpr->type.isLeftValue;
-    subscriptExpr->type.isReadOnlyMemoryLocation = baseExpr->type.isReadOnlyMemoryLocation;
+    // An element of an array is part of the array, so it has the array's value category
+    // and access.
+    subscriptExpr->type.valueCategory = baseExpr->type.valueCategory;
+    subscriptExpr->type.access = baseExpr->type.access;
 
     return subscriptExpr;
 }
@@ -3678,7 +3673,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
         auto arrayType = getArrayType(m_astBuilder, elementType, elementCount);
 
-        subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
+        subscriptExpr->type = ExprInfo(m_astBuilder->getTypeType(arrayType));
         return subscriptExpr;
     }
     else if (auto baseArrayType = as<ArrayExpressionType>(baseType))
@@ -3824,7 +3819,7 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
     }
 
     // Check if we're trying to assign to a non-l-value (const variable, immutable member, etc.)
-    if (!expr->type.isLeftValue)
+    if (!expr->type.isWritableStorageLocation())
     {
         getSink()->diagnose(Diagnostics::AttemptingToAssignToConstVariable{.expr = expr});
     }
@@ -3862,7 +3857,7 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         }
     }
 
-    if (!expr->left->type.isLeftValue)
+    if (!expr->left->type.isWritableStorageLocation())
     {
         if (as<ErrorType>(type))
         {
@@ -4442,14 +4437,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     // for an `inout` parameter to be converted in both
                     // directions.
                     //
-                    // A `__ref_readonly` parameter only reads its argument, so the argument
-                    // may also be a memory location that the caller cannot write.
-                    const bool acceptsReadOnlyMemoryLocation =
-                        as<RefReadOnlyParamType>(paramType) != nullptr;
                     if (argExpr)
                     {
-                        if (!argExpr->type.isLeftValue && !(acceptsReadOnlyMemoryLocation &&
-                                                            argExpr->type.isReadOnlyMemoryLocation))
+                        if (!canArgBeBoundToStorageParam(
+                                argExpr->type,
+                                funcType->getParamPassingMode(pp)))
                         {
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
@@ -4476,7 +4468,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                             // front end and ICE during IR lowering.
                             if (implicitCastExpr && implicitCastExpr->arguments.getCount() == 1 &&
                                 as<OutParamTypeBase>(paramType) &&
-                                implicitCastExpr->arguments[0]->type.isLeftValue &&
+                                implicitCastExpr->arguments[0]->type.isWritableStorageLocation() &&
                                 _canLValueCoerce(
                                     implicitCastExpr->arguments[0]->type,
                                     implicitCastExpr->type))
@@ -4961,7 +4953,7 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         auto node = m_astBuilder->create<BuiltinOperatorExpr>();
         node->op = uKind;
         node->arguments.add(arg);
-        node->type = QualType(uOperandType);
+        node->type = ExprInfo(uOperandType);
         node->loc = expr->loc;
         // Register the operand/result types in a differentiable scope regardless of the operator
         // (matching the breadth of the pre-fast-path `visitInvokeExpr`): the operand of a `!`/`~`
@@ -5114,24 +5106,24 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // Result type: arithmetic/bitwise preserve the operand type; comparison yields a
     // boolean of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>,
     // matrix<T,R,C> -> matrix<bool,R,C>).
-    QualType resultType;
+    ExprInfo resultType;
     if (isComparison)
     {
         Type* boolType = m_astBuilder->getBoolType();
         if (vecType)
-            resultType = QualType(createVectorType(boolType, vecType->getElementCount()));
+            resultType = ExprInfo(createVectorType(boolType, vecType->getElementCount()));
         else if (matType)
-            resultType = QualType(m_astBuilder->getMatrixType(
+            resultType = ExprInfo(m_astBuilder->getMatrixType(
                 boolType,
                 matType->getRowCount(),
                 matType->getColumnCount(),
                 matType->getLayout()));
         else
-            resultType = QualType(boolType);
+            resultType = ExprInfo(boolType);
     }
     else
     {
-        resultType = QualType(operandType);
+        resultType = ExprInfo(operandType);
     }
 
     // Produce a dedicated `BuiltinOperatorExpr` carrying the `kind` resolved at the top of this
@@ -5589,7 +5581,7 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
             expr->type = GetTypeForDeclRef(expr->declRef, expr->loc);
         return expr;
     }
-    expr->type = QualType(m_astBuilder->getErrorType());
+    expr->type = ExprInfo(m_astBuilder->getErrorType());
     auto lookupResult = lookUp(
         m_astBuilder,
         this,
@@ -5735,15 +5727,15 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
 
         auto thisLambdaExpr = astBuilder->create<ThisExpr>();
         thisLambdaExpr->scope = lambdaDecl->ownedScope;
-        thisLambdaExpr->type = QualType(DeclRefType::create(astBuilder, lambdaDecl));
+        thisLambdaExpr->type = ExprInfo(DeclRefType::create(astBuilder, lambdaDecl));
         thisLambdaExpr->checked = true;
 
         auto resultMemberExpr = astBuilder->create<MemberExpr>();
         resultMemberExpr->declRef = capturedVarDecl;
         resultMemberExpr->baseExpression = thisLambdaExpr;
-        resultMemberExpr->type = exprIn->type;
+        // A lambda captures a copy of the variable, so a use of it is a pure value.
+        resultMemberExpr->type = ExprInfo(exprIn->type.type);
         resultMemberExpr->loc = exprIn->loc;
-        resultMemberExpr->type.isLeftValue = false;
         resultMemberExpr->checked = true;
         return resultMemberExpr;
     }
@@ -7090,9 +7082,9 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     if (auto valuePackType = as<ValuePackType>(operandType))
     {
         if (isFirstOrLastQuery())
-            packQueryExpr->type = QualType(valuePackType->getElementType());
+            packQueryExpr->type = ExprInfo(valuePackType->getElementType());
         else
-            packQueryExpr->type = QualType(valuePackType);
+            packQueryExpr->type = ExprInfo(valuePackType);
         return packQueryExpr;
     }
 
@@ -7102,12 +7094,12 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
         // a `ValuePackType` or `TupleType`, e.g. `expand Wrapper<each T>`. Value-pack queries are
         // handled above, and tuple-valued queries are handled separately.
         SLANG_ASSERT(isTypePack(operandType));
-        packQueryExpr->type = QualType(applyPackQueryToType(operandType));
+        packQueryExpr->type = ExprInfo(applyPackQueryToType(operandType));
         return packQueryExpr;
     }
 
     Type* resultType = applyPackQueryToType(operandType);
-    packQueryExpr->type = QualType(resultType);
+    packQueryExpr->type = ExprInfo(resultType);
     return packQueryExpr;
 }
 
@@ -7230,10 +7222,10 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
 
         if (leftInfo.kind == ShapePackOperandKind::Tuple &&
             rightInfo.kind == ShapePackOperandKind::Tuple)
-            shapeConcatExpr->type = QualType(_createIntTupleType(m_astBuilder, leftInfo.rank));
+            shapeConcatExpr->type = ExprInfo(_createIntTupleType(m_astBuilder, leftInfo.rank));
         else
             shapeConcatExpr->type =
-                QualType(leftInfo.valuePackType ? leftInfo.valuePackType : rightInfo.valuePackType);
+                ExprInfo(leftInfo.valuePackType ? leftInfo.valuePackType : rightInfo.valuePackType);
         return shapeConcatExpr;
     }
 
@@ -7318,9 +7310,9 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
         }
 
         if (valueInfo.kind == ShapePackOperandKind::Tuple)
-            shapePermuteExpr->type = QualType(_createIntTupleType(m_astBuilder, valueInfo.rank));
+            shapePermuteExpr->type = ExprInfo(_createIntTupleType(m_astBuilder, valueInfo.rank));
         else
-            shapePermuteExpr->type = QualType(valueInfo.valuePackType);
+            shapePermuteExpr->type = ExprInfo(valueInfo.valuePackType);
         return shapePermuteExpr;
     }
 
@@ -7378,9 +7370,9 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
         }
 
         if (valueInfo.kind == ShapePackOperandKind::Tuple)
-            shapeSwapExpr->type = QualType(_createIntTupleType(m_astBuilder, valueInfo.rank));
+            shapeSwapExpr->type = ExprInfo(_createIntTupleType(m_astBuilder, valueInfo.rank));
         else
-            shapeSwapExpr->type = QualType(valueInfo.valuePackType);
+            shapeSwapExpr->type = ExprInfo(valueInfo.valuePackType);
         return shapeSwapExpr;
     }
 
@@ -7425,9 +7417,9 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
     }
 
     if (valueInfo.kind == ShapePackOperandKind::Tuple)
-        shapeReduceExpr->type = QualType(_createIntTupleType(m_astBuilder, valueInfo.rank));
+        shapeReduceExpr->type = ExprInfo(_createIntTupleType(m_astBuilder, valueInfo.rank));
     else
-        shapeReduceExpr->type = QualType(valueInfo.valuePackType);
+        shapeReduceExpr->type = ExprInfo(valueInfo.valuePackType);
     return shapeReduceExpr;
 }
 
@@ -7531,7 +7523,7 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
                     // Create the folded integer literal expression
                     auto foldedExpr = m_astBuilder->create<IntegerLiteralExpr>();
                     foldedExpr->loc = expr->loc;
-                    foldedExpr->type = QualType(resultType);
+                    foldedExpr->type = ExprInfo(resultType);
                     foldedExpr->value = resultValue;
                     return foldedExpr;
                 }
@@ -7562,7 +7554,7 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
         // Create the folded integer literal expression
         auto foldedExpr = m_astBuilder->create<IntegerLiteralExpr>();
         foldedExpr->loc = expr->loc;
-        foldedExpr->type = QualType(resultType);
+        foldedExpr->type = ExprInfo(resultType);
         foldedExpr->value = resultValue;
         return foldedExpr;
     }
@@ -7878,7 +7870,7 @@ static bool isSpecializeWithArgTypesPlaceholder(Expr* arg)
     //
     auto varExpr = as<VarExpr>(arg);
     return varExpr && varExpr->astNodeType == ASTNodeType::VarExpr && !varExpr->name &&
-           !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
+           !varExpr->declRef && varExpr->type.type && varExpr->type.isWritableStorageLocation();
 }
 
 // Return whether `expr` has an error type, or is an implicit cast of an expression that has one.
@@ -8662,7 +8654,7 @@ Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
     if (isTypeExpr)
         expr->type = m_astBuilder->getTypeType(expandType);
     else
-        expr->type = QualType(expandType);
+        expr->type = ExprInfo(expandType);
     return expr;
 }
 
@@ -8706,7 +8698,7 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
                 m_capturedPacks->add(
                     m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, declRef));
             }
-            expr->type = QualType(valPackType->getElementType());
+            expr->type = ExprInfo(valPackType->getElementType());
             return expr;
         }
     }
@@ -8745,7 +8737,7 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         if (isTypeNode)
             expr->type = m_astBuilder->getTypeType(eachType);
         else
-            expr->type = QualType(eachType);
+            expr->type = ExprInfo(eachType);
         return expr;
     }
 error:;
@@ -8919,6 +8911,36 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
     }
 }
 
+/// Get the info of a swizzle of a base with info `baseInfo`, given the swizzle's result type
+/// `resultType`, whether its components repeat, and whether its components can name one memory
+/// location of the base.
+///
+/// Consider this example, where `v` is a read-write memory location of type `int4`:
+///
+/// ```
+/// v.xx  // a read-only pure value, because a write would need to store two values in `x`
+/// v.xz  // a read-write storage location, because `x` and `z` are not adjacent
+/// v.yz  // a read-write memory location
+/// ```
+///
+/// The swizzle keeps the access of its base. The caller decides which component lists can name
+/// a memory location: adjacent, in-order components of a vector, or a single component of a
+/// matrix or tuple.
+static ExprInfo getExprInfoOfSwizzle(
+    Type* resultType,
+    ExprInfo const& baseInfo,
+    bool hasDuplicateComponents,
+    bool canComponentsNameMemoryLocation)
+{
+    if (hasDuplicateComponents || !baseInfo.isStorageLocation())
+        return ExprInfo(resultType);
+
+    auto valueCategory = baseInfo.isMemoryLocation() && canComponentsNameMemoryLocation
+                             ? ExprValueCategory::MemoryLocation
+                             : ExprValueCategory::StorageLocation;
+    return ExprInfo(resultType, valueCategory, baseInfo.access);
+}
+
 Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     MemberExpr* memberRefExpr,
     Type* baseElementType,
@@ -9036,23 +9058,24 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
         // Note(tfoley): the official HLSL rules seem to be that it produces
         // a one-component vector, which is then implicitly convertible to
         // a scalar, but that seems like it just adds complexity.
-        swizExpr->type = QualType(baseElementType);
+        swizExpr->type = ExprInfo(baseElementType);
     }
     else
     {
         // TODO(tfoley): would be nice to "re-sugar" type
         // here if the input type had a sugared name...
-        swizExpr->type = QualType(createVectorType(
+        swizExpr->type = ExprInfo(createVectorType(
             baseElementType,
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), elementCount)));
     }
 
-    // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components. Only a single element is a memory location,
-    // because the elements of a matrix row or column need not be adjacent.
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
-    swizExpr->type.isReadOnlyMemoryLocation =
-        elementCount == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
+    // Only a single element is a memory location, because the elements of a matrix row or
+    // column need not be adjacent.
+    swizExpr->type = getExprInfoOfSwizzle(
+        swizExpr->type.type,
+        swizExpr->base->type,
+        anyDuplicates,
+        elementCount == 1);
 
     return swizExpr;
 }
@@ -9152,7 +9175,7 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
     {
         // single-component swizzle produces a scalar
         //
-        swizExpr->type = QualType(baseTupleType->getMember(swizExpr->elementIndices[0]));
+        swizExpr->type = ExprInfo(baseTupleType->getMember(swizExpr->elementIndices[0]));
     }
     else
     {
@@ -9161,15 +9184,16 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
         {
             types.add(baseTupleType->getMember(index));
         }
-        swizExpr->type = QualType(m_astBuilder->getTupleType(types.getArrayView()));
+        swizExpr->type = ExprInfo(m_astBuilder->getTupleType(types.getArrayView()));
     }
 
-    // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components. A single element is a memory location, while
-    // several elements form a new tuple and so do not name one.
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
-    swizExpr->type.isReadOnlyMemoryLocation =
-        swizExpr->elementIndices.getCount() == 1 && swizExpr->base->type.isReadOnlyMemoryLocation;
+    // A single element is a memory location, while several elements form a new tuple and so
+    // do not name one.
+    swizExpr->type = getExprInfoOfSwizzle(
+        swizExpr->type.type,
+        swizExpr->base->type,
+        anyDuplicates,
+        swizExpr->elementIndices.getCount() == 1);
     return swizExpr;
 }
 
@@ -9274,27 +9298,27 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
         // Note(tfoley): the official HLSL rules seem to be that it produces
         // a one-component vector, which is then implicitly convertible to
         // a scalar, but that seems like it just adds complexity.
-        swizExpr->type = QualType(baseElementType);
+        swizExpr->type = ExprInfo(baseElementType);
     }
     else
     {
         // TODO(tfoley): would be nice to "re-sugar" type
         // here if the input type had a sugared name...
-        swizExpr->type = QualType(createVectorType(
+        swizExpr->type = ExprInfo(createVectorType(
             baseElementType,
             m_astBuilder->getIntVal(
                 m_astBuilder->getIntType(),
                 swizExpr->elementIndices.getCount())));
     }
 
-    // A swizzle of a writable base can be used as an l-value as long as there were no
-    // duplicates in the list of components. It is a memory location only if its components
-    // are adjacent and in order, as in `v.yz`; `v.xz` and `v.yx` can be written component by
-    // component but have no single address.
-    swizExpr->type.isLeftValue = !anyDuplicates && swizExpr->base->type.isLeftValue;
-    swizExpr->type.isReadOnlyMemoryLocation =
-        areSwizzleComponentsContiguous(swizExpr->elementIndices) &&
-        swizExpr->base->type.isReadOnlyMemoryLocation;
+    // A swizzle is a memory location only if its components are adjacent and in order, as in
+    // `v.yz`; `v.xz` and `v.yx` can be written component by component but have no single
+    // address.
+    swizExpr->type = getExprInfoOfSwizzle(
+        swizExpr->type.type,
+        swizExpr->base->type,
+        anyDuplicates,
+        areSwizzleComponentsContiguous(swizExpr->elementIndices));
 
     return swizExpr;
 }
@@ -9696,7 +9720,7 @@ bool SemanticsVisitor::doesNameResolveToDecl(Name* name, Scope* scope, Decl* dec
 
 void SemanticsVisitor::maybeSuggestMissingGenericConstraintForMemberLookup(
     DeclRefExpr* expr,
-    QualType const& baseType)
+    ExprInfo const& baseType)
 {
     // A `::` access is always a static lookup, even on a value (`v::m`, whose `baseType` is the
     // value's type). A `.` access is static when its base is a type (`T.m`, a `TypeType`).
@@ -9786,13 +9810,13 @@ void SemanticsVisitor::maybeSuggestMissingGenericConstraintForMemberLookup(
 
 Expr* SemanticsVisitor::lookupMemberResultFailure(
     DeclRefExpr* expr,
-    QualType const& baseType,
+    ExprInfo const& baseType,
     bool supressDiagnostic)
 {
     // Check it's a member expression
     SLANG_ASSERT(as<StaticMemberExpr>(expr) || as<MemberExpr>(expr));
 
-    expr->type = QualType(m_astBuilder->getErrorType());
+    expr->type = ExprInfo(m_astBuilder->getErrorType());
     if (!supressDiagnostic)
     {
         if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
@@ -10074,8 +10098,9 @@ Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
 
 Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
 {
-    // A `this` expression will default to immutable.
-    expr->type.isLeftValue = false;
+    // A `this` expression will default to an immutable pure value.
+    expr->type.valueCategory = ExprValueCategory::Value;
+    expr->type.access = ExprAccess::ReadOnly;
 
     // We will do an upwards search starting in the current
     // scope, looking for a surrounding type (or `extension`)
@@ -10087,7 +10112,8 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
 
         if (const auto ctorDecl = as<ConstructorDecl>(containerDecl); ctorDecl)
         {
-            expr->type.isLeftValue = true;
+            expr->type.valueCategory = ExprValueCategory::MemoryLocation;
+            expr->type.access = ExprAccess::ReadWrite;
         }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
@@ -10135,8 +10161,7 @@ Expr* SemanticsVisitor::checkThisExprWithoutCapturing(ThisExpr* expr)
 
             if (thisParamInfo)
             {
-                expr->type.type = thisParamInfo->type;
-                expr->type.isLeftValue = isThisExprWritable(
+                expr->type = getExprInfoOfThisExpr(
                     getDefaultDeclRef(funcDeclBase).as<CallableDecl>(),
                     *thisParamInfo);
                 return expr;
@@ -10256,7 +10281,10 @@ Expr* SemanticsExprVisitor::visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     // As long as the type is not readonly tagged we
     // can use CastToSuperType as an L-value
     if (!expr->type.hasReadOnlyOnTarget)
-        expr->type.isLeftValue = true;
+    {
+        expr->type.valueCategory = ExprValueCategory::MemoryLocation;
+        expr->type.access = ExprAccess::ReadWrite;
+    }
     return expr;
 }
 
@@ -10275,8 +10303,10 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
             }
             if (isNonCopyableType(parentFunc->returnType.type))
             {
-                expr->type.isLeftValue = true;
-                expr->type.type = parentFunc->returnType.type;
+                expr->type = ExprInfo(
+                    parentFunc->returnType.type,
+                    ExprValueCategory::MemoryLocation,
+                    ExprAccess::ReadWrite);
                 return expr;
             }
         }
