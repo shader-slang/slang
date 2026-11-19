@@ -8,6 +8,7 @@
 #include "core/slang-lz4-compression-system.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-riff-file-system.h"
+#include "core/slang-string-util.h"
 #include "core/slang-zip-file-system.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -804,6 +805,35 @@ SLANG_UNIT_TEST(fileSystem)
             SLANG_CHECK(SLANG_SUCCEEDED(_testImplicitDirectory(type)));
         }
     }
+}
+
+// The combined path from calcCombinedPath is the spelling every later file operation (existence
+// check, unique identity, loading) sees, so both combine branches must return the simplified
+// form: `.` and `x/..` segments collapse, while leading `..` segments are kept because they
+// cannot be resolved without an absolute base. This pins the contract on every platform,
+// including Windows where an inflated spelling can exceed the legacy ~260-character path limit.
+SLANG_UNIT_TEST(calcCombinedPathProducesSimplifiedPaths)
+{
+    ISlangFileSystemExt* fileSystem = OSFileSystem::getExtSingleton();
+
+    auto checkCombined = [&](SlangPathType fromPathType,
+                             const char* fromPath,
+                             const char* path,
+                             const char* expected)
+    {
+        ComPtr<ISlangBlob> combinedBlob;
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            fileSystem->calcCombinedPath(fromPathType, fromPath, path, combinedBlob.writeRef())));
+        const String combined(StringUtil::getString(combinedBlob));
+        SLANG_CHECK(combined == expected);
+    };
+
+    checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../x.slang", "a/x.slang");
+    checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "./x.slang", "a/b/x.slang");
+    checkCombined(SLANG_PATH_TYPE_FILE, "a/b/c.slang", "../../x.slang", "x.slang");
+    checkCombined(SLANG_PATH_TYPE_FILE, "c.slang", "../x.slang", "../x.slang");
+    checkCombined(SLANG_PATH_TYPE_DIRECTORY, "a/b/../b", "f.slang", "a/b/f.slang");
+    checkCombined(SLANG_PATH_TYPE_DIRECTORY, "", "x.slang", "x.slang");
 }
 
 // Loads a ZIP and then modifies it so miniz must take ownership of the Slang-owned input buffer.
