@@ -1440,7 +1440,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 {
     switch (inst->getOp())
     {
-    case kIROp_GetUnsizedBuffer:
+    case kIROp_SizedBufferToUnsizedBuffer:
         {
             // Both forms are prelude aggregates. The unsized value retains only
             // the data field, whose physical element type was legalized together

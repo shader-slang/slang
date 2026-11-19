@@ -1454,7 +1454,7 @@ struct ByteAddressBufferLegalizationContext
                 &index);
         }
 
-        if (byteAddressBuffer->getOp() == kIROp_GetUnsizedBuffer)
+        if (byteAddressBuffer->getOp() == kIROp_SizedBufferToUnsizedBuffer)
         {
             // A view of a byte-address buffer becomes a view of its equivalent structured
             // buffer. Preserve the conversion so the two logical types remain distinct.
@@ -1466,7 +1466,7 @@ struct ByteAddressBufferLegalizationContext
                 getEquivalentStructuredBufferParamType(
                     elementType,
                     byteAddressBuffer->getDataType()),
-                kIROp_GetUnsizedBuffer,
+                kIROp_SizedBufferToUnsizedBuffer,
                 1,
                 &buffer);
         }

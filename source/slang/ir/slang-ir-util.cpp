@@ -3713,7 +3713,7 @@ bool doesOpProduceResourceContentAddress(IROp op)
     {
     case kIROp_GetStructuredBufferPtr:
     case kIROp_GetUntypedBufferPtr:
-    case kIROp_GetUnsizedBuffer:
+    case kIROp_SizedBufferToUnsizedBuffer:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
     case kIROp_ImageTexelPointer:
@@ -3743,7 +3743,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
-    case kIROp_GetUnsizedBuffer:
+    case kIROp_SizedBufferToUnsizedBuffer:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
         return isPointerToImmutableLocation(loc->getOperand(0));

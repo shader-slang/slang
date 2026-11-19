@@ -65,7 +65,7 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         // A resource conversion retains its underlying resource. Like indexing, it is
         // suitable for specialization when its base is; the callee reconstructs the view.
         case kIROp_CastDynamicResource:
-        case kIROp_GetUnsizedBuffer:
+        case kIROp_SizedBufferToUnsizedBuffer:
             {
                 auto base = arg->getOperand(0);
 
@@ -647,7 +647,7 @@ struct FunctionParameterSpecializationContext
         }
         else if (
             oldArg->getOp() == kIROp_CastDynamicResource ||
-            oldArg->getOp() == kIROp_GetUnsizedBuffer)
+            oldArg->getOp() == kIROp_SizedBufferToUnsizedBuffer)
         {
             // Resource views are reconstructed in the callee with the original result
             // type. Their underlying resource determines the specialization key.
@@ -989,7 +989,7 @@ struct FunctionParameterSpecializationContext
         }
         else if (
             oldArg->getOp() == kIROp_CastDynamicResource ||
-            oldArg->getOp() == kIROp_GetUnsizedBuffer)
+            oldArg->getOp() == kIROp_SizedBufferToUnsizedBuffer)
         {
             // Reconstruct the wrapper inside the specialized body: first obtain the
             // specialized value for the wrapped operand, then re-apply the

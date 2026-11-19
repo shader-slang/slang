@@ -167,7 +167,7 @@ struct ResourceTypeLoweringContext : InstPassBase
         builder.setInsertBefore(inst);
         switch (inst->getOp())
         {
-        case kIROp_GetUnsizedBuffer:
+        case kIROp_SizedBufferToUnsizedBuffer:
             {
                 auto structType = cast<IRStructType>(inst->getDataType());
                 SLANG_ASSERT(

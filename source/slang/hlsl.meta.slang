@@ -170,7 +170,7 @@ ${
 $}
     /// Discard the buffer length while preserving access to the same storage.
     [__readNone]
-    __intrinsic_op($(kIROp_GetUnsizedBuffer))
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(ByteAddressBuffer buffer);
 ${
@@ -6684,7 +6684,7 @@ ${
 $}
     /// Discard the buffer length while preserving access to the same storage.
     [__readNone]
-    __intrinsic_op($(kIROp_GetUnsizedBuffer))
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(StructuredBuffer<T, L> buffer);
 ${
@@ -6889,7 +6889,7 @@ ${
 $}
     /// Discard the buffer length while preserving access to the same storage.
     [__readNone]
-    __intrinsic_op($(kIROp_GetUnsizedBuffer))
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(RWByteAddressBuffer buffer);
 ${
@@ -8002,7 +8002,7 @@ ${
 $}
     /// Discard the buffer length while preserving access to the same storage.
     [__readNone]
-    __intrinsic_op($(kIROp_GetUnsizedBuffer))
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(RWStructuredBuffer<T, L> buffer);
 ${

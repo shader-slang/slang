@@ -2389,7 +2389,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     }
 
     List<IRInst*> m_instsToRemove;
-    OrderedHashSet<IRInst*> m_getUnsizedBufferInsts;
+    OrderedHashSet<IRInst*> m_sizedBufferToUnsizedBufferInsts;
     void processWorkList()
     {
         while (workList.getCount() != 0)
@@ -2421,8 +2421,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_Call:
                 processCall(as<IRCall>(inst));
                 break;
-            case kIROp_GetUnsizedBuffer:
-                m_getUnsizedBufferInsts.add(inst);
+            case kIROp_SizedBufferToUnsizedBuffer:
+                m_sizedBufferToUnsizedBufferInsts.add(inst);
                 break;
             case kIROp_GetElement:
                 processGetElement(as<IRGetElement>(inst));
@@ -3016,7 +3016,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Type lowering has now given each view the same physical pointer type as its source.
         // Remove the conversion only at this boundary, after logical type specialization.
-        for (auto inst : m_getUnsizedBufferInsts)
+        for (auto inst : m_sizedBufferToUnsizedBufferInsts)
         {
             auto buffer = inst->getOperand(0);
             SLANG_RELEASE_ASSERT(inst->getDataType() == buffer->getDataType());

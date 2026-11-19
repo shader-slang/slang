@@ -2960,7 +2960,7 @@ local insts = {
 		},
 	},
 	-- Discard the length of a sized buffer while preserving its element type and access.
-	{ getUnsizedBuffer = { operands = { { "buffer" } } } },
+	{ sizedBufferToUnsizedBuffer = { operands = { { "buffer" } } } },
 	-- Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 	{ getEquivalentStructuredBuffer = { min_operands = 1 } },
 	-- Gets a T[] pointer to the underlying data of a StructuredBuffer etc...

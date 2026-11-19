@@ -892,5 +892,5 @@ return {
 	["Type.UntypedBufferResourceType.ByteAddressBufferTypeBase.UnsizedRWByteAddressBuffer"] = 916,
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedStructuredBuffer"] = 917,
 	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedRWStructuredBuffer"] = 918,
-	["getUnsizedBuffer"] = 919
+	["sizedBufferToUnsizedBuffer"] = 919
 }
