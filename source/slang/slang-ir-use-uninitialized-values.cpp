@@ -114,9 +114,21 @@ static bool isAliasable(IRInst* inst)
     return false;
 }
 
-// The `upper` field contains the struct that the type is
-// is contained in. It is used to check for empty structs.
-static bool canIgnoreType(IRType* type, IRType* upper)
+// The state of one `canIgnoreType` walk. `enclosingStructs` holds the structs whose fields are
+// being checked further up the walk. A pointer back to one of them is not ignorable, which keeps a
+// walk through `struct A { B* b; }` and `struct B { A* a; }` finite. `finishedStructs` caches each
+// struct's answer, which does not depend on the path it was reached from: a struct is ignorable
+// exactly when no non-ignorable field type and no pointer cycle is reachable from it.
+struct CanIgnoreTypeWalk
+{
+    HashSet<IRType*> enclosingStructs;
+    Dictionary<IRType*, bool> finishedStructs;
+};
+
+// Returns true if a value of `type` holds nothing that can be uninitialized, such as void, an
+// interface, or a struct whose fields are all ignorable. A pointer is treated as its pointee, which
+// is what matters for a global of pointer type.
+static bool canIgnoreTypeImpl(IRType* type, CanIgnoreTypeWalk& walk)
 {
     // In case specialization returns a function instead
     if (!type)
@@ -128,13 +140,20 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     // For structs, ignore if its empty
     if (auto str = as<IRStructType>(type))
     {
+        if (auto finished = walk.finishedStructs.tryGetValue(type))
+            return *finished;
+        if (!walk.enclosingStructs.add(type))
+            return false;
+
         int count = 0;
         for (auto field : str->getFields())
         {
             IRType* ftype = field->getFieldType();
-            count += !canIgnoreType(ftype, type);
+            count += !canIgnoreTypeImpl(ftype, walk);
         }
 
+        walk.enclosingStructs.remove(type);
+        walk.finishedStructs[type] = (count == 0);
         return (count == 0);
     }
 
@@ -149,12 +168,10 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     // For pointers, check the value type (primarily for globals)
     if (auto ptr = as<IRPtrType>(type))
     {
-        // Avoid the recursive step if its a
-        // recursive structure like a linked list
         IRType* ptype = ptr->getValueType();
         if (auto resolvedType = as<IRType>(getResolvedInstForDecorations(ptype)))
             ptype = resolvedType;
-        return (ptype != upper) && canIgnoreType(ptype, upper);
+        return canIgnoreTypeImpl(ptype, walk);
     }
 
     // In the case of specializations, check returned type
@@ -162,10 +179,16 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     {
         IRInst* inner = getResolvedInstForDecorations(spec);
         IRType* innerType = (IRType*)(inner);
-        return canIgnoreType(innerType, upper);
+        return canIgnoreTypeImpl(innerType, walk);
     }
 
     return false;
+}
+
+static bool canIgnoreType(IRType* type)
+{
+    CanIgnoreTypeWalk walk;
+    return canIgnoreTypeImpl(type, walk);
 }
 
 // If `argUse` is an *argument* operand of an unconditional branch or loop (i.e. a phi
@@ -1410,7 +1433,7 @@ static List<IRStructField*> checkFieldsFromExit(
     auto fields = type->getFields();
     for (auto field : fields)
     {
-        if (canIgnoreType(field->getFieldType(), nullptr))
+        if (canIgnoreType(field->getFieldType()))
             continue;
 
         if (!usedKeys.contains(field->getKey()))
@@ -1564,7 +1587,7 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
                 continue;
 
             IRType* type = inst->getFullType();
-            if (canIgnoreType(type, nullptr))
+            if (canIgnoreType(type))
                 continue;
 
             // We compute both diagnostic classes from one collection of reads and writes. The
@@ -1625,7 +1648,7 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
     // writing the global. Retaining the simpler pre-link no-write proof also diagnoses marked
     // globals when a compilation performs semantic checking without target emission.
     IRType* type = variable->getFullType();
-    if (canIgnoreType(type, nullptr))
+    if (canIgnoreType(type))
         return;
 
     // Semantic, global-input, and hit-attribute decorations identify values supplied by the shader
