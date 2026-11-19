@@ -140,12 +140,8 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     // long directory.
     String pathString = Path::getExecutablePath();
 
-    if (pathString.getLength() == 0)
-    {
-        return SLANG_FAIL;
-    }
-
-    // We don't want the instance name, just the path to it
+    // We don't want the instance name, just the path to it. An empty executable path leaves
+    // the parent directory empty, and the tail check below reports that failure.
     out.clear();
     out.append(Path::getParentDirectory(pathString));
 

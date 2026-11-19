@@ -70,9 +70,15 @@ static SlangResult _readRegistryKey(const char* path, const char* keyName, Strin
             value.setCount(size + size / 2);
             continue;
         }
+        if (ret != ERROR_SUCCESS)
+        {
+            // `size` is only defined on success and on ERROR_MORE_DATA, so no buffer
+            // bookkeeping happens on any other failure code.
+            break;
+        }
         // A REG_SZ value normally includes its terminator in the returned size; terminate
-        // unconditionally (with room made for it) so a value stored without one cannot read
-        // past the copied bytes.
+        // explicitly (with room made for it) so a value stored without one cannot read past
+        // the copied bytes.
         value.setCount(size + 1);
         value[size] = 0;
         break;
@@ -321,8 +327,8 @@ static SlangResult _findVersionsWithVSWhere(
     // no fixed bound. `ProgramFiles(x86)` is only defined on 64-bit Windows; on 32-bit Windows
     // the same folder is `%ProgramFiles%`, so we fall back to that name (a missing variable and
     // an empty one both leave the result empty here). A process with a stripped environment
-    // block has neither variable, in which case we fail and the caller falls back to the
-    // registry scan for finding Visual Studio installs.
+    // block has neither variable, in which case we fail; the caller ignores failure here and
+    // always also scans the registry for Visual Studio installs.
     String programFilesPath;
     {
         StringBuilder buffer;

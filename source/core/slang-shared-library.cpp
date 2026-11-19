@@ -133,10 +133,13 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
 {
 #if defined(_WIN32)
     HMODULE moduleHandle;
-    GetModuleHandleExA(
-        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        (LPCSTR)symbolInLib,
-        &moduleHandle);
+    if (!GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCSTR)symbolInLib,
+            &moduleHandle))
+    {
+        return String();
+    }
     // GetModuleFileNameW silently truncates a path that does not fit the buffer and returns the
     // buffer size, so we grow the buffer until the returned length is smaller.
     List<wchar_t> buffer;
