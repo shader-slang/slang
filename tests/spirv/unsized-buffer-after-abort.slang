@@ -1,11 +1,11 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -validate-ir -O0
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -validate-ir -O3
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -validate-ir -validate-with-downstream-compiler -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -validate-ir -validate-with-downstream-compiler -O3
 
 StructuredBuffer<uint> inputs[2];
 RWStructuredBuffer<uint> output;
 
-[numthreads(1, 1, 1)]
-void computeMain(uint3 tid : SV_DispatchThreadID)
+[noinline]
+void accessBuffers(uint3 tid)
 {
     // Legalizing this dynamic array access queues its users, including the conversion in the
     // later block. Abort legalization then deletes that conversion before deferred cleanup.
@@ -21,6 +21,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         output[0] = src[0];
 }
 
+// Abort becomes a terminator during SPIR-V legalization, which still visits the helper. Dead-code
+// elimination then removes the unreachable helper and its local array of resource pointers,
+// which SPIR-V cannot represent. This keeps the test focused on the deleted conversion's lifetime.
+[numthreads(1, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    abort("stop before call");
+    accessBuffers(tid);
+}
+
 // CHECK: OpAbortKHR
-// CHECK-NEXT: %{{[a-zA-Z0-9_]+}} = OpLabel
-// CHECK: OpStore
+// CHECK-NEXT: OpFunctionEnd
