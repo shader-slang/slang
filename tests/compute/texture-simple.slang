@@ -6,7 +6,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj -output-using-type
 
 // Doesn't work on CUDA, not clear why yet
-//DISABLE_TEST_INPUT: Texture1D(format=R_Float32, size=4, content = one, mipMaps=1):name tLoad1D
+//DISABLE_TEST_INPUT: Texture1D(format=R32Float, size=4, content = one, mipMaps=1):name tLoad1D
 //Texture1D<float> tLoad1D;
 
 // Not supported in WGSL: 1D array texture not supported in WGSL

@@ -2,8 +2,8 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-// Doesn't work on VK - GLSL output doesn't replace InterlockedAdd.  
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -emit-spirv-via-glsl -shaderobj
 // Cannot work on CUDA, as outputBuffer becomes a CUsurfObject - which do not appear to have atomics available.
 // If the buffer was a StructuredBuffer this would work on CUDA.
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
@@ -19,7 +19,7 @@
 
 //METALLIB: @computeMain
 
-//TEST_INPUT:ubuffer(format=R_UInt32, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
+//TEST_INPUT:ubuffer(format=R32Uint, data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name outputBuffer
 
 RWBuffer<uint> outputBuffer;
 
