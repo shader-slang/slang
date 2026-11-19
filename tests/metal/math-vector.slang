@@ -59,52 +59,52 @@ bool Test_Vector()
     // METAL: sincos(
     // METAL-NOT: sincos(
     sincos<T>(zero, outFloat1, outFloat2);
-    voidResult = voidResult && zero == outFloat1 && one == outFloat2;
+    voidResult = voidResult && all(zero == outFloat1) && all(one == outFloat2);
 
     return voidResult
         // METAL: acos(
         // METAL-NOT: acos(
-        && zero == acos<T>(one)
+        && all(zero == acos<T>(one))
 
         // METAL: acosh(
         // METAL-NOT: acosh(
-        && zero == acosh<T>(one)
+        && all(zero == acosh<T>(one))
 
         // METAL: asin(
         // METAL-NOT: asin(
-        && zero == asin<T>(zero)
+        && all(zero == asin<T>(zero))
 
         // METAL: asinh(
         // METAL-NOT: asinh(
-        && zero == asinh<T>(zero)
+        && all(zero == asinh<T>(zero))
 
         // METAL: atan(
         // METAL-NOT: atan(
-        && zero == atan<T>(zero)
+        && all(zero == atan<T>(zero))
 
         // METAL: atan2(
         // METAL-NOT: atan2(
-        && zero == atan2<T>(zero, one)
+        && all(zero == atan2<T>(zero, one))
 
         // METAL: atanh(
         // METAL-NOT: atanh(
-        && zero == atanh<T>(zero)
+        && all(zero == atanh<T>(zero))
 
         // METAL: ceil(
         // METAL-NOT: ceil(
-        && zero == ceil<T>(zero)
+        && all(zero == ceil<T>(zero))
 
         // METAL: copysign(
         // METAL-NOT: copysign(
-        && zero == copysign<T>(zero, zero)
+        && all(zero == copysign<T>(zero, zero))
 
         // METAL: cos(
         // METAL-NOT: cos(
-        && one == cos<T>(zero)
+        && all(one == cos<T>(zero))
 
         // METAL: cosh(
         // METAL-NOT: cosh(
-        && one == cosh<T>(zero)
+        && all(one == cosh<T>(zero))
 
         // METAL: cospi(
         // METAL-NOT: cospi(
@@ -112,169 +112,169 @@ bool Test_Vector()
 
         // METAL: divide(
         // METAL-NOT: divide(
-        && zero == divide<T>(zero, one)
+        && all(zero == divide<T>(zero, one))
 
         // METAL: exp(
         // METAL-NOT: exp(
-        && one == exp<T>(zero)
+        && all(one == exp<T>(zero))
 
         // METAL: exp2(
         // METAL-NOT: exp2(
-        && one == exp2<T>(zero)
+        && all(one == exp2<T>(zero))
 
         // METAL: exp10(
         // METAL-NOT: exp10(
-        && one == exp10<T>(zero)
+        && all(one == exp10<T>(zero))
 
         // METAL: fabs(
         // METAL-NOT: fabs(
-        && zero == fabs<T>(zero)
+        && all(zero == fabs<T>(zero))
 
         // METAL: abs(
         // METAL-NOT: abs(
-        && zero == abs<T>(zero)
+        && all(zero == abs<T>(zero))
 
         // METAL: fdim(
         // METAL-NOT: fdim(
-        && zero == fdim<T>(zero, zero)
+        && all(zero == fdim<T>(zero, zero))
 
         // METAL: floor(
         // METAL-NOT: floor(
-        && zero == floor<T>(zero)
+        && all(zero == floor<T>(zero))
 
         // METAL: fma(
         // METAL-NOT: fma(
-        && zero == fma(zero, zero, zero)
+        && all(zero == fma(zero, zero, zero))
 
         // METAL: fmax(
         // METAL-NOT: fmax(
-        && zero == fmax<T>(zero, zero)
+        && all(zero == fmax<T>(zero, zero))
 
         // METAL: max(
         // METAL-NOT: max(
-        && zero == max<T>(zero, zero)
+        && all(zero == max<T>(zero, zero))
 
         // METAL: fmax3(
         // METAL-NOT: fmax3(
-        && zero == fmax3<T>(zero, zero, zero)
+        && all(zero == fmax3<T>(zero, zero, zero))
 
         // METAL: max3(
         // METAL-NOT: max3(
-        && zero == max3<T>(zero, zero, zero)
+        && all(zero == max3<T>(zero, zero, zero))
 
         // METAL: fmedian3(
         // METAL-NOT: fmedian3(
-        && zero == fmedian3<T>(zero, zero, zero)
+        && all(zero == fmedian3<T>(zero, zero, zero))
 
         // METAL: median3(
         // METAL-NOT: median3(
-        && zero == median3<T>(zero, zero, zero)
+        && all(zero == median3<T>(zero, zero, zero))
 
         // METAL: fmin(
         // METAL-NOT: fmin(
-        && zero == fmin<T>(zero, zero)
+        && all(zero == fmin<T>(zero, zero))
 
         // METAL: min(
         // METAL-NOT: min(
-        && zero == min<T>(zero, zero)
+        && all(zero == min<T>(zero, zero))
 
         // METAL: fmin3(
         // METAL-NOT: fmin3(
-        && zero == fmin3<T>(zero, zero, zero)
+        && all(zero == fmin3<T>(zero, zero, zero))
 
         // METAL: min3(
         // METAL-NOT: min3(
-        && zero == min3<T>(zero, zero, zero)
+        && all(zero == min3<T>(zero, zero, zero))
 
         // METAL: fmod(
         // METAL-NOT: fmod(
-        && zero == fmod<T>(zero, one)
+        && all(zero == fmod<T>(zero, one))
 
         // METAL: fract(
         // METAL-NOT: fract(
-        && zero == fract<T>(zero)
+        && all(zero == fract<T>(zero))
 
         // METAL: frexp(
         // METAL-NOT: frexp(
-        && zero == frexp<T>(zero, outInt) && all(zeroInt == outInt)
+        && all(zero == frexp<T>(zero, outInt)) && all(zeroInt == outInt)
 
         // METAL: ldexp(
         // METAL-NOT: ldexp(
-        && zero == ldexp<T>(zero, zeroInt)
+        && all(zero == ldexp<T>(zero, zeroInt))
 
         // METAL: log(
         // METAL-NOT: log(
-        && zero == log<T>(one)
+        && all(zero == log<T>(one))
 
         // METAL: log2(
         // METAL-NOT: log2(
-        && zero == log2<T>(one)
+        && all(zero == log2<T>(one))
 
         // METAL: log10(
         // METAL-NOT: log10(
-        && zero == log10<T>(one)
+        && all(zero == log10<T>(one))
 
         // METAL: modf(
         // METAL-NOT: modf(
-        && zero == modf<T>(zero, outFloat1)
+        && all(zero == modf<T>(zero, outFloat1))
 
 #if TEST_WHEN_nextafter_WORKS
         // M-ETAL: nextafter(
         // METAL-NOT: nextafter(
-        && zero == nextafter<T>(zero, zero)
+        && all(zero == nextafter<T>(zero, zero))
 #endif
 
         // METAL: pow(
         // METAL-NOT: pow(
-        && zero == pow<T>(zero, one)
+        && all(zero == pow<T>(zero, one))
 
         // METAL: powr(
         // METAL-NOT: powr(
-        && zero == powr<T>(zero, one)
+        && all(zero == powr<T>(zero, one))
 
         // METAL: rint(
         // METAL-NOT: rint(
-        && zero == rint<T>(zero)
+        && all(zero == rint<T>(zero))
 
         // METAL: round(
         // METAL-NOT: round(
-        && zero == round<T>(zero)
+        && all(zero == round<T>(zero))
 
         // METAL: rsqrt(
         // METAL-NOT: rsqrt(
-        && one == rsqrt<T>(one)
+        && all(one == rsqrt<T>(one))
 
         // METAL: sin(
         // METAL-NOT: sin(
-        && zero == sin<T>(zero)
+        && all(zero == sin<T>(zero))
 
         // METAL: sinh(
         // METAL-NOT: sinh(
-        && zero == sinh<T>(zero)
+        && all(zero == sinh<T>(zero))
 
         // METAL: sinpi(
         // METAL-NOT: sinpi(
-        && zero == sinpi<T>(zero)
+        && all(zero == sinpi<T>(zero))
 
         // METAL: sqrt(
         // METAL-NOT: sqrt(
-        && zero == sqrt<T>(zero)
+        && all(zero == sqrt<T>(zero))
 
         // METAL: tan(
         // METAL-NOT: tan(
-        && zero == tan<T>(zero)
+        && all(zero == tan<T>(zero))
 
         // METAL: tanh(
         // METAL-NOT: tanh(
-        && zero == tanh<T>(zero)
+        && all(zero == tanh<T>(zero))
 
         // METAL: tanpi(
         // METAL-NOT: tanpi(
-        && zero == tanpi<T>(zero)
+        && all(zero == tanpi<T>(zero))
 
         // METAL: trunc(
         // METAL-NOT: trunc(
-        && zero == trunc<T>(zero)
+        && all(zero == trunc<T>(zero))
         ;
 
     // METAL-LABEL: Test_Vector_1

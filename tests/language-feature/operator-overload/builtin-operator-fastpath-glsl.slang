@@ -9,8 +9,16 @@
 
 import glsl;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
+
+// Under `import glsl`, vector `==` on a generic element type still resolves to the glsl module's
+// scalar-`bool` `operator==` (true when all components are equal), because the GLSL-scope bail-out
+// in `convertToBuiltinArithmeticOp` runs before element-type classification.
+bool allEqT<T : __BuiltinFloatingPointType>(vector<T, 4> a, vector<T, 4> b)
+{
+    return a == b;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -37,8 +45,11 @@ void computeMain()
     bool someNe = (va != vc);
     outputBuffer[3] = someNe ? 50.0 : 0.0; // -> 50.0
 
+    outputBuffer[4] = allEqT<float>(va, vc) ? 25.0 : 10.0; // -> 10.0
+
     // CHECK: 2.0
     // CHECK: 3.0
     // CHECK: 100.0
     // CHECK: 50.0
+    // CHECK: 10.0
 }
