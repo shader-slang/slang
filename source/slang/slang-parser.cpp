@@ -9559,6 +9559,80 @@ static Expr* parseAtomicExpr(Parser* parser)
     }
 }
 
+/// Return whether `expr` can name a type, as the `int` in the function-style cast `int**(p)`
+/// does. A `false` result means `expr` certainly produces a value; `true` means it names a type
+/// or the parser cannot tell. Literals, calls, casts, `sizeof`-like expressions, parenthesized
+/// expressions, `this` and `p->m` always produce values. An indexed expression names a type only
+/// if its base does (`int[3]` but not `a[0]`), and a member `x.m` is a value when `x` is a
+/// variable or another value (`s.k`, `v.x`), but can name a type when `x` names a type or a
+/// namespace (`ns.T`). A name that resolves names a type only if its declaration is a type. Any
+/// other expression, such as a generic application `Ptr<int>` or a name that does not resolve
+/// to a single declaration, can name a type.
+static bool _mayNameType(Parser* parser, Expr* expr)
+{
+    if (as<LiteralExpr>(expr) || as<InvokeExpr>(expr) || as<SizeOfLikeExpr>(expr) ||
+        as<ParenExpr>(expr) || as<ThisExpr>(expr) || as<DerefMemberExpr>(expr))
+        return false;
+    if (auto indexExpr = as<IndexExpr>(expr))
+        return _mayNameType(parser, indexExpr->baseExpression);
+    if (auto memberExpr = as<MemberExpr>(expr))
+    {
+        if (Decl* baseDecl = _tryResolveDecl(parser, memberExpr->baseExpression))
+            return !as<VarDeclBase>(baseDecl);
+        return _mayNameType(parser, memberExpr->baseExpression);
+    }
+    if (Decl* decl = _tryResolveDecl(parser, expr))
+        return _isType(decl);
+    return true;
+}
+
+/// Return whether the run of `*` at the cursor, which follows the expression `expr`, starts a
+/// pointer type suffix, as in `RWStructuredBuffer<int**>`, rather than a multiply, as in
+/// `a * *p`.
+///
+/// The expression grammar reads a pointer type where it stands in for a type: a generic argument
+/// (also inside a declaration such as `RWStructuredBuffer<int**> b;`), a cast such as
+/// `(int**)p`, an operand of `sizeof`, or a type string that `Linkage::parseTermString` parses
+/// for reflection or specialization, which ends right after the type. The outermost type of a
+/// declaration is parsed by `ParseType` and does not reach this code. In those places the run is
+/// followed by `,`, `)`, `>`, `>>`, `[` or the end of the input, so we look past the whole run
+/// and read those tokens as a type suffix. We also accept `:`, `;` and `.` as conservative
+/// terminators, because none of them can start an operand. `(` is decided below. Every other token
+/// reads as the start of a multiply's right operand; a token such as `]` or `=` that cannot start
+/// one then fails as a syntax error.
+static bool _isPointerTypeSuffix(Parser* parser, Expr* expr)
+{
+    SLANG_ASSERT(parser->tokenReader.peekTokenType() == TokenType::OpMul);
+    TokenReader lookahead = parser->tokenReader;
+    lookahead.advanceToken();
+    int starCount = 1;
+    while (lookahead.peekTokenType() == TokenType::OpMul)
+    {
+        lookahead.advanceToken();
+        starCount++;
+    }
+    switch (lookahead.peekTokenType())
+    {
+    case TokenType::Comma:
+    case TokenType::RParent:
+    case TokenType::OpGreater:
+    case TokenType::OpRsh:
+    case TokenType::Colon:
+    case TokenType::Semicolon:
+    case TokenType::LBracket:
+    case TokenType::Dot:
+    case TokenType::EndOfFile:
+        return true;
+    case TokenType::LParent:
+        // A single `*` before `(` is a multiply: `x * (y + z)` is not a cast, and `int*(p)` is
+        // not a function-style pointer cast. With two or more `*`, `int**(p)` is a
+        // function-style cast unless `expr` is known to be a value, as in `a * *(p + 1)`.
+        return starCount > 1 && _mayNameType(parser, expr);
+    default:
+        return false;
+    }
+}
+
 static Expr* parsePostfixExpr(Parser* parser)
 {
     auto expr = parseAtomicExpr(parser);
@@ -9680,29 +9754,11 @@ static Expr* parsePostfixExpr(Parser* parser)
                     expr = memberExpr;
             }
             break;
+        // Pointer type suffix `T*`, or the start of a multiply `a * b`
         case TokenType::OpMul:
-            {
-                // We may have a pointer type expr, e.g. T*, or the `*` is a mul operator.
-                // We can easily disambiguate by looking ahead of `*`, if the token after it
-                // is `,`, `>`, `)` or `>>`, then it must be a type postfix.
-                auto lookahead = peekTokenType(parser, 1);
-                switch (lookahead)
-                {
-                case TokenType::Comma:
-                case TokenType::RParent:
-                case TokenType::OpGreater:
-                case TokenType::OpRsh:
-                case TokenType::Colon:
-                case TokenType::Semicolon:
-                case TokenType::LBracket:
-                case TokenType::OpMul:
-                case TokenType::Dot:
-                    expr = parsePostfixTypeSuffix(parser, expr);
-                    break;
-                default:
-                    return expr;
-                }
-            }
+            if (!_isPointerTypeSuffix(parser, expr))
+                return expr;
+            expr = parsePostfixTypeSuffix(parser, expr);
             break;
         }
     }
