@@ -79,7 +79,10 @@ public interface INumericShapedType
     /// The logical scalar repeated by this type. A logical scalar uses `Scalar == This`.
     associatedtype Scalar;
 
-    /// The result type of component-wise comparison and classification operations.
+    /// A Boolean shape with one decision per logical component of this type.
+    ///
+    /// Component-wise comparisons and classifications produce masks, and `selectComponents`
+    /// consumes one.
     associatedtype Mask : IBooleanMask;
 
     /// Constructs a value whose every logical component is `value`.

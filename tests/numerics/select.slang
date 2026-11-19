@@ -90,17 +90,18 @@ void computeMain()
     typealias RowMatrix = matrix<float, 2, 3, MatrixLayoutMode.RowMajor>;
     let matrixMask = matrix<bool, 2, 3, MatrixLayoutMode.RowMajor>(
         true, false, true, false, true, false);
-    let rowResult = chooseComponents(matrixMask, RowMatrix(1, 2, 3, 4, 5, 6), RowMatrix(10));
-    outputBuffer[7] = int(matricesEqual(rowResult, RowMatrix(1, 10, 3, 10, 5, 10)));
+    let rowResult = chooseComponents(
+        matrixMask, RowMatrix(1, 2, 3, 4, 5, 6), RowMatrix(11, 12, 13, 14, 15, 16));
+    outputBuffer[7] = int(matricesEqual(rowResult, RowMatrix(1, 12, 3, 14, 5, 16)));
 
     typealias ColumnMatrix = matrix<float, 2, 3, MatrixLayoutMode.ColumnMajor>;
     let columnResult = chooseComponents(
         matrix<bool, 2, 3, MatrixLayoutMode.ColumnMajor>(matrixMask),
-        ColumnMatrix(1, 2, 3, 4, 5, 6), ColumnMatrix(10));
-    outputBuffer[8] = int(matricesEqual(columnResult, ColumnMatrix(1, 10, 3, 10, 5, 10)));
+        ColumnMatrix(1, 2, 3, 4, 5, 6), ColumnMatrix(11, 12, 13, 14, 15, 16));
+    outputBuffer[8] = int(matricesEqual(columnResult, ColumnMatrix(1, 12, 3, 14, 5, 16)));
     let integerResult = chooseComponents(
-        bool2x2(true, false, false, true), int2x2(1, 2, 3, 4), int2x2(9));
-    outputBuffer[9] = int(matricesEqual(integerResult, int2x2(1, 9, 9, 4)));
+        bool2x2(true, false, false, true), int2x2(1, 2, 3, 4), int2x2(11, 12, 13, 14));
+    outputBuffer[9] = int(matricesEqual(integerResult, int2x2(1, 12, 13, 4)));
 
     // Concrete builtin calls must remain compatible with the new generic fallback.
     outputBuffer[10] = int((select(mask, float3(1, 2, 3), float3(4, 5, 6)) ==

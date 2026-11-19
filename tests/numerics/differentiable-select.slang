@@ -65,20 +65,27 @@ void computeMain()
     results[4] = (vectorLeft.d == float2(5.0, 0.0)).all(); // CHECK: 1
     results[5] = (vectorRight.d == float2(0.0, 7.0)).all(); // CHECK: 1
 
-    // The matrix witness must preserve its explicit layout in primal and derivative results.
+    // We use a column-major matrix and give each component a distinct value.
+    // Swapping result columns then changes their values even when their mask bits match.
     typealias Matrix = matrix<float, 2, 3, MatrixLayoutMode.ColumnMajor>;
     typealias MatrixMask = matrix<bool, 2, 3, MatrixLayoutMode.ColumnMajor>;
     let matrixMask = MatrixMask(true, false, true, false, true, false);
+    let matrixIfTrue = Matrix(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+    let matrixIfFalse = Matrix(11.0, 12.0, 13.0, 14.0, 15.0, 16.0);
     let matrixForward = fwd_diff(chooseComponents<Matrix>)(
-        matrixMask, diffPair(Matrix(2.0), Matrix(3.0)), diffPair(Matrix(5.0), Matrix(7.0)));
-    results[6] = (matrixForward.p == Matrix(2.0, 5.0, 2.0, 5.0, 2.0, 5.0)).all(); // CHECK: 1
-    results[7] = (matrixForward.d == Matrix(3.0, 7.0, 3.0, 7.0, 3.0, 7.0)).all(); // CHECK: 1
+        matrixMask,
+        diffPair(matrixIfTrue, Matrix(21.0, 22.0, 23.0, 24.0, 25.0, 26.0)),
+        diffPair(matrixIfFalse, Matrix(31.0, 32.0, 33.0, 34.0, 35.0, 36.0)));
+    results[6] = (matrixForward.p == Matrix(1.0, 12.0, 3.0, 14.0, 5.0, 16.0)).all(); // CHECK: 1
+    results[7] = (matrixForward.d == Matrix(21.0, 32.0, 23.0, 34.0, 25.0, 36.0)).all(); // CHECK: 1
 
-    var matrixLeft = diffPair(Matrix(2.0), Matrix(0.0));
-    var matrixRight = diffPair(Matrix(5.0), Matrix(0.0));
-    bwd_diff(chooseComponents<Matrix>)(matrixMask, matrixLeft, matrixRight, Matrix(11.0));
-    results[8] = (matrixLeft.d == Matrix(11.0, 0.0, 11.0, 0.0, 11.0, 0.0)).all(); // CHECK: 1
-    results[9] = (matrixRight.d == Matrix(0.0, 11.0, 0.0, 11.0, 0.0, 11.0)).all(); // CHECK: 1
+    var reverseIfTrue = diffPair(matrixIfTrue, Matrix(0.0));
+    var reverseIfFalse = diffPair(matrixIfFalse, Matrix(0.0));
+    let matrixOutputDifferential = Matrix(41.0, 42.0, 43.0, 44.0, 45.0, 46.0);
+    bwd_diff(chooseComponents<Matrix>)(
+        matrixMask, reverseIfTrue, reverseIfFalse, matrixOutputDifferential);
+    results[8] = (reverseIfTrue.d == Matrix(41.0, 0.0, 43.0, 0.0, 45.0, 0.0)).all(); // CHECK: 1
+    results[9] = (reverseIfFalse.d == Matrix(0.0, 42.0, 0.0, 44.0, 0.0, 46.0)).all(); // CHECK: 1
 
     let custom = fwd_diff(chooseComponents<TwoValues>)(
         mask, diffPair(TwoValues(2.0, 3.0), TwoValues.Differential(1.0, 2.0)),
