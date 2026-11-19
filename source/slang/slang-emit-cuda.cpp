@@ -3,6 +3,7 @@
 
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-rich-diagnostics.h"
 
 
@@ -521,57 +522,13 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 
 String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
-    // We have an entry-point function in the IR module and need to
-    // generate the name of the corresponding CUDA C++ function.
-    //
-    // The most common case will be a compute kernel, in which case
-    // we will emit the function more or less as-is, including
-    // usingits original name as the name of the global symbol.
-    //
+    // The global symbol of a CUDA kernel is the C-like entry-point name, after the rename of
+    // `main`, preceded by the OptiX program-type prefix of its stage. A compute kernel has no
+    // prefix; a ray-tracing kernel for OptiX needs one so that the OptiX runtime knows its stage.
+    // `checkEntryPointNamesAreUnique` builds the same symbol to find kernels that would collide.
     String funcName = Super::generateEntryPointNameImpl(entryPointDecor);
-    String globalSymbolName = funcName;
-
-    // We also suport emitting ray tracing kernels for use with
-    // OptiX, and in that case the name of the global symbol
-    // must be prefixed to indicate to the OptiX runtime what
-    // stage it is to be compiled for.
-    //
-    auto stage = entryPointDecor->getProfile().getStage();
-    switch (stage)
-    {
-    default:
-        break;
-
-#define CASE(STAGE, PREFIX)                    \
-    case Stage::STAGE:                         \
-        globalSymbolName = #PREFIX + funcName; \
-        break
-
-        // Optix 7 Guide, Section 6.1 (Program input)
-        //
-        // > The input PTX should include one or more NVIDIA OptiX programs.
-        // > The type of program affects how the program can be used during
-        // > the execution of the pipeline. These program types are specified
-        // by prefixing the program name with the following:
-        //
-        // >    Program type        Function name prefix
-        CASE(RayGeneration, __raygen__);
-        CASE(Intersection, __intersection__);
-        CASE(AnyHit, __anyhit__);
-        CASE(ClosestHit, __closesthit__);
-        CASE(Miss, __miss__);
-        CASE(Callable, __direct_callable__);
-        //
-        // There are two stages (or "program types") supported by OptiX
-        // that Slang currently cannot target:
-        //
-        // CASE(ContinuationCallable,   __continuation_callable__);
-        // CASE(Exception,              __exception__);
-        //
-#undef CASE
-    }
-
-    return globalSymbolName;
+    return String(getOptiXEntryPointNamePrefix(entryPointDecor->getProfile().getStage())) +
+           funcName;
 }
 
 void CUDASourceEmitter::emitGlobalRTTISymbolPrefix()
