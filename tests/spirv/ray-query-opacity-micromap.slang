@@ -1,15 +1,17 @@
 //TEST:SIMPLE(filecheck=SPV_ON): -target spirv -entry main -profile spirv_1_4 -capability rayquery_opacity_micromap -restrictive-capability-check
 //TEST:SIMPLE(filecheck=SPV_UPGRADE): -target spirv -entry main -profile spirv_1_3 -emit-spirv-directly
-//TEST:SIMPLE(filecheck=SPV_OFF): -target spirv -entry main -profile spirv_1_4 -capability rayquery -restrictive-capability-check -DQUERY_FLAGS=0
+//TEST:SIMPLE(filecheck=SPV_OFF): -target spirv -entry main -profile spirv_1_4 -capability rayquery -restrictive-capability-check -DUSE_EMPTY_FEATURES
 //TEST:SIMPLE(filecheck=SPV_OFF): -target spirv -entry main -profile spirv_1_4 -capability rayquery -restrictive-capability-check -DUSE_DEFAULT_QUERY
 //TEST:SIMPLE(filecheck=HLSL_ON): -target hlsl -entry main -profile sm_6_9 -restrictive-capability-check
-//TEST:SIMPLE(filecheck=HLSL_OFF): -target hlsl -entry main -profile sm_6_5 -restrictive-capability-check -DQUERY_FLAGS=0
+//TEST:SIMPLE(filecheck=HLSL_ON): -target hlsl -entry main -profile sm_6_9 -restrictive-capability-check -DREPEAT_MICROMAP_FEATURE
+//TEST:SIMPLE(filecheck=HLSL_OFF): -target hlsl -entry main -profile sm_6_5 -restrictive-capability-check -DUSE_EMPTY_FEATURES
 //TEST:SIMPLE(filecheck=HLSL_DEFAULT): -target hlsl -entry main -profile sm_6_5 -restrictive-capability-check -DUSE_DEFAULT_QUERY
 //TEST:SIMPLE(filecheck=GLSL_ON): -target glsl -entry main -capability rayquery_opacity_micromap
-//TEST:SIMPLE(filecheck=GLSL_OFF): -target glsl -entry main -DQUERY_FLAGS=0
+//TEST:SIMPLE(filecheck=GLSL_OFF): -target glsl -entry main -DUSE_EMPTY_FEATURES
+//TEST:SIMPLE(filecheck=METAL_OFF): -target metal -entry main -DUSE_EMPTY_FEATURES
 
 // Two opted-in queries need only one entry-point execution mode. The first generic
-// argument still controls ray flags, independently of the new query flags.
+// argument still controls ray flags, independently of the selected feature types.
 // SPV_ON: OpCapability RayTracingOpacityMicromapExecutionModeKHR
 // SPV_ON: OpExtension "SPV_KHR_opacity_micromap"
 // SPV_ON: OpEntryPoint GLCompute %[[ENTRY:[A-Za-z0-9_]+]] "main"
@@ -22,12 +24,12 @@
 // SPV_ON: OpRayQueryInitializeKHR
 // SPV_ON-NOT: OpacityMicromapIdKHR
 
-// The conditional requirement must upgrade the binary header before emission.
+// The feature requirement must upgrade the binary header before emission.
 // SPV_UPGRADE: Version: 1.4
 // SPV_UPGRADE: OpCapability RayTracingOpacityMicromapExecutionModeKHR
 // SPV_UPGRADE: OpExecutionModeId %{{[A-Za-z0-9_]+}} OpacityMicromapIdKHR
 
-// An explicit zero and the omitted argument must both retain the ordinary path.
+// An empty feature set and the omitted argument must both retain the ordinary path.
 // SPV_OFF-NOT: OpacityMicromap
 // SPV_OFF-NOT: SPV_KHR_opacity_micromap
 // SPV_OFF: OpRayQueryInitializeKHR
@@ -53,14 +55,21 @@
 // GLSL_OFF: rayQueryInitializeEXT(
 // GLSL_OFF-NOT: gl_EnableOpacityMicromapEXT
 
-#ifndef QUERY_FLAGS
-#define QUERY_FLAGS RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS
+// METAL_OFF: ->reset(
+
+#ifdef USE_EMPTY_FEATURES
+typedef RayQueryFeatures<> TestFeatures;
+#elif defined(REPEAT_MICROMAP_FEATURE)
+// Repeating a feature exercises a nonempty pack tail and still enables only bit 0.
+typedef RayQueryFeatures<RayQueryOpacityMicroMaps, RayQueryOpacityMicroMaps> TestFeatures;
+#else
+typedef RayQueryFeatures<RayQueryOpacityMicroMaps> TestFeatures;
 #endif
 
 #ifdef USE_DEFAULT_QUERY
 typedef RayQuery TestQuery;
 #else
-typedef RayQuery<RAY_FLAG_FORCE_NON_OPAQUE, QUERY_FLAGS> TestQuery;
+typedef RayQuery<RAY_FLAG_FORCE_NON_OPAQUE, TestFeatures> TestQuery;
 #endif
 
 RaytracingAccelerationStructure scene;

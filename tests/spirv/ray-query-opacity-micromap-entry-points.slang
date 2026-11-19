@@ -17,15 +17,17 @@
 RaytracingAccelerationStructure scene;
 RWStructuredBuffer<uint> output;
 
+typedef RayQueryFeatures<RayQueryOpacityMicroMaps> MicromapFeatures;
+
 [noinline]
-uint trace<let queryFlags : RAYQUERY_FLAG>()
+uint trace<Features : IRayQueryFeature>()
 {
     RayDesc ray;
     ray.Origin = float3(0, 0, 0);
     ray.Direction = float3(0, 0, 1);
     ray.TMin = 0;
     ray.TMax = 100;
-    RayQuery<RAY_FLAG_NONE, queryFlags> query;
+    RayQuery<RAY_FLAG_NONE, Features> query;
     query.TraceRayInline(scene, RAY_FLAG_NONE, 0xff, ray);
     return query.Proceed();
 }
@@ -34,19 +36,19 @@ uint trace<let queryFlags : RAYQUERY_FLAG>()
 [numthreads(1, 1, 1)]
 void enabledA()
 {
-    output[0] = trace<RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS>();
+    output[0] = trace<MicromapFeatures>();
 }
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void enabledB()
 {
-    output[1] = trace<RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS>();
+    output[1] = trace<MicromapFeatures>();
 }
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void ordinary()
 {
-    output[2] = trace<RAYQUERY_FLAG_NONE>();
+    output[2] = trace<RayQueryFeatures<>>();
 }

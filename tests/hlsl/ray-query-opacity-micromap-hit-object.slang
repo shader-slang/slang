@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -profile sm_6_9 -capability ser_dxr
 
-// Both FromRayQuery overloads must infer query flags from an opted-in query.
+// Both FromRayQuery overloads must infer feature types from an opted-in query.
 // Existing explicit generic calls retain their ray-flags/attribute-type ordering.
 // CHECK: RayQuery<0{{[uU]? *, *}}1{{[uU]? *}}>
 // CHECK: dx::HitObject::FromRayQuery(
@@ -28,7 +28,7 @@ void main()
     ray.Direction = float3(0, 0, 1);
     ray.TMin = 0;
     ray.TMax = 100;
-    RayQuery<RAY_FLAG_NONE, RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS> query;
+    RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>> query;
     query.TraceRayInline(scene, RAY_FLAG_NONE, 0xff, ray);
     while (query.Proceed())
     {
@@ -41,7 +41,7 @@ void main()
     Attributes attributes;
     attributes.distance = 1;
 
-    RayQuery<RAY_FLAG_NONE, RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS> customQuery;
+    RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>> customQuery;
     customQuery.TraceRayInline(scene, RAY_FLAG_NONE, 0xff, ray);
     while (customQuery.Proceed())
     {

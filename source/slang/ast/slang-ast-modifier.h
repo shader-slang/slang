@@ -683,9 +683,12 @@ class IntrinsicTypeModifier : public Modifier
 
     Token opToken;
 
-    // Additional literal opreands to provide when creating instances.
-    // (e.g., for a texture type this passes in shape/mutability info)
-    FIDDLE() List<uint32_t> irOperands;
+    // Explicit integer operands replace the generic substitution arguments when present.
+    FIDDLE() List<Expr*> operandExprs;
+
+    // Checked values are the source of truth for substitution and lowering. Keep the
+    // expressions only for source information; lowering must not reconstruct their syntax.
+    FIDDLE() List<IntVal*> operandVals;
 };
 
 // More HLSL Keyword

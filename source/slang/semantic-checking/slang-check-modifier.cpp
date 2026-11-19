@@ -1983,8 +1983,8 @@ Modifier* SemanticsVisitor::checkModifier(
         // Core builtin annotations require compiler-owned declaration shapes. Ordinary modules
         // may instead select a ray-tracing stage interface or descriptor, whose shape is the
         // checked declaration reference. Reject other builtin annotations before forming a Type,
-        // so downstream consumers never see unsupported shapes. `__intrinsic_type` only records
-        // an IR opcode and remains valid user syntax.
+        // so downstream consumers never see unsupported shapes. `__intrinsic_type` records
+        // an IR opcode and optional operand values, and remains valid user syntax.
         if ((as<MagicTypeModifier>(m) || as<BuiltinTypeModifier>(m) ||
              as<BuiltinRequirementModifier>(m)) &&
             !isFromCoreModule(decl) &&
@@ -2018,6 +2018,19 @@ Modifier* SemanticsVisitor::checkModifier(
             getSink()->diagnose(
                 Diagnostics::RefAccessKeywordRequiresExperimentalFeature{.modifier = m});
         }
+    }
+
+    if (auto intrinsicTypeModifier = as<IntrinsicTypeModifier>(m))
+    {
+        // The parser wires the modifier's scope to the declaration's generic parameters.
+        // Preserve dependent integer values here so normal substitution can specialize them
+        // before lowerSimpleIntrinsicType constructs the intrinsic IR type.
+        intrinsicTypeModifier->operandVals.clear();
+        for (auto operandExpr : intrinsicTypeModifier->operandExprs)
+        {
+            intrinsicTypeModifier->operandVals.add(checkLinkTimeConstantIntVal(operandExpr));
+        }
+        return intrinsicTypeModifier;
     }
 
     if (as<ConstExprModifier>(m))

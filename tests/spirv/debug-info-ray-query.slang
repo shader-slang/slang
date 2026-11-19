@@ -2,8 +2,8 @@
 
 // RayQuery is an opaque builtin. This test uses three [noinline] function parameters as a simple
 // fixture that forces each distinct instantiation to be retained and emitted into debug info.
-// Both flag operands must appear in the name, so instantiations that differ only in ray flags or
-// query flags are distinguished instead of sharing an incorrect or missing name.
+// The lowered ray flags and feature flags must appear in the name, so instantiations that differ
+// only in ray flags or selected features do not share an incorrect or missing name.
 
 RWStructuredBuffer<float> outBuf;
 
@@ -19,7 +19,7 @@ float useRayQueryForceOpaque(RayQuery<RAY_FLAG_FORCE_OPAQUE> q, float r)
 }
 [noinline]
 float useRayQueryMicromap(
-    RayQuery<RAY_FLAG_NONE, RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS> q,
+    RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>> q,
     float r)
 {
     return r;
@@ -31,7 +31,7 @@ void main(uint3 tid: SV_DispatchThreadID)
 {
     RayQuery<RAY_FLAG_NONE> q0;
     RayQuery<RAY_FLAG_FORCE_OPAQUE> q1;
-    RayQuery<RAY_FLAG_NONE, RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS> q2;
+    RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>> q2;
     outBuf[tid.x] = useRayQueryNone(q0, 1.0) + useRayQueryForceOpaque(q1, 1.0)
         + useRayQueryMicromap(q2, 1.0);
 }

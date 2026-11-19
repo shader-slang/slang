@@ -11080,9 +11080,7 @@ static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
     modifier->irOp = parseIROp(parser, modifier->opToken);
     while (AdvanceIf(parser, TokenType::Comma))
     {
-        auto operand =
-            uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
-        modifier->irOperands.add(operand);
+        modifier->operandExprs.add(parser->ParseArgExpr());
     }
     parser->ReadToken(TokenType::RParent);
 

@@ -2939,16 +2939,41 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         List<IRInst*> operands;
-        // If there are any substitutions attached to the declRef,
-        // add them as operands of the IR type.
-        SubstitutionSet(type->getDeclRef())
-            .forEachSubstitutionArg(
+        SubstitutionSet substitutions(type->getDeclRef());
+        if (intrinsicTypeModifier->operandExprs.getCount())
+        {
+            // Consider this declaration:
+            //
+            // __intrinsic_type(RayQuery, flags, Features._rayQueryFlags)
+            // struct Query<let flags : uint, Features : IRayQueryFeature> {}
+            //
+            // checkModifier retains both operands as checked integer values. Substituting
+            // the Query specialization resolves the feature's associated constant through
+            // its witness, so the IR type receives flags rather than a feature type and witness.
+            // The same semantic value path handles literals and dependent expressions.
+            SLANG_RELEASE_ASSERT(
+                intrinsicTypeModifier->operandVals.getCount() ==
+                intrinsicTypeModifier->operandExprs.getCount());
+            for (auto operandVal : intrinsicTypeModifier->operandVals)
+            {
+                SLANG_RELEASE_ASSERT(operandVal);
+                auto specializedVal = operandVal->substitute(context->astBuilder, substitutions);
+                auto irOperand = lowerSimpleVal(context, specializedVal);
+                SLANG_RELEASE_ASSERT(irOperand);
+                operands.add(irOperand);
+            }
+        }
+        else
+        {
+            // Without explicit operands, use the intrinsic declaration's generic arguments.
+            substitutions.forEachSubstitutionArg(
                 [&](Val* arg)
                 {
                     auto argVal = lowerVal(context, arg).val;
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
                 });
+        }
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),

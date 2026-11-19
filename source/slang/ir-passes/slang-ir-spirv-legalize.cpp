@@ -2567,20 +2567,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_CoopMatrixType:
                 m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
                 break;
-            case kIROp_Func:
-                // A specialized TraceRayInline call can require the opacity micromap
-                // execution mode even when the target did not explicitly request it.
-                // Select SPIR-V 1.4 before legalization chooses storage classes and
-                // entry-point interfaces; upgrading only during emission is too late.
-                for (auto block : as<IRFunc>(globalInst)->getBlocks())
-                {
-                    for (auto inst : block->getChildren())
-                    {
-                        if (as<IRRequireRayQueryOpacityMicromap>(inst))
-                            m_sharedContext->requireSpirvVersion(0x10400);
-                    }
-                }
-                break;
             }
 
             for (auto decor : globalInst->getDecorations())

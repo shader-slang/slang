@@ -22791,28 +22791,83 @@ typedef uint RAYQUERY_FLAG;
 static const RAYQUERY_FLAG RAYQUERY_FLAG_NONE = 0x00;
 
 /// Allow a ray query to use opacity micromaps attached to its acceleration structure.
-/// Pass this flag as the second generic argument to `RayQuery`.
+/// Native query flag encoding. Select `RayQueryOpacityMicroMaps` in Slang.
 /// @category raytracing
 static const RAYQUERY_FLAG RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS = 0x01;
 
-/// The optional second generic argument selects ray-query features independently of ray flags.
-/// For example, `RayQuery<RAY_FLAG_NONE, RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS>` enables
-/// opacity micromaps when `TraceRayInline` is called. This requires the
-/// `rayquery_opacity_micromap` capability: shader model 6.9 for HLSL, or the KHR opacity
-/// micromap execution mode for SPIR-V. GLSL uses `GL_EXT_opacity_micromap_ray_query_mode`
-/// to express the same execution mode.
+/// A built-in ray-query feature or combination of features.
+/// @category raytracing
+[sealed]
+interface IRayQueryFeature
+{
+    // The public type carries capability requirements; this value describes the
+    // corresponding native query flags when the opaque query type is lowered.
+    internal static const RAYQUERY_FLAG _rayQueryFlags;
+}
+
+/// Allows a ray query to use opacity micromaps attached to its acceleration structure.
+/// Requires shader model 6.9 for HLSL, or the opacity-micromap ray-query mode for SPIR-V/GLSL.
+/// @category raytracing
+[require(rayquery_opacity_micromap)]
+struct RayQueryOpacityMicroMaps : IRayQueryFeature
+{
+    internal static const RAYQUERY_FLAG _rayQueryFlags = RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS;
+}
+
+internal struct _RayQueryEmptyFeatures : IRayQueryFeature
+{
+    internal static const RAYQUERY_FLAG _rayQueryFlags = RAYQUERY_FLAG_NONE;
+}
+
+// Fold a nonempty feature pack into native flags using ordinary constant expressions.
+// For example, RayQueryFeatures<RayQueryOpacityMicroMaps> combines the first feature's
+// flags with the empty tail's zero. __packBranch selects the empty case before any
+// attempt to access its first element. Both branches implement the same interface so
+// the flag lookup remains valid while the pack is still generic.
+internal struct _RayQueryNonEmptyFeatures<each Feature> : IRayQueryFeature
+    where expand each Feature : IRayQueryFeature
+    where nonempty(Feature)
+{
+    private typealias FirstFeature = __first(Feature);
+    private typealias RemainingFeatures = _RayQueryFeatureUnion<__trimFirst(Feature)>;
+    internal static const RAYQUERY_FLAG _rayQueryFlags =
+        FirstFeature._rayQueryFlags | RemainingFeatures._rayQueryFlags;
+}
+
+internal typealias _RayQueryFeatureUnion<each Feature>
+    where expand each Feature : IRayQueryFeature =
+    __packBranch(Feature, _RayQueryEmptyFeatures, _RayQueryNonEmptyFeatures<expand each Feature>);
+
+/// Combines ray-query features into the second generic argument of `RayQuery`.
+/// `RayQueryFeatures<>` selects no additional features. Repeating a feature has no extra effect.
+/// @category raytracing
+struct RayQueryFeatures<each Feature> : IRayQueryFeature
+    where expand each Feature : IRayQueryFeature
+{
+    internal static const RAYQUERY_FLAG _rayQueryFlags =
+        _RayQueryFeatureUnion<expand each Feature>._rayQueryFlags;
+}
+
+/// The optional second generic argument selects ray-query feature types independently of ray flags.
+/// For example, `RayQuery<RAY_FLAG_NONE, RayQueryFeatures<RayQueryOpacityMicroMaps>>` enables
+/// opacity micromaps when `TraceRayInline` is called. The feature type requires the
+/// `rayquery_opacity_micromap` capability. SPIR-V uses the KHR execution mode, while GLSL
+/// expresses the same mode through `GL_EXT_opacity_micromap_ray_query_mode`.
 ///
 /// For SPIR-V and GLSL, enabling opacity micromaps applies to every ray query in each
 /// entry point that reaches the opted-in `TraceRayInline` call, including queries whose
-/// second generic argument is `RAYQUERY_FLAG_NONE`. The application must enable the
+/// feature set is empty. The application must enable the
 /// Vulkan micromap feature and attach micromaps to the acceleration structure separately.
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
-__intrinsic_type($(kIROp_RayQueryType))
+// Keep Features in the source type so normal capability checking sees the selected policies.
+// The explicit intrinsic operands lower their native flags without erasing that type information
+// through an alias to a numeric query type before capability checking and generic inference.
+__intrinsic_type($(kIROp_RayQueryType), rayFlagsGeneric, Features._rayQueryFlags)
 struct RayQuery<
     let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE,
-    let rayQueryFlagsGeneric : RAYQUERY_FLAG = RAYQUERY_FLAG_NONE>
+    Features : IRayQueryFeature = RayQueryFeatures<>>
 {
     /// Initialize a new ray query in its default state.
     __intrinsic_op($(kIROp_AllocateOpaqueHandle))
@@ -22902,15 +22957,12 @@ struct RayQuery<
         uint                            instanceInclusionMask,
         RayDesc                         ray)
     {
-        if ((rayQueryFlagsGeneric & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) != 0)
-            __requireCapability(rayquery_opacity_micromap);
-
         __target_switch
         {
         case hlsl: __intrinsic_asm ".TraceRayInline";
         case glsl:
         case spirv:
-            if ((rayQueryFlagsGeneric & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) != 0)
+            if ((Features._rayQueryFlags & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) != 0)
                 __requireRayQueryOpacityMicromap();
 
             __rayQueryInitializeEXT(
@@ -22922,9 +22974,6 @@ struct RayQuery<
                 ray.Direction,
                 ray.TMax);
         case metal:
-            static_assert(
-                (rayQueryFlagsGeneric & RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS) == 0,
-                "Metal does not support opacity micromaps in ray queries");
             __reset(ray.Origin, ray.Direction, ray.TMin, ray.TMax, accelerationStructure, instanceInclusionMask, rayFlags | rayFlagsGeneric);
         }
     }
@@ -26585,8 +26634,8 @@ struct HitObject
     [require(hlsl, ser_dxr_raygen)]
     __generic<
         let rayFlagsGeneric : RAY_FLAG,
-        let rayQueryFlagsGeneric : RAYQUERY_FLAG = RAYQUERY_FLAG_NONE>
-    static HitObject FromRayQuery(RayQuery<rayFlagsGeneric, rayQueryFlagsGeneric> Query)
+        Features : IRayQueryFeature = RayQueryFeatures<>>
+    static HitObject FromRayQuery(RayQuery<rayFlagsGeneric, Features> Query)
     {
         __target_switch
         {
@@ -26604,9 +26653,9 @@ struct HitObject
     __generic<
         let rayFlagsGeneric : RAY_FLAG,
         attr_t,
-        let rayQueryFlagsGeneric : RAYQUERY_FLAG = RAYQUERY_FLAG_NONE>
+        Features : IRayQueryFeature = RayQueryFeatures<>>
     static HitObject FromRayQuery(
-        RayQuery<rayFlagsGeneric, rayQueryFlagsGeneric> Query,
+        RayQuery<rayFlagsGeneric, Features> Query,
         uint CommittedCustomHitKind,
         attr_t CommittedCustomAttribs)
     {
