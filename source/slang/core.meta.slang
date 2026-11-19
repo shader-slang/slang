@@ -5082,6 +5082,16 @@ attribute_syntax [deprecated(message: String)] : DeprecatedAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [RemovedSince(languageVersion: int, message: String)] : RemovedSinceAttribute;
 
+/// Mark a declaration so that referencing it is an error that reports `message`.
+/// @param message The diagnostic message to show when the declaration is referenced.
+///
+/// Unlike `[deprecated]` (a warning) and `[RemovedSince]` (an error tied to a language
+/// version), this attribute is unconditional. It applies at any reference, including
+/// the reference overload resolution materializes when it selects a candidate carrying
+/// the attribute as the chosen overload.
+__attributeTarget(DeclBase)
+attribute_syntax [__diagnoseOnUse(message: String)] : DiagnoseOnUseAttribute;
+
 /// Controls the behavior of the compiler when a differentiable function is detected to have side-effects.
 /// @category misc_types
 enum SideEffectBehavior

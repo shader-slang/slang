@@ -2169,6 +2169,21 @@ class RemovedSinceAttribute : public Attribute
     FIDDLE() String message;
 };
 
+/// A `[__diagnoseOnUse("message")]` attribute indicates that any reference to
+/// the target declaration is an error that reports the given message. In
+/// particular, an overload-resolution candidate carrying this attribute can be
+/// selected as the winner (when no real overload applies), and materializing
+/// that reference reports the error. A reference formed through a type (such
+/// as constructor selection via `int4(...)`) does not flow through declaration
+/// reference checking, so the attribute is not diagnosed for those.
+///
+FIDDLE()
+class DiagnoseOnUseAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String message;
+};
+
 FIDDLE()
 class NonCopyableTypeAttribute : public Attribute
 {

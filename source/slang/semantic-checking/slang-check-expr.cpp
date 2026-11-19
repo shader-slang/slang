@@ -423,6 +423,22 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
         }
     }
 
+    // A `[__diagnoseOnUse]` declaration is an unconditional reference error, independent of
+    // the module's language version, so we report it before the deprecation warning and stop:
+    // a declaration carrying both reports only this error. This is also the path that turns a
+    // diagnostic-carrying fallback overload into an error: overload resolution selects it as
+    // the chosen candidate only when no real overload applies, and the reference it then
+    // materializes flows through this check.
+    if (auto diagnoseOnUseAttr = declRef.getDecl()->findModifier<DiagnoseOnUseAttribute>())
+    {
+        getSink()->diagnose(Diagnostics::DiagnoseOnUse{
+            .decl = declRef.getDecl(),
+            .message = diagnoseOnUseAttr->message,
+            .location = loc});
+
+        return;
+    }
+
     // If the declaration has not been removed in this language version, we report deprecation
     // as a warning. The declaration formatter supplies its user-visible name here as well.
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())

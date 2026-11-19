@@ -1291,6 +1291,18 @@ Modifier* SemanticsVisitor::validateAttribute(
         removedSinceAttr->sinceVersion = int32_t(sinceVersion->getValue());
         removedSinceAttr->message = message;
     }
+    else if (auto diagnoseOnUseAttr = as<DiagnoseOnUseAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 1);
+
+        String message;
+        if (!checkLiteralStringVal(attr->args[0], &message))
+        {
+            return nullptr;
+        }
+
+        diagnoseOnUseAttr->message = message;
+    }
     else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
     {
         SLANG_ASSERT(attr->args.getCount() == 1);
