@@ -3018,6 +3018,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Remove the conversion only at this boundary, after logical type specialization.
         for (auto inst : m_sizedBufferToUnsizedBufferInsts)
         {
+            // Legalization can delete a recorded conversion, e.g. after an abort.
+            if (!inst->parent)
+                continue;
+
             auto buffer = inst->getOperand(0);
             SLANG_RELEASE_ASSERT(inst->getDataType() == buffer->getDataType());
             inst->replaceUsesWith(buffer);
