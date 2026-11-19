@@ -4016,6 +4016,20 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     info->specializedFuncDeclRef = specializedFuncDeclRef;
 
+    // The supplied arguments just made the entry point's generic parameters concrete, the same
+    // specialization boundary a call in a function body completes at overload resolution. The
+    // note names the site that bound them: the first generic argument's source expression when
+    // the specialization came from source syntax, and otherwise the generic's own declaration —
+    // CLI- and API-supplied arguments carry no location of their own. The check exits without
+    // diagnosing when the reference carries no generic application.
+    SourceLoc specializationLoc = specializedFuncDeclRef.getDecl()->loc;
+    if (argCount > 0 && args[0].expr)
+        specializationLoc = args[0].expr->loc;
+    PortableRT::checkSpecializedCallableBody(
+        &visitor,
+        specializedFuncDeclRef.declRefBase,
+        specializationLoc);
+
     // The generic arguments supplied through -specialize or IComponentType::specialize are now
     // bound to the entry point's generic parameters. For example, specializing genericMain<T>
     // with MetalOnly makes specializedFuncDeclRef identify genericMain<MetalOnly>.

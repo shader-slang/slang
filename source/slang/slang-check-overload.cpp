@@ -3,6 +3,7 @@
 #include "slang-ast-base.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
+#include "slang-check-portable-ray-tracing.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
 
@@ -1634,6 +1635,46 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
 
     if (!TryCheckOverloadCandidateVisibility(context, candidate))
         goto error;
+
+    // The candidate is now fully applied; this is the point where a generic's parameters
+    // became concrete, so the portable ray-tracing check re-reads the callee's body with
+    // these arguments bound — the call itself did not exist when the body was checked
+    // abstractly. Completion is a slight over-approximation of selection: a tied ambiguous
+    // candidate set completes every viable candidate, the same as the other completion-time
+    // diagnostics above, so an instantiation the final resolution never uses may be reported
+    // once too. checkSpecializedCallableBody itself exits without diagnosing when the
+    // compilation has not opted in, no loaded module declares a stage input, or the reference
+    // is not a generic specialization, so non-ray-tracing compiles reach only those fast
+    // checks — plus, on the Generic path below, the interning of the rebuilt application
+    // reference, which the completed callee expression re-creates moments later anyway.
+    if (candidate.flavor == OverloadCandidate::Flavor::Generic)
+    {
+        if (!(candidate.flags & OverloadCandidate::Flag::IsPartiallyAppliedGeneric))
+        {
+            // The candidate names the GenericDecl itself, while the check needs the inner
+            // callable's declaration reference with the arguments bound; building it through
+            // getGenericAppDeclRef also makes it the same interned value the completed callee
+            // expression carries, which is what the check's per-instantiation dedup keys on.
+            auto genericDeclRef = candidate.item.declRef.as<GenericDecl>();
+            auto genSubst = candidate.subst.findGenericAppDeclRef(genericDeclRef.getDecl());
+            if (genericDeclRef && genSubst)
+                PortableRT::checkSpecializedCallableBody(
+                    this,
+                    m_astBuilder->getGenericAppDeclRef(genericDeclRef, genSubst->getArgs()),
+                    context.loc);
+        }
+    }
+    else if (candidate.flavor == OverloadCandidate::Flavor::Func)
+    {
+        // A plain call's callee reference already carries any enclosing application (a method
+        // of `Factory<Input>`, or the inner function of an already-specialized generic), so it
+        // is passed as-is: the check walks the reference's own substitution chain, unlike the
+        // Generic flavor where the arguments live on the candidate instead.
+        PortableRT::checkSpecializedCallableBody(
+            this,
+            candidate.item.declRef.declRefBase,
+            context.loc);
+    }
 
     {
         Expr* baseExpr;

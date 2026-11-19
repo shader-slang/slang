@@ -17,6 +17,20 @@ class MagicTypeModifier;
 struct SemanticsVisitor;
 class EntryPoint;
 
+// Per-compilation state for the post-specialization stage-input checks: the set of generic
+// instantiations whose bodies were already validated after substitution (specialized decl-refs
+// are interned Vals, so pointer identity distinguishes instantiations), and a cached scan of
+// the loaded modules for the stage-input declarations.
+class PortableRTSpecializationCheckState : public RefObject
+{
+public:
+    HashSet<Val*> checkedSpecializationDeclRefs;
+    Index loadedModuleCountAtScan = -1;
+    bool stageInputsLoaded = false;
+    // Number of nested body walks in flight on this linkage; caps the walker's stack use.
+    Index currentWalkDepth = 0;
+};
+
 namespace PortableRT
 {
 
@@ -39,14 +53,23 @@ void diagnoseDuplicateSchemaEntries(
     Type* schemaType,
     SourceLoc satisfyingDeclLoc);
 
-/// Checks whether the variable's storage, parameter direction, and initializer allow an RT input.
-void diagnoseInvalidVariableType(DiagnosticSink* sink, VarDeclBase* varDecl);
+/// Checks whether the variable's storage, parameter direction, and initializer allow an RT
+/// input. The visitor is required because resolving a substituted field type can require a
+/// conformance witness that is not checked yet at this use site; the resolver advances the
+/// declaring type on demand.
+void diagnoseInvalidVariableType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    VarDeclBase* varDecl);
 
 /// Diagnoses restricted RT types used as function results.
-void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl);
+void diagnoseInvalidReturnType(SemanticsVisitor* visitor, DiagnosticSink* sink, CallableDecl* decl);
 
 /// Diagnoses restricted RT types used as property results.
-void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* decl);
+void diagnoseInvalidPropertyType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    PropertyDecl* decl);
 
 /// Allows the ray-tracing stage-interface and descriptor AST types in imported library
 /// declarations.
@@ -91,6 +114,25 @@ DeclRef<FuncDecl> findEntryPointByName(
 
 /// Diagnoses stage inputs exposed by a selected native entry-point signature.
 void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink);
+
+/// Checks a generic callable's body for stage-input uses that its declaration-time checking could
+/// not see: `specializedCallableDeclRef` is the callable's checked declaration reference with the
+/// concrete generic arguments bound (a `GenericAppDeclRef` in its substitution chain). The check
+/// silently exits unless the compilation opted into experimental features, a loaded module
+/// declares a stage input, the reference names a callable specialized by a generic application,
+/// the callee's body is not itself mid-check (a recursive generic), and this instantiation was
+/// not already checked — so calling it from every overload completion is cheap for every other
+/// compile. A null or unsubstituted reference also exits without diagnosing. One coverage
+/// limit: a helper imported from a serialized `.slang-module` keeps its signature but not its
+/// body, so forbidden body constructions inside such a helper are not diagnosed here (an
+/// IR-level check is the follow-up; see the tracking discussion on #13686). `instantiationLoc`
+/// names the call or specialization that bound the arguments, and is reported beside any
+/// diagnostic found inside the generic body so the reader can see which concrete call made the
+/// type known.
+void checkSpecializedCallableBody(
+    SemanticsVisitor* visitor,
+    DeclRefBase* specializedCallableDeclRef,
+    SourceLoc instantiationLoc);
 
 /// Sets the public and target names for an entry point selected by its source stage type.
 void initializeEntryPoint(EntryPoint* entryPoint, Name* entryPointName, Type* stageType);

@@ -132,6 +132,10 @@ static DeclRef<FuncDecl> _getStageImplementationFromSubtypeWitness(
     return invokeWitness.getDeclRef().as<FuncDecl>();
 }
 
+// Defined below, after getStageInputKind, which the module scan reads. Returns the check
+// state, or null when this compilation cannot contain a restricted declaration.
+static PortableRTSpecializationCheckState* _getStageInputCheckState(Linkage* linkage);
+
 // Only the library's stage interfaces and input views have restricted value uses. A user struct
 // implementing a stage interface is an ordinary value; identifying it never requires inheritance.
 enum class RestrictedTypeKind
@@ -151,38 +155,157 @@ static RestrictedTypeKind _getDirectRestrictedTypeKind(Type* type)
     return RestrictedTypeKind::None;
 }
 
-// Checks the supplied type and built-in containers without inspecting ordinary struct fields.
-// Consider `struct Box<T> { T value; }`: its field is checked while its type is still T.
-// Validating the field of Box<MissInput<C>> needs separate checking after substitution. Walking
-// every ordinary struct here would force unfinished declarations, e.g. Node's own `Ptr<Node> next`.
+// Resolves a substituted type to the concrete type it names, so a caller can read the
+// declaration the type refers to. Two indirections are ordinary for a type that was written in
+// terms of a generic parameter:
+// 1. An associated type such as `T.Item` with `T = Carrier` substitutes to a lookup through
+//    the conformance witness. Resolving it reads the conformance's witness table, which exists
+//    once the declaring type reaches ReadyForConformances; the use site can be checked before
+//    that state, so advance it on demand here.
+// 2. The concrete member may be a typealias (Carrier.Item is one), so follow `typealias`
+//    declarations to the type they name, the same as an ordinary source type.
+// Each step can expose another lookup (for example an alias to a nested associated type), so
+// the loop applies the same treatment to each result and a chain of any legal depth resolves.
+// A visited set terminates true cycles, which cannot arise from a well-checked declaration:
+// a type that repeats along a resolution chain is chasing its own tail, and the last type it
+// reached is the most resolved form available. A lookup whose witness is not a subtype witness
+// (an optional conformance recorded as a NoneWitness, for example) also stops the loop with
+// the type unresolved; callers then classify it as ordinary, matching what the declaration-time
+// checks concluded while the conformance was unresolved. The return value is the most resolved
+// form of the input, and is null only when the input itself is null: a non-null type comes back
+// as its most resolved form even when a step stops the loop early.
+static Type* _resolveSubstitutedFieldType(SemanticsVisitor* visitor, Type* type)
+{
+    HashSet<Val*> visited;
+    while (type)
+    {
+        if (!visited.add(type))
+            return type;
+        LookupDeclRef* lookup = nullptr;
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            DeclRefBase* declRefBase = declRefType->getDeclRef();
+            lookup = as<LookupDeclRef>(declRefBase);
+        }
+        if (lookup)
+        {
+            auto witness = as<SubtypeWitness>(lookup->getWitness());
+            DeclRef<AggTypeDeclBase> subDeclRefType;
+            if (witness)
+                subDeclRefType = isDeclRefTypeOf<AggTypeDeclBase>(witness->getSub());
+            if (!subDeclRefType)
+                return type;
+            // Advance the declaring type's conformance checking on demand, guarding the same
+            // mid-check window the body walk guards: advancing a declaration whose own checking
+            // is in flight would be answered with a spurious cyclic-reference fatal. In that
+            // window the witness table is simply not ready yet, so the lookup stays unresolved
+            // and classifies as ordinary — the same answer the declaration-time checks had.
+            if (!subDeclRefType.getDecl()->checkState.isBeingChecked())
+            {
+                visitor->ensureDecl(subDeclRefType.getDecl(), DeclCheckState::ReadyForConformances);
+            }
+        }
+        auto resolvedType = as<Type>(type->resolve());
+        if (!resolvedType)
+            return type;
+        type = resolvedType;
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto typeDefDeclRef = declRefType->getDeclRef().as<TypeDefDecl>())
+            {
+                type = getType(type->getASTBuilder(), typeDefDeclRef);
+                continue;
+            }
+        }
+        return type;
+    }
+    return nullptr;
+}
+
+// Checks the supplied type and built-in containers, plus the substituted fields of a
+// specialized generic struct. Consider `struct Box<T> { T value; }`: its field is checked while
+// its type is still T. A later use that supplies the concrete argument, such as a
+// `Box<Carrier>` parameter, reaches this classifier carrying the generic application, and each
+// field's substituted type is available through its member declaration reference — so
+// following those fields restores the storage rule without a separate pending-use list.
 //
-// Arrays and pointers expose already-checked element types, so follow those types here. Fields
-// depending on T or T.Item need validation after specialization, just like constructing T() or
-// T.Item(); that limitation is tracked in shader-slang/slang#13686.
-static RestrictedTypeKind _getRestrictedTypeKind(Type* type)
+// Only a generic application is followed into fields. A concrete, non-generic struct's fields
+// were checked at their own declaration — including any field that stores an input, which is
+// an immediate error there — so walking them again here would only repeat those diagnostics.
+// The recursion terminates on the same boundary: a substituted field that resolves to a
+// concrete non-generic struct is classified directly (its fields were already checked), and
+// an abstract field such as `T value` inside `Box<T>` resolves to another parameterized type
+// that repeats the same reasoning. A visited set stops recursive struct types such as
+// `struct Node { Ptr<Node> next; }` from walking into themselves forever, and a field whose
+// type is not checked yet — for example while the struct's own declaration is still being
+// formed — is skipped: the declaration-time checks own it once the declaration completes.
+static const int kRestrictedTypeWalkDepthLimit = 32;
+static const Index kSpecializationWalkDepthLimit = 32;
+
+static RestrictedTypeKind _getRestrictedTypeKindImpl(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Type*>& visited,
+    int depth)
 {
     type = unwrapModifiedType(type);
     auto kind = _getDirectRestrictedTypeKind(type);
     if (kind != RestrictedTypeKind::None)
         return kind;
 
-    unwrapTypeElements(
-        type,
-        [&](Type* elementType)
-        {
-            kind = _getRestrictedTypeKind(elementType);
-            return kind != RestrictedTypeKind::None;
-        });
-    return kind;
+    // The visited set only stops chains that repeat a type: a struct whose field names its own
+    // generic form with a *growing* argument (struct A<T> { Ptr<A<T[]>> next; }) produces a
+    // distinct interned type at every hop, so a depth budget bounds those instead of the stack.
+    if (depth > kRestrictedTypeWalkDepthLimit)
+        return RestrictedTypeKind::None;
+    if (!visited.add(type))
+        return RestrictedTypeKind::None;
+
+    if (unwrapTypeElements(
+            type,
+            [&](Type* elementType)
+            {
+                kind = _getRestrictedTypeKindImpl(visitor, elementType, visited, depth + 1);
+                return kind != RestrictedTypeKind::None;
+            }))
+        return kind;
+
+    auto declRefType = as<DeclRefType>(type);
+    auto structDeclRef =
+        declRefType ? declRefType->getDeclRef().as<StructDecl>() : DeclRef<StructDecl>();
+    if (!structDeclRef || !SubstitutionSet(structDeclRef).findGenericAppDeclRef())
+        return RestrictedTypeKind::None;
+
+    auto astBuilder = type->getASTBuilder();
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::All))
+    {
+        auto fieldType = _resolveSubstitutedFieldType(visitor, getType(astBuilder, fieldDeclRef));
+        if (!fieldType)
+            continue;
+        kind = _getRestrictedTypeKindImpl(visitor, fieldType, visited, depth + 1);
+        if (kind != RestrictedTypeKind::None)
+            return kind;
+    }
+    return RestrictedTypeKind::None;
+}
+
+static RestrictedTypeKind _getRestrictedTypeKind(SemanticsVisitor* visitor, Type* type)
+{
+    HashSet<Type*> visited;
+    return _getRestrictedTypeKindImpl(visitor, type, visited, 0);
 }
 
 // Reports an invalid use of an RT builtin type: a stage input or the stage interface itself.
 // "RT builtin" means a compiler-recognized library type, not necessarily a C++ BuiltinType.
 // Concrete structs implementing the interface remain ordinary types. Returns true when an error
 // is reported, or false when the supplied type needs no diagnostic.
-static bool _diagnoseInvalidBuiltinTypeUse(DiagnosticSink* sink, Type* type, SourceLoc location)
+static bool _diagnoseInvalidBuiltinTypeUse(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    Type* type,
+    SourceLoc location)
 {
-    switch (_getRestrictedTypeKind(type))
+    switch (_getRestrictedTypeKind(visitor, type))
     {
     case RestrictedTypeKind::StageInterface:
         // The interface itself, e.g. IMissShader, cannot be a runtime value. A concrete struct
@@ -349,9 +472,20 @@ static ConcreteTypePack* _getEntryTypes(ASTBuilder* astBuilder, Type* entryListT
 void diagnoseInputInNativeEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 {
     SLANG_RELEASE_ASSERT(!entryPoint->isStructuralRayTracingEntryPoint());
-    auto diagnoseInputType = [sink](Type* type, SourceLoc location)
+    if (!_getStageInputCheckState(entryPoint->getLinkage()))
+        return;
+    // The entry point may have no owning module, and unlike findEntryPointByName below, the
+    // context needs no imported-module seeding: signature types are fully checked by the time
+    // validation runs, so resolving them never requires a fresh extension lookup.
+    auto sharedContext = SharedSemanticsContext::createForOptionalModule(
+        entryPoint->getLinkage(),
+        entryPoint->getModule(),
+        entryPoint->getLinkage()->m_optionSet.getLanguageVersion(),
+        sink);
+    SemanticsVisitor visitor(sharedContext);
+    auto diagnoseInputType = [&visitor, sink](Type* type, SourceLoc location)
     {
-        if (_getRestrictedTypeKind(type) == RestrictedTypeKind::StageInput)
+        if (_getRestrictedTypeKind(&visitor, type) == RestrictedTypeKind::StageInput)
         {
             sink->diagnose(Diagnostics::StructuralRayTracingInputInNativeEntryPoint{
                 .type = type,
@@ -623,43 +757,57 @@ void diagnoseDuplicateSchemaEntries(
 // A direct input is allowed as a non-uniform in parameter or an initialized non-static local.
 // Globals, fields, and other parameter directions are rejected. The input types have private
 // constructors, so ordinary constructor access checking rejects direct construction.
-void diagnoseInvalidVariableType(DiagnosticSink* sink, VarDeclBase* varDecl)
+// Returns true when the declaration stores an existing input rather than a fresh one: an
+// explicitly non-`uniform` `in` parameter receives one from its caller, and an initialized
+// non-`static` local copies one. Everything else — an uninitialized local, a `static` local,
+// a `uniform` or `out`/`inout` parameter, a global, a field — stores a fresh or aliased input
+// and is rejected. The exemption is keyed on the *direct* input spelling: a wrapped input
+// such as `Optional<MissInput<C>>` is a container the caller cannot hand over, so it stays
+// rejected even in an `in` parameter (tests/ray-tracing-2 pins that case). The concrete
+// declaration check and the post-specialization walk share this one predicate.
+static bool _isAllowedStageInputStorage(VarDeclBase* varDecl)
 {
-    auto type = varDecl->getType();
-    // Recognize the input type itself, such as MissInput<C>. Unknown means it is not a stage input.
-    if (_getDirectStageInputKind(type) != Stage::Unknown)
+    if (auto param = as<ParamDecl>(varDecl))
     {
-        if (auto param = as<ParamDecl>(varDecl))
-        {
-            // checkCallableDeclCommon also calls this helper for function parameters. An in
-            // parameter receives an existing input from its caller; uniform would instead request
-            // a host binding. Uniform parameters and other directions reach the rejection below.
-            if (getExplicitlyDeclaredParamPassingMode(param) == ParamPassingMode::In &&
-                !param->hasModifier<HLSLUniformModifier>())
-                return;
-        }
-        else if (
-            isLocalVar(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>() && varDecl->initExpr)
-        {
-            return;
-        }
+        return getExplicitlyDeclaredParamPassingMode(param) == ParamPassingMode::In &&
+               !param->hasModifier<HLSLUniformModifier>();
     }
+    return isLocalVar(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>() && varDecl->initExpr;
+}
+
+void diagnoseInvalidVariableType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    VarDeclBase* varDecl)
+{
+    if (!_getStageInputCheckState(visitor->getShared()->m_linkage))
+        return;
+    auto type = varDecl->getType();
+    // checkCallableDeclCommon also calls this helper for function parameters. Recognize the
+    // input type itself, such as MissInput<C>; Unknown means it is not a stage input. A direct
+    // input in an allowed storage position passes, and everything else reaches the rejection
+    // below.
+    if (_getDirectStageInputKind(type) != Stage::Unknown && _isAllowedStageInputStorage(varDecl))
+        return;
     // Reject input declarations that were not accepted above: globals, fields, static locals,
     // disallowed parameters, and uninitialized locals such as `MissInput<C> fresh;`. This also
     // checks restricted types inside built-in containers and the stage interface itself.
     // Reaching this call does not imply an error: ordinary types, including concrete stage
     // structs, pass without a diagnostic.
-    _diagnoseInvalidBuiltinTypeUse(sink, type, varDecl->loc);
+    _diagnoseInvalidBuiltinTypeUse(visitor, sink, type, varDecl->loc);
 }
 
 // Rejects results such as `rt::MissInput<C> makeInput();`. Inputs may be received as in parameters
 // and copied locally, but a function cannot promise a new input. Constructors do not have
 // a separately declared return type, so they are not subject to this check.
-void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl)
+void diagnoseInvalidReturnType(SemanticsVisitor* visitor, DiagnosticSink* sink, CallableDecl* decl)
 {
+    if (!_getStageInputCheckState(visitor->getShared()->m_linkage))
+        return;
     if (as<ConstructorDecl>(decl))
         return;
     _diagnoseInvalidBuiltinTypeUse(
+        visitor,
         sink,
         decl->returnType.type,
         decl->returnType.exp ? decl->returnType.exp->loc : decl->loc);
@@ -667,12 +815,364 @@ void diagnoseInvalidReturnType(DiagnosticSink* sink, CallableDecl* decl)
 
 // Rejects a property such as `property rt::MissInput<C> input { get; }`. Payload and record
 // properties have ordinary application-defined result types and remain legal.
-void diagnoseInvalidPropertyType(DiagnosticSink* sink, PropertyDecl* propertyDecl)
+void diagnoseInvalidPropertyType(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    PropertyDecl* propertyDecl)
 {
+    if (!_getStageInputCheckState(visitor->getShared()->m_linkage))
+        return;
     _diagnoseInvalidBuiltinTypeUse(
+        visitor,
         sink,
         propertyDecl->type.type,
         propertyDecl->type.exp ? propertyDecl->type.exp->loc : propertyDecl->loc);
+}
+
+// =============================================================================
+// Checks after a generic's parameters become concrete
+// =============================================================================
+
+// A generic body is checked once while its parameters are still abstract, so a forbidden use the
+// concrete instantiation would expose cannot be diagnosed at the declaration. Consider:
+//
+//     uint manufacture<T : ICarrier>()
+//     {
+//         T.Item local = T.Item();  // Checked with T abstract; MissInput<C> once T = Carrier.
+//     }
+//
+// The walker below re-reads that already-checked body with one instantiation's substitutions
+// applied, and reports the uses the substitution turned into stage-input uses. It reuses the
+// checked expressions' types (their substitution is the same machinery getType applies to
+// member declaration references), and does not rebuild any syntax. Declarations and expressions
+// whose types the substitution leaves untouched are skipped: the declaration-time checks already
+// covered them concretely, so each reported use is one the abstraction introduced.
+class _SpecializedCallableBodyRTChecker
+    : public SemanticsDeclReferenceVisitor<_SpecializedCallableBodyRTChecker>
+{
+    typedef SemanticsDeclReferenceVisitor<_SpecializedCallableBodyRTChecker> Base;
+
+public:
+    _SpecializedCallableBodyRTChecker(
+        SemanticsContext const& outer,
+        SubstitutionSet inSubst,
+        SourceLoc inInstantiationLoc,
+        String inCalleeName)
+        : Base(outer)
+        , subst(inSubst)
+        , instantiationLoc(inInstantiationLoc)
+        , calleeName(inCalleeName)
+    {
+    }
+
+    SubstitutionSet subst;
+    SourceLoc instantiationLoc;
+    String calleeName;
+
+    void visitVarDeclBase(VarDeclBase* varDecl)
+    {
+        _checkVarDecl(varDecl);
+        Base::visitVarDeclBase(varDecl);
+    }
+
+    // The generated DeclVisitor routes a grouped declaration statement ("int a, b;") to the
+    // shared base's visitDeclBase no-op, so without this override the walk would skip every
+    // local a multi-declarator statement declares.
+    void visitDeclGroup(DeclGroup* group)
+    {
+        for (auto decl : group->decls)
+            dispatchIfNotNull(decl);
+    }
+
+    void visitInvokeExpr(InvokeExpr* expr)
+    {
+        // A construction resolves to a constructor invocation, including the synthesized
+        // default constructor the abstract body saw for `T()` and `T.Item()`.
+        auto declRefExpr = as<DeclRefExpr>(expr->functionExpr);
+        if (declRefExpr && as<ConstructorDecl>(declRefExpr->declRef.getDecl()))
+            _checkConstructionExpr(expr);
+        Base::visitInvokeExpr(expr);
+    }
+
+    // The desugared form of `T()` that the constructor-invocation comment refers to.
+    void visitDefaultConstructExpr(DefaultConstructExpr* expr) { _checkConstructionExpr(expr); }
+
+    void visitInitializerListExpr(InitializerListExpr* expr)
+    {
+        // `T t = {}` constructs through the constructor, exactly as the direct spelling of
+        // `MissInput<C> t = {}` does, so the braced form is a construction too.
+        _checkConstructionExpr(expr);
+        Base::visitInitializerListExpr(expr);
+    }
+
+    void visitGenericAppDeclRef(GenericAppDeclRef* genericAppDeclRef)
+    {
+        if (!visitedVals.add(genericAppDeclRef))
+            return;
+        _checkInnerSpecialization(genericAppDeclRef);
+        // Operand zero is the inner declaration (an AST-node operand, so the ValNode filter
+        // skips it); its specialized body is handled by _checkInnerSpecialization above, so
+        // only the argument operands are descended into here.
+        for (Index i = 0; i < genericAppDeclRef->getOperandCount(); i++)
+        {
+            if (genericAppDeclRef->m_operands[i].kind == ValNodeOperandKind::ValNode)
+                dispatchIfNotNull(genericAppDeclRef->getOperand(i));
+        }
+    }
+
+private:
+    // Returns the substituted, resolved form of an abstract checked type, or null when the
+    // substitution does not change it — the caller's signal that the declaration-time checks
+    // already covered this declaration concretely, so the walk skips it. The low-level
+    // substituteImpl is used for its diff output, which the higher-level applyToType does not
+    // expose. Substituted associated types resolve through conformance witness tables that may
+    // not be checked yet at the call site, so the result routes through the same resolver the
+    // storage classifier uses; that resolver returns null only for a null input, so null here
+    // means only "unchanged".
+    Type* _substituteCheckedType(Type* type)
+    {
+        int diff = 0;
+        auto substitutedVal = type->substituteImpl(getASTBuilder(), subst, &diff);
+        if (!diff || !substitutedVal)
+            return nullptr;
+        auto substitutedType = as<Type>(substitutedVal);
+        if (!substitutedType)
+            return nullptr;
+        return _resolveSubstitutedFieldType(this, substitutedType);
+    }
+
+    // Reports pair the use with the note naming the instantiation that made the type concrete,
+    // so a diagnostic added here has its note alongside by construction. One benign edge: two
+    // alias-equivalent instantiations of the same body deduplicate the primary error (same
+    // location) while their notes carry distinct call-site locations, so the second pair can
+    // surface as an extra note without a new error above it.
+    template<typename Diagnostic>
+    void _reportUse(Diagnostic const& diagnostic)
+    {
+        diagnoseOnce(diagnostic);
+        diagnoseOnce(Diagnostics::StructuralRayTracingInputGenericInstantiation{
+            .callee = calleeName,
+            .location = instantiationLoc});
+    }
+
+    // Applies the concrete storage policy (_isAllowedStageInputStorage, shared with the
+    // declaration-time check) to the type this instantiation revealed for an abstract `T`
+    // declaration. A restricted type that is not a direct input — a container holding one, or
+    // the stage interface itself — never qualifies for the exemption, exactly as in concrete
+    // code. The interface kind reports the runtime-value error the concrete path reports;
+    // storage kinds report the storage error.
+    void _checkVarDecl(VarDeclBase* varDecl)
+    {
+        // A null type is error recovery: a prior diagnostic left this declaration untyped.
+        auto declaredType = varDecl->getType();
+        if (!declaredType)
+            return;
+        auto substitutedType = _substituteCheckedType(declaredType);
+        if (!substitutedType)
+            return;
+        // Switch on the classified kind, as the concrete path does, so a container holding the
+        // stage interface reports the runtime-value error rather than a storage message that
+        // would read as conditionally legal. The storage allowance stays keyed on the *direct*
+        // input spelling, exactly as in the concrete predicate: a wrapped input is a container
+        // the caller cannot hand over, so it is rejected even in an allowed position.
+        auto kind = _getRestrictedTypeKind(this, substitutedType);
+        if (kind == RestrictedTypeKind::None)
+            return;
+
+        if (_getDirectStageInputKind(substitutedType) != Stage::Unknown &&
+            _isAllowedStageInputStorage(varDecl))
+            return;
+
+        if (kind == RestrictedTypeKind::StageInterface)
+        {
+            _reportUse(Diagnostics::StructuralRayTracingStageRuntimeValue{
+                .type = substitutedType,
+                .location = varDecl->loc});
+            return;
+        }
+        _reportUse(Diagnostics::StructuralRayTracingInputStorage{
+            .type = substitutedType,
+            .location = varDecl->loc});
+    }
+
+    // A construction whose substituted result is a stage input would manufacture an input the
+    // invocation never supplied. The direct spelling fails on the private constructor's
+    // access check; through a generic parameter the constructor was resolved abstractly, so
+    // the use is reported here.
+    void _checkConstructionExpr(Expr* expr)
+    {
+        // A null type is error recovery: a prior diagnostic left this expression untyped.
+        auto resultType = expr->type.type;
+        if (!resultType)
+            return;
+        auto substitutedType = _substituteCheckedType(resultType);
+        if (!substitutedType || _getDirectStageInputKind(substitutedType) == Stage::Unknown)
+            return;
+        _reportUse(Diagnostics::StructuralRayTracingInputConstruction{
+            .type = substitutedType,
+            .location = expr->loc});
+    }
+
+    // A call inside the generic body may itself be generic. The substitution decides whether
+    // the callee's arguments are already the ones it will be checked with: an application the
+    // outer substitution leaves unchanged was completed (and checked) at its own site, except
+    // for one shape — a recursive call whose arguments were concrete during the callee's own
+    // abstract body check, which was skipped mid-check and removed from the dedup set so this
+    // walk can pick it up. The per-specialization dedup set is therefore the sole re-entry
+    // gate; it also bounds how far a chain of distinct specializations can nest, together
+    // with the walk-depth cap in the entry function.
+    void _checkInnerSpecialization(GenericAppDeclRef* genericAppDeclRef)
+    {
+        int diff = 0;
+        auto specialized = static_cast<DeclRefBase*>(
+            genericAppDeclRef->substituteImpl(getASTBuilder(), subst, &diff));
+        if (!specialized)
+            return;
+        SourceLoc innerLoc =
+            sourceLocStack.getCount() ? sourceLocStack.getLast() : instantiationLoc;
+        checkSpecializedCallableBody(this, specialized, innerLoc);
+    }
+};
+
+// Returns true when the declaration tree contains one of the ray-tracing stage-input
+// structures (MissInput, ClosestHitInput, and their siblings). Only a declaration with one of
+// these annotations classifies as a restricted type, so nothing in a compilation whose loaded
+// modules declare none can ever be diagnosed by these checks.
+static bool _declTreeDeclaresStageInputs(Decl* decl)
+{
+    // A generic declaration holds its parameters and constraints as members, but its inner
+    // declaration — where a generic struct's own annotations live — is not a member, so follow
+    // it explicitly.
+    if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        if (auto inner = getInner(genericDecl))
+        {
+            if (_declTreeDeclaresStageInputs(inner))
+                return true;
+        }
+    }
+    if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+    {
+        if (getStageInputKind(aggTypeDecl) != Stage::Unknown)
+            return true;
+    }
+    if (auto containerDecl = as<ContainerDecl>(decl))
+    {
+        for (auto member : containerDecl->getDirectMemberDecls())
+        {
+            if (_declTreeDeclaresStageInputs(member))
+                return true;
+        }
+    }
+    return false;
+}
+
+// Returns the per-compilation check state, creating it on first use.
+static PortableRTSpecializationCheckState* _getCheckState(Linkage* linkage)
+{
+    auto& state = linkage->m_portableRTSpecializationCheckState;
+    if (!state)
+        state = new PortableRTSpecializationCheckState();
+    return state;
+}
+
+// Returns the per-compilation check state when this compilation can contain a restricted
+// declaration, or null when it cannot, so every entry point below shares one gate:
+// 1. The stage-input module is experimental, so a compilation without the experimental opt-in
+//    cannot have loaded it. The opt-in is broader than this feature (every standard-module
+//    build passes it too), so it is only the cheap first filter.
+// 2. Only a loaded stage-input declaration classifies as a restricted type, so a compilation
+//    whose modules declare none has nothing for these checks to report. The loaded-module
+//    scan runs once per load-count change; the count is a sound cache key because modules
+//    are appended to the linkage's list and never removed, and once a stage input is seen the
+//    answer stays true for the rest of the compilation.
+static PortableRTSpecializationCheckState* _getStageInputCheckState(Linkage* linkage)
+{
+    SLANG_ASSERT(linkage);
+    if (!linkage->m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+        return nullptr;
+    auto state = _getCheckState(linkage);
+    if (state->stageInputsLoaded)
+        return state;
+    if (state->loadedModuleCountAtScan != linkage->loadedModulesList.getCount())
+    {
+        state->loadedModuleCountAtScan = linkage->loadedModulesList.getCount();
+        state->stageInputsLoaded = false;
+        for (auto loadedModule : linkage->loadedModulesList)
+        {
+            auto moduleDecl = loadedModule ? loadedModule->getModuleDecl() : nullptr;
+            if (moduleDecl && _declTreeDeclaresStageInputs(moduleDecl))
+            {
+                state->stageInputsLoaded = true;
+                break;
+            }
+        }
+    }
+    return state->stageInputsLoaded ? state : nullptr;
+}
+
+void checkSpecializedCallableBody(
+    SemanticsVisitor* visitor,
+    DeclRefBase* specializedCallableDeclRef,
+    SourceLoc instantiationLoc)
+{
+    if (!specializedCallableDeclRef)
+        return;
+
+    auto state = _getStageInputCheckState(visitor->getShared()->m_linkage);
+    if (!state)
+        return;
+
+    SubstitutionSet subst(specializedCallableDeclRef);
+    if (!subst.findGenericAppDeclRef())
+        return;
+
+    auto callableDecl = as<CallableDecl>(specializedCallableDeclRef->getDecl());
+    if (!callableDecl)
+        return;
+
+    // Terminology: a *specialization* is the substituted declaration reference this function
+    // receives, and an *instantiation* is a concrete call or -specialize binding one; each
+    // instantiation corresponds to exactly one specialization, so "checked once per
+    // compilation" means the specialization is recorded here, whatever name it goes by below.
+    // One specialization is checked once per compilation, however many call sites complete it.
+    // Recording it before walking also stops a recursive generic — a body that calls another
+    // instantiation of itself — from cycling.
+    if (!state->checkedSpecializationDeclRefs.add(specializedCallableDeclRef))
+        return;
+
+    // The walk reads the checked body, and the call that completed this candidate may sit
+    // inside the callee's own abstract body check — a recursive generic. A declaration whose
+    // body is still being checked cannot be re-entered (the checker answers that state with
+    // a fatal cyclic-reference error), so skip this completion and let the recursion's own
+    // later completion run the walk once the body pass has finished.
+    if (callableDecl->checkState.isBeingChecked())
+    {
+        state->checkedSpecializationDeclRefs.remove(specializedCallableDeclRef);
+        return;
+    }
+
+    // A chain of distinct specializations nests one walker frame per link; the dedup set
+    // stops cycles but not depth. Bound in-flight walks, dropping the dedup record so a
+    // later, shallower completion of the same specialization can still run the walk.
+    if (state->currentWalkDepth >= kSpecializationWalkDepthLimit)
+    {
+        state->checkedSpecializationDeclRefs.remove(specializedCallableDeclRef);
+        return;
+    }
+    state->currentWalkDepth++;
+
+    // The walk reads the checked body; the declaration's own checking finishes it if the call
+    // site appears before the body's checks have run.
+    visitor->ensureDecl(callableDecl, DeclCheckState::DefinitionChecked);
+
+    _SpecializedCallableBodyRTChecker checker(
+        *visitor,
+        subst,
+        instantiationLoc,
+        getText(callableDecl->getName()));
+    checker.dispatchIfNotNull(callableDecl);
+    state->currentWalkDepth--;
 }
 
 } // namespace PortableRT

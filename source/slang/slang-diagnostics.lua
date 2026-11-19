@@ -1109,6 +1109,20 @@ err(
 )
 
 err(
+    "structural-ray-tracing-input-construction",
+    20027,
+    "fresh construction of a structural ray-tracing stage input",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' cannot be constructed here; it must come from the current invocation" }
+)
+
+standalone_note(
+    "structural-ray-tracing-input-generic-instantiation",
+    -1,
+    "in the instantiation of '~callee'",
+    span { loc = "location" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
