@@ -1259,14 +1259,25 @@ struct Preprocessor
     /// A stack of "active" input files
     InputFile* m_currentInputFile = nullptr;
 
-    // TODO: We could split the macro environment into a `globalEnv`
-    // and a `superGlobalEnv` such that built-in macros like `__FILE__`
-    // and `__LINE__` are defined in the super-global environment so
-    // that they can be shadowed by user-defined macros but will again
-    // be available after an `#undef`.
+    /// Definitions of built-in macros like `__FILE__` and `__LINE__`.
+    ///
+    /// Built-in macros live in their own environment, which `globalEnv` reaches
+    /// through `Environment::parent`, so a user `#define` shadows a built-in
+    /// inside `globalEnv` and a later `#undef` removes only the shadow, leaving
+    /// the built-in available again. The asymmetry between the directives that
+    /// target a built-in name is intended: a `#define` warns, because the
+    /// shadow hides something the user may not expect to be hidden, while an
+    /// `#undef` with no shadow in effect stays silent, because the built-in
+    /// remains defined and nothing observable changes.
+    Environment superGlobalEnv;
 
-    /// Currently-defined macros
+    /// Currently-defined macros, including user-level shadows of built-in macros
     Environment globalEnv;
+
+    /// Constructing a preprocessor links `globalEnv` to `superGlobalEnv`, so
+    /// every instance has the two-level macro environment the directive
+    /// handlers rely on.
+    Preprocessor() { globalEnv.parent = &superGlobalEnv; }
 
     /// A pre-allocated token that can be returned to represent end-of-input situations.
     Token endOfFileToken;
@@ -1422,7 +1433,9 @@ InputFile::~InputFile()
 //
 
 
-// Find the currently-defined macro of the given name, or return NULL
+// Find the currently-defined macro of the given name, or return NULL.
+// The search walks outward through `parent` environments, so a definition in
+// an inner environment shadows one in an outer environment.
 static MacroDefinition* LookupMacro(Environment* environment, Name* name)
 {
     for (Environment* e = environment; e; e = e->parent)
@@ -3863,12 +3876,15 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
         return;
     Name* name = nameToken.getName();
 
-    MacroDefinition* oldMacro = LookupMacro(&context->m_preprocessor->globalEnv, name);
-    if (oldMacro)
+    MacroDefinition* oldMacro = NULL;
+    bool oldMacroIsUserDefined =
+        context->m_preprocessor->globalEnv.macros.tryGetValue(name, oldMacro);
+    MacroDefinition* visibleMacro = LookupMacro(&context->m_preprocessor->globalEnv, name);
+    if (visibleMacro)
     {
         auto sink = GetSink(context);
 
-        if (oldMacro->isBuiltin())
+        if (visibleMacro->isBuiltin())
         {
             sink->diagnose(Diagnostics::BuiltinMacroRedefinition{
                 .name = name->text,
@@ -3879,10 +3895,19 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             sink->diagnose(Diagnostics::MacroRedefinition{
                 .name = name,
                 .location = nameToken.loc,
-                .originalLocation = oldMacro->getLoc()});
+                .originalLocation = visibleMacro->getLoc()});
         }
 
-        delete oldMacro;
+        // `visibleMacro` is the definition this `#define` would override: the
+        // user-level one if any exists (the same macro as `oldMacro`),
+        // otherwise the built-in in `superGlobalEnv`. Only a user-level
+        // definition is replaced here; a built-in is never deleted, so a later
+        // `#undef` removes the shadow and the built-in becomes visible again.
+        if (oldMacroIsUserDefined)
+        {
+            context->m_preprocessor->globalEnv.macros.remove(name);
+            delete oldMacro;
+        }
     }
 
     MacroDefinition* macro = new MacroDefinition();
@@ -4075,17 +4100,23 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     Name* name = nameToken.getName();
 
     Environment* env = &context->m_preprocessor->globalEnv;
-    MacroDefinition* macro = LookupMacro(env, name);
-    if (macro != NULL)
+    MacroDefinition* macro = NULL;
+    if (env->macros.tryGetValue(name, macro))
     {
-        // name was defined, so remove it
+        // A user-level definition exists, so remove it; a built-in underneath
+        // it, if any, becomes visible again.
         env->macros.remove(name);
 
         delete macro;
     }
+    else if (LookupMacro(&context->m_preprocessor->superGlobalEnv, name))
+    {
+        // A built-in with no user-level shadow in effect stays defined, so the
+        // `#undef` is a silent no-op and the built-in keeps expanding.
+    }
     else
     {
-        // name wasn't defined
+        // No definition at any level.
         GetSink(context)->diagnose(
             Diagnostics::MacroNotDefined{.name = name->text, .location = nameToken.loc});
     }
@@ -4968,6 +4999,9 @@ static void DefineMacro(Preprocessor* preprocessor, String const& key, String co
     macro->nameAndLoc.name = keyName;
     macro->nameAndLoc.loc = keyView->getRange().begin;
 
+    // Command-line defines are user-level definitions: this lookup sees only
+    // `globalEnv`, so `-D` of a built-in name shadows the built-in rather than
+    // deleting it, and the built-in returns after a later `#undef`.
     MacroDefinition* oldMacro = NULL;
     if (preprocessor->globalEnv.macros.tryGetValue(keyName, oldMacro))
     {
@@ -5167,7 +5201,7 @@ TokenList preprocessSource(
             macro->nameAndLoc = NameLoc(name);
             macro->ops.add(op);
 
-            preprocessor.globalEnv.macros[name] = macro;
+            preprocessor.superGlobalEnv.macros[name] = macro;
         }
     }
 

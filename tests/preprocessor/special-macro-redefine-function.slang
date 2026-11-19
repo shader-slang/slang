@@ -16,4 +16,6 @@ __FILE__(There)
 
 __FILE__
 
-// CHECK: "Is" "Anybody" "Is" There __FILE__
+// The last item is `__FILE__` expanding to this file's invocation-relative
+// path, as the test harness invokes the compiler from the repository root.
+// CHECK: "Is" "Anybody" "Is" There "tests/preprocessor/special-macro-redefine-function.slang"

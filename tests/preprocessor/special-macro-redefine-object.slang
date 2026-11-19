@@ -1,7 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag,exit-code=0):-E
-// TODO(#14354): This line is disabled, because the preprocessor does not restore a builtin macro
-// after `#undef`. The last `__LINE__` is emitted as it is, and `CHECK: 14` fails.
-//DISABLE_TEST:SIMPLE(filecheck=CHECK):-E
+//TEST:SIMPLE(filecheck=CHECK):-E
 
 __LINE__
 
@@ -15,6 +13,7 @@ __LINE__
 
 __LINE__
 
-// CHECK: 6
+// CHECK: standard output = {
+// CHECK: 4
 // CHECK: "Hello"
-// CHECK: 16
+// CHECK: 14
