@@ -716,6 +716,9 @@ struct WorkgroupUniformLoadContext
         HashSet<IRInst*> visited;
         List<IRInst*> values;
         List<IRBlock*> blocks;
+        // Pointer parameters of the callee whose pointee on entry must be uniform. Each one maps
+        // to what the call's argument points to (see `requireUniformPointee`).
+        List<UInt> pointeeParams;
 
         void addValue(IRInst* value)
         {
@@ -727,7 +730,53 @@ struct WorkgroupUniformLoadContext
             if (block && visited.add(block))
                 blocks.add(block);
         }
+        void addPointeeParam(UInt paramIndex)
+        {
+            if (!pointeeParams.contains(paramIndex))
+                pointeeParams.add(paramIndex);
+        }
     };
+
+    // Returns true if the value that the pointer parameter `param` points to on entry to its
+    // function can still be there at `reader`: some path from the entry to `reader` passes no
+    // store to the whole pointee. A store through an element or field address, or a call that is
+    // passed the pointer, may leave part of the entry value, so it does not count.
+    static bool canEntryValueReach(IRParam* param, IRInst* reader)
+    {
+        auto readerBlock = as<IRBlock>(reader->getParent());
+        auto code = as<IRGlobalValueWithCode>(param->getParent()->getParent());
+        if (!readerBlock || !code)
+            return true;
+        HashSet<IRBlock*> visited;
+        List<IRBlock*> stack;
+        stack.add(code->getFirstBlock());
+        visited.add(code->getFirstBlock());
+        while (stack.getCount())
+        {
+            auto block = stack.getLast();
+            stack.removeLast();
+            bool killed = false;
+            for (auto inst : block->getChildren())
+            {
+                if (inst == reader)
+                    return true;
+                auto store = as<IRStore>(inst);
+                if (store && store->getPtr() == param)
+                {
+                    killed = true;
+                    break;
+                }
+            }
+            if (killed)
+                continue;
+            for (auto successor : block->getSuccessors())
+            {
+                if (visited.add(successor))
+                    stack.add(successor);
+            }
+        }
+        return false;
+    }
 
     // Callees that `traceCallee` is following, so that a recursive call is not followed again.
     HashSet<IRInst*> activeCallees;
@@ -792,8 +841,16 @@ struct WorkgroupUniformLoadContext
 
         Index blockIndex = 0;
         Index valueIndex = 0;
-        while (blockIndex < slice.blocks.getCount() || valueIndex < slice.values.getCount())
+        Index pointeeIndex = 0;
+        while (blockIndex < slice.blocks.getCount() || valueIndex < slice.values.getCount() ||
+               pointeeIndex < slice.pointeeParams.getCount())
         {
+            if (pointeeIndex < slice.pointeeParams.getCount())
+            {
+                requireUniformPointee(call, slice.pointeeParams[pointeeIndex++], outer);
+                continue;
+            }
+
             // The branches that decide whether the block runs must be uniform. This stays inside
             // the callee: the value does not need the call to be in uniform control flow.
             if (blockIndex < slice.blocks.getCount())
@@ -846,7 +903,13 @@ struct WorkgroupUniformLoadContext
                 else if (
                     getFunctionParamIndex(root, pointerParamIndex) &&
                     root->getParent() == firstBlock)
-                    requireUniformPointee(call, pointerParamIndex, outer);
+                {
+                    // The callee's own writes through the parameter that can reach the load, and
+                    // what the argument points to if the load can still read the value on entry.
+                    forEachWrite(root, load, addValue, addBlock, followCallWrite);
+                    if (canEntryValueReach(as<IRParam>(root), load))
+                        slice.addPointeeParam(pointerParamIndex);
+                }
                 else
                     require(load);
                 continue;
@@ -872,12 +935,18 @@ struct WorkgroupUniformLoadContext
         return true;
     }
 
+    // Pointer parameters whose callers `requireUniformPointee` has followed outside a callee
+    // being followed, so that a recursive forwarding call is not followed again.
+    HashSet<IRInst*> followedPointeeParams;
+
     // A load through the pointer parameter `paramIndex` of a function reads the memory that the
     // call's argument points to. When that is a local variable of the caller, follow its writes
-    // that can reach the call, as for a load of the variable. The values go to `outer` when the
-    // call is inside a callee being followed, and to `require` otherwise. A groupshared variable
-    // passed by reference is not followed: rewriting it would need a `workgroupUniformLoad` of
-    // the argument at the call, not of the load in the callee.
+    // that can reach the call, as for a load of the variable. When it is a pointer parameter of
+    // the caller, which forwards its own argument, also follow the caller's writes through it,
+    // and then what its callers pass if the value on entry can reach the call. The values go to
+    // `outer` when the call is inside a callee being followed, and to `require` otherwise. A
+    // groupshared variable passed by reference is not followed: rewriting it would need a
+    // `workgroupUniformLoad` of the argument at the call, not of the load in the callee.
     void requireUniformPointee(IRCall* call, UInt paramIndex, CallSlice* outer)
     {
         if (paramIndex >= call->getArgCount())
@@ -890,7 +959,9 @@ struct WorkgroupUniformLoadContext
                 require(value);
         };
         auto argRoot = getAddressRoot(call->getArg(paramIndex), requireValue);
-        if (!as<IRVar>(argRoot))
+        UInt forwardedParamIndex = 0;
+        bool isForwarded = getFunctionParamIndex(argRoot, forwardedParamIndex);
+        if (!as<IRVar>(argRoot) && !isForwarded)
             return;
         forEachWrite(
             argRoot,
@@ -904,6 +975,22 @@ struct WorkgroupUniformLoadContext
                     requireUniformBranchChoice(block);
             },
             [&](IRCall* writer, UInt arg) { traceCallee(writer, Int(arg), outer); });
+        if (!isForwarded || !canEntryValueReach(as<IRParam>(argRoot), call))
+            return;
+        if (outer)
+        {
+            // The caller is the callee being followed, so its parameter stands for the argument
+            // of the call being followed.
+            outer->addPointeeParam(forwardedParamIndex);
+            return;
+        }
+        if (!followedPointeeParams.add(argRoot))
+            return;
+        auto caller = as<IRGlobalValueWithCode>(argRoot->getParent()->getParent());
+        forEachCallOf(
+            caller,
+            [&](IRCall* callerCall)
+            { requireUniformPointee(callerCall, forwardedParamIndex, nullptr); });
     }
 
     // Returns the index of `param` if it is a parameter of the first block of a function.
@@ -951,6 +1038,16 @@ struct WorkgroupUniformLoadContext
         UInt paramIndex = 0;
         if (getFunctionParamIndex(root, paramIndex))
         {
+            // A pointer parameter: the function's own writes through it that can reach the load,
+            // and what each call passes if the load can still read the value on entry.
+            forEachWrite(
+                root,
+                load,
+                requireValue,
+                [&](IRBlock* block) { requireUniformBranchChoice(block); },
+                [&](IRCall* call, UInt arg) { traceCallee(call, Int(arg), nullptr); });
+            if (!canEntryValueReach(as<IRParam>(root), load))
+                return;
             auto code = as<IRGlobalValueWithCode>(root->getParent()->getParent());
             forEachCallOf(
                 code,
