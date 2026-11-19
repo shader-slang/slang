@@ -287,17 +287,28 @@ bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
     return false;
 }
 
+/// Return the user semantic that gives `inst` a `@location`, or null when `inst` is a built-in
+/// value or has no user semantic.
+///
+/// Both `@location` and `@interpolate` emission use this test, because WGSL only permits
+/// `@interpolate` on user-defined stage inputs and outputs, which are exactly the declarations that
+/// carry `@location`.
+static IRSemanticDecoration* findLocationSemantic(IRInst* inst)
+{
+    if (inst->findDecoration<IRTargetSystemValueDecoration>())
+        return nullptr;
+    return inst->findDecoration<IRSemanticDecoration>();
+}
+
 void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
 {
-    if (!maybeEmitSystemSemantic(inst))
+    if (maybeEmitSystemSemantic(inst))
+        return;
+    if (auto semanticDecoration = findLocationSemantic(inst))
     {
-        if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
-        {
-            m_writer->emit("@location(");
-            m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
-            m_writer->emit(")");
-            return;
-        }
+        m_writer->emit("@location(");
+        m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
+        m_writer->emit(")");
     }
 }
 
@@ -1836,6 +1847,19 @@ void WGSLSourceEmitter::emitInterpolationModifiersImpl(
     IRType* /* valueType */,
     IRVarLayout* /* layout */)
 {
+    // A struct with `nointerpolation` fields is also emitted as an ordinary value type when it is
+    // used away from the stage boundary. Consider a fragment entry point that forwards its varyings
+    // to a callable:
+    //
+    //     struct Varyings { float4 position : SV_Position; nointerpolation uint id : ID; }
+    //     float fs(Varyings v, uniform F callback) : SV_Target0 { return callback(v); }
+    //
+    // Varying legalization packs the entry-point input into a new struct whose fields carry the
+    // semantics, but `F::operator()` still takes the original `Varyings`. That struct's fields keep
+    // the source interpolation mode and have no `@location`, so WGSL would reject `@interpolate`.
+    if (!findLocationSemantic(varInst))
+        return;
+
     char const* interpolationType = nullptr;
     char const* interpolationSampling = nullptr;
     for (auto dd : varInst->getDecorations())

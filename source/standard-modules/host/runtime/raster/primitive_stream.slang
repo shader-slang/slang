@@ -139,13 +139,13 @@ public struct VertexPrimitiveStream<
             __describeRasterState<State, uint(AssemblyTopology)>(),
             State.ColorTargets.describe()));
         __makeGraphicsPipeline(
-            __primitiveVertex<Varyings, Vertex>,
-            __primitiveFragment<Varyings, Color.ClearValue, Fragment>,
+            primitiveVertexStage<Varyings, Vertex>,
+            primitiveFragmentStage<Varyings, Color.ClearValue, Fragment>,
             description)(
             targets.colors._0,
             primitives.source.assemble(primitives.instanceCount, primitives.firstInstance),
             parameters.lower(),
-            __VertexBindings<Vertex>(
+            PrimitiveVertexBindings<Vertex>(
                 vertexShader,
                 primitives.source.getVertexOffset(),
                 primitives.firstInstance),
@@ -167,14 +167,14 @@ public struct VertexPrimitiveStream<
                 __describeRasterState<State, uint(AssemblyTopology)>(),
                 State.ColorTargets.describe()));
         __makeGraphicsPipeline(
-            __primitiveVertex<Varyings, Vertex>,
-            __primitiveFragment<Varyings, Color.ClearValue, Fragment>,
+            primitiveVertexStage<Varyings, Vertex>,
+            primitiveFragmentStage<Varyings, Color.ClearValue, Fragment>,
             description)(
             targets.colors._0,
             targets.depth,
             primitives.source.assemble(primitives.instanceCount, primitives.firstInstance),
             parameters.lower(),
-            __VertexBindings<Vertex>(
+            PrimitiveVertexBindings<Vertex>(
                 vertexShader,
                 primitives.source.getVertexOffset(),
                 primitives.firstInstance),
@@ -195,7 +195,9 @@ __GraphicsPipelineDesc<
     return { data };
 }
 
-struct __VertexBindings<Vertex>
+// The bindings type and both stage adapters reach generated shader code. WGSL rejects identifiers
+// that begin with two underscores, so these names avoid the `__` prefix used for host-only helpers.
+struct PrimitiveVertexBindings<Vertex>
 {
     Vertex shader;
     uint vertexOffset;
@@ -203,19 +205,21 @@ struct __VertexBindings<Vertex>
 }
 
 [shader("vertex")]
-Varyings __primitiveVertex<Varyings, Vertex : IFunc<Varyings, VertexInvocation>>(
+Varyings primitiveVertexStage<Varyings, Vertex : IFunc<Varyings, VertexInvocation>>(
     uint vertexID: SV_VertexID,
     uint instanceID: SV_InstanceID,
-    uniform __VertexBindings<Vertex> bindings)
+    uniform PrimitiveVertexBindings<Vertex> bindings)
 {
-    // These Slang system values exclude the base offsets on the shader-pulling path. The domain
-    // exposes effective IDs, so the adapter adds the source offset and first instance once.
+    // HGVM issues every draw with zero native vertex and instance offsets, because backends disagree
+    // on whether these system values include them. The IDs therefore start at zero (or at the raw
+    // index value), and the adapter adds the source offset and first instance exactly once to
+    // expose effective IDs.
     return bindings.shader(
         VertexInvocation(vertexID + bindings.vertexOffset, instanceID + bindings.firstInstance));
 }
 
 [shader("fragment")]
-Output __primitiveFragment<Varyings, Output, Fragment : IFunc<Output, Varyings>>(
+Output primitiveFragmentStage<Varyings, Output, Fragment : IFunc<Output, Varyings>>(
     Varyings varyings,
     uniform Fragment fragment)
     : SV_Target0

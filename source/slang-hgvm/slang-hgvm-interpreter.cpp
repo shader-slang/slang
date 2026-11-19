@@ -12245,8 +12245,6 @@ void DeviceState::executeGraphicsCall(
             offsetof(GraphicsDrawValue, indices));
         if (draw.first > indices->elementCount || draw.count > indices->elementCount - draw.first)
             fail("HGVM index range exceeds its index buffer");
-        if (draw.baseVertex < 0)
-            fail("HGVM negative base vertices require signed RHI indexed-draw arguments");
     }
     else if (draw.first > UINT32_MAX - (draw.count - 1))
         fail("HGVM vertex range overflows uint32 IDs");
@@ -12306,20 +12304,25 @@ void DeviceState::executeGraphicsCall(
     renderState.scissorRects[0] = parameters.scissor;
     renderState.scissorRectCount = 1;
     renderState.stencilRef = parameters.stencilRef;
+    // Draws fetch no vertex buffers, so the native first vertex, base vertex, and first instance
+    // would only change the vertex and instance IDs that the shader sees. Backends disagree on
+    // those IDs: SPIR-V and D3D12 exclude the offsets, while WGSL `vertex_index` and
+    // `instance_index` include them and offer no base value to subtract. We therefore always draw
+    // with zero offsets, and the raster vertex adapter adds the source's vertex offset and the
+    // first instance exactly once. A negative base vertex then wraps in that uint addition and
+    // yields the expected effective ID, so it needs no signed native argument.
     rhi::DrawArguments arguments;
     arguments.vertexCount = draw.count;
     arguments.instanceCount = draw.instanceCount;
-    arguments.startInstanceLocation = draw.firstInstance;
+    arguments.startInstanceLocation = 0;
+    arguments.startVertexLocation = 0;
     if (indices)
     {
         renderState.indexBuffer = {indices->resource, 0};
         renderState.indexFormat = rhi::IndexFormat::Uint32;
         arguments.startIndexLocation = draw.first;
-        arguments.startVertexLocation = uint32_t(draw.baseVertex);
         pendingBatch.holds.buffers.add(indices->resource);
     }
-    else
-        arguments.startVertexLocation = draw.first;
     pass->setRenderState(renderState);
     if (indices)
         pass->drawIndexed(arguments);
