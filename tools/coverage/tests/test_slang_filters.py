@@ -58,17 +58,17 @@ class SlangcExcludePatternsTests(unittest.TestCase):
 
     def test_language_server_excluded(self):
         self.assertTrue(
-            self._excluded("source/slang/slang-language-server.cpp")
+            self._excluded("source/slang/language-server/slang-language-server.cpp")
         )
         self.assertTrue(
-            self._excluded("source/slang/slang-language-server-protocol.h")
+            self._excluded("source/slang/language-server/slang-language-server-completion.h")
         )
 
     def test_ast_decl_headers_excluded(self):
-        self.assertTrue(self._excluded("source/slang/slang-ast-expr.h"))
-        self.assertTrue(self._excluded("source/slang/slang-ast-modifier.h"))
+        self.assertTrue(self._excluded("source/slang/ast/slang-ast-expr.h"))
+        self.assertTrue(self._excluded("source/slang/ast/slang-ast-modifier.h"))
         # The .cpp counterpart is kept.
-        self.assertFalse(self._excluded("source/slang/slang-ast-modifier.cpp"))
+        self.assertFalse(self._excluded("source/slang/ast/slang-ast-modifier.cpp"))
 
     def test_compiler_files_kept(self):
         self.assertFalse(self._excluded("source/slang/slang-check.cpp"))

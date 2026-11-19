@@ -168,8 +168,8 @@ end
 -- Main program
 local function main(args)
 	local command = args[1] or "check"
-	local inst_file = args[2] or "source/slang/slang-ir-insts.lua"
-	local stable_file = args[3] or "source/slang/slang-ir-insts-stable-names.lua"
+	local inst_file = args[2] or "source/slang/ir/slang-ir-insts.lua"
+	local stable_file = args[3] or "source/slang/ir/slang-ir-insts-stable-names.lua"
 
 	-- Validate command
 	local valid_commands = { check = true, update = true }
