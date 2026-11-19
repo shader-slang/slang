@@ -8,6 +8,8 @@ const { chromium } = createRequire(path.join(repo, "javascript/docs-editor/packa
 const docs = path.join(repo, "docs/heterogeneity");
 const runtime = path.resolve(repo, process.env.HSLANG_DOCS_RUNTIME_DIR || "javascript/docs-runtime");
 const comparison = process.argv.includes("--ggx-comparison");
+// The finished scene runs the tutorial's own render-final-scene example to its sample limit.
+const finalScene = process.argv.includes("--final-scene");
 const { sources } = require("./sdf-tutorial-sources.cjs").readSdfTutorial();
 sources["preview.slang"] = `import slang.runtime; import "environment-map"; import display;
     [host] void main(Window w) {
@@ -42,12 +44,14 @@ if (comparison) sources["preview.slang"] = `import slang.runtime; import "enviro
                 state, 1u, tracing, 0.002, 0.004);
         }, 1.0, 32u, 4096u);
     }`;
+if (finalScene) sources["preview.slang"] = sources["render-final-scene.slang"];
+const [canvasWidth, canvasHeight] = finalScene ? [1280, 720] : [comparison ? 1536 : 1024, 512];
 
 const server = http.createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
     if (pathname === "/") {
         response.setHeader("Content-Type", "text/html");
-        response.end(`<!doctype html><canvas width="${comparison ? 1536 : 1024}" height="512"></canvas>`);
+        response.end(`<!doctype html><canvas width="${canvasWidth}" height="${canvasHeight}"></canvas>`);
         return;
     }
     const root = pathname.startsWith("/assets/") ? runtime : docs;
@@ -72,7 +76,7 @@ const server = http.createServer((request, response) => {
             const { MemorySlangFileSystem, OverlaySlangFileSystem } = await import("/assets/slangvm/src/file-system.js");
             const { preloadRuntime } = await import("/scripts/snippet-filesystem.js");
             const mappingURL = new URL("/scripts/snippet-files.json", location.href);
-            const mapping = (await (await fetch(mappingURL)).json()).environment;
+            const mapping = (await (await fetch(mappingURL)).json())["render-environment"];
             const files = Object.fromEntries(Object.entries(mapping).map(([name, url]) => [name, new URL(url, mappingURL).href]));
             const { preloadedFiles } = await preloadRuntime(files);
             let result;
@@ -96,11 +100,12 @@ const server = http.createServer((request, response) => {
             try {
                 const window = await vm.createWindow(document.querySelector("canvas"));
                 await (await vm.load("preview.slang")).main(window);
-                if (!result) throw new Error("The environment preview did not present an image");
+                if (!result) throw new Error("The preview did not present an image");
                 return result;
             } finally { await vm.close(); }
         }, { sources, comparison });
-        const output = comparison ? "sdf-ggx-roughness.png" : "sdf-environment.png";
+        const output = finalScene ? "sdf-final-scene.png"
+            : comparison ? "sdf-ggx-roughness.png" : "sdf-environment.png";
         fs.writeFileSync(path.join(docs, "images", output), Buffer.from(png, "base64"));
         console.log(`Rendered images/${output} using the tutorial's current shader helpers.`);
     } finally {

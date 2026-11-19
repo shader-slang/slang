@@ -189,7 +189,8 @@ export function createEditor(container, { source, name, filename, files, onRun, 
         wordBasedSuggestions: "off", fixedOverflowWidgets: true,
         ariaLabel: `Slang source: ${name}`, scrollbar: { alwaysConsumeMouseWheel: false },
     });
-    const resize = () => { container.style.height = `${Math.min(600, Math.max(180, editor.getContentHeight()))}px`; };
+    // The editor fits its content, so short modules stay short; long programs scroll past 600px.
+    const resize = () => { container.style.height = `${Math.min(600, editor.getContentHeight())}px`; };
     resize();
     const sizeListener = editor.onDidContentSizeChange(resize);
     async function foldDefaults(lines) {

@@ -1,5 +1,8 @@
 /* Programs use <!-- runnable: name [backend=none] [canvas=16:9] -->;
-   importable support files use <!-- module: name --> and have no Run button. */
+   importable support files use <!-- module: name --> and have no Run button.
+   A canvas program's code block may be followed directly by a paragraph holding only an
+   image. That image is the program's expected output: the cell shows it in place of the
+   canvas until the reader runs the program, and again after Reset. */
 (() => {
   "use strict";
   const workerURL = new URL("snippet-worker.js", document.currentScript.src);
@@ -81,6 +84,11 @@
       foldLines.push(prefix.toString().split("\n").length);
       comment.textContent = comment.textContent.replace(/\/\/!FOLD[ \t]*/, "");
     }
+    // Readers without scripts see the expected-output image below the code instead.
+    const expectedParagraph = aspect ? block.nextElementSibling : null;
+    const expectedImage = expectedParagraph?.matches("p") && expectedParagraph.children.length === 1 &&
+      expectedParagraph.firstElementChild.matches("img") && !expectedParagraph.textContent.trim()
+      ? expectedParagraph.firstElementChild : null;
     const original = code.textContent.split("\n")
       .map((line, index) => foldLines.includes(index + 1) ? line.trimEnd() : line)
       .join("\n").trimEnd();
@@ -125,7 +133,7 @@
       </div>`;
     const fallback = card.querySelector("textarea");
     fallback.value = original;
-    fallback.rows = Math.min(28, Math.max(8, original.split("\n").length));
+    fallback.rows = Math.min(28, Math.max(1, original.split("\n").length));
     fallback.setAttribute("aria-label", `Slang source: ${name}`);
     let editor = {
       getValue: () => fallback.value,
@@ -192,7 +200,8 @@
       if (display.hidden) return;
       const next = measureCanvas();
       if (!next) return;
-      if (displaySize && (next[0] !== displaySize[0] || next[1] !== displaySize[1]) && !canvasRun) {
+      const showingExpected = !!expectedImage && display.firstElementChild === expectedImage;
+      if (displaySize && (next[0] !== displaySize[0] || next[1] !== displaySize[1]) && !canvasRun && !showingExpected) {
         // Finished output has no live VM to redraw it. Discard it instead of scaling old pixels.
         display.replaceChildren();
       }
@@ -224,6 +233,14 @@
       card.classList.toggle("snippet-error", error);
       status.textContent = message;
       updateSourceStatus();
+    }
+
+    // The checked-in image scales with the display, unlike a finished canvas, so it survives resizes.
+    function showExpected() {
+      display.replaceChildren(expectedImage);
+      display.hidden = false;
+      status.textContent = "Expected output. Run the example to render it in your browser.";
+      result.hidden = false;
     }
 
     function failure(message) {
@@ -355,6 +372,7 @@
       display.replaceChildren();
       display.hidden = true;
       result.hidden = true;
+      if (expectedImage) showExpected();
     });
     fallback.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
@@ -374,6 +392,11 @@
       }
     });
     block.replaceWith(card);
+    if (expectedImage) {
+      expectedImage.classList.add("snippet-expected");
+      expectedParagraph.remove();
+      showExpected();
+    }
     resizeObserver?.observe(display);
     const editorReady = loadEditor().then(({ bundle, mappings }) => {
       if (disposed) return;

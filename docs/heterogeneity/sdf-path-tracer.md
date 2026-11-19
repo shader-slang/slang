@@ -1,27 +1,40 @@
 # An SDF path tracer, one step at a time
 
-We will build an image of a sphere from a function that measures distance. Along the
-way, we will learn how to describe a surface, find it along a ray, and light it.
-We start with a ray tracer that finds surfaces by sphere tracing, then extend it into
-a path tracer. The tutorial has four chapters on this page:
+In this tutorial we build an interactive path tracer that runs in the browser. By the
+end, you can drag to orbit a camera around a glossy blue sphere on a checkerboard floor,
+lit by an HDR environment map, and watch the image sharpen as samples accumulate.
+Every shape in the scene is a **signed distance function** (SDF): a function that
+returns how far a point is from the nearest surface.
 
-- [Chapter 1: Build an SDF ray tracer](#chapter-1-build-an-sdf-ray-tracer) — 1.1–1.4
-  introduce distance functions, ray intersections, surface normals, and blended shapes.
-- [Chapter 2: Add environment lighting and path tracing](#chapter-2-add-environment-lighting-and-path-tracing) — 2.1–2.6
-  add an environment map, mirror reflection, diffuse sampling, a path tracer, accumulation,
-  and importance sampling.
-- [Chapter 3: Add realistic materials with microfacet models](#chapter-3-add-realistic-materials-with-microfacet-models) — 3.1–3.2
-  introduce glossy reflection from tiny mirror-like facets, then a glossy blue sphere on
-  a checkerboard floor.
-- [Chapter 4: Make the path tracer interactive](#chapter-4-make-the-path-tracer-interactive) — 4.1–4.2
-  turn mouse input into an orbiting camera and restart the average when the view changes.
+![The finished scene: a glossy blue sphere on a checkerboard floor, reflecting the room around it.](images/sdf-final-scene.png)
+
+Each of the four chapters adds one part of that renderer:
+
+- [Chapter 1: Build an SDF ray tracer](#chapter-1-build-an-sdf-ray-tracer) builds the
+  geometry and the camera. We describe shapes with distance functions (1.1), find where
+  camera rays hit them with sphere tracing (1.2), shade them using surface normals (1.3),
+  and blend shapes together (1.4).
+- [Chapter 2: Add environment lighting and path tracing](#chapter-2-add-environment-lighting-and-path-tracing)
+  adds light. An environment map surrounds the scene (2.1), a mirror reflects it (2.2),
+  and a matte surface scatters it in random directions (2.3). A path tracer follows that
+  light across several bounces (2.4). Averaging samples across frames (2.5) and choosing
+  better directions (2.6) reduce the noise that randomness introduces.
+- [Chapter 3: Add realistic materials with microfacet models](#chapter-3-add-realistic-materials-with-microfacet-models)
+  adds the final materials and scene. A microfacet model covers glossy reflection (3.1),
+  and a coated blue sphere on a checkerboard floor becomes the final scene (3.2).
+- [Chapter 4: Make the path tracer interactive](#chapter-4-make-the-path-tracer-interactive)
+  hands the camera to the reader. Mouse input orbits and zooms the camera (4.1), and the
+  average restarts whenever the view changes (4.2).
+
+The [final example](cell:render-interactive.slang) imports modules from every chapter,
+so most of its code is code you will already have seen.
 
 Each code cell is an editable `h-slang` file; press ![Run](images/snippet-run.svg "Run")
 on an example to see its image. Code links in the text jump to their definitions,
 and **Ctrl+click** (**⌘+click** on macOS) does the same inside an editor.
 No graphics background is needed: we introduce the concepts as we use them.
 
-??? info "Using the examples"
+??? info "Running the examples"
     **Ctrl+Enter** (**⌘+Enter** on macOS) also runs an example; **F12** or the
     **Go to Definition** context-menu action follows a definition. Navigation opens
     collapsed sections automatically. ![Reset](images/snippet-reset.svg "Reset")
@@ -101,7 +114,7 @@ public float sphereDistance(float3 position, float3 center, float radius)
 The following example uses [`sphereDistance`](cell:sphere-distance.slang#sphereDistance)
 to colour a slice through the chosen sphere's field.
 
-??? example "Deep Dive 1.1.1: Window management and frame rendering"
+??? example "Deep Dive 1.1.1: `frame-loop.slang` — Window management and frame rendering"
     Every example calls [`runFrames`](cell:frame-loop.slang#runFrames) with a function
     that draws the next frame. The loop owns the surface, texture allocation, resize
     events, and presentation. A small [`Frame`](cell:frame-loop.slang#Frame) record
@@ -284,7 +297,7 @@ centre and radius, the ray, and its numerical stopping settings. A small
 shows how. The image is a
 **binary intersection mask**: white pixels hit the sphere; black pixels miss.
 
-??? example "Deep Dive 1.2.1: Pinhole camera rays and field of view"
+??? example "Deep Dive 1.2.1: `camera.slang` — Pinhole camera rays and field of view"
     [`Camera`](cell:camera.slang#Camera) stores three fields.
     [`position`](cell:camera.slang#Camera.position) is the origin of every ray, and
     [`target`](cell:camera.slang#Camera.target) is a point to look toward. Moving the
@@ -1143,7 +1156,7 @@ A shared **pseudorandom number generator** (PRNG) provides repeatable random-loo
 numbers in `[0, 1)`. The pixel and sample index both affect its starting state, so
 neighbouring pixels and successive samples explore different directions.
 
-??? example "Deep Dive 2.3.1: Pseudorandom numbers for pixel samples"
+??? example "Deep Dive 2.3.1: `prng.slang` — Pseudorandom numbers for pixel samples"
     [`prng.slang`](cell:prng.slang) is our PRNG. An integer mixer
     scrambles bits; [`nextRandom`](cell:prng.slang#nextRandom) advances its state and converts the high 24 bits to
     a float in `[0, 1)`. Keeping the result below 1 matters for sampling formulas.
@@ -1175,7 +1188,7 @@ neighbouring pixels and successive samples explore different directions.
     }
     ```
 
-??? example "Deep Dive 2.3.2: Hemisphere sampling in surface coordinates"
+??? example "Deep Dive 2.3.2: `hemisphere.slang` — Hemisphere sampling in surface coordinates"
     [`hemisphere.slang`](cell:hemisphere.slang) supplies the direction construction discussed above.
     [`orientHemisphere`](cell:hemisphere.slang#orientHemisphere) builds two perpendicular tangent axes around the normal,
     then rotates a local direction into the scene. Both the matte sampler here and the
@@ -1936,7 +1949,7 @@ chooses directions roughly in proportion to the lobe and divides by their densit
 It picks a facet normal from the GGX distribution, then reflects the view direction
 around that facet. Deep Dive 3.1.1 shows how.
 
-??? example "Deep Dive 3.1.1: Importance sampling the GGX distribution"
+??? example "Deep Dive 3.1.1: `ggx-sampling.slang` — Importance sampling the GGX distribution"
     [`sampleGGXHalfVector`](cell:ggx-sampling.slang#sampleGGXHalfVector) draws the facet
     normal $\mathbf h$ from the GGX distribution, using two uniform random numbers in
     `[0, 1)`.
@@ -2115,7 +2128,7 @@ receive less light: a soft contact shadow.
 [`tracePath`](cell:path-tracer.slang#tracePath) already follows such paths; we only
 raise its bounce limit. The scene uses the same room environment as before.
 
-??? example "Deep Dive 3.2.1: Diffuse reflection beneath a GGX coat"
+??? example "Deep Dive 3.2.1: `coated-diffuse.slang` — Diffuse reflection beneath a GGX coat"
     The diffuse base receives only the light that passes through the coating, and
     its reflected light must pass through the coating again to leave. Our small
     teaching model approximates those two transmission factors with Fresnel terms.
@@ -2203,7 +2216,7 @@ raise its bounce limit. The scene uses the same room environment as before.
     }
     ```
 
-??? example "Deep Dive 3.2.2: Signed distance to a box"
+??? example "Deep Dive 3.2.2: `box-sdf.slang` — Signed distance to a box"
     The checkerboard is a **finite, thin box**. A box gives the floor real edges and
     a signed distance outside its footprint, so rays that miss the board see the
     environment. An infinite plane would keep producing ever-smaller checks all the
@@ -2235,7 +2248,7 @@ raise its bounce limit. The scene uses the same room environment as before.
     }
     ```
 
-??? example "Deep Dive 3.2.3: Sphere and checkerboard scene construction"
+??? example "Deep Dive 3.2.3: `checker-scene.slang` — Sphere and checkerboard scene construction"
     The final cell uses a unit sphere centred at $(0,1,0)$, resting on a board
     whose top lies at $y=0$. These are scene choices:
     the sphere and box distance functions both accept their own positions and sizes.

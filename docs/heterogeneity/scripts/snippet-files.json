@@ -211,5 +211,7 @@
   "ggx-sampling": {},
   "coated-diffuse": {},
   "scene": {},
-  "box-sdf": {}
+  "box-sdf": {},
+  "render-triangles": {},
+  "render-icosahedron": {}
 }
