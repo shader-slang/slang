@@ -4896,19 +4896,19 @@ enum _AttributeTargets
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
 
-/// Associate a D3D12 root signature with a function, given as a string in the
-/// HLSL root-signature sub-language. The compiler accepts and reflects the
-/// string as-is; it does not validate the root-signature syntax, use it to
-/// influence binding calculation, or emit it into generated code. The
-/// user-attribute reflection API is therefore the only way to retrieve the
-/// string; creating the root signature object from it is up to the application.
-/// @param value The root-signature string.
-/// @remarks This attribute is available in both the Slang and HLSL source
-/// dialects. It is declared as a user-defined attribute rather than through
-/// `attribute_syntax` because the user-attribute reflection lists only
-/// include user-defined attributes. The `Function` usage target allows it on
-/// any function, but it is intended for entry points, which reflection reaches
-/// through `IEntryPoint::getFunctionReflection()`.
+/// Associate a root signature with a function declaration.
+///
+/// @param value A string that defines the root signature.
+///
+/// This attribute is allowed on any function declaration, but is intended
+/// for use with function declarations used as entry points.
+///
+/// This attribute is currently only intended for use when compiling for D3D12,
+/// in which case the string argument is expected to define a root signature
+/// using the root-signature DSL syntax introduced by HLSL.
+///
+/// An application can query for a root signature attribute and inspect
+/// its argument using the reflection API for user-defined attributes.
 [__AttributeUsage(_AttributeTargets.Function)]
 struct RootSignatureAttribute
 {
