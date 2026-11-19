@@ -1896,6 +1896,11 @@ public:                                                              \
 
         /** Calculate a path combining the 'fromPath' with 'path'
 
+        The result is in simplified form: `.` and `x/..` segments are collapsed and `/` is used
+        as the separator, matching what getPath() returns for PathKind::Simplified. An empty
+        combination yields ".". Implementations of this interface must return the simplified
+        spelling.
+
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
 
         @param fromPathType How to interpret the from path - as a file or a directory.
@@ -1903,7 +1908,8 @@ public:                                                              \
         @param path Path to be determined relative to the fromPath
         @param pathOut Holds the string which is the relative path. The string is held in the blob
         zero terminated.
-        @returns A `SlangResult` to indicate success or failure in loading the file.
+        @returns `SLANG_OK` on success, or `SLANG_E_INVALID_ARG` if `fromPathType` is not a valid
+        `SlangPathType`.
         */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
             SlangPathType fromPathType,

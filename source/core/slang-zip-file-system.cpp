@@ -673,7 +673,13 @@ SlangResult ZipFileSystemImpl::calcCombinedPath(
             relPath = Path::combine(fromPath, path);
             break;
         }
+    default:
+        return SLANG_E_INVALID_ARG;
     }
+
+    // The ISlangFileSystemExt contract for calcCombinedPath promises the simplified form, so
+    // callers holding the interface see one spelling whichever implementation answers.
+    relPath = Path::simplify(relPath);
 
     *pathOut = StringUtil::createStringBlob(relPath).detach();
     return SLANG_OK;
