@@ -34,6 +34,12 @@ void legalizeEntryPointVaryingParamsForMetal(
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints);
 
+/// Return the type of `field` when it is an array carrying Metal's `[[clip_distance]]` attribute,
+/// else null. MSL types the attribute as `float` or a native `float[n]`, so the Metal emitter
+/// declares such a field as a native array, and Metal entry-point legalization writes it one
+/// element at a time because a native array cannot be assigned as a whole.
+IRArrayType* getMetalClipDistanceArrayType(IRStructField* field);
+
 void legalizeEntryPointVaryingParamsForWGSL(
     IRModule* module,
     DiagnosticSink* sink,

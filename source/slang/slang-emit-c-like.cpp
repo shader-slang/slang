@@ -4689,8 +4689,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(
         emitSemanticsPrefix(fieldKey);
         emitStructFieldAttributes(structType, ff, allowOffsetLayout);
         emitMemoryQualifiers(fieldKey);
-        emitType(fieldType, getName(fieldKey));
-        emitSemantics(fieldKey, allowOffsetLayout);
+        emitStructFieldTypeAndSemantics(ff, allowOffsetLayout);
         emitPostDeclarationAttributesForType(fieldType);
         emitStructDeclarationSeparator();
         m_writer->emit("\n");
@@ -4698,6 +4697,15 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(
 
     m_writer->dedent();
     m_writer->emit("}");
+}
+
+void CLikeSourceEmitter::emitStructFieldTypeAndSemantics(
+    IRStructField* field,
+    bool allowOffsetLayout)
+{
+    auto fieldKey = field->getKey();
+    emitType(field->getFieldType(), getName(fieldKey));
+    emitSemantics(fieldKey, allowOffsetLayout);
 }
 
 void CLikeSourceEmitter::emitClass(IRClassType* classType)
