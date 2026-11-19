@@ -3476,6 +3476,39 @@ ${
 
 $}
 
+// The `*` shapes below have no element-wise meaning: a matrix against a vector, or two
+// matrices of different shapes. A call with those operands would otherwise fail overload
+// resolution with a plain "no overload" error and a long list of unrelated candidate notes.
+// These fallback declarations occupy exactly those shapes at a low overload rank, and carry
+// `[__diagnoseOnUse]`, so referencing one is an error that names the `mul` spelling:
+//
+//     float4x4 m; float4 v;
+//     float4 r = m * v; // error: use of '*' is an error: ... use 'mul(m, v)' instead.
+//
+// They are declared here, beside the real `operator*` family, and constrained to
+// `__BuiltinArithmeticType` like the generic real overloads, so that a real overload wins
+// every resolution where both apply: overload comparison ranks conversion cost ahead of
+// overload rank, and a scalar operand can broadcast into the fallback's vector parameter,
+// so the fallback must pay at least the same witness cost as the real overloads for its
+// element-family constraint to stay behind them. The declarations have no body: there is no
+// element-wise `matrix * vector` to lower, and the algebraic product belongs to `mul`; the
+// only purpose of these declarations is to be selected by resolution when nothing real
+// applies, and report the error.
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[OverloadRank(-10)]
+[__diagnoseOnUse("'*' does not define a matrix-vector product in Slang; use 'mul(m, v)' instead.")]
+vector<T,N> operator*(matrix<T,N,M> m, vector<T,M> v);
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[OverloadRank(-10)]
+[__diagnoseOnUse("'*' does not define a vector-matrix product in Slang; use 'mul(v, m)' instead.")]
+vector<T,M> operator*(vector<T,N> v, matrix<T,N,M> m);
+
+__generic<T : __BuiltinArithmeticType, let R : int, let N : int, let C : int>
+[OverloadRank(-10)]
+[__diagnoseOnUse("'*' is element-wise and requires same-shape matrices; use 'mul(m1, m2)' for the matrix product.")]
+matrix<T,R,C> operator*(matrix<T,R,N> m1, matrix<T,N,C> m2);
+
 //@ public:
 
 
