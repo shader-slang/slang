@@ -10647,30 +10647,51 @@ static String getDifferentiabilityConformanceKindText(DifferentiabilityConforman
     }
 }
 
-// Walk the witness chain to determine if `targetDecl` appears along the
-// canonical lookup path.  This handles `LookupDeclRef` chains as well as
-// `ExpandSubtypeWitness` / `EachSubtypeWitness` wrappers.
-//
-static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targetDecl)
+/// Return whether the specialized inheritance requirement occurs in the canonical proof
+/// `witness`.
+///
+/// An inherited-interface requirement on this path owns a nested witness table. Other requirements
+/// that reach the same interface store the canonical proof instead of another table.
+static bool doesWitnessLookupPathContainInheritance(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    DeclRef<InheritanceDecl> targetInheritanceDeclRef)
 {
+    // Consider this example:
+    //
+    //     interface IRoot { int read(); }
+    //     interface IBase<T> : IRoot {}
+    //     interface IDerived : IBase<int>, IBase<float> {}
+    //     struct Value : IDerived { int read() { return 7; } }
+    //
+    // If inheritance linearization selects `Value : IDerived : IBase<int> : IRoot`, only the
+    // `IBase<int> : IRoot` requirement owns the nested `Value : IRoot` table. The requirement
+    // through `IBase<float>` shares the inheritance declaration, but records the selected proof
+    // instead of another table. We retain the owning interface application when comparing them.
+    // A requirement lookup and a lexical refinement reference can select that same requirement;
+    // projecting it from its lexical parent gives both references the ordinary canonical form.
+    auto targetDeclRef = astBuilder->getMemberDeclRef<Decl>(
+        targetInheritanceDeclRef.getParent(),
+        targetInheritanceDeclRef.getDecl());
     auto currentWitness = witness;
     for (;;)
     {
         if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
         {
+            // We compare canonical member references so generic arguments remain part of the
+            // requirement identity, including when a non-generic parent gives a direct reference.
+            auto witnessDeclRef = declaredSubtypeWitness->getDeclRef();
+            auto witnessRequirementDeclRef =
+                astBuilder->getMemberDeclRef(witnessDeclRef.getParent(), witnessDeclRef.getDecl());
+            if (witnessRequirementDeclRef == targetDeclRef)
+                return true;
 
-            if (auto memberDeclRef =
-                    as<MemberDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+            if (auto lookupDeclRef = SubstitutionSet(witnessDeclRef).findLookupDeclRef())
             {
-                if (memberDeclRef->getDecl() == targetDecl)
-                    return true;
-            }
-
-            if (auto lookupDeclRef =
-                    SubstitutionSet(declaredSubtypeWitness->getDeclRef().declRefBase)
-                        .findLookupDeclRef())
-            {
-                if (lookupDeclRef->getDecl() == targetDecl)
+                auto lookupRequirementDeclRef = astBuilder->getMemberDeclRef(
+                    lookupDeclRef->getParent(),
+                    lookupDeclRef->getDecl());
+                if (lookupRequirementDeclRef == targetDeclRef)
                     return true;
 
                 currentWitness = lookupDeclRef->getWitness();
@@ -10679,6 +10700,17 @@ static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targ
             {
                 break;
             }
+        }
+        else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(currentWitness))
+        {
+            // Ordinary composition records both parts of the inheritance path explicitly.
+            // Either part can select the inherited-interface requirement we are looking for.
+            if (doesWitnessLookupPathContainInheritance(
+                    astBuilder,
+                    transitiveWitness->getSubToMid(),
+                    targetInheritanceDeclRef))
+                return true;
+            currentWitness = transitiveWitness->getMidToSup();
         }
         else if (auto expandWitness = as<ExpandSubtypeWitness>(currentWitness))
         {
@@ -10728,8 +10760,10 @@ bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
             m_astBuilder->getDeclaredSubtypeWitness(subType, reqType, requiredInheritanceDeclRef);
     }
 
-    bool isOnCanonicalPath =
-        doesWitnessLookupPathContainDecl(subIsReqWitness, requiredInheritanceDeclRef.getDecl());
+    bool isOnCanonicalPath = doesWitnessLookupPathContainInheritance(
+        m_astBuilder,
+        subIsReqWitness,
+        requiredInheritanceDeclRef);
     if (!isOnCanonicalPath)
     {
         if (!witnessTable->containsRequirement(requirementKey))
@@ -12704,8 +12738,10 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
     contentAssistInfo.completionSuggestions.candidateItems.insertRange(0, candidateItems);
 }
 
-// Helper function to recursively fill in witness table entries for inheritance requirements
-// on generic type constraints. This establishes canonical paths for diamond conformance patterns.
+// Fill in inherited-interface witnesses for a generic constraint by following its canonical paths.
+//
+// We specialize each inheritance requirement in its owning interface application before selecting
+// the path, so requirements shared by different generic applications remain distinct.
 void SemanticsVisitor::_fillInGenericConstraintPathResolutionTableForInheritance(
     Type* subType,
     Type* interfaceType,
@@ -12719,20 +12755,24 @@ void SemanticsVisitor::_fillInGenericConstraintPathResolutionTableForInheritance
     if (!interfaceDecl)
         return;
 
-    // For each inheritance requirement in the interface,
-    // determine the canonical path from subType to that inherited interface.
-    for (auto inheritanceDecl : interfaceDecl.getDecl()->getMembersOfType<InheritanceDecl>())
+    // We use declaration keys within `pathResolutionTable`, whose `baseType` identifies this
+    // interface application. Path selection also needs that application's substitutions.
+    for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(m_astBuilder, interfaceDecl))
     {
-        auto reqType = inheritanceDecl->base.type;
+        auto inheritanceDecl = inheritanceDeclRef.getDecl();
+        auto reqType = getBaseType(m_astBuilder, inheritanceDeclRef);
         if (!reqType)
             continue;
 
-        // Try to get the witness that shows subType conforms to reqType
+        // We select the proof using the specialized base type for this interface application.
         auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
         if (!subIsReqWitness)
             continue;
 
-        bool isOnCanonicalPath = doesWitnessLookupPathContainDecl(subIsReqWitness, inheritanceDecl);
+        bool isOnCanonicalPath = doesWitnessLookupPathContainInheritance(
+            m_astBuilder,
+            subIsReqWitness,
+            inheritanceDeclRef);
         if (isOnCanonicalPath)
         {
             // Create a nested witness table if we are on the canonical path.
