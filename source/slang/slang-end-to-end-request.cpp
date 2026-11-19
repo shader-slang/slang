@@ -4,7 +4,6 @@
 #include "compiler-core/slang-pretty-writer.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-performance-profiler.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
 #include "slang-module-library.h"
@@ -12,7 +11,8 @@
 #include "slang-reflection-json.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-serialize-container.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/serialization/slang-serialize-container.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "compiler-core/slang-artifact-associated-impl.h"

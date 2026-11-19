@@ -30,8 +30,8 @@
 #include "slang-profile.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-serialize-ir.h"
 #include "slang.h"
+#include "slang/serialization/slang-serialize-ir.h"
 
 #ifdef _WIN32
 #include <fcntl.h>

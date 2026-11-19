@@ -3,8 +3,8 @@
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-rich-diagnostics-render.h"
 #include "core/slang-basic.h"
-#include "slang-ast-support-types.h"
 #include "slang-target.h"
+#include "slang/ast/slang-ast-support-types.h"
 
 
 //

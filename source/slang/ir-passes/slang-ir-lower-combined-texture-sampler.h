@@ -1,0 +1,16 @@
+#pragma once
+
+#include "slang/ir/slang-ir.h"
+
+namespace Slang
+{
+struct CodeGenContext;
+struct IRModule;
+class DiagnosticSink;
+
+// Lower combined texture sampler types to structs.
+void lowerCombinedTextureSamplers(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    DiagnosticSink* sink);
+} // namespace Slang

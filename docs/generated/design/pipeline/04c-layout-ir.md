@@ -11,10 +11,10 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 
 This page documents the **layout IR module** built by
 `TargetProgram::createIRModuleForLayout`
-([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+([slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 line 16434), together with the parameter-binding pass that computes
 the `ProgramLayout` it consumes
-([slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)).
+([slang-parameter-binding.cpp](../../../../source/slang/layout-and-binding/slang-parameter-binding.cpp)).
 The layout IR module is a sibling of the per-translation-unit
 executable IR module described in
 [04-ast-to-ir.md](04-ast-to-ir.md); its only job is to carry
@@ -40,7 +40,7 @@ behavior rather than emit behavior.
 
 ## Source
 
-- [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+- [slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
   — `TargetProgram::createIRModuleForLayout` (line 16434) is the
   constructor; the global-parameter loop is at lines 16479-16498,
   the entry-point loop at 16536-16582, the obfuscation gate at
@@ -53,7 +53,7 @@ behavior rather than emit behavior.
   `createIRModuleForLayout` (line 120), the cache field
   `m_irModuleForLayout` (line 151), and the error latch
   `m_layoutHasErrors` (line 139).
-- [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)
+- [slang-parameter-binding.cpp](../../../../source/slang/layout-and-binding/slang-parameter-binding.cpp)
   — computes the `ProgramLayout` instance (`m_layout`) that
   `createIRModuleForLayout` walks.
   `generateParameterBindings(TargetProgram*, DiagnosticSink*)`
@@ -62,7 +62,7 @@ behavior rather than emit behavior.
   in `m_layout` and then immediately drives
   `createIRModuleForLayout`. `createIRModuleForLayout` asserts that
   `m_layout` is non-null before proceeding.
-- [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
+- [slang-type-layout.cpp](../../../../source/slang/layout-and-binding/slang-type-layout.cpp)
   — computes the per-type `TypeLayout` objects that parameter
   binding assembles into a `ProgramLayout`. This file is
   included in the manifest entry's `watched_paths` for this page; see [Manifest coverage](#manifest-coverage).
@@ -77,7 +77,7 @@ behavior rather than emit behavior.
 `createIRModuleForLayout` is a *transcription* step: every binding
 number, register space, and byte offset it writes into IR was
 already decided by
-[slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp).
+[slang-parameter-binding.cpp](../../../../source/slang/layout-and-binding/slang-parameter-binding.cpp).
 Understanding the layout IR module therefore requires knowing what
 that pass guarantees.
 
@@ -115,7 +115,7 @@ silently ignored by binding: the parameter received a positionally
 defaulted binding. It is now honored on targets for which
 `doesTargetSupportVkBindingOnEntryPointParameters` returns true —
 defined in
-[slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
+[slang-type-layout.cpp](../../../../source/slang/layout-and-binding/slang-type-layout.cpp)
 line 3388 as `isKhronosTarget(target) || isWGPUTarget(target)`,
 i.e. SPIR-V/GLSL and WGSL. Every other target still ignores the
 attribute in this position:
@@ -174,7 +174,7 @@ fully placed by explicit annotations, so an entry point whose
 parameters are all explicitly bound no longer forces a default set.
 
 Whether the annotation is *ignorable* is diagnosed separately, in
-[slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp):
+[slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp):
 `isVkBindingCompatibleEntryPointParameterType` (line 1033) decides
 which parameter types can have a binding placed at all, and
 `Diagnostics::UnhandledModOnEntryPointParameter` (lines 2702-2723) —
@@ -277,7 +277,7 @@ with the span message "the current compilation target does not support
 ray tracing entry point parameters for the '~stage' stage". A
 `SLANG_RELEASE_ASSERT(rules)` was also added at the top of
 `createTypeLayoutWith` (line 6525; the assert is at line 6532) in
-[slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
+[slang-type-layout.cpp](../../../../source/slang/layout-and-binding/slang-type-layout.cpp)
 as a backstop for any future null-rules caller.
 
 The Metal, CPU, and LLVM layout-rules families return `nullptr` from
@@ -299,7 +299,7 @@ family, and the example below cannot demonstrate it: WGSL does not support
 ray-tracing *stages*,
 so `-target wgsl -stage miss` is expected to abort with an
 unsupported-stage error from the WGSL emitter
-([slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)
+([slang-emit-wgsl.cpp](../../../../source/slang/emission/slang-emit-wgsl.cpp)
 line 244) rather than report anything about payload layout. This was
 not re-run for this revision. The WGSL family's three accessors return
 the GLSL ray-tracing rules, so the family would supply rules if a
@@ -336,7 +336,7 @@ support these parameters on SPIR-V, HLSL, and GLSL.
 
 - **Built together with the `ProgramLayout`, not separately.**
   `TargetProgram::getOrCreateLayout`
-  ([slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)
+  ([slang-parameter-binding.cpp](../../../../source/slang/layout-and-binding/slang-parameter-binding.cpp)
   line 4843) takes the linkage's component-type operation mutex,
   computes `m_layout` via `generateParameterBindings` if it is not yet
   set, and then, in the same call, populates `m_irModuleForLayout`:
@@ -350,7 +350,7 @@ support these parameters on SPIR-V, HLSL, and GLSL.
 
   So *any* caller that asks for the program layout also pays for
   the layout IR module. `getOrCreateIRModuleForLayout`
-  ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+  ([slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
   line 16074) is a two-line wrapper that calls `getOrCreateLayout`
   and then returns the now-populated field; it does not itself
   invoke the constructor.
@@ -385,7 +385,7 @@ support these parameters on SPIR-V, HLSL, and GLSL.
   `linkIR`, which adds an existing layout module (obtained through
   `getExistingIRModuleForLayout`) to its module list so
   layout-decorated global symbols participate in linking
-  ([slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
+  ([slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp)
   lines 2265-2267) and reads the module's global-scope
   `IRLayoutDecoration` (line 2348). The end-to-end compile request also
   calls `getOrCreateLayout` and then `getOrCreateIRModuleForLayout` for
@@ -550,7 +550,7 @@ both modules lose their name hints together.
   per-module IR; `linkIR` does, however, pull an existing layout
   module into its symbol set so its `IRLayoutDecoration`s are visible
   during linking
-  ([slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
+  ([slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp)
   lines 2265-2267).
 - **No function bodies for user-defined functions.** The entry-point
   `IRFunc` instances are stubs; their only purpose is to anchor an
@@ -630,7 +630,7 @@ declared in
 | Gate | CLI spelling | Accessor | Effect |
 |---|---|---|---|
 | `CompilerOptionName::Obfuscate` | `-obfuscate` | `shouldObfuscateCode()` (line 384) | Enables the strip + DCE block at the end of `createIRModuleForLayout`, and is also passed to the `SharedIRGenContext` constructor there (line 16456). |
-| `CompilerOptionName::BindlessSpaceIndex` | `-bindless-space-index <index>` | `getIntOption(...)` at [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp) line 4818 | Requests a specific descriptor space for the bindless descriptor heap; parameter binding honors it only if that space is not already in `usedSpaces`. |
+| `CompilerOptionName::BindlessSpaceIndex` | `-bindless-space-index <index>` | `getIntOption(...)` at [slang-parameter-binding.cpp](../../../../source/slang/layout-and-binding/slang-parameter-binding.cpp) line 4818 | Requests a specific descriptor space for the bindless descriptor heap; parameter binding honors it only if that space is not already in `usedSpaces`. |
 
 The CLI spellings come from the option table in
 [slang-options.cpp](../../../../source/slang/slang-options.cpp)
@@ -651,14 +651,14 @@ The page's manifest `watched_paths` are `slang-lower-to-ir.cpp`,
 `slang-ir.cpp`, `slang-options.cpp`, and `slang-type-layout.cpp`. The
 files this page cites and that the manifest watches are:
 
-- [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
+- [slang-type-layout.cpp](../../../../source/slang/layout-and-binding/slang-type-layout.cpp)
   computes the `TypeLayout` objects parameter binding assembles, owns
   `createTypeLayoutWith`, and owns the
   `doesTargetSupportVkBindingOnEntryPointParameters` target gate.
 - [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
   is where the binding diagnostics (including error `39032`) are
   declared.
-- [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)
+- [slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp)
   owns the "attribute ignored" warnings for annotations that binding
   cannot honor.
 - [slang-options.cpp](../../../../source/slang/slang-options.cpp)
@@ -670,9 +670,9 @@ files this page cites and that the manifest watches are:
 them beyond the `Shader64BitIndexingDecoration` opcode that
 `slang-ir-insts.lua` defines. Two cited paths are not watched:
 
-- [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)
+- [slang-ir-link.cpp](../../../../source/slang/ir-passes/slang-ir-link.cpp)
   is the consumer that pulls the layout module into linking.
-- [slang-parameter-binding.h](../../../../source/slang/slang-parameter-binding.h)
+- [slang-parameter-binding.h](../../../../source/slang/layout-and-binding/slang-parameter-binding.h)
   declares the `generateParameterBindings(Program*, TargetRequest*,
   DiagnosticSink*)` overload (line 27); the `TargetProgram*` overload
   this page describes is defined in `slang-parameter-binding.cpp`.

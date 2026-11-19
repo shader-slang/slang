@@ -11,7 +11,7 @@ anchored to
 
 Audience: nightly CI. The bundle exercises the **pre-link IR-pass
 sequence** that runs inside `generateIRForTranslationUnit` in
-[slang-lower-to-ir.cpp](../../../../../source/slang/slang-lower-to-ir.cpp)
+[slang-lower-to-ir.cpp](../../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 **before** the per-translation-unit IR module is cached and pulled
 into `linkAndOptimizeIR` by `linkIR`. The doc organises the sequence
 into four phases:
@@ -187,12 +187,12 @@ in `README.md`.
 
 ## Source files you may consult for _verification only_
 
-- `source/slang/slang-lower-to-ir.cpp` (`generateIRForTranslationUnit`,
+- `source/slang/lower-to-ir/slang-lower-to-ir.cpp` (`generateIRForTranslationUnit`,
   for the actual phase boundaries)
-- `source/slang/slang-ir-lower-defer.cpp`
-- `source/slang/slang-ir-lower-error-handling.cpp`
-- `source/slang/slang-ir-bit-field-accessors.cpp`
-- `source/slang/slang-ir-link.cpp`
+- `source/slang/ir-passes/slang-ir-lower-defer.cpp`
+- `source/slang/ir-passes/slang-ir-lower-error-handling.cpp`
+- `source/slang/ir-passes/slang-ir-bit-field-accessors.cpp`
+- `source/slang/ir-passes/slang-ir-link.cpp`
 
 You may **not** mine these for behavioural claims that the doc
 does not make.

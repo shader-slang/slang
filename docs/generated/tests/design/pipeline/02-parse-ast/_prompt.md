@@ -110,16 +110,16 @@ realizable (e.g. the exact spelling of a decl keyword, the
 diagnostic code emitted for an unexpected token). You may **not**
 mine them for behavioral claims that the doc does not make.
 
-- `source/slang/slang-parser.h`
-- `source/slang/slang-parser.cpp`
-- `source/slang/slang-ast-base.h`
-- `source/slang/slang-ast-decl.h`
-- `source/slang/slang-ast-expr.h`
-- `source/slang/slang-ast-stmt.h`
-- `source/slang/slang-ast-type.h`
-- `source/slang/slang-ast-modifier.h`
-- `source/slang/slang-ast-builder.h`
-- `source/slang/slang-ast-builder.cpp`
+- `source/slang/parser/slang-parser.h`
+- `source/slang/parser/slang-parser.cpp`
+- `source/slang/ast/slang-ast-base.h`
+- `source/slang/ast/slang-ast-decl.h`
+- `source/slang/ast/slang-ast-expr.h`
+- `source/slang/ast/slang-ast-stmt.h`
+- `source/slang/ast/slang-ast-type.h`
+- `source/slang/ast/slang-ast-modifier.h`
+- `source/slang/ast/slang-ast-builder.h`
+- `source/slang/ast/slang-ast-builder.cpp`
 
 If you find yourself thinking "this would cover the branch at
 `slang-parser.cpp:NNNN`", stop and re-read the doc.

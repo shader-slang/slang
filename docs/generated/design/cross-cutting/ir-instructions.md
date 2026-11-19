@@ -11,7 +11,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 
 This document is a categorized reference for the Slang IR instruction
 set, derived from
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua). The
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua). The
 intended reader is a developer writing or modifying an IR pass who
 needs to look up an opcode.
 
@@ -24,11 +24,11 @@ This document does not duplicate it.
 
 ## Source
 
-- [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+- [slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua)
   is the canonical declaration of the instruction set. Each entry
   carries a name, optional `struct_name`, optional `operands`, and
   flags such as `hoistable` and `parent`.
-- [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) holds
+- [slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h) holds
   the hand-written C++ wrapper structs (`struct IRFoo : IRInst`) and
   their inline accessors — but only for opcodes that need members the
   generator cannot derive. A FIDDLE template near the end of the file
@@ -40,21 +40,21 @@ This document does not duplicate it.
   without anyone writing it, while `IRTypeAlignmentAttr` is written out
   by hand because its operands are declared as a `min_operands` count
   and its accessors have to interpret an optional trailing operand.
-- [slang-ir-insts-enum.h](../../../../source/slang/slang-ir-insts-enum.h)
+- [slang-ir-insts-enum.h](../../../../source/slang/ir/slang-ir-insts-enum.h)
   declares `enum IROp : int32_t`, but its enumerators are not written
   by hand: the build-time tool `slang-fiddle` expands the
   `instEnums()` template in
-  [slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) over the
+  [slang-ir.h.lua](../../../../source/slang/ir/slang-ir.h.lua) over the
   Lua table and emits `slang-ir-insts-enum.h.fiddle` (under
   `build/source/slang/fiddle/`), which that header includes. Its
   `instInfoEntries()` template likewise fills the `kIROps` table in
-  [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp)
+  [slang-ir-insts-info.cpp](../../../../source/slang/ir/slang-ir-insts-info.cpp)
   with the `IROpInfo` record (mnemonic, fixed operand count, op flags)
   that `getIROpInfo` returns. At `source_commit` the enum holds 865
   concrete opcodes; `kIROpCount` is the sentinel that counts them and
   `kIROp_Invalid` aliases it.
-- [slang-ir.h](../../../../source/slang/slang-ir.h) /
-  [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) define
+- [slang-ir.h](../../../../source/slang/ir/slang-ir.h) /
+  [slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) define
   `IRInst`, `IRBuilder`, traversal helpers, and the hoistable / global-
   value deduplication infrastructure.
 
@@ -62,7 +62,7 @@ Several files this page has to cite are not in the manifest's
 `watched_paths` for it, so changing them will not mark this page
 stale: `slang-ir.h.lua` (which owns the Lua-key → `kIROpFlag_*`
 mapping and the generated `IROpInfo` table), `slang-ir-insts-enum.h`,
-[slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)
+[slang-ir-insts-stable-names.lua](../../../../source/slang/ir/slang-ir-insts-stable-names.lua)
 (which owns the serialized opcode identities described under *Module
 versioning* below), and the two `extras/` checker scripts cited under
 *Adding a new opcode*. They should be added to this document's
@@ -164,7 +164,7 @@ reader can confirm they are on the right page before clicking
 through. The full list of opcodes in each family lives in the
 corresponding `ir-reference/*.md` page; the canonical opcode
 declarations live in
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua).
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua).
 
 ### Type instructions
 
@@ -192,7 +192,7 @@ scalar layout change that. A vector local is not a buffer element: in
 `StructuredBuffer<float3> b; ... float3 v = b[i];` the buffer element is
 `packed_float3` on Metal while `v` stays a native `float3`. The rule
 lives in
-[slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp),
+[slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-buffer-element-type.cpp),
 where `usesPackedVectorStorage` admits only natural-layout
 `StorageBuffer` / `UserPointer` buffers and `needsPackedVectorStorage`
 accepts every vector with more than one element.
@@ -220,10 +220,10 @@ component constructors are declared `__intrinsic_op(kIROp_MakeVector)`,
 so `float3(a, b, c)` lowers to `makeVector`. An array initializer list
 such as `int a[3] = { 1, 2, 3 }` lowers to `makeArray`
 (`visitInitializerListExpr`,
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+[slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 line 6314), with a short list padded by default values up to the element
 count; `IRBuilder::emitDefaultConstruct`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4291)
+([slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) line 4291)
 likewise builds `makeArray` and `makeStruct` from per-element and
 per-field defaults.
 
@@ -241,7 +241,7 @@ per-field defaults.
 No Slang construct reaches `alloca`: every local declaration — scalar,
 struct, or fixed-size array — lowers to `var` instead. Its only producer
 is `IRBuilder::emitAlloca`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4078), whose
+([slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) line 4078), whose
 size argument is an RTTI object pointer rather than an integer, and
 nothing in the tree calls it at `source_commit`.
 
@@ -269,15 +269,15 @@ nothing in the tree calls it at `source_commit`.
 | (...see [../ir-reference/structure.md](../ir-reference/structure.md) for the full list) | | | |
 
 A `generic` body ends in `return_val`, not `yield`: `findGenericReturnVal`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9985) reads
+([slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) line 9985) reads
 the last block's terminator as an `IRReturn`. A `yield` terminator does
 exist as a sibling of `return_val`
-([slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) line
+([slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua) line
 1457), but it closes an `expand` body, not a generic — its only producers
 are `visitExpandExpr`
-([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+([slang-lower-to-ir.cpp](../../../../source/slang/lower-to-ir/slang-lower-to-ir.cpp)
 line 6049) and
-[slang-ir-lower-expand-type.cpp](../../../../source/slang/slang-ir-lower-expand-type.cpp)
+[slang-ir-lower-expand-type.cpp](../../../../source/slang/ir-passes/slang-ir-lower-expand-type.cpp)
 line 107. See
 [../ir-reference/control-flow.md](../ir-reference/control-flow.md).
 
@@ -325,7 +325,7 @@ read.
 ## Hoistable / global / deduplicated values
 
 The flag bits in
-[slang-ir.h](../../../../source/slang/slang-ir.h):
+[slang-ir.h](../../../../source/slang/ir/slang-ir.h):
 
 ```cpp
 enum : IROpFlags
@@ -363,7 +363,7 @@ the IR.
 `Hoistable` is the mechanism behind several "one canonical inst per
 logical value" guarantees. For example, `builtinRequirementKey` is
 hoistable so that `IRBuilder::getBuiltinRequirementKey(kind)` in
-[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) returns the same
+[slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h) returns the same
 key inst for a given `BuiltinRequirementKind` on every request within
 one destination `IRModule` — making a witness lookup and the matching
 witness-table entry agree by construction rather than by entry order.
@@ -382,7 +382,7 @@ as written, so an opcode whose operands are conceptually an unordered
 order. That is what `IRBuilder::getSet` is for: it takes a `HashSet`,
 sorts by `getUniqueID`, and builds the inst from the sorted list.
 `getSetFromSortedElements`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7605) is the
+([slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp) line 7605) is the
 same thing for a caller that already holds a canonical list, skipping
 the intermediate hash set and the sort. Its precondition — strictly
 increasing by `getUniqueID`, duplicate-free, and all global — is the
@@ -402,12 +402,12 @@ path and perturb the canonical order of unrelated sets.
 
 A number of opcodes are conceptually *decorations*: every entry in the
 `Decoration` family in
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) (the
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua) (the
 opcodes such as `nameHint` and `targetIntrinsic`, whose generated C++
 wrappers are named `IRNameHintDecoration` and
 `IRTargetIntrinsicDecoration`) is modeled as an ordinary `IRInst`,
 wrapped by `IRDecoration` in
-[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The older design
+[slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h). The older design
 note in [../../../design/ir.md](../../../design/ir.md) still describes
 decorations-as-instructions as a planned migration; at `source_commit`
 that migration has already happened, so read that wording as history
@@ -422,7 +422,7 @@ producing a value. The full per-opcode catalog is in
 ## Module versioning and opcode insertion
 
 The comment at the top of
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua):
 
 > Please make sure to update the supported module versions in
 > Slang::IRModule accordingly when modifying this file.
@@ -433,7 +433,7 @@ but that renumbering never reaches a `.slang-module` file, because an
 opcode is not serialized as its enum value. Every entry also has a
 *stable name* — a small integer assigned once and never reused, listed
 in
-[slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)
+[slang-ir-insts-stable-names.lua](../../../../source/slang/ir/slang-ir-insts-stable-names.lua)
 under the entry's dotted path (`Type.BasicType.Int`,
 `Attr.TypeAlignment`, ...) — and the serializer converts through
 `getOpcodeStableName` / `getStableNameOpcode`. At `source_commit` that
@@ -444,7 +444,7 @@ the file so they can never be handed out again. See
 stable name the running compiler does not know becomes `Unrecognized`.
 
 What the supported-version range controls is loading: the comment on
-it in [slang-ir.h](../../../../source/slang/slang-ir.h) says binary
+it in [slang-ir.h](../../../../source/slang/ir/slang-ir.h) says binary
 module loading checks the range before decoding serialized AST and IR,
 `IRModule::isModuleVersionSupported` tests membership in the inclusive
 range, and adding an instruction requires a new writer version while
@@ -464,7 +464,7 @@ The mechanism is an optional trailing operand read through a
 count-checking accessor. `IRDebugFunction` is the worked example: it
 has a sixth operand for the function's lexical parent scope, and
 `getParentScope`
-([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line
+([slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h) line
 2861) is written as `getOperandCount() > 5 ? getOperand(5) : nullptr`,
 so a `DebugFunction` stored without the operand simply reads as having
 no parent scope. The emitter cooperates by never
@@ -481,7 +481,7 @@ scope to name. The design rationale is in
 ## Adding a new opcode
 
 1. Add an entry to
-   [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+   [slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua)
    inside the family it belongs to, not at the end of the file: the
    nesting is what keeps the family's opcodes in one contiguous range,
    which is what makes an `as<IRBasicType>()`-style check a single
@@ -489,7 +489,7 @@ scope to name. The design rationale is in
 2. Give it a stable name. Running
    [extras/check-ir-stable-names.lua](../../../../extras/check-ir-stable-names.lua)
    with the `update` command appends the new dotted path to
-   [slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)
+   [slang-ir-insts-stable-names.lua](../../../../source/slang/ir/slang-ir-insts-stable-names.lua)
    with the next unused id; the `check` command requires every live
    opcode to have a stable name and all IDs to be unique, while retired
    entries are allowed with a warning. CI enforces this through
@@ -497,7 +497,7 @@ scope to name. The design rationale is in
    which builds the vendored Lua, runs `check`, and fails the job with
    the diff `update` would have written.
 3. Bump `k_maxSupportedModuleVersion` in
-   [slang-ir.h](../../../../source/slang/slang-ir.h). CI reminds you
+   [slang-ir.h](../../../../source/slang/ir/slang-ir.h). CI reminds you
    via
    [extras/check-inst-version-changes.sh](../../../../extras/check-inst-version-changes.sh),
    which makes no GitHub API call itself: when a PR touches an IR
@@ -511,13 +511,13 @@ scope to name. The design rationale is in
    operands in the Lua entry is enough for the generator to emit
    `struct IRFoo` with matching accessors. Hand-write `struct IRFoo :
    IRInst` in
-   [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h),
+   [slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h),
    marked `FIDDLE()` / `FIDDLE(leafInst())`, only when the wrapper
    needs members the generator cannot derive.
 6. Add an emitter to `IRBuilder` for ergonomic creation — declared in
-   [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) and
+   [slang-ir-insts.h](../../../../source/slang/ir/slang-ir-insts.h) and
    defined in
-   [slang-ir.cpp](../../../../source/slang/slang-ir.cpp), or written
+   [slang-ir.cpp](../../../../source/slang/ir/slang-ir.cpp), or written
    inline in the header when it is a one-liner. Name it `get*` rather
    than `emit*` when the opcode is hoistable, matching `getPoison`
    (defined in the `.cpp`) and `getBuiltinRequirementKey` (inline in

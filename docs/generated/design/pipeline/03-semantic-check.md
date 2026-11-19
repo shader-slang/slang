@@ -55,7 +55,7 @@ The result is the input to AST → IR lowering
 
 The checker is implemented as a family of visitor subclasses that
 share state through `SemanticsContext`. The base visitor lives in
-[slang-check-impl.h](../../../../source/slang/slang-check-impl.h) and is
+[slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h) and is
 declared as:
 
 ```cpp
@@ -82,18 +82,18 @@ downstream compiler.
 | File | Concern | Example rejection |
 | --- | --- | --- |
 | [slang-check.cpp](../../../../source/slang/slang-check.cpp) | Entry point; orchestrates the checking phases | none from checking; it sequences the phases |
-| [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp) | `Decl` checking — types, signatures, default values, attributes | `E30200`, a declaration conflicting with an earlier one |
-| [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) | `Expr` checking — type inference, lvalue-ness, conversions | `E30011`, assigning to something that is not an l-value |
-| [slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp) | `Stmt` checking — control flow, scope rules, return-type validation | `E30003`, `break` outside a loop or `switch` |
-| [slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp) | Resolves `Type` references that appear in `Expr` form | `E30060`, an expression used where a type is required |
-| [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp) | Overload resolution; ranks candidates produced by lookup | `E40018`, the note naming the argument that rejected a candidate |
-| [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances | none; a missing requirement is reported as `E38100` by its caller in `slang-check-decl.cpp` |
-| [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp) | Implicit-conversion ranking and coercion site checks | `E30523`, too many initializers in an initializer list |
-| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation | `E30815`, a circular `extension` (see below) |
-| [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) | Validates modifier combinations and attribute arguments | `E31202`, two modifiers from one exclusive group on a decl |
-| [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) | `E30433`, a pack count that fails a `countof(...)` constraint |
-| [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values | none; a bad resolution result is reported at the use site |
-| [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules | `E38007`, an entry point with no stage |
+| [slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp) | `Decl` checking — types, signatures, default values, attributes | `E30200`, a declaration conflicting with an earlier one |
+| [slang-check-expr.cpp](../../../../source/slang/semantic-checking/slang-check-expr.cpp) | `Expr` checking — type inference, lvalue-ness, conversions | `E30011`, assigning to something that is not an l-value |
+| [slang-check-stmt.cpp](../../../../source/slang/semantic-checking/slang-check-stmt.cpp) | `Stmt` checking — control flow, scope rules, return-type validation | `E30003`, `break` outside a loop or `switch` |
+| [slang-check-type.cpp](../../../../source/slang/semantic-checking/slang-check-type.cpp) | Resolves `Type` references that appear in `Expr` form | `E30060`, an expression used where a type is required |
+| [slang-check-overload.cpp](../../../../source/slang/semantic-checking/slang-check-overload.cpp) | Overload resolution; ranks candidates produced by lookup | `E40018`, the note naming the argument that rejected a candidate |
+| [slang-check-conformance.cpp](../../../../source/slang/semantic-checking/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances | none; a missing requirement is reported as `E38100` by its caller in `slang-check-decl.cpp` |
+| [slang-check-conversion.cpp](../../../../source/slang/semantic-checking/slang-check-conversion.cpp) | Implicit-conversion ranking and coercion site checks | `E30523`, too many initializers in an initializer list |
+| [slang-check-inheritance.cpp](../../../../source/slang/semantic-checking/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation | `E30815`, a circular `extension` (see below) |
+| [slang-check-modifier.cpp](../../../../source/slang/semantic-checking/slang-check-modifier.cpp) | Validates modifier combinations and attribute arguments | `E31202`, two modifiers from one exclusive group on a decl |
+| [slang-check-constraint.cpp](../../../../source/slang/semantic-checking/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) | `E30433`, a pack count that fails a `countof(...)` constraint |
+| [slang-check-resolve-val.cpp](../../../../source/slang/semantic-checking/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values | none; a bad resolution result is reported at the use site |
+| [slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules | `E38007`, an entry point with no stage |
 
 `E30815` is narrower than "circular extension" suggests. It is not a
 general cycle detector over extension target types; it fires only when
@@ -102,7 +102,7 @@ information is still being computed. `getInheritanceInfo(DeclRef<ExtensionDecl>)
 pushes an `InheritanceCircularityInfo` node naming the extension onto a
 linked stack and recurses;
 `_checkForCircularityInExtensionTargetType`
-([slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp)
+([slang-check-inheritance.cpp](../../../../source/slang/semantic-checking/slang-check-inheritance.cpp)
 line 254) walks that stack on entry and, on finding the same `Decl*`,
 reports `CircularityInExtension` and returns an empty `InheritanceInfo`
 so the recursion terminates.
@@ -120,9 +120,9 @@ during linearization rather than reported as a cycle.
 The parser left function and method bodies as `UnparsedStmt` nodes
 (see [02-parse-ast.md](02-parse-ast.md)). When the checker reaches
 one, `SemanticsVisitor::maybeParseStmt`
-([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+([slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp),
 line 15606) calls `parseUnparsedStmt`
-([slang-parser.h](../../../../source/slang/slang-parser.h)) with a
+([slang-parser.h](../../../../source/slang/parser/slang-parser.h)) with a
 `SemanticsVisitor*` so that the parser can call back into the
 checker to disambiguate `<` tokens at parse time. Once the body is
 parsed, the checker continues over the resulting `Stmt` tree, so there
@@ -136,7 +136,7 @@ Name resolution produces `DeclRef`s — a decl plus a substitution that
 records how its generic and outer-context parameters have been bound.
 The concrete `DeclRefBase` operations (`DirectDeclRef`, `LookupDeclRef`,
 and substitution application) are implemented in
-[slang-ast-decl-ref.cpp](../../../../source/slang/slang-ast-decl-ref.cpp).
+[slang-ast-decl-ref.cpp](../../../../source/slang/ast/slang-ast-decl-ref.cpp).
 The algorithmic rules — scope construction, the lookup algorithm,
 shadowing, visibility filtering, and overload resolution — live in
 the dedicated [../name-resolution/](../name-resolution) subtree.
@@ -148,24 +148,24 @@ For the deeper rationale on decl-refs themselves see
 
 The checker implements generic-parameter resolution through:
 
-- [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp)
+- [slang-check-constraint.cpp](../../../../source/slang/semantic-checking/slang-check-constraint.cpp)
   — accumulates and solves type / value / witness constraints.
-- [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp)
+- [slang-check-conformance.cpp](../../../../source/slang/semantic-checking/slang-check-conformance.cpp)
   — finds (or synthesizes) the witness that a type satisfies an
   interface required by a constraint.
-- [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp)
+- [slang-check-resolve-val.cpp](../../../../source/slang/semantic-checking/slang-check-resolve-val.cpp)
   — validates `Val` substitutions after generic resolution.
 
 When resolving a generic application,
 `TryCheckOverloadCandidateConstraints`
-([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp))
+([slang-check-overload.cpp](../../../../source/slang/semantic-checking/slang-check-overload.cpp))
 routes an outermost generic's defaulted and witness arguments (a nested
 generic keeps the per-constraint linear pass) through
 the constraint solver's fixpoint (`trySolveGenericArguments`) — the
 same path used for inferred arguments — passing only the explicitly
 supplied ordinary-argument prefix
 (`OverloadCandidate::explicitGenericArgCount` in
-[slang-check-impl.h](../../../../source/slang/slang-check-impl.h)) as
+[slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h)) as
 fixed caller input so a user-written self-reference argument is not
 overwritten by a parameter's default. On solver failure the code
 falls through to the per-constraint linear pass that re-derives the
@@ -177,7 +177,7 @@ A constraint written on an associated type — whether as
 `GenericTypeConstraintDecl` requirement of the *enclosing interface*
 (a sibling of `A`), not nested under `A`. In that unified
 representation `findWitnessForInterfaceRequirement`
-([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp))
+([slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp))
 satisfies an interface-level constraint requirement by re-checking
 the subtype (or, for an `==` constraint, type-equality) relationship
 after `This` has been replaced by the conforming type, rather than by
@@ -190,7 +190,7 @@ witness-table early-out at the top of that function.
 
 Linearized inheritance lists are computed by `getInheritanceInfo` /
 `_calcInheritanceInfo` in
-[slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp).
+[slang-check-inheritance.cpp](../../../../source/slang/semantic-checking/slang-check-inheritance.cpp).
 For an associated-type access such as `T.D`, the engine surfaces the
 interface-level `__constraint`s of the interfaces each anchor type
 conforms to, re-expresses each through the anchor's conformance witness,
@@ -202,13 +202,13 @@ ioSkippedIncompleteFacet` out-parameter; a frame whose skipped set is
 non-empty after subtracting itself is partial, is not cached, and is
 recomputed by a later root-level query. A bare-`This` subject on an
 interface `__constraint` is rejected in `visitGenericTypeConstraintDecl`
-([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+([slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp),
 line 4755) as `ConstraintSubjectCannotBeThisType`.
 
 When a generic cannot be specialized for a call, the failure reason is
 captured eagerly but reported lazily. The constraint solver records a
 `GenericArgumentInferenceFailure`
-([slang-check-impl.h](../../../../source/slang/slang-check-impl.h)) — a
+([slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h)) — a
 tagged union whose `Kind` selects both the stored payload and the
 diagnostic that will eventually be emitted:
 
@@ -229,7 +229,7 @@ formatting is deferred so speculative candidates never pay for it. The failure i
 and turned into a focused diagnostic only if overload resolution
 selects that failed candidate — see the `switch` over
 `candidate.genericInferenceFailure.kind` in `CompleteOverloadCandidate`
-([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)).
+([slang-check-overload.cpp](../../../../source/slang/semantic-checking/slang-check-overload.cpp)).
 A candidate whose failure `Kind` is `None` still falls back to the
 catch-all `Diagnostics::GenericArgumentInferenceFailed`.
 
@@ -249,9 +249,9 @@ the `attribute_syntax` declarations in
 [core.meta.slang](../../../../source/slang/core.meta.slang), lines 489,
 498 and 517; `ForwardDifferentiableAttribute` and
 `BackwardDifferentiableAttribute` both derive from `DifferentiableAttribute`
-in [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h)).
+in [slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h)).
 `SemanticsDeclHeaderVisitor::synthesizeDifferentiabilityRequirements`
-([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+([slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp),
 line 16160) runs for each non-synthesized `FunctionDeclBase` in the
 `DeclCheckState::ReadyForReference` arm of the decl-check dispatch, after
 `SignatureChecked` has recorded the effective `this` parameter. On seeing
@@ -321,11 +321,11 @@ this document only points at the implementation.
 Some declarations gain members at check time: default conformance witnesses, generated comparison /
 construction methods, and several built-in conformances. The
 *decisions* about what to synthesize live primarily in
-[slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+[slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp)
 — for example `_synthesizeCtorSignature` for default constructors and
 the `trySynthesize*RequirementWitness` routines for interface
 requirements — while
-[slang-ast-synthesis.cpp](../../../../source/slang/slang-ast-synthesis.cpp)
+[slang-ast-synthesis.cpp](../../../../source/slang/ast/slang-ast-synthesis.cpp)
 supplies the `ASTSynthesizer` helpers (`emitBinaryExpr`, `emitVarExpr`,
 `emitInvokeExpr`, `emitVarDeclStmt`, ...) that build the AST fragments
 those routines emit. The checker calls into this machinery for members the user did not
@@ -334,11 +334,11 @@ write but the language guarantees.
 ## Modifier validation
 
 Modifier-specific checks live in
-[slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp):
+[slang-check-modifier.cpp](../../../../source/slang/semantic-checking/slang-check-modifier.cpp):
 which modifiers are allowed on which decls, mutually exclusive
 combinations, attribute argument types, and the differences between
 Slang and GLSL input. Modifier nodes themselves are defined in
-[slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h).
+[slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h).
 
 *Mutually exclusive* is decided by `getModifierConflictGroupKind`
 (line 1564), which maps a modifier's `ASTNodeType` to the group it
@@ -355,7 +355,7 @@ a sampling location (`noperspective centroid`).
 The dialect axis here is GLSL rather than HLSL. `checkModifier` (line
 1946) computes `isGLSLInput` from
 `SharedSemanticsContext::isGLSLSourceLanguage`
-([slang-check-impl.h](../../../../source/slang/slang-check-impl.h), line
+([slang-check-impl.h](../../../../source/slang/semantic-checking/slang-check-impl.h), line
 1056), which is true when the translation unit's source language is GLSL
 (false for a context with no translation unit), and passes it to
 `isModifierAllowedOnDecl` (line 1681); a
@@ -373,7 +373,7 @@ Without GLSL input the arm for `GloballyCoherentModifier` and
 `HLSLVolatileModifier` (line 1741) requires `as<VarDecl>(decl)`, and a
 parameter is a `ParamDecl`, which derives from `VarDeclBase` as a
 *sibling* of `VarDecl`
-([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) lines
+([slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h) lines
 321, 339, 648), so the modifier is rejected. Many other combinations are
 settled earlier, by the parser or by plain acceptance, and never reach
 `E31201`.
@@ -390,7 +390,7 @@ branch on the flag at all.
 `public`, `internal` and `private` are checked like any other
 modifier, but the scope each one names is not the source file.
 `isDeclVisibleFromScope`
-([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp),
+([slang-check-expr.cpp](../../../../source/slang/semantic-checking/slang-check-expr.cpp),
 line 1181) decides the question:
 
 | Modifier | Visible from |
@@ -408,7 +408,7 @@ interface requirement — is rejected up front with `E30603`.
 
 `validateDynInterfaceUsage` and
 `validateDynInterfaceUseWithInheritanceDecl`
-([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+([slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp),
 lines 383 and 453) constrain what a `dyn interface` may declare and
 what may conform to one. `validateDynInterfaceUsage` is gated on
 `allowExperimentalDynamicDispatch` (line 375) and is a no-op unless
@@ -431,7 +431,7 @@ fixed-size box.
 
 ## Shader-specific checks
 
-[slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)
+[slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp)
 validates entry points: the function's stage attribute, parameter
 modifiers (`in`, `out`, `inout` and stage-specific intrinsics), return
 type compatibility with the stage, and resource binding rules.
@@ -441,7 +441,7 @@ inference walk:
 
 - **Generic-struct capability requirements.**
   `collectGenericStructTypeUses`
-  ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
+  ([slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp))
   recurses through an entry point's signature types (parameters and
   return type, through each struct's fields with substitutions applied
   and through `Val` operands) to find every user-defined generic struct
@@ -465,7 +465,7 @@ inference walk:
   `void main<T>(...)` left genuinely unspecialized lowers to an
   `IRGeneric` rather than an `IRFunc` and used to crash at link time.
   `createSpecializedGlobalAndEntryPointsComponentType`
-  ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
+  ([slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp))
   uses `Linkage::isSpecialized` together with the presence of
   specialization-argument strings to decide, and calls
   `diagnoseGenericEntryPoint` (line 4269) — which emits `E38014`
@@ -476,7 +476,7 @@ inference walk:
   most one depth system value. Because the per-parameter semantic check
   looks at each semantic in isolation, the conflict is detected
   separately: `collectDepthOutputSemantics`
-  ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp),
+  ([slang-check-shader.cpp](../../../../source/slang/semantic-checking/slang-check-shader.cpp),
   line 649 at `source_commit`) walks every `out` / `inout` parameter and
   the return type — unwrapping `Conditional<T>` and array wrappers and
   recursing into struct fields, so a semantic on a field of an
@@ -516,7 +516,7 @@ threaded into `SemanticsContext`. Check-level recovery is generally
 "continue with a placeholder type" so that one error does not cascade:
 unresolved decls become `ErrorType`-typed, and overload resolution
 returns a synthetic `errorExpr`. When `ExpectATypeRepr`
-([slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp))
+([slang-check-type.cpp](../../../../source/slang/semantic-checking/slang-check-type.cpp))
 finds an expression that does not denote a type, it builds the
 `Diagnostics::ExpectedAType` message from the expression's actual type
 and, when available, the referenced name.
@@ -557,7 +557,7 @@ Several diagnostics point the user at the likely fix:
   `myLongVariableName`, while `sqr` does not suggest the core module's
   `sqrt`.
 - **Discarded `[NoDiscard]` results.** `maybeDiagnoseDiscardedNoDiscardResult`
-  ([slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp),
+  ([slang-check-stmt.cpp](../../../../source/slang/semantic-checking/slang-check-stmt.cpp),
   line 742) fires with `E30059` when the result of a call to a
   `[NoDiscard]`-marked function is thrown away — `f();` written as a
   bare expression statement, or in a `for` side-effect expression —

@@ -23,7 +23,7 @@ recognizes.
 1. `# Slang Grammar (Reverse-Engineered)` (title)
 2. `## Caveats` — explicit list:
    - This grammar is reverse-engineered from
-     [slang-parser.cpp](../../../../source/slang/slang-parser.cpp), not
+     [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp), not
      designed; mismatches with the implementation are bugs in the
      grammar.
    - It is context-sensitive: identifiers are classified at lookup
@@ -48,17 +48,17 @@ recognizes.
    `break`, `continue`, `discard`, `defer` if present).
 7. `## Expressions` — productions for the expression grammar
    following the parser's precedence ladder. Cite
-   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) and
+   [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) and
    note the heuristic for `<` (generic application vs. comparison).
    The `Literal` production must enumerate every concrete
    `LiteralExpr` subclass declared in
-   [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)
+   [slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h)
    (currently `IntegerLiteralExpr`, `FloatingPointLiteralExpr`,
    `BoolLiteralExpr`, `NullPtrLiteralExpr`, `NoneLiteralExpr`,
    `StringLiteralExpr`, and any future siblings), even when the
    literal is parsed via the keyword syntax-decl table
    (`_makeParseExpr("true", parseTrueExpr)` and friends in
-   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp))
+   [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp))
    rather than from a distinct token kind. Add a one-sentence note
    identifying which of those literal forms are lexically
    `Identifier` tokens (`true`, `false`, `nullptr`, `none`) rather
@@ -73,7 +73,7 @@ recognizes.
     deferred-body interaction.
 
 Every production must be verifiable by reading the named parsing
-functions in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
+functions in [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp).
 When you state a production, parenthetically cite the parser function
 that implements it (e.g. "implemented in `parseDecl`").
 
@@ -82,13 +82,13 @@ that implements it (e.g. "implemented in `parseDecl`").
 - [ ] Every terminal is either an explicit string literal or one of
       the token kinds in [tokens.md](tokens.md).
 - [ ] Every non-terminal cites at least one parser function in
-      [slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
+      [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp).
 - [ ] Productions for ambiguous constructs (`<` in expressions, type
       vs. value identifiers) include a note explaining how the parser
       disambiguates.
 - [ ] The `Literal` production lists every concrete `LiteralExpr`
       subclass declared in
-      [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h),
+      [slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h),
       including the ones parsed via the keyword syntax-decl
       mechanism (`'true'`, `'false'`, `'nullptr'`, `'none'`). No
       literal form is also duplicated under a `KeywordExpr`-style
