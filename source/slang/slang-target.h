@@ -82,6 +82,13 @@ bool isMetalTarget(CodeGenTarget target);
 bool isKhronosTarget(TargetRequest* targetReq);
 bool isKhronosTarget(CodeGenTarget target);
 
+/// Does `[vk::offset]` move struct fields and entry-point `uniform` parameters on `targetReq`?
+/// It does only on SPIR-V and GLSL. Other targets emit their structs without explicit offsets,
+/// so there, and when no target is known, layout uses the offsets that the layout rules compute.
+/// Front-end layout (reflection) and IR layout (generated code) both use this predicate, so
+/// that they agree.
+bool doesTargetHonorVkOffset(TargetRequest* targetReq);
+
 /// Are we generating code where SPIRV is the target?
 bool isSPIRV(CodeGenTarget codeGenTarget);
 

@@ -3309,6 +3309,11 @@ bool isKhronosTarget(TargetRequest* targetReq)
     return isKhronosTarget(targetReq->getTarget());
 }
 
+bool doesTargetHonorVkOffset(TargetRequest* targetReq)
+{
+    return targetReq && isKhronosTarget(targetReq);
+}
+
 bool isSPIRV(CodeGenTarget codeGenTarget)
 {
     return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;

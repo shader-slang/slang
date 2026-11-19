@@ -145,6 +145,10 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             IRIntegerValue lastFieldAlignment = 0;
             IRType* lastFieldType = NULL;
             bool seenFinalUnsizedArrayField = false;
+            // The target rule covers every struct, not only the entry-point parameter
+            // struct: off SPIR-V and GLSL, a field with `[vk::offset]` keeps the offset that
+            // the layout rules compute, which is where the emitted struct puts it.
+            const bool applyVkOffset = doesTargetHonorVkOffset(targetReq);
             for (auto field : structType->getFields())
             {
                 // If we failed to catch an unsized array earlier in the pipeline,
@@ -158,8 +162,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 seenFinalUnsizedArrayField =
                     fieldTypeLayout.size == IRSizeAndAlignment::kIndeterminateSize;
 
-                if (auto offsetDecor =
-                        field->getKey()->findDecoration<IRVkStructOffsetDecoration>())
+                auto offsetDecor = field->getKey()->findDecoration<IRVkStructOffsetDecoration>();
+                if (offsetDecor && applyVkOffset)
                 {
                     offset = offsetDecor->getOffset()->getValue();
                 }
