@@ -8179,23 +8179,24 @@ struct TriangleStream
     }
 };
 
+// The unroll bound is the largest vector or matrix dimension (16), so every size unrolls fully.
 #define VECTOR_MAP_UNARY(TYPE, COUNT, FUNC, VALUE) \
-    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(16)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define MATRIX_MAP_UNARY(TYPE, ROWS, COLS, FUNC, VALUE) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(16)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(VALUE[i]); } return result
 
 #define VECTOR_MAP_BINARY(TYPE, COUNT, FUNC, LEFT, RIGHT) \
-    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(16)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define MATRIX_MAP_BINARY(TYPE, ROWS, COLS, FUNC, LEFT, RIGHT) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(16)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(LEFT[i], RIGHT[i]); } return result
 
 #define VECTOR_MAP_TRINARY(TYPE, COUNT, FUNC, A, B, C) \
-    vector<TYPE,COUNT> result; [ForceUnroll(4)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    vector<TYPE,COUNT> result; [ForceUnroll(16)] for(int i = 0; i < COUNT; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 #define MATRIX_MAP_TRINARY(TYPE, ROWS, COLS, FUNC, A, B, C) \
-    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(4)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
+    matrix<TYPE,ROWS,COLS> result; [ForceUnroll(16)] for(int i = 0; i < ROWS; ++i) { result[i] = FUNC(A[i], B[i], C[i]); } return result
 
 // Vectors with more than 4 elements and matrices with more than 4 rows or columns have no native
 // type on any target; they are lowered to arrays (see `legalizeLargeVectorMatrixTypes`). An
