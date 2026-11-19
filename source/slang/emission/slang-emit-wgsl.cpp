@@ -1108,9 +1108,9 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     SLANG_UNEXPECTED("unhandled base type for IntLit in WGSL emission");
                     break;
 
+                // We report the error and emit no literal text; the diagnostic fails
+                // compilation before the malformed output can be consumed.
                 case BaseType::Int8:
-                    // We report the error and emit no literal text; the diagnostic fails
-                    // compilation before the malformed output can be consumed.
                     {
                         diagnoseOnce(Diagnostics::Int8NotSupportedInWgsl{.typeName = "int8_t"});
                         break;
