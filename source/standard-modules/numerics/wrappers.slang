@@ -78,6 +78,17 @@ public bool any(M value)
     return value.any();
 }
 
+/// Returns each logical component from `ifTrue` where `condition` is true, and from `ifFalse`
+/// otherwise.
+__generic<T : INumericShapedType>
+[__readNone]
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+public T select(T.Mask condition, T ifTrue, T ifFalse)
+{
+    return T.selectComponents(condition, ifTrue, ifFalse);
+}
+
 /// Returns the dot product of `left` and `right`.
 __generic<T : IDotProduct>
 [__readNone]

@@ -17,8 +17,10 @@
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
+// CHECK-NEXT: 1
+// CHECK-NEXT: 1
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=results
+//TEST_INPUT:ubuffer(count=16, stride=4):out,name=results
 
 import slang.numerics.differentiable;
 
@@ -34,7 +36,7 @@ struct Pair : IDifferentiableDotProduct
 
     typealias Differential = Pair;
     typealias Scalar = float;
-    typealias Mask = bool;
+    typealias Mask = bool2;
 
     [Differentiable]
     static Differential dzero()
@@ -52,6 +54,14 @@ struct Pair : IDifferentiableDotProduct
     static This fromScalar(Scalar value)
     {
         return {value, value};
+    }
+
+    [Differentiable]
+    static This selectComponents(no_diff Mask condition, This ifTrue, This ifFalse)
+    {
+        return {
+            condition.x ? ifTrue.first : ifFalse.first,
+            condition.y ? ifTrue.second : ifFalse.second};
     }
 
     Scalar dotProductWith(This other)
@@ -153,4 +163,10 @@ void computeMain()
     results[11] = int(approximatelyEqual(pairForward.d, 29.0));
     results[12] = int(approximatelyEqual(pairLeft.d.first, 3.0));
     results[13] = int(approximatelyEqual(pairRight.d.second, 2.0));
+
+    // `IDifferentiableDotProduct` inherits the selection requirement. A mixed mask verifies
+    // that the `Pair` conformance makes an independent decision for each field.
+    let selectedPair = select(bool2(true, false), Pair(1.0, 2.0), Pair(3.0, 4.0));
+    results[14] = int(selectedPair.first == 1.0);
+    results[15] = int(selectedPair.second == 4.0);
 }
