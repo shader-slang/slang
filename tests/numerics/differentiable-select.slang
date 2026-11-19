@@ -7,7 +7,7 @@
 
 import slang.numerics.differentiable;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=results
+//TEST_INPUT:ubuffer(count=14, stride=4):out,name=results
 RWStructuredBuffer<uint> results;
 
 // A user-defined representation must dispatch through its differentiable conformance as well.
@@ -41,6 +41,9 @@ T chooseComponents<T : IDifferentiableNumericShapedType>(
     return select(condition, ifTrue, ifFalse);
 }
 
+// Checks scalar selection in forward mode. For a vector, a column-major matrix, and `TwoValues`,
+// the checks cover both forward and reverse modes.
+// The harness provides 14 entries in `results`. Each check writes 1 for success or 0 for failure.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()

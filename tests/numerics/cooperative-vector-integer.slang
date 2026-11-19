@@ -15,12 +15,14 @@
 // CHECK-NEXT: 20
 // CHECK-NEXT: 6
 // CHECK-NEXT: 9
-// CHECK-NEXT: 7
-// CHECK-NEXT: 4
-// CHECK-NEXT: 3
-// CHECK-NEXT: 8
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+// The last four entries are the selected signed components followed by the unsigned components.
+// CHECK-NEXT: {{^}}7{{$}}
+// CHECK-NEXT: {{^}}4{{$}}
+// CHECK-NEXT: {{^}}3{{$}}
+// CHECK-NEXT: {{^}}8{{$}}
+
+//TEST_INPUT:ubuffer(count=16, stride=4):out,name=outputBuffer
 import slang.numerics;
 
 RWStructuredBuffer<int> outputBuffer;

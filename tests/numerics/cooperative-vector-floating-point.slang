@@ -37,6 +37,8 @@ void computeMain()
         constructFromBuiltinFloatingPoint<CoopVec<float, 4>>(half(0.5));
     CoopVec<float, 4> result = realCurve(value, CoopVec<float, 4>(4.0));
     bool ordered = allLessThan(value, CoopVec<float, 4>(1.0));
+
+    // The compilation test uses one component from each input so both mask choices reach the store.
     let selected = chooseComponents(bool4(true, false, true, false), result, value);
     outputBuffer[0] = selected[0] + selected[1] + float(ordered);
 }

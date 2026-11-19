@@ -18,24 +18,27 @@
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 18.000000
-// CHECK-NEXT: 2.000000
-// CHECK-NEXT: 20.000000
-// CHECK-NEXT: 4.000000
-// CHECK-NEXT: 40.000000
-// CHECK-NEXT: 1.000000
-// CHECK-NEXT: 20.000000
-// CHECK-NEXT: 3.000000
-// CHECK-NEXT: 40.000000
-// CHECK-NEXT: 2.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 4.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 3.000000
-// CHECK-NEXT: 0.000000
-// CHECK-NEXT: 5.000000
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+// The selection checks expect four components each for the primal result, its tangent, and the
+// adjoints for the true and false inputs, in that order.
+// CHECK-NEXT: {{^}}2.000000{{$}}
+// CHECK-NEXT: {{^}}20.000000{{$}}
+// CHECK-NEXT: {{^}}4.000000{{$}}
+// CHECK-NEXT: {{^}}40.000000{{$}}
+// CHECK-NEXT: {{^}}1.000000{{$}}
+// CHECK-NEXT: {{^}}20.000000{{$}}
+// CHECK-NEXT: {{^}}3.000000{{$}}
+// CHECK-NEXT: {{^}}40.000000{{$}}
+// CHECK-NEXT: {{^}}2.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}4.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}3.000000{{$}}
+// CHECK-NEXT: {{^}}0.000000{{$}}
+// CHECK-NEXT: {{^}}5.000000{{$}}
+
+//TEST_INPUT:ubuffer(count=33, stride=4):out,name=outputBuffer
 
 import slang.numerics.differentiable;
 

@@ -13,7 +13,7 @@
 // CHECK: type: int32_t
 // CHECK-COUNT-14: {{^}}1{{$}}
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(count=14, stride=4):out,name=outputBuffer
 //TEST_INPUT:ubuffer(data=[0x7fc00001 0x80000000 0x7fc00002 0], stride=4):name=inputBits
 
 import slang.numerics;
@@ -67,6 +67,9 @@ bool matricesEqual<T : __BuiltinArithmeticType, let R : int, let C : int, let L 
     return true;
 }
 
+// Writes one pass flag per selection check, with 1 for success and 0 for failure.
+// For the runtime cases, the harness provides 14 entries in `outputBuffer` and the four
+// floating-point bit patterns in `inputBits`.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -110,8 +113,9 @@ void computeMain()
         bool2(false, true), CoordinatePair(1, 2), CoordinatePair(3, 4));
     outputBuffer[11] = int(pairResult.x == 3.0 && pairResult.y == 2.0);
 
-    // Buffer-loaded bits keep NaN payloads and zero signs observable after specialization. Each
-    // selected component must preserve its bits even when the other argument contains a NaN.
+    // `inputBits` holds a NaN, negative zero, a NaN with a different payload, and positive zero.
+    // We load the values and derive the mask at runtime so we can check that the generated code
+    // preserves the bits of each chosen component, even when the other input contains a NaN.
     let expectedBits = uint4(inputBits[0], inputBits[1], inputBits[2], inputBits[3]);
     let ifTrue = asfloat(uint4(inputBits[0], inputBits[1], 0, inputBits[2]));
     let ifFalse = asfloat(uint4(0, 0, inputBits[2], inputBits[3]));
