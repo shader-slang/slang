@@ -212,6 +212,7 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParam
 
 Val* SemanticsVisitor::ExtractGenericArgVal(
     Expr* exp,
+    Type* genericParamType,
     ConstantFoldingCircularityInfo* circularityInfo)
 {
     if (auto overloadedExpr = as<OverloadedExpr>(exp))
@@ -235,7 +236,7 @@ Val* SemanticsVisitor::ExtractGenericArgVal(
         }
         return ExtractGenericArgInteger(
             exp,
-            nullptr,
+            genericParamType,
             ConstantFoldingKind::LinkTime,
             getSink(),
             circularityInfo);
@@ -250,7 +251,7 @@ Type* SemanticsVisitor::InstantiateGenericType(
 
     for (auto argExpr : args)
     {
-        evaledArgs.add(ExtractGenericArgVal(argExpr));
+        evaledArgs.add(ExtractGenericArgVal(argExpr, nullptr, nullptr));
     }
 
     DeclRef<Decl> innerDeclRef =
@@ -390,12 +391,18 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     return false;
                 }
                 // TODO: this is one place where syntax should get cloned!
+                // The default folds through the parameter's declared type, so
+                // a specialization that omitted the argument records the same
+                // canonical `IntVal` an explicitly written argument produces.
                 if (outProperType)
                 {
                     ConstantFoldingCircularityInfo newCircularityInfo(
                         makeDeclRef(valParam),
                         nullptr);
-                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
+                    args.add(ExtractGenericArgVal(
+                        valParam->initExpr,
+                        valParam->getType(),
+                        &newCircularityInfo));
                 }
             }
         }

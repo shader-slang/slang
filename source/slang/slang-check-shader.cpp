@@ -3802,6 +3802,29 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                     intVal =
                         getLinkage()->getASTBuilder()->getIntVal(m_astBuilder->getIntType(), 0);
                 }
+                else if (intVal->getType() != paramDecl->getType())
+                {
+                    // The argument `Val` may have been folded from an expression whose
+                    // own type differs from the parameter's declared type (an unsuffixed
+                    // integer literal folds with its `Int` type). Coerce the folded value
+                    // to the declared type here, so an API/CLI specialization records
+                    // the same canonical value an in-source specialization of the
+                    // parameter produces, and the two compare equal under `Val::equals`.
+                    auto astBuilder = getLinkage()->getASTBuilder();
+                    if (auto folded = as<IntVal>(TypeCastIntVal::tryFoldImpl(
+                            astBuilder,
+                            paramDecl->getType(),
+                            intVal,
+                            sink)))
+                    {
+                        intVal = folded;
+                    }
+                    else
+                    {
+                        intVal =
+                            as<IntVal>(astBuilder->getTypeCastIntVal(paramDecl->getType(), intVal));
+                    }
+                }
 
                 ModuleSpecializationInfo::GenericArgInfo expandedArg;
                 expandedArg.paramDecl = paramDecl;
@@ -3840,7 +3863,7 @@ static void _extractSpecializationArgs(
         auto argExpr = argExprs[ii];
 
         SpecializationArg arg;
-        arg.val = semanticsVisitor.ExtractGenericArgVal(argExpr);
+        arg.val = semanticsVisitor.ExtractGenericArgVal(argExpr, nullptr, nullptr);
         outArgs.add(arg);
     }
 }

@@ -935,13 +935,19 @@ Val* getGenericParamDefaultArgVal(SemanticsVisitor* visitor, Decl* paramDecl)
         // The default-value expression for a generic value parameter must be
         // folded into an `IntVal` before it can be stored in the argument list.
         // For `Foo<let N : int = 4>`, this returns the folded integer value
-        // `4`. Constant folding can encounter circular defaults like
-        // `N = M, M = N`, so this path uses the same circularity guard as other
-        // semantic checks.
+        // `4`. The fold goes through the parameter's declared type, so an
+        // unsuffixed literal default (e.g. `uint32_t N = 16`) yields the same
+        // param-typed `IntVal` an explicitly written argument produces, and
+        // the two spellings of the specialization compare equal. Constant
+        // folding can encounter circular defaults like `N = M, M = N`, so
+        // this path uses the same circularity guard as other semantic checks.
         SemanticsVisitor::ConstantFoldingCircularityInfo newCircularityInfo(
             makeDeclRef(paramDecl),
             nullptr);
-        return visitor->ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo);
+        return visitor->ExtractGenericArgVal(
+            valParam->initExpr,
+            valParam->getType(),
+            &newCircularityInfo);
     }
     return nullptr;
 }

@@ -2169,7 +2169,20 @@ public:
         ConstantFoldingCircularityInfo* circularityInfo = nullptr);
     IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
-    Val* ExtractGenericArgVal(Expr* exp, ConstantFoldingCircularityInfo* circularityInfo = nullptr);
+    // Extract the semantic value of a generic argument from an expression.
+    // `genericParamType` is the declared type of the value parameter the
+    // argument is filling; when non-null, an integer-valued expression is
+    // folded through that type, so the resulting `IntVal` carries the
+    // parameter's declared type rather than the expression's own type. This
+    // keeps an implicitly defaulted argument and an explicitly written
+    // argument of the same value equal under `Val::equals`, since both fold
+    // to the one canonical form. Callers extracting an argument with no value
+    // parameter in scope pass `nullptr`, leaving the fold to the expression's
+    // own type.
+    Val* ExtractGenericArgVal(
+        Expr* exp,
+        Type* genericParamType,
+        ConstantFoldingCircularityInfo* circularityInfo);
 
     // Construct a type representing the instantiation of
     // the given generic declaration for the given arguments.
