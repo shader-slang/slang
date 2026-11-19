@@ -48,6 +48,41 @@ IRInst* findCloneForOperand(IRCloneEnv* env, IRInst* oldOperand)
     return oldOperand;
 }
 
+void cloneDebugScopeTree(
+    IRCloneEnv* cloneEnv,
+    IRBuilder* builder,
+    IRInst* rootScope,
+    IRInst* rootReplacement)
+{
+    if (rootReplacement)
+        cloneEnv->mapOldValToNew[rootScope] = rootReplacement;
+    List<IRInst*> scopes;
+    scopes.add(rootScope);
+    while (scopes.getCount())
+    {
+        auto scope = scopes.getLast();
+        scopes.removeLast();
+        // Record the parent clone before visiting its lexical children. Their parent
+        // operands, and later the function body's scope operands, use this mapping.
+        if (scope != rootScope || !rootReplacement)
+        {
+            SLANG_ASSERT(!lookUp(cloneEnv, scope));
+            cloneInst(cloneEnv, builder, scope);
+        }
+        // A nested lexical block refers to this scope through its parent operand.
+        // Follow those uses to discover children, leaving variables and scope markers
+        // to the ordinary function-body clone instead of traversing all users.
+        for (auto use = scope->firstUse; use; use = use->nextUse)
+        {
+            if (auto lexicalBlock = as<IRDebugLexicalBlock>(use->getUser()))
+            {
+                if (lexicalBlock->getParentScope() == scope)
+                    scopes.add(lexicalBlock);
+            }
+        }
+    }
+}
+
 // Clone the declaration scopes owned by a function before specializing its body.
 // Consider `void f(IFoo value) { { int local = value.get(); } }` specialized for
 // two concrete implementations of IFoo. Each copy needs its own DebugFunction,
@@ -63,28 +98,7 @@ static void cloneDebugScopesForFunc(IRCloneEnv* cloneEnv, IRBuilder* builder, IR
 
     // Start with the function's debug metadata, not the executable IRFunc. The scopes
     // are siblings of that function, so cloning its children would not copy them.
-    List<IRInst*> scopes;
-    scopes.add(decoration->getDebugFunc());
-    while (scopes.getCount())
-    {
-        auto scope = scopes.getLast();
-        scopes.removeLast();
-        SLANG_ASSERT(!lookUp(cloneEnv, scope));
-        // Record the parent clone before visiting its lexical children. Their parent
-        // operands, and later the function body's scope operands, use this mapping.
-        cloneInst(cloneEnv, builder, scope);
-        // A nested lexical block refers to this scope through its parent operand.
-        // Follow those uses to discover children, leaving variables and scope markers
-        // to the ordinary function-body clone instead of traversing all users.
-        for (auto use = scope->firstUse; use; use = use->nextUse)
-        {
-            if (auto lexicalBlock = as<IRDebugLexicalBlock>(use->getUser()))
-            {
-                if (lexicalBlock->getParentScope() == scope)
-                    scopes.add(lexicalBlock);
-            }
-        }
-    }
+    cloneDebugScopeTree(cloneEnv, builder, decoration->getDebugFunc(), nullptr);
 }
 
 IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)

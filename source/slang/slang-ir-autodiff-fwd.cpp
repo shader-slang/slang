@@ -131,6 +131,10 @@ struct ForwardDiffTranslationContext
     // Pending values to write back to inout params at the end of the current function.
     OrderedDictionary<IRInst*, InstPair> mapInOutParamToWriteBackValue;
 
+    // The DebugFunction at the root of the scope tree that translateFunc's body inherits:
+    // the record of the primal clone it transcribes from.
+    IRInst* inheritedDebugRoot = nullptr;
+
     // Signals the translater to use an IRTrivialForwardDifferentiate(func)
     // instruction for functions that are non-forward-differentiable, but
     // have a reverse-mode derivative defined.
@@ -2484,9 +2488,12 @@ struct ForwardDiffTranslationContext
 
         this->translateFunc(inBuilder, origFunc, cast<IRFunc>(fwdDiffFunc));
 
+        // Give the derivative its debug record before hoisting: hoisting a derivative out of a
+        // generic clones it together with its record and scope tree, so re-rooting first keeps
+        // the inherited root identifiable and leaves the record on the IRFunc itself.
+        copyDebugInfo(origFunc, fwdDiffFunc, inheritedDebugRoot);
         fwdDiffFunc = maybeHoist(*inBuilder, fwdDiffFunc);
         stripTempDecorations(fwdDiffFunc);
-        copyDebugInfo(origFunc, fwdDiffFunc);
         propagatePropertiesForSingleFunc(inBuilder->getModule(), cast<IRFunc>(fwdDiffFunc));
     }
 
@@ -2561,6 +2568,12 @@ struct ForwardDiffTranslationContext
 #if _DEBUG
         checkAutodiffInstDecorations(diffFunc);
 #endif
+
+        // The body is complete here. Its own scopes are transcribed from the primal clone's scope
+        // tree, so the clone's DebugFunction is the root that copyDebugInfo re-roots onto the
+        // derivative.
+        auto debugFuncDecor = primalFuncClone->findDecoration<IRDebugFuncDecoration>();
+        inheritedDebugRoot = debugFuncDecor ? debugFuncDecor->getDebugFunc() : nullptr;
 
         return InstPair(primalFunc, diffFunc);
     }
@@ -3600,7 +3613,7 @@ IRInst* maybeTranslateRawForwardDerivativeWithAnnotations(
     fwdDiffFunc = pair.differential;
 
     translater.translateFunc(&builder, origFunc, cast<IRFunc>(fwdDiffFunc));
-    copyDebugInfo(origFunc, fwdDiffFunc);
+    copyDebugInfo(origFunc, fwdDiffFunc, translater.inheritedDebugRoot);
 
     // For this version, we won't try to remove any generated annotations.
     return fwdDiffFunc;
