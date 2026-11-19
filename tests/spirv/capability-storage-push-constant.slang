@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK8): -target spirv -profile spirv_1_3 -DCONST_UINT8
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DCONST_UINT16
 //TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DCONST_HALF
+//TEST:SIMPLE(filecheck=CHECK16): -target spirv -profile spirv_1_3 -DCONST_BFLOAT16
 //TEST:SIMPLE(filecheck=CHECKBOTH): -target spirv -profile spirv_1_3 -DCONST_UINT8 -DCONST_HALF
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -profile spirv_1_3
 
@@ -20,6 +21,8 @@ struct PushConstants {
     int8_t index;
 #elif defined(CONST_UINT16)
     int16_t index;
+#elif defined(CONST_BFLOAT16)
+    BFloat16 index;
 #else
     int32_t index;
 #endif
