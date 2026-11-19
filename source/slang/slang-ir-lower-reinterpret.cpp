@@ -205,6 +205,9 @@ struct ReinterpretLoweringContext
         builder.setInsertBefore(inst);
         auto anyValueType =
             builder.getAnyValueType(builder.getIntValue(builder.getUIntType(), anyValueSize));
+        // The pack and unpack carry the reinterpret's location, so that a diagnostic about
+        // marshalling them points at the user's `reinterpret` call.
+        IRBuilderSourceLocRAII sourceLocScope(&builder, inst->sourceLoc);
         auto packInst = builder.emitPackAnyValue(anyValueType, operand);
         auto unpackInst = builder.emitUnpackAnyValue(toType, packInst);
         inst->replaceUsesWith(unpackInst);

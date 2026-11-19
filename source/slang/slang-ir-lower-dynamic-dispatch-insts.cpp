@@ -198,6 +198,10 @@ IRFunc* emitWitnessTableWrapper(
     auto block = builder->emitBlock();
     builder->setInsertInto(block);
 
+    // The wrapper's pack/unpack insts carry the implementing function's location, so that
+    // a diagnostic about marshalling one of its values points at user code.
+    IRBuilderSourceLocRAII sourceLocScope(builder, funcInst->sourceLoc);
+
     ShortList<IRParam*> params;
     for (UInt i = 0; i < funcTypeInInterface->getParamCount(); i++)
     {
