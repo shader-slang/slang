@@ -102,8 +102,8 @@ bool isTestTargetName(const UnownedStringSlice& name);
 // result. Every other value must select at least one target.
 //
 // Returns `SLANG_E_INVALID_ARG` and sets `outError` for an unknown name, an empty token, or an
-// empty result that is not `none`. A name that is wrong must be an error, because a silent skip would run the test
-// on fewer targets than the author wants.
+// empty result that is not `none`. A name that is wrong must be an error, because a silent skip
+// would run the test on fewer targets than the author wants.
 SlangResult parseTestTargets(
     const UnownedStringSlice& value,
     TestTargetFlags& outTargets,
