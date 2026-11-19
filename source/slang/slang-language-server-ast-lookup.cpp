@@ -638,9 +638,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
         return visitor.dispatch(expr);
     }
 
-    // A condition clause is searched per form, through the condition-clause
-    // visitor: an expression condition carries its expression; a declaration
-    // condition carries its declaration plus the checked value derived from it.
+    // Search a condition clause through the condition-clause visitor.
     bool checkConditionClause(ConditionClause* clause)
     {
         if (!clause)

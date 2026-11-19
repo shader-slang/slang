@@ -1115,10 +1115,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             return;
         return DeclVisitor<VisitorType>::dispatch(val);
     }
-    // A condition clause is dispatched per form, through the condition-clause
-    // visitor: an expression condition carries its expression; a declaration
-    // condition carries its declaration plus the checked value that semantic
-    // checking derived from it.
+    // Dispatch a condition clause through the condition-clause visitor.
     void dispatchConditionClause(ConditionClause* clause)
     {
         if (!clause)

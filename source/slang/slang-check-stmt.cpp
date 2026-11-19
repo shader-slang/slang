@@ -281,19 +281,10 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     return e;
 }
 
-// Check a condition clause in place, per form. An expression condition checks
-// its expression through the ordinary predicate path. A declaration condition,
-// as in the HLSL `if (int count = c)`, first brings the declaration of `count`
-// to its declaration point, then derives the tested value from it: an
-// expression that references `count` directly (no lookup — the declaration is
-// in hand), sent through the same `checkPredicateExpr` path as any other
-// condition, which coerces it to `bool` and stores it as the clause's
-// `predicateExpr`. A declaration condition is not an `AssignExpr`, so the
-// assignment-in-predicate check is not involved.
+// Check a condition clause in place.
 void SemanticsStmtVisitor::checkConditionClause(ConditionClause* clause)
 {
-    if (!clause)
-        return;
+    SLANG_ASSERT(clause);
 
     struct ConditionClauseChecker : ConditionClauseVisitor<ConditionClauseChecker>
     {
@@ -306,6 +297,8 @@ void SemanticsStmtVisitor::checkConditionClause(ConditionClause* clause)
         void visitDeclConditionClause(DeclConditionClause* declConditionClause)
         {
             checker->checkDeclAtDeclarationPoint(declConditionClause->decl);
+            // The tested value references the checked declaration directly, so
+            // no lookup is involved in deriving it.
             auto varExpr = checker->m_astBuilder->create<VarExpr>();
             varExpr->loc = declConditionClause->decl->getNameLoc();
             varExpr->declRef = makeDeclRef<Decl>(declConditionClause->decl);

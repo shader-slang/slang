@@ -7897,38 +7897,84 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         context->scopeEndBlock = previous;
     }
 
+    // The result of `lowerConditionClause`: the IR value the statement branches
+    // on, the checked expression it came from, and the debug-scope state for the
+    // lexical scope the clause may have entered, which the invoking statement
+    // restores when that scope ends.
+    struct LoweredConditionClause
+    {
+        IRInst* conditionValue = nullptr;
+        Expr* checkedExpr = nullptr;
+        IRInst* conditionScope = nullptr;
+        IRInst* previousScope = nullptr;
+    };
+
+    // Lower a condition clause: lower whatever the clause itself declares (a
+    // declaration condition initializes its variable right here, before the
+    // test), then the tested value. A clause that introduces a lexical scope
+    // enters it for its debug info; the invoking statement restores the
+    // previous scope when the clause's scope ends.
+    LoweredConditionClause lowerConditionClause(ConditionClause* conditionClause)
+    {
+        struct ConditionClauseLoweringVisitor
+            : ConditionClauseVisitor<ConditionClauseLoweringVisitor>
+        {
+            IRGenContext* context;
+            LoweredConditionClause result;
+            void visitConditionClause(ConditionClause*) {}
+            void visitExprConditionClause(ExprConditionClause* exprConditionClause)
+            {
+                result.checkedExpr = exprConditionClause->expr;
+                result.conditionValue =
+                    getSimpleVal(context, lowerRValueExpr(context, result.checkedExpr));
+            }
+            void visitDeclConditionClause(DeclConditionClause* declConditionClause)
+            {
+                result.previousScope = context->currentDebugScope;
+                result.conditionScope = emitDebugLexicalBlockForScope(
+                    context,
+                    declConditionClause->scopeDecl,
+                    declConditionClause->loc);
+                if (result.conditionScope)
+                {
+                    context->currentDebugScope = result.conditionScope;
+                    emitCurrentDebugScope(context);
+                }
+                lowerDecl(context, declConditionClause->decl);
+                result.checkedExpr = declConditionClause->predicateExpr;
+                result.conditionValue =
+                    getSimpleVal(context, lowerRValueExpr(context, result.checkedExpr));
+            }
+        };
+        ConditionClauseLoweringVisitor visitor;
+        visitor.context = context;
+        visitor.dispatch(conditionClause);
+        return visitor.result;
+    }
+
+    // Restore the debug scope that a lowered condition clause entered, and emit
+    // the enclosing scope's marker so the instructions that follow are
+    // attributed to it.
+    void restoreConditionClauseScope(const LoweredConditionClause& lowered)
+    {
+        if (lowered.conditionScope)
+        {
+            context->currentDebugScope = lowered.previousScope;
+            emitCurrentDebugScope(context);
+        }
+    }
+
     void visitIfStmt(IfStmt* stmt)
     {
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto clause = stmt->condition;
-        auto declConditionClause = as<DeclConditionClause>(clause);
-        // A declaration condition's scope covers the condition and both arms (the
-        // variable is visible there, like C++), so give it its own debug lexical block
-        // while the statement lowers, mirroring how a BlockStmt's scope is handled.
-        auto previousDebugScope = context->currentDebugScope;
-        auto conditionDebugScope = declConditionClause ? emitDebugLexicalBlockForScope(
-                                                             context,
-                                                             declConditionClause->scopeDecl,
-                                                             declConditionClause->loc)
-                                                       : nullptr;
-        if (conditionDebugScope)
-        {
-            context->currentDebugScope = conditionDebugScope;
-            emitCurrentDebugScope(context);
-        }
-        // A declaration condition declares its variable right before the test, in the
-        // statement's condition slot, so the variable is initialized before the branch
-        // and is in scope for both arms.
-        if (declConditionClause)
-            lowerDecl(context, declConditionClause->decl);
-
-        auto condExpr = getPredicateExpr(clause);
+        auto lowered = lowerConditionClause(stmt->condition);
+        auto condExpr = lowered.checkedExpr;
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
-        auto irCond = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+        auto irCond = lowered.conditionValue;
 
         maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
@@ -8013,14 +8059,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             insertBlock(afterBlock);
         }
 
-        if (conditionDebugScope)
-        {
-            // The statement's blocks are done; the code that follows the statement is
-            // back in the enclosing lexical scope, so emit that scope's marker into
-            // the after block before its instructions.
-            context->currentDebugScope = previousDebugScope;
-            emitCurrentDebugScope(context);
-        }
+        restoreConditionClauseScope(lowered);
 
         maybeEmitDebugLine(context, this, stmt, stmt->afterLoc);
 
@@ -8232,39 +8271,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(loopHead);
 
-        // A declaration condition's scope covers the loop head, where the variable is
-        // re-initialized before every test, and the body, where it is visible, so the
-        // whole loop lowers inside its own debug lexical block. The code after the
-        // loop returns to the enclosing scope.
-        auto previousDebugScope = context->currentDebugScope;
-        auto declConditionClause = as<DeclConditionClause>(stmt->condition);
-        auto conditionDebugScope = declConditionClause ? emitDebugLexicalBlockForScope(
-                                                             context,
-                                                             declConditionClause->scopeDecl,
-                                                             declConditionClause->loc)
-                                                       : nullptr;
-        if (conditionDebugScope)
-        {
-            context->currentDebugScope = conditionDebugScope;
-            emitCurrentDebugScope(context);
-        }
+        auto lowered = lowerConditionClause(stmt->condition);
 
         // Now that we are within the header block, we
         // want to emit the expression for the loop condition:
         uint32_t coverageBranchSiteID = 0;
         SourceLoc coverageBranchLoc;
-        if (auto clause = stmt->condition)
         {
-            // A declaration condition declares its variable in the condition slot, so the
-            // variable is re-initialized before every test, and a `continue` (which jumps
-            // to loopHead) re-runs the declaration, as in C++.
-            if (declConditionClause)
-                lowerDecl(context, declConditionClause->decl);
-
-            auto condExpr = getPredicateExpr(clause);
+            auto condExpr = lowered.checkedExpr;
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
-            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+            auto irCondition = lowered.conditionValue;
 
             coverageBranchLoc = condExpr->loc;
             coverageBranchSiteID =
@@ -8305,15 +8322,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
 
-        if (conditionDebugScope)
+        if (lowered.conditionScope)
         {
-            context->currentDebugScope = previousDebugScope;
+            context->currentDebugScope = lowered.previousScope;
         }
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
 
-        if (conditionDebugScope)
+        if (lowered.conditionScope)
         {
             emitCurrentDebugScope(context);
         }
@@ -8360,37 +8377,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(testLabel);
 
-        // A `do`-`while` condition variable is visible in the condition only — the body
-        // runs before the condition, so the body never shares that scope (it lowered
-        // above, in the enclosing scope). Give the condition its own debug lexical
-        // block, covering just the test where the variable is declared and tested.
-        auto previousDebugScope = context->currentDebugScope;
-        auto declConditionClause = as<DeclConditionClause>(stmt->condition);
-        auto conditionDebugScope = declConditionClause ? emitDebugLexicalBlockForScope(
-                                                             context,
-                                                             declConditionClause->scopeDecl,
-                                                             declConditionClause->loc)
-                                                       : nullptr;
-        if (conditionDebugScope)
-        {
-            context->currentDebugScope = conditionDebugScope;
-            emitCurrentDebugScope(context);
-        }
+        auto lowered = lowerConditionClause(stmt->condition);
 
-        // Now that we are within the header block, we
-        // want to emit the expression for the loop condition:
-        if (auto clause = stmt->condition)
         {
-            // A declaration condition declares its variable in the condition slot, so
-            // the variable is re-initialized before every test. A `continue` jumps here
-            // (testLabel), so it re-runs the declaration too, which is the C++ behavior.
-            if (declConditionClause)
-                lowerDecl(context, declConditionClause->decl);
-
-            auto condExpr = getPredicateExpr(clause);
+            auto condExpr = lowered.checkedExpr;
             maybeEmitDebugLine(context, this, stmt, condExpr->loc);
 
-            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
+            auto irCondition = lowered.conditionValue;
 
             // One thing to be careful here is that lowering irCondition
             // may create additional blocks due to short circuiting, so
@@ -8451,15 +8444,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
         }
 
-        if (conditionDebugScope)
+        if (lowered.conditionScope)
         {
-            context->currentDebugScope = previousDebugScope;
+            context->currentDebugScope = lowered.previousScope;
         }
 
         // Finally we insert the label that a `break` will jump to
         insertBlock(breakLabel);
 
-        if (conditionDebugScope)
+        if (lowered.conditionScope)
         {
             emitCurrentDebugScope(context);
         }
@@ -9835,11 +9828,8 @@ static IRInst* maybeEmitDebugLexicalBlock(IRGenContext* context, Stmt* stmt)
     return emitDebugLexicalBlockForScope(context, scopedStmt->scopeDecl, stmt->loc);
 }
 
-// Emit a debug lexical block for `scopeDecl` nested in the current scope, or return null
-// when debug info is off. Condition clauses own scopes that are not carried by any
-// statement (a declaration condition's scope spans the condition and, for `if` and
-// `while`, the arms), so they call this directly instead of going through
-// `maybeEmitDebugLexicalBlock`, which keys off the statement.
+// Emit a debug lexical block for `scopeDecl` nested in the current scope, or return
+// null when debug info is off.
 static IRInst* emitDebugLexicalBlockForScope(
     IRGenContext* context,
     ScopeDecl* scopeDecl,

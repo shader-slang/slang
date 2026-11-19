@@ -99,9 +99,8 @@ class ExprConditionClause : public ConditionClause
 {
     FIDDLE(...)
 
-    /// The tested expression: what the source wrote between the parentheses. Semantic
-    /// checking updates it in place with the checked expression, which names the
-    /// referenced declarations and has been converted to `bool`.
+    /// The tested expression; semantic checking updates it in place with the
+    /// checked expression.
     FIDDLE() Expr* expr = nullptr;
 };
 
@@ -124,15 +123,12 @@ class DeclConditionClause : public ConditionClause
     /// `while`, the condition only for `do`-`while`).
     FIDDLE() ScopeDecl* scopeDecl = nullptr;
 
-    /// The tested value, derived during semantic checking: an expression naming the
-    /// declared variable, checked and converted to `bool` like any other condition.
-    /// Null until then — the parser builds only the declaration.
+    /// The tested value, derived during semantic checking; null until then.
     FIDDLE() Expr* predicateExpr = nullptr;
 };
 
-// The tested value of a condition, after semantic checking has resolved names and
-// converted the value to `bool`: the checked expression for an expression condition,
-// the checked naming expression for a declaration condition. Null before checking.
+// The tested value of a condition clause, after semantic checking; null before
+// checking.
 inline Expr* getPredicateExpr(ConditionClause* clause)
 {
     if (auto exprConditionClause = as<ExprConditionClause>(clause))
