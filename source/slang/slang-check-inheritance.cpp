@@ -830,6 +830,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // If we know the type has a facet represented by `extensionTargetDeclRef`, we can consider
     // all extensions on this decl to see if they apply to the type.
     //
+    // An interface's extensions can be considered more than once (see the extension loop
+    // below), so we remember which extensions already apply to avoid adding a base twice.
+    HashSet<Decl*> appliedExtensionDecls;
     auto considerExtension = [&](DeclRef<Decl> extensionTargetDeclRef,
                                  Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness)
     {
@@ -837,6 +840,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         auto candidateExtensions = getCandidateExtensions(extensionTargetDeclRef, &visitor);
         for (auto extDecl : candidateExtensions)
         {
+            if (appliedExtensionDecls.contains(extDecl))
+                continue;
+
             // The list of *candidate* extensions is computed and
             // cached based on the identity of the declaration alone,
             // and does not take into account any generic arguments
@@ -863,6 +869,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // own linearized inheritance list will include
             // any transitive based declared on the `extension`.
             //
+            appliedExtensionDecls.add(extDecl);
             auto extInheritanceInfo =
                 getInheritanceInfo(extDeclRef, circularityInfo, ioSkippedIncompleteFacet);
             addDirectBaseFacet(
@@ -1455,6 +1462,29 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     {
         HashSet<Type*> supTypesConsideredForExtensionApplication;
         Dictionary<Type*, SubtypeWitness*> additionalSubtypeWitnesses;
+
+        // When several bases prove the same supertype, we keep a proof that does not depend on
+        // an `optional` constraint, for the same reason `_mergeFacetLists` does: given
+        // `where optional T : IFloat where T : IInteger`, only the `IInteger` proof of
+        // `T : IArithmetic` lets an `extension<U : IArithmetic>` apply to `T`. The required
+        // proof can first appear in a later round, through an extension applied in an earlier
+        // one, so we return true when a proof is replaced and the caller considers that
+        // supertype's extensions again.
+        auto recordAdditionalSubtypeWitness = [&](Type* supType, SubtypeWitness* witness)
+        {
+            if (auto existing = additionalSubtypeWitnesses.tryGetValue(supType))
+            {
+                if (findOptionalConstraintWitness(*existing) &&
+                    !findOptionalConstraintWitness(witness))
+                {
+                    *existing = witness;
+                    return true;
+                }
+                return false;
+            }
+            additionalSubtypeWitnesses.add(supType, witness);
+            return false;
+        };
         for (;;)
         {
             // After we flatten the list of bases, we may discover additional opportunities
@@ -1476,10 +1506,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                                 baseInterfaceDeclRef.getDecl(),
                                 (*base)->facetImpl.subtypeWitness,
                                 facet->subtypeWitness);
-                            additionalSubtypeWitnesses.addIfNotExists(
+                            bool replaced = recordAdditionalSubtypeWitness(
                                 facet->origin.type,
                                 transitiveWitness);
-                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type) ||
+                                replaced)
                             {
                                 supTypeWorkList.add(interfaceDeclRef);
                             }
@@ -1491,10 +1522,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                                 baseFacet->subtypeWitness,
                                 facet->subtypeWitness);
 
-                            additionalSubtypeWitnesses.addIfNotExists(
+                            bool replaced = recordAdditionalSubtypeWitness(
                                 facet->origin.type,
                                 transitiveWitness);
-                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type) ||
+                                replaced)
                             {
                                 supTypeWorkList.add(interfaceDeclRef);
                             }
@@ -1751,25 +1783,42 @@ void SharedSemanticsContext::_mergeFacetLists(
             //
             auto indirectFacet = new (arena) Facet::Impl();
 
-            // Look through the heads of all the lists to see if we can find a matching
-            // facet with a lower level of indirection.
+            // Look through the heads of all the lists for the matching facet whose proof we
+            // keep. Candidates are ranked on two keys. First, we prefer a base whose
+            // `selfIsSubtypeOfBase` witness (below) does not depend on an `optional`
+            // constraint; `baseIsSubtypeOfFacet` is written in terms of the base's own `This`,
+            // so it cannot be the half that does. Second, we prefer the most direct facet, to
+            // minimize the levels of indirection in the final linearization. Among equal
+            // candidates, the base written first wins.
             //
-            // We want to prioritize the most direct facet possible, to minimize the levels of
-            // indirection in the final linearization.
+            // Given `where optional T : IFloat where T : IInteger`, both bases lead to
+            // `IArithmetic`, but only the path through `IInteger` proves `T : IArithmetic`
+            // outside an `if (T is IFloat)` check. The ranking applies only to this
+            // indirect-facet path: a facet that is itself a direct base, as in
+            // `where optional T : IArithmetic`, keeps its declared proof (handled above).
             //
+            auto dependsOnOptionalConstraint = [](DirectBaseInfo* base)
+            { return findOptionalConstraintWitness(base->facetImpl.subtypeWitness) != nullptr; };
             Facet::DirectnessVal baseDirectness =
                 Facet::DirectnessVal(foundFacet.getImpl()->directness);
+            bool isFoundBaseOptional = dependsOnOptionalConstraint(foundBase);
             for (auto base : bases)
             {
                 Facet headFacet = base->facets.getHead();
-                if (originsMatch(foundFacet, headFacet))
+                if (!originsMatch(foundFacet, headFacet))
+                    continue;
+
+                auto headDirectness = Facet::DirectnessVal(headFacet.getImpl()->directness);
+                bool isBaseOptional = dependsOnOptionalConstraint(base);
+                bool isPreferred = isBaseOptional == isFoundBaseOptional
+                                       ? headDirectness < baseDirectness
+                                       : !isBaseOptional;
+                if (isPreferred)
                 {
-                    if (Facet::DirectnessVal(headFacet.getImpl()->directness) < baseDirectness)
-                    {
-                        foundFacet = headFacet;
-                        foundBase = base;
-                        baseDirectness = Facet::DirectnessVal(headFacet.getImpl()->directness);
-                    }
+                    foundFacet = headFacet;
+                    foundBase = base;
+                    baseDirectness = headDirectness;
+                    isFoundBaseOptional = isBaseOptional;
                 }
             }
 

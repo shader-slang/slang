@@ -1404,6 +1404,28 @@ inline bool isTypeEqualityWitness(Val* witness)
     return false;
 }
 
+/// Return the witness for an `optional` generic constraint that `witness` is, or is looked up
+/// through, or null if `witness` has neither shape.
+///
+/// Consider `T f<T>(T a, T b) where optional T : IFloat { return a + b; }`. The `+` overload
+/// needs `T : IArithmetic`, which `IFloat` inherits, and the witness that
+/// `T : IArithmetic` is a `DeclaredSubtypeWitness` on `IFloat`'s inheritance declaration,
+/// looked up through the optional `T : IFloat` witness. The lookup is the only part of that
+/// witness that mentions the optional constraint, and the derived witness is only as certain
+/// as the witness it is looked up through, so we follow `LookupDeclRef` witnesses until we reach
+/// an optional constraint or a witness that is not looked up through another one.
+///
+/// The walk recognizes one shape, a chain of `DeclaredSubtypeWitness`es linked by
+/// `LookupDeclRef` witnesses, which is how `_specializeInterfaceInheritanceWitness` builds every
+/// facet a generic parameter inherits through an interface constraint. Other shapes, such as a
+/// `TransitiveSubtypeWitness` or the pack wrappers built for a type-pack parameter, are not
+/// followed and return null.
+///
+/// `DeclaredSubtypeWitness::isOptional()` stays a test of the witness's own declaration because
+/// it decides how `T is I` is folded and lowered: treating a derived witness as optional there
+/// would turn `T is IArithmetic` into a runtime check of the `T : IFloat` witness.
+DeclaredSubtypeWitness* findOptionalConstraintWitness(SubtypeWitness* witness);
+
 bool isValuePack(Val* val);
 bool isAbstractValuePack(Val* val);
 

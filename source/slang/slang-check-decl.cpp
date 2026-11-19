@@ -3985,8 +3985,18 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         overloadContext.args = &argExprs;
 
         auto type = varDecl->getType();
+        // A type that finds its default initializer through an `optional` constraint gets a
+        // different answer inside and outside an `if (T is I)` check, so the choice is not
+        // cached for it.
+        bool canCacheDefaultInitializer = !canTypeConformThroughOptionalConstraint(type);
         ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
-        auto ctorMethod = getShared()->tryGetImplicitCastMethod(key);
+        auto cacheDefaultInitializer = [&](ImplicitCastMethod const& method)
+        {
+            if (canCacheDefaultInitializer)
+                getShared()->cacheImplicitCastMethod(key, method);
+        };
+        auto ctorMethod =
+            canCacheDefaultInitializer ? getShared()->tryGetImplicitCastMethod(key) : nullptr;
         if (ctorMethod)
         {
             overloadContext.bestCandidateStorage = ctorMethod->conversionFuncOverloadCandidate;
@@ -4009,7 +4019,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             //
             if (overloadContext.bestCandidates[0].status != OverloadCandidate::Status::Applicable)
             {
-                getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
+                cacheDefaultInitializer(ImplicitCastMethod{});
             }
             else
             {
@@ -4027,7 +4037,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             //
             if (overloadContext.bestCandidate->status != OverloadCandidate::Status::Applicable)
             {
-                getShared()->cacheImplicitCastMethod(key, ImplicitCastMethod{});
+                cacheDefaultInitializer(ImplicitCastMethod{});
             }
             else
             {
@@ -4047,12 +4057,16 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 {
                     varDecl->initExpr =
                         CompleteOverloadCandidate(overloadContext, *overloadContext.bestCandidate);
-                    getShared()->cacheImplicitCastMethod(
-                        key,
-                        ImplicitCastMethod{*overloadContext.bestCandidate, 0});
+                    cacheDefaultInitializer(ImplicitCastMethod{*overloadContext.bestCandidate, 0});
                 }
             }
         }
+
+        // `T x;` under an unchecked `where optional T : IDefaultInitializable` would call
+        // `__init()` through that constraint. The filter removed it, so we report the
+        // constraint rather than silently leave `x` without its initializer.
+        if (!canCacheDefaultInitializer && !varDecl->initExpr)
+            diagnoseDefaultInitializerBehindOptionalConstraint(varDecl, type);
     }
 
     // Check after initialization and type inference: `let copy = input` is valid, while
