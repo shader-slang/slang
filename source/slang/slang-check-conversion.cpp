@@ -1724,7 +1724,7 @@ bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl
     return translationUnit && translationUnit->sourceLanguage == SourceLanguage::HLSL;
 }
 
-static bool isMatrixLayoutConversion(Type* toType, Type* fromType)
+bool isMatrixLayoutConversion(Type* toType, Type* fromType)
 {
     if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
     {

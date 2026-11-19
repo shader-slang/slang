@@ -439,10 +439,6 @@ FIDDLE()
 class LValueImplicitCastExpr : public TypeCastExpr
 {
     FIDDLE(...)
-    explicit LValueImplicitCastExpr(const TypeCastExpr& rhs)
-        : Super(rhs)
-    {
-    }
 };
 
 // To work around situations like int += uint
@@ -452,22 +448,12 @@ FIDDLE()
 class OutImplicitCastExpr : public LValueImplicitCastExpr
 {
     FIDDLE(...)
-    /// Allow explict construction from any TypeCastExpr
-    explicit OutImplicitCastExpr(const TypeCastExpr& rhs)
-        : Super(rhs)
-    {
-    }
 };
 
 FIDDLE()
 class InOutImplicitCastExpr : public LValueImplicitCastExpr
 {
     FIDDLE(...)
-    /// Allow explict construction from any TypeCastExpr
-    explicit InOutImplicitCastExpr(const TypeCastExpr& rhs)
-        : Super(rhs)
-    {
-    }
 };
 
 /// A cast of a value to a super-type of its type.
