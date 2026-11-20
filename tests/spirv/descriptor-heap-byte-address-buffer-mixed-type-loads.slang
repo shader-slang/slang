@@ -29,7 +29,7 @@ ByteAddressBuffer buf;
 RWByteAddressBuffer rwBuf;
 RWStructuredBuffer<float> outBuf;
 
-uint readIndex(ByteAddressBuffer b, uint offset)
+uint readWord(ByteAddressBuffer b, uint offset)
 {
     return b.Load(offset);
 }
@@ -56,7 +56,7 @@ void writeWord(RWByteAddressBuffer b, uint offset, uint value)
 void main(uint tid : SV_DispatchThreadID)
 {
     ByteAddressBuffer heapBuf = ResourceDescriptorHeap[tid];
-    uint i = readIndex(heapBuf, tid * 4);
+    uint i = readWord(heapBuf, tid * 4);
     float2 v = buf.Load<float2>(tid * 8);
     outBuf[0] = v.x + v.y + float(i);
 }
@@ -81,7 +81,7 @@ void mainHeapHelpers(uint3 tid : SV_DispatchThreadID)
     // different element types. Neither ByteAddressBuffer parameter may survive
     // into byte-address-buffer legalization: each heap fetch specializes into
     // its callee and each load takes its own element-type view.
-    uint i = readIndex(ResourceDescriptorHeap[tid.x], 0);
+    uint i = readWord(ResourceDescriptorHeap[tid.x], 0);
     float2 v = readFloat2(ResourceDescriptorHeap[tid.y], 8);
     outBuf[0] = v.x + v.y + float(i);
 }
