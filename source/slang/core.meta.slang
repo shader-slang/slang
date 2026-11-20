@@ -986,8 +986,22 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 
 //@ hidden:
 
-// This enum contract excludes arbitrary integer construction. All enums implement it; ordinary
-// enums also implement __EnumType below, which adds integer constructors.
+// Provides the tag type and operations shared by all enums, without integer constructors.
+// Enums with capability-restricted cases conform directly to this interface. Ordinary enums
+// conform to __EnumType below, which inherits this interface and adds __init(int) through
+// ILogical, as well as __init(__Tag).
+//
+// A restricted enum can still be constructed from a matching compile-time constant. Consider:
+//
+//     enum MyEnum { [require(hlsl)] A = 0x01 }
+//     MyEnum named = MyEnum.A;     // Requires hlsl.
+//     MyEnum cast = MyEnum(0x01);  // Requires hlsl and emits a warning.
+//
+// The compiler handles MyEnum(0x01) as a builtin cast, without calling an interface constructor.
+// The constant must match exactly one case; the cast carries that case's capability requirements
+// and warns that the numeric spelling introduces them. Runtime integers and constants without a
+// unique matching case are rejected. Omitting integer constructors from this interface prevents
+// generic code from bypassing these checks through a constructor promised by its constraint.
 [builtin]
 __magic_type(RestrictedEnumType)
 interface __RestrictedEnumType : __LogicalType
@@ -1000,7 +1014,7 @@ interface __RestrictedEnumType : __LogicalType
 };
 
 // Preserve the integer-construction contract of __EnumType for ordinary enums. An enum with
-// capability-restricted cases cannot implement this contract: an integer does not identify
+// capability-restricted cases cannot implement this contract: a runtime integer does not identify
 // which case's requirements the caller must satisfy.
 [builtin]
 __magic_type(EnumTypeType)
