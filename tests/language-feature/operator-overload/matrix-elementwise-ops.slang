@@ -6,8 +6,18 @@
 // twice the identity, the element-wise product has zero off-diagonals while the algebraic
 // product `mul(m1, m2)` would carry them, so the values below pin the element-wise reading.
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
+
+// A generic body over a narrowly constrained element type must keep using the real scalar
+// broadcast: `m * s` resolves to the real overload here (a fallback constrained to a
+// narrower element family would steal this resolution), and the value below pins the
+// element-wise result.
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+matrix<T,N,M> scaledBy(matrix<T,N,M> m, T s)
+{
+    return m * s;
+}
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -30,9 +40,14 @@ void computeMain()
     float2x2 sum = m1 + m2;
     outputBuffer[0] = sum[0][0]; // 3.0
 
+    // The generic scalar broadcast above, actually executed: 2 * m1 = {{2,4},{6,8}}.
+    float2x2 genScaled = scaledBy<float, 2, 2>(m1, 2.0);
+    outputBuffer[5] = genScaled[0][0] + genScaled[0][1] + genScaled[1][0] + genScaled[1][1]; // 20.0
+
     // CHECK: 3.0
     // CHECK: 0.0
     // CHECK: 2.0
     // CHECK: 8.0
     // CHECK: 7.5
+    // CHECK: 20.0
 }

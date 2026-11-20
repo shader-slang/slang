@@ -4,8 +4,9 @@
 // carrying it is an error reporting the attribute's message. These cases pin the
 // user-declaration surface of the attribute directly (the builtin `operator*` fallbacks
 // exercise it in matrix-vector-mul-hint.slang): references to functions, variables and
-// types; interaction with `[deprecated]` and `[RemovedSince]`; the selected-vs-unselected
-// overload candidate behavior; and the attribute's argument validation.
+// types; the constructor-versus-coercion reference boundary; interaction with
+// `[deprecated]` and `[RemovedSince]`; the selected-vs-unselected overload candidate
+// behavior; and the usage attributes' argument validation.
 
 // A function carrying the attribute reports its message at every call.
 [__diagnoseOnUse("use newFunc instead")]
@@ -84,12 +85,38 @@ int twoArgs() { return 1; }
 [__diagnoseOnUse(3)]
 int nonString() { return 1; }
 
-// Declaration checking validates the attribute arguments first:
+// The same user-reachable surplus-argument hazard applies to the older usage attributes;
+// their validation now diagnoses the count instead of asserting it.
+[deprecated("a", "b")]
+int deprecatedTwoArgs() { return 1; }
+
+[RemovedSince(0, "gone", "extra")]
+int removedThreeArgs() { return 1; }
+
+// The constructor boundary: a multi-argument type call materializes a reference to the
+// selected `__init`, so an `__init` carrying the attribute reports the error; a
+// single-argument construction is an explicit coercion and routes through the conversion
+// machinery instead of declaration reference checking, so it is not diagnosed.
+struct DiagCtor
+{
+    [__diagnoseOnUse("this constructor is retired")]
+    __init(int a, int b) { a + b; }
+    __init(int a) { a; }
+}
+
+DiagCtor multiArg = DiagCtor(1, 2);
+DiagCtor singleArg = DiagCtor(5);
+
+// Declaration checking validates the attribute arguments first, in declaration order:
 // CHECK: error[E31001]: wrong number of attribute arguments
 // CHECK: attribute '__diagnoseOnUse' expects 1 arguments (0 provided)
 // CHECK: error[E31001]: wrong number of attribute arguments
 // CHECK: attribute '__diagnoseOnUse' expects 1 arguments (2 provided)
 // CHECK: error[E33071]: expected a string literal
+// CHECK: error[E31001]: wrong number of attribute arguments
+// CHECK: attribute 'deprecated' expects 1 arguments (2 provided)
+// CHECK: error[E31001]: wrong number of attribute arguments
+// CHECK: attribute 'RemovedSince' expects 2 arguments (3 provided)
 
 // The parameter-type reference to LegacyGrid is diagnosed while signatures are checked,
 // before any function body runs.
@@ -119,3 +146,10 @@ int nonString() { return 1; }
 // CHECK: error[E31207]: use of removed declaration
 // CHECK: removedFunc has been removed since language version '0': removed now
 // CHECK-NOT: E31233
+
+// The constructor boundary is checked last: the multi-argument construction of DiagCtor
+// reports the error, and the single-argument construction that follows is a coercion and
+// reports nothing.
+// CHECK: error[E31233]: use of a declaration marked as an error on use
+// CHECK: use of 'DiagCtor.init' is an error: this constructor is retired
+// CHECK-NOT: use of 'DiagCtor.init' is an error

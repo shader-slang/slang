@@ -2009,10 +2009,7 @@ public:
     /// version to decide whether removal applies; reports nothing when no module is available.
     /// Inspects `originalExpr`, when non-null, to suppress repeats and uses at the declaration's
     /// name location.
-    void diagnoseDeprecatedAndRemovedDeclRefUsage(
-        DeclRef<Decl> declRef,
-        SourceLoc loc,
-        Expr* originalExpr);
+    void diagnoseUsageAttrDeclRefUsage(DeclRef<Decl> declRef, SourceLoc loc, Expr* originalExpr);
 
     DeclRef<Decl> getDefaultDeclRef(Decl* decl)
     {

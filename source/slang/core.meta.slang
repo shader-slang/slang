@@ -3488,20 +3488,26 @@ $}
 //
 // A fallback is only ever *selected* for the invalid shapes: overload comparison ranks the
 // per-argument conversion cost ahead of overload rank, so a real overload whose parameters
-// fit the operands exactly (including the scalar broadcast forms, which a scalar operand
-// reaches at zero cost through them) wins before the rank tie-break is ever consulted, and
-// the rank of -10 then loses every remaining tie — to the rank-10 generic forms, to the
-// unranked per-type forms, and to the glsl module's rank-15 algebraic products in GLSL
-// operator scope. The mixed-shape declaration also applies to same-shape products, where it
-// loses that same tie and the element-wise result stands.
+// fit the operands exactly — and a scalar operand reaches the real scalar-broadcast
+// overloads at zero cost — wins before the rank tie-break is ever consulted. The rank of
+// -10 then loses every remaining tie: to the rank-10 generic forms, to the per-type forms
+// (which carry no `[OverloadRank]` and therefore default to rank 0), and to the glsl
+// module's rank-15 algebraic products in GLSL operator scope. The mixed-shape declaration
+// also applies to same-shape products, where it loses that same tie and the element-wise
+// result stands.
 //
 // The `__BuiltinArithmeticType` constraint mirrors the generic real overloads' element
-// family. It keeps the hint to element families where `mul` applies, and it is what keeps
-// the fallbacks out of generic bodies with narrowly constrained element parameters (for
-// example the stdlib's `__BuiltinFloatingPointType`-constrained matrix generics): a fallback
-// constrained to that narrower family gets selected for `matrix * scalar` calls inside such
-// bodies and takes over resolutions the real overloads should win, so the constraint must
-// match the real family rather than narrow it.
+// family. It keeps the hint to the arithmetic element families; the logical family keeps
+// the old error even though `mul` has logical-element variants, because a logical-element
+// fallback family would need its own review of the generic-body interactions below. The
+// constraint is also what keeps the fallbacks out of generic bodies with narrowly
+// constrained element parameters (for example the stdlib's
+// `__BuiltinFloatingPointType`-constrained matrix generics): a fallback constrained to one
+// of those narrower families is selected for `matrix * scalar` calls inside such bodies
+// and takes over resolutions the real overloads should win — building the core module with
+// these fallbacks narrowed to `__BuiltinFloatingPointType` fails exactly at the module's
+// own `radians` and `__smoothstep_impl` matrix generics — so the constraint must match the
+// real family rather than narrow it.
 //
 // The declarations have no body: there is no element-wise `matrix * vector` to lower, and
 // the algebraic product belongs to `mul`; the only purpose of these declarations is to be
@@ -5132,11 +5138,16 @@ attribute_syntax [RemovedSince(languageVersion: int, message: String)] : Removed
 ///
 /// Unlike `[deprecated]` (a warning) and `[RemovedSince]` (an error tied to a language
 /// version), this attribute does not depend on the module's language version: the error
-/// applies at any reference. That includes the reference overload resolution materializes
-/// for the candidate it selects, so an overload-resolution candidate carrying the attribute
-/// reports the error when it is the chosen candidate. A declaration that also carries
-/// `[RemovedSince]` reports the removal error instead once the module's language version
-/// reaches the removal version.
+/// applies at any reference. If an overload carrying this attribute is the one a call
+/// resolves to, the call is an error; overloads that lose resolution report nothing.
+/// A constructor reached through a multi-argument type call such as `LegacyGrid(1, 2)`
+/// counts as a reference to the `__init` declaration that carries the attribute, while a
+/// single-argument construction is an explicit coercion and is not diagnosed. A declaration
+/// that also carries `[RemovedSince]` reports the removal error instead once the module's
+/// language version reaches the removal version.
+///
+/// @internal The spelling is reserved for the standard library's own declarations; a
+/// public spelling can be introduced later without breaking code that uses this one.
 __attributeTarget(DeclBase)
 attribute_syntax [__diagnoseOnUse(message: String)] : DiagnoseOnUseAttribute;
 

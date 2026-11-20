@@ -9,7 +9,7 @@
 
 import glsl;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -54,10 +54,19 @@ void computeMain()
     float4 mv34 = m34 * vg3; // -> (1, 1, 1, 0)
     outputBuffer[5] = mv34[0] + mv34[1] + mv34[2] + mv34[3]; // 3.0
 
+    // Non-square mat-mat: both the glsl module's rank-15 algebraic overload and the
+    // rank -10 fallback apply to these shapes with different result types; the GLSL
+    // semantics must win, and the test only compiles when the product is a 3x3.
+    float2x3 mg = float2x3(a, 0.0, 0.0, 0.0, 0.0, a); // rows: [1,0,0],[0,0,1]
+    float3x2 mg2 = float3x2(a, 0.0, 0.0, a, 0.0, 0.0); // rows: [1,0],[0,1],[0,0]
+    float3x3 mm = mg * mg2; // algebraic: [[1,0,0],[0,0,1],[0,0,0]]
+    outputBuffer[6] = mm[0][0] + mm[1][2]; // 1.0 + 1.0 = 2.0
+
     // CHECK: 2.0
     // CHECK: 3.0
     // CHECK: 100.0
     // CHECK: 50.0
     // CHECK: 6.0
     // CHECK: 3.0
+    // CHECK: 2.0
 }

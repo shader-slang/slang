@@ -69,10 +69,14 @@ void computeMain()
     // `m *= v` keeps today's behavior: no `operator*=` covers it, so the error is E39999
     // with its candidate notes, not the fallback diagnostic. The fallback family
     // deliberately covers only the `*` operator for now; a matching `operator*=`
-    // fallback would be a straightforward follow-up if the hint is wanted here too.
+    // fallback would be a straightforward follow-up if the hint is wanted here too. The
+    // E40026 "write x = x * y" note cannot appear because it only attaches when one best
+    // candidate explains the call, and here the whole `operator*=` family is inapplicable,
+    // so the no-overload error fires instead.
     m *= v;
     // CHECK: error[E39999]: no overload for '*=' applicable to arguments of type (matrix<float,4,4>, vector<float,4>)
     // CHECK-NOT: E40026
+    // CHECK-NOT: E39999
 }
 
 // Generic bodies over narrowly constrained element types keep working: the fallback family

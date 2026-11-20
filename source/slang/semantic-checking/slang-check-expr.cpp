@@ -348,7 +348,7 @@ ContainerDecl* isStaticScopeDecl(Decl* decl)
     return nullptr;
 }
 
-void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
+void SemanticsVisitor::diagnoseUsageAttrDeclRefUsage(
     DeclRef<Decl> declRef,
     SourceLoc loc,
     Expr* originalExpr)
@@ -358,6 +358,8 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     // `[deprecated]` reports its warning version-independently, and so does
     // `[__diagnoseOnUse]`). We first look for that module in the current lexical
     // scope; a query with no module context reports nothing for any of the three.
+    // The version-independent `[__diagnoseOnUse]` check shares this gate deliberately,
+    // so that all three attributes are enforced through this one code path.
     ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
 
     // Some semantic queries run outside a lexical module scope. We then try the module
@@ -530,7 +532,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     // We report deprecation or removal at this use's location before constructing its
     // checked expression. For a uniform shadow, we check the parameter selected above.
     if (getSink())
-        diagnoseDeprecatedAndRemovedDeclRefUsage(declRefForUsageDiagnostics, loc, originalExpr);
+        diagnoseUsageAttrDeclRefUsage(declRefForUsageDiagnostics, loc, originalExpr);
 
     // We now choose the expression kind. A reference without a base becomes a `VarExpr`.
     // With a base, we distinguish static member references from instance member accesses.
