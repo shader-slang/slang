@@ -2976,6 +2976,10 @@ protected:
         SLANG_UNUSED(index);
     }
 
+    /// Whether the target allows dual-source blending only as one pair at location 0, with members
+    /// of the same type and no other color output (WGSL's `@blend_src` rules).
+    virtual bool requiresSingleDualSourceBlendPair() const { return false; }
+
     // Report a `vk::index` on a field of a struct nested in the fragment output struct: the
     // flattened output does not keep the blend index of a nested field.
     bool reportNestedDualSourceBlendOutputs(IRStructTypeLayout* structLayout, bool isNested) const
@@ -3005,10 +3009,13 @@ protected:
     // VaryingOutput offset's space). A location used this way must have exactly one output with
     // index 0 and one with index 1. Hand both to markDualSourceBlendOutput, with the location and
     // index from the result layout, so the target does not turn them into two render targets.
+    // `flattenedKeys` maps a key of the original output struct to its key in `structType`, when
+    // flattening a nested struct gave the fields new keys.
     void markDualSourceBlendOutputs(
         IRBuilder& builder,
         IRStructType* structType,
-        IRVarLayout* resultLayout) const
+        IRVarLayout* resultLayout,
+        const Dictionary<IRInst*, IRInst*>& flattenedKeys) const
     {
         auto structLayout =
             resultLayout ? as<IRStructTypeLayout>(resultLayout->getTypeLayout()) : nullptr;
@@ -3036,9 +3043,16 @@ protected:
                 outputs->add(fieldAttr);
         }
 
-        HashSet<IRInst*> structKeys;
+        Dictionary<IRInst*, IRType*> structFieldTypes;
         for (auto field : structType->getFields())
-            structKeys.add(field->getKey());
+            structFieldTypes[field->getKey()] = field->getFieldType();
+        auto getStructKey = [&](IRStructFieldLayoutAttr* fieldAttr) -> IRInst*
+        {
+            IRInst* key = fieldAttr->getFieldKey();
+            if (auto flattenedKey = flattenedKeys.tryGetValue(key))
+                key = *flattenedKey;
+            return structFieldTypes.containsKey(key) ? key : nullptr;
+        };
         for (auto& [location, outputs] : dualSourceOutputs)
         {
             UInt sourceCount[2] = {0, 0};
@@ -3063,10 +3077,41 @@ protected:
                     .location = reportAt->getFieldKey()->sourceLoc});
                 continue;
             }
+            if (requiresSingleDualSourceBlendPair())
+            {
+                if (location != 0)
+                {
+                    m_sink->diagnose(Diagnostics::DualSourceBlendOutputNotLocationZero{
+                        .blendLocation = Int(location),
+                        .location = reportAt->getFieldKey()->sourceLoc});
+                    continue;
+                }
+                auto key0 = getStructKey(outputs[0]);
+                auto key1 = getStructKey(outputs[1]);
+                if (key0 && key1 && structFieldTypes[key0] != structFieldTypes[key1])
+                {
+                    m_sink->diagnose(Diagnostics::DualSourceBlendOutputTypeMismatch{
+                        .blendLocation = Int(location),
+                        .location = reportAt->getFieldKey()->sourceLoc});
+                    continue;
+                }
+                bool hasOtherOutput = false;
+                for (auto fieldAttr : structLayout->getFieldLayoutAttrs())
+                {
+                    if (outputs.contains(fieldAttr) ||
+                        !fieldAttr->getLayout()->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                        continue;
+                    m_sink->diagnose(Diagnostics::DualSourceBlendOutputWithOtherOutputs{
+                        .location = fieldAttr->getFieldKey()->sourceLoc});
+                    hasOtherOutput = true;
+                }
+                if (hasOtherOutput)
+                    continue;
+            }
             for (auto fieldAttr : outputs)
             {
-                auto key = fieldAttr->getFieldKey();
-                if (!structKeys.contains(key))
+                auto key = getStructKey(fieldAttr);
+                if (!key)
                     continue;
                 markDualSourceBlendOutput(
                     builder,
@@ -4351,7 +4396,22 @@ private:
                 flattenedStruct,
                 resultLayout);
             if (entryPoint.entryPointDecor->getProfile().getStage() == Stage::Fragment)
-                markDualSourceBlendOutputs(builder, flattenedStruct, resultLayout);
+            {
+                // Flattening gives every field a new key. The result layout still names the
+                // original keys, so map the direct fields' keys to the flattened ones.
+                Dictionary<IRInst*, IRInst*> flattenedKeys;
+                if (returnStructType != flattenedStruct)
+                {
+                    for (auto field : returnStructType->getFields())
+                    {
+                        if (as<IRStructType>(field->getFieldType()))
+                            continue;
+                        if (auto newField = mapOldFieldToNewField[field].getMapping())
+                            flattenedKeys[field->getKey()] = newField->getKey();
+                    }
+                }
+                markDualSourceBlendOutputs(builder, flattenedStruct, resultLayout, flattenedKeys);
+            }
             return;
         }
 
@@ -5298,6 +5358,8 @@ public:
         : LegalizeShaderEntryPointContext(module, sink)
     {
     }
+
+    bool requiresSingleDualSourceBlendPair() const SLANG_OVERRIDE { return true; }
 
     void markDualSourceBlendOutput(
         IRBuilder& builder,

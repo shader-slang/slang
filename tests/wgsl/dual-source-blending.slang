@@ -8,7 +8,8 @@
 //TEST:SIMPLE(filecheck=MTL-NOSEM): -target metal -stage fragment -entry noSemanticMain
 //TEST:SIMPLE(filecheck=REORDER): -target wgsl -stage fragment -entry reorderedMain
 //TEST:SIMPLE(filecheck=MTL-REORDER): -target metal -stage fragment -entry reorderedMain
-//TEST:SIMPLE(filecheck=MIXED): -target wgsl -stage fragment -entry mixedMain
+//TEST:SIMPLE(filecheck=DEPTH): -target wgsl -stage fragment -entry depthMain
+//TEST:SIMPLE(filecheck=MTL-DEPTH): -target metal -stage fragment -entry depthMain
 // Validate the emitted WGSL through Tint (ignored where the downstream compiler is absent).
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -stage fragment -entry dualMain
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -stage fragment -entry mrtMain
@@ -92,23 +93,30 @@ ReorderedOut reorderedMain(float4 p: SV_Position)
     return o;
 }
 
-// A dual-source pair next to an ordinary output at another location.
-struct MixedOut
+// A direct dual-source pair next to a nested built-in output. Flattening the nested struct gives
+// every field a new key, and the pair must still be marked.
+struct DepthOut
+{
+    float depth : SV_Depth;
+};
+struct PairWithNestedDepthOut
 {
     [[vk::location(0), vk::index(0)]] float4 color : SV_Target0;
     [[vk::location(0), vk::index(1)]] float4 blend : SV_Target1;
-    [[vk::location(1)]] float4 other : SV_Target2;
+    DepthOut d;
 };
 
-// MIXED: @location(0) @blend_src(0) color_{{[0-9]+}} : vec4<f32>
-// MIXED: @location(0) @blend_src(1) blend_{{[0-9]+}} : vec4<f32>
-// MIXED-NOT: blend_src
-// MIXED: other_{{[0-9]+}} : vec4<f32>
-MixedOut mixedMain(float4 p: SV_Position)
+// DEPTH: enable dual_source_blending;
+// DEPTH: @location(0) @blend_src(0) color_{{[0-9]+}} : vec4<f32>
+// DEPTH: @location(0) @blend_src(1) blend_{{[0-9]+}} : vec4<f32>
+// DEPTH: @builtin(frag_depth)
+// MTL-DEPTH: float4 color_{{[0-9]+}} {{\[\[}}color(0), index(0){{\]\]}};
+// MTL-DEPTH: float4 blend_{{[0-9]+}} {{\[\[}}color(0), index(1){{\]\]}};
+PairWithNestedDepthOut depthMain(float4 p: SV_Position)
 {
-    MixedOut o;
+    PairWithNestedDepthOut o;
     o.color = p;
     o.blend = p * 0.5;
-    o.other = p * 0.25;
+    o.d.depth = 0.5;
     return o;
 }

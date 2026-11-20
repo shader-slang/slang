@@ -5283,6 +5283,27 @@ err(
 )
 
 err(
+    "dual-source-blend-output-not-location-zero",
+    39035,
+    "dual-source blending output not at location 0",
+    span { loc = "location", message = "dual-source blending on this target must use location 0, not location ~blendLocation:Int" }
+)
+
+err(
+    "dual-source-blend-output-type-mismatch",
+    39036,
+    "dual-source blending outputs of different types",
+    span { loc = "location", message = "the two dual-source blending outputs at location ~blendLocation:Int must have the same type on this target" }
+)
+
+err(
+    "dual-source-blend-output-with-other-outputs",
+    39037,
+    "color output next to dual-source blending outputs",
+    span { loc = "location", message = "a fragment shader that uses dual-source blending can have no color output other than the pair at location 0 on this target" }
+)
+
+err(
     "dual-source-blend-output-nested",
     39034,
     "nested dual-source blending output",
