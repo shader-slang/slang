@@ -2,26 +2,33 @@
 //TEST:SIMPLE(filecheck=COMPILE): -no-codegen -Wno-30081 -Wno-41024
 // COMPILE: result code = 0
 
+// The CPU run checks how HLSL `if` and `while` initialize and test a variable declared in
+// the condition, and where that variable is visible. `computeMain` writes the results in
+// test order to consecutive elements of `outputBuffer`. The compile-only run checks that
+// the `.hlsl` extension selects the dialect that accepts the declarations.
+//
 // `testIfCondition` exercises implicit float-to-int and int-to-bool conversions.
 // `testCommaExpressionCondition` intentionally uses the comma operator. Both runs suppress
 // the warnings for these constructs.
 //TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// Counts an initializer call and returns a fraction that converts to zero as an `int`.
 float nextFraction(inout int evaluations)
 {
     ++evaluations;
     return 0.75f;
 }
 
+// Records the selected arm's value, initializer call count, and outer `count` in elements
+// 0 through 2 of `outputBuffer`.
 void testIfCondition()
 {
     int count = 37;
     int evaluations = 0;
 
-    // `nextFraction` runs once. Conversion to `int` produces zero, so control enters the
-    // `else` arm. Both arms can read the inner `count`, and the outer `count` is visible again
-    // after the statement.
+    // `nextFraction` runs once. Conversion to `int` produces zero, so the `else` arm
+    // records the inner `count`. After the statement we record the outer `count`.
     if (int count = nextFraction(evaluations))
         outputBuffer[0] = count + 1;
     else
@@ -31,6 +38,8 @@ void testIfCondition()
     outputBuffer[2] = count;
 }
 
+// Records the loop's sum, condition evaluation count, and outer `remaining` in elements 3
+// through 5 of `outputBuffer`.
 void testWhileCondition()
 {
     int evaluations = 0;
@@ -58,10 +67,11 @@ void testWhileCondition()
     outputBuffer[5] = remaining;
 }
 
+// Returns 1 on the first call and 11 on the second if the condition variable retains its value.
 int testStaticCondition()
 {
-    // A declaration used as a condition has the same storage duration as a local declaration
-    // with the same modifiers. The second call reads the value written by the first.
+    // The first call sees zero and stores one. The second call sees one because the condition
+    // declares a `static` local. We add 10 on the true path to record which arm ran.
     if (static int previousCalls = 0)
         return previousCalls + 10;
     else
@@ -76,6 +86,7 @@ namespace Types
     typedef int Count;
 }
 
+// Returns the product if the expression and declaration conditions both evaluate to true.
 int testConditionLookahead()
 {
     int left = 2;
@@ -91,18 +102,22 @@ int testConditionLookahead()
     return -1;
 }
 
+// Returns the outer `count` if the condition initializes the inner `count` to 2.
 int testInitializerShadowing()
 {
     int count = 3;
     bool hasInnerValue = false;
 
-    // The initializer reads the outer `count`. The arm reads the variable it initializes.
+    // The initializer reads the outer `count`, and the arm reads the inner `count`.
+    // The flag lets us check the inner value while returning the value visible after the `if`.
     if (int count = count - 1)
         hasInnerValue = count == 2;
 
     return hasInnerValue ? count : -1;
 }
 
+// Both overloads return the same buffer so the expected output is independent of overload
+// selection.
 RWStructuredBuffer<int> getOutputBuffer(int value)
 {
     return outputBuffer;
@@ -113,12 +128,14 @@ RWStructuredBuffer<int> getOutputBuffer(float value)
     return outputBuffer;
 }
 
+// Records the assignment from the comma expression in `outputBuffer[10]`.
 void testCommaExpressionCondition()
 {
     int value = 0;
 
-    // The overloaded call supplies the buffer for the assignment. The comparison is false,
-    // so the assignment in the condition is the only write to `outputBuffer[10]`.
+    // `getOutputBuffer(value)[10]` could start a declaration with a type name followed by
+    // a parenthesized declarator and an array suffix. In the comma expression, the assignment
+    // writes 23 and the false comparison keeps the arm from overwriting it.
     if (getOutputBuffer(value)[10] = 23, value > 0)
         outputBuffer[10] = -2;
 }

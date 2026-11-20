@@ -4,6 +4,11 @@
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=DO_WHILE): -lang hlsl tests/diagnostics/declaration-as-condition.slang -DDO_WHILE_TEST -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE_EX(diag=DECLARATOR): -lang hlsl tests/diagnostics/declaration-as-condition.slang -DDECLARATOR_TEST -no-codegen
 
+// The Slang-mode run checks for diagnostics on declarations in `if` and `while` conditions.
+// The GLSL-mode run expects a diagnostic for a declaration in an `if` condition. The HLSL
+// cases cover out-of-scope names, a declaration in a `do`–`while` condition, and malformed
+// declarations.
+
 #if defined(SCOPE_TEST)
 void readAfterIf()
 {
