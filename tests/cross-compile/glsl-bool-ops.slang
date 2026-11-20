@@ -3,7 +3,7 @@
 // This test exists to ensure that binary operations on
 // vectors of `bool` produce correct GLSL/SPIR-V output.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx11):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 uint test(uint val)
 {

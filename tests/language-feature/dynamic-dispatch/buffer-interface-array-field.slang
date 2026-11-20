@@ -2,7 +2,7 @@
 // interface-typed values. Each array element may hold a different
 // concrete type, requiring independent dispatch per element.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(8)]
 interface IFoo

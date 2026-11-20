@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):
 groupshared Atomic<uint> values[10];
 
 //TEST_INPUT: set outputAddr = out ubuffer(data=[0 0 0 0], stride=4)

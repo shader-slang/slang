@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx11, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 struct Test {
     RWStructuredBuffer<int> val;

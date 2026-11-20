@@ -9,7 +9,7 @@
 // The inner IValue* is obtained from a uniform buffer containing a serialized
 // existential. Taking &local of an interface-typed variable is not supported.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK): -output-using-type
 
 interface IValue
 {

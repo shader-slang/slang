@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-compile-arg -msvc-style-bitfield-packing
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):-compile-arg -msvc-style-bitfield-packing
 
 // The deprecated -msvc-style-bitfield-packing option packs from MSB to LSB.
 // Actual MSVC packing on little-endian platforms runs from LSB to MSB.

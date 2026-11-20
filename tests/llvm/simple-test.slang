@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 

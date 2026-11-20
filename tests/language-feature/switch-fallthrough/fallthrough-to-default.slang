@@ -4,7 +4,7 @@
 //
 // DX11 and WGSL don't support fall-through natively, but the restructure
 // pass legalizes fall-through by inlining code, so tests should still pass.
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+metal+cuda+cpu+wgpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Verify HLSL output preserves fallthrough structure for SM 6.0
 //TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute

@@ -32,8 +32,8 @@
 // same values as the fused control -- so a rewrite that wires a case to the
 // wrong result would fail here even though no OpSwitch survives. The -O3 variant
 // runs with the threading pass active (computeMain emits no OpSwitch at -O3).
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=EQ):-output-using-type
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=EQ):-output-using-type -Xslang -O3
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=EQ):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=EQ):-output-using-type -Xslang -O3
 
 struct SampleResult
 {

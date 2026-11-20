@@ -7,7 +7,7 @@
 // so using `INode*` instead of `INode` breaks the cycle and allows the struct
 // to have a finite, packable size.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=output
 RWStructuredBuffer<float> output;

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda+cpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // CHECK:      0
 // CHECK-NEXT: 1

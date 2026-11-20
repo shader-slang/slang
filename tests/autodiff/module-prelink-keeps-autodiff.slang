@@ -1,5 +1,5 @@
 //TEST:COMPILE: tests/autodiff/diff-library-module.slang -o tests/autodiff/diff-library-module.slang-module
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for the prelink-vs-final-link distinction behind
 // `IRSharedSpecContext::isFinalCodegenLink` (slang-ir-link.cpp): only the

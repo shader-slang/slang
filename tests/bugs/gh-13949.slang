@@ -5,7 +5,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=INIT): -target spirv -entry computeMain -stage compute -DINITIALIZED
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=BUF):-output-using-type -Xslang -DINITIALIZED
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type -Xslang -DINITIALIZED
 
 // CHECK: OpEntryPoint
 

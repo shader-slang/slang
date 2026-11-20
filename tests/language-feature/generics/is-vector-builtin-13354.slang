@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // `__isVector<T>()` asks about `T` itself: true for `float3`, and false for `float` and `float3x3`,
 // even though a matrix is made of the same `float` elements as a vector. `isVectorAfterSpecialization`

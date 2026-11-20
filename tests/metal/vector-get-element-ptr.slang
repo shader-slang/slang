@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
 
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

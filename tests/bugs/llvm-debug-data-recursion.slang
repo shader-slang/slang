@@ -1,5 +1,5 @@
 // This test just needs to run without crashing.
-//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK): -Xslang -g3
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK): -Xslang -g3
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 

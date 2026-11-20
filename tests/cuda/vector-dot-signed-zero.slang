@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Unrolling the `dot` fallback removes its `+0.0` accumulator seed: the additive-identity peephole
 // folds `+0.0 + x` to `x`, which is unsafe for signed zero because `+0.0 + (-0.0)` is `+0.0` while

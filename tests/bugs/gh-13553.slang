@@ -7,7 +7,7 @@
 // Inputs come from a buffer so that no shift is folded at compile time, and no case shifts a
 // negative value left (undefined before C++20).
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
 

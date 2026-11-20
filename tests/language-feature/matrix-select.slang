@@ -1,5 +1,5 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+wgpu+llvm, filecheck-buffer=CHK):-output-using-type -xslang -matrix-layout-column-major
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+wgpu+llvm, filecheck-buffer=CHK):-output-using-type -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):-output-using-type -xslang -matrix-layout-column-major
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):-output-using-type -xslang -matrix-layout-row-major
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

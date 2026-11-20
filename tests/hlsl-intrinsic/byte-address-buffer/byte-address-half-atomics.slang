@@ -2,7 +2,7 @@
 // test the atomics on half types.
 
 // Disabled because validation layer doesn't like vector atomics, although nv driver does allow it.
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK): -profile cs_6_2 -render-features half -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-dx12, filecheck-buffer=CHECK): -profile cs_6_2 -render-features half -output-using-type
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry computeMain -stage compute -emit-spirv-directly -skip-spirv-validation
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -profile cs_6_3
 //TEST_INPUT:set tmpBuffer = ubuffer(data=[0 0 0 0], stride=4)

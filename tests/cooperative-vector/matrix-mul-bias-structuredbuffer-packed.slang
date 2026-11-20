@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-cuda, filecheck-buffer=CHECK):-render-feature cooperative-vector -output-using-type
 
 // These platforms don't support these operations from structured buffers
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include

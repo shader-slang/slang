@@ -5,7 +5,7 @@
 //  This allows a thread group to share local memory allocated with the groupshared attribute."
 
 // Functional test requires GPU (barriers not available on CPU target)
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 // Emission test verifiable without GPU
 //TEST:SIMPLE(filecheck=EMIT): -target hlsl -stage compute -entry computeMain
 

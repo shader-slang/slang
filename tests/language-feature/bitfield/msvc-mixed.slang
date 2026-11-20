@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -compile-arg -msvc-style-bitfield-packing
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK):-output-using-type -compile-arg -msvc-style-bitfield-packing
 
 // Legacy MSB-first packing with MSVC-style backing fields for mixed type sizes.
 // CHECK:      15

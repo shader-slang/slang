@@ -8,7 +8,7 @@
 //TEST:SIMPLE(filecheck=CHECK_DXIL):-target dxil-assembly -entry computeMain -stage compute -profile cs_6_2 -denorm-mode-fp16 preserve
 //TEST:SIMPLE(filecheck=CHECK_DXIL):-target dxil-assembly -entry computeMain -stage compute -profile cs_6_2 -denorm-mode-fp16 ftz
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=PRESERVE):-Xslang -denorm-mode-fp16 -Xslang preserve
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=PRESERVE):-Xslang -denorm-mode-fp16 -Xslang preserve
 // Capability shaderDenormFlushToZeroFloat16 is VK_FALSE on the Vulkan device used for CI testing, resulting in
 // runtime error VUID-RuntimeSpirv-shaderDenormFlushToZeroFloat16-06299 during CI testing
 

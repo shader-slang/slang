@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Both impls of IA carry an interface-typed (IB) field — an existential nested inside
 // another existential. The IA values come straight from host-written buffer contents, so

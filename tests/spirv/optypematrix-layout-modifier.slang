@@ -4,27 +4,27 @@
 
 // No matrix layout modifier with -matrix-layout-column-major option
 //TEST:SIMPLE(filecheck=CHECK_COLUMN):-target spirv -entry computeMain -stage compute -matrix-layout-column-major -DMATRIX_LAYOUT
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT
 
 // No matrix layout modifier with -matrix-layout-row-major option
 //TEST:SIMPLE(filecheck=CHECK_ROW):-target spirv -entry computeMain -stage compute -matrix-layout-row-major -DMATRIX_LAYOUT
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT
 
 // column_major matrix layout modifier with -matrix-column-major option
 //TEST:SIMPLE(filecheck=CHECK_COLUMN):-target spirv -entry computeMain -stage compute -matrix-layout-column-major -DMATRIX_LAYOUT=column_major
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=column_major
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=column_major
 
 // column_major matrix layout modifier with -matrix-row-major option (expect column major)
 //TEST:SIMPLE(filecheck=CHECK_COLUMN):-target spirv -entry computeMain -stage compute -matrix-layout-row-major -DMATRIX_LAYOUT=column_major
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=column_major
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=column_major
 
 // row_major matrix layout modifier with -matrix-column-major option (expect row major)
 //TEST:SIMPLE(filecheck=CHECK_ROW):-target spirv -entry computeMain -stage compute -matrix-layout-column-major -DMATRIX_LAYOUT=row_major
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=row_major
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=row_major
 
 // row_major matrix layout modifier with -matrix-row-major option
 //TEST:SIMPLE(filecheck=CHECK_ROW):-target spirv -entry computeMain -stage compute -matrix-layout-row-major -DMATRIX_LAYOUT=row_major
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=row_major
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=row_major
 
 
 struct MatrixData

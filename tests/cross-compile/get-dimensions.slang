@@ -1,5 +1,5 @@
 //DISABLE_TEST:REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+cuda+cpu+wgpu+llvm):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 struct Thing
 {

@@ -1,7 +1,7 @@
 // Regression test for #13273: an array index read before a store to the index
 // variable must not be re-evaluated after that store in textual targets.
 
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=CHECK):-output-using-type
 
 // We also check the generated source, because a wrong fold of `pop`, `popTwoUses`,
 // `popBelow`, `popField` or `loopPop` does not change the results of the CPU and CUDA runtime

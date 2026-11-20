@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type -capability cuda_sm_8_9 -render-features fp8
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -capability cuda_sm_8_9 -render-features fp8
 
 // CUDA fp8 (FloatE4M3) cooperative matrix multiply-add with **half** accumulator
 // and output.  Targets PTX

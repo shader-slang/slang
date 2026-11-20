@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=BUF):
 
 struct MyStruct
 {

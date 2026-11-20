@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 2

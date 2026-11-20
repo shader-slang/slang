@@ -10,7 +10,7 @@
 // while LinkedNode is self-referential (it contains INode*). This extends
 // coverage beyond interface-ptr-in-impl.slang which only has two implementations.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target spirv -stage compute -entry computeMain -report-dynamic-dispatch-sites
 //TEST:SIMPLE(filecheck=SIZE):-target spirv-asm -stage compute -entry computeMain -dump-ir-after inferAnyValueSizeWhereNecessary
 

@@ -1,6 +1,6 @@
 // Test using interface typed shader parameters wrapped inside a `StructuredBuffer`.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 [anyValueSize(8)]
 interface IInterface

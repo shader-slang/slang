@@ -19,7 +19,7 @@
 // CHECK-DAG: %d64v4 = OpBitcast %v4double %u64v4
 // CHECK-DAG: %i64v4 = OpBitcast %v4long %u64v4
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=OUT):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[100 0 200 0 300 0 400 0 500 0 600 0 700 0 800 0 900 0 1000 0], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -compile-arg -msvc-style-bitfield-packing
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -compile-arg -msvc-style-bitfield-packing
 
 // Legacy MSB-first packing with zero-width bitfields.
 // CHECK:      123

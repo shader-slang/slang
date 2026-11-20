@@ -17,7 +17,7 @@
 // Excluded pairs: integer+half (E30081, CPU backend limitation) and
 // float+double (E30082 performance warning).
 
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK): -output-using-type
 
 T add<T : IArithmetic>(T a, T b)
 {

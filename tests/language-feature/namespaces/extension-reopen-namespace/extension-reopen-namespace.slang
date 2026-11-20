@@ -12,7 +12,7 @@
 // same fragment as its referenced types resolves fine, so merging reopen_ns_types
 // and reopen_ns_ext into one file would silently neuter this regression.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 module reopen_ns;
 

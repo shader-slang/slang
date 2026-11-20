@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for shader-slang/slang#11075: generic `IFloat`/`IInteger` `min`/`max` on builtin
 // scalars dispatch through `__IMinMax` to the concrete scalar overloads, so they return the same

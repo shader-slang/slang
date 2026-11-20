@@ -1,11 +1,11 @@
 //TEST(compute):SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 //TEST(compute):SIMPLE(filecheck=SPIRV_BL):-target spirv-asm -entry computeMain -stage compute -DBLOCK_LOAD
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-matrix-block-loads
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-Xslang -DRW -render-feature cooperative-matrix-block-loads
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-render-feature cooperative-matrix-block-loads
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-Xslang -DRW -render-feature cooperative-matrix-block-loads
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_BL):-Xslang -DBLOCK_LOAD -render-feature cooperative-matrix-block-loads
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_BL):-Xslang -DBLOCK_LOAD -Xslang -DRW -render-feature cooperative-matrix-block-loads
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_BL):-Xslang -DBLOCK_LOAD -render-feature cooperative-matrix-block-loads
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK_BL):-Xslang -DBLOCK_LOAD -Xslang -DRW -render-feature cooperative-matrix-block-loads
 
 //CHECK: 2
 //CHECK-NEXT: 2

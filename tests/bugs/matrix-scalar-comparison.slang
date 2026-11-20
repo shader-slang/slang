@@ -9,7 +9,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 // slang-test also synthesizes a CUDA lane from the -cpu lane.
-//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu+wgpu, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 // SPIRV-NOT: {{error\[E[0-9]+\]}}
 // SPIRV: OpFOrdGreaterThan

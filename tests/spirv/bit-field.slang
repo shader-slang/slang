@@ -1,6 +1,6 @@
 // bit-field.slang
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUFFER):-output-using-type
 
 // Test direct SPIR-V emit on bit field operations.
 

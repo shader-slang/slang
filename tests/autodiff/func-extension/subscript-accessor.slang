@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 //TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -dump-ir -o - -entry computeMain -stage compute -g -experimental-feature
 
 // Verify that user code can name multi-index subscript accessors as function-extension targets.

@@ -47,8 +47,8 @@
 // WIDEN: OpConstant %uint 2146959360
 // WIDEN-NOT: OpConstant %uint 2146435072
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-Xslang -O1
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=BUF):-Xslang -O1
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=BUF):-Xslang -O0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

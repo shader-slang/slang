@@ -5,10 +5,10 @@
 //TEST:SIMPLE: -target spirv -entry main -stage compute -o numeric-interfaces-custom-floating-point.spv -experimental-feature
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-custom-integer-part.hlsl -experimental-feature -DTEST_INTEGER_PART
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-custom-integer-part.spv -experimental-feature -DTEST_INTEGER_PART
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=INTEGER): -output-using-type -Xslang -experimental-feature -Xslang -DTEST_INTEGER_PART
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=INTEGER): -output-using-type -Xslang -experimental-feature -Xslang -DTEST_INTEGER_PART
 //TEST:SIMPLE: -target hlsl -entry computeMain -stage compute -o numeric-interfaces-custom-wide-integer-part.hlsl -experimental-feature -DTEST_INTEGER_PART -DTEST_WIDE_INTEGER_PART
 //TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o numeric-interfaces-custom-wide-integer-part.spv -experimental-feature -DTEST_INTEGER_PART -DTEST_WIDE_INTEGER_PART
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=INTEGER): -output-using-type -Xslang -experimental-feature -Xslang -DTEST_INTEGER_PART -Xslang -DTEST_WIDE_INTEGER_PART
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=INTEGER): -output-using-type -Xslang -experimental-feature -Xslang -DTEST_INTEGER_PART -Xslang -DTEST_WIDE_INTEGER_PART
 
 import slang.numerics;
 

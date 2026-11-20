@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+metal, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT: Texture2D(size=4, format=D32Float, content = one):name texture
 Texture2D texture;

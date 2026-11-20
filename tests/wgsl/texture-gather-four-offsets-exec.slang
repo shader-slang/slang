@@ -1,6 +1,6 @@
 // A four-offset gather must give, in component i, the (i0, j0) texel (component w) of a gather with
 // offset i: the Vulkan run checks the emulation against native ConstOffsets.
-//TEST:COMPARE_COMPUTE(targets=vk+wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+wgpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: Texture2D(size=8, content=gradient, mipMaps=1):name tex
 Texture2D<float4> tex;

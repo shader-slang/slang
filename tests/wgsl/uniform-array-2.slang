@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 struct Params{
     int2 data[2];

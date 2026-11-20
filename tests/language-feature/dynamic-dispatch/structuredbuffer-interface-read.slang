@@ -3,7 +3,7 @@
 // This is a core pattern for material/light systems: a buffer of heterogeneous
 // objects accessed via a common interface.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(8)]
 interface IFoo

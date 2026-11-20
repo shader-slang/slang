@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 #version 430
 precision highp float;
 precision highp int;

@@ -1,7 +1,7 @@
 import "glsl";
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUTPUT):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=OUTPUT):
 //CHECK: OpExecutionMode %computeMain LocalSize 1 2 3
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name outputBuffer

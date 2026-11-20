@@ -13,7 +13,7 @@
 // correct implementation -- if the two witness ids were confused, the outputs
 // would swap. The interleaved re-reads confirm each element's id is stable.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+metal+cuda+cpu+wgpu+llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(8)]
 interface IFoo

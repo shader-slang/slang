@@ -6,7 +6,7 @@
 // test checks the same splat for the initializer of a module-scope `static const`: it is a tree of
 // module-scope instructions, with no function around it.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP): -target cpp -line-directive-mode none -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute

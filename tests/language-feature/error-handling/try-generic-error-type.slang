@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // A `try` on a callee whose error type is generic checks the caller and any `catch` against
 // the error type substituted at the call site: `g<MyError>` propagates and is caught as

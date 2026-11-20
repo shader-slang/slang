@@ -3,7 +3,7 @@
 // Functional test: verify that `is`/`as` on generic-parameterized interface
 // values produce correct results (issue #10563).
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(16)]
 interface IAnimal

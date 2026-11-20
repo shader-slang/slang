@@ -1,6 +1,6 @@
 // gather-texture2darray.slang
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=vk+cpu+llvm, filecheck-buffer=CHECK):-output-using-type -render-feature hardware-device
 //TEST(compute):SIMPLE(filecheck=HLSL):-target hlsl -profile cs_6_6 -entry computeMain
 //TEST(compute):SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
 

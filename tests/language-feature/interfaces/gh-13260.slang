@@ -5,7 +5,7 @@
 // must inherit the interface default, which reconstructs a `Hit` via `unpack` and calls its
 // instance `value()`.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute -conformance Hit:IHit=0
 
 struct Packed

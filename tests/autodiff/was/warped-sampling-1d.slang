@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=dx12+cuda, filecheck-buffer=CHECK):-output-using-type -profile cs_5_1 -use-dxbc -compute-dispatch 4,1,1
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type -profile cs_5_1 -use-dxbc -compute-dispatch 4,1,1
 
 //TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=endpointDifferentialBuffer
 RWStructuredBuffer<float> endpointDifferentialBuffer;

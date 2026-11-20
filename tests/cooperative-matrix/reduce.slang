@@ -1,7 +1,7 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHK_ROW):-output-using-type -Xslang -DTEST_MODE=0 -render-feature cooperative-matrix-reductions
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHK_COLUMN):-output-using-type -Xslang -DTEST_MODE=1 -render-feature cooperative-matrix-reductions
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHK_ROW_AND_COLUMN):-output-using-type -Xslang -DTEST_MODE=2 -render-feature cooperative-matrix-reductions
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHK_2X2):-output-using-type -Xslang -DTEST_MODE=3 -render-feature cooperative-matrix-reductions
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK_ROW):-output-using-type -Xslang -DTEST_MODE=0 -render-feature cooperative-matrix-reductions
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK_COLUMN):-output-using-type -Xslang -DTEST_MODE=1 -render-feature cooperative-matrix-reductions
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK_ROW_AND_COLUMN):-output-using-type -Xslang -DTEST_MODE=2 -render-feature cooperative-matrix-reductions
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK_2X2):-output-using-type -Xslang -DTEST_MODE=3 -render-feature cooperative-matrix-reductions
 
 //CHK_ROW-COUNT-8: 36
 

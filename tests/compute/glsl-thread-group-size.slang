@@ -2,7 +2,7 @@
 // size, verifying all three dimensions.
 // Regression test for https://github.com/shader-slang/slang/issues/9953
 
-//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=metal+cuda, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 #version 430
 

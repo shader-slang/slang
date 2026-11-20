@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute -experimental-feature
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -experimental-feature

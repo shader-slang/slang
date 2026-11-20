@@ -2,7 +2,7 @@
 
 // Disable FXC DX11 because currently FXC can't compile with
 // "error X3708: 'continue' cannot be used in a switch"
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu+wgpu):
+//TEST:COMPARE_COMPUTE(targets=all-dx11):
 
 int testWhile(int r) {
     int result = 0;

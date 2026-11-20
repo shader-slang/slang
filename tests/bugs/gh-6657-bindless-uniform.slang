@@ -1,7 +1,7 @@
 //TEST:REFLECTION(filecheck=CHECK_REFLECTION):-stage compute -entry computeMain -target cpp -no-codegen
 //TEST:REFLECTION(filecheck=CHECK_REFLECTION):-stage compute -entry computeMain -target cuda -no-codegen
 //TEST:REFLECTION(filecheck=CHECK_METAL):-stage compute -entry computeMain -target metal -no-codegen
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK_RUNTIME):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=CHECK_RUNTIME):-output-using-type
 
 // Test that DescriptorHandle<T> in a structured buffer is correctly reflected
 // and works at runtime on bindless targets

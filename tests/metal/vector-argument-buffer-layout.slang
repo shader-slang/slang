@@ -1,5 +1,5 @@
 //TEST:REFLECTION(filecheck=METAL): -target metal
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-entry computeMain -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-entry computeMain -output-using-type
 
 
 //METAL: "name": "o",

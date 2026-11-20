@@ -1,4 +1,4 @@
-//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type -Xslang -DMETAL
+//TEST(metal):COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -DMETAL
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outStructuredBuffer
 RWStructuredBuffer<float> outStructuredBuffer;

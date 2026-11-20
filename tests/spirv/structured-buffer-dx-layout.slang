@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-xslang -fvk-use-dx-layout
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-cuda-wgpu, filecheck-buffer=CHECK):-xslang -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry computeMain -stage compute -fvk-use-dx-layout
 
 struct Test_t

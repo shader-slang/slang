@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=BUF):-entry computeMain
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-entry computeMain
 
 #pragma warning(disable:30816)
 

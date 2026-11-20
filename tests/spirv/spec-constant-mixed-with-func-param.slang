@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+wgpu, filecheck-buffer=BUF):-output-using-type
 
 // Test that a generic function combining specialization constants with regular
 // function parameters compiles correctly: mixed spec-const/non-spec-const

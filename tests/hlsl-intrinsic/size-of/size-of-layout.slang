@@ -1,5 +1,5 @@
 // Can't test -cpu due to missing data layout support on C++ target.
-//TEST:COMPARE_COMPUTE(targets=vk+llvm, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+llvm, filecheck-buffer=BUF):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name outputBuffer
 

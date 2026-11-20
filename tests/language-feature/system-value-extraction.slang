@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+metal+cuda+cpu+wgpu+llvm, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):
 
 // Slang allows the type of system value semantics to differ from their
 // "canonical" type - e.g. `uint8_t tid : SV_DispatchThreadID` is technically

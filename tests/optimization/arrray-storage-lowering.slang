@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPV): -target spirv -O3
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
 
 struct DoubleNested
 {

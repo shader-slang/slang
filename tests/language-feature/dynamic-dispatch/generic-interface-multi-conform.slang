@@ -2,7 +2,7 @@
 // interface. Each specialization participates independently in dynamic
 // dispatch when used through the corresponding existential type.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 interface IProcessor<T : IArithmetic>

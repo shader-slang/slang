@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[2], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;

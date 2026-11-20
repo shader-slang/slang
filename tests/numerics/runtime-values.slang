@@ -1,7 +1,7 @@
 // Verify representative runtime values for generic arithmetic, elementary functions,
 // component-wise comparisons, and logical-mask operations on builtin scalar and shaped types.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 1

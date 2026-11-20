@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute -Wno-41024
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF): -output-using-type -xslang -Wno-41024
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF): -output-using-type -xslang -Wno-41024
 
 //TEST_INPUT: RWTexture2D(format=R32Uint, size=4, content = zero, arrayLength=2, sampleCount=two, mipMaps = 1):name rwTexture2DMSArray
 [[vk::binding(2)]]

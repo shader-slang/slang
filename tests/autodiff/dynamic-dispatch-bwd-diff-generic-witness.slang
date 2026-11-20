@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for feeding block-local witness tables synthesized by autodiff to
 // `IRBuilder::getSet`, which requires global operands. Existential-table collection must keep only
