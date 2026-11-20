@@ -219,7 +219,7 @@ if(SLANG_ENABLE_GFX)
         LINK_WITH_PRIVATE
             core
             slang
-            Vulkan-Headers
+            Vulkan::Headers
             metal-cpp
             stb
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
