@@ -23083,6 +23083,32 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         { _propagateRequirement(this, mutableCapSet, varDecl, node, nodeCaps, refLoc); },
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
+
+    // An unscoped enum adds a module-scope `static const` alias for each case,
+    // and an unqualified reference to the case resolves to that alias, so the
+    // alias must carry the case's requirements or they are silently unenforced
+    // in the unqualified spelling (`E v = FirstValue;`). The alias's type walk
+    // above only reaches the enclosing enum's requirements, and its initializer
+    // is not walked (like any var initializer), so join the aliased case's
+    // inferred set here. The case is ensured before the call because
+    // `_propagateRequirement` reads its `inferredCapabilityRequirements`
+    // argument at the call site, before its own internal ensureDecl runs.
+    if (auto aliasModifier = varDecl->findModifier<UnscopedEnumCaseAliasModifier>())
+    {
+        // The case is null when user code attaches the modifier through `syntax`.
+        if (auto enumCaseDecl = aliasModifier->enumCaseDecl)
+        {
+            ensureDecl(enumCaseDecl, DeclCheckState::CapabilityChecked);
+            _propagateRequirement(
+                this,
+                mutableCapSet,
+                varDecl,
+                enumCaseDecl,
+                enumCaseDecl->inferredCapabilityRequirements,
+                varDecl->loc);
+        }
+    }
+
     varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
 }
 
@@ -23150,14 +23176,21 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 
 void SemanticsDeclCapabilityVisitor::visitEnumCaseDecl(EnumCaseDecl* enumCaseDecl)
 {
-    // Merge the enum case's own [require(...)] attributes into its inferred capability
-    // set, so a consumer's reference to `MyEnum.Case` propagates those requirements
-    // through the ordinary reference walk, exactly as a whole-enum [require] does.
-    // A case is its own capability boundary: a consumer already joins the enclosing
-    // enum's requirements through its reference to the enum itself (the base of
-    // `MyEnum.Case`), so the parent chain is not merged here. The tag expression is a
-    // constant and is not walked, mirroring how `checkVarDeclCommon` does not walk a
-    // variable's initializer.
+    // Merge the enum case's own [require(...)] attributes into its inferred
+    // capability set, so a consumer's reference to `MyEnum.Case` propagates those
+    // requirements through the ordinary reference walk, exactly as a whole-enum
+    // [require] does. Only the case's own attributes are merged, not the parent
+    // chain: every reference form already joins the enclosing enum's
+    // requirements at the use site — a qualified `MyEnum.Case` through its base
+    // expression, and a bare case reference through the case's type, which is
+    // the enum type (`visitDeclRefExpr` dispatches `expr->type.type`), the same
+    // route that covers an unscoped-enum alias through its `static const` type.
+    // Of the capability-implying modifiers `getDeclaredCapabilitySet` recognizes,
+    // only [require] applies to an enum case: the others name entry points
+    // ([shader(...)]) and 64-bit indexing, neither meaningful here. The tag
+    // expression is not capability-checked — references inside it, such as
+    // another case's name, propagate nothing — mirroring how
+    // `checkVarDeclCommon` walks a variable's type but not its initializer.
     CapabilitySet mutableCapSet{enumCaseDecl->inferredCapabilityRequirements};
     for (auto mod : enumCaseDecl->modifiers)
     {
