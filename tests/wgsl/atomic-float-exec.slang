@@ -8,6 +8,17 @@ RWStructuredBuffer<Atomic<float>> sums;
 RWStructuredBuffer<float> outputBuffer;
 groupshared Atomic<float> groupSum;
 
+// Make the storage updates to `sums` and the workgroup update to `groupSum` visible to the whole
+// workgroup. `AllMemoryBarrierWithGroupSync` also emits `textureBarrier()`, which needs an optional
+// WGSL language extension, and this test uses no textures.
+void storageAndWorkgroupBarrier()
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "storageBarrier(); workgroupBarrier()";
+    }
+}
+
 [numthreads(64, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID, uint gi: SV_GroupIndex)
 {
@@ -21,7 +32,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID, uint gi: SV_GroupIndex)
     sums[2].max(v);
     groupSum.add(1.0);
     // The reads below need the storage updates to `sums` too, not only `groupSum`.
-    AllMemoryBarrierWithGroupSync();
+    storageAndWorkgroupBarrier();
 
     if (tid.x == 0)
     {
