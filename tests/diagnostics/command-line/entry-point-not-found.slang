@@ -13,6 +13,14 @@
 // CHECK-NOT: E30015
 // CHECK-NOT: undefined identifier
 
+// A name with non-ASCII letters is still an identifier, so it is reported once too.
+
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=NONASCII,exit-code=2):-target spirv -entry mäin
+
+// NONASCII-NOT: undefined identifier
+// NONASCII: error[E38000]: no function found matching entry point name 'mäin'
+// NONASCII-NOT: undefined identifier
+
 // When the name is more than an identifier, the lookup can fail in a part that
 // E38000 does not mention (here the generic argument), so its errors are kept.
 

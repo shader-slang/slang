@@ -932,7 +932,8 @@ static bool _isPlainIdentifier(UnownedStringSlice text)
         return false;
     for (char c : text)
     {
-        if (!CharUtil::isAlphaOrDigit(c) && c != '_' && c != '$')
+        // The lexer accepts any non-ASCII code point in an identifier, so accept its UTF-8 bytes.
+        if (!CharUtil::isAlphaOrDigit(c) && c != '_' && c != '$' && (unsigned char)c < 0x80)
             return false;
     }
     return true;
