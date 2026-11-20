@@ -10823,11 +10823,11 @@ bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
     RequirementWitness existingWitness;
     if (witnessTable->tryGetRequirementWitness(requirementKey, existingWitness))
     {
-        // A canonical inherited-interface entry is created only by this branch, including its
-        // `PrepareForLookup` mode, and is always a nested table. A non-canonical path stores a
-        // `SubtypeWitness` value in the branch above and is finalized without re-entering this
-        // canonical branch. Seeing that value here would mean the path classification or the
-        // per-requirement checking state has changed underneath an already-published entry.
+        // A canonical inherited-interface entry is always a nested table. Enum conformance
+        // synthesis and `PrepareForLookup` can publish it before ordinary checking finishes.
+        // A non-canonical path stores a `SubtypeWitness` value in the branch above and is finalized
+        // without re-entering this canonical branch. Seeing that value here would mean the path
+        // classification or checking state has changed underneath an already-published entry.
         SLANG_RELEASE_ASSERT(
             existingWitness.getFlavor() == RequirementWitness::Flavor::witnessTable);
         satisfyingWitnessTable = existingWitness.getWitnessTable();
@@ -11376,8 +11376,8 @@ SemanticsVisitor::ConformanceRequirementCheckResult SemanticsVisitor::ensureConf
     bool requirementSatisfied = false;
     if (previousState == RequirementCheckState::WitnessReady)
     {
-        // The forceful projection path currently publishes only inherited-interface tables. The
-        // table is already present, so validate that nested conformance without treating mere
+        // Enum synthesis and projection lookup publish inherited-interface tables before all
+        // requirements are checked. Validate that nested conformance without treating mere
         // dictionary presence as success.
         if (auto requiredInheritanceDeclRef = requiredMemberDeclRef.as<InheritanceDecl>())
         {
@@ -13580,15 +13580,13 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
 
 
     // Every enum conforms to __RestrictedEnumType, whose tag and logical-operation requirements do
-    // not promise construction from arbitrary integers. Install this before __EnumType below,
-    // so ordinary inherited-interface checking reuses this canonical tag witness.
+    // not promise construction from arbitrary integers. Ordinary enums inherit this contract
+    // through __EnumType, so build the tag table before choosing the direct conformance below.
+    auto enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
+    enumConformanceDecl->loc = decl->loc;
     {
         Type* enumTypeType = getASTBuilder()->getRestrictedEnumType();
-
-        InheritanceDecl* enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
-        enumConformanceDecl->loc = decl->loc;
         enumConformanceDecl->base.type = enumTypeType;
-        decl->addMember(enumConformanceDecl);
 
         // The `__RestrictedEnumType` interface has a required member, the `__Tag` type.
         // We need to satisfy this requirement automatically, rather than require
@@ -13656,8 +13654,6 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         // TODO: eventually we should consider synthesizing other requirements for
         // the min/max tag values, or the total number of tags, so that people don't
         // have to declare these as additional cases.
-
-        enumConformanceDecl->setCheckState(DeclCheckState::DefinitionChecked);
     }
 
     // __EnumType includes ILogical and integer constructors. Keep that existing contract
@@ -13667,12 +13663,45 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     // unique named case in _coerce and retain that declaration reference on the cast.
     if (!enumHasCapabilityRestrictedCases(decl))
     {
-        auto rawEnumConformance = m_astBuilder->create<InheritanceDecl>();
-        rawEnumConformance->loc = decl->loc;
-        rawEnumConformance->base.type = getASTBuilder()->getEnumTypeType();
-        decl->addMember(rawEnumConformance);
-        rawEnumConformance->setCheckState(DeclCheckState::DefinitionChecked);
+        auto enumTypeType = getASTBuilder()->getEnumTypeType();
+        auto enumInterfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(enumTypeType);
+        SLANG_RELEASE_ASSERT(enumInterfaceDeclRef);
+
+        DeclRef<InheritanceDecl> restrictedEnumRequirement;
+        for (auto requirement :
+             getMembersOfType<InheritanceDecl>(m_astBuilder, enumInterfaceDeclRef))
+        {
+            ensureDecl(requirement, DeclCheckState::CanUseBaseOfInheritanceDecl);
+            if (getBaseType(m_astBuilder, requirement)->equals(enumConformanceDecl->base.type))
+            {
+                restrictedEnumRequirement = requirement;
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(restrictedEnumRequirement);
+
+        // Consider this example:
+        //
+        //     __generic<T : __EnumType>
+        //     extension T : IValue where T.__Tag : IValue { /* forward to __Tag */ }
+        //     enum E : int { value = 42 }
+        //
+        // Applying the extension while computing E's inheritance requests __Tag before
+        // conformance checking. Publish the tag table on the inherited path now so this lookup
+        // does not depend on the completed inheritance information it is helping to compute.
+        RefPtr<WitnessTable> witnessTable = new WitnessTable();
+        witnessTable->baseType = enumTypeType;
+        witnessTable->witnessedType = enumConformanceDecl->witnessTable->witnessedType;
+        InterfaceRequirementKey requirementKey(restrictedEnumRequirement.getDecl());
+        witnessTable->add(requirementKey, RequirementWitness(enumConformanceDecl->witnessTable));
+        // The tag is ready, but ordinary conformance checking must still populate the inherited
+        // logical operations. WitnessReady preserves that distinction for the existing checker.
+        witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::WitnessReady);
+        enumConformanceDecl->base.type = enumTypeType;
+        enumConformanceDecl->witnessTable = witnessTable;
     }
+    decl->addMember(enumConformanceDecl);
+    enumConformanceDecl->setCheckState(DeclCheckState::DefinitionChecked);
 }
 
 // Increments an enumerator value and returns true if there was a wrap-around
