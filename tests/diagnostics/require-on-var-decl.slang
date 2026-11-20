@@ -17,11 +17,17 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKMEMBER,non-exhaustive):-target hlsl -entry computeMainMember -stage compute
 // static const data member reached through a generic spelling
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKGENERIC,non-exhaustive):-target hlsl -entry computeMainGeneric -stage compute
+// internal gated variable: the internal join branch (declared joins inferred, no
+// superset enforcement) must gate consumers the same way
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECKINTERNAL,non-exhaustive):-target hlsl -entry computeMainInternal -stage compute
 // control: a gated function consumed in the same position
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKFUNC,non-exhaustive):-target hlsl -entry computeMainFunc -stage compute
 
 [require(spirv)]
 static const float w = 1.0;
+
+[require(spirv)]
+internal static const float wInternal = 1.0;
 
 struct G
 {
@@ -70,6 +76,15 @@ void computeMainGeneric(uint3 tid : SV_DispatchThreadID)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
+void computeMainInternal(uint3 tid : SV_DispatchThreadID)
+{
+    if (wInternal > 0.0)
+    {
+    }
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
 void computeMainFunc(uint3 tid : SV_DispatchThreadID)
 {
     if (f() > 0.0)
@@ -80,4 +95,5 @@ void computeMainFunc(uint3 tid : SV_DispatchThreadID)
 //CHECKVAR: E36107
 //CHECKMEMBER: E36107
 //CHECKGENERIC: E36107
+//CHECKINTERNAL: E36107
 //CHECKFUNC: E36107
