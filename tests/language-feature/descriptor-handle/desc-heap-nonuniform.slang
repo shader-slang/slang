@@ -7,8 +7,10 @@
 // The property is asserted on the HLSL and GLSL backends, where `NonUniformResourceIndex` /
 // `nonuniformEXT` are the surface forms and survival is directly observable. On both backends
 // the marker must sit directly on the scalar heap index, not nested inside the `uint2` /
-// `uvec2` construction of the untyped-handle round-trip that a peephole fold collapses.
-// SPIR-V decoration is covered by `desc-heap-nonuniform-spirv.slang`.
+// `uvec2` construction that the emitted untyped-handle wrap/unwrap passes through before the
+// peephole fold collapses it. The `.Handle` construction spelling, which exercises that
+// wrap/unwrap in source, is covered by `desc-heap-nonuniform-handle.slang`; SPIR-V decoration
+// is covered by `desc-heap-nonuniform-spirv.slang`.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6
@@ -29,8 +31,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // HLSL: ResourceDescriptorHeap[NonUniformResourceIndex(
 // HLSL: SamplerDescriptorHeap[NonUniformResourceIndex(
 
-// GLSL expresses the same property with `nonuniformEXT` directly on each heap index; either
-// heap may carry the `_0` suffix depending on emission order, so the heap names are wildcards.
+// GLSL expresses the same property with `nonuniformEXT` directly on each heap index. Emission
+// folds the texture and the sampler into one combined `sampler2D(texture, sampler)` constructor,
+// so the resource-heap index is pinned inside `sampler2D(` and the sampler-heap index after its
+// comma; either heap may carry the `_0` suffix depending on emission order, so the heap names
+// are wildcards.
 // GLSL: #extension GL_EXT_nonuniform_qualifier : require
 // GLSL: sampler2D(_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(
 // GLSL: ,_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(
