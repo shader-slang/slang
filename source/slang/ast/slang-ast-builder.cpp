@@ -781,16 +781,16 @@ ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)
     return as<ParameterBlockType>(getSpecializedBuiltinType(elementType, "ParameterBlockType"));
 }
 
-HLSLStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
+HLSLSizedStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
 {
-    return as<HLSLStructuredBufferType>(
-        getSpecializedBuiltinType(elementType, "HLSLStructuredBufferType"));
+    return as<HLSLSizedStructuredBufferType>(
+        getSpecializedBuiltinType(elementType, "HLSLSizedStructuredBufferType"));
 }
 
-HLSLRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
+HLSLSizedRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
 {
-    return as<HLSLRWStructuredBufferType>(
-        getSpecializedBuiltinType(elementType, "HLSLRWStructuredBufferType"));
+    return as<HLSLSizedRWStructuredBufferType>(
+        getSpecializedBuiltinType(elementType, "HLSLSizedRWStructuredBufferType"));
 }
 
 SamplerStateType* ASTBuilder::getSamplerStateType()

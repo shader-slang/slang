@@ -9598,6 +9598,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_LookupWitnessMethod:
     case kIROp_GetSequentialID:
     case kIROp_GetAddress:
+    case kIROp_SizedBufferToUnsizedBuffer:
     case kIROp_GetValueFromBoundInterface:
     case kIROp_MakeUInt64:
     case kIROp_MakeCoopVector:

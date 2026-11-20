@@ -697,9 +697,9 @@ public:
 
     ParameterBlockType* getParameterBlockType(Type* elementType);
 
-    HLSLStructuredBufferType* getStructuredBufferType(Type* elementType);
+    HLSLSizedStructuredBufferType* getStructuredBufferType(Type* elementType);
 
-    HLSLRWStructuredBufferType* getRWStructuredBufferType(Type* elementType);
+    HLSLSizedRWStructuredBufferType* getRWStructuredBufferType(Type* elementType);
 
     SamplerStateType* getSamplerStateType();
 

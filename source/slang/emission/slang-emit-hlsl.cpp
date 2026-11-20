@@ -2148,9 +2148,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         switch (structuredBufferType->getOp())
         {
         case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLUnsizedStructuredBufferType:
             m_writer->emit("StructuredBuffer");
             break;
         case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLUnsizedRWStructuredBufferType:
             m_writer->emit("RWStructuredBuffer");
             break;
         case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -2180,9 +2182,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         switch (type->getOp())
         {
         case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLUnsizedByteAddressBufferType:
             m_writer->emit("ByteAddressBuffer");
             break;
         case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_HLSLUnsizedRWByteAddressBufferType:
             m_writer->emit("RWByteAddressBuffer");
             break;
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:

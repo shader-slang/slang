@@ -372,14 +372,40 @@ class HLSLStructuredBufferTypeBase : public BuiltinGenericType
     FIDDLE(...)
 };
 
-FIDDLE()
+FIDDLE(abstract)
 class HLSLStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
     FIDDLE(...)
 };
 
 FIDDLE()
+class HLSLSizedStructuredBufferType : public HLSLStructuredBufferType
+{
+    FIDDLE(...)
+};
+
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedStructuredBufferType : public HLSLStructuredBufferType
+{
+    FIDDLE(...)
+};
+
+FIDDLE(abstract)
 class HLSLRWStructuredBufferType : public HLSLStructuredBufferTypeBase
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLSizedRWStructuredBufferType : public HLSLRWStructuredBufferType
+{
+    FIDDLE(...)
+};
+
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedRWStructuredBufferType : public HLSLRWStructuredBufferType
 {
     FIDDLE(...)
 };
@@ -397,14 +423,40 @@ class UntypedBufferResourceType : public BuiltinType
     FIDDLE(...)
 };
 
-FIDDLE()
+FIDDLE(abstract)
 class HLSLByteAddressBufferType : public UntypedBufferResourceType
 {
     FIDDLE(...)
 };
 
 FIDDLE()
+class HLSLSizedByteAddressBufferType : public HLSLByteAddressBufferType
+{
+    FIDDLE(...)
+};
+
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedByteAddressBufferType : public HLSLByteAddressBufferType
+{
+    FIDDLE(...)
+};
+
+FIDDLE(abstract)
 class HLSLRWByteAddressBufferType : public UntypedBufferResourceType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class HLSLSizedRWByteAddressBufferType : public HLSLRWByteAddressBufferType
+{
+    FIDDLE(...)
+};
+
+// Preserve the resource category while distinguishing buffers that do not carry a length.
+FIDDLE()
+class HLSLUnsizedRWByteAddressBufferType : public HLSLRWByteAddressBufferType
 {
     FIDDLE(...)
 };
@@ -1465,6 +1517,9 @@ class ModifiedType : public Type
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
+
+/// Returns whether the resource deliberately carries no buffer length.
+bool isUnsizedBufferType(Type* type);
 
 bool isCopyableType(Type* type);
 bool isNonCopyableType(Type* type);

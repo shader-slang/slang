@@ -212,6 +212,14 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
         return UnownedStringSlice::fromLiteral("RWByteAddressBuffer");
     case kIROp_HLSLByteAddressBufferType:
         return UnownedStringSlice::fromLiteral("ByteAddressBuffer");
+    case kIROp_HLSLUnsizedStructuredBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedStructuredBuffer");
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedRWStructuredBuffer");
+    case kIROp_HLSLUnsizedByteAddressBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedByteAddressBuffer");
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
+        return UnownedStringSlice::fromLiteral("UnsizedRWByteAddressBuffer");
     case kIROp_SamplerStateType:
         return UnownedStringSlice::fromLiteral("SamplerState");
     case kIROp_SamplerComparisonStateType:
@@ -1432,6 +1440,17 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 {
     switch (inst->getOp())
     {
+    case kIROp_SizedBufferToUnsizedBuffer:
+        {
+            // Both forms are prelude aggregates. The unsized value retains only
+            // the data field, whose physical element type was legalized together
+            // with the sized source before emission.
+            emitType(inst->getDataType());
+            m_writer->emit("{(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(").data}");
+            return true;
+        }
     default:
         {
             return false;

@@ -529,6 +529,16 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         break;
     }
 
+    // Unsized CPU/CUDA prelude buffers contain only their data pointer.
+    if (isUnsizedBufferType(type))
+    {
+        auto size = targetReq && (isCPUTarget(targetReq) || isCUDATarget(targetReq))
+                        ? builtinTypeInfo.genericPointerSize
+                        : 8;
+        *outSizeAndAlignment = IRSizeAndAlignment(size, size);
+        return SLANG_OK;
+    }
+
     // Handle StructuredBuffer types
     if (as<IRHLSLStructuredBufferTypeBase>(type))
     {

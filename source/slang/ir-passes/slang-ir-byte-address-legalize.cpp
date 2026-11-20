@@ -190,6 +190,13 @@ struct ByteAddressBufferLegalizationContext
 
     void processGetEquivalentStructuredBuffer(IRInst* inst)
     {
+        // Unsized CPU/CUDA buffers reinterpret their data member through prelude
+        // methods or LLVM resource lowering. Creating another global resource would
+        // lose a local value, such as a view obtained by converting a sized buffer.
+        if (isUnsizedBufferType(inst->getDataType()) &&
+            (isCPUTarget(m_target) || isCUDATarget(m_target)))
+            return;
+
         m_builder.setInsertBefore(inst);
 
         // We need to see what type it is to be interpreted as.
@@ -262,6 +269,14 @@ struct ByteAddressBufferLegalizationContext
         load->removeAndDeallocate();
     }
 
+    // Typed structured-buffer and LLVM accesses require natural alignment. For example,
+    // Load<uint64_t>(4) needs two word accesses; the prelude handles that byte alignment
+    // inside its methods instead.
+    bool requiresNaturalAlignment()
+    {
+        return m_options.translateToStructuredBufferOps || isCPUTargetViaLLVM(m_target);
+    }
+
     bool isTypeLegalForByteAddressLoadStore(IRType* type)
     {
         // Whether or not a type is legal to use for
@@ -282,6 +297,12 @@ struct ByteAddressBufferLegalizationContext
         //
         if (auto basicType = as<IRBasicType>(type))
         {
+            // Check 64-bit accesses individually so a four-byte-aligned operation is
+            // split while an explicitly aligned access can retain its full width.
+            if (requiresNaturalAlignment() &&
+                getSameSizeUIntBaseType(basicType->getOp()) == BaseType::UInt64)
+                return false;
+
             // On targets that require translation to
             // make all load/store use `uint` values,
             // any scalar type that isn't `uint` is
@@ -941,10 +962,9 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
-            // Only split misaligned 8-byte scalar loads for targets that translate
-            // byte-address buffers into typed structured buffers. Targets that keep
-            // byte-address-buffer operations use the simple/lowerBasicTypeOps paths.
-            if (m_options.translateToStructuredBufferOps)
+            // A typed memory access needs natural alignment even when it originated
+            // from a byte-address buffer, whose location only promises four bytes.
+            if (requiresNaturalAlignment())
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_NULL_ON_FAIL(
@@ -1434,6 +1454,23 @@ struct ByteAddressBufferLegalizationContext
                 &index);
         }
 
+        if (byteAddressBuffer->getOp() == kIROp_SizedBufferToUnsizedBuffer)
+        {
+            // A view of a byte-address buffer becomes a view of its equivalent structured
+            // buffer. Preserve the conversion so the two logical types remain distinct.
+            auto buffer =
+                getEquivalentStructuredBuffer(elementType, byteAddressBuffer->getOperand(0));
+            if (!buffer)
+                return nullptr;
+            return m_builder.emitIntrinsicInst(
+                getEquivalentStructuredBufferParamType(
+                    elementType,
+                    byteAddressBuffer->getDataType()),
+                kIROp_SizedBufferToUnsizedBuffer,
+                1,
+                &buffer);
+        }
+
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
         {
             // If the code is fetching the byte-address buffer from an
@@ -1622,6 +1659,10 @@ struct ByteAddressBufferLegalizationContext
             return m_builder.getType(kIROp_HLSLStructuredBufferType, 2, typeOperands);
         case kIROp_HLSLRWByteAddressBufferType:
             return m_builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
+        case kIROp_HLSLUnsizedByteAddressBufferType:
+            return m_builder.getType(kIROp_HLSLUnsizedStructuredBufferType, 2, typeOperands);
+        case kIROp_HLSLUnsizedRWByteAddressBufferType:
+            return m_builder.getType(kIROp_HLSLUnsizedRWStructuredBufferType, 2, typeOperands);
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
             return m_builder.getType(
                 kIROp_HLSLRasterizerOrderedStructuredBufferType,
@@ -1963,9 +2004,8 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
-            // Match the load path: this split is only needed when byte-address buffers
-            // are translated into typed structured buffers.
-            if (m_options.translateToStructuredBufferOps)
+            // Match the load path for buffers that become typed memory accesses.
+            if (requiresNaturalAlignment())
             {
                 IRSizeAndAlignment sizeAlignment;
                 SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
