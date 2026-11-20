@@ -7,8 +7,9 @@
 // `loadGlobalTexture` with the selected heap index, so the first call must carry 0 and the second 1.
 
 //CHECK-LABEL: ; Function main
-//CHECK: OpFunctionCall %v4float %loadGlobalTexture %uint_0
-//CHECK: OpFunctionCall %v4float %loadGlobalTexture %uint_1
+//CHECK: %[[BEFORE:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %uint_0
+//CHECK: %[[AFTER:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %uint_1
+//CHECK: OpFAdd %v4float %[[BEFORE]] %[[AFTER]]
 //CHECK-LABEL: ; Function loadGlobalTexture
 //CHECK: %[[INDEX:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
 //CHECK: OpUntypedAccessChainKHR {{.*}} %slang_resourceHeap %[[INDEX]]
