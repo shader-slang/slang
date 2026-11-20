@@ -4803,6 +4803,29 @@ CapabilitySet getDeclRefCapabilityRequirements(
     DeclRef<Decl> declRef,
     List<Decl*>& outReferencedDecls);
 
+// A declaration whose requirements contribute to a set, and where it is used.
+struct CapabilityRequirementUse
+{
+    Decl* decl;
+    SourceLoc loc;
+};
+
+// Collect the requirements of a type conformance linked for dynamic dispatch: those of the
+// conforming type, including its fields, and of each declaration that satisfies an interface
+// requirement. Append the contributing declarations to `outUses`.
+CapabilitySet getTypeConformanceCapabilityRequirements(
+    SemanticsVisitor* visitor,
+    SubtypeWitness* witness,
+    List<CapabilityRequirementUse>& outUses);
+
+// Report each target of the linkage that cannot satisfy the requirements of the type
+// conformance `witness`. Returns false if an error was reported.
+bool validateTypeConformanceCapabilities(
+    Linkage* linkage,
+    SemanticsVisitor* visitor,
+    SubtypeWitness* witness,
+    DiagnosticSink* sink);
+
 RefPtr<ComponentType> createUnspecializedGlobalComponentType(
     FrontEndCompileRequest* compileRequest);
 

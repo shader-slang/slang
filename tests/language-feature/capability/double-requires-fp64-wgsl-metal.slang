@@ -2,9 +2,12 @@
 // A use of `double` reachable from an entry point is reported as a capability error at the user's
 // code. The check runs before optimization, so a `double` that would fold away is reported too.
 // A struct's instance fields count wherever a value of the struct type is used (CASE 3-4, 8-10,
-// 14, 18), except resource fields, which type legalization moves out of the struct outside Metal
-// parameter blocks (CASE 16). The default value of an omitted argument counts at the call
-// (CASE 11-12). CASE 15-17 must compile.
+// 14, 18). A resource field counts through its element type only, because type legalization
+// moves the field out of the struct but Metal keeps it in a parameter block's argument buffer
+// (CASE 16, 21). The default value of an omitted argument counts at the call (CASE 11-12), and
+// the initializer of a static variable where the variable is read (CASE 19-20). A conformance
+// linked with `-conformance` is checked against the target when it is created (CASE 22-23).
+// CASE 15-17 and 24 must compile.
 //DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=BUFFER, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=0
 //DIAGNOSTIC_TEST:SIMPLE(diag=PARAM, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=1
@@ -37,13 +40,26 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=GATED, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=14
 //DIAGNOSTIC_TEST:SIMPLE(diag=ASSOC, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=18
 //DIAGNOSTIC_TEST:SIMPLE(diag=ASSOC, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=18
-//DIAGNOSTIC_TEST:SIMPLE(diag=EXPLICIT): -target wgsl -entry computeMain -stage compute -DCASE=15
-//DIAGNOSTIC_TEST:SIMPLE(diag=EXPLICIT): -target metal -entry computeMain -stage compute -DCASE=15
-//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE): -target wgsl -entry computeMain -stage compute -DCASE=16
-//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE): -target metal -entry computeMain -stage compute -DCASE=16
-//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE): -target cuda -entry computeMain -stage compute -DCASE=16
-//DIAGNOSTIC_TEST:SIMPLE(diag=QUALIFIER): -target wgsl -entry computeMain -stage compute -DCASE=17
-//DIAGNOSTIC_TEST:SIMPLE(diag=QUALIFIER): -target metal -entry computeMain -stage compute -DCASE=17
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=19
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATIC, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=19
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATICMEMBER, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=20
+//DIAGNOSTIC_TEST:SIMPLE(diag=STATICMEMBER, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=20
+//DIAGNOSTIC_TEST:SIMPLE(diag=PBLOCK, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=21
+//DIAGNOSTIC_TEST:SIMPLE(diag=PBLOCK, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=21
+//DIAGNOSTIC_TEST:SIMPLE(diag=CONFMETHOD, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=22 -conformance "FloatValue:IValue=0" -conformance "DoubleValue:IValue=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CONFMETHOD, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=22 -conformance "FloatValue:IValue=0" -conformance "DoubleValue:IValue=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CONFFIELD, non-exhaustive): -target wgsl -entry computeMain -stage compute -DCASE=23 -conformance "FloatValue:IValue=0" -conformance "DoubleValue:IValue=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CONFFIELD, non-exhaustive): -target metal -entry computeMain -stage compute -DCASE=23 -conformance "FloatValue:IValue=0" -conformance "DoubleValue:IValue=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CONFOK, exit-code=0): -target wgsl -entry computeMain -stage compute -DCASE=24 -conformance "FloatValue:IValue=0" -conformance "IntValue:IValue=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CONFOK, exit-code=0): -target metal -entry computeMain -stage compute -DCASE=24 -conformance "FloatValue:IValue=0" -conformance "IntValue:IValue=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CONFOK, exit-code=0): -target spirv -entry computeMain -stage compute -DCASE=22 -conformance "FloatValue:IValue=0" -conformance "DoubleValue:IValue=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=EXPLICIT, exit-code=0): -target wgsl -entry computeMain -stage compute -DCASE=15
+//DIAGNOSTIC_TEST:SIMPLE(diag=EXPLICIT, exit-code=0): -target metal -entry computeMain -stage compute -DCASE=15
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE, exit-code=0): -target wgsl -entry computeMain -stage compute -DCASE=16
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE, exit-code=0): -target metal -entry computeMain -stage compute -DCASE=16
+//DIAGNOSTIC_TEST:SIMPLE(diag=RESOURCE, exit-code=0): -target cuda -entry computeMain -stage compute -DCASE=16
+//DIAGNOSTIC_TEST:SIMPLE(diag=QUALIFIER, exit-code=0): -target wgsl -entry computeMain -stage compute -DCASE=17
+//DIAGNOSTIC_TEST:SIMPLE(diag=QUALIFIER, exit-code=0): -target metal -entry computeMain -stage compute -DCASE=17
 
 #if (CASE == 0)
 
@@ -470,6 +486,118 @@ void computeMain()
 */
 {
     outputBuffer[0] = sb[0].x.a;
+}
+
+#elif (CASE == 19)
+
+// The entry point reads `kScale`, so the initializer that computes it runs for the entry point.
+RWStructuredBuffer<float> outputBuffer;
+
+static float kScale = (float)(double(outputBuffer[1]) * 2.0LF);
+//STATIC:                    ^ see using of 'double'
+
+[numthreads(1, 1, 1)]
+void computeMain()
+/*STATIC:
+     ^^^^^^^^^^^ unavailable features in entry point
+*/
+{
+    outputBuffer[0] = kScale;
+}
+
+#elif (CASE == 20)
+
+// The same holds for a static member of a struct.
+RWStructuredBuffer<float> outputBuffer;
+
+struct Settings
+{
+    static float scale = (float)(double(outputBuffer[1]) * 2.0LF);
+//STATICMEMBER:                 ^ see using of 'double'
+};
+
+[numthreads(1, 1, 1)]
+void computeMain()
+/*STATICMEMBER:
+     ^^^^^^^^^^^ unavailable features in entry point
+*/
+{
+    outputBuffer[0] = Settings.scale;
+}
+
+#elif (CASE == 21)
+
+// `wide` is never used, but Metal keeps it in the parameter block's argument buffer.
+struct Globals
+{
+    RWStructuredBuffer<double> wide;
+//PBLOCK:                      ^^^^ see using of 'double'
+    RWStructuredBuffer<float> output;
+};
+
+ParameterBlock<Globals> globals;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+/*PBLOCK:
+     ^^^^^^^^^^^ unavailable features in entry point
+*/
+{
+    globals.output[0] = 1.0f;
+}
+
+#elif (CASE >= 22)
+
+// No entry point names `DoubleValue` or `IntValue`, but `-conformance` links each of them, with
+// its fields and methods, for dynamic dispatch.
+interface IValue
+{
+    float get();
+}
+
+struct FloatValue : IValue
+{
+    float v;
+    float get() { return v; }
+};
+
+#if (CASE == 22)
+struct DoubleValue : IValue
+/*CONFMETHOD:
+       ^^^^^^^^^^^ dependencies not compatible on target
+*/
+{
+    float v;
+    float get() { return (float)(double(v) * 2.0LF); }
+//CONFMETHOD:                   ^ see using of 'double'
+};
+#elif (CASE == 23)
+struct DoubleValue : IValue
+/*CONFFIELD:
+       ^^^^^^^^^^^ dependencies not compatible on target
+*/
+{
+    double v;
+/*CONFFIELD:
+           ^ see using of 'double'
+*/
+    float get() { return v > 0.0LF ? 1.0f : 0.0f; }
+};
+#else
+struct IntValue : IValue
+{
+    int v;
+    float get() { return float(v); }
+};
+#endif
+
+RWStructuredBuffer<float> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain(uniform int id)
+{
+    IValue value = createDynamicObject<IValue>(id, 1.0f);
+    outputBuffer[0] = value.get();
 }
 
 #endif

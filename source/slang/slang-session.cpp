@@ -1014,7 +1014,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     RefPtr<TypeConformance> result;
-    DiagnosticSink sink;
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
     SLANG_EXCEPTION_TRY
@@ -1027,7 +1027,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
             (Slang::Type*)type,
             (Slang::Type*)interfaceType,
             IsSubTypeOptions::None);
-        if (auto subtypeWitness = as<SubtypeWitness>(witness))
+        // Linking the conformance emits the conforming type and its implementations for every
+        // target, so check their requirements here, as entry points are checked when they are
+        // selected.
+        auto subtypeWitness = as<SubtypeWitness>(witness);
+        if (subtypeWitness &&
+            validateTypeConformanceCapabilities(this, &visitor, subtypeWitness, &sink))
         {
             result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
         }

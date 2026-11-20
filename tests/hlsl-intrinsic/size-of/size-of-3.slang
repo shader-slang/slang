@@ -1,5 +1,7 @@
 
-//TEST:COMPARE_COMPUTE(targets=all):
+// WGSL and Metal have no double, so there the 8-byte case uses uint64_t instead.
+//TEST:COMPARE_COMPUTE(targets=all-wgpu-metal):-xslang -DSUPPORT_DOUBLE
+//TEST:COMPARE_COMPUTE(targets=wgpu+metal):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 
@@ -38,7 +40,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     const int idx = asint(dispatchThreadID.x);
 
+#ifdef SUPPORT_DOUBLE
     double doub = 13.0;
+#else
+    uint64_t doub = 13;
+#endif
     uint16_t u16 = 10;
 
     uint3 vec = uint3(0);
