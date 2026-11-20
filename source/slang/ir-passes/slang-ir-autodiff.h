@@ -677,6 +677,11 @@ bool isDifferentialOrRecomputeBlock(IRBlock* block);
 
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc);
 
+// Copy debug info from `srcFunc` onto a derivative function that a translation op has just
+// synthesized, building a fresh DebugFunction record for `destFunc` rather than re-referencing
+// `srcFunc`'s record.
+void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst* destFunc);
+
 void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
 
 inline bool isDifferentialInst(IRInst* inst)
