@@ -130,28 +130,58 @@ struct BitCastLoweringContext
     }
 
     // Find a `DescriptorHandle<T>` in `type`, either `type` itself or one nested in its struct
-    // fields or array elements, that `readObject` cannot build from bits on this target.
-    IRDescriptorHandleType* findUnbuildableDescriptorHandle(IRType* type)
+    // fields or array elements, for which `isUnsupported` returns true.
+    template<typename IsUnsupported>
+    IRDescriptorHandleType* findDescriptorHandle(IRType* type, const IsUnsupported& isUnsupported)
     {
         switch (type->getOp())
         {
         case kIROp_DescriptorHandleType:
             {
                 auto handleType = as<IRDescriptorHandleType>(type);
-                return getDescriptorHandleLeafSize(handleType) ? nullptr : handleType;
+                return isUnsupported(handleType) ? handleType : nullptr;
             }
         case kIROp_StructType:
             for (auto field : as<IRStructType>(type)->getFields())
             {
-                if (auto handleType = findUnbuildableDescriptorHandle(field->getFieldType()))
+                if (auto handleType = findDescriptorHandle(field->getFieldType(), isUnsupported))
                     return handleType;
             }
             return nullptr;
         case kIROp_ArrayType:
-            return findUnbuildableDescriptorHandle(as<IRArrayType>(type)->getElementType());
+            return findDescriptorHandle(as<IRArrayType>(type)->getElementType(), isUnsupported);
         default:
             return nullptr;
         }
+    }
+
+    // Find a `DescriptorHandle<T>` in `type` that `readObject` cannot build from bits on this
+    // target.
+    IRDescriptorHandleType* findUnbuildableDescriptorHandle(IRType* type)
+    {
+        return findDescriptorHandle(
+            type,
+            [&](IRDescriptorHandleType* handleType)
+            { return getDescriptorHandleLeafSize(handleType) == 0; });
+    }
+
+    // Find a `DescriptorHandle<T>` in `type` that `extractValueAtOffset` cannot read. It reads a
+    // leaf of 1, 2, 4 or 8 bytes, and a handle is 4 or 8 bytes where it is readable, so a handle
+    // of another size, such as a 16-byte C++ or CUDA structured-buffer handle, is not.
+    IRDescriptorHandleType* findUnreadableDescriptorHandle(IRType* type)
+    {
+        return findDescriptorHandle(
+            type,
+            [&](IRDescriptorHandleType* handleType)
+            {
+                IRSizeAndAlignment layout;
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        targetProgram->getTargetReq(),
+                        handleType,
+                        &layout)))
+                    return true;
+                return layout.size != 4 && layout.size != 8;
+            });
     }
 
     // Extract an object of `type` from `offset` in `src`.
@@ -511,6 +541,19 @@ struct BitCastLoweringContext
         if (auto handleType = findUnbuildableDescriptorHandle(toType))
         {
             sink->diagnose(Diagnostics::BitCastToUnsupportedDescriptorHandle{
+                .fromType = fromType,
+                .toType = toType,
+                .handleType = handleType,
+                .location = inst->sourceLoc,
+            });
+            return;
+        }
+
+        // `readObject` reads every byte of the source as integer leaves. A handle in the source
+        // that is not a readable leaf would abort that read, so report it at the cast.
+        if (auto handleType = findUnreadableDescriptorHandle(fromType))
+        {
+            sink->diagnose(Diagnostics::BitCastFromUnsupportedDescriptorHandle{
                 .fromType = fromType,
                 .toType = toType,
                 .handleType = handleType,

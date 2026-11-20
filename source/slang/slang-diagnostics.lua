@@ -5847,6 +5847,14 @@ err(
 )
 
 err(
+    "bit-cast-from-unsupported-descriptor-handle",
+    41206,
+    "bit_cast cannot read this DescriptorHandle as bits",
+    span { loc = "location", message = "cannot bit_cast '~fromType:IRInst' to '~toType:IRInst': '~handleType:IRInst' cannot be read as bits on this target" },
+    note { message = "bit_cast the handle itself rather than an aggregate that contains it", span { loc = "location" } }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",

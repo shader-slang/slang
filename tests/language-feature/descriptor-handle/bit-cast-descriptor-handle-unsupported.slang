@@ -3,11 +3,15 @@
 // C++ and CUDA a handle is not plain data. On C++ and CUDA a handle nested in an aggregate is built
 // from one integer leaf, which a 16-byte structured-buffer handle is not; a bare handle of the
 // wrong size gets the usual size mismatch.
+// Reading a handle out of an aggregate source works the same way, so a 16-byte structured-buffer
+// handle inside a source struct is reported at the cast too (READ).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=SPV):-target spirv -entry spirvMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CPP):-target cpp -entry cppMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=OTHER):-target hlsl -entry spirvMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=OTHER):-target metal -entry spirvMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=READ):-target cpp -entry readMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=READ):-target cuda -entry readMain -stage compute
 
 uniform uint2 handleBits;
 uniform uint4 wideBits;
@@ -51,4 +55,28 @@ void cppMain()
 //CPP:                                               ^ error E41202
 //CPP:                                               ^ with size '8' casted into 'DescriptorHandle<StructuredBuffer<vector<float,4>>>' with size '16'
     outputBuffer[0] = s.buffer[s.index.x] + b[0];
+}
+
+uniform StructuredBuffer<float4>.Handle bufferHandle;
+
+struct WideHandle
+{
+    StructuredBuffer<float4>.Handle buffer;
+}
+
+struct TextureAndBits
+{
+    Texture2D.Handle texture;
+    uint2 bits;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void readMain()
+{
+    let s = bit_cast<TextureAndBits>(WideHandle(bufferHandle));
+//READ:                             ^ error E41206
+//READ:                             ^ 'DescriptorHandle<StructuredBuffer<vector<float,4>>>' cannot be read as bits
+//READ:                             ^ rather than an aggregate that contains it
+    outputBuffer[0] = float4(float(s.bits.x));
 }
