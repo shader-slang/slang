@@ -91,6 +91,23 @@ public void myFunc()
 }
 ```
 
+An individual enum case can also declare its own `[require]` attributes, so that each value
+of an enum can be gated to its own set of compilation targets:
+```csharp
+enum MyEnum
+{
+    [require(spirv)]
+    FirstValue = 0,
+
+    [require(hlsl)]
+    SecondValue = 1,
+};
+```
+Using `MyEnum.FirstValue` requires the compilation target to satisfy both the enum's own
+requirements and `FirstValue`'s, so the code above makes `MyEnum.FirstValue` usable only when
+targeting SPIR-V, while `MyEnum.SecondValue` is usable only when targeting HLSL. Cases without
+a `[require]` are only gated by the enum's own requirements, if any.
+
 ## Capabilities Between Subtype and Supertype
 
 For inheritance/implementing-interfaces, the story is a bit different.
