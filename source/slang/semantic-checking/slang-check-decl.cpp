@@ -23085,7 +23085,7 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
 
     // Merge the variable's own `[require(...)]` attributes into its inferred set,
-    // mirroring the merge the function path performs in `checkFunctionCommon`. The
+    // mirroring the merge the function path performs in `visitFunctionDeclBase`. The
     // inferred set is what a consumer's reference walk propagates through
     // `_propagateRequirement`, so without this merge a gated variable compiles cleanly
     // on every target, and so does every consumer of it. Consider:
