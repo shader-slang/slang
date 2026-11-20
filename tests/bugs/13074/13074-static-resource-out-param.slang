@@ -5,6 +5,8 @@
 // binding before changing the selection to heap resource 1, and the final read must use resource 1.
 // The checks distinguish the two reads and prove their order: each read is a call to
 // `loadGlobalTexture` with the selected heap index, so the first call must carry 0 and the second 1.
+// The second call carrying 1 also proves the `out` update to `selectedTexture` was threaded through
+// the helper calls: the final read uses the binding the nested helper selected.
 
 //CHECK-LABEL: ; Function main
 //CHECK: %[[BEFORE:[A-Za-z0-9_]+]] = OpFunctionCall %v4float %loadGlobalTexture %uint_0

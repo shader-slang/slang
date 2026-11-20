@@ -105,9 +105,12 @@ void mainHeapHelpers(uint3 tid : SV_DispatchThreadID)
 void mainNoInline(uint3 tid : SV_DispatchThreadID)
 {
     // A [noinline] helper keeps its function shape; specialization must still
-    // rewrite its signature so the heap fetch happens inside the callee.
+    // rewrite its signature so the heap fetch happens inside the callee. The
+    // global load at another element type makes the entry discriminate: a
+    // broken compiler reuses the helper's uint view for it.
     uint i = readWordNoInline(ResourceDescriptorHeap[tid.x], 0);
-    outBuf[0] = float(i);
+    float2 v = buf.Load<float2>(0);
+    outBuf[0] = v.x + v.y + float(i);
 }
 
 [shader("compute")]
@@ -129,8 +132,9 @@ void mainRW(uint3 tid : SV_DispatchThreadID)
 void mainMixedSig(uint3 tid : SV_DispatchThreadID)
 {
     // The mixed-signature shape: a heap-fetched texture and a heap-fetched
-    // byte-address buffer passed to one helper. Specialization is all-or-nothing,
-    // so both fetches must be specializable or neither parameter survives into
+    // byte-address buffer passed to one helper. On this direct SPIR-V path both
+    // parameters want specialization, and specialization is all-or-nothing, so
+    // both fetches must be specializable or neither parameter survives into
     // byte-address legalization.
     readTexAndWord(ResourceDescriptorHeap[tid.x], ResourceDescriptorHeap[tid.y]);
     float2 v = buf.Load<float2>(0);
@@ -159,11 +163,12 @@ void mainMixedSig(uint3 tid : SV_DispatchThreadID)
 
 // NOINLINE: OpCapability DescriptorHeapEXT
 // NOINLINE: %StructuredBuffer = OpTypeStruct %_runtimearr_uint
+// NOINLINE: %StructuredBuffer_0 = OpTypeStruct %_runtimearr_v2float
+// NOINLINE: OpAccessChain %_ptr_StorageBuffer_v2float %buf
 // NOINLINE-NOT: ByteAddressBuffer
 
 // RW: OpCapability DescriptorHeapEXT
 // RW: %RWStructuredBuffer = OpTypeStruct %_runtimearr_uint
-// RW: %RWStructuredBuffer_0 = OpTypeStruct %_runtimearr_float
 // RW: OpAccessChain %_ptr_StorageBuffer_float %rwBuf
 // RW-NOT: ByteAddressBuffer
 
