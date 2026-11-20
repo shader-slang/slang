@@ -891,8 +891,17 @@ public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-[require(glsl, GLSL_400)]
+// Conjoining the first attribute with GLSL_400 ("GLSL 400 and related
+// capabilities of other targets") gates glsl >= 4.00, hlsl >= sm_5_1 and
+// cuda >= sm_6_0, and admits metal, cpp and llvm unversioned. spirv and wgsl
+// stay in their own attributes so GLSL_400's spirv_1_3 alternative can never
+// raise the spirv floor above what master admitted; the compound alias omits
+// both targets so the conjoin cannot reach them.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_llvm, GLSL_400)]
 [require(spirv)]
+[require(wgsl)]
 public matrix<T,N,N> inverse(matrix<T,N,N> m)
 {
     __target_switch
@@ -901,6 +910,93 @@ public matrix<T,N,N> inverse(matrix<T,N,N> m)
     case spirv: return spirv_asm {
         OpExtInst $$matrix<T,N,N> result glsl450 MatrixInverse $m
     };
+    default:
+        // This arm serves the targets without a native inverse: hlsl, cuda, cpp,
+        // metal, wgsl and llvm. The glsl and spirv cases above never reach it.
+        static_assert(N >= 1 && N <= 4, "inverse is only implemented up to 4x4 matrices");
+        T det = determinant(m);
+        matrix<T, N, N> result;
+        // The adjugate is the transpose of the cofactor matrix, so result[row][col]
+        // is the cofactor of m with row `col` and column `row` removed, negated
+        // when row + col is odd.
+        if (N == 1)
+        {
+            result[0][0] = T(1) / det;
+        }
+        else if (N == 2)
+        {
+            result[0][0] = m[1][1] / det;
+            result[0][1] = -m[0][1] / det;
+            result[1][0] = -m[1][0] / det;
+            result[1][1] = m[0][0] / det;
+        }
+        else if (N == 3)
+        {
+            result[0][0] = (m[1][1]*m[2][2] - m[2][1]*m[1][2]) / det;
+            result[0][1] = -(m[0][1]*m[2][2] - m[2][1]*m[0][2]) / det;
+            result[0][2] = (m[0][1]*m[1][2] - m[1][1]*m[0][2]) / det;
+            result[1][0] = -(m[1][0]*m[2][2] - m[2][0]*m[1][2]) / det;
+            result[1][1] = (m[0][0]*m[2][2] - m[2][0]*m[0][2]) / det;
+            result[1][2] = -(m[0][0]*m[1][2] - m[1][0]*m[0][2]) / det;
+            result[2][0] = (m[1][0]*m[2][1] - m[2][0]*m[1][1]) / det;
+            result[2][1] = -(m[0][0]*m[2][1] - m[2][0]*m[0][1]) / det;
+            result[2][2] = (m[0][0]*m[1][1] - m[1][0]*m[0][1]) / det;
+        }
+        else // if (N == 4)
+        {
+            // Each entry below is its cofactor expanded along the first column of the
+            // 3x3 minor surviving the row/column removal: one product term per
+            // element of that column, each multiplying a 2x2 minor.
+            result[0][0] = (m[1][1] * (m[2][2]*m[3][3] - m[3][2]*m[2][3])
+                - m[2][1] * (m[1][2]*m[3][3] - m[3][2]*m[1][3])
+                + m[3][1] * (m[1][2]*m[2][3] - m[2][2]*m[1][3])) / det;
+            result[0][1] = -(m[0][1] * (m[2][2]*m[3][3] - m[3][2]*m[2][3])
+                - m[2][1] * (m[0][2]*m[3][3] - m[3][2]*m[0][3])
+                + m[3][1] * (m[0][2]*m[2][3] - m[2][2]*m[0][3])) / det;
+            result[0][2] = (m[0][1] * (m[1][2]*m[3][3] - m[3][2]*m[1][3])
+                - m[1][1] * (m[0][2]*m[3][3] - m[3][2]*m[0][3])
+                + m[3][1] * (m[0][2]*m[1][3] - m[1][2]*m[0][3])) / det;
+            result[0][3] = -(m[0][1] * (m[1][2]*m[2][3] - m[2][2]*m[1][3])
+                - m[1][1] * (m[0][2]*m[2][3] - m[2][2]*m[0][3])
+                + m[2][1] * (m[0][2]*m[1][3] - m[1][2]*m[0][3])) / det;
+            result[1][0] = -(m[1][0] * (m[2][2]*m[3][3] - m[3][2]*m[2][3])
+                - m[2][0] * (m[1][2]*m[3][3] - m[3][2]*m[1][3])
+                + m[3][0] * (m[1][2]*m[2][3] - m[2][2]*m[1][3])) / det;
+            result[1][1] = (m[0][0] * (m[2][2]*m[3][3] - m[3][2]*m[2][3])
+                - m[2][0] * (m[0][2]*m[3][3] - m[3][2]*m[0][3])
+                + m[3][0] * (m[0][2]*m[2][3] - m[2][2]*m[0][3])) / det;
+            result[1][2] = -(m[0][0] * (m[1][2]*m[3][3] - m[3][2]*m[1][3])
+                - m[1][0] * (m[0][2]*m[3][3] - m[3][2]*m[0][3])
+                + m[3][0] * (m[0][2]*m[1][3] - m[1][2]*m[0][3])) / det;
+            result[1][3] = (m[0][0] * (m[1][2]*m[2][3] - m[2][2]*m[1][3])
+                - m[1][0] * (m[0][2]*m[2][3] - m[2][2]*m[0][3])
+                + m[2][0] * (m[0][2]*m[1][3] - m[1][2]*m[0][3])) / det;
+            result[2][0] = (m[1][0] * (m[2][1]*m[3][3] - m[3][1]*m[2][3])
+                - m[2][0] * (m[1][1]*m[3][3] - m[3][1]*m[1][3])
+                + m[3][0] * (m[1][1]*m[2][3] - m[2][1]*m[1][3])) / det;
+            result[2][1] = -(m[0][0] * (m[2][1]*m[3][3] - m[3][1]*m[2][3])
+                - m[2][0] * (m[0][1]*m[3][3] - m[3][1]*m[0][3])
+                + m[3][0] * (m[0][1]*m[2][3] - m[2][1]*m[0][3])) / det;
+            result[2][2] = (m[0][0] * (m[1][1]*m[3][3] - m[3][1]*m[1][3])
+                - m[1][0] * (m[0][1]*m[3][3] - m[3][1]*m[0][3])
+                + m[3][0] * (m[0][1]*m[1][3] - m[1][1]*m[0][3])) / det;
+            result[2][3] = -(m[0][0] * (m[1][1]*m[2][3] - m[2][1]*m[1][3])
+                - m[1][0] * (m[0][1]*m[2][3] - m[2][1]*m[0][3])
+                + m[2][0] * (m[0][1]*m[1][3] - m[1][1]*m[0][3])) / det;
+            result[3][0] = -(m[1][0] * (m[2][1]*m[3][2] - m[3][1]*m[2][2])
+                - m[2][0] * (m[1][1]*m[3][2] - m[3][1]*m[1][2])
+                + m[3][0] * (m[1][1]*m[2][2] - m[2][1]*m[1][2])) / det;
+            result[3][1] = (m[0][0] * (m[2][1]*m[3][2] - m[3][1]*m[2][2])
+                - m[2][0] * (m[0][1]*m[3][2] - m[3][1]*m[0][2])
+                + m[3][0] * (m[0][1]*m[2][2] - m[2][1]*m[0][2])) / det;
+            result[3][2] = -(m[0][0] * (m[1][1]*m[3][2] - m[3][1]*m[1][2])
+                - m[1][0] * (m[0][1]*m[3][2] - m[3][1]*m[0][2])
+                + m[3][0] * (m[0][1]*m[1][2] - m[1][1]*m[0][2])) / det;
+            result[3][3] = (m[0][0] * (m[1][1]*m[2][2] - m[2][1]*m[1][2])
+                - m[1][0] * (m[0][1]*m[2][2] - m[2][1]*m[0][2])
+                + m[2][0] * (m[0][1]*m[1][2] - m[1][1]*m[0][2])) / det;
+        }
+        return result;
     }
 }
 
