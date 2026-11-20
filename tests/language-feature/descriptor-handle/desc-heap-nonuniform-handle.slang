@@ -6,15 +6,16 @@
 // `desc-heap-nonuniform.slang`), instead of leaving the marker nested inside the `uint2` /
 // `uvec2` construction. The resource and the sampler heap are both covered, because the two heap
 // types load through distinct descriptor-load intrinsics, so a marker-dropping regression in one
-// chain must not be masked by the other still passing. SPIR-V decoration for this spelling is
-// covered by `desc-heap-nonuniform-spirv.slang`.
+// chain must not be masked by the other still passing. SPIR-V decoration for the resource heap
+// is covered by `desc-heap-nonuniform-spirv.slang`.
 
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain
 
 RWStructuredBuffer<float> outputBuffer;
 
+[shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
@@ -30,15 +31,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // HLSL: ResourceDescriptorHeap[NonUniformResourceIndex(
 // HLSL: SamplerDescriptorHeap[NonUniformResourceIndex(
 
-// The DXIL directive routes the emitted HLSL through DXC: reaching a valid DXIL module confirms
-// DXC accepts the handle-construction path's SM6.6 heap output.
+// The DXIL directive routes the emitted HLSL through DXC. The last `i1` operand of
+// `createHandleFromHeap` is the non-uniform-index flag, so these checks pin that DXC propagates
+// the marker to each heap handle — resource heap first, then sampler heap — beyond accepting the
+// emitted SM6.6 heap output at all.
 // DXIL: define void @computeMain(
+// DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 false, i1 true)
+// DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 true, i1 true)
 
-// GLSL expresses the same property with `nonuniformEXT` directly on each heap index. Emission
-// folds the texture and the sampler into one combined `sampler2D(texture, sampler)` constructor,
-// so the resource-heap index is pinned inside `sampler2D(` and the sampler-heap index after its
-// comma; either heap may carry the `_0` suffix depending on emission order, so the heap names
-// are wildcards.
+// GLSL asserts the same property as `desc-heap-nonuniform.slang`, whose check block explains the
+// combined `sampler2D(texture, sampler)` constructor shape these anchors pin and the heap-name
+// suffix wildcards.
 // GLSL: #extension GL_EXT_nonuniform_qualifier : require
 // GLSL: sampler2D(_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(
 // GLSL: ,_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(

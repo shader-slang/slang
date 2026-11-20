@@ -12,12 +12,13 @@
 // wrap/unwrap in source, is covered by `desc-heap-nonuniform-handle.slang`; SPIR-V decoration
 // is covered by `desc-heap-nonuniform-spirv.slang`.
 
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain
 
 RWStructuredBuffer<float> outputBuffer;
 
+[shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
@@ -34,12 +35,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // GLSL expresses the same property with `nonuniformEXT` directly on each heap index. Emission
 // folds the texture and the sampler into one combined `sampler2D(texture, sampler)` constructor,
 // so the resource-heap index is pinned inside `sampler2D(` and the sampler-heap index after its
-// comma; either heap may carry the `_0` suffix depending on emission order, so the heap names
-// are wildcards.
+// comma; each heap name carries a counter suffix whose value depends on emission order, so the
+// names are wildcards.
 // GLSL: #extension GL_EXT_nonuniform_qualifier : require
 // GLSL: sampler2D(_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(
 // GLSL: ,_slang_resource_heap{{[0-9_]*}}[nonuniformEXT(
 
-// The DXIL directive routes the emitted HLSL through DXC: reaching a valid DXIL module confirms DXC
-// accepts the untyped-handle path's SM6.6 heap output.
+// The DXIL directive routes the emitted HLSL through DXC. The last `i1` operand of
+// `createHandleFromHeap` is the non-uniform-index flag, so these checks pin that DXC propagates
+// the marker to each heap handle — resource heap first, then sampler heap — beyond accepting the
+// emitted SM6.6 heap output at all.
 // DXIL: define void @computeMain(
+// DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 false, i1 true)
+// DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 true, i1 true)
