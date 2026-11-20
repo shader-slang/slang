@@ -23084,15 +23084,18 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
 
-    // An unscoped enum adds a module-scope `static const` alias for each case,
-    // and an unqualified reference to the case resolves to that alias, so the
-    // alias must carry the case's requirements or they are silently unenforced
-    // in the unqualified spelling (`E v = FirstValue;`). The alias's type walk
-    // above only reaches the enclosing enum's requirements, and its initializer
-    // is not walked (like any var initializer), so join the aliased case's
-    // inferred set here. The case is ensured before the call because
-    // `_propagateRequirement` reads its `inferredCapabilityRequirements`
-    // argument at the call site, before its own internal ensureDecl runs.
+    // An unscoped enum adds a `static const` alias in the enum's enclosing
+    // scope for each case, and an unqualified reference to the case resolves to
+    // that alias, so the alias must carry the case's requirements or they are
+    // silently unenforced in the unqualified spelling (`E v = FirstValue;`).
+    // The alias's type walk above only reaches the enclosing enum's
+    // requirements, and its initializer is not walked (like any var
+    // initializer), so join the aliased case's inferred set here. The case is
+    // ensured before the call because `_propagateRequirement` reads its
+    // `inferredCapabilityRequirements` argument at the call site, before its
+    // own internal ensureDecl runs. `varDecl->loc` is the reference location
+    // because the parser copies the case's identifier location onto the alias,
+    // so conflict diagnostics point at the case name.
     if (auto aliasModifier = varDecl->findModifier<UnscopedEnumCaseAliasModifier>())
     {
         // The case is null when user code attaches the modifier through `syntax`.
@@ -23180,17 +23183,24 @@ void SemanticsDeclCapabilityVisitor::visitEnumCaseDecl(EnumCaseDecl* enumCaseDec
     // capability set, so a consumer's reference to `MyEnum.Case` propagates those
     // requirements through the ordinary reference walk, exactly as a whole-enum
     // [require] does. Only the case's own attributes are merged, not the parent
-    // chain: every reference form already joins the enclosing enum's
-    // requirements at the use site — a qualified `MyEnum.Case` through its base
-    // expression, and a bare case reference through the case's type, which is
-    // the enum type (`visitDeclRefExpr` dispatches `expr->type.type`), the same
-    // route that covers an unscoped-enum alias through its `static const` type.
-    // Of the capability-implying modifiers `getDeclaredCapabilitySet` recognizes,
-    // only [require] applies to an enum case: the others name entry points
-    // ([shader(...)]) and 64-bit indexing, neither meaningful here. The tag
-    // expression is not capability-checked — references inside it, such as
-    // another case's name, propagate nothing — mirroring how
-    // `checkVarDeclCommon` walks a variable's type but not its initializer.
+    // chain: every reference form the use-site reference walk sees already joins
+    // the enclosing enum's requirements at the use site — a qualified
+    // `MyEnum.Case` through its base expression, and a bare case reference
+    // through the case's type, which is the enum type (`visitDeclRefExpr`
+    // dispatches `expr->type.type`), the same route that covers an unscoped
+    // enum's alias through its `static const` type (the alias's own case-level
+    // join lives in `checkVarDeclCommon`). `getDeclRefCapabilityRequirements`,
+    // the specialization-info walk, reads only the referenced decl's own set and
+    // is the one consumer that does not see the enum-level requirements here.
+    // Of the capability-implying modifiers `getDeclaredCapabilitySet`
+    // recognizes, only [require] applies to an enum case: the others name entry
+    // points ([shader(...)]) and 64-bit indexing, neither meaningful here — if
+    // that helper ever grows another modifier that does apply to a case, this
+    // loop must pick it up too. The tag expression is not capability-checked —
+    // references inside it, such as another case's name, propagate nothing;
+    // capability gating applies where the case is consumed, not where its tag
+    // value is derived. The inferred set is expected to be empty when this
+    // visitor runs; it is seeded for symmetry with `checkVarDeclCommon`.
     CapabilitySet mutableCapSet{enumCaseDecl->inferredCapabilityRequirements};
     for (auto mod : enumCaseDecl->modifiers)
     {
