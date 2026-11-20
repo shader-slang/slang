@@ -188,7 +188,10 @@ target_include_directories(
 # (or override-supplied) headers don't trip Slang's extra warnings / -Werror.
 add_library(fast_float INTERFACE)
 if(SLANG_USE_SYSTEM_FAST_FLOAT)
-    find_package(FastFloat 6.1 CONFIG REQUIRED)
+    find_package(FastFloat CONFIG REQUIRED)
+    if(FastFloat_VERSION VERSION_LESS "6.1")
+        message(FATAL_ERROR "Slang requires fast_float 6.1 or newer")
+    endif()
     target_link_libraries(fast_float INTERFACE FastFloat::fast_float)
 elseif(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
     set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
