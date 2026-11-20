@@ -6856,6 +6856,13 @@ Decl* Parser::ParseGLSLInterfaceBlock()
 static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 {
     EnumCaseDecl* decl = parser->astBuilder->create<EnumCaseDecl>();
+
+    // An enum case accepts the same modifier/attribute syntax as any other
+    // declaration, so that a case can carry its own `[require(...)]`
+    // capability requirements.
+    Modifiers modifiers = ParseModifiers(parser);
+    _addModifiers(decl, modifiers);
+
     parser->FillPosition(decl);
 
     decl->nameAndLoc = expectIdentifier(parser);

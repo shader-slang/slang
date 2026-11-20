@@ -1482,6 +1482,7 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     void visitDeclGroup(DeclGroup*) {}
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void visitContainerDecl(ContainerDecl* decl);
+    void visitEnumCaseDecl(EnumCaseDecl* enumCaseDecl);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -23145,6 +23146,25 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential child must get it's capabilities from `getDeclaredCapabilitySet`.
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
+}
+
+void SemanticsDeclCapabilityVisitor::visitEnumCaseDecl(EnumCaseDecl* enumCaseDecl)
+{
+    // Merge the enum case's own [require(...)] attributes into its inferred capability
+    // set, so a consumer's reference to `MyEnum.Case` propagates those requirements
+    // through the ordinary reference walk, exactly as a whole-enum [require] does.
+    // A case is its own capability boundary: a consumer already joins the enclosing
+    // enum's requirements through its reference to the enum itself (the base of
+    // `MyEnum.Case`), so the parent chain is not merged here. The tag expression is a
+    // constant and is not walked, mirroring how `checkVarDeclCommon` does not walk a
+    // variable's initializer.
+    CapabilitySet mutableCapSet{enumCaseDecl->inferredCapabilityRequirements};
+    for (auto mod : enumCaseDecl->modifiers)
+    {
+        if (auto req = as<RequireCapabilityAttribute>(mod))
+            mutableCapSet.unionWith(req->capabilitySet);
+    }
+    enumCaseDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
 }
 
 void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extensionDecl)
