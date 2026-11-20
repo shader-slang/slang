@@ -96,11 +96,13 @@ int removedThreeArgs() { return 1; }
 // The constructor boundary: a multi-argument type call materializes a reference to the
 // selected `__init`, so an `__init` carrying the attribute reports the error; a
 // single-argument construction is an explicit coercion and routes through the conversion
-// machinery instead of declaration reference checking, so it is not diagnosed.
+// machinery instead of declaration reference checking, so even an attributed `__init`
+// is not diagnosed for it.
 struct DiagCtor
 {
     [__diagnoseOnUse("this constructor is retired")]
     __init(int a, int b) { a + b; }
+    [__diagnoseOnUse("the one-argument constructor is retired too")]
     __init(int a) { a; }
 }
 
