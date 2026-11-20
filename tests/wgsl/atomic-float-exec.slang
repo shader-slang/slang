@@ -20,7 +20,8 @@ void computeMain(uint3 tid: SV_DispatchThreadID, uint gi: SV_GroupIndex)
     sums[1].min(v);
     sums[2].max(v);
     groupSum.add(1.0);
-    GroupMemoryBarrierWithGroupSync();
+    // The reads below need the storage updates to `sums` too, not only `groupSum`.
+    AllMemoryBarrierWithGroupSync();
 
     if (tid.x == 0)
     {

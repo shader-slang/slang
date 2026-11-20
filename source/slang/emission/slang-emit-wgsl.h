@@ -28,6 +28,9 @@ public:
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    // If `inst` is an atomic operation on an f32 value (held as `atomic<u32>`), emit it as a WGSL
+    // statement and return true. Otherwise emit nothing and return false, so the caller falls back
+    // to the default statement emission.
     bool tryEmitF32AtomicStmt(IRInst* inst);
     virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault)
