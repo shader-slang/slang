@@ -1384,8 +1384,18 @@ struct ByteAddressBufferLegalizationContext
         {
             return nullptr;
         }
-        if (as<IRHLSLStructuredBufferTypeBase>(byteAddressBuffer->getDataType()))
-            return byteAddressBuffer;
+        // A buffer that already has a structured-buffer type is safe to reuse only when
+        // that type's element type matches the one this access needs. The parameter path
+        // below retypes the shared byte-address-buffer type instruction in place, so a
+        // buffer can carry an equivalent structured-buffer type whose element type was
+        // chosen for a different access. On a mismatch we fall through so the branches
+        // below provide a view of the buffer at the requested element type.
+        if (auto structuredBufferType =
+                as<IRHLSLStructuredBufferTypeBase>(byteAddressBuffer->getDataType()))
+        {
+            if (structuredBufferType->getElementType() == elementType)
+                return byteAddressBuffer;
+        }
         // The simple case for replacement is when the byte-address buffer to
         // be replaced is a global shader parameter. That path will get its
         // own routine.
@@ -1469,6 +1479,12 @@ struct ByteAddressBufferLegalizationContext
             if (!m_options.translateToStructuredBufferOps)
                 return nullptr;
 
+            // We retype the byte-address-buffer type instruction in place so the
+            // parameter and its call-site arguments stay in type agreement. IR type
+            // instructions are deduplicated module-wide, so this retype reaches every
+            // buffer of the same byte-address-buffer type; accesses at other element
+            // types get per-type views through the element-type checks above. A single
+            // parameter accessed at two different element types is not supported here.
             IRType* babType = babParam->getDataType();
             IRType* structuredBufferType =
                 getEquivalentStructuredBufferParamType(elementType, babType);
@@ -1607,8 +1623,25 @@ struct ByteAddressBufferLegalizationContext
         IRType* elementType,
         IRType* byteAddressBufferType)
     {
-        if (as<IRHLSLStructuredBufferTypeBase>(byteAddressBufferType))
-            return byteAddressBufferType;
+        if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(byteAddressBufferType))
+        {
+            if (structuredBufferType->getElementType() == elementType)
+                return byteAddressBufferType;
+
+            // The structured-buffer kind and layout are still the right equivalence
+            // for this buffer; only the element type is wrong for the current access,
+            // so we rebuild the same kind of structured-buffer type with the requested
+            // element type. The layout operand is preserved when the type carries one,
+            // and the default layout is used otherwise.
+            auto dataLayout = structuredBufferType->getDataLayout();
+            IRInst* typeOperands[2] = {
+                elementType,
+                dataLayout ? dataLayout : m_builder.getType(kIROp_DefaultBufferLayoutType)};
+            return m_builder.getType(
+                byteAddressBufferType->getOp(),
+                structuredBufferType->getOperandCount(),
+                typeOperands);
+        }
 
         // Our task in this function is to compute the type for
         // a structure buffer that is equivalent to `byteAddressBufferType`,
