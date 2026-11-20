@@ -545,6 +545,8 @@ private:
         {
             HGVMInputEvent event;
             event.type = HGVMInputEventType::MouseScroll;
+            event.position[0] = float(args.x);
+            event.position[1] = float(args.y);
             event.scroll[1] = float(args.delta) / 120.0f;
             window->events.add(event);
         };

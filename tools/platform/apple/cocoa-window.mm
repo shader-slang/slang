@@ -317,7 +317,9 @@ static KeyCode getKeyCode(NSUInteger keyCode)
 
     int delta = (int)deltaY;
 
-    window->events.mouseWheel(MouseEventArgs{0, 0, delta, getModifierState([event modifierFlags])});
+    getMousePosition(event, self, mouseX, mouseY);
+    window->events.mouseWheel(
+        MouseEventArgs{mouseX, mouseY, delta, getModifierState([event modifierFlags])});
 }
 
 - (void)keyDown:(NSEvent *)event

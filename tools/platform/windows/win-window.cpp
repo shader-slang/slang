@@ -143,7 +143,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             int delta = GET_WHEEL_DELTA_WPARAM(wParam);
             if (window)
             {
-                window->events.mouseWheel(MouseEventArgs{0, 0, delta, getModifierState(wParam)});
+                // Wheel messages carry screen coordinates, unlike WM_MOUSEMOVE's client
+                // coordinates, so convert them before reporting where the cursor is.
+                POINT point = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                ScreenToClient(hWnd, &point);
+                window->events.mouseWheel(
+                    MouseEventArgs{point.x, point.y, delta, getModifierState(wParam)});
             }
         }
         break;
