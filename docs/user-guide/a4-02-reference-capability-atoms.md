@@ -1199,6 +1199,9 @@ Compound Capabilities
 `cpp_glsl`
 > CPP, and GLSL code-gen targets
 
+`cpp_glsl_hlsl_metal`
+> CPP, GLSL, HLSL and Metal code-gen targets
+
 `cpp_glsl_hlsl_metal_spirv`
 > CPP, GLSL, HLSL, Metal, and SPIRV code-gen targets
 
