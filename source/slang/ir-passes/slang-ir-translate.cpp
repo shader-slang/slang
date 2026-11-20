@@ -326,20 +326,22 @@ IRInst* TranslationContext::maybeTranslateIdentityRemat(IRInst* inst)
 
     // The identity remat is synthesized with no name and no debug info. Its first parameter is
     // the minimal context struct, so name it after that type, and give it debug info from the
-    // apply function it was generated alongside, which carries the user's source location. The
-    // apply function may still be an unresolved translate inst here; resolve it through the
-    // dictionary so the copy reads the decorated function itself.
-    auto srcFunc = inst->getOperand(0);
-    if (as<IRTranslateBase>(srcFunc))
-        srcFunc = maybeTranslateInst(srcFunc);
-    SLANG_ASSERT(srcFunc);
+    // apply function an IdentityRemat is generated alongside — its operand 0, created by the
+    // front end alongside the conformance — which carries the user's source location. Operand
+    // resolution normally happens before this handler runs, but the memoized translation flow
+    // does not guarantee it, so resolve a still-untranslated operand through the dictionary
+    // here.
+    auto applyOperand = inst->getOperand(0);
+    if (as<IRTranslateBase>(applyOperand))
+        applyOperand = maybeTranslateInst(applyOperand);
+    SLANG_ASSERT(as<IRFunc>(applyOperand));
     if (auto ctxNameHint = funcType->getParamType(0)->findDecoration<IRNameHintDecoration>())
     {
         StringBuilder nameSb;
         nameSb << "s_rematCtx_" << ctxNameHint->getName();
         subBuilder.addNameHintDecoration(func, nameSb.getUnownedSlice());
     }
-    copyDebugInfoForSynthesizedFunc(&subBuilder, srcFunc, func);
+    copyDebugInfoForSynthesizedFunc(&subBuilder, applyOperand, func);
 
     return func;
 }

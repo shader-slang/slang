@@ -1361,6 +1361,20 @@ bool isDiffInst(IRInst* inst)
     return false;
 }
 
+const char kApplyAdapterNamePrefix[] = "s_apply_";
+
+// Name `dstInst` after `srcInst`'s name hint, prepending `prefix`. No-op when `srcInst` has no
+// name hint.
+void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix)
+{
+    if (auto nameHint = srcInst->findDecoration<IRNameHintDecoration>())
+    {
+        String name = nameHint->getName();
+        name = prefix + name;
+        builder->addNameHintDecoration(dstInst, name.getUnownedSlice());
+    }
+}
+
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
 {
     // Copy debug decorations.
@@ -1386,15 +1400,15 @@ void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst
 {
     // Copy `srcFunc`'s debug decorations onto a derivative function that a translation op has
     // just synthesized. Unlike `copyDebugInfo`, which re-references the source's record, this
-    // builds a fresh IRDebugFunction record for the destination, so the derivative reports its
-    // own name in a debugger and its body gets its own DebugFunctionDefinition: the SPIR-V
-    // emitter binds at most one definition per record, so sharing the source's record would leave
+    // builds a fresh IRDebugFunction record for the destination: the SPIR-V emitter binds at
+    // most one DebugFunctionDefinition per record, so sharing the source's record would leave
     // the derivative's body undescribed whenever the source's body claims the record first.
-    // The bodies translation ops synthesize contain no cloned debug scopes, so a record of the
-    // derivative's own is coherent by construction. The record is inserted in the destination's
-    // own scope because a synthesized derivative can still sit inside an IRGeneric at this
-    // point, and its type operand may reference that generic's parameters. No-op when the
-    // source carries no debug info.
+    // Owning the record is safe here because a synthesized body's instructions carry no debug
+    // scopes of their own — they resolve to the function's own record — whereas a cloned body's
+    // scopes point at the source's record, which is why the clone-based translations keep
+    // sharing it. The record is inserted in the destination's own scope because a synthesized
+    // derivative can still sit inside an IRGeneric at this point, and its type operand may
+    // reference that generic's parameters. No-op when the source carries no debug info.
     for (auto decor : srcFunc->getDecorations())
     {
         switch (decor->getOp())
@@ -1403,10 +1417,13 @@ void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst
             {
                 auto srcDebugFunc = as<IRDebugFunction>(decor->getOperand(0));
                 IRInst* nameOperand = srcDebugFunc->getName();
+                // The destination's own name is the point of the record; without a name hint it
+                // falls back to the source's name, the front end's own fallback for unnamed
+                // functions.
                 if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
                     nameOperand = nameHint->getNameOperand();
                 auto debugType = destFunc->getDataType();
-                SLANG_ASSERT(debugType);
+                SLANG_RELEASE_ASSERT(debugType);
                 builder->setInsertBefore(destFunc);
                 auto destDebugFunc = builder->emitDebugFunction(
                     nameOperand,

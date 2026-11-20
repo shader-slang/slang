@@ -2288,13 +2288,7 @@ struct ForwardDiffTranslationContext
             as<IRFuncType>(origFunc->getFullType()));
         diffFunc->setFullType(diffFuncType);
 
-        if (auto nameHint = origFunc->findDecoration<IRNameHintDecoration>())
-        {
-            auto originalName = nameHint->getName();
-            StringBuilder newNameSb;
-            newNameSb << "s_fwd_" << originalName;
-            builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
-        }
+        generateName(&builder, origFunc, diffFunc, "s_fwd_");
 
         // Transfer checkpoint hint decorations
         copyCheckpointHints(&builder, origFunc, diffFunc);
@@ -3636,13 +3630,7 @@ IRInst* maybeTranslateTrivialForwardDerivative(
 
     // Name the trivial derivative after its source function, matching the naming the full
     // forward translation uses, and give it debug info from the source function.
-    if (auto nameHint = targetFunc->findDecoration<IRNameHintDecoration>())
-    {
-        auto originalName = nameHint->getName();
-        StringBuilder newNameSb;
-        newNameSb << "s_fwd_" << originalName;
-        builder.addNameHintDecoration(fwdDiffFunc, newNameSb.getUnownedSlice());
-    }
+    generateName(&builder, targetFunc, fwdDiffFunc, "s_fwd_");
     copyDebugInfoForSynthesizedFunc(&builder, targetFunc, fwdDiffFunc);
 
     return fwdDiffFunc;

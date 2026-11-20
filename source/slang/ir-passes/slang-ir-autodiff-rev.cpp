@@ -162,16 +162,6 @@ SlangResult prepareFuncForBackwardDiff(
     return SLANG_OK;
 }
 
-static void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix)
-{
-    if (auto nameHint = srcInst->findDecoration<IRNameHintDecoration>())
-    {
-        String name = nameHint->getName();
-        name = prefix + name;
-        builder->addNameHintDecoration(dstInst, name.getUnownedSlice());
-    }
-}
-
 static IRInst* maybeHoistAndSpecialize(IRBuilder& builder, IRInst* inst)
 {
     IRInst* specializedVal = nullptr;
@@ -401,7 +391,7 @@ struct BackwardDiffTranslationContext
         sortBlocksInFunc(propagateFunc);
         sortBlocksInFunc(targetFunc);
 
-        generateName(builder, targetFunc, applyFunc, "s_apply_");
+        generateName(builder, targetFunc, applyFunc, kApplyAdapterNamePrefix);
         generateName(builder, targetFunc, propagateFunc, "s_bwdProp_");
         generateName(builder, targetFunc, rematFuncResult, "s_remat_");
         // generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
@@ -723,11 +713,13 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
     builder.addForceInlineDecoration(rematFunc);
 
-    generateName(&builder, primalFunc, applyFunc, "s_apply_");
+    generateName(&builder, primalFunc, applyFunc, kApplyAdapterNamePrefix);
     generateName(&builder, primalFunc, rematFunc, "s_remat_");
     generateName(&builder, primalFunc, bwdPropFunc, "s_bwdProp_");
     generateName(&builder, primalFunc, fullContextType, "s_bwdCallableCtx_");
 
+    // Names first, then records: each fresh record reads the adapter's just-added name hint,
+    // and the hoisting below must see the finished decoration set.
     copyDebugInfoForSynthesizedFunc(&builder, primalFunc, applyFunc);
     copyDebugInfoForSynthesizedFunc(&builder, primalFunc, rematFunc);
     copyDebugInfoForSynthesizedFunc(&builder, primalFunc, bwdPropFunc);

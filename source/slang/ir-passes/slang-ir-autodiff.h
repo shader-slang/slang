@@ -677,10 +677,28 @@ bool isDifferentialOrRecomputeBlock(IRBlock* block);
 
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc);
 
-// Copy debug info from `srcFunc` onto a derivative function that a translation op has just
-// synthesized, building a fresh DebugFunction record for `destFunc` rather than re-referencing
-// `srcFunc`'s record.
+// Debug-info policy for the functions autodiff translation synthesizes: a function whose body
+// would otherwise emit no DebugFunctionDefinition needs a record of its own, because the SPIR-V
+// emitter binds at most one definition per record; this helper builds that record, copying the
+// source's location and scope but naming and typing it after the destination itself. A
+// derivative that clones the source's body (the full forward/backward translations) may keep
+// sharing the source's record via `copyDebugInfo` instead: its cloned debug scopes attribute
+// the instructions independently. A synthesized function with no source function to copy a
+// location from gets a name only.
+//
+// The record is named after `destFunc`'s existing name hint — add the hint before calling; with
+// no hint it falls back to the source record's name, the same linkage-name fallback the front
+// end uses for unnamed functions. `destFunc` must already have its full type set. The helper
+// moves the builder's insertion point to just before `destFunc`.
 void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst* destFunc);
+
+// Name `dstInst` after `srcInst`'s name hint, prepending `prefix`. No-op when `srcInst` has no
+// name hint.
+void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix);
+
+// The prefix naming apply adapters ("s_apply_<primal>"): both producers of apply adapters use
+// it, and the bwd_diff wrapper recovers the primal's name by stripping it.
+extern const char kApplyAdapterNamePrefix[];
 
 void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
 
