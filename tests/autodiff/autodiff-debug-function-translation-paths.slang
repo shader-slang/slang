@@ -17,12 +17,25 @@
 // mySqr has a user-written backward derivative, so `bwd_diff(f)` (f calls mySqr) exercises the
 // legacy paths: the apply/remat/propagate adapters for mySqr, and the bwd_diff(f) wrapper itself.
 // bumpCounter is [TreatAsDifferentiable], so `fwd_diff(useCounter)` synthesizes a trivial forward
-// derivative for it. applyFunc has a custom __apply func_extension, whose conformance synthesizes
-// an identity remat for its context type.
+// derivative for it. applyFunc has a custom __apply func_extension: its conformance synthesizes
+// an identity remat for its context type, and its bwd_diff wrapper adapts the synthesized
+// extension function, which carries no name hint — the wrapper is then named after the context
+// type its remat passes through (s_bwd_SquareContext), keeping its record distinguishable.
+//
+// The DiffPair add/zero witnesses are named for mid-pass IR readability, but they are inlined
+// within the translation pass and appear at neither checkpoint (probed with a nested
+// DifferentialPair<DifferentialPair<float>> differential forcing the pair's own conformance);
+// they are the one name-only path and carry no DebugFunction record by design.
+//
+// The last directive compiles without -g: no source function carries debug info, so no
+// synthesized function gets a record — pinning the helper's documented no-op.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -g3 -O0 -emit-spirv-directly -entry computeMain -stage compute -experimental-feature
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir-after finalizeAutoDiffPass -o - -entry computeMain -stage compute -g3 -experimental-feature
+
+//TEST:SIMPLE(filecheck=NOG):-target spirv-asm -dump-ir-after finalizeAutoDiffPass -o - -entry computeMain -stage compute -experimental-feature
+// NOG-NOT: DebugFunction(
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -102,12 +115,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: [[FWD_REC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[FWD_STR]]
 //CHECK-DAG: DebugFunctionDefinition [[FWD_REC]] %s_fwd_bumpCounter
 
-// The apply and remat adapters and the identity remat are folded away before SPIR-V, so their
-// debug records are checked at the IR level (after autodiff): each is a distinct record named
-// after the function it describes, tied to it by the DebugFunction decoration.
+// The apply and remat adapters, the identity remat, and the __apply wrapper are folded away
+// before SPIR-V, so their debug records are checked at the IR level (after autodiff): each is a
+// distinct record named after the function it describes, tied to it by the DebugFunction
+// decoration. The __apply wrapper covers the adapter shape with no name hint (the synthesized
+// extension function), where the name comes from the remat's context type.
 //IR-DAG: [[APPLY_REC:%[0-9]+]]{{.*}}DebugFunction("s_apply_mySqr"
 //IR-DAG: [DebugFunction([[APPLY_REC]])]
 //IR-DAG: [[REMAT_REC:%[0-9]+]]{{.*}}DebugFunction("s_remat_mySqr"
 //IR-DAG: [DebugFunction([[REMAT_REC]])]
 //IR-DAG: [[CTXREMAT_REC:%[0-9]+]]{{.*}}DebugFunction("s_rematCtx_SquareContext"
 //IR-DAG: [DebugFunction([[CTXREMAT_REC]])]
+//IR-DAG: [[ABWD_REC:%[0-9]+]]{{.*}}DebugFunction("s_bwd_SquareContext"
+//IR-DAG: [DebugFunction([[ABWD_REC]])]
