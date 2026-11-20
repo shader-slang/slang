@@ -380,7 +380,7 @@ SLANG_UNIT_TEST(structuralRayTracingEntryPointAcceptsMethodSelection)
 // tests/compute/simple.slang for PTX target generates invalid code.
 // TODO: Remove this when issue #4760 is resolved, because at that point
 // tests/compute/simple.slang should cover the same issue.
-SLANG_UNIT_TEST(cudaCodeGenBug)
+SLANG_UNIT_TEST_USING_APIS(cudaCodeGenBug, CUDA)
 {
     // We need the CUDA backend for this test
     if (!SLANG_SUCCEEDED(

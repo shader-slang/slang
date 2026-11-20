@@ -35,11 +35,6 @@ on:
         type: string
         default: ""
         description: "Optional suffix for artifact name (e.g., '-cuda')"
-      cpu-only:
-        required: false
-        type: boolean
-        default: false
-        description: "Restrict slang-test to CPU and LLVM backends via -api cpu+llvm"
       slang-user-skills:
         required: false
         type: boolean
@@ -49,12 +44,12 @@ on:
         required: false
         type: boolean
         default: false
-        description: "Restrict slang-test to GPU APIs (vk+cuda+dx11+dx12+mtl+wgpu) while retaining no-API tests needed by multi-step workflows"
+        description: "Run only the GPU tests (-api all-cpu-llvm -compile-test false -api-only)"
       gpu-tier:
         required: false
         type: string
         default: ""
-        description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
+        description: "GPU tier label: 't4', 'sm80plus', or 'nogpu' for a runner that has no GPU. Used to choose the tests to run, and the tier-specific lists."
 
 jobs:
   test-slang:
@@ -110,7 +105,7 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
-          cpu-only: ${{ inputs.cpu-only }}
+          cpu-only: ${{ inputs.gpu-tier == 'nogpu' }}
 
       - name: Validate Slang user-skill examples
         if: inputs.slang-user-skills
@@ -136,8 +131,8 @@ jobs:
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
-          if [[ "${{ inputs.cpu-only }}" == "true" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            echo "::error::cpu-only and gpu-api-only are mutually exclusive"
+          if [[ "${{ inputs.gpu-tier }}" == "nogpu" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
+            echo "::error::gpu-tier nogpu and gpu-api-only are mutually exclusive"
             exit 1
           fi
 
@@ -145,7 +140,7 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           # Vulkan runtime validation needs a Vulkan device; skip on CPU tier.
-          if [[ "${{ inputs.cpu-only }}" != "true" && "${{ inputs.enable-debug-layers }}" == "true" ]]; then
+          if [[ "${{ inputs.gpu-tier }}" != "nogpu" && "${{ inputs.enable-debug-layers }}" == "true" ]]; then
             export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
           fi
           # Force AVX-512 off in slang-llvm's JIT TargetMachine. We have observed
@@ -169,21 +164,32 @@ jobs:
           # slang-test accepts only a single -api option (a later one silently
           # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
-          if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+          if [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
             # Restrict to CPU / LLVM backends; tests requiring any GPU API get
-            # ignored by the test filter rather than run-and-failed.
+            # ignored by the test filter rather than run-and-failed. The compile
+            # tests (the tests that use no API, such as SIMPLE) and the unit
+            # tests that need no GPU run here, and on macOS: the GPU jobs use
+            # -compile-test false.
             api_expr="cpu+llvm"
+            slang_test_args+=("-compile-test" "true" "-api-only")
           elif [[ "${{ inputs.os }}" == "macos" ]]; then
-            # Metal is the only GPU API on macOS; restrict to it. (cpu)/(llvm)
-            # tests are skipped here and covered by the CPU-only tier, while
-            # no-API tests still run because their requiredFlags==0.
-            api_expr="mtl"
+            # No CPU-only job runs on macOS, so these jobs run everything that
+            # the machine supports: Metal, the (cpu) / (llvm) tests, and the
+            # compile tests (the tests that use no API).
+            api_expr="all"
+            slang_test_args+=("-compile-test" "true" "-api-only")
           elif [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped.
-            # Intentionally NOT using -api-only: no-API tests still need to run
-            # because COMPILE directives in multi-step compile→dispatch tests
-            # have requiredFlags==0 and would be skipped, breaking the dispatch.
-            api_expr="vk+cuda+dx11+dx12+mtl+wgpu"
+            # Restrict to GPU APIs ("all" without cpu and llvm, where llvm is
+            # the tests that use -emit-cpu-via-llvm) so (cpu) / (llvm) tests are
+            # skipped, and use -compile-test false so the compile tests (the
+            # tests that use no API, such as SIMPLE) and the unit tests that
+            # need no GPU are skipped too: the CPU-only jobs run them.
+            # -compile-test false keeps the COMPILE lines that prepare the input
+            # of a GPU test in the same file (for example a COMPILE line before a
+            # COMPARE_COMPUTE line), the lines that need NVRTC, and the unit
+            # tests that declare a GPU API.
+            api_expr="all-cpu-llvm"
+            slang_test_args+=("-compile-test" "false" "-api-only")
           else
             api_expr="all"
           fi
@@ -209,7 +215,7 @@ jobs:
 
           # T4 runners cannot execute SM 8.0+ cooperative matrix / neural tests
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
-            slang_test_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
+            slang_test_args+=("-exclude-list" "tests/tests-require-sm80.txt")
             # tests/expected-failure-linux-gpu.txt lists failures of the Linux
             # T4 machines, so it applies only to Linux jobs.
             if [[ "${{ inputs.os }}" == "linux" ]]; then
@@ -251,6 +257,9 @@ jobs:
            --platform "${{ inputs.platform }}" \
            --config "${{ inputs.config }}" \
            --skip-file tests/expected-example-failure-github.txt
+      # The slangc tests need no GPU, so the CPU-only jobs run them, and the jobs
+      # that run only the GPU APIs do not.
       - name: Run slangc tests
+        if: "!inputs.gpu-api-only"
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh

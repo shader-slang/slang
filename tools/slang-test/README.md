@@ -48,6 +48,9 @@ A test may be in one or more categories. The categories are specified on top of 
 
 - `-api <expr>`: Enable specific APIs (e.g., 'vk+dx12' or '+dx11')
 - `-api-only`: Only run tests that use specified APIs
+- `-compile-test [true|false]`: Run the tests that use no render API, such as `SIMPLE` tests
+  (default: true, false with `-api-only`). With `false`, a `COMPILE` line that prepares the input
+  of a test that uses an API, and a line that needs NVRTC, still run.
 - `-synthesizedTestApi <expr>`: Set APIs for synthesized tests
 - `-skip-api-detection`: Skip API availability detection
 
@@ -93,6 +96,9 @@ Available APIs:
 - `-skip-list <file>`: Specify file containing tests to skip. Each line is
   either a source-path prefix, or the name of one expanded subtest
   (`<path>.<n>`, e.g. `tests/compute/parameter-block.slang.6`).
+- `-exclude-list <file>`: The same as `-skip-list`.
+- `-include-list <file>`: Specify file containing the only tests to run, in the
+  same format as `-skip-list`. The file must have at least one entry.
 - `-exclude-prefix <prefix>`: Exclude tests, with the same two forms as
   `-skip-list`.
 

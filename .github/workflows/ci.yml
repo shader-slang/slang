@@ -627,7 +627,7 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
-      cpu-only: true
+      gpu-tier: nogpu
       server-count: 4
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
@@ -646,7 +646,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
-      cpu-only: true
+      gpu-tier: nogpu
       slang-user-skills: true
       server-count: 4
 
@@ -711,6 +711,7 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      gpu-tier: nogpu
 
   test-linux-release-gcc-aarch64-cpu:
     needs: [filter, build-linux-release-gcc-aarch64]
@@ -723,6 +724,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
+      gpu-tier: nogpu
 
   # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
   # hosted image).
@@ -741,9 +743,9 @@ jobs:
       # -api expression it selects still defaults to "all", which the
       # Linux ARM64 jobs above handle via tests/expected-failure-no-gpu.txt.
       # That denylist hasn't been validated against this new, GPU-less
-      # platform, so restrict directly to cpu+llvm via cpu-only instead of
-      # relying on it.
-      cpu-only: true
+      # platform, so restrict directly to cpu+llvm via gpu-tier nogpu instead
+      # of relying on it.
+      gpu-tier: nogpu
 
   test-windows-release-cl-aarch64-cpu:
     needs: [filter, build-windows-release-cl-aarch64]
@@ -756,7 +758,7 @@ jobs:
       config: release
       runs-on: '["windows-11-vs2026-arm"]'
       full-gpu-tests: false
-      cpu-only: true
+      gpu-tier: nogpu
 
   # Windows x86_64 CPU-only tests (GitHub-hosted; no GPU).
   # They use the artifact from the self-hosted build job and run only the
@@ -772,7 +774,7 @@ jobs:
       config: debug
       runs-on: '["windows-2022"]'
       full-gpu-tests: false
-      cpu-only: true
+      gpu-tier: nogpu
 
   test-windows-release-cl-x86_64-cpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -785,7 +787,7 @@ jobs:
       config: release
       runs-on: '["windows-2022"]'
       full-gpu-tests: false
-      cpu-only: true
+      gpu-tier: nogpu
 
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-t4:

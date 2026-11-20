@@ -130,31 +130,35 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
-          test_roots=()
           slang_test_args=(
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
+            "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
           )
 
+          # The GPU tiers run the same way, and differ only in which tests they
+          # select (see the case below). Restrict to GPU APIs ("all" without cpu
+          # and llvm, where llvm is the tests that use -emit-cpu-via-llvm) so
+          # (cpu) / (llvm) tests are skipped, and use -compile-test false so the
+          # compile tests (the tests that use no API, such as SIMPLE) and the
+          # unit tests that need no GPU are skipped too — the CPU-only tier
+          # covers those. -compile-test false keeps the COMPILE lines that
+          # prepare the input of a GPU test in the same file (for example a
+          # COMPILE line before a COMPARE_COMPUTE line), the lines that need
+          # NVRTC, and the unit tests that declare a GPU API.
+          slang_test_args+=("-api" "all-cpu-llvm" "-compile-test" "false" "-api-only")
+
           case "${{ inputs.gpu-tier }}" in
             t4)
-              # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped — the
-              # CPU-only tier covers those. Intentionally NOT using -api-only:
-              # no-API tests (COMPILE directives in multi-step compile→dispatch
-              # sequences, SIMPLE/DIAGNOSTIC tests that validate SPIR-V emission)
-              # still need to run on the GPU tier for correctness.
-              slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
               # T4 cannot execute SM 8.0+ cooperative matrix PTX safely.
-              slang_test_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
-              slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+              slang_test_args+=("-exclude-list" "tests/tests-require-sm80.txt")
               ;;
             sm80plus)
               # Keep L4/Blackwell cost bounded: run only the capability subset
               # that T4 cannot safely cover, not a second full Linux GPU suite.
-              test_roots=("tests/cooperative-matrix/" "tests/neural/" "slang-unit-test-tool/cooperativeMatrixSubgroupTypeMetadata.internal")
-              slang_test_args+=("-api" "vk+cuda")
+              slang_test_args+=("-include-list" "tests/tests-require-sm80.txt")
               ;;
             *)
               echo "::error::unknown gpu-tier '${{ inputs.gpu-tier }}' (expected t4 or sm80plus)"
@@ -178,10 +182,10 @@ jobs:
           # Print the fully-resolved command so the CI log shows exactly which
           # arguments were used (the conditional logic only shows the source).
           printf '+ %q' "$bin_dir/slang-test"
-          printf ' %q' "${test_roots[@]}" "${slang_test_args[@]}"
+          printf ' %q' "${slang_test_args[@]}"
           printf '\n'
 
-          "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
+          "$bin_dir/slang-test" "${slang_test_args[@]}"
 
       - name: Check slang-test worktree cleanliness
         if: always()
@@ -192,12 +196,6 @@ jobs:
             printf '%s\n' "$status"
             exit 1
           fi
-
-      - name: Run slangc tests
-        if: inputs.gpu-tier == 't4'
-        run: |
-          ulimit -c unlimited
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
 
       # Extract gdb backtraces from any cores written to /var/cores during
       # the test steps above. /var/cores lives on the host (bind-mounted in

@@ -62,7 +62,7 @@ static SlangResult compileComputeToPTX(
 // header was created or reused — NVRTC does not surface that through the emitted PTX (the
 // invalidation test uses nvrtcGetPCHCreateStatus for that). NVRTC compiles to PTX without a GPU, so
 // the test only needs a loadable NVRTC; otherwise it reports Ignored.
-SLANG_UNIT_TEST(nvrtcPrecompiledHeader)
+SLANG_UNIT_TEST_USING_APIS(nvrtcPrecompiledHeader, CUDA)
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
