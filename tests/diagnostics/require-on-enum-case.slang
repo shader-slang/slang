@@ -1,10 +1,8 @@
 // Regression test for https://github.com/shader-slang/slang/issues/14664.
 //
-// A [require(...)] attribute on an individual enum case was a parse error:
-// `parseEnumCaseDecl` never parsed modifiers, and the capability checker had
-// no enum-case path (`EnumCaseDecl` dispatched to the no-op `visitDecl`), so
-// per-target requirements on a single enum member could neither be written
-// nor enforced.
+// [require(...)] on an individual enum case must parse, and a consumer of
+// the case must inherit that case's per-target capability requirements,
+// mirroring whole-enum [require] behavior.
 //
 // The first invocation consumes the spirv-gated case for `-target hlsl` and
 // must fail with E36107. The second consumes the hlsl-gated case for
