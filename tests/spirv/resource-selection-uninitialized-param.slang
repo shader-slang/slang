@@ -6,10 +6,12 @@
 // dangling operands behind (shader-slang/slang#14646).
 //
 // The regression signal is the compile itself: without the fix the compiler crashes
-// (SIGSEGV in Release; "def must be ancestor of use" from -validate-ir in Debug). The
-// CHECK lines pin the emitted structure so the trigger shape cannot silently disappear:
-// the -O0 runs keep the specialized callee visible as a separate function, while the
-// default runs inline it into the entry point, so the two levels get their own labels.
+// (SIGSEGV in Release; "def must be ancestor of use" from -validate-ir in Debug). A fixed
+// compile still emits warning E41016 for the uninitialized argument, which is expected.
+// The CHECK lines pin the emitted structure so the trigger shape cannot silently
+// disappear: the -O0 runs keep the specialized callee visible as a separate function,
+// while the default runs inline it into the entry point, so the two levels get their
+// own labels.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -validate-ir
 //TEST:SIMPLE(filecheck=CHECK_UNOPT):-target spirv -entry main -stage compute -validate-ir -O0
