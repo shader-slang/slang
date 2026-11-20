@@ -33,8 +33,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // The DXIL directive routes the emitted HLSL through DXC. The last `i1` operand of
 // `createHandleFromHeap` is the non-uniform-index flag, so these checks pin that DXC propagates
-// the marker to each heap handle — resource heap first, then sampler heap — beyond accepting the
-// emitted SM6.6 heap output at all.
+// the marker to each heap handle — resource heap first, then sampler heap — beyond merely
+// accepting the emitted SM6.6 heap output.
 // DXIL: define void @computeMain(
 // DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 false, i1 true)
 // DXIL: @dx.op.createHandleFromHeap(i32 218, i32 %{{[0-9]+}}, i1 true, i1 true)
