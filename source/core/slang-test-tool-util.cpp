@@ -5,6 +5,11 @@
 #include "slang-io.h"
 #include "slang-string-util.h"
 
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+#include <crtdbg.h>
+#include <stdlib.h>
+#endif
+
 namespace Slang
 {
 
@@ -53,6 +58,24 @@ namespace Slang
         }
     }
     return false;
+}
+
+/* static */ void TestToolUtil::suppressCrtDebugDialogs()
+{
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Silencing the abort() dialog is not enough to keep an unattended run
+    // going: the debug CRT reports errors and failed assertions (for example
+    // heap corruption) through its own modal dialog. We route those reports
+    // to stderr, and to the debugger when one is attached, so the run
+    // continues while the report stays visible. The _CrtSetReport* calls are
+    // removed by the preprocessor when _DEBUG isn't defined, so a release
+    // build only gets the abort() silencing.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+#endif
 }
 
 /* static */ SlangResult TestToolUtil::getIncludePath(
