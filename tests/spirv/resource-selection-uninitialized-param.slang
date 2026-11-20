@@ -9,7 +9,7 @@
 // (SIGSEGV in Release; "def must be ancestor of use" from -validate-ir in Debug). A fixed
 // compile still emits warning E41016 for the uninitialized argument, which is expected.
 // The -O0 runs are the regression carriers: they keep the specialized callee visible as a
-// separate function, and each CHECK set pins that callee by name, its E41016 diagnostic,
+// separate function, and each CHECK set pins the cloned callee, its E41016 diagnostic,
 // and the merge-block value with live uses. The default runs only anchor the inlined
 // shape (the optimized pipeline inlines the callee into the entry point), so the two
 // optimization levels get their own labels.
@@ -104,7 +104,7 @@ void g(Texture2D undefTexture)
 // CHECK_SWITCH_UNOPT: OpIMul %uint %[[W2]] %uint_2
 // CHECK_SWITCH_UNOPT: OpFunctionEnd
 
-[notinline]
+[noinline]
 void inner(Texture2D x, Texture2D y)
 {
     gOut[0] = x.Load(0);
