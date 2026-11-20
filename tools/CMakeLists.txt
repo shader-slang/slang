@@ -193,7 +193,7 @@ if(SLANG_ENABLE_GFX OR (SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI))
         set(slang_glm_includes "${slang_SOURCE_DIR}/external/glm")
     endif()
     if(SLANG_USE_SYSTEM_TINYOBJLOADER)
-        find_package(tinyobjloader 2 CONFIG REQUIRED)
+        find_package(tinyobjloader CONFIG REQUIRED)
         set(slang_tinyobj_includes
             "$<TARGET_PROPERTY:tinyobjloader::tinyobjloader,INTERFACE_INCLUDE_DIRECTORIES>"
         )
