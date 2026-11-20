@@ -4378,6 +4378,17 @@ void SemanticsVisitor::settlePendingTryCoverage(
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
     auto rs = ResolveInvoke(expr);
+    if (auto castExpr = as<BuiltinCastExpr>(rs);
+        castExpr && castExpr->targetEnumCase &&
+        (expr->arguments.getCount() != 1 || rs != expr->arguments[0]))
+    {
+        // ResolveInvoke has selected an actual conversion, so emit the warning here rather
+        // than from coercion probes or their temporary diagnostic sink. An identity cast
+        // returns its argument unchanged and must not warn again about an inner conversion.
+        getSink()->diagnose(Diagnostics::EnumConstantCastRequiresCaseCapability{
+            .enumCase = castExpr->targetEnumCase.getDecl(),
+            .expr = expr});
+    }
     if (auto invoke = as<InvokeExpr>(rs))
     {
         if (!invoke->functionExpr)

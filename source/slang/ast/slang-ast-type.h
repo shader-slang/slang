@@ -856,7 +856,14 @@ class DynamicType : public BuiltinType
     FIDDLE(...)
 };
 
-// Type built-in `__EnumType` type
+// The built-in `__BuiltinEnumType` interface shared by all enums.
+FIDDLE()
+class BuiltinEnumType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+// The built-in `__EnumType` interface for enums that allow integer construction.
 FIDDLE()
 class EnumTypeType : public BuiltinType
 {

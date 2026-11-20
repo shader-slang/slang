@@ -90,6 +90,16 @@ Type* SharedASTBuilder::getEnumTypeType()
     return m_enumTypeType;
 }
 
+Type* SharedASTBuilder::getBuiltinEnumType()
+{
+    if (!m_builtinEnumType)
+    {
+        auto decl = findMagicDecl("BuiltinEnumType");
+        m_builtinEnumType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+    }
+    return m_builtinEnumType;
+}
+
 Type* SharedASTBuilder::getDynamicType()
 {
     if (!m_dynamicType)

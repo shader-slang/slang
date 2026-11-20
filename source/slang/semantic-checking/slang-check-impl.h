@@ -461,6 +461,9 @@ struct OverloadCandidate
     // phases. Currently this is only needed for generics.
     SubstitutionSet subst;
 
+    // Checked generic arguments belonging to this candidate survive callee reconstruction.
+    List<Expr*> genericArgumentExpressions;
+
     // For a generic candidate, the number of leading ordinary generic arguments
     // that were supplied explicitly (as opposed to filled from a parameter's
     // default). `TryCheckOverloadCandidateConstraints` hands this prefix to the
@@ -2491,7 +2494,7 @@ public:
     /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
     /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
     /// in a translation unit using the HLSL-flavored dialect, and never for `bool`
-    /// (which already has its own implicit conversion from any `__EnumType`).
+    /// (which already has its own implicit conversion from any `__BuiltinEnumType`).
     bool isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
@@ -2907,8 +2910,11 @@ public:
         RefPtr<WitnessTable> witnessTable,
         BuiltinRequirementKind requirementKind);
 
-    /// Attempt to synthesize function requirements for enum types to make them conform to
-    /// `ILogical`.
+    /// Determine whether an enum has explicitly capability-restricted cases, checking its
+    /// case modifiers before inspecting them. Such enums require a known case for integer casts.
+    bool enumHasCapabilityRestrictedCases(EnumDecl* enumDecl);
+
+    /// Attempt to synthesize comparison and logical function requirements for enum types.
     bool trySynthesizeEnumTypeMethodRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<FunctionDeclBase> requirementDeclRef,
@@ -3610,6 +3616,9 @@ public:
         // resolution selects the failed candidate.
         GenericArgumentInferenceFailure* failure = nullptr;
         SourceLoc applicationLoc = SourceLoc();
+
+        // Return checked expressions only for defaults that remain selected after solving.
+        List<Expr*>* defaultArgumentExpressions = nullptr;
     };
 
     bool isRelevantGeneric(GenericInferenceContext& system, Decl* generic);
@@ -3829,6 +3838,9 @@ public:
 
         Expr* baseExpr = nullptr;
 
+        // The checked generic arguments on the expression currently supplying candidates.
+        const List<Expr*>* genericArgumentExpressions = nullptr;
+
         // Are we still trying out candidates, or are we
         // checking the chosen one for real?
         Mode mode = Mode::JustTrying;
@@ -3919,7 +3931,11 @@ public:
     void TryCheckOverloadCandidate(OverloadResolveContext& context, OverloadCandidate& candidate);
 
     // Create the representation of a given generic applied to some arguments
-    Expr* createGenericDeclRef(Expr* baseExpr, Expr* originalExpr, SubstitutionSet substSet);
+    Expr* createGenericDeclRef(
+        Expr* baseExpr,
+        Expr* originalExpr,
+        SubstitutionSet substSet,
+        const List<Expr*>& genericArgumentExpressions);
 
     // Take an overload candidate that previously got through
     // `TryCheckOverloadCandidate` above, and try to finish
@@ -4149,7 +4165,8 @@ public:
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
         List<QualType>* innerParameterTypes = nullptr,
-        GenericArgumentInferenceFailure* outFailure = nullptr);
+        GenericArgumentInferenceFailure* outFailure = nullptr,
+        List<Expr*>* outDefaultArgumentExpressions = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 

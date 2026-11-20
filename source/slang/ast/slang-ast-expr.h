@@ -29,6 +29,12 @@ class DeclRefExpr : public Expr
     // The declaration of the symbol being referenced
 
     FIDDLE() DeclRef<Decl> declRef;
+
+    // Keep checked generic arguments for declaration-reference analysis. For example,
+    // `readValue<Mode.hlslMode>()` has a canonical integer generic argument, but capability
+    // checking must still see the named case. Overload resolution preserves these expressions
+    // when it replaces a generic application with its selected declaration reference.
+    FIDDLE() List<Expr*> genericArgumentExpressions;
     // The name of the symbol being referenced
     Name* name = nullptr;
 
@@ -165,6 +171,10 @@ FIDDLE()
 class MakeArrayFromElementExpr : public Expr
 {
     FIDDLE(...)
+
+    // This expression repeats the default value of its array element type; it has no
+    // explicit element operand. Preserve the selected defaults for semantic analysis.
+    FIDDLE() List<Expr*> defaultArgumentExpressions;
 };
 
 // An initializer list, e.g. `{ 1, 2, 3 }`
@@ -173,6 +183,11 @@ class InitializerListExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() List<Expr*> args;
+
+    // Checked source expressions selected for omitted aggregate elements and fields.
+    // These preserve dependencies without changing the positional arguments that lowering
+    // uses to distinguish explicit initialization from specialized default initialization.
+    FIDDLE() List<Expr*> defaultArgumentExpressions;
 
     bool useCStyleInitialization = true;
 };
@@ -235,6 +250,11 @@ FIDDLE()
 class InvokeExpr : public AppExprBase
 {
     FIDDLE(...)
+
+    // Overload completion retains the checked initializers of omitted parameters. Consider
+    // `readMode(Mode mode = Mode.hlslMode)` called as `readMode()`: lowering supplies the
+    // default through the selected callee, while reference analysis needs its source case.
+    FIDDLE() List<Expr*> defaultArgumentExpressions;
 };
 
 FIDDLE()
@@ -351,7 +371,7 @@ FIDDLE()
 class StaticMemberExpr : public DeclRefExpr
 {
     FIDDLE(...)
-    Expr* baseExpression = nullptr;
+    FIDDLE() Expr* baseExpression = nullptr;
     SourceLoc memberOperatorLoc;
 };
 
@@ -433,6 +453,11 @@ class BuiltinCastExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() Expr* base = nullptr;
+
+    // A constant cast to an enum with capability-restricted cases identifies the unique
+    // case with that tag. The reference preserves that case's requirements, while base
+    // preserves the checked operand and its own dependencies. Other casts leave this empty.
+    FIDDLE() DeclRef<EnumCaseDecl> targetEnumCase;
 };
 
 FIDDLE()
@@ -1018,6 +1043,9 @@ public:
     /// Witness arguments are deliberately not stored here; they are formed only
     /// after the remaining ordinary arguments are inferred.
     List<Val*> providedOrdinaryArgs;
+
+    // Preserve the checked expressions until call-site inference produces the final reference.
+    List<Expr*> genericArgumentExpressions;
 };
 
 

@@ -441,6 +441,29 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         result = DeclRefType::create(
             getASTBuilder(),
             getASTBuilder()->getGenericAppDeclRef(genericDeclRef, args.getArrayView()));
+
+        // A bare generic type name uses every declared default. Preserve those checked
+        // expressions on the type reference, just as explicit generic application does,
+        // so `struct Holder<let V : Mode = Mode.hlslMode> {}; Holder value;` retains the
+        // case requirement.
+        // A speculative proper-type query must not mutate its input expression.
+        if (diagSink)
+        {
+            if (auto declRefExpr = as<DeclRefExpr>(expr))
+            {
+                declRefExpr->genericArgumentExpressions.clear();
+                for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
+                {
+                    if (auto typeParam = as<GenericTypeParamDecl>(member))
+                    {
+                        if (typeParam->initType.exp)
+                            declRefExpr->genericArgumentExpressions.add(typeParam->initType.exp);
+                    }
+                    else if (auto valueParam = as<GenericValueParamDecl>(member))
+                        declRefExpr->genericArgumentExpressions.add(valueParam->initExpr);
+                }
+            }
+        }
     }
 
     // default case: we expect this to already be a proper type

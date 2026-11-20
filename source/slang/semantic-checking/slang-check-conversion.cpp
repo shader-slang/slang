@@ -992,6 +992,67 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     return false;
 }
 
+// Collect the checked source expressions used by an omitted aggregate initializer.
+// Consider `struct S { Mode mode = Mode.hlslMode; }; S values[2] = {};`.
+// The initializer has no positional arguments, and lowering supplies the field default
+// for each array element. Remember that source expression here so capability checking
+// sees the case reference. Do not insert it into the runtime argument list: lowering
+// still owns the substitution context in which a generic field default is evaluated.
+struct DefaultInitializerExpressionCollector
+{
+    SemanticsVisitor* visitor;
+    List<Expr*> expressions;
+    HashSet<Type*> visitedTypes;
+
+    void collect(DeclRef<VarDecl> fieldDeclRef)
+    {
+        visitor->ensureDecl(fieldDeclRef, DeclCheckState::DefinitionChecked);
+        if (auto initExpr = fieldDeclRef.getDecl()->initExpr)
+            expressions.add(initExpr);
+        else
+            collect(getType(visitor->getASTBuilder(), fieldDeclRef));
+    }
+
+    void collect(Type* type)
+    {
+        type = unwrapModifiedType(type)->getCanonicalType();
+        // A repeated element type contributes the same source dependencies only once.
+        if (!visitedTypes.add(type))
+            return;
+
+        if (auto arrayType = as<ArrayExpressionType>(type))
+        {
+            collect(arrayType->getElementType());
+        }
+        else if (auto tupleType = as<TupleType>(type))
+        {
+            for (Index i = 0; i < tupleType->getMemberCount(); ++i)
+                collect(tupleType->getMember(i));
+        }
+        else if (auto declRefType = as<DeclRefType>(type))
+        {
+            auto aggregate = declRefType->getDeclRef().as<AggTypeDecl>();
+            // Abstract and link-time aggregate types have no selected concrete fields yet.
+            // Their default construction is resolved later, just as in getDefaultVal().
+            if (!aggregate || !aggregate.getDecl()->hasBody || aggregate.getDecl()->aliasedType)
+                return;
+            if (!aggregate.as<StructDecl>() && !aggregate.as<ClassDecl>() &&
+                !aggregate.as<GLSLInterfaceBlockDecl>())
+                return;
+
+            auto astBuilder = visitor->getASTBuilder();
+            if (auto structDeclRef = aggregate.as<StructDecl>())
+            {
+                if (auto baseType = findBaseStructType(astBuilder, structDeclRef))
+                    collect(baseType);
+            }
+            for (auto field :
+                 getMembersOfType<VarDecl>(astBuilder, aggregate, MemberFilterStyle::Instance))
+                collect(field);
+        }
+    }
+};
+
 bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     Type* inToType,
     Expr** outToExpr,
@@ -1006,6 +1067,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     // In the case where we need to build a result expression,
     // we will collect the new arguments here
     List<Expr*> coercedArgs;
+    DefaultInitializerExpressionCollector defaults{this};
 
     if (isEffectivelyScalarForInitializerLists(toType))
     {
@@ -1035,6 +1097,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             // as an `InitializerListExpr` with zero arguments,
             // and then have the IR generation logic deal with
             // synthesizing default values.
+            if (outToExpr)
+                defaults.collect(toType);
         }
     }
     else if (auto toVecType = as<VectorExpressionType>(toType))
@@ -1160,7 +1224,11 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 toMakeArrayFromElementExpr->loc = fromInitializerListExpr->loc;
                 toMakeArrayFromElementExpr->type = QualType(toType);
                 if (outToExpr)
+                {
+                    defaults.collect(toElementType);
+                    toMakeArrayFromElementExpr->defaultArgumentExpressions = defaults.expressions;
                     *outToExpr = toMakeArrayFromElementExpr;
+                }
                 return true;
             }
             for (UInt ee = 0; ee < elementCount; ++ee)
@@ -1179,6 +1247,10 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
+                }
+                else if (outToExpr)
+                {
+                    defaults.collect(toElementType);
                 }
             }
         }
@@ -1307,6 +1379,10 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             {
                 coercedArgs.add(coercedArg);
             }
+            else if (outToExpr)
+            {
+                defaults.collect(elementType);
+            }
         }
     }
     else if (auto toDeclRefType = as<DeclRefType>(toType))
@@ -1337,6 +1413,10 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 {
                     coercedArgs.add(coercedArg);
                 }
+                else if (outToExpr)
+                {
+                    defaults.collect(baseStructType);
+                }
             }
 
             // We will go through the fields in order and try to match them
@@ -1361,6 +1441,10 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 if (coercedArg)
                 {
                     coercedArgs.add(coercedArg);
+                }
+                else if (outToExpr)
+                {
+                    defaults.collect(fieldDeclRef);
                 }
             }
         }
@@ -1390,6 +1474,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         toInitializerListExpr->loc = fromInitializerListExpr->loc;
         toInitializerListExpr->type = QualType(toType);
         toInitializerListExpr->args = coercedArgs;
+        toInitializerListExpr->defaultArgumentExpressions = defaults.expressions;
 
         // Wrap initalizer list args if we're creating a non-differentiable struct within a
         // differentiable function.
@@ -1701,7 +1786,7 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
 bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType)
 {
     // Only builtin scalars are eligible, and `bool` is excluded: it already has
-    // a dedicated implicit conversion from any `__EnumType` (core.meta.slang),
+    // a dedicated implicit conversion from any `__BuiltinEnumType` (core.meta.slang),
     // so routing it through the enum->tag->bool composite would introduce a
     // second, competing representation of the same conversion.
     auto toBasicType = as<BasicExpressionType>(toType);
@@ -1746,6 +1831,59 @@ static bool isMatrixLayoutConversion(Type* toType, Type* fromType)
             fromArrayType->getElementType());
     }
     return false;
+}
+
+// Resolve a checked constant tag to one named case, preserving the case's declaration identity.
+// Consider `enum Mode { [require(hlsl)] hlslMode = 0, [require(spirv)] spirvMode = 1 }`.
+// `Mode(0)` must carry hlslMode's requirement, while a runtime tag cannot identify which case
+// is being constructed. Equal tags on different cases are ambiguous because those cases can
+// have different requirements; the caller must name the intended case explicitly.
+static DeclRef<EnumCaseDecl> findEnumCaseForConstantCast(
+    SemanticsVisitor* visitor,
+    DeclRef<EnumDecl> enumDeclRef,
+    Expr* tagExpr,
+    DiagnosticSink* sink)
+{
+    IntegerLiteralValue tagValue = 0;
+    auto foldedTag = visitor->tryConstantFoldExpr(
+        tagExpr,
+        SemanticsVisitor::ConstantFoldingKind::CompileTime,
+        nullptr);
+    if (!tryGetConstantIntVal(foldedTag, tagValue))
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::EnumCastRequiresConstantCase{
+                .enumDecl = enumDeclRef.getDecl(),
+                .expr = tagExpr});
+        return {};
+    }
+
+    visitor->ensureDecl(enumDeclRef, DeclCheckState::DefinitionChecked);
+    DeclRef<EnumCaseDecl> matchingCase;
+    for (auto caseDecl : enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>())
+    {
+        IntegerLiteralValue caseValue = 0;
+        // Definition checking has already diagnosed cases without a concrete integer tag.
+        // Skip those recovery values so they cannot become a successful constant conversion.
+        if (!tryGetConstantIntVal(caseDecl->tagVal, caseValue))
+            continue;
+        if (caseValue != tagValue)
+            continue;
+        if (matchingCase)
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::EnumCastAmbiguousCase{
+                    .enumDecl = enumDeclRef.getDecl(),
+                    .expr = tagExpr});
+            return {};
+        }
+        matchingCase = visitor->getASTBuilder()->getMemberDeclRef(enumDeclRef, caseDecl);
+    }
+    if (!matchingCase && sink)
+        sink->diagnose(Diagnostics::EnumCastHasNoMatchingCase{
+            .enumDecl = enumDeclRef.getDecl(),
+            .expr = tagExpr});
+    return matchingCase;
 }
 
 bool SemanticsVisitor::_coerce(
@@ -2329,6 +2467,12 @@ bool SemanticsVisitor::_coerce(
     {
         if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
         {
+            bool requiresNamedCase = enumHasCapabilityRestrictedCases(toEnumDeclRef.getDecl());
+            // This conversion depends on the argument value, so a type-only probe cannot
+            // establish that an arbitrary value can be converted to the restricted enum.
+            if (requiresNamedCase && !fromExpr)
+                return false;
+
             auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
             if (!tagType)
                 return false;
@@ -2338,13 +2482,21 @@ bool SemanticsVisitor::_coerce(
             if (_coerce(
                     site,
                     tagType,
-                    outToExpr ? &tagExpr : nullptr,
+                    outToExpr || requiresNamedCase ? &tagExpr : nullptr,
                     fromType,
                     fromExpr,
                     sink,
                     &tagCost,
                     nullptr))
             {
+                DeclRef<EnumCaseDecl> targetEnumCase;
+                if (requiresNamedCase)
+                {
+                    targetEnumCase =
+                        findEnumCaseForConstantCast(this, toEnumDeclRef, tagExpr, sink);
+                    if (!targetEnumCase)
+                        return false;
+                }
                 if (outCost)
                     *outCost = tagCost + kConversionCost_Explicit;
                 if (outToExpr)
@@ -2354,6 +2506,7 @@ bool SemanticsVisitor::_coerce(
                     if (fromExpr)
                         enumExpr->loc = fromExpr->loc;
                     enumExpr->base = tagExpr;
+                    enumExpr->targetEnumCase = targetEnumCase;
                     *outToExpr = enumExpr;
                 }
                 setWitnessOfConversionToBuiltinConversion();
@@ -2671,7 +2824,7 @@ bool SemanticsVisitor::_coerce(
     // `T` exactly — and no scalar builtin declares an implicit initializer
     // with an opaque generic parameter type (a contingent core-module
     // property, pinned by generic-arithmetic-coerce-diag.slang). The one
-    // exception is `bool` (`__init<T : __EnumType>(T)` in core.meta.slang),
+    // exception is `bool` (`__init<T : __BuiltinEnumType>(T)` in core.meta.slang),
     // so `bool` targets are excluded. Everything else stays on the search
     // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
     // scalars such as `BFloat16`/FP8 (which do declare generic initializers).

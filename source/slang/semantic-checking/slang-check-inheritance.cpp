@@ -673,7 +673,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto& arena = astBuilder->getArena();
     SemanticsVisitor visitor(this);
 
-    // An enum's `__EnumType` conformance is not written in source; it is synthesized in
+    // An enum's builtin conformances are not written in source; they are synthesized in
     // `SemanticsDeclBasesVisitor::visitEnumDecl` when the enum reaches `ReadyForLookup`. Its base
     // list is therefore incomplete until then, so force that state before linearizing to avoid
     // caching a spurious non-conforming result.

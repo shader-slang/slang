@@ -1063,6 +1063,10 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     List<SourceLoc> sourceLocStack;
 
+    // Canonical types retain type requirements, but not the source of folded value arguments.
+    bool visitingTypeExpressionDependencies = false;
+    HashSet<Expr*> activeDefaultArgumentExpressions;
+
     struct PushSourceLocRAII
     {
         List<SourceLoc>& stack;
@@ -1105,9 +1109,57 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     }
     void dispatchIfNotNull(Val* val)
     {
-        if (!val)
+        if (!val || visitingTypeExpressionDependencies)
             return;
         return ValVisitor<VisitorType>::dispatch(val);
+    }
+
+    // Visit only expression dependencies that are absent from the canonical type. Consider
+    // `Holder<Mode.hlslMode>`: its type already names Holder and the integer argument, while
+    // its checked expression retains the named case. Visiting the unspecialized Holder
+    // reference again would duplicate type analysis instead of recovering the case dependency.
+    void visitTypeExpressionDependencies(Expr* expr)
+    {
+        auto saved = visitingTypeExpressionDependencies;
+        SLANG_DEFER(visitingTypeExpressionDependencies = saved);
+        visitingTypeExpressionDependencies = true;
+        dispatchIfNotNull(expr);
+    }
+
+    // Value arguments need ordinary reference analysis, including array dimensions in
+    // `float[int(Mode.hlslMode) + 1]`. Type arguments need only source dependencies absent
+    // from the enclosing application's canonical type.
+    void visitArgumentExpression(Expr* expr)
+    {
+        if (!expr)
+            return;
+        auto saved = visitingTypeExpressionDependencies;
+        SLANG_DEFER(visitingTypeExpressionDependencies = saved);
+        visitingTypeExpressionDependencies = as<TypeType>(expr->type) != nullptr;
+        dispatchIfNotNull(expr);
+    }
+
+    // Default expressions are shared declaration dependencies, so their edges form a graph.
+    // For `struct Loop<each T> { Loop<T, int> next; }`, a synthesized constructor's
+    // selected default can refer back to the same checked initializer. Revisiting that
+    // source adds no dependencies; lowering still diagnoses the infinitely nested type.
+    // Track only the active path so another use in a different target_switch branch is
+    // checked against that branch's capabilities too.
+    void visitDefaultArgumentExpressions(const List<Expr*>& expressions)
+    {
+        for (auto expr : expressions)
+        {
+            if (!activeDefaultArgumentExpressions.add(expr))
+                continue;
+            SLANG_DEFER(activeDefaultArgumentExpressions.remove(expr));
+            visitArgumentExpression(expr);
+        }
+    }
+
+    void visitTypeExp(TypeExp const& typeExp)
+    {
+        dispatchIfNotNull(typeExp.type);
+        visitTypeExpressionDependencies(typeExp.exp);
     }
     void dispatchIfNotNull(DeclBase* val)
     {
@@ -1124,7 +1176,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitIndexExpr(IndexExpr* subscriptExpr)
     {
         for (auto arg : subscriptExpr->indexExprs)
-            dispatchIfNotNull(arg);
+            visitArgumentExpression(arg);
         dispatchIfNotNull(subscriptExpr->baseExpression);
     }
 
@@ -1148,16 +1200,17 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     {
         dispatchIfNotNull(genericAppExpr->functionExpr);
         for (auto arg : genericAppExpr->arguments)
-            dispatchIfNotNull(arg);
+            visitArgumentExpression(arg);
     }
 
-    void visitSharedTypeExpr(SharedTypeExpr* expr) { dispatchIfNotNull(expr->base.exp); }
+    void visitSharedTypeExpr(SharedTypeExpr* expr) { visitTypeExp(expr->base); }
 
     void visitInvokeExpr(InvokeExpr* expr)
     {
         dispatchIfNotNull(expr->functionExpr);
         for (auto arg : expr->arguments)
             dispatchIfNotNull(arg);
+        visitDefaultArgumentExpressions(expr->defaultArgumentExpressions);
     }
 
     // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
@@ -1169,11 +1222,12 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(arg);
     }
 
-    void visitTypeCastExpr(TypeCastExpr* expr)
+    void visitTypeCastExpr(TypeCastExpr* expr) { visitInvokeExpr(expr); }
+
+    void visitBuiltinCastExpr(BuiltinCastExpr* expr)
     {
-        dispatchIfNotNull(expr->functionExpr);
-        for (auto arg : expr->arguments)
-            dispatchIfNotNull(arg);
+        dispatchIfNotNull(expr->base);
+        dispatchIfNotNull(expr->targetEnumCase.declRefBase);
     }
 
     void visitDerefExpr(DerefExpr* expr) { dispatchIfNotNull(expr->base); }
@@ -1190,8 +1244,28 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->declRef.declRefBase);
     }
 
+    void visitDeclRefExpressionDependencies(DeclRefExpr* expr)
+    {
+        for (auto arg : expr->genericArgumentExpressions)
+            visitArgumentExpression(arg);
+        // `typealias HlslHolder = Holder<Mode.hlslMode>` expands to Holder<0> in the
+        // canonical type. Preserve the alias declaration's dependencies when its source
+        // reference is visited, just as we preserve the value argument on a direct use.
+        if (visitingTypeExpressionDependencies && expr->declRef.as<TypeDefDecl>())
+        {
+            auto saved = visitingTypeExpressionDependencies;
+            SLANG_DEFER(visitingTypeExpressionDependencies = saved);
+            visitingTypeExpressionDependencies = false;
+            dispatchIfNotNull(expr->declRef.declRefBase);
+            processDeclModifiers(expr->declRef.getDecl(), expr->loc);
+        }
+    }
+
     void visitDeclRefExpr(DeclRefExpr* expr)
     {
+        visitDeclRefExpressionDependencies(expr);
+        if (visitingTypeExpressionDependencies)
+            return;
         dispatchIfNotNull(expr->type.type);
         dispatchIfNotNull(expr->declRef.declRefBase);
 
@@ -1207,6 +1281,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
+        visitTypeExpressionDependencies(expr->baseExpression);
+        visitDeclRefExpressionDependencies(expr);
         dispatchIfNotNull(expr->declRef.declRefBase);
     }
     void visitInitializerListExpr(InitializerListExpr* expr)
@@ -1215,6 +1291,12 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         {
             dispatchIfNotNull(arg);
         }
+        visitDefaultArgumentExpressions(expr->defaultArgumentExpressions);
+    }
+
+    void visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+    {
+        visitDefaultArgumentExpressions(expr->defaultArgumentExpressions);
     }
 
     void visitThisExpr(ThisExpr*) { return; }
@@ -1224,10 +1306,10 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitThisInterfaceExpr(ThisInterfaceExpr*) { return; }
     void visitAndTypeExpr(AndTypeExpr* expr)
     {
-        dispatchIfNotNull(expr->left.type);
-        dispatchIfNotNull(expr->right.type);
+        visitTypeExp(expr->left);
+        visitTypeExp(expr->right);
     }
-    void visitPointerTypeExpr(PointerTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+    void visitPointerTypeExpr(PointerTypeExpr* expr) { visitTypeExp(expr->base); }
     void visitAsTypeExpr(AsTypeExpr* expr)
     {
         dispatchIfNotNull(expr->value);
@@ -1251,20 +1333,20 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     }
     void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr*) { return; }
     void visitSPIRVAsmExpr(SPIRVAsmExpr*) { return; }
-    void visitModifiedTypeExpr(ModifiedTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+    void visitModifiedTypeExpr(ModifiedTypeExpr* expr) { visitTypeExp(expr->base); }
     void visitFuncTypeExpr(FuncTypeExpr* expr)
     {
         for (const auto& t : expr->parameters)
         {
-            dispatchIfNotNull(t.type);
+            visitTypeExp(t);
         }
-        dispatchIfNotNull(expr->result.type);
+        visitTypeExp(expr->result);
     }
     void visitTupleTypeExpr(TupleTypeExpr* expr)
     {
         for (auto t : expr->members)
         {
-            dispatchIfNotNull(t.type);
+            visitTypeExp(t);
         }
     }
     void visitShapePackTransformExpr(ShapePackTransformExpr* expr)
@@ -1274,9 +1356,9 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     }
     void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
     {
-        dispatchIfNotNull(expr->packOperand.type);
-        dispatchIfNotNull(expr->emptyType.type);
-        dispatchIfNotNull(expr->nonEmptyType.type);
+        visitTypeExp(expr->packOperand);
+        visitTypeExp(expr->emptyType);
+        visitTypeExp(expr->nonEmptyType);
     }
     void visitTryExpr(TryExpr* expr) { dispatchIfNotNull(expr->base); }
     void visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
@@ -1440,7 +1522,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitVarDeclBase(VarDeclBase* varDecl)
     {
-        dispatchIfNotNull(varDecl->type.type);
+        visitTypeExp(varDecl->type);
         dispatchIfNotNull(varDecl->initExpr);
     }
 };
@@ -1482,6 +1564,10 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     void visitSubscriptDecl(SubscriptDecl* subscriptDecl);
 
     void visitPropertyDecl(PropertyDecl* propertyDecl);
+
+    void visitEnumCaseDecl(EnumCaseDecl* enumCaseDecl);
+
+    void visitTypeDefDecl(TypeDefDecl* typeDefDecl);
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
@@ -9472,12 +9558,36 @@ Stmt* _synthesizeMemberAssignMemberHelper(
 }
 
 
+bool SemanticsVisitor::enumHasCapabilityRestrictedCases(EnumDecl* enumDecl)
+{
+    for (auto caseDecl : enumDecl->getMembersOfType<EnumCaseDecl>())
+    {
+        // Enum bases are established before case bodies are checked. ModifiersChecked is
+        // sufficient to recognize [require] without evaluating a case's tag expression,
+        // which may itself refer to the enum and need its completed inheritance list.
+        ensureDecl(caseDecl, DeclCheckState::ModifiersChecked);
+        if (caseDecl->hasModifier<RequireCapabilityAttribute>())
+            return true;
+    }
+    return false;
+}
+
 bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<FunctionDeclBase> funcDeclRef,
     RefPtr<WitnessTable> witnessTable,
     BuiltinRequirementKind requirementKind)
 {
+    if (requirementKind == BuiltinRequirementKind::InitLogicalFromInt &&
+        enumHasCapabilityRestrictedCases(as<EnumDecl>(context->parentDecl)))
+    {
+        // Consider an enum with an HLSL-only case and a SPIR-V-only case. Its values can
+        // still be compared, but an integer constructor would let a generic T : ILogical
+        // manufacture either case without checking its requirements. Refuse to synthesize
+        // that witness even if the enum explicitly declares an ILogical conformance.
+        return false;
+    }
+
     List<Expr*> synArgs;
     ThisExpr* synThis = nullptr;
     auto synFunc =
@@ -10809,7 +10919,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // This applies to *every* kind of requirement (methods, associated types,
     // constraints, ...). In particular it covers the cases where conformance
     // synthesis deliberately supplied a witness that a fresh re-derivation below
-    // would reject -- e.g. an `enum`'s automatic `__EnumType` conformance
+    // would reject -- e.g. an `enum`'s automatic `__BuiltinEnumType` conformance
     // supplies the `__Tag : __BuiltinIntegerType` witness directly, including for
     // a `bool`-tagged `enum` where `bool` is a permitted tag type yet does not
     // actually conform to `__BuiltinIntegerType`. Respecting a synthesis-provided
@@ -13469,26 +13579,25 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     decl->tagType = tagType;
 
 
-    // An `enum` type should automatically conform to the `__EnumType` interface.
-    // The compiler needs to insert this conformance behind the scenes, and this
-    // seems like the best place to do it.
+    // Every enum conforms to __BuiltinEnumType, whose tag and logical-operation requirements do
+    // not promise construction from arbitrary integers. Install this before __EnumType below,
+    // so ordinary inherited-interface checking reuses this canonical tag witness.
     {
-        // First, look up the type of the `__EnumType` interface.
-        Type* enumTypeType = getASTBuilder()->getEnumTypeType();
+        Type* enumTypeType = getASTBuilder()->getBuiltinEnumType();
 
         InheritanceDecl* enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
         enumConformanceDecl->loc = decl->loc;
-        enumConformanceDecl->base.type = getASTBuilder()->getEnumTypeType();
+        enumConformanceDecl->base.type = enumTypeType;
         decl->addMember(enumConformanceDecl);
 
-        // The `__EnumType` interface has one required member, the `__Tag` type.
+        // The `__BuiltinEnumType` interface has a required member, the `__Tag` type.
         // We need to satisfy this requirement automatically, rather than require
         // the user to actually declare a member with this name (otherwise we wouldn't
         // let them define a tag value with the name `__Tag`).
         //
         RefPtr<WitnessTable> witnessTable = new WitnessTable();
         witnessTable->baseType = enumConformanceDecl->base.type;
-        witnessTable->witnessedType = enumTypeType;
+        witnessTable->witnessedType = DeclRefType::create(m_astBuilder, makeDeclRef(decl));
         enumConformanceDecl->witnessTable = witnessTable;
 
         Name* tagAssociatedTypeName = getSession()->getNameObj("__Tag");
@@ -13517,9 +13626,9 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         // Okay, add the conformance witness for `__Tag` being satisfied by `tagType`
         witnessTable->add(tagAssociatedTypeDecl, RequirementWitness(tagType));
 
-        // `__EnumType` constrains its `__Tag` associated type with
+        // `__BuiltinEnumType` constrains its `__Tag` associated type with
         // `__Tag : __BuiltinIntegerType`. In the unified representation that bound is a
-        // constraint requirement of the `__EnumType` interface (a sibling of `__Tag`),
+        // constraint requirement of the `__BuiltinEnumType` interface (a sibling of `__Tag`),
         // so this compiler-synthesized conformance must supply its witness too --
         // otherwise the conformance check would re-derive it and reject permitted tag
         // types. For an integer tag type the witness is the real subtype witness; for
@@ -13549,6 +13658,20 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         // have to declare these as additional cases.
 
         enumConformanceDecl->setCheckState(DeclCheckState::DefinitionChecked);
+    }
+
+    // __EnumType includes ILogical and integer constructors. Keep that existing contract
+    // for ordinary enums, but do not promise it for an enum whose cases have requirements.
+    // A named case carries those requirements through its declaration reference; an
+    // arbitrary integer has no such reference. Checked constant casts instead resolve a
+    // unique named case in _coerce and retain that declaration reference on the cast.
+    if (!enumHasCapabilityRestrictedCases(decl))
+    {
+        auto rawEnumConformance = m_astBuilder->create<InheritanceDecl>();
+        rawEnumConformance->loc = decl->loc;
+        rawEnumConformance->base.type = getASTBuilder()->getEnumTypeType();
+        decl->addMember(rawEnumConformance);
+        rawEnumConformance->setCheckState(DeclCheckState::DefinitionChecked);
     }
 }
 
@@ -22420,6 +22543,15 @@ static void _propagateSeeDefinitionOf(
         Diagnostics::SeeDefinitionOf{.decl = funcDecl});
 }
 
+// A global or static member initializer runs independently of a particular call's arguments.
+// Local initializers belong to their statement context; parameter and field initializers are
+// defaults that contribute requirements only when a caller selects them.
+static bool shouldInferCapabilitiesFromVariableInitializer(Decl* decl)
+{
+    return as<VarDecl>(decl) && !isLocalVar(decl) &&
+           (isGlobalDecl(decl) || decl->hasModifier<HLSLStaticModifier>());
+}
+
 static void _propagateRequirement(
     SemanticsVisitor* visitor,
     CapabilitySet& resultCaps,
@@ -22590,6 +22722,14 @@ struct CapabilityDeclReferenceVisitor
         SourceLoc loc = SourceLoc();
         if (Base::sourceLocStack.getCount())
             loc = Base::sourceLocStack.getLast();
+        // These declarations can retain a restricted case through a tag expression,
+        // initializer, or type argument. For example, `int f() { return Globals.mode; }`
+        // may precede `struct Globals { static const int mode = int(Mode.hlslMode); }`.
+        // Complete the declaration's new source-dependency analysis before taking the
+        // requirement snapshot, including references retained by constant enum casts.
+        if (as<EnumCaseDecl>(decl) || as<TypeDefDecl>(decl) ||
+            shouldInferCapabilitiesFromVariableInitializer(decl))
+            this->ensureDecl(decl, DeclCheckState::CapabilityChecked);
         handleProcessFunc(decl, decl->inferredCapabilityRequirements, loc);
     }
     virtual void processDeclModifiers(Decl* decl, SourceLoc refLoc) override
@@ -23036,17 +23176,24 @@ CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     CapabilitySet mutableCapSet{varDecl->inferredCapabilityRequirements};
-    visitReferencedDecls(
-        *this,
-        varDecl->type.type,
-        varDecl->loc,
-        varDecl->findModifier<RequireCapabilityAttribute>(),
+    for (auto attribute : varDecl->getModifiersOfType<RequireCapabilityAttribute>())
+        mutableCapSet.unionWith(attribute->capabilitySet);
+    CapabilityDeclReferenceVisitor visitor(
         [this,
          varDecl,
          &mutableCapSet](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
         { _propagateRequirement(this, mutableCapSet, varDecl, node, nodeCaps, refLoc); },
         [this, varDecl](DiagnosticCategory category)
-        { _propagateSeeDefinitionOf(this, varDecl, category); });
+        { _propagateSeeDefinitionOf(this, varDecl, category); },
+        varDecl->findModifier<RequireCapabilityAttribute>(),
+        *this);
+    visitor.sourceLocStack.add(varDecl->loc);
+    visitor.visitTypeExp(varDecl->type);
+    // A global constant initialized with Mode.hlslMode must retain the case's requirement.
+    // Local initializers are visited in their enclosing statement's target-switch context.
+    // Parameter and instance-field defaults are visited only when a call uses those defaults.
+    if (shouldInferCapabilitiesFromVariableInitializer(varDecl))
+        visitor.dispatchIfNotNull(varDecl->initExpr);
     varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
 }
 
@@ -23112,6 +23259,52 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
 }
 
+void SemanticsDeclCapabilityVisitor::visitEnumCaseDecl(EnumCaseDecl* enumCaseDecl)
+{
+    // Keep each case's requirements on its declaration so referencing the enum type does not
+    // require every case's capabilities. Consider this example:
+    //
+    //     enum Mode { [require(hlsl)] hlslMode = 0, alias = hlslMode }
+    //
+    // Both cases require HLSL: the first declares that requirement, and the second references
+    // it in its checked tag expression. The ordinary declaration-reference walk then propagates
+    // either case's requirements to a function that uses it, while a Mode parameter remains
+    // available on other targets.
+    auto capabilities = getDeclaredCapabilitySet(enumCaseDecl);
+    visitReferencedDecls(
+        *this,
+        enumCaseDecl->tagExpr,
+        enumCaseDecl->loc,
+        enumCaseDecl->findModifier<RequireCapabilityAttribute>(),
+        [this,
+         enumCaseDecl,
+         &capabilities](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
+        { _propagateRequirement(this, capabilities, enumCaseDecl, node, nodeCaps, refLoc); },
+        [this, enumCaseDecl](DiagnosticCategory category)
+        { _propagateSeeDefinitionOf(this, enumCaseDecl, category); });
+    enumCaseDecl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
+}
+
+void SemanticsDeclCapabilityVisitor::visitTypeDefDecl(TypeDefDecl* typeDefDecl)
+{
+    // A type alias can select a restricted case in a generic argument. Preserve the
+    // checked expression's requirements on the alias, even though its canonical type
+    // stores only the folded argument: `typealias Selected = Holder<Mode.hlslMode>`.
+    auto capabilities = getDeclaredCapabilitySet(typeDefDecl);
+    CapabilityDeclReferenceVisitor visitor(
+        [this,
+         typeDefDecl,
+         &capabilities](SyntaxNode* node, const CapabilitySetVal* nodeCaps, SourceLoc refLoc)
+        { _propagateRequirement(this, capabilities, typeDefDecl, node, nodeCaps, refLoc); },
+        [this, typeDefDecl](DiagnosticCategory category)
+        { _propagateSeeDefinitionOf(this, typeDefDecl, category); },
+        typeDefDecl->findModifier<RequireCapabilityAttribute>(),
+        *this);
+    visitor.sourceLocStack.add(typeDefDecl->loc);
+    visitor.visitTypeExp(typeDefDecl->type);
+    typeDefDecl->inferredCapabilityRequirements = capabilities.freeze(getASTBuilder());
+}
+
 void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extensionDecl)
 {
     // Set up the extension's own inferred capabilities from its [require(...)] attributes,
@@ -23153,6 +23346,7 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
     if (!targetTypeDecl)
         return;
 
+
     // We must call ensureDecl before the _propagateRequirement call below because
     // targetTypeDecl->inferredCapabilityRequirements is evaluated as a C++ argument
     // expression at the call site, before _propagateRequirement runs its own ensureDecl.
@@ -23190,19 +23384,21 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
             member->loc);
     }
 
-    // visit the body of our funcDecl, propagate capabilities.
-    visitReferencedDecls(
-        *this,
-        funcDecl->body,
-        funcDecl->loc,
-        funcDecl->findModifier<RequireCapabilityAttribute>(),
+    // The checked return type expression can select an enum case in a generic argument,
+    // just like an expression in the body. Visit both before freezing the function's requirements.
+    CapabilityDeclReferenceVisitor visitor(
         [this, funcDecl, &mutableFuncDeclCapSet](
             SyntaxNode* node,
             const CapabilitySetVal* nodeCaps,
             SourceLoc refLoc)
         { _propagateRequirement(this, mutableFuncDeclCapSet, funcDecl, node, nodeCaps, refLoc); },
         [this, funcDecl](DiagnosticCategory category)
-        { _propagateSeeDefinitionOf(this, funcDecl, category); });
+        { _propagateSeeDefinitionOf(this, funcDecl, category); },
+        funcDecl->findModifier<RequireCapabilityAttribute>(),
+        *this);
+    visitor.sourceLocStack.add(funcDecl->loc);
+    visitor.visitTypeExp(funcDecl->returnType);
+    visitor.dispatchIfNotNull(funcDecl->body);
 
     // A user-defined forward/backward derivative is invoked only when the primal is
     // *differentiated* (`fwd_diff` / `bwd_diff`), not on every call to the primal.

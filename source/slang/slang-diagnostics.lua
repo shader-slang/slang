@@ -3527,6 +3527,34 @@ warning(
     }
 )
 
+err(
+    "enum-cast-requires-constant-case",
+    32007,
+    "enum cast requires a compile-time constant case",
+    span { loc = "expr:Expr", message = "enum '~enumDecl:Decl' has capability-restricted cases; use a compile-time constant matching a unique named case" }
+)
+
+err(
+    "enum-cast-has-no-matching-case",
+    32008,
+    "enum cast has no matching case",
+    span { loc = "expr:Expr", message = "no named case of enum '~enumDecl:Decl' has this value; use a named case" }
+)
+
+err(
+    "enum-cast-ambiguous-case",
+    32009,
+    "enum cast matches multiple cases",
+    span { loc = "expr:Expr", message = "multiple cases of enum '~enumDecl:Decl' have this value; name the intended case explicitly" }
+)
+
+warning(
+    "enum-constant-cast-requires-case-capability",
+    32010,
+    "enum constant cast inherits case capability requirements",
+    span { loc = "expr:Expr", message = "this conversion selects case '~enumCase:Decl' and inherits its capability requirements; use the named case explicitly" }
+)
+
 -- 303xx: interfaces and associated types
 
 err(

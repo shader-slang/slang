@@ -91,6 +91,63 @@ public void myFunc()
 }
 ```
 
+## Capabilities of Enum Cases
+
+An enum case can declare a capability requirement with `[require(...)]`. Referencing the case
+contributes that requirement to the enclosing declaration, just like calling a function with a
+capability requirement. Other cases do not restrict the enum type itself, so code can accept,
+copy, compare, and return enum values without requiring every case's capabilities.
+
+```csharp
+enum BackendValue
+{
+    [require(hlsl)]
+    direct3D = 0,
+
+    [require(spirv)]
+    vulkan = 1,
+}
+
+int consume(BackendValue value)
+{
+    return int(value);
+}
+
+[require(hlsl)]
+int useDirect3D()
+{
+    return consume(BackendValue.direct3D); // Requires hlsl, but not spirv.
+}
+```
+
+A case whose initializer references another case also inherits that case's requirements.
+Automatically assigning an integer tag to a case does not introduce a reference to the previous
+case.
+
+If any case declares a capability requirement, integer-to-enum conversion requires a compile-time
+constant whose value, after conversion to the enum's underlying tag type, matches exactly one
+declared case. The conversion carries that case's requirements: `BackendValue(0)` and
+`(BackendValue)0` require `hlsl`, just like `BackendValue.direct3D`. The compiler also warns about the conversion because its numeric
+spelling hides the capability requirement it introduces. Use the named case directly to make
+that requirement visible and avoid the warning.
+
+A runtime integer cannot identify the case at compile time, so `BackendValue(runtimeValue)` is
+an error. A constant with no matching case is also an error. If multiple cases share the constant's
+value, name the intended case explicitly so the compiler can check its requirements. Conversion
+in the other direction, such as `int(value)`, remains available.
+
+Such enums also do not automatically conform to `ILogical` or the internal `__EnumType`
+interface, whose contracts include integer construction. This prevents generic functions
+constrained by those interfaces from bypassing the restriction. Enums without explicit case requirements
+retain their integer constructors and these conformances.
+
+Requirements also follow case references in generic arguments and in default expressions when
+those defaults are selected. Supplying an explicit argument does not acquire requirements from
+the unused default.
+
+These rules check source case references and builtin integer conversions. They do not change
+zero initialization of enum storage, bitwise operations, or values loaded from memory.
+
 ## Capabilities Between Subtype and Supertype
 
 For inheritance/implementing-interfaces, the story is a bit different.
