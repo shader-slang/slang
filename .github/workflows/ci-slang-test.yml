@@ -40,16 +40,11 @@ on:
         type: boolean
         default: false
         description: "Validate the bundled Slang user skills and their examples"
-      gpu-api-only:
-        required: false
-        type: boolean
-        default: false
-        description: "Run only the GPU tests (-api all-cpu-llvm -compile-test false -api-only)"
       gpu-tier:
         required: false
         type: string
         default: ""
-        description: "GPU tier label: 't4', 'sm80plus', or 'nogpu' for a runner that has no GPU. Used to choose the tests to run, and the tier-specific lists."
+        description: "GPU tier of the runner: 't4', 'sm80plus', or 'nogpu' (no GPU). Empty runs all tests. It chooses the tests that the job runs."
 
 jobs:
   test-slang:
@@ -82,7 +77,7 @@ jobs:
           git reset --hard HEAD
 
       - name: Checkout OptiX headers
-        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os != 'macos'
+        if: inputs.full-gpu-tests && inputs.os != 'macos'
         run: |
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
@@ -105,7 +100,7 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
-          cpu-only: ${{ inputs.gpu-tier == 'nogpu' }}
+          gpu-tier: ${{ inputs.gpu-tier }}
 
       - name: Validate Slang user-skill examples
         if: inputs.slang-user-skills
@@ -129,13 +124,6 @@ jobs:
 
       - name: Test Slang
         run: |
-          # Fail fast on mutually exclusive inputs — both would accumulate
-          # -api filters and produce an empty test partition.
-          if [[ "${{ inputs.gpu-tier }}" == "nogpu" && "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            echo "::error::gpu-tier nogpu and gpu-api-only are mutually exclusive"
-            exit 1
-          fi
-
           # SPIR-V emission / validation don't need a GPU — keep on all tiers.
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -164,35 +152,56 @@ jobs:
           # slang-test accepts only a single -api option (a later one silently
           # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
-          if [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
-            # Restrict to CPU / LLVM backends; tests requiring any GPU API get
-            # ignored by the test filter rather than run-and-failed. The compile
-            # tests (the tests that use no API, such as SIMPLE) and the unit
-            # tests that need no GPU run here, and on macOS: the GPU jobs use
-            # -compile-test false.
-            api_expr="cpu+llvm"
-            slang_test_args+=("-compile-test" "true" "-api-only")
-          elif [[ "${{ inputs.os }}" == "macos" ]]; then
-            # No CPU-only job runs on macOS, so these jobs run everything that
-            # the machine supports: Metal, the (cpu) / (llvm) tests, and the
-            # compile tests (the tests that use no API).
-            api_expr="all"
-            slang_test_args+=("-compile-test" "true" "-api-only")
-          elif [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            # Restrict to GPU APIs ("all" without cpu and llvm, where llvm is
-            # the tests that use -emit-cpu-via-llvm) so (cpu) / (llvm) tests are
-            # skipped, and use -compile-test false so the compile tests (the
-            # tests that use no API, such as SIMPLE) and the unit tests that
-            # need no GPU are skipped too: the CPU-only jobs run them.
-            # -compile-test false keeps the COMPILE lines that prepare the input
-            # of a GPU test in the same file (for example a COMPILE line before a
-            # COMPARE_COMPUTE line), the lines that need NVRTC, and the unit
-            # tests that declare a GPU API.
-            api_expr="all-cpu-llvm"
-            slang_test_args+=("-compile-test" "false" "-api-only")
-          else
-            api_expr="all"
-          fi
+          case "${{ inputs.gpu-tier }}" in
+            nogpu)
+              # Restrict to CPU / LLVM backends; tests requiring any GPU API get
+              # ignored by the test filter rather than run-and-failed. The
+              # compile tests (the tests that use no API, such as SIMPLE) and
+              # the unit tests that need no GPU run here, and on macOS: the GPU
+              # tiers use -compile-test false.
+              api_expr="cpu+llvm"
+              slang_test_args+=("-compile-test" "true" "-api-only")
+              ;;
+            t4 | sm80plus)
+              # The GPU tiers run the same way, and differ only in which tests
+              # they select (see below). Restrict to GPU APIs ("all" without
+              # cpu and llvm, where llvm is the tests that use
+              # -emit-cpu-via-llvm) so (cpu) / (llvm) tests are skipped, and use
+              # -compile-test false so the compile tests (the tests that use no
+              # API, such as SIMPLE) and the unit tests that need no GPU are
+              # skipped too: the nogpu jobs run them. -compile-test false keeps
+              # the COMPILE lines that prepare the input of a GPU test in the
+              # same file (for example a COMPILE line before a COMPARE_COMPUTE
+              # line), the lines that need NVRTC, and the unit tests that
+              # declare a GPU API.
+              api_expr="all-cpu-llvm"
+              slang_test_args+=("-compile-test" "false" "-api-only")
+              if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
+                # T4 runners cannot execute SM 8.0+ cooperative matrix / neural
+                # tests.
+                slang_test_args+=("-exclude-list" "tests/tests-require-sm80.txt")
+              else
+                # Keep the SM80 cost bounded: run only the tests that T4 cannot.
+                slang_test_args+=("-include-list" "tests/tests-require-sm80.txt")
+              fi
+              # tests/expected-failure-linux-gpu.txt lists failures of the Linux
+              # GPU machines, so it applies only to Linux jobs.
+              if [[ "${{ inputs.os }}" == "linux" ]]; then
+                slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+              fi
+              ;;
+            "")
+              # No tier: no nogpu job runs on this OS (macOS), so the job runs
+              # everything that the machine supports: Metal, the (cpu) / (llvm)
+              # tests, and the compile tests (the tests that use no API).
+              api_expr="all"
+              slang_test_args+=("-compile-test" "true" "-api-only")
+              ;;
+            *)
+              echo "::error::unknown gpu-tier '${{ inputs.gpu-tier }}' (expected t4, sm80plus or nogpu)"
+              exit 1
+              ;;
+          esac
 
           slang_test_args+=("-api" "$api_expr")
 
@@ -212,16 +221,6 @@ jobs:
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
           fi
 
-
-          # T4 runners cannot execute SM 8.0+ cooperative matrix / neural tests
-          if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
-            slang_test_args+=("-exclude-list" "tests/tests-require-sm80.txt")
-            # tests/expected-failure-linux-gpu.txt lists failures of the Linux
-            # T4 machines, so it applies only to Linux jobs.
-            if [[ "${{ inputs.os }}" == "linux" ]]; then
-              slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
-            fi
-          fi
 
           # Skip most neural tests in debug builds to reduce CI time
           if [[ "${{ inputs.config }}" == "debug" ]]; then
@@ -260,6 +259,6 @@ jobs:
       # The slangc tests need no GPU, so the CPU-only jobs run them, and the jobs
       # that run only the GPU APIs do not.
       - name: Run slangc tests
-        if: "!inputs.gpu-api-only"
+        if: inputs.gpu-tier == '' || inputs.gpu-tier == 'nogpu'
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh

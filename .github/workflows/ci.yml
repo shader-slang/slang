@@ -801,9 +801,6 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      # The windows-*-x86_64-cpu jobs run the (cpu) and (llvm) tests on free
-      # runners, so this paid T4 job runs only the GPU API tests.
-      gpu-api-only: true
       gpu-tier: t4
 
   test-windows-debug-cl-x86_64-gpu-rhi:
@@ -828,9 +825,6 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
-      # The windows-*-x86_64-cpu jobs run the (cpu) and (llvm) tests on free
-      # runners, so this paid T4 job runs only the GPU API tests.
-      gpu-api-only: true
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:
