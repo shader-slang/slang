@@ -15,8 +15,9 @@
 // The static-through-value spelling: the base expression's own [require]
 // must reach the checker exactly as the instance spelling delivers it.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage compute -entry computeMain -DTEST_VALUE_BASE
-// The satisfied-capability direction must stay clean too.
-//TEST:SIMPLE: -target spirv -stage compute -entry computeMain -DTEST_GENERIC_FUNCTION -o capability-static-member-generic.spvasm
+// The satisfied-capability direction must stay clean too; the filecheck pins
+// that the generic static call emits its entry point for a satisfying target.
+//TEST:SIMPLE(filecheck=OK): -target spirv -stage compute -entry computeMain -DTEST_GENERIC_FUNCTION
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -97,3 +98,5 @@ void computeMain()
     outputBuffer[0] = makeV().x;
 #endif
 }
+
+// OK: OpEntryPoint GLCompute %computeMain "main" %outputBuffer
