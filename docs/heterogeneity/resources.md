@@ -138,7 +138,11 @@ void main()
     let destination = RWStructuredBuffer<uint>::alloc(6);
 
     destination[range(1, 3)] = source[range(0, 2)]; // Device copy; no host round trip.
+
+    // The same device copy, written as a method call.
     destination[range(3, 5)].copyFrom(source[range(0, 2)]);
+
+    // One readback of four elements.
     let result = destination[range(1, 5)].host();
     for (uint i = 0; i < uint(result.getCount()); ++i)
         print(result[i]); // 17, 23, 17, 23 (one per line).

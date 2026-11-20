@@ -5,6 +5,7 @@ Save this as `main.slang`. It needs no imports and runs entirely on the CPU.
 <!-- runnable: first-program backend=none -->
 
 ```slang
+// Host functions run on the CPU, like ordinary functions.
 [host]
 public int add(int a, int b)
 {

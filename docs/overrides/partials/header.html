@@ -24,7 +24,9 @@
           </span>
           <span class="hs-preview-badge">Early research preview</span>
         </div>
-        <div class="md-header__topic" data-md-component="header-topic">
+        {#- Material swaps the site name for the page title on scroll; the page-title
+            topic repeats the badge so the preview notice stays visible. -#}
+        <div class="md-header__topic hs-header-brand" data-md-component="header-topic">
           <span class="md-ellipsis">
             {% if page.meta and page.meta.title %}
               {{ page.meta.title }}
@@ -32,6 +34,7 @@
               {{ page.title }}
             {% endif %}
           </span>
+          <span class="hs-preview-badge" aria-hidden="true">Early research preview</span>
         </div>
       </div>
     </div>

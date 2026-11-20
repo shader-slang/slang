@@ -21,14 +21,21 @@ import slang.runtime;
 void main()
 {
     let values = RWStructuredBuffer<float>::alloc(1024);
+
+    // Runs on the GPU: one invocation for each i in 0..1023.
     Grid(1024).dispatch((uint i) => { values[i] = float(i); });
 
     let output = RWStructuredBuffer<float>::alloc(1024);
     float scale = 2.0;
+
+    // The lambda captures `values` and `scale`; h-slang passes both to the kernel.
     Grid(1024).dispatch((uint i) =>
     {
+        // Reads the first dispatch's results.
         output[i] = scale * values[i] + 1.0;
     });
+
+    // Reading on the host waits for both dispatches.
     print(output[256]); // 513.000000
 }
 ```
@@ -55,11 +62,15 @@ import slang.runtime;
 void main(Window w)
 { //!FOLD
     let surface = createSurface<TextureFormat::rgba8Unorm>(w);
+
+    // The canvas image to draw into.
     let presented = acquireSurfaceTexture(surface);
     uint width, height;
     presented.GetDimensions(width, height);
     let size = uint2(width, height);
     let image = draw(size);
+
+    // Copy the computed image into the canvas.
     blitTexture2D(presented, image);
     presentSurface(surface);
 }
@@ -67,8 +78,11 @@ void main(Window w)
 RWTexture2D<float4> draw(uint2 resolution)
 {
     let image = RWTexture2D<float4>::alloc(resolution.x, resolution.y);
+
+    // One invocation per pixel, in 8×8 groups.
     Grid(resolution).dispatch<8, 8>((uint2 p) =>
     {
+        // Pixel centre, scaled to 0..1.
         float2 uv = (float2(p) + 0.5) / float2(resolution);
         image[p] = float4(uv.x, uv.y, 0.35, 1.0);
     });
@@ -96,6 +110,7 @@ images local to the drawing helper so they are released before `resizeSurface`.
 -->
 
 **Boolean captures on WebGPU.** WGSL does not permit `bool` in uniform data.
+To pass a flag to a WebGPU kernel, capture it as an `int` or `uint` (0 or 1) and compare it with zero inside the lambda.
 
 ## Raw dispatch
 
@@ -109,6 +124,7 @@ Here **groupCount counts workgroups**, so the shader code is responsible for han
 [numthreads(64, 1, 1)]
 void fill(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<uint> output, uint count)
 {
+    // 16 groups × 64 threads = 1024 threads for 1000 elements.
     if (tid.x < count)
         output[tid.x] = tid.x;
 }
@@ -117,6 +133,8 @@ void fill(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<uint> output, uint
 void main()
 {
     let output = RWStructuredBuffer<uint>::alloc(1000);
+
+    // Counts workgroups, not threads.
     dispatch(fill, uint3(16, 1, 1))(output, 1000);
     print(output[999]); // 999
 }
@@ -142,6 +160,8 @@ void fillValue<T : __BuiltinArithmeticType, let Value : int>(
 void main()
 {
     let output = RWStructuredBuffer<float>::alloc(64);
+
+    // Pick T and Value, then launch one group of 64 threads.
     dispatch(fillValue<float, 7>, uint3(1, 1, 1))(output);
     print(output[0]); // 7.000000
 }
@@ -164,8 +184,12 @@ void main()
     for (uint i = 0; i < 256; ++i)
         cpuParameters[i] = float(i);
     let parameters = RWStructuredBuffer<float>::alloc(256);
+
+    // Upload all 256 values in one copy.
     parameters[range(0, 256)].copyFrom(cpuParameters);
     let output = RWStructuredBuffer<float>::alloc(1024);
+
+    // The kernel captures one buffer instead of 256 floats, so it stays within push-constant limits.
     Grid(1024).dispatch((uint i) => { output[i] = parameters[i % 256]; });
     print(output[255]); // 255.000000
 }
