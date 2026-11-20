@@ -1,7 +1,6 @@
 // Starting with a basic test for the ability to render stuff...
 
 //TEST(smoke,render):COMPARE_HLSL_RENDER:
-//DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -mtl
 //DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -llvm
 //DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -vk
 //DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -cpu

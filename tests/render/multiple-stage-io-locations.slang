@@ -1,6 +1,4 @@
 //TEST(smoke,render):COMPARE_HLSL_RENDER:
-// TODO: Investigate Metal failure
-//DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -mtl
 //DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -llvm
 //DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -vk
 //DISABLE_TEST(smoke,render):COMPARE_HLSL_RENDER: -cpu
