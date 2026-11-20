@@ -428,12 +428,6 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
 
   # Windows ARM64 build. GitHub-hosted, native — not cross-compiled.
-  # Deliberately NOT added to check-ci's required needs list below: this
-  # repo has zero real-world CI runs on this image yet (only
-  # workflow_dispatch spikes during validation, before it merged). A
-  # day-old GA image can still have rough edges a required check
-  # shouldn't gate every PR merge on. Promote to required once it has run
-  # cleanly across several PRs.
   build-windows-debug-cl-aarch64:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -626,7 +620,6 @@ jobs:
       platform: x86_64
       config: debug
       runs-on: '["ubuntu-24.04"]'
-      full-gpu-tests: false
       gpu-tier: nogpu
       server-count: 4
 
@@ -645,7 +638,6 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["ubuntu-24.04"]'
-      full-gpu-tests: false
       gpu-tier: nogpu
       slang-user-skills: true
       server-count: 4
@@ -661,7 +653,6 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["macos-latest"]'
-      full-gpu-tests: true
       server-count: 3
       gpu-tier: metal
 
@@ -686,7 +677,6 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["macos-latest"]'
-      full-gpu-tests: true
       server-count: 3
       gpu-tier: metal
 
@@ -712,7 +702,6 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
-      full-gpu-tests: false
       gpu-tier: nogpu
 
   test-linux-release-gcc-aarch64-cpu:
@@ -725,7 +714,6 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["ubuntu-24.04-arm"]'
-      full-gpu-tests: false
       gpu-tier: nogpu
 
   # Windows ARM64 test (GitHub-hosted, native, CPU only — no GPU on this
@@ -740,13 +728,6 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["windows-11-vs2026-arm"]'
-      full-gpu-tests: false
-      # full-gpu-tests: false alone only disables full-GPU-test setup; the
-      # -api expression it selects still defaults to "all", which the
-      # Linux ARM64 jobs above handle via tests/expected-failure-no-gpu.txt.
-      # That denylist hasn't been validated against this new, GPU-less
-      # platform, so restrict directly to cpu+llvm via gpu-tier nogpu instead
-      # of relying on it.
       gpu-tier: nogpu
 
   test-windows-release-cl-aarch64-cpu:
@@ -759,7 +740,6 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["windows-11-vs2026-arm"]'
-      full-gpu-tests: false
       gpu-tier: nogpu
 
   # Windows x86_64 CPU-only tests (GitHub-hosted; no GPU).
@@ -775,7 +755,6 @@ jobs:
       platform: x86_64
       config: debug
       runs-on: '["windows-2022"]'
-      full-gpu-tests: false
       gpu-tier: nogpu
 
   test-windows-release-cl-x86_64-cpu:
@@ -788,7 +767,6 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["windows-2022"]'
-      full-gpu-tests: false
       gpu-tier: nogpu
 
   # Windows GPU tests (self-hosted)
@@ -802,10 +780,9 @@ jobs:
       platform: x86_64
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
       gpu-tier: t4
 
-  test-windows-debug-cl-x86_64-gpu-rhi:
+  test-windows-debug-cl-x86_64-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-rhi-test.yml
@@ -826,10 +803,9 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
-      full-gpu-tests: true
       gpu-tier: t4
 
-  test-windows-release-cl-x86_64-gpu-rhi:
+  test-windows-release-cl-x86_64-rhi:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-rhi-test.yml
@@ -1017,6 +993,8 @@ jobs:
         build-macos-27-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
+        build-windows-debug-cl-aarch64,
+        build-windows-release-cl-aarch64,
         static-linux-debug-gcc-aarch64,
         static-linux-release-gcc-aarch64,
         static-macos-release-clang-aarch64,
@@ -1041,11 +1019,13 @@ jobs:
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,
         test-materialx-windows-release,
+        test-windows-debug-cl-aarch64-cpu,
         test-windows-debug-cl-x86_64-cpu,
-        test-windows-debug-cl-x86_64-gpu-rhi,
+        test-windows-debug-cl-x86_64-rhi,
         test-windows-debug-cl-x86_64-t4,
+        test-windows-release-cl-aarch64-cpu,
         test-windows-release-cl-x86_64-cpu,
-        test-windows-release-cl-x86_64-gpu-rhi,
+        test-windows-release-cl-x86_64-rhi,
         test-windows-release-cl-x86_64-t4,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,

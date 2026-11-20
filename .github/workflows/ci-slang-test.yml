@@ -18,18 +18,10 @@ on:
       runs-on:
         required: true
         type: string
-      full-gpu-tests:
-        required: false
-        type: boolean
-        default: false
       server-count:
         required: false
         type: number
         default: 8
-      enable-debug-layers:
-        required: false
-        type: boolean
-        default: true
       artifact-suffix:
         required: false
         type: string
@@ -77,7 +69,7 @@ jobs:
           git reset --hard HEAD
 
       - name: Checkout OptiX headers
-        if: inputs.full-gpu-tests && inputs.os != 'macos'
+        if: inputs.gpu-tier == 't4' || inputs.gpu-tier == 'sm80plus'
         run: |
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
@@ -117,7 +109,7 @@ jobs:
       # intrinsics need __CUDA_ARCH__ >= 530 (fp16) / 800 (bf16); nvcc's
       # default sm_52 has neither. Compile-only, so any arch works.
       - name: Compile offline (non-NVRTC) CUDA prelude test
-        if: inputs.os == 'windows' && inputs.full-gpu-tests
+        if: inputs.os == 'windows' && (inputs.gpu-tier == 't4' || inputs.gpu-tier == 'sm80plus')
         run: >-
           nvcc -std=c++17 -arch=compute_80 -c tests/cuda/cuda-prelude-vec1-make.cu
           -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
@@ -127,9 +119,7 @@ jobs:
           # SPIR-V emission / validation don't need a GPU — keep on all tiers.
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          if [[ "${{ inputs.enable-debug-layers }}" == "true" ]]; then
-            export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
-          fi
+          export VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation
           # Force AVX-512 off in slang-llvm's JIT TargetMachine. We have observed
           # intermittent illegal-instruction failures on both GitHub-hosted and
           # GCP VMs, indicating that LLVM's host-detection path can mis-report
@@ -145,7 +135,7 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
+            "-enable-debug-layers" "true"
           )
 
           # slang-test accepts only a single -api option (a later one silently
@@ -208,8 +198,8 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
-          # Add no-GPU failure list for non-GPU tests
-          if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then
+          # Add no-GPU failure list for the jobs that have no GPU
+          if [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
           fi
 
@@ -245,7 +235,7 @@ jobs:
 
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        if: inputs.gpu-tier != 'nogpu' && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \

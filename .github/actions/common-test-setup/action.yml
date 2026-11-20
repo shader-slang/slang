@@ -137,8 +137,13 @@ runs:
           echo "runner_name=${RUNNER_NAME:-unknown}"
           echo "os=macos"
           echo "ENV_INFO_END"
-        elif [[ "${{ inputs.os }}" == "windows" && "${{ inputs.gpu-tier }}" != "nogpu" ]]; then
-          check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda"
+        elif [[ "${{ inputs.gpu-tier }}" == "nogpu" ]]; then
+          # A job without a GPU runs the (cpu) and (llvm) tests, so it needs
+          # both. The GPU APIs are not checked, because the runner can have a
+          # software device, such as WARP on Windows.
+          check_api_support "cpu" "llvm"
+        elif [[ "${{ inputs.os }}" == "windows" ]]; then
+          check_api_support "vk,vulkan" "dx12,d3d12" "dx11,d3d11" "cuda" "wgpu,webgpu"
 
           echo "Printing CUDA compiler version: ..."
           nvcc --version || (echo "ERROR: CUDA compiler (nvcc) not available on Windows" && exit 1)
