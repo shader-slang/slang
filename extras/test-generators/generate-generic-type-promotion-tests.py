@@ -141,8 +141,9 @@ def getConversionCost(fromKind, fromRank, toKind, toRank):
 def inferType(typeA, typeB):
     """Determine which type T is inferred when both types constrain the same
     generic parameter. Mirrors TryJoinTypes in slang-check-constraint.cpp:
-    the strictly cheaper conversion direction wins, and an equal-cost tie
-    between distinct types has no better side, so inference fails."""
+    the strictly cheaper conversion direction wins; an equal-cost tie between
+    distinct types has no better side, except that a `bool` operand loses
+    (the one-off compatibility rule), and every other tie fails."""
 
     # cost to convert B to A
     costBtoA = getConversionCost(typeB.kind, typeB.rank, typeA.kind, typeA.rank)
@@ -155,7 +156,13 @@ def inferType(typeA, typeB):
         return typeB
     if costAtoB > costBtoA:
         return typeA
-    return None  # equal cost: no better side, inference fails
+
+    # Equal cost: the bool side loses; any other tie fails inference.
+    if typeA.kind == kKind_Bool:
+        return typeB
+    if typeB.kind == kKind_Bool:
+        return typeA
+    return None
 
 
 def getTypeCode(t):
@@ -168,12 +175,21 @@ def shouldSkipPair(ta, tb, inferred):
     - Integer + half -> T=half: E30081 'implicit conversion not recommended'
       and CPU backend cannot convert half<->int.
     - float + double -> T=double: E30082 'implicit float-to-double conversion'
-      warns about performance."""
+      warns about performance.
+    - Bool + floating or pointer-sized signed -> T=non-bool: the `bool`
+      operand converts at general-conversion cost, which emits the E30081
+      warning the strict compute harness rejects (the bool-loses rule itself
+      is pinned by the hand-written diagnostic tests)."""
     if inferred.name == "half":
         if ta.isInteger() or tb.isInteger():
             return True
     if inferred.name == "double":
         if (ta.name == "float" or tb.name == "float"):
+            return True
+    if ta.kind == kKind_Bool or tb.kind == kKind_Bool:
+        if inferred.kind == kKind_Float or (
+            inferred.kind == kKind_Signed and inferred.rank == kRank_IntPtr
+        ):
             return True
     return False
 
@@ -242,15 +258,14 @@ def generateTestFile(pairs, description, testDirectives, extraNote=""):
 // identity (getInferredTypeCode). The type code encodes sizeof(T) with sign:
 //   positive = unsigned type, negative = signed or float type.
 //
-// Bool pairs join with most integer types (the integer side is strictly
-// better) and tie with floating-point and pointer-sized signed types at
-// equal conversion cost; the tie pairs fail inference and are generated
-// into gen-generic-type-promotion-tie-rejection.slang (issue #10164).
-// Bool itself therefore never appears as an inferred type here: it either
-// loses the join or is partitioned into the rejection file.
+// Bool pairs always join: against integer types the integer side is
+// strictly better, and against floating-point types the one-off
+// bool-loses tie-break applies, matching TryJoinTypes. Bool itself
+// therefore never appears as an inferred type here.
 //
-// Excluded pairs: integer+half (E30081, CPU backend limitation) and
-// float+double (E30082 performance warning).
+// Excluded pairs: integer+half (E30081, CPU backend limitation),
+// float+double (E30082 performance warning), and bool+floating or
+// bool+pointer-sized-signed (E30081 for the `bool` operand).
 {extraNote}
 {directives}
 
@@ -315,8 +330,9 @@ def generateRejectionTestFile(pairs):
 // Equal-cost ties: generic parameter promotion inference.
 // Tests {len(pairs)} type pair combinations in both argument orders.
 //
-// Each pair's conversion costs tie in both directions, so neither type is
-// better and inference fails instead of picking a side (issue #10164).
+// Each pair's conversion costs tie in both directions and neither side is
+// `bool` (which loses its ties by the compatibility rule), so neither type
+// is better and inference fails instead of picking a side (issue #10164).
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 void joinArgs<T>(T a, T b)

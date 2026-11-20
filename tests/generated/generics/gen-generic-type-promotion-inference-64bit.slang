@@ -11,15 +11,14 @@
 // identity (getInferredTypeCode). The type code encodes sizeof(T) with sign:
 //   positive = unsigned type, negative = signed or float type.
 //
-// Bool pairs join with most integer types (the integer side is strictly
-// better) and tie with floating-point and pointer-sized signed types at
-// equal conversion cost; the tie pairs fail inference and are generated
-// into gen-generic-type-promotion-tie-rejection.slang (issue #10164).
-// Bool itself therefore never appears as an inferred type here: it either
-// loses the join or is partitioned into the rejection file.
+// Bool pairs always join: against integer types the integer side is
+// strictly better, and against floating-point types the one-off
+// bool-loses tie-break applies, matching TryJoinTypes. Bool itself
+// therefore never appears as an inferred type here.
 //
-// Excluded pairs: integer+half (E30081, CPU backend limitation) and
-// float+double (E30082 performance warning).
+// Excluded pairs: integer+half (E30081, CPU backend limitation),
+// float+double (E30082 performance warning), and bool+floating or
+// bool+pointer-sized-signed (E30081 for the `bool` operand).
 //
 // 64-bit types (int64_t, uint64_t, double, intptr_t, uintptr_t) may
 // require extensions on GPU backends, so this test runs on CPU only.
