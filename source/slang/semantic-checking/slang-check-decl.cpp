@@ -1503,6 +1503,13 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
     // visitPropertyDecl.
     void _checkExtensionMemberCapConflict(Decl* memberDecl);
 
+    // Return the capability set a declaration's own [require(...)] attributes declare,
+    // ignoring the parent chain that getDeclaredCapabilitySet walks. Used where the
+    // parent's requirements are already enforced or propagated elsewhere and only the
+    // declaration itself is in scope: the extension-member compatibility check below,
+    // and the variable merge in checkVarDeclCommon.
+    CapabilitySet getOwnDeclaredCapabilitySet(Decl* decl);
+
     enum class UndeclaredCapabilityDiagnosticKind
     {
         UseOfUndeclaredCapability,
@@ -23087,36 +23094,44 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     // Merge the variable's own `[require(...)]` attributes into its inferred set,
     // mirroring the merge the function path performs in `visitFunctionDeclBase`. The
     // inferred set is what a consumer's reference walk propagates through
-    // `_propagateRequirement`, so without this merge a gated variable compiles cleanly
-    // on every target, and so does every consumer of it. Consider:
+    // `_propagateRequirement`, so without this merge a gated variable and every
+    // consumer whose reference is walked (function bodies, statements, type
+    // references) compile cleanly on any target. Consider:
     //     [require(spirv)] static const float w = 1.0;
     //     export float a() { return w; }
     // Compiling `a` for `hlsl` must fail, which requires `w`'s inferred set to carry
-    // `spirv`.
+    // `spirv`. A variable's initializer is not walked, so chained constants
+    // (`static const float x = w;`) are not transitively gated by this merge; a
+    // variable's initializer may legitimately reference gated declarations
+    // (resource-typed initializers do), so walking initializers needs its own design.
     //
-    // Only the variable's own attributes are merged, not the parent chain that
-    // `getDeclaredCapabilitySet` would walk. A parent struct's or function's
-    // requirements already reach a consumer through its reference to the parent type,
-    // and re-merging them here would also feed them back into the enclosing
-    // capability-usage computation through parameter and local references (the
-    // `target_switch` case validation walks those references), which would pollute the
-    // per-case capability sets with the requirements of the whole parent chain.
+    // This serves every kind of `VarDeclBase` a module can declare: global constants
+    // and static members, whose requirements reach consumers directly, and parameters
+    // and function locals, whose requirements reach the enclosing function through its
+    // parameter and body walks.
+    //
+    // Only the variable's own attributes are merged, on both the inferred and the
+    // declared side, not the parent chain that `getDeclaredCapabilitySet` would walk.
+    // A parent struct's requirements already reach a consumer through its reference to
+    // the parent type, and a parent function's requirements are already carried by the
+    // function doing the consuming. Re-merging the parent chain here would also feed it
+    // back into the enclosing capability-usage computation through parameter and local
+    // references (the `target_switch` case validation walks those references), which
+    // would pollute the per-case capability sets — and because the declared set lands
+    // in the inferred set in both branches below, that pollution happens whichever
+    // side the parent requirements enter from.
+    //
     // Public decls must declare a superset of what their type references; internal
-    // decls join the two sets, as with functions.
-    CapabilitySet ownDeclaredCaps;
-    for (auto mod : varDecl->modifiers)
-    {
-        if (auto req = as<RequireCapabilityAttribute>(mod))
-            ownDeclaredCaps.unionWith(req->capabilitySet);
-    }
+    // decls join the two sets, as with functions. Unlike the function path we do not
+    // attach an `ExplicitlyDeclaredCapabilityModifier` here: nothing reads it off a
+    // variable, and attaching one would newly opt a variable implementation into the
+    // interface-conformance capability check.
+    CapabilitySet ownDeclaredCaps = getOwnDeclaredCapabilitySet(varDecl);
     if (ownDeclaredCaps.isEmpty())
         return;
 
     auto vis = getDeclVisibility(varDecl);
     const auto frozenDeclaredCaps = ownDeclaredCaps.freeze(getASTBuilder());
-    auto declaredCapModifier = m_astBuilder->create<ExplicitlyDeclaredCapabilityModifier>();
-    declaredCapModifier->declaredCapabilityRequirements = frozenDeclaredCaps;
-    addModifier(varDecl, declaredCapModifier);
     if (vis == DeclVisibility::Public)
     {
         CapabilityAtomSet failedAvailableCapabilityConjunction;
@@ -23405,14 +23420,20 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 //     compatible [require(glsl)] and a member adds its own [require(hlsl)],
 //     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
 //     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
-void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memberDecl)
+CapabilitySet SemanticsDeclCapabilityVisitor::getOwnDeclaredCapabilitySet(Decl* decl)
 {
     CapabilitySet ownDeclaredCaps;
-    for (auto mod : memberDecl->modifiers)
+    for (auto mod : decl->modifiers)
     {
         if (auto req = as<RequireCapabilityAttribute>(mod))
             ownDeclaredCaps.unionWith(req->capabilitySet);
     }
+    return ownDeclaredCaps;
+}
+
+void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memberDecl)
+{
+    CapabilitySet ownDeclaredCaps = getOwnDeclaredCapabilitySet(memberDecl);
     if (ownDeclaredCaps.isEmpty())
         return;
 
