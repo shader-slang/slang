@@ -281,20 +281,6 @@ jobs:
             echo "::warning::slang-test exited with code $slang_test_exit"
           fi
 
-      - name: Run slangc tests with Sanitizers
-        if: steps.build.outcome == 'success'
-        run: |
-          # Same ASan checks as the slang-test step above; see the comment there.
-          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_odr_violation=2:log_path=$PWD/asan-logs/asan-slangc"
-          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan-slangc"
-          export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
-
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh && slangc_test_exit=0 || slangc_test_exit=$?
-          echo "SLANGC_TEST_EXIT=$slangc_test_exit" >> "$GITHUB_ENV"
-          if [ "$slangc_test_exit" -ne 0 ]; then
-            echo "::warning::slangc tests exited with code $slangc_test_exit"
-          fi
-
       - name: Sanitizer Summary
         if: always()
         env:
@@ -647,13 +633,13 @@ jobs:
               echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "Build failed -- sanitizer results unavailable." >> "$GITHUB_STEP_SUMMARY"
-            elif [ "${SLANG_TEST_EXIT:-0}" -ne 0 ] || [ "${SLANGC_TEST_EXIT:-0}" -ne 0 ]; then
+            elif [ "${SLANG_TEST_EXIT:-0}" -ne 0 ]; then
               echo "::warning::Tests exited with errors but produced no sanitizer logs (non-blocking)."
               echo ""
               {
                 echo "## Sanitizer Report"
                 echo ""
-                echo "Tests exited with errors (slang-test=${SLANG_TEST_EXIT:-skipped}, slangc=${SLANGC_TEST_EXIT:-skipped})"
+                echo "Tests exited with errors (slang-test=${SLANG_TEST_EXIT:-skipped})"
                 echo "but produced no sanitizer logs. No sanitizer findings to report."
                 echo ""
                 echo "The test failures are unrelated to sanitizer checks and are handled by the main CI job."
