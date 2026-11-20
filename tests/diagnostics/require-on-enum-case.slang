@@ -26,7 +26,7 @@
 // compile clean on `-target hlsl`.
 // The tenth (guarded by -DTEST_UNSCOPED, because the unqualified name only
 // resolves under `-unscoped-enum`) references the spirv-gated case by its
-// unqualified name: the module-scope alias the name resolves to must carry
+// unqualified name: the enclosing-scope alias the name resolves to must carry
 // the case's requirements, so it must fail with E36107.
 // The eleventh mirrors the tenth's success side: the unqualified spelling of
 // a case the target satisfies must compile clean, pinning that the alias join
