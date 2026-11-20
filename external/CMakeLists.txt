@@ -187,7 +187,10 @@ target_include_directories(
 # fast_float headers (header-only). Mark as a system include so the bundled
 # (or override-supplied) headers don't trip Slang's extra warnings / -Werror.
 add_library(fast_float INTERFACE)
-if(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
+if(SLANG_USE_SYSTEM_FAST_FLOAT)
+    find_package(FastFloat 6.1 CONFIG REQUIRED)
+    target_link_libraries(fast_float INTERFACE FastFloat::fast_float)
+elseif(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
     set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
 else()
     set(_fast_float_include
@@ -205,11 +208,13 @@ else()
         )
     endif()
 endif()
-target_include_directories(
-    fast_float
-    ${system}
-    INTERFACE "${_fast_float_include}"
-)
+if(NOT SLANG_USE_SYSTEM_FAST_FLOAT)
+    target_include_directories(
+        fast_float
+        ${system}
+        INTERFACE "${_fast_float_include}"
+    )
+endif()
 
 # Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout and the shared mimalloc
 # build options before either consumer is configured so slang-compiler can use mimalloc even when

@@ -258,6 +258,7 @@ advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LUA "Build slang-fiddle using system Lua" OFF)
 advanced_option(SLANG_USE_SYSTEM_CMARK "Build using system cmark-gfm" OFF)
+advanced_option(SLANG_USE_SYSTEM_FAST_FLOAT "Build using system fast_float" OFF)
 advanced_option(
     SLANG_USE_SYSTEM_VULKAN_HEADERS
     "Build using system Vulkan headers"
