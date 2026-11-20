@@ -2800,11 +2800,24 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeFuncsForBufferLoadArgs, codeGenContext);
     }
 
-    // If we are generating code for CUDA, we should translate all immutable buffer loads to
-    // using `__ldg` intrinsic for improved performance.
     if (isCUDATarget(targetRequest))
     {
-        SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
+        // OptiX can return stale data through __ldg after a buffer is updated between
+        // launches. Keep ordinary loads throughout the module, including shared callees,
+        // if any of the entry points being emitted is a ray-tracing stage.
+        bool hasOptixEntryPoint = false;
+        for (auto index : codeGenContext->getEntryPointIndices())
+        {
+            if (isRaytracingStage(codeGenContext->getEntryPoint(index)->getStage()))
+            {
+                hasOptixEntryPoint = true;
+                break;
+            }
+        }
+        if (!hasOptixEntryPoint)
+        {
+            SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
+        }
     }
 
     SLANG_PASS(performForceInlining);
