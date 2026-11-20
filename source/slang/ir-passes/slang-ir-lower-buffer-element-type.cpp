@@ -2557,6 +2557,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     {
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
     case kIROp_HLSLAppendStructuredBufferType:
     case kIROp_HLSLConsumeStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -2658,6 +2660,8 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             break;
         case kIROp_HLSLStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLUnsizedStructuredBufferType:
+        case kIROp_HLSLUnsizedRWStructuredBufferType:
         case kIROp_HLSLAppendStructuredBufferType:
         case kIROp_HLSLConsumeStructuredBufferType:
         case kIROp_HLSLRasterizerOrderedStructuredBufferType:

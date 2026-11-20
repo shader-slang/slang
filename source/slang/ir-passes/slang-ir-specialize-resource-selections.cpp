@@ -411,6 +411,7 @@ struct ResourceSelectionContext
         case kIROp_FieldAddress:
         case kIROp_RWStructuredBufferGetElementPtr:
         case kIROp_GetEquivalentStructuredBuffer:
+        case kIROp_SizedBufferToUnsizedBuffer:
             return true;
         default:
             return false;

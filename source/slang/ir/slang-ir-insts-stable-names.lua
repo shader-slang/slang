@@ -888,5 +888,10 @@ return {
 	["metalTraceRay"] = 912,
 	["Decoration.Artificial"] = 913,
 	["Decoration.assumeValidResourceOperands"] = 914,
-	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 915
+	["Type.UntypedBufferResourceType.ByteAddressBufferTypeBase.UnsizedByteAddressBuffer"] = 915,
+	["Type.UntypedBufferResourceType.ByteAddressBufferTypeBase.UnsizedRWByteAddressBuffer"] = 916,
+	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedStructuredBuffer"] = 917,
+	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedRWStructuredBuffer"] = 918,
+	["sizedBufferToUnsizedBuffer"] = 919,
+	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920
 }

@@ -157,11 +157,25 @@ This type is supported natively when targeting HLSL.
 For all other targets, this type maps to a buffer of 32bit unsigned integers.
  @category buffer_types
 */
-__magic_type(HLSLByteAddressBufferType)
-__intrinsic_type($(kIROp_HLSLByteAddressBufferType))
+${
+for (bool unsized : { false, true }) {
+$}
+__magic_type(HLSL$(unsized ? "UnsizedByteAddressBuffer" : "SizedByteAddressBuffer")Type)
+__intrinsic_type($(unsized ? kIROp_HLSLUnsizedByteAddressBufferType : kIROp_HLSLByteAddressBufferType))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-struct ByteAddressBuffer
+struct $(unsized ? "__UnsizedByteAddressBuffer" : "ByteAddressBuffer")
 {
+${
+    if (unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(ByteAddressBuffer buffer);
+${
+    } else {
+$}
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [__readNone]
@@ -179,6 +193,9 @@ struct ByteAddressBuffer
         }
     }
 
+${
+    }
+$}
     /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The 32-bit unsigned integer loaded from the buffer.
@@ -510,6 +527,11 @@ struct ByteAddressBuffer
         return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 };
+${
+}
+$}
+
+typealias __SizedByteAddressBuffer = ByteAddressBuffer;
 
 // Texture
 
@@ -6622,6 +6644,18 @@ __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
 [require(spirv, structuredbuffer)]
 LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer, uint element);
 
+__intrinsic_op($(kIROp_ByteAddressBufferLoad))
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
+T __byteAddressBufferLoad<T>(__UnsizedByteAddressBuffer buffer, uint offset, constexpr uint alignment);
+
+__intrinsic_op($(kIROp_ByteAddressBufferLoad))
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
+T __byteAddressBufferLoad<T>(__UnsizedRWByteAddressBuffer buffer, uint offset, constexpr uint alignment);
+
+__intrinsic_op($(kIROp_ByteAddressBufferStore))
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
+void __byteAddressBufferStore<T>(__UnsizedRWByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
+
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
 A structured buffer can be viewed as an array of the specified element type.
@@ -6636,12 +6670,26 @@ When generating code for other targets, this parameter is ignored and has no eff
 @see `RWStructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`, `RasterizerOrderedStructuredBuffer`.
 @category buffer_types Buffer types
 **/
+${
+for (bool unsized : { false, true }) {
+$}
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
-__magic_type(HLSLStructuredBufferType)
-__intrinsic_type($(kIROp_HLSLStructuredBufferType))
-struct StructuredBuffer : IArray<T>
+__magic_type(HLSL$(unsized ? "UnsizedStructuredBuffer" : "SizedStructuredBuffer")Type)
+__intrinsic_type($(unsized ? kIROp_HLSLUnsizedStructuredBufferType : kIROp_HLSLStructuredBufferType))
+struct $(unsized ? "__UnsizedStructuredBuffer" : "StructuredBuffer")$(unsized ? "" : " : IArray<T>")
 {
 
+${
+    if (unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(StructuredBuffer<T, L> buffer);
+${
+    } else {
+$}
     /// Get the dimensions of the buffer.
     /// @param numStructs The number of structures in the buffer.
     /// @param stride The stride, in bytes, of each structure element.
@@ -6657,6 +6705,9 @@ struct StructuredBuffer : IArray<T>
         stride = rs.y;
     }
 
+${
+    }
+$}
     /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
@@ -6696,6 +6747,11 @@ struct StructuredBuffer : IArray<T>
         get;
     };
 };
+${
+}
+$}
+
+typealias __SizedStructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = StructuredBuffer<T, L>;
 
 /**
 Represents an opaque handle to a consume structured buffer allocated in global memory.
@@ -6799,10 +6855,13 @@ ${
 static const struct {
     IROp op;
     char const* name;
+    char const* typeName;
+    bool unsized;
 } kMutableByteAddressBufferCases[] =
 {
-    { kIROp_HLSLRWByteAddressBufferType,                "RWByteAddressBuffer" },
-    { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
+    { kIROp_HLSLRWByteAddressBufferType, "SizedRWByteAddressBuffer", "RWByteAddressBuffer", false },
+    { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer", "RasterizerOrderedByteAddressBuffer", false },
+    { kIROp_HLSLUnsizedRWByteAddressBufferType, "UnsizedRWByteAddressBuffer", "__UnsizedRWByteAddressBuffer", true },
 };
 for(auto item : kMutableByteAddressBufferCases) {
 $}
@@ -6820,11 +6879,22 @@ This type is supported natively when targeting HLSL.
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
 [require(byteaddressbuffer_rw)]
-struct $(item.name)
+struct $(item.typeName)
 {
     // Note(tfoley): supports all operations from `ByteAddressBuffer`
     // TODO(tfoley): can this be made a sub-type?
 
+${
+    if (item.unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(RWByteAddressBuffer buffer);
+${
+    } else {
+$}
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
@@ -6841,6 +6911,9 @@ struct $(item.name)
         }
     }
 
+${
+    }
+$}
     /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return The 32-bit unsigned integer loaded from the buffer.
@@ -7187,7 +7260,7 @@ ${
         {"Xor", "xor"},
         {"Exchange", "exchange"}
     };
-    if (item.op == kIROp_HLSLRWByteAddressBufferType)
+    if (item.op == kIROp_HLSLRWByteAddressBufferType || item.unsized)
     {
 $}
 
@@ -7880,14 +7953,19 @@ ${
 }
 $}
 
+typealias __SizedRWByteAddressBuffer = RWByteAddressBuffer;
+
 ${
 static const struct {
     IROp op;
     char const* name;
+    char const* typeName;
+    bool unsized;
 } kMutableStructuredBufferCases[] =
 {
-    { kIROp_HLSLRWStructuredBufferType,                "RWStructuredBuffer" },
-    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
+    { kIROp_HLSLRWStructuredBufferType, "SizedRWStructuredBuffer", "RWStructuredBuffer", false },
+    { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer", "RasterizerOrderedStructuredBuffer", false },
+    { kIROp_HLSLUnsizedRWStructuredBufferType, "UnsizedRWStructuredBuffer", "__UnsizedRWStructuredBuffer", true },
 };
 for(auto item : kMutableStructuredBufferCases) {
 $}
@@ -7910,7 +7988,7 @@ When generating code for other targets, this parameter is ignored and has no eff
  @see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
  @category buffer_types
 **/
-struct $(item.name) : IRWArray<T>
+struct $(item.typeName)$(item.unsized ? "" : " : IRWArray<T>")
 {
     /// Decrements the object's hidden counter.
     /// @return The post-decremented counter value.
@@ -7919,6 +7997,17 @@ struct $(item.name) : IRWArray<T>
     [require(hlsl)]
     uint DecrementCounter();
 
+${
+    if (item.unsized) {
+$}
+    /// Discard the buffer length while preserving access to the same storage.
+    [__readNone]
+    __intrinsic_op($(kIROp_SizedBufferToUnsizedBuffer))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(RWStructuredBuffer<T, L> buffer);
+${
+    } else {
+$}
     /// Get the dimensions of the buffer.
     /// @param numStructs The number of structures in the buffer.
     /// @param stride The stride, in bytes, of each structure element.
@@ -7939,6 +8028,9 @@ struct $(item.name) : IRWArray<T>
         }
     }
 
+${
+    }
+$}
     /// Increment the object's hidden counter.
     /// @return The pre-incremented counter value.
     /// @remarks
@@ -7994,6 +8086,8 @@ struct $(item.name) : IRWArray<T>
 ${
 }
 $}
+
+typealias __SizedRWStructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout> = RWStructuredBuffer<T, L>;
 
 /// @category stage_io
 __generic<T>
@@ -11077,6 +11171,13 @@ StructuredBuffer<T> __getEquivalentStructuredBuffer<T>(ByteAddressBuffer b);
 
 __intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
 RasterizerOrderedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(RasterizerOrderedByteAddressBuffer b);
+
+// Reinterpreting the element type must not invent a length for an unsized buffer.
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+__UnsizedRWStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(__UnsizedRWByteAddressBuffer b);
+
+__intrinsic_op($(kIROp_GetEquivalentStructuredBuffer))
+__UnsizedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(__UnsizedByteAddressBuffer b);
 
 // Error message
 

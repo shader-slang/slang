@@ -10,6 +10,20 @@
 namespace Slang
 {
 
+bool isUnsizedBufferType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
+    case kIROp_HLSLUnsizedByteAddressBufferType:
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // Share the struct-field traversal while allowing callers to choose which field types disappear.
 // DCE's existing query ignores only void and nested empty structs. Payload boundaries also need
 // arrays of empty elements, but must preserve target-intrinsic types even when they have no fields.
@@ -583,9 +597,13 @@ bool isValueType(IRInst* dataType)
             return (resType->getAccess() == SLANG_RESOURCE_ACCESS_READ);
         else if (as<IRSamplerStateTypeBase>(dataType))
             return true;
-        else if (as<IRHLSLByteAddressBufferType>(dataType))
+        else if (
+            as<IRHLSLByteAddressBufferType>(dataType) ||
+            as<IRHLSLUnsizedByteAddressBufferType>(dataType))
             return true;
-        else if (as<IRHLSLStructuredBufferType>(dataType))
+        else if (
+            as<IRHLSLStructuredBufferType>(dataType) ||
+            as<IRHLSLUnsizedStructuredBufferType>(dataType))
             return true;
         return false;
     }
@@ -663,6 +681,8 @@ bool isWrapperType(IRInst* inst)
     case kIROp_ByValueBorrowInParamType:
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
     case kIROp_HLSLAppendStructuredBufferType:
     case kIROp_HLSLConsumeStructuredBufferType:
@@ -1388,12 +1408,16 @@ AddressAliasingClass getAliasingClass(IRInst* addr)
         case kIROp_TextureType:
             return AddressAliasingClass::BoundTexture;
         case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLUnsizedStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLUnsizedRWStructuredBufferType:
         case kIROp_HLSLAppendStructuredBufferType:
         case kIROp_HLSLConsumeStructuredBufferType:
         case kIROp_HLSLRasterizerOrderedStructuredBufferType:
         case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLUnsizedByteAddressBufferType:
         case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_HLSLUnsizedRWByteAddressBufferType:
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
         case kIROp_GLSLShaderStorageBufferType:
             return AddressAliasingClass::BoundBuffer;
@@ -3693,6 +3717,7 @@ bool doesOpProduceResourceContentAddress(IROp op)
     {
     case kIROp_GetStructuredBufferPtr:
     case kIROp_GetUntypedBufferPtr:
+    case kIROp_SizedBufferToUnsizedBuffer:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
     case kIROp_ImageTexelPointer:
@@ -3722,6 +3747,7 @@ bool isPointerToImmutableLocation(IRInst* loc)
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
+    case kIROp_SizedBufferToUnsizedBuffer:
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_ImageSubscript:
         return isPointerToImmutableLocation(loc->getOperand(0));
@@ -3737,6 +3763,8 @@ bool isPointerToImmutableLocation(IRInst* loc)
     {
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLByteAddressBufferType:
+    case kIROp_HLSLUnsizedStructuredBufferType:
+    case kIROp_HLSLUnsizedByteAddressBufferType:
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
         return true;

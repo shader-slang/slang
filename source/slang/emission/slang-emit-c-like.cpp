@@ -1563,6 +1563,13 @@ CLikeSourceEmitter::FoldPolicy CLikeSourceEmitter::getFoldPolicy(IRInst* inst)
 
     case kIROp_NonUniformResourceIndex:
         return FoldPolicy::Always;
+
+    case kIROp_SizedBufferToUnsizedBuffer:
+        // On native resource targets, we emit the conversion as its operand. WGSL does not
+        // allow copying a storage buffer's runtime-sized array into a local variable.
+        if (!isCPUTarget(getTargetReq()) && !isCUDATarget(getTargetReq()))
+            return FoldPolicy::Always;
+        break;
     }
 
     // Layouts and attributes are only present to annotate other
@@ -2708,6 +2715,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
             break;
         }
+    case kIROp_SizedBufferToUnsizedBuffer:
+        // Native resource targets use the same representation for both buffer types.
+        // Preserve the distinct IR types and forward the value only when emitting it.
+        emitOperand(inst->getOperand(0), outerPrec);
+        break;
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToResource:

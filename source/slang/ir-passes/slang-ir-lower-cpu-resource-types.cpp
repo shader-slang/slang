@@ -5,6 +5,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang/ir/slang-ir-layout.h"
+#include "slang/ir/slang-ir-util.h"
 #include "slang/ir/slang-ir.h"
 
 // This pass lowers resource types and the instructions accessing them into
@@ -19,6 +20,9 @@
 //
 //     Instructions that access `LoweredType` are lowered immediately in this
 //     pass such that they index `data` as needed.
+//
+// Unsized structured and byte-address buffers use the same struct without the
+// size field. This matches their one-field C++ and CUDA prelude aggregates.
 //
 // ConstantBufferType/ParameterBlockType:
 //
@@ -56,11 +60,12 @@ struct ResourceTypeLoweringContext : InstPassBase
     {
         if (loweredResourceTypes.containsKey(type))
             return;
-
         IRType* loweredType = nullptr;
         AccessQualifier access = AccessQualifier::Read;
         if (type->getOp() == kIROp_HLSLRWByteAddressBufferType ||
-            type->getOp() == kIROp_HLSLRWStructuredBufferType)
+            type->getOp() == kIROp_HLSLRWStructuredBufferType ||
+            type->getOp() == kIROp_HLSLUnsizedRWByteAddressBufferType ||
+            type->getOp() == kIROp_HLSLUnsizedRWStructuredBufferType)
             access = AccessQualifier::ReadWrite;
 
         switch (type->getOp())
@@ -79,40 +84,50 @@ struct ResourceTypeLoweringContext : InstPassBase
             break;
         case kIROp_HLSLStructuredBufferType:
         case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLUnsizedStructuredBufferType:
+        case kIROp_HLSLUnsizedRWStructuredBufferType:
             {
                 auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type);
                 auto layoutType =
                     getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
 
-                IRStructType* s = builder.createStructType();
-                auto ptrKey = builder.createStructKey();
-                auto sizeKey = builder.createStructKey();
                 auto ptrType = builder.getPtrType(
                     bufferType->getElementType(),
                     access,
                     AddressSpace::Generic,
                     layoutType);
+                IRStructType* s = builder.createStructType();
+                auto ptrKey = builder.createStructKey();
                 builder.createStructField(s, ptrKey, ptrType);
-                builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
+                if (!isUnsizedBufferType(type))
+                {
+                    auto sizeKey = builder.createStructKey();
+                    builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
+                }
                 loweredType = s;
             }
             break;
         case kIROp_HLSLByteAddressBufferType:
         case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_HLSLUnsizedByteAddressBufferType:
+        case kIROp_HLSLUnsizedRWByteAddressBufferType:
             {
                 auto layoutType =
                     getTypeLayoutTypeForBuffer(codeGenContext->getTargetProgram(), builder, type);
 
-                IRStructType* s = builder.createStructType();
-                auto ptrKey = builder.createStructKey();
-                auto sizeKey = builder.createStructKey();
                 auto ptrType = builder.getPtrType(
                     builder.getUInt8Type(),
                     access,
                     AddressSpace::Generic,
                     layoutType);
+                IRStructType* s = builder.createStructType();
+                auto ptrKey = builder.createStructKey();
                 builder.createStructField(s, ptrKey, ptrType);
-                builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
+                if (!isUnsizedBufferType(type))
+                {
+                    auto sizeKey = builder.createStructKey();
+                    builder.createStructField(s, sizeKey, builder.getType(kIROp_UIntPtrType));
+                }
                 loweredType = s;
             }
             break;
@@ -142,6 +157,7 @@ struct ResourceTypeLoweringContext : InstPassBase
     IRInst* getBufferSize(IRBuilder& builder, IRInst* buffer)
     {
         auto structType = cast<IRStructType>(buffer->getDataType());
+        SLANG_ASSERT(structType->getFields().getFirst() != structType->getFields().getLast());
         return builder.emitFieldExtract(buffer, structType->getFields().getLast()->getKey());
     }
 
@@ -151,6 +167,16 @@ struct ResourceTypeLoweringContext : InstPassBase
         builder.setInsertBefore(inst);
         switch (inst->getOp())
         {
+        case kIROp_SizedBufferToUnsizedBuffer:
+            {
+                auto structType = cast<IRStructType>(inst->getDataType());
+                SLANG_ASSERT(
+                    structType->getFields().getFirst() == structType->getFields().getLast());
+                auto ptrType = structType->getFields().getFirst()->getFieldType();
+                auto ptr = getBufferPtr(builder, inst->getOperand(0));
+                loweredInst = builder.emitMakeStruct(structType, {builder.emitCast(ptrType, ptr)});
+            }
+            break;
         case kIROp_RWStructuredBufferGetElementPtr:
             {
                 auto gepInst = static_cast<IRRWStructuredBufferGetElementPtr*>(inst);
@@ -192,12 +218,9 @@ struct ResourceTypeLoweringContext : InstPassBase
                 auto ptrType =
                     builder.getPtrTypeWithAddressSpace(inst->getDataType(), untypedPtrType);
 
-                // This may seem risky in terms of alignment. However, with the
-                // LLVM CPU targets, we rely on the `legalizeByteAddressBufferOps`
-                // pass to scalarize the load/stores such that the load and store
-                // ops we see in this pass only occur on 4-byte aligned types.
-                // Conveniently, they can't be misaligned due to ByteAddressBuffers
-                // imposing an alignment of 4 on all accesses.
+                // For LLVM CPU targets, legalizeByteAddressBufferOps proves natural
+                // alignment for each typed access. It splits 64-bit accesses into word
+                // operations when only the buffer's four-byte alignment is known.
                 auto typedPtr = builder.emitCast(ptrType, offsetPtr);
                 loweredInst = builder.emitLoad(inst->getDataType(), typedPtr);
             }
@@ -250,6 +273,15 @@ struct ResourceTypeLoweringContext : InstPassBase
 
                 auto structType = cast<IRStructType>(bufferType);
                 auto ptrType = as<IRPtrType>(structType->getFields().getFirst()->getFieldType());
+                auto ptr = getBufferPtr(builder, byteBuffer);
+                // Unsized buffers are one-field structs produced by lowerType.
+                // Reinterpreting them carries only the pointer into the new view.
+                if (structType->getFields().getFirst() == structType->getFields().getLast())
+                {
+                    loweredInst =
+                        builder.emitMakeStruct(structType, {builder.emitCast(ptrType, ptr)});
+                    break;
+                }
                 auto rules =
                     getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), ptrType);
                 auto elementType = ptrType->getValueType();
@@ -261,7 +293,6 @@ struct ResourceTypeLoweringContext : InstPassBase
                     elementType,
                     &sizeAlignment);
 
-                auto ptr = getBufferPtr(builder, byteBuffer);
                 auto bytes = getBufferSize(builder, byteBuffer);
 
                 auto size = builder.emitDiv(
