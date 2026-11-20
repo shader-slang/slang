@@ -281,13 +281,42 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     return e;
 }
 
+void SemanticsStmtVisitor::checkConditionClause(ConditionClause* conditionClause)
+{
+    ConditionClauseVisitor<SemanticsStmtVisitor>::dispatch(conditionClause);
+}
+
+void SemanticsStmtVisitor::visitExprConditionClause(ExprConditionClause* conditionClause)
+{
+    conditionClause->expr = checkPredicateExpr(conditionClause->expr);
+}
+
+void SemanticsStmtVisitor::visitDeclConditionClause(DeclConditionClause* conditionClause)
+{
+    auto varDecl = conditionClause->decl;
+
+    // The variable comes into scope after its initializer. In `if (int n = n - 1)`,
+    // the initializer still refers to the enclosing `n`. As with locals in a block,
+    // `checkDeclAtDeclarationPoint` makes the new declaration visible after checking it.
+    varDecl->hiddenFromLookup = true;
+    checkDeclAtDeclarationPoint(varDecl);
+
+    // In `if (int count = getCount())`, the predicate tests the value stored in
+    // `count` after its initializer has been converted to `int`. We already have
+    // the declaration, so the implicit read needs no name lookup.
+    auto varExpr = m_astBuilder->create<VarExpr>();
+    varExpr->loc = varDecl->getNameLoc();
+    varExpr->declRef = makeDeclRef<Decl>(varDecl);
+    conditionClause->predicateExpr = checkPredicateExpr(varExpr);
+}
+
 void SemanticsStmtVisitor::visitDoWhileStmt(DoWhileStmt* stmt)
 {
     generateUniqueIDForStmt(stmt);
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    stmt->predicate = checkPredicateExpr(stmt->predicate);
+    checkConditionClause(stmt->condition);
     subContext.checkStmt(stmt->statement);
     checkLoopInDifferentiableFunc(stmt);
 }
@@ -556,7 +585,7 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
 {
     WithOuterStmt subContext(this, stmt);
-    stmt->predicate = checkPredicateExpr(stmt->predicate);
+    checkConditionClause(stmt->condition);
     subContext.checkStmt(stmt->positiveStatement);
     subContext.checkStmt(stmt->negativeStatement);
 }
@@ -636,7 +665,7 @@ void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
     generateUniqueIDForStmt(stmt);
     checkModifiers(stmt);
     WithOuterStmt subContext(this, stmt);
-    stmt->predicate = checkPredicateExpr(stmt->predicate);
+    checkConditionClause(stmt->condition);
     subContext.checkStmt(stmt->statement);
     checkLoopInDifferentiableFunc(stmt);
 }

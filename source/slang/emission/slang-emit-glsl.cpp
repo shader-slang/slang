@@ -314,7 +314,8 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
         break;
     }
 
-    bool isReadOnly = (as<IRHLSLStructuredBufferType>(structuredBufferType) != nullptr);
+    bool isReadOnly = as<IRHLSLStructuredBufferType>(structuredBufferType) ||
+                      as<IRHLSLUnsizedStructuredBufferType>(structuredBufferType);
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
@@ -348,13 +349,15 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
     The actual structuredBufferType could be
 
     HLSLStructuredBufferType                        - This is unambiguously read only
+    HLSLUnsizedStructuredBufferType                 - Read only
     HLSLRWStructuredBufferType                      - Read write
+    HLSLUnsizedRWStructuredBufferType               - Read write
     HLSLRasterizerOrderedStructuredBufferType       - Allows read/write access
     HLSLAppendStructuredBufferType                  - Write
     HLSLConsumeStructuredBufferType                 - TODO (JS): Its possible that this can be
     readonly, but we currently don't support on GLSL
     */
-    if (as<IRHLSLStructuredBufferType>(structuredBufferType))
+    if (isReadOnly)
     {
         m_writer->emit("readonly ");
     }
@@ -435,13 +438,13 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
         }
     }
 
+    bool isReadOnly = as<IRHLSLByteAddressBufferType>(bufferType) ||
+                      as<IRHLSLUnsizedByteAddressBufferType>(bufferType);
     auto layout = getVarLayout(varDecl);
     if (layout)
     {
         // We can use ShaderResource/DescriptorSlot interchangably here.
         // This is possible because vk-shift-*
-        bool isReadOnly = (as<IRHLSLByteAddressBufferType>(bufferType) != nullptr);
-
         const LayoutResourceKindFlags kinds =
             (isReadOnly ? LayoutResourceKindFlag::ShaderResource
                         : LayoutResourceKindFlag::UnorderedAccess) |
@@ -469,11 +472,13 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
     before buffer with 'readonly'
 
     HLSLByteAddressBufferType                   - This is unambiguously read only
+    HLSLUnsizedByteAddressBufferType            - Read only
     HLSLRWByteAddressBufferType                 - Read write
+    HLSLUnsizedRWByteAddressBufferType          - Read write
     HLSLRasterizerOrderedByteAddressBufferType  - Allows read/write access
     */
 
-    if (as<IRHLSLByteAddressBufferType>(bufferType))
+    if (isReadOnly)
     {
         m_writer->emit("readonly ");
     }

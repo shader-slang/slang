@@ -1,6 +1,6 @@
 // direct-spirv-control-flow.slang
 
-//TEST:COMPARE_COMPUTE(targets=vk):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test direct SPIRV emit on control fl.
 

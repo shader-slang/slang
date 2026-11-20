@@ -583,8 +583,10 @@ static bool isValidCoopVecAccumulationOperand(IRInst* operand)
     switch (type->getOp())
     {
     case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLUnsizedRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
     case kIROp_HLSLRWByteAddressBufferType:
+    case kIROp_HLSLUnsizedRWByteAddressBufferType:
     case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
         return true;
     default:

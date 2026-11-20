@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11+dx12, filecheck-buffer=CHK):-output-using-type
 
 // Vulkan/GLSL doesn't support 1-dimensional matrix.
 

@@ -58,7 +58,7 @@ return {
 	["Type.Kind.Generic"] = 56,
 	["Type.PtrTypeBase.Ptr"] = 57,
 	["Type.PtrTypeBase.RefParam"] = 58,
-	["Type.PtrTypeBase.BorrowInParam"] = 59,
+	["Type.PtrTypeBase.BorrowInParamBase.BorrowInParam"] = 59,
 	["Type.PtrTypeBase.PseudoPtr"] = 60,
 	["Type.PtrTypeBase.OutParamTypeBase.OutParam"] = 61,
 	["Type.PtrTypeBase.OutParamTypeBase.BorrowInOutParam"] = 62,
@@ -888,6 +888,12 @@ return {
 	["metalTraceRay"] = 912,
 	["Decoration.Artificial"] = 913,
 	["Decoration.assumeValidResourceOperands"] = 914,
-	["EnumCaseInfo"] = 915,
-	["CheckEnumCast"] = 916
+	["Type.UntypedBufferResourceType.ByteAddressBufferTypeBase.UnsizedByteAddressBuffer"] = 915,
+	["Type.UntypedBufferResourceType.ByteAddressBufferTypeBase.UnsizedRWByteAddressBuffer"] = 916,
+	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedStructuredBuffer"] = 917,
+	["Type.BuiltinGenericType.HLSLStructuredBufferTypeBase.UnsizedRWStructuredBuffer"] = 918,
+	["sizedBufferToUnsizedBuffer"] = 919,
+	["Type.PtrTypeBase.BorrowInParamBase.ByValueBorrowInParam"] = 920,
+	["EnumCaseInfo"] = 921,
+	["CheckEnumCast"] = 922
 }

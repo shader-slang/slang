@@ -4,7 +4,7 @@
 // does not collide with the reserved `This` name during constructor synthesis. The
 // captured `this` must reach the lambda body, so `f()` returns getVal() * 2 == 42.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;

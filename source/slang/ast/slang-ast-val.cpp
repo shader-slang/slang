@@ -1,6 +1,7 @@
 // slang-ast-type.cpp
 #include "slang-ast-val.h"
 
+#include "core/slang-math-int-ops.h"
 #include "core/slang-uint-set.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
@@ -12,6 +13,10 @@
 #include "slang/slang-mangle.h"
 #include "slang/slang-rich-diagnostics.h"
 
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <typeinfo>
 
 namespace Slang
@@ -1896,8 +1901,13 @@ struct PolynomialIntValBuilder
         {
             return terms[0]->getParamFactors()[0]->getParam();
         }
+        // The terms and the constant term are combined in 64 bits, so a polynomial that folds
+        // to a constant is narrowed to its type here. For example, with `uint N = 0xFFFFFFFFu`,
+        // the bound `(N + 1u) * 2u + 1u` sums to 0x200000001 in 64 bits and to 1 in `uint`.
         if (terms.getCount() == 0)
-            return astBuilder->getIntVal(type, constantTerm);
+            return astBuilder->getIntVal(
+                type,
+                astBuilder->narrowValueToConstantType(type, constantTerm));
         return nullptr;
     }
 
@@ -1964,7 +1974,7 @@ Val* PolynomialIntVal::_substituteImplOverride(
     *ioDiff += diff;
 
     if (builder.terms.getCount() == 0)
-        return astBuilder->getIntVal(getType(), builder.constantTerm);
+        return builder.getIntVal(getType());
     if (diff != 0)
     {
         return builder.getIntVal(getType());
@@ -2245,27 +2255,6 @@ Val* TypeCastIntVal::_resolveImplOverride()
     return this;
 }
 
-// Fold a constant integer shift. Negative counts leave the value symbolic (returns false);
-// out-of-range counts are masked to the operand width, matching common hardware behavior and
-// avoiding C++ undefined behavior. Shared by every constant-folding path so `x << y` produces
-// the same constant regardless of which path reaches it.
-static bool _tryFoldConstantShift(
-    IntegerLiteralValue base,
-    IntegerLiteralValue count,
-    bool isLeftShift,
-    IntegerLiteralValue& out)
-{
-    if (count < 0)
-        return false;
-    const auto width = std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-    const auto shiftCount = static_cast<std::make_unsigned_t<IRIntegerValue>>(count) % width;
-    out = isLeftShift
-              ? static_cast<IntegerLiteralValue>(
-                    static_cast<std::make_unsigned_t<IntegerLiteralValue>>(base) << shiftCount)
-              : (base >> shiftCount);
-    return true;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinOperationIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op)
@@ -2419,7 +2408,149 @@ void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
     }
 }
 
-Val* BuiltinOperationIntVal::tryFoldImpl(
+/// Return the `MathIntType` of the builtin scalar type `baseType`, or `MathIntType::NullType` for
+/// a builtin type that is not an integer or `bool` type, such as `float`.
+static MathIntType baseTypeToMathIntType(BaseType baseType)
+{
+    switch (baseType)
+    {
+    case BaseType::Int:
+        return MathIntType::Int32Type;
+
+    case BaseType::UInt:
+        return MathIntType::UInt32Type;
+
+    case BaseType::Int64:
+    case BaseType::IntPtr:
+        return MathIntType::Int64Type;
+
+    case BaseType::UInt64:
+    case BaseType::UIntPtr:
+        return MathIntType::UInt64Type;
+
+    case BaseType::Int16:
+        return MathIntType::Int16Type;
+
+    case BaseType::UInt16:
+        return MathIntType::UInt16Type;
+
+    case BaseType::Char:
+    case BaseType::Int8:
+        return MathIntType::Int8Type;
+
+    case BaseType::UInt8:
+        return MathIntType::UInt8Type;
+
+    case BaseType::Bool:
+        return MathIntType::BoolType;
+
+    default:
+        return MathIntType::NullType;
+    }
+}
+
+MathIntType getIntegerFoldingMathIntType(ASTBuilder* astBuilder, Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
+            type = getTagType(astBuilder, enumDeclRef);
+    }
+    if (auto basicType = as<BasicExpressionType>(type))
+        return baseTypeToMathIntType(basicType->getBaseType());
+    return MathIntType::NullType;
+}
+
+/// Return `getIntegerFoldingMathIntType(astBuilder, type)` for the type of an operand or the
+/// result of a fold below. A builtin type that integer folding does not represent, such as
+/// `float`, is out of contract there, because an integer constant never has such a type, so it
+/// fails a release assertion. Any other such type, such as a struct type, yields
+/// `MathIntType::NullType`.
+static MathIntType getFoldOperandMathIntType(ASTBuilder* astBuilder, Type* type)
+{
+    const MathIntType mathType = getIntegerFoldingMathIntType(astBuilder, type);
+    SLANG_RELEASE_ASSERT(mathType.width != 0 || !as<BasicExpressionType>(type));
+    return mathType;
+}
+
+/// Return decimal text that reads back as exactly `value` and reads as a floating-point value.
+/// An integral value below 1e20 in magnitude is written in full, as in "300.0" or
+/// "18446744073709551616.0" for 2^64, which covers the bounds of every integer type. Any other
+/// value is written with the fewest significant digits that read back exactly, as in "300.5"
+/// or "1e+300". The default "%g" format keeps only six significant digits, which would show
+/// 2^63 and the slightly smaller values that still fit in `int64_t` the same way.
+static String formatFloatValueForDiagnostic(double value)
+{
+    if (std::isnan(value))
+        return "nan";
+    if (std::isinf(value))
+        return value < 0 ? "-inf" : "inf";
+
+    char text[512];
+    if (value == std::trunc(value) && std::fabs(value) < 1e20)
+    {
+        snprintf(text, sizeof(text), "%.0f.0", value);
+        return String(text);
+    }
+
+    for (int precision = 1; precision <= 17; ++precision)
+    {
+        snprintf(text, sizeof(text), "%.*g", precision, value);
+        if (strtod(text, nullptr) == value)
+            break;
+    }
+    return String(text);
+}
+
+IntVal* TypeCastIntVal::tryFoldFromFloat(
+    ASTBuilder* astBuilder,
+    Type* resultType,
+    double value,
+    DiagnosticSink* sink,
+    SourceLoc loc)
+{
+    const MathIntType resultMathType = getFoldOperandMathIntType(astBuilder, resultType);
+    SLANG_RELEASE_ASSERT(resultMathType.width != 0);
+
+    MathIntResult res = MathIntOps::convertFloatValue(resultMathType, value);
+
+    // A null `sink` means the caller suppresses these diagnostics.
+    // See also SemanticsVisitor::getFoldDiagnosticSink.
+    if (res.flags & MathIntResult::TargetDefined)
+    {
+        if (sink)
+        {
+            sink->diagnose(Diagnostics::TargetDefinedFloatConversion{
+                .value = formatFloatValueForDiagnostic(value),
+                .type = resultType,
+                .location = loc});
+        }
+        return nullptr;
+    }
+
+    return astBuilder->getIntVal(resultType, res.value.getSignedValue());
+}
+
+Index getShortCircuitResultArgIndex(
+    BuiltinOperationKind op,
+    ConstantIntVal* firstArg,
+    bool logicalOpsShortCircuit)
+{
+    const bool isTrue = firstArg->getValue() != 0;
+    switch (op)
+    {
+    case BuiltinOperationKind::Conditional:
+        return isTrue ? 1 : 2;
+    case BuiltinOperationKind::And:
+        return (logicalOpsShortCircuit && !isTrue) ? 0 : -1;
+    case BuiltinOperationKind::Or:
+        return (logicalOpsShortCircuit && isTrue) ? 0 : -1;
+    default:
+        return -1;
+    }
+}
+
+IntVal* BuiltinOperationIntVal::tryFoldImpl(
     ASTBuilder* astBuilder,
     Type* resultType,
     BuiltinOperationKind op,
@@ -2427,13 +2558,48 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     DiagnosticSink* sink,
     SourceLoc loc)
 {
-    List<ConstantIntVal*> constArgs;
+    size_t numArgs{};
+    std::array<MathIntValue, 3> constArgs{};
+
+    // we need a concrete result type for folding
+    SLANG_RELEASE_ASSERT(resultType);
+    const MathIntType resType = getFoldOperandMathIntType(astBuilder, resultType);
+    if (resType.width == 0)
+        return nullptr;
+
+    // A `?:` whose condition is constant takes the value of the selected operand, even when the
+    // other operand is still symbolic. For example, after `B = true` and `N = 32` are
+    // substituted into `B ? 1 : (1 << N)`, the shift stays unfolded because its value is
+    // target-defined, but the result is 1. We do not apply this to `&&` and `||` here, because
+    // whether they short-circuit depends on `-disable-short-circuit`, which this fold cannot see.
+    if (newArgs.getCount() == 3)
+    {
+        if (auto condition = as<ConstantIntVal>(newArgs[0]))
+        {
+            const Index resultArgIndex =
+                getShortCircuitResultArgIndex(op, condition, /*logicalOpsShortCircuit*/ false);
+            if (resultArgIndex > 0)
+                return newArgs[resultArgIndex];
+        }
+    }
+
     for (auto arg : newArgs)
     {
+        if (numArgs >= 3)
+            return nullptr; // too many args for constant folding
+
         auto c = as<ConstantIntVal>(arg);
         if (!c)
             return nullptr; // still symbolic
-        constArgs.add(c);
+
+        const MathIntType argType = getFoldOperandMathIntType(astBuilder, c->getType());
+        if (argType.width == 0)
+            return nullptr; // integer folding does not support the argument's type
+
+        MathIntValue v = MathIntValue::constructFromValue(argType, c->getValue());
+
+        constArgs.at(numArgs) = v;
+        ++numArgs;
     }
 
     // Reject a malformed node whose argument count does not match the operation's arity, so a
@@ -2442,100 +2608,115 @@ Val* BuiltinOperationIntVal::tryFoldImpl(
     const bool isUnary =
         (op == BuiltinOperationKind::Neg || op == BuiltinOperationKind::BitNot ||
          op == BuiltinOperationKind::Not);
-    const Index expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
-    if (constArgs.getCount() != expectedArgs)
+    const size_t expectedArgs = (op == BuiltinOperationKind::Conditional) ? 3 : (isUnary ? 1 : 2);
+    if (numArgs != expectedArgs)
         return nullptr;
 
-    const IntegerLiteralValue a0 = constArgs[0]->getValue();
-    const IntegerLiteralValue a1 = (constArgs.getCount() > 1) ? constArgs[1]->getValue() : 0;
-    const IntegerLiteralValue a2 = (constArgs.getCount() > 2) ? constArgs[2]->getValue() : 0;
-    // Do the wrapping arithmetic (negate/add/sub/mul) through the unsigned type: signed
-    // overflow is UB (and `-INT64_MIN` / `INT64_MIN / -1` even trap on real hardware), while
-    // unsigned wraps two's-complement, matching what the target IR ops compute at runtime.
-    using UInt = std::make_unsigned_t<IntegerLiteralValue>;
-    const UInt u0 = (UInt)a0;
-    const UInt u1 = (UInt)a1;
-    IntegerLiteralValue r = 0;
+    const MathIntValue& arg0 = constArgs.at(0);
+    const MathIntValue& arg1 = constArgs.at(1);
+    const MathIntValue& arg2 = constArgs.at(2);
+
+    MathIntResult res{};
+
     switch (op)
     {
     case BuiltinOperationKind::Neg:
-        r = (IntegerLiteralValue)(UInt(0) - u0);
+        res = MathIntOps::neg(resType, arg0);
         break;
     case BuiltinOperationKind::BitNot:
-        r = ~a0;
+        res = MathIntOps::bitwiseNot(resType, arg0);
         break;
     case BuiltinOperationKind::Not:
-        r = (a0 == 0);
+        res = MathIntOps::logicalNot(arg0);
         break;
     case BuiltinOperationKind::Eql:
-        r = (a0 == a1);
+        res = MathIntOps::compEql(arg0, arg1);
         break;
     case BuiltinOperationKind::Neq:
-        r = (a0 != a1);
+        res = MathIntOps::compNeq(arg0, arg1);
         break;
     case BuiltinOperationKind::Less:
-        r = (a0 < a1);
+        res = MathIntOps::compLess(arg0, arg1);
         break;
     case BuiltinOperationKind::Greater:
-        r = (a0 > a1);
+        res = MathIntOps::compGreater(arg0, arg1);
         break;
     case BuiltinOperationKind::Leq:
-        r = (a0 <= a1);
+        res = MathIntOps::compLeq(arg0, arg1);
         break;
     case BuiltinOperationKind::Geq:
-        r = (a0 >= a1);
+        res = MathIntOps::compGeq(arg0, arg1);
         break;
     case BuiltinOperationKind::BitAnd:
-        r = a0 & a1;
+        res = MathIntOps::bitwiseAnd(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::BitOr:
-        r = a0 | a1;
+        res = MathIntOps::bitwiseOr(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::BitXor:
-        r = a0 ^ a1;
+        res = MathIntOps::bitwiseXor(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Add:
-        r = (IntegerLiteralValue)(u0 + u1);
+        res = MathIntOps::add(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Sub:
-        r = (IntegerLiteralValue)(u0 - u1);
+        res = MathIntOps::sub(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Mul:
-        r = (IntegerLiteralValue)(u0 * u1);
+        res = MathIntOps::mul(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Div:
+        res = MathIntOps::div(resType, arg0, arg1);
+        break;
     case BuiltinOperationKind::Mod:
-        if (a1 == 0)
-        {
-            if (sink)
-                sink->diagnose(Diagnostics::DivideByZero{.location = loc});
-            return nullptr;
-        }
-        // `INT64_MIN / -1` overflows and traps (SIGFPE) on real hardware, so handle the
-        // `/ -1` case without dividing: `x / -1 == -x` (wrapping) and `x % -1 == 0`.
-        if (a1 == -1)
-            r = (op == BuiltinOperationKind::Div) ? (IntegerLiteralValue)(UInt(0) - u0) : 0;
-        else
-            r = (op == BuiltinOperationKind::Div) ? (a0 / a1) : (a0 % a1);
+        res = MathIntOps::rem(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::Lsh:
+        res = MathIntOps::lsh(resType, arg0, arg1);
+        break;
     case BuiltinOperationKind::Rsh:
-        if (!_tryFoldConstantShift(a0, a1, /*isLeftShift*/ op == BuiltinOperationKind::Lsh, r))
-            return nullptr;
+        res = MathIntOps::rsh(resType, arg0, arg1);
         break;
     case BuiltinOperationKind::And:
-        r = ((a0 != 0) && (a1 != 0)) ? 1 : 0;
+        res = MathIntOps::logicalAnd(arg0, arg1);
         break;
     case BuiltinOperationKind::Or:
-        r = ((a0 != 0) || (a1 != 0)) ? 1 : 0;
+        res = MathIntOps::logicalOr(arg0, arg1);
         break;
     case BuiltinOperationKind::Conditional:
-        r = (a0 != 0) ? a1 : a2;
+        res = MathIntOps::ternaryConditional(arg0, arg1, arg2);
         break;
     default:
         return nullptr;
     }
-    return astBuilder->getIntVal(resultType, r);
+
+    // A null `sink` means the caller suppresses these diagnostics.
+    // See also SemanticsVisitor::getFoldDiagnosticSink.
+    if (res.flags & MathIntResult::Undefined)
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::DivideByZero{.location = loc});
+
+        return nullptr;
+    }
+
+    if (res.flags & MathIntResult::TargetDefined)
+    {
+        if (sink)
+        {
+            sink->diagnose(Diagnostics::TargetDefinedValue{
+                .arg0Val = arg0.toString(),
+                .op = getBuiltinOperationOpText(op),
+                .arg1Val = arg1.toString(),
+                .location = loc});
+        }
+
+        return nullptr;
+    }
+
+    // Note: We'll ignore integer overflows here even if MathIntResults reports
+    // it. Wrapping is intended.
+    return astBuilder->getIntVal(resultType, res.value.getSignedValue());
 }
 
 Val* BuiltinOperationIntVal::_resolveImplOverride()

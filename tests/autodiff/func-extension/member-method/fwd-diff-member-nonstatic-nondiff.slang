@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 
 // Test: __func_extension fwd_diff for a non-static method of a non-differentiable type.
 // The this param should appear as no_diff MyData in the fwd_diff signature.

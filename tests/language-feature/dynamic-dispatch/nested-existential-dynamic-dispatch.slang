@@ -12,7 +12,7 @@
 //   5. Container + additional IBar param through IWeightedProcessor (triple dispatch)
 //   6. Chained processors: output of one IProcessor feeds another IProcessor
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1" -conformance "BarX:IBar=0" -conformance "BarY:IBar=1" -conformance "ScaleProcessor:IProcessor=0" -conformance "OffsetProcessor:IProcessor=1" -conformance "ArraySumProcessor:IArrayProcessor=0" -conformance "ArrayMaxProcessor:IArrayProcessor=1" -conformance "DualScaleProcessor:IDualProcessor=0" -conformance "DualAddProcessor:IDualProcessor=1" -conformance "MixedScaleProcessor:IMixedProcessor=0" -conformance "MixedSumProcessor:IMixedProcessor=1" -conformance "WeightedProcessor:IWeightedProcessor=0" -conformance "BiasedProcessor:IWeightedProcessor=1"
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer

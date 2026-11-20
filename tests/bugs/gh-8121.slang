@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all-dx11, filecheck-buffer=CHECK):
 
 //TEST_INPUT:ubuffer(data=[1 1 1 1], stride=4),name=inputBuffer
 RWStructuredBuffer<int[2]> inputBuffer;

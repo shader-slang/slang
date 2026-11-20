@@ -13,7 +13,7 @@
 //   nodeBuf.evaluate() dispatches IndirectNode::evaluate() which calls
 //   source.get() (Literal::get() = 10) + offset (5) = 15
 
-//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu+llvm, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=CHECK): -output-using-type
 //TEST:SIMPLE(filecheck=MTL):-target metal -stage compute -entry computeMain -conformance "Literal:IValue=1" -conformance "LeafNode:INode=1" -conformance "IndirectNode:INode=2"
 
 // On Metal, pointers go through a 64-bit value when packed into or read out of a uint2.

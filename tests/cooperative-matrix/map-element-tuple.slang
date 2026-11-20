@@ -1,8 +1,8 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=0 -render-feature cooperative-matrix-per-element-operations
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=1 -render-feature cooperative-matrix-per-element-operations
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=2 -render-feature cooperative-matrix-per-element-operations
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=3 -render-feature cooperative-matrix-per-element-operations
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=4 -render-feature cooperative-matrix-per-element-operations
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=0 -render-feature cooperative-matrix-per-element-operations
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=1 -render-feature cooperative-matrix-per-element-operations
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=2 -render-feature cooperative-matrix-per-element-operations
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=3 -render-feature cooperative-matrix-per-element-operations
+//TEST:COMPARE_COMPUTE(targets=all-glsl, filecheck-buffer=CHECK):-output-using-type -Xslang -DTEST_MODE=4 -render-feature cooperative-matrix-per-element-operations
 
 //CHECK:type: float
 //CHECK-NEXT:9

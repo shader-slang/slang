@@ -9,7 +9,7 @@
 //
 // Runs on the CPU target so it executes in CI without a GPU; also covered on the GPU targets.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(16)]
 interface IShape

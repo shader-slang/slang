@@ -1,7 +1,7 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):-compile-arg -bitfield-packing-rules -compile-arg default
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):-compile-arg -bitfield-packing-rules -compile-arg msvc
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):-compile-arg -bitfield-packing-rules -compile-arg legacy-msb-first-msvc
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):-compile-arg -bitfield-packing-rules -compile-arg default
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):-compile-arg -bitfield-packing-rules -compile-arg msvc
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm):-compile-arg -bitfield-packing-rules -compile-arg legacy-msb-first-msvc
 
 // The first word distinguishes LSB-first from MSB-first packing within one backing uint.
 // In Mixed, default rules fit both fields in one uint16_t backing field.

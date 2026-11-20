@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda):
+//TEST:COMPARE_COMPUTE(targets=all-vk-glsl-wgpu-llvm):
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
 //CHECK-DAG: txq.width.b32 %0, [%1];

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 interface IFoo
 {

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=BUFFER): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu-llvm, filecheck-buffer=BUFFER): -output-using-type
 
 interface IAddressLike : IDifferentiablePtrType
 {

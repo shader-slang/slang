@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 interface IFoo<T>
 {
     associatedtype Parameters : IDifferentiablePtrType;

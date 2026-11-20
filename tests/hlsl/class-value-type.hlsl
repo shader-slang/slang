@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=COMPILE): -target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=COMPILE): -target spirv -stage compute -entry computeMain
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -source-language hlsl -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -source-language hlsl -output-using-type
 // COMPILE: result code = 0
 
 // HLSL classes are values: copies and by-value parameters have independent storage.

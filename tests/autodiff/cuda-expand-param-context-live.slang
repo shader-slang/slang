@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -validate-ir -g
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none -validate-ir
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none -validate-ir -g
-//TEST:COMPARE_COMPUTE(targets=metal+cuda+cpu, filecheck-buffer=NUMERIC): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=NUMERIC): -output-using-type
 
 // Exercise live nondifferentiable fields, nested call contexts, a differentiable
 // struct, and a custom reverse derivative after parameter contexts are expanded.

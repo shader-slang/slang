@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain -DTYPE=int
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain -DTYPE=int
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type -xslang -DTYPE=int
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type -xslang -DTYPE=uint
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu, filecheck-buffer=BUF):-output-using-type -xslang -DTYPE=int
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu, filecheck-buffer=BUF):-output-using-type -xslang -DTYPE=uint
 
 #ifndef TYPE
 #define TYPE int

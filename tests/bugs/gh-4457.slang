@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHK):-output-using-type
 
 // This tests if the scope(::) is recognized for a local variable declaration.
 

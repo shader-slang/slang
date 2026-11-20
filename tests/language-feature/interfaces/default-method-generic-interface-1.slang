@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Test that a generic interface method in a generic interface
 // can have a body providing default implementation.

@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu):-g0
+//TEST:COMPARE_COMPUTE(targets=all-dx11-metal):-g0
 
 // Tests slang-llvm can deal with large items on stack.
 // On some targets this requires special handling (_chkstk on windows for example)

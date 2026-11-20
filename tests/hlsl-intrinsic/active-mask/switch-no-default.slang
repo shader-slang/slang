@@ -5,7 +5,7 @@
 // branch directly to the `break` target after the
 // `switch`).
 
-//TEST:COMPARE_COMPUTE(targets=cuda):-capability cuda_sm_7_0
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda):-capability cuda_sm_7_0
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name buffer
 RWStructuredBuffer<int> buffer;

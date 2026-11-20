@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector
+//TEST:COMPARE_COMPUTE(targets=all-glsl-cuda, filecheck-buffer=CHECK):-render-feature cooperative-vector
 
 //TEST_INPUT: set inputBuffer = ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12], stride=4);
 uniform int32_t* inputBuffer;

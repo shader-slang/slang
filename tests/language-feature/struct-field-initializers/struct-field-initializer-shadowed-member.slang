@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+cuda+cpu+llvm, filecheck-buffer=BUF):-entry computeMain
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

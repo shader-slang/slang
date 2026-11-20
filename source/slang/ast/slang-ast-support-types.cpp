@@ -4,11 +4,31 @@
 #include "slang-ast-base.h"
 #include "slang-ast-expr.h"
 #include "slang-ast-print.h"
+#include "slang-ast-stmt.h"
 #include "slang-ast-type.h"
+#include "slang-visitor.h"
 #include "slang/semantic-checking/slang-check-impl.h"
 
 namespace Slang
 {
+Expr* getPredicateExpr(ConditionClause* conditionClause)
+{
+    struct PredicateExprVisitor : ConditionClauseVisitor<PredicateExprVisitor, Expr*>
+    {
+        Expr* visitExprConditionClause(ExprConditionClause* conditionClause)
+        {
+            return conditionClause->expr;
+        }
+        Expr* visitDeclConditionClause(DeclConditionClause* conditionClause)
+        {
+            return conditionClause->predicateExpr;
+        }
+    };
+    auto predicateExpr = PredicateExprVisitor().dispatch(conditionClause);
+    SLANG_RELEASE_ASSERT(predicateExpr);
+    return predicateExpr;
+}
+
 KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name)
 {
 #define SLANG_KNOWN_BUILTIN_DECL(NAME)                  \

@@ -2,7 +2,7 @@
 // ITransform<T> receives an IScaler<T> parameter, and both the
 // transform and scaler implementations are resolved at runtime.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 interface IScaler<T : IArithmetic>

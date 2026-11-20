@@ -4,7 +4,7 @@
 // shares the C++ emitter with CUDA); the CUDA and CPP passes assert the emit-form
 // win, and that types which are NOT byte-compatible stay on the safe per-field path.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CPP):-target cpp -stage compute -entry computeMain
 

@@ -11,6 +11,43 @@
 
 namespace Slang
 {
+/// Return `loadedTexel` with the component that the runtime `index` selects replaced by
+/// `storedValue`.
+///
+/// Consider `t[coord][channel] = v` with `channel` read from a cbuffer: the texel is rebuilt one
+/// component at a time, taking the stored value on the selected component and the loaded texel
+/// on every other component. Only the image element type's own `componentCount` components can be
+/// selected; the remaining lanes of the 4-wide texel are padding and keep the loaded texel's
+/// values, so a runtime index that falls in the padding range (or is otherwise out of range)
+/// changes nothing. That graceful no-op applies to runtime indices only, because an out-of-range
+/// constant index stays on the swizzle path and fails at emission.
+static IRInst* emitTexelWithComponentReplaced(
+    IRBuilder& builder,
+    IRType* vector4Type,
+    IRType* componentType,
+    IRInst* loadedTexel,
+    IRInst* storedValue,
+    IRInst* index,
+    UInt componentCount)
+{
+    Array<IRInst*, 4> components;
+    for (UInt component = 0; component < componentCount; component++)
+    {
+        auto oldComponent = builder.emitElementExtract(loadedTexel, component);
+        // The component constant takes the index's own integer type, so the comparison stays
+        // between same-typed operands with no inserted cast.
+        auto componentValue = builder.getIntValue(index->getDataType(), component);
+        auto isTargetComponent = builder.emitEql(index, componentValue);
+        IRInst* selectArgs[] = {isTargetComponent, storedValue, oldComponent};
+        components.add(builder.emitIntrinsicInst(componentType, kIROp_Select, 3, selectArgs));
+    }
+    for (UInt component = componentCount; component < 4; component++)
+    {
+        components.add(builder.emitElementExtract(loadedTexel, component));
+    }
+    return builder.emitMakeVector(vector4Type, components.getCount(), components.getBuffer());
+}
+
 void legalizeStore(
     TargetRequest* target,
     IRBuilder& builder,
@@ -122,8 +159,26 @@ void legalizeStore(
             {
                 auto originalValue = builder.emitImageLoad(vector4Type, loadParams);
                 auto index = getElementPtr->getIndex();
-                newValue =
-                    builder.emitSwizzleSet(vector4Type, originalValue, legalizedStore, 1, &index);
+                // The swizzle below requires a compile-time-constant component index; a runtime
+                // index instead rebuilds the texel with per-component selects.
+                if (as<IRIntLit>(index))
+                {
+                    newValue =
+                        builder
+                            .emitSwizzleSet(vector4Type, originalValue, legalizedStore, 1, &index);
+                }
+                else
+                {
+                    auto componentCount = (UInt)getIRVectorElementSize(imageElementType);
+                    newValue = emitTexelWithComponentReplaced(
+                        builder,
+                        vector4Type,
+                        vectorBaseType,
+                        originalValue,
+                        legalizedStore,
+                        index,
+                        componentCount);
+                }
             }
             else
             {

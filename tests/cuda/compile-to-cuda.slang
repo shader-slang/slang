@@ -1,5 +1,5 @@
 //DISABLE_TEST(smoke):SIMPLE: -target ptx -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=cuda):
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm):
 
 //TEST_INPUT:ubuffer(data=[1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);

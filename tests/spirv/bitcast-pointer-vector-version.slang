@@ -14,7 +14,7 @@
 // Instead, it should be lowered
 //CHECK_SPIRV14-NOT: OpBitcast %v2uint %.*_ptr
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=OUT):-output-using-type -capability vk_mem_model
+//TEST:COMPARE_COMPUTE(targets=all-glsl-dx11-dx12-wgpu, filecheck-buffer=OUT):-output-using-type -capability vk_mem_model
 
 //TEST_INPUT: set inputPtr = ubuffer(data=[1073741824 1077936128 1082130432], stride=4);
 uniform float* inputPtr;

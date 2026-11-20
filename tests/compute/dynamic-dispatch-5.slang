@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx11+cuda+cpu):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test dynamic dispatch code gen for general `This` type.
 [anyValueSize(8)]

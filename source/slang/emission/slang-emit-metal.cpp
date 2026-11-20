@@ -159,7 +159,8 @@ static bool isAddressIntoReadOnlyBuffer(IRInst* addr)
         case kIROp_RWStructuredBufferGetElementPtr:
             {
                 auto bufferType = unwrapDescriptorHandle(addr->getOperand(0)->getDataType());
-                return bufferType && bufferType->getOp() == kIROp_HLSLStructuredBufferType;
+                return as<IRHLSLStructuredBufferType>(bufferType) ||
+                       as<IRHLSLUnsizedStructuredBufferType>(bufferType);
             }
         default:
             return false;
@@ -1487,7 +1488,7 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         // A read-only buffer is a `const device` pointer, so that Metal knows the
         // shader never writes it (a vertex function that returns a value may not
         // have writable buffers).
-        if (type->getOp() == kIROp_HLSLStructuredBufferType)
+        if (as<IRHLSLStructuredBufferType>(type) || as<IRHLSLUnsizedStructuredBufferType>(type))
             m_writer->emit("const ");
         emitType(structuredBufferType->getElementType());
         m_writer->emit(" device*");
@@ -1499,9 +1500,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         switch (type->getOp())
         {
         case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLUnsizedByteAddressBufferType:
             m_writer->emit("const uint32_t device*");
             break;
         case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_HLSLUnsizedRWByteAddressBufferType:
         case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
             m_writer->emit("uint32_t device*");
             break;

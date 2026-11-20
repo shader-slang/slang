@@ -15,7 +15,7 @@
 // The param variable is declared but not read, so the test validates
 // that layout creation completes without hanging.
 
-//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=all-cuda-cpu, filecheck-buffer=CHECK):-output-using-type
 
 ParameterBlock<DescriptorHandle<Buffer<uint>>> param;
 

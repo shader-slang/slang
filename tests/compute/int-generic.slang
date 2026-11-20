@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:type Material<1,2>
 

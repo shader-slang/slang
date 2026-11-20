@@ -2,7 +2,7 @@
 // declared in the modern (`name : Type`) or the legacy (C-style) syntax. A modern-syntax `__ref`
 // or `__ref_writeonly` parameter is writable, like `out` and `inout`.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -xslang -experimental-feature
 
 func setRef(__ref x : int) { x = 1; }
 func setRefWriteOnly(__ref_writeonly x : int) { x = 2; }

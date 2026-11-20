@@ -3,7 +3,7 @@
 // Ensure that HLSL `fmod` works and produces
 // expected output on Vulkan/GLSL.
 
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx11+llvm):
+//TEST:COMPARE_COMPUTE(targets=all):
 
 //TEST_INPUT:cbuffer(data=[4 0 0 0]):name=C
 cbuffer C

@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=BUF):-output-using-type
 
 // METAL: threadgroup_barrier
 

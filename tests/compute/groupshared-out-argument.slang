@@ -5,7 +5,7 @@
 // element passed to an `inout uint` parameter through an implicit conversion, and every
 // invocation reads the results after the barrier.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[5], stride=4):name=counters
 RWStructuredBuffer<uint> counters;

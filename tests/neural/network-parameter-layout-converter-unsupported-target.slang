@@ -21,5 +21,11 @@ void computeMain(uint tid : SV_GroupIndex)
         1);
 }
 
-// CHECK: static assertion failed
-// CHECK: NetworkParameterLayoutConverter.toOptimalLayout
+// toOptimalLayout's [require]s (cuda/metal/spirv compute) fire at the entry
+// point before the lowered body's own static_assert is reached, so the
+// diagnostic names the call site rather than the converter's internals. That
+// also retires this file's coverage of the converter's own
+// "supports CUDA, SPIR-V, and Metal targets only" static_assert — from this
+// entry point it is no longer reachable.
+// CHECK: error[E36107]: unavailable features in entry point
+// CHECK: see using of 'toOptimalLayout'

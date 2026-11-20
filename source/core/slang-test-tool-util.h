@@ -129,6 +129,22 @@ struct TestToolUtil
         Index subTestIndex);
 
     static SlangResult getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath);
+
+    /// Prevents modal dialogs from stopping an unattended run.
+    ///
+    /// When the build option `SLANG_IGNORE_ABORT_MSG` is on and the compiler is MSVC, this
+    /// suppresses the `abort()` message box. It also sends the debug CRT reports of kind
+    /// `_CRT_ERROR` and `_CRT_ASSERT` (for example "HEAP CORRUPTION DETECTED") to the standard
+    /// error, because `_set_abort_behavior` does not change how `_CrtDbgReport` reports them. The
+    /// CRT report functions have an effect only in a debug build. Otherwise this function does
+    /// nothing.
+    ///
+    /// The setting applies to the CRT of the calling module. Slang builds with the static CRT, so
+    /// each executable and each shared-library tool (for example render-test-tool) must call this
+    /// function itself. After the CRT writes a report, the process continues. For example, it can
+    /// continue with a damaged heap and fail later with a different symptom. The first report in
+    /// the standard error shows the first problem.
+    static void suppressDebugDialogs();
 };
 
 } // namespace Slang

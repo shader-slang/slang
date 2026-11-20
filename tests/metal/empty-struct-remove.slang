@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=BUF):-output-using-type
 
 // METAL-NOT: struct emptyStruct
 struct emptyStruct

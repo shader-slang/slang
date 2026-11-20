@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv
 
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK): -output-using-type
 
 // Check that a buffer chosen in a branch is read correctly per thread.
 // SPIRV-NOT: VariablePointers

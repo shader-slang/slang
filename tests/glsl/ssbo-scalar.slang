@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=all-wgpu-llvm, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 #version 430
 precision highp float;

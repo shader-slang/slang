@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK): -output-using-type
 
 // Regression test for the `_coerce` fast-rejection of opaque generic type
 // parameters into scalar builtins (overload-resolution perf optimization).

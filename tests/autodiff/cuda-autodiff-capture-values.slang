@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -validate-ir
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -validate-ir -g
-//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=NUMERIC): -output-using-type -Xslang -DTEST_COMPUTE=1
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=NUMERIC): -output-using-type -Xslang -DTEST_COMPUTE=1
 
 // Capturing a large immutable input must preserve its value identity through
 // rematerialization. Both automatic derivatives and custom derivative adapters

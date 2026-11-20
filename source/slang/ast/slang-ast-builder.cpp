@@ -9,6 +9,14 @@
 namespace Slang
 {
 
+IntegerLiteralValue ASTBuilder::narrowValueToConstantType(Type* type, IntegerLiteralValue value)
+{
+    const MathIntType mathType = getIntegerFoldingMathIntType(this, type);
+    if (mathType.width == 0)
+        return value;
+    return MathIntValue::constructFromValue(mathType, value).getSignedValue();
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SharedASTBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SharedASTBuilder::SharedASTBuilder(Session* session, RootASTBuilder* rootASTBuilder)
@@ -758,6 +766,14 @@ PtrTypeBase* ASTBuilder::getPtrType(
 
 ConstantIntVal* ASTBuilder::getIntVal(Type* type, IntegerLiteralValue value)
 {
+    // A constant without a type cannot be lowered to IR, and integer folding cannot know
+    // its width, so every producer must know the type of the value it creates.
+    SLANG_RELEASE_ASSERT(type);
+#if _DEBUG
+    // In release builds SLANG_ASSERT can be an optimizer assumption, so check the range only
+    // in debug builds instead of making an out-of-range value undefined behavior.
+    SLANG_ASSERT(isValueInRangeOfConstantType(type, value));
+#endif
     if (auto enumRef = isDeclRefTypeOf<EnumDecl>(type->getCanonicalType());
         enumRef && enumRef.getDecl()->hasCapabilityRestrictedCases)
     {
@@ -808,6 +824,19 @@ IntVal* ASTBuilder::getIntValWithRequirements(IntVal* value, ConstArrayView<Val*
     return getOrCreate<IntValWithRequirements>(value->getType(), value, combined.getArrayView());
 }
 
+/// Return the constant `size` converted to `int`, the type in which array, vector and matrix
+/// types store their sizes. The value is converted, not relabeled, so that the result is a valid
+/// `int` constant even when `size` does not fit in `int`. For example, the `uint` size
+/// 2147483648 becomes the `int` value -2147483648. The checker reports sizes that do not fit
+/// before they get here, so the conversion only keeps the representation valid.
+static IntVal* convertConstantSizeToInt(ASTBuilder* astBuilder, ConstantIntVal* size)
+{
+    auto intSize = as<IntVal>(
+        TypeCastIntVal::tryFoldImpl(astBuilder, astBuilder->getIntType(), size, nullptr));
+    SLANG_RELEASE_ASSERT(intSize);
+    return intSize;
+}
+
 ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount)
 {
     if (!elementCount)
@@ -818,7 +847,7 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         // Canonicalize constant elementCount to int.
         if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
         {
-            elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
+            elementCount = convertConstantSizeToInt(this, elementCountConstantInt);
         }
         else
         {
@@ -847,16 +876,16 @@ ParameterBlockType* ASTBuilder::getParameterBlockType(Type* elementType)
         getSpecializedBuiltinType(elementType, "ParameterBlockType"));
 }
 
-HLSLStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
+HLSLSizedStructuredBufferType* ASTBuilder::getStructuredBufferType(Type* elementType)
 {
-    return dynamicCast<HLSLStructuredBufferType>(
-        getSpecializedBuiltinType(elementType, "HLSLStructuredBufferType"));
+    return dynamicCast<HLSLSizedStructuredBufferType>(
+        getSpecializedBuiltinType(elementType, "HLSLSizedStructuredBufferType"));
 }
 
-HLSLRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
+HLSLSizedRWStructuredBufferType* ASTBuilder::getRWStructuredBufferType(Type* elementType)
 {
-    return dynamicCast<HLSLRWStructuredBufferType>(
-        getSpecializedBuiltinType(elementType, "HLSLRWStructuredBufferType"));
+    return dynamicCast<HLSLSizedRWStructuredBufferType>(
+        getSpecializedBuiltinType(elementType, "HLSLSizedRWStructuredBufferType"));
 }
 
 SamplerStateType* ASTBuilder::getSamplerStateType()
@@ -870,7 +899,7 @@ VectorExpressionType* ASTBuilder::getVectorType(Type* elementType, IntVal* eleme
     // Canonicalize constant elementCount to int.
     if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
     {
-        elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
+        elementCount = convertConstantSizeToInt(this, elementCountConstantInt);
     }
     Val* args[] = {elementType, elementCount};
     return dynamicCast<VectorExpressionType>(
@@ -886,11 +915,11 @@ MatrixExpressionType* ASTBuilder::getMatrixType(
     // Canonicalize constant size arguments to int.
     if (auto rowCountConstantInt = as<ConstantIntVal>(rowCount))
     {
-        rowCount = getIntVal(getIntType(), rowCountConstantInt->getValue());
+        rowCount = convertConstantSizeToInt(this, rowCountConstantInt);
     }
     if (auto colCountConstantInt = as<ConstantIntVal>(colCount))
     {
-        colCount = getIntVal(getIntType(), colCountConstantInt->getValue());
+        colCount = convertConstantSizeToInt(this, colCountConstantInt);
     }
     Val* args[] = {elementType, rowCount, colCount, layout};
     return dynamicCast<MatrixExpressionType>(

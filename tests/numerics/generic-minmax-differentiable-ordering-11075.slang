@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 // Regression test for shader-slang/slang#11075: with `slang.numerics.differentiable` imported, a
 // generic that names `IDifferentiableRealOrderingFunctions` next to `IComparable` or `IFloat` must

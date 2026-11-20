@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=CHECK): -output-using-type
 
 // Verify that a generic subscript with a where-clause constraint
 // supports both get and set accessors with different integer types.

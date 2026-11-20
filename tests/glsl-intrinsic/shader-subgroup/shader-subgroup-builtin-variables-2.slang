@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+metal+wgpu, filecheck-buffer=BUF):-entry computeMain -source-language glsl
+//TEST:COMPARE_COMPUTE(targets=all-dx11-cpu-llvm, filecheck-buffer=BUF):-entry computeMain -source-language glsl
 
 
 // There are some issues with the Metal backend when using glsl-style syntax - this should be fixed.

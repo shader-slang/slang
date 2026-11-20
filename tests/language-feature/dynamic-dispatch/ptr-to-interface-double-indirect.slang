@@ -7,7 +7,7 @@
 // type IFoo* works because the address-of operates on the pointer storage
 // rather than on an existential value.
 
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
 
 interface IFoo
 {

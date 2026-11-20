@@ -1,7 +1,7 @@
 // Verify that a varying logical scalar remains differentiable when it is repeated across a
 // builtin or user-defined shaped numeric value.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -Xslang -experimental-feature
 
 import slang.numerics.differentiable;
 

@@ -1,7 +1,7 @@
 // This test is only run with the LLVM target because LLVM optimizes
 // uninitialized values very aggressively and is therefore much more reliable
 // at surfacing this bug.
-//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu+llvm, filecheck-buffer=CHECK):
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

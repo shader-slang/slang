@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
-//TEST(metal):COMPARE_COMPUTE(targets=metal):-output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal+cuda+cpu+llvm):-output-using-type
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
 
 // VK test disabled due to unhandled global inst

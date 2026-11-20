@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain
-//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=BUF):
+//TEST:COMPARE_COMPUTE(targets=all-dx11-dx12-wgpu, filecheck-buffer=BUF):
 
 // Test that pointer casts in GLSL generate constructor-style casts instead of C-style casts
 // This addresses issue https://github.com/shader-slang/slang/issues/7838

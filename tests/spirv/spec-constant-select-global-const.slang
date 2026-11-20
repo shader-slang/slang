@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

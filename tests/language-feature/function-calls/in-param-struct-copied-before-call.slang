@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-dx12, filecheck-buffer=CHECK):-output-using-type
 
 // A struct `in` parameter receives a copy of its argument taken before the call, so it keeps the
 // old value when the same variable is also passed to a parameter that the call writes. These cases

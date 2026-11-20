@@ -2,7 +2,7 @@
 // values for float/half literals. Rounding mode is the standard IEEE 754
 // round to nearest, ties to even.
 
-//TEST:COMPARE_COMPUTE(targets=vk+glsl+dx12+metal+cuda+cpu, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all-dx11-wgpu, filecheck-buffer=CHECK):
 
 // WGSL does not have uint16_t, which is needed for verification. See issue #11835
 

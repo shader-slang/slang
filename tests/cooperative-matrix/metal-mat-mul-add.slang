@@ -1,4 +1,4 @@
-//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // (2.0 * 3.0) * 8 + 1.0 = 49.0
 // CHECK: type: float

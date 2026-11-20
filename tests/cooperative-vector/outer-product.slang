@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-render-feature cooperative-vector -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-glsl-cuda, filecheck-buffer=CHECK):-render-feature cooperative-vector -output-using-type
 
 // HLSL doesn't support the training operations
 

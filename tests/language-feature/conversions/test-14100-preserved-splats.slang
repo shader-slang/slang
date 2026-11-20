@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-metal-wgpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 // The core module splats builtin scalar and enum sources into vectors with `__builtin_cast`,
 // and splats a one-element vector into a vector of the same element type. These conversions

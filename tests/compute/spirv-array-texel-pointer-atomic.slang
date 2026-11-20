@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute -Wno-41024
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF): -output-using-type -xslang -Wno-41024
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-wgpu-llvm, filecheck-buffer=BUF): -output-using-type -xslang -Wno-41024
 
 //TEST_INPUT: RWTexture2D(format=R32Uint, size=4, content = zero, arrayLength=2, mipMaps = 1):name rwTexture2DArray
 [[vk::binding(2)]]

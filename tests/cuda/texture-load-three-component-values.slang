@@ -3,7 +3,7 @@
 // gradient texture stores x / 3 in red, y / 3 in green, 0 in blue and 1 in alpha, and both texels
 // read here have red, green and alpha all different, so a reordered or shifted component (alpha in
 // place of red or blue, for example) changes the output. The CPU lane checks the same values.
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-llvm, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: Texture2D(size=4, content=gradient, format=RGBA32Float):name t2
 Texture2D<float3> t2;

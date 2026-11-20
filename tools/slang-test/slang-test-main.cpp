@@ -8386,10 +8386,8 @@ int main(int argc, char** argv)
     signal(SIGPIPE, SIG_IGN);
 #endif
 
-#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
-    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
-    _set_abort_behavior(0, _WRITE_ABORT_MSG);
-#endif
+    // Suppress modal dialogs in unattended/LLM-driven builds.
+    Slang::TestToolUtil::suppressDebugDialogs();
 
     // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);

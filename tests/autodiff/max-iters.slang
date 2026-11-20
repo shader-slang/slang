@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+dx12+metal+cuda+wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all-cpu-llvm, filecheck-buffer=CHECK):-output-using-type
 
 // Note: there is a bug in fxc compiler errorneously reporting infinite loop for this shader.
 // Skipping d3d11 test to avoid the bug.

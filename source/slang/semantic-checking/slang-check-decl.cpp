@@ -1049,10 +1049,12 @@ private:
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
 };
 
+/// Walk declaration references in syntax and checked values.
 template<typename VisitorType>
 struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
                                        public StmtVisitor<VisitorType>,
                                        public ExprVisitor<VisitorType>,
+                                       public ConditionClauseVisitor<VisitorType>,
                                        public ValVisitor<VisitorType>,
                                        public DeclVisitor<VisitorType>
 {
@@ -1260,9 +1262,19 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        if (expr->baseExpression)
-            dispatchIfNotNull(expr->baseExpression->type.type);
-        dispatchIfNotNull(expr->declRef.declRefBase);
+        // Delegate to visitDeclRefExpr so a static-member reference gets full
+        // parity with every other member reference: the referenced member's
+        // [require]s, any requirements carried by the member's type, and any
+        // requirements carried by the base expression all propagate, exactly
+        // as visitMemberExpr delivers them for instance members. The declRefBase
+        // walk alone never reaches the inner member decl of the MemberDeclRef
+        // or LookupDeclRef that a generic parent or witness builds (its Decl
+        // operand is ValNodeOperandKind::ASTNode, not ValNodeOperandKind::ValNode),
+        // so without this delegation the member's requirements are silently
+        // dropped. Static-member references therefore now contribute their type
+        // and base decls to collectReferencedDecls too, matching MemberExpr.
+        dispatchIfNotNull(expr->baseExpression);
+        visitDeclRefExpr(expr);
     }
     void visitInitializerListExpr(InitializerListExpr* expr)
     {
@@ -1405,6 +1417,21 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->innerExpr);
     }
 
+    // Condition clause visitor
+
+    void visitExprConditionClause(ExprConditionClause* conditionClause)
+    {
+        dispatchIfNotNull(conditionClause->expr);
+    }
+
+    void visitDeclConditionClause(DeclConditionClause* conditionClause)
+    {
+        dispatchIfNotNull(conditionClause->decl);
+        // The implicit conversion to `bool` can introduce references beyond those
+        // in the declaration's type and initializer.
+        dispatchIfNotNull(conditionClause->predicateExpr);
+    }
+
     // Stmt Visitor
 
     void visitDeclStmt(DeclStmt* stmt) { dispatchIfNotNull(stmt->decl); }
@@ -1425,7 +1452,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDoWhileStmt(DoWhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        ConditionClauseVisitor<VisitorType>::dispatch(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 
@@ -1466,7 +1493,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitIfStmt(IfStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        ConditionClauseVisitor<VisitorType>::dispatch(stmt->condition);
         dispatchIfNotNull(stmt->positiveStatement);
         dispatchIfNotNull(stmt->negativeStatement);
     }
@@ -1492,7 +1519,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitWhileStmt(WhileStmt* stmt)
     {
-        dispatchIfNotNull(stmt->predicate);
+        ConditionClauseVisitor<VisitorType>::dispatch(stmt->condition);
         dispatchIfNotNull(stmt->statement);
     }
 
@@ -2434,12 +2461,18 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
     // in case it crosses module boundaries.
     //
     //
-    if (!isScalarIntegerType(varDecl->type))
+    if (!isInitializerFoldedByDeclarationCheck(varDecl))
         return nullptr;
     return tryConstantFoldDeclRef(
         DeclRef<VarDeclBase>(varDecl),
         ConstantFoldingKind::SpecializationConstant,
-        nullptr);
+        nullptr,
+        /*isDeclarationCheck*/ true);
+}
+
+bool SemanticsVisitor::isInitializerFoldedByDeclarationCheck(VarDeclBase* varDecl)
+{
+    return isScalarIntegerType(varDecl->type);
 }
 
 void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceDecl)
@@ -3237,8 +3270,17 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
                  varDecl->findModifier<HLSLStaticModifier>()))
             {
+                // A variable whose type is inferred has its initializer checked above, so we
+                // fold it as usual. Otherwise the initializer is checked only in the body phase,
+                // and folding an unchecked expression would produce untyped values, so we fold
+                // only a literal initializer, which needs no checking.
                 varDecl->val =
-                    tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
+                    varDecl->isChecked(DeclCheckState::DefinitionChecked)
+                        ? tryConstantFoldExpr(
+                              varDecl->initExpr,
+                              ConstantFoldingKind::LinkTime,
+                              nullptr)
+                        : tryFoldUncheckedLiteralInitializer(varDecl->type.type, varDecl->initExpr);
             }
         }
     }
@@ -13778,6 +13820,14 @@ static bool _incrementEnumerator(IntegerLiteralValue& value, BaseType baseType, 
         {
             value = 1;
             return true;
+        }
+
+        // A signed tag type stores its top bit as a negative value. For example, the `int8_t`
+        // flag after 0x40 is 0x80, which is -128 in `int8_t`.
+        if (info.flags & BaseTypeInfo::Flag::Signed)
+        {
+            const unsigned excessBits = 64U - significantBits;
+            value = static_cast<int64_t>(static_cast<uint64_t>(value) << excessBits) >> excessBits;
         }
 
         return false;

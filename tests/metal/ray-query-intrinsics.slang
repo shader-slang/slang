@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=LIB): -target metallib -stage compute -entry computeMain
-//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type -render-feature ray-query
+//TEST(metal):COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -render-feature ray-query
 
 // MTL-DAG: get_candidate_instance_id
 // MTL-DAG: get_candidate_user_instance_id

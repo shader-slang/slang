@@ -1363,6 +1363,20 @@ err(
     span { loc = "location" }
 )
 
+warning(
+    "target-defined-value",
+    30005,
+    "target-defined value",
+    span { loc = "location", message = "the value of expression ~arg0Val ~op ~arg1Val is target-defined." }
+)
+
+warning(
+    "target-defined-float-conversion",
+    30036,
+    "target-defined value",
+    span { loc = "location", message = "converting ~value to '~type:Type' is target-defined." }
+)
+
 err(
     "break-outside-loop",
     30003,
@@ -1461,6 +1475,13 @@ err(
     30025,
     "array size must be non-negative",
     span { loc = "location", message = "array size must be non-negative." }
+)
+
+err(
+    "array-size-too-large",
+    30034,
+    "array size too large",
+    span { loc = "location", message = "array size must not exceed 2147483647." }
 )
 
 err(
@@ -1636,6 +1657,13 @@ err(
     30443,
     "trailing `const` is only allowed in the HLSL dialect",
     span { loc = "modifier:Modifier", message = "C++-style trailing `const` requires the HLSL-flavored dialect (use a `.hlsl` file or pass `-lang hlsl`)." }
+)
+
+err(
+    "variable-declaration-not-allowed-as-condition",
+    30444,
+    "a variable declaration is not allowed as a condition",
+    span { loc = "location" }
 )
 
 err(

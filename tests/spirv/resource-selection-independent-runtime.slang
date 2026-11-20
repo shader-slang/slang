@@ -1,7 +1,7 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type -Xslang -O0
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type -Xslang -O1
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type -xslang -DMANUAL -Xslang -O0
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK): -output-using-type -xslang -DMANUAL -Xslang -O1
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK): -output-using-type -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK): -output-using-type -Xslang -O1
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm, filecheck-buffer=CHECK): -output-using-type -xslang -DMANUAL -Xslang -O0
+//TEST:COMPARE_COMPUTE(targets=all-cuda-cpu-llvm, filecheck-buffer=CHECK): -output-using-type -xslang -DMANUAL -Xslang -O1
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -validate-ir -validate-ir-detailed
 

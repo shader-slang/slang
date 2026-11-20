@@ -4,7 +4,7 @@
 
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=TINT): -target wgsl-spirv-asm -entry computeMain -stage compute
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu+wgpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // WGSL-DAG: (u32(0) - {{.*}})
 // WGSL-DAG: (vec2<u32>(0) - {{.*}})

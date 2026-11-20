@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for issue #7748: Dictionary key collision in multi-level break processing
 // This test specifically exercises the case of "continue inside a switch that is inside a for loop"

@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -validate-ir
-//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=NUMERIC): -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=NUMERIC): -output-using-type
 
 // CUDA: __global__ void computeMain(
 

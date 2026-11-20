@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk+metal+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 // Regression test for treating nominal structs as structural types during type-flow. Recursing
 // into `Square.extra` made `Optional<Square>` appear non-concrete, so the none branch retyped the

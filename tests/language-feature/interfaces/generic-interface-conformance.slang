@@ -1,6 +1,6 @@
 // Test that we allow type conformances whose base interface is generic.
 
-//TEST:COMPARE_COMPUTE(targets=vk+dx11, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 public interface ITestInterface<Real : IFloat> {
     Real sample();

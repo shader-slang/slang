@@ -3,7 +3,7 @@
 // are boxed into existentials, stored to a buffer, loaded back as existentials,
 // and dispatched through the interface.
 
-//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(8)]
 interface IFoo

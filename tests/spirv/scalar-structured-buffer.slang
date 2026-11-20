@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
+//TEST:COMPARE_COMPUTE(targets=all-wgpu, filecheck-buffer=CHECK):
 
 float getData<L:IBufferDataLayout>(StructuredBuffer<float3, L> p, int index)
 {
