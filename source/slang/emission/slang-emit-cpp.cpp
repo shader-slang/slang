@@ -1945,7 +1945,8 @@ void CPPSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     // GCC across expressions; either does it wherever the target has FMA instructions (x86-64
     // with FMA3, every AArch64). This is the source-level form of the `-ffp-contract=off` that
     // the GCC/Clang downstream compilers get on the command line in precise mode, so it also
-    // holds when the generated source is compiled elsewhere. It comes before the prelude, so the
+    // holds when the generated source is compiled elsewhere, unless that build passes
+    // `-ffp-contract=fast`, which overrides these pragmas. It comes before the prelude, so the
     // prelude's inline functions are compiled under it too. The previous settings are saved here
     // and restored at the end of the module (see `emitModuleImpl`), so code that follows a
     // generated header keeps its own contraction setting.
