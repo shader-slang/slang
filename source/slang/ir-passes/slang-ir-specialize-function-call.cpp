@@ -52,6 +52,22 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         if (as<IRSPIRVResourceHeap>(arg) || as<IRSPIRVSamplerHeap>(arg))
             return true;
 
+        // A `SPIRVLoadDescriptorFromHeap` selects an opaque descriptor from the
+        // descriptor heap (`heap[index]`). It is not a data load — it has no byte
+        // offset and no side effects — so it is safe to move into a specialized
+        // callee exactly like an element access. We do so for byte-address-buffer
+        // values: threading the fetched value through the parameter would leave a
+        // byte-address-buffer parameter behind for the byte-address legalization
+        // pass to retype, so the fetch itself must move into the callee. Other
+        // resource parameters keep the existing value-threading shape their callers
+        // already reconstruct.
+        if (arg->getOp() == kIROp_SPIRVLoadDescriptorFromHeap &&
+            as<IRByteAddressBufferTypeBase>(arg->getDataType()))
+        {
+            arg = arg->getOperand(0);
+            continue;
+        }
+
         // As we will see later, we can also
         // specialize a call when the argument
         // is the result of indexing into an
@@ -74,11 +90,6 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         // 0) is, so we trace through it to that base. Without this case a bindless
         // resource argument would not be recognized as specializable.
         case kIROp_CastDynamicResource:
-        // A `SPIRVLoadDescriptorFromHeap` selects an opaque descriptor from the
-        // descriptor heap (`heap[index]`). It is not a data load — it has no byte
-        // offset and no side effects — so it is safe to move into a specialized
-        // callee exactly like an element access.
-        case kIROp_SPIRVLoadDescriptorFromHeap:
             {
                 auto base = arg->getOperand(0);
 
