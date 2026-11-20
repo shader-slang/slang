@@ -1483,14 +1483,23 @@ struct ResourceSelectionContext
         }
 
         auto after = builder.createBlock();
-        func->addBlock(after);
         List<IRBlock*> arms;
         for (Index i = 0; i < alternatives.getCount(); i++)
+            arms.add(builder.createBlock());
+        // The arms and their merge block are inserted right after the block being split
+        // instead of being appended to the end of the function. The merge block receives
+        // the instructions that follow the split point, and IR consumers (most notably
+        // the function cloner that call specialization uses) require the block list
+        // order to match dominance order; appending would place those instructions'
+        // definitions after the existing blocks that use them. The inliner keeps the
+        // same adjacency when it splits a block around an inlined call.
+        IRInst* listTail = builder.getBlock();
+        for (auto arm : arms)
         {
-            auto arm = builder.createBlock();
-            func->addBlock(arm);
-            arms.add(arm);
+            arm->insertAfter(listTail);
+            listTail = arm;
         }
+        after->insertAfter(listTail);
         if (condition)
             builder.emitIfElse(condition, arms[0], arms[1], after);
         else
