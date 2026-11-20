@@ -18563,7 +18563,7 @@ uint WaveGetNumWaves()
 /// WaveReadLaneFirst(SV_GroupIndex / WaveGetLaneCount()): all lanes of a wave return the
 /// quotient of its first active lane. That is the wave index only if the lanes of each wave
 /// have consecutive group indices; HLSL does not guarantee that for all hardware and workgroup
-/// shapes.
+/// shapes. Where they do not, the value also depends on which lanes are active.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
