@@ -18561,9 +18561,11 @@ uint WaveGetNumWaves()
 /// On HLSL with Shader Model 6.10 or later it lowers to GetGroupWaveIndex. Earlier shader
 /// models have no wave index, so it is computed as
 /// WaveReadLaneFirst(SV_GroupIndex / WaveGetLaneCount()): all lanes of a wave return the
-/// quotient of its first active lane. That is the wave index only if the lanes of each wave
-/// have consecutive group indices; HLSL does not guarantee that for all hardware and workgroup
-/// shapes. Where they do not, the value also depends on which lanes are active.
+/// quotient of its first active lane. That is the wave index only if each wave consists of
+/// exactly the lanes with one quotient, i.e. the group indices from i * WaveGetLaneCount() to
+/// (i + 1) * WaveGetLaneCount() - 1 for wave i; HLSL does not guarantee that for all hardware
+/// and workgroup shapes. Where the lanes of a wave have different quotients, the value also
+/// depends on which lanes are active.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -18622,10 +18624,11 @@ uint WaveGetWaveIndex()
             {
                 uint groupIndex = __builtinGroupIndex;
                 uint waveSize = WaveGetLaneCount();
-                // Where the lanes of a wave have consecutive group indices, the quotient is the
-                // same for all of them. We take the value of the first lane, which makes that
-                // known to the downstream compiler, so it keeps the index and the values derived
-                // from it in scalar registers instead of one copy per lane.
+                // Where the group indices of a wave are in one range
+                // [i * waveSize, (i + 1) * waveSize), the quotient is the same for all its lanes.
+                // We take the value of the first lane, which makes that known to the downstream
+                // compiler, so it keeps the index and the values derived from it in scalar
+                // registers instead of one copy per lane.
                 return WaveReadLaneFirst(groupIndex / waveSize);
             }
         default:
