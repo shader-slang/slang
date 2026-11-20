@@ -46,7 +46,12 @@ endif()
 # SPIRV-Headers (header-only; provides spirv/unified1/spirv.h)
 if(NOT TARGET spirv-headers)
     add_library(spirv-headers INTERFACE)
-    if(
+    if(TARGET SPIRV-Headers::SPIRV-Headers)
+        target_link_libraries(
+            spirv-headers
+            INTERFACE SPIRV-Headers::SPIRV-Headers
+        )
+    elseif(
         SPVDB_SLANG_EXTERNAL_DIR
         AND EXISTS "${SPVDB_SLANG_EXTERNAL_DIR}/spirv-headers/include"
     )
@@ -90,7 +95,9 @@ endif()
 
 # nlohmann/json (header-only) — reuse Slang's submodule if present, else fetch.
 if(NOT TARGET nlohmann_json)
-    if(
+    if(TARGET nlohmann_json::nlohmann_json)
+        add_library(nlohmann_json ALIAS nlohmann_json::nlohmann_json)
+    elseif(
         SPVDB_SLANG_EXTERNAL_DIR
         AND EXISTS
             "${SPVDB_SLANG_EXTERNAL_DIR}/nlohmann-json/include/nlohmann/json.hpp"

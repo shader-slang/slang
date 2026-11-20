@@ -259,6 +259,7 @@ advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LUA "Build slang-fiddle using system Lua" OFF)
 advanced_option(SLANG_USE_SYSTEM_CMARK "Build using system cmark-gfm" OFF)
 advanced_option(SLANG_USE_SYSTEM_FAST_FLOAT "Build using system fast_float" OFF)
+advanced_option(SLANG_USE_SYSTEM_NLOHMANN_JSON "Build using system nlohmann/json" OFF)
 advanced_option(
     SLANG_USE_SYSTEM_VULKAN_HEADERS
     "Build using system Vulkan headers"
@@ -636,6 +637,10 @@ if(SLANG_USE_SYSTEM_CMARK)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(CMARK REQUIRED IMPORTED_TARGET GLOBAL libcmark-gfm)
     add_library(libcmark-gfm ALIAS PkgConfig::CMARK)
+endif()
+
+if(SLANG_USE_SYSTEM_NLOHMANN_JSON)
+    find_package(nlohmann_json CONFIG REQUIRED)
 endif()
 
 if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
