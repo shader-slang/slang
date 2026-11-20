@@ -1382,6 +1382,28 @@ static int _getCPPAtomicMemoryOrder(IRInst* inst, IROp op)
         else if (order == kIRMemoryOrder_AcquireRelease)
             order = kIRMemoryOrder_Release;
     }
+    else if (op == kIROp_AtomicCompareExchange && inst->getOperandCount() > 4)
+    {
+        // The helper takes one order and derives the order of a failed exchange from it (the
+        // same order without its release). Strengthen that order so the derived one is at least
+        // the requested failure order (operand 4). For example, a success order of `Relaxed`
+        // with a failure order of `Acquire` becomes `Acquire`. Using an order stronger than
+        // requested is always allowed.
+        if (auto failLit = as<IRIntLit>(inst->getOperand(4)))
+        {
+            auto failOrder = int(failLit->getValue());
+            if (failOrder == kIRMemoryOrder_SeqCst)
+                order = kIRMemoryOrder_SeqCst;
+            else if (
+                failOrder == kIRMemoryOrder_Acquire || failOrder == kIRMemoryOrder_AcquireRelease)
+            {
+                if (order == kIRMemoryOrder_Relaxed)
+                    order = kIRMemoryOrder_Acquire;
+                else if (order == kIRMemoryOrder_Release)
+                    order = kIRMemoryOrder_AcquireRelease;
+            }
+        }
+    }
     return order;
 }
 
