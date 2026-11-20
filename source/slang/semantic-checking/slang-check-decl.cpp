@@ -10919,7 +10919,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // This applies to *every* kind of requirement (methods, associated types,
     // constraints, ...). In particular it covers the cases where conformance
     // synthesis deliberately supplied a witness that a fresh re-derivation below
-    // would reject -- e.g. an `enum`'s automatic `__BuiltinEnumType` conformance
+    // would reject -- e.g. an `enum`'s automatic `__RestrictedEnumType` conformance
     // supplies the `__Tag : __BuiltinIntegerType` witness directly, including for
     // a `bool`-tagged `enum` where `bool` is a permitted tag type yet does not
     // actually conform to `__BuiltinIntegerType`. Respecting a synthesis-provided
@@ -13579,18 +13579,18 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
     decl->tagType = tagType;
 
 
-    // Every enum conforms to __BuiltinEnumType, whose tag and logical-operation requirements do
+    // Every enum conforms to __RestrictedEnumType, whose tag and logical-operation requirements do
     // not promise construction from arbitrary integers. Install this before __EnumType below,
     // so ordinary inherited-interface checking reuses this canonical tag witness.
     {
-        Type* enumTypeType = getASTBuilder()->getBuiltinEnumType();
+        Type* enumTypeType = getASTBuilder()->getRestrictedEnumType();
 
         InheritanceDecl* enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
         enumConformanceDecl->loc = decl->loc;
         enumConformanceDecl->base.type = enumTypeType;
         decl->addMember(enumConformanceDecl);
 
-        // The `__BuiltinEnumType` interface has a required member, the `__Tag` type.
+        // The `__RestrictedEnumType` interface has a required member, the `__Tag` type.
         // We need to satisfy this requirement automatically, rather than require
         // the user to actually declare a member with this name (otherwise we wouldn't
         // let them define a tag value with the name `__Tag`).
@@ -13626,9 +13626,9 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         // Okay, add the conformance witness for `__Tag` being satisfied by `tagType`
         witnessTable->add(tagAssociatedTypeDecl, RequirementWitness(tagType));
 
-        // `__BuiltinEnumType` constrains its `__Tag` associated type with
+        // `__RestrictedEnumType` constrains its `__Tag` associated type with
         // `__Tag : __BuiltinIntegerType`. In the unified representation that bound is a
-        // constraint requirement of the `__BuiltinEnumType` interface (a sibling of `__Tag`),
+        // constraint requirement of the `__RestrictedEnumType` interface (a sibling of `__Tag`),
         // so this compiler-synthesized conformance must supply its witness too --
         // otherwise the conformance check would re-derive it and reject permitted tag
         // types. For an integer tag type the witness is the real subtype witness; for

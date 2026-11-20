@@ -2494,7 +2494,7 @@ public:
     /// accepts (one carrying `UnscopedEnumAttribute`, from either `-unscoped-enum`
     /// or an explicit `[UnscopedEnum]` — see that predicate for the exact routes),
     /// in a translation unit using the HLSL-flavored dialect, and never for `bool`
-    /// (which already has its own implicit conversion from any `__BuiltinEnumType`).
+    /// (which already has its own implicit conversion from any `__RestrictedEnumType`).
     bool isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.

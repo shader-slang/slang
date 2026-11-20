@@ -856,9 +856,9 @@ class DynamicType : public BuiltinType
     FIDDLE(...)
 };
 
-// The built-in `__BuiltinEnumType` interface shared by all enums.
+// The built-in `__RestrictedEnumType` interface shared by all enums.
 FIDDLE()
-class BuiltinEnumType : public BuiltinType
+class RestrictedEnumType : public BuiltinType
 {
     FIDDLE(...)
 };

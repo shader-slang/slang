@@ -986,10 +986,11 @@ interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPoint
 
 //@ hidden:
 
-// The common contract of every enum, including enums with capability-restricted cases.
+// This enum contract excludes arbitrary integer construction. All enums implement it; ordinary
+// enums also implement __EnumType below, which adds integer constructors.
 [builtin]
-__magic_type(BuiltinEnumType)
-interface __BuiltinEnumType : __LogicalType
+__magic_type(RestrictedEnumType)
+interface __RestrictedEnumType : __LogicalType
 {
     // The type of tags for this `enum`
     //
@@ -1003,7 +1004,7 @@ interface __BuiltinEnumType : __LogicalType
 // which case's requirements the caller must satisfy.
 [builtin]
 __magic_type(EnumTypeType)
-interface __EnumType : __BuiltinEnumType, ILogical
+interface __EnumType : __RestrictedEnumType, ILogical
 {
     __builtin_requirement($((int)BuiltinRequirementKind::InitLogicalFromInt))
     __init(__Tag value);
@@ -1347,7 +1348,7 @@ $}
         // the needed features in our type system to implement
         // that constraint right now.
         //
-        __generic<T:__BuiltinEnumType>
+        __generic<T:__RestrictedEnumType>
         __intrinsic_op($(kIROp_IntCast))
         __init(T value);
 
@@ -1733,7 +1734,7 @@ extension bool : IRangedValue
     __intrinsic_op($(kIROp_CastPtrToBool))
     __init($(fullPtrType) ptr);
 
-    __generic<T : __BuiltinEnumType>
+    __generic<T : __RestrictedEnumType>
     __implicit_conversion($(kConversionCost_IntegerTruncate))
     [__unsafeForceInlineEarly]
     __init(T v)
@@ -3023,7 +3024,8 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     // decides which element types a source can splat into, and supplies the `constraint+` cost.
     // A user-defined conversion such as `float.__init(float3)` therefore does not make `float3`
     // implicitly convertible to `float4`, and an enum source always splats its tag value. The enum
-    // splat is a separate overload because `__BuiltinEnumType` does not refine `__BuiltinScalarType`.
+    // splat is a separate overload because `__RestrictedEnumType` does not refine
+    // `__BuiltinScalarType`.
     __implicit_conversion(constraint+)
     [__unsafeForceInlineEarly]
     [__readNone]
@@ -3037,7 +3039,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     [__unsafeForceInlineEarly]
     [__readNone]
     [TreatAsDifferentiable]
-    __init<FromType : __BuiltinEnumType>(FromType value) where ToType(FromType) implicit
+    __init<FromType : __RestrictedEnumType>(FromType value) where ToType(FromType) implicit
     {
         this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
     }
@@ -3681,11 +3683,11 @@ void endInvocationInterlock();
 
 //@ hidden:
 
-__generic<E : __BuiltinEnumType>
+__generic<E : __RestrictedEnumType>
 __intrinsic_op($(kIROp_Eql))
 bool operator==(E left, E right);
 
-__generic<E : __BuiltinEnumType>
+__generic<E : __RestrictedEnumType>
 __intrinsic_op($(kIROp_Neq))
 bool operator!=(E left, E right);
 
@@ -4000,22 +4002,22 @@ T operator ^=(in out T v0, T v1)
 // them directly to intrinsic op to allow constant propagation at AST level to
 // work on enum types.
 
-__generic<T : __BuiltinEnumType>
+__generic<T : __RestrictedEnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitAnd))
 T operator &(T v0, T v1);
 
-__generic<T : __BuiltinEnumType>
+__generic<T : __RestrictedEnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitOr))
 T operator |(T v0, T v1);
 
-__generic<T : __BuiltinEnumType>
+__generic<T : __RestrictedEnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitXor))
 T operator ^(T v0, T v1);
 
-__generic<T : __BuiltinEnumType>
+__generic<T : __RestrictedEnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitNot))
 __prefix T operator ~(T v0);

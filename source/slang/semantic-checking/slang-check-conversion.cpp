@@ -1786,7 +1786,7 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
 bool SemanticsVisitor::isEnumToBuiltinScalarConversionEnabled(EnumDecl* enumDecl, Type* toType)
 {
     // Only builtin scalars are eligible, and `bool` is excluded: it already has
-    // a dedicated implicit conversion from any `__BuiltinEnumType` (core.meta.slang),
+    // a dedicated implicit conversion from any `__RestrictedEnumType` (core.meta.slang),
     // so routing it through the enum->tag->bool composite would introduce a
     // second, competing representation of the same conversion.
     auto toBasicType = as<BasicExpressionType>(toType);
@@ -2824,7 +2824,7 @@ bool SemanticsVisitor::_coerce(
     // `T` exactly — and no scalar builtin declares an implicit initializer
     // with an opaque generic parameter type (a contingent core-module
     // property, pinned by generic-arithmetic-coerce-diag.slang). The one
-    // exception is `bool` (`__init<T : __BuiltinEnumType>(T)` in core.meta.slang),
+    // exception is `bool` (`__init<T : __RestrictedEnumType>(T)` in core.meta.slang),
     // so `bool` targets are excluded. Everything else stays on the search
     // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
     // scalars such as `BFloat16`/FP8 (which do declare generic initializers).

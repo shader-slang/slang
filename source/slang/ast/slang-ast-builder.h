@@ -34,7 +34,7 @@ public:
     /// Get the enum type type
     Type* getEnumTypeType();
     /// Get the common interface implemented by every enum.
-    Type* getBuiltinEnumType();
+    Type* getRestrictedEnumType();
     /// Get the __Dynamic type
     Type* getDynamicType();
     /// Get the NullPtr type
@@ -118,7 +118,7 @@ protected:
     Type* m_stringType = nullptr;
     Type* m_nativeStringType = nullptr;
     Type* m_enumTypeType = nullptr;
-    Type* m_builtinEnumType = nullptr;
+    Type* m_restrictedEnumType = nullptr;
     Type* m_dynamicType = nullptr;
     Type* m_nullPtrType = nullptr;
     Type* m_noneType = nullptr;
@@ -625,7 +625,7 @@ public:
     Type* getNullPtrType() { return m_sharedASTBuilder->getNullPtrType(); }
     Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
-    Type* getBuiltinEnumType() { return m_sharedASTBuilder->getBuiltinEnumType(); }
+    Type* getRestrictedEnumType() { return m_sharedASTBuilder->getRestrictedEnumType(); }
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
 
     Type* getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness);

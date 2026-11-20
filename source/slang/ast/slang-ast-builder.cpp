@@ -90,14 +90,14 @@ Type* SharedASTBuilder::getEnumTypeType()
     return m_enumTypeType;
 }
 
-Type* SharedASTBuilder::getBuiltinEnumType()
+Type* SharedASTBuilder::getRestrictedEnumType()
 {
-    if (!m_builtinEnumType)
+    if (!m_restrictedEnumType)
     {
-        auto decl = findMagicDecl("BuiltinEnumType");
-        m_builtinEnumType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
+        auto decl = findMagicDecl("RestrictedEnumType");
+        m_restrictedEnumType = DeclRefType::create(m_astBuilder, makeDeclRef<Decl>(decl));
     }
-    return m_builtinEnumType;
+    return m_restrictedEnumType;
 }
 
 Type* SharedASTBuilder::getDynamicType()
