@@ -1401,7 +1401,7 @@ void __wgsl_check_texture_type_texel_offset()
 {
      __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
 
-     static_assert(Shape.flavor != $(SLANG_TEXTURE_2D) || Shape.flavor != $(SLANG_TEXTURE_3D)
+     static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D)
          , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
 }
 
@@ -1626,6 +1626,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "Sample with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1638,11 +1639,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case metal:
                 return __getTexture().Sample(__getSampler(), location, offset);
             case glsl:
-                __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $2)$z";
+                __intrinsic_asm "$ctextureOffset($0, $1, $2)$z";
             case spirv:
                 return spirv_asm [__assumeValidResourceOperands]
                 {
-                    OpCapability MinLod;
                     %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
                     __truncate $$T result __sampledType(T) %__sampled;
                 };
@@ -1657,6 +1657,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
+        static_assert(!(Shape is __ShapeCube), "Sample with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1684,6 +1685,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     T Sample(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "Sample with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1747,6 +1749,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1776,6 +1779,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, sm_5_0)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1805,6 +1809,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1843,6 +1848,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -1883,6 +1889,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmp with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1918,6 +1926,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, sm_5_0)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmp with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -1947,6 +1957,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevelZero with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -1982,6 +1994,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, sm_5_0)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevelZero with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -1999,6 +2013,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case glsl:
@@ -2058,6 +2073,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevel with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case glsl:
@@ -2108,6 +2125,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevel with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -2135,6 +2154,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         __target_switch
         {
@@ -2165,6 +2185,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
@@ -2195,6 +2216,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
@@ -2224,6 +2246,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -2277,6 +2300,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
@@ -2318,6 +2342,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
@@ -2454,8 +2479,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
             case hlsl:
@@ -2483,8 +2509,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
             case hlsl:
@@ -2510,8 +2537,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, sm_5_0)]
-    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
@@ -2648,6 +2676,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleLevel with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
             case hlsl:
@@ -2676,6 +2705,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [require(hlsl_spirv, sm_5_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleLevel with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
@@ -3148,6 +3178,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "Sample with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3213,6 +3244,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0_fragment)]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
+        static_assert(!(Shape is __ShapeCube), "Sample with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3261,6 +3293,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [ForceInline]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "Sample with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3364,6 +3397,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3427,6 +3461,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, sm_5_0)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3459,6 +3494,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3514,6 +3550,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -3548,6 +3585,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmp with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3597,6 +3636,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, sm_5_0)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmp with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3628,6 +3669,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevelZero with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -3660,6 +3703,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, sm_5_0)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevelZero with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -3677,6 +3722,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case glsl:
@@ -3737,6 +3783,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevel with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case glsl:
@@ -3789,6 +3837,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpLevel with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -3818,6 +3868,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         __target_switch
         {
@@ -3847,6 +3898,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
@@ -3877,6 +3929,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
@@ -3908,6 +3961,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -3958,6 +4012,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
@@ -3998,6 +4053,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
@@ -4096,8 +4152,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset)
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
             case cpp:
@@ -4161,8 +4218,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [ForceInline]
     __glsl_extension(GL_ARB_sparse_texture_clamp)
     [require(cpp_glsl_hlsl_metal_spirv, texture_sm_4_0)]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp)
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
             case cpp:
@@ -4210,8 +4268,9 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, sm_5_0)]
-    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float lodClamp, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
@@ -4393,6 +4452,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleLevel with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
             case cpp:
@@ -4457,6 +4517,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [require(hlsl_spirv, sm_5_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
+        static_assert(!(Shape is __ShapeCube), "SampleLevel with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
         case hlsl:
@@ -4637,6 +4698,7 @@ vector<T.Element,4> __texture_gather_offset(
     vector<int, Shape.planeDimensions> offset,
     int component)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     static const int isMS = 0;
     static const int isCombined = 0;
 
@@ -4702,6 +4764,7 @@ vector<T.Element,4> __texture_gather_offset(
     vector<int, Shape.planeDimensions> offset,
     int component)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     __target_switch
     {
     case glsl:
@@ -4724,6 +4787,7 @@ vector<T.Element,4> __texture_gather_offsets(
     constexpr vector<int, Shape.planeDimensions> offset4,
     int component)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     __target_switch
     {
     case glsl:
@@ -4761,6 +4825,7 @@ vector<T.Element,4> __texture_gather_offsets(
     constexpr vector<int, Shape.planeDimensions> offset4,
     int component)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     __target_switch
     {
     case glsl:
@@ -4862,6 +4927,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     T.Element compareValue,
     vector<int, Shape.planeDimensions> offset)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     static const int isMS = 0;
     static const int isCombined = 0;
 
@@ -4915,6 +4981,7 @@ vector<T.Element,4> __texture_gatherCmp_offset(
     T.Element compareValue,
     vector<int, Shape.planeDimensions> offset)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     __target_switch
     {
     case glsl:
@@ -4939,6 +5006,7 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
     vector<int, Shape.planeDimensions> offset3,
     vector<int, Shape.planeDimensions> offset4)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     __target_switch
     {
     case glsl:
@@ -4973,6 +5041,7 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
     vector<int, Shape.planeDimensions> offset3,
     vector<int, Shape.planeDimensions> offset4)
 {
+    static_assert(!(Shape is __ShapeCube), "Gather with offset is not supported for TextureCube or TextureCubeArray");
     __target_switch
     {
     case glsl:
