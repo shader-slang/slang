@@ -127,9 +127,11 @@ float F32_frexp(float x, int* e);
 float F32_modf(float x, float* ip);
 
 // Ternary
+// A fused multiply-add rounds once. `a * b + c` would only be fused if the compiler contracts it,
+// which it does not under `-fp-mode precise`, so call the builtin.
 SLANG_FORCE_INLINE float F32_fma(float a, float b, float c)
 {
-    return a * b + c;
+    return __builtin_fmaf(a, b, c);
 }
 
 SLANG_PRELUDE_EXTERN_C_END
@@ -389,7 +391,7 @@ double F64_modf(double x, double* ip);
 // Ternary
 SLANG_FORCE_INLINE double F64_fma(double a, double b, double c)
 {
-    return a * b + c;
+    return __builtin_fma(a, b, c);
 }
 
 SLANG_PRELUDE_EXTERN_C_END
