@@ -1716,6 +1716,65 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_spirv, texture_sm_4_1_clamp_fragment)]
+    T Sample(vector<float, Shape.dimensions+isArray> location, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "Sample with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().Sample(__getSampler(), location, clamp);
+        case glsl:
+            __intrinsic_asm "$ctextureClampARB($0, $1, $2)$z";
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location MinLod $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T Sample(vector<float, Shape.dimensions+isArray> location, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "Sample with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().Sample(__getSampler(), location, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location MinLod $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias)
     {
@@ -1776,6 +1835,35 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
+    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp);
+        case metal:
+            return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp);
+        case glsl:
+            __intrinsic_asm "$ctextureOffsetClampARB($0, $1, $3, $2, $4)$z";
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset|MinLod $bias $offset $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(hlsl_spirv, sm_5_0)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
@@ -1791,12 +1879,74 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case spirv:
             return spirv_asm [__assumeValidResourceOperands]
             {
+                OpCapability MinLod;
                 OpCapability SparseResidency;
                 %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset $bias $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset|MinLod $bias $offset $clamp;
                 %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
                 %__sampled:__sampledType(T) = OpCompositeExtract  %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
+    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleBias(__getSampler(), location, bias, clamp);
+        case metal:
+            return __getTexture().SampleBias(__getSampler(), location, bias, clamp);
+        case glsl:
+            __intrinsic_asm "$ctextureClampARB($0, $1, $2, $3)$z";
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|MinLod $bias $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleBias(__getSampler(), location, bias, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|MinLod $bias $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
                 OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
@@ -1840,6 +1990,60 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             };
         case wgsl:
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, sm_5_0)]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmp with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, clamp);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue MinLod $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmp with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue MinLod $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
         }
     }
 
@@ -1920,6 +2124,30 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, sm_5_0)]
+    float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmp with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset, clamp);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue ConstOffset|MinLod $offset $clamp;
+            };
+        }
+    }
 
     [__readNone]
     [ForceInline]
@@ -2005,6 +2233,25 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset, status);
         case spirv:
             return SampleCmpLevel(location, compareValue, 0.0, offset, status);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpLevelZero with residency status and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, status);
+        case spirv:
+            return SampleCmpLevel(location, compareValue, 0.0, status);
         }
     }
 
@@ -2151,6 +2398,35 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, sm_6_7)]
+    [require(spirv, texture_shadowlod, spvSparseResidency)]
+    float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpLevel with residency status and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod $level;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
@@ -2214,6 +2490,116 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset, clamp);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset|MinLod $gradX $gradY $offset $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowgrad)]
+    [require(spirv, texture_shadowgrad, spvSparseResidency)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset|MinLod $gradX $gradY $offset $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(Shape is __ShapeCube, "SampleCmpGrad with a minimum LOD clamp and no offset is available only for TextureCube");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, clamp);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad|MinLod $gradX $gradY $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowgrad)]
+    [require(spirv, texture_shadowgrad, spvSparseResidency)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(Shape is __ShapeCube, "SampleCmpGrad with a minimum LOD clamp and no offset is available only for TextureCube");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|MinLod $gradX $gradY $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(spirv, texture_shadowgrad, spvSparseResidency)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
@@ -2221,11 +2607,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
-        case hlsl:
-            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
-                , "HLSL supports only float and half type textures");
-            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset, status);
         case spirv:
             return spirv_asm [__assumeValidResourceOperands]
             {
@@ -2340,10 +2721,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, texture_shadowbias)]
-    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
-        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -2351,7 +2732,112 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
-            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset, status);
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset, clamp);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset|MinLod $bias $offset $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowbias)]
+    [require(spirv, texture_shadowbias, spvSparseResidency)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset|MinLod $bias $offset $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowbias)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, clamp);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias|MinLod $bias $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowbias)]
+    [require(spirv, texture_shadowbias, spvSparseResidency)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|MinLod $bias $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(spirv, texture_shadowbias, spvSparseResidency)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
         case spirv:
             return spirv_asm [__assumeValidResourceOperands]
             {
@@ -2566,6 +3052,65 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleGrad with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, clamp);
+        case metal:
+            return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, clamp);
+        case glsl:
+            __intrinsic_asm "$ctextureGradClampARB($0, $1, $2, $3, $4)$z";
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|MinLod $gradX $gradY $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleGrad with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, clamp, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $this $location Grad|MinLod $gradX $gradY $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level)
     {
@@ -2720,6 +3265,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
                 %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod|ConstOffset $level $offset;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleLevel with residency status and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleLevel(__getSampler(), location, level, status);
+        case spirv:
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod $level;
                 %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
                 %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
@@ -3326,6 +3901,67 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_spirv, texture_sm_4_1_clamp_fragment)]
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "Sample with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".Sample";
+        case glsl:
+            __intrinsic_asm "$ctextureClampARB($p, $2, $3)$z";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location MinLod $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "Sample with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".Sample";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location MinLod $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias)
     {
@@ -3458,6 +4094,53 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
+    T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleBias";
+        case metal:
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    __intrinsic_asm "$c$0.sample($1, ($2).xy, uint(($2).z), bias($3), min_lod_clamp($5), $4)$z";
+                }
+            }
+            else
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                case $(SLANG_TEXTURE_3D):
+                    __intrinsic_asm "$c$0.sample($1, $2, bias($3), min_lod_clamp($5), $4)$z";
+                }
+            }
+            __intrinsic_asm "<invalid intrinsic>";
+        case glsl:
+            __intrinsic_asm "$ctextureOffsetClampARB($p, $2, $4, $3, $5)$z";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias|ConstOffset|MinLod $bias $offset $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(hlsl_spirv, sm_5_0)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
@@ -3487,6 +4170,76 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 __truncate $$T result __sampledType(T) %__sampled;
             };
        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
+    T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleBias";
+        case metal:
+            if (isArray == 1)
+            {
+                __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), bias($3), min_lod_clamp($4))$z";
+            }
+            else
+            {
+                __intrinsic_asm "$c$0.sample($1, $2, bias($3), min_lod_clamp($4))$z";
+            }
+        case glsl:
+            __intrinsic_asm "$ctextureClampARB($p, $2, $3, $4)$z";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias|MinLod $bias $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleBias";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location Bias|MinLod $bias $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
     }
 
     [__readNone]
@@ -3542,6 +4295,62 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             }
             __intrinsic_asm "textureSampleCompare($0, $1, $2, $3)";
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, sm_5_0)]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmp with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmp";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue MinLod $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmp with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmp";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue MinLod $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
         }
     }
 
@@ -3634,6 +4443,31 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, sm_5_0)]
+    float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmp with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmp";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue ConstOffset|MinLod $offset $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, sm_5_0)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmp with offset is not supported for TextureCube or TextureCubeArray");
@@ -3714,6 +4548,25 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             __intrinsic_asm ".SampleCmpLevelZero";
         case spirv:
             return SampleCmpLevel(s, location, compareValue, 0.0, offset, status);
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpLevelZero with residency status and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpLevelZero";
+        case spirv:
+            return SampleCmpLevel(s, location, compareValue, 0.0, status);
         }
     }
 
@@ -3865,6 +4718,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    [require(hlsl, sm_6_7)]
+    [require(spirv, texture_shadowlod, spvSparseResidency)]
+    float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpLevel with residency status and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpLevel";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Lod $level;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
@@ -3927,11 +4810,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, texture_shadowgrad)]
-    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
-        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __target_switch
         {
         case hlsl:
@@ -3943,11 +4826,120 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm [__assumeValidResourceOperands]
             {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset|MinLod $gradX $gradY $offset $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowgrad)]
+    [require(spirv, texture_shadowgrad, spvSparseResidency)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset|MinLod $gradX $gradY $offset $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(spirv, texture_shadowgrad, spvSparseResidency)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 %__sparseResultType = OpTypeStruct $$uint $$float;
 
                 %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(Shape is __ShapeCube, "SampleCmpGrad with a minimum LOD clamp and no offset is available only for TextureCube");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Grad|MinLod $gradX $gradY $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowgrad)]
+    [require(spirv, texture_shadowgrad, spvSparseResidency)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(Shape is __ShapeCube, "SampleCmpGrad with a minimum LOD clamp and no offset is available only for TextureCube");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Grad|MinLod $gradX $gradY $clamp;
 
                 %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
                 OpStore &status %__residentCode;
@@ -4051,10 +5043,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [__readNone]
     [ForceInline]
     [require(hlsl_spirv, texture_shadowbias)]
-    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp)
     {
-        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
         __requireComputeDerivative();
         __target_switch
         {
@@ -4067,11 +5059,120 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm [__assumeValidResourceOperands]
             {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset|MinLod $bias $offset $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowbias)]
+    [require(spirv, texture_shadowbias, spvSparseResidency)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset|MinLod $bias $offset $clamp;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(spirv, texture_shadowbias, spvSparseResidency)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __Shape3D), "Comparison sampling is not supported for 3D textures");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                 %__sparseResultType = OpTypeStruct $$uint $$float;
 
                 %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowbias)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue Bias|MinLod $bias $clamp;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, texture_shadowbias)]
+    [require(spirv, texture_shadowbias, spvSparseResidency)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleCmpBias with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue Bias|MinLod $bias $clamp;
 
                 %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
                 OpStore &status %__residentCode;
@@ -4299,6 +5400,74 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
+    __glsl_extension(GL_ARB_sparse_texture_clamp)
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1_clamp_fragment)]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp)
+    {
+        static_assert(Shape is __ShapeCube, "SampleGrad with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleGrad";
+        case metal:
+            if (isArray == 1)
+            {
+                __intrinsic_asm "$c$0.sample($1, ($2).xyz, uint(($2).w), gradientcube($3, $4), min_lod_clamp($5))$z";
+            }
+            else
+            {
+                __intrinsic_asm "$c$0.sample($1, $2, gradientcube($3, $4), min_lod_clamp($5))$z";
+            }
+        case glsl:
+            __intrinsic_asm "$ctextureGradClampARB($p, $2, $3, $4, $5)$z";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|MinLod $gradX $gradY $clamp;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, float clamp, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleGrad with a minimum LOD clamp and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleGrad";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Grad|MinLod $gradX $gradY $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level)
     {
@@ -4509,6 +5678,37 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
                 __intrinsic_asm "textureSampleLevel($0, $1, $2, $3, $4)$z";
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl, sm_5_0)]
+    [require(spirv, sm_5_0, spvSparseResidency)]
+    T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, out uint status)
+    {
+        static_assert(Shape is __ShapeCube, "SampleLevel with residency status and no offset is available only for TextureCube and TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleLevel";
+        case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
+            return spirv_asm [__assumeValidResourceOperands]
+            {
+                OpCapability SparseResidency;
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Lod $level;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
+
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
+            };
         }
     }
 

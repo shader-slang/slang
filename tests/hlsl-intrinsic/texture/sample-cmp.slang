@@ -74,8 +74,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += shadowMap1D.SampleCmpGrad(shadowSampler, input.texCoord.x, input.depth, ddx1, ddy1, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += shadowMap1D.SampleCmpGrad(shadowSampler, input.texCoord.x, input.depth, ddx1, ddy1, offset1, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpGrad
@@ -91,8 +91,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += sampler1DShadow.SampleCmpGrad(input.texCoord.x, input.depth, ddx1, ddy1, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += sampler1DShadow.SampleCmpGrad(input.texCoord.x, input.depth, ddx1, ddy1, offset1, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -109,8 +109,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += shadowMap1D.SampleCmpBias(shadowSampler, input.texCoord.x, input.depth, bias, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += shadowMap1D.SampleCmpBias(shadowSampler, input.texCoord.x, input.depth, bias, offset1, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -126,8 +126,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += sampler1DShadow.SampleCmpBias(input.texCoord.x, input.depth, bias, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += sampler1DShadow.SampleCmpBias(input.texCoord.x, input.depth, bias, offset1, 0.0, status);
 #endif
 
     // ===== Texture1DArray Tests =====
@@ -146,8 +146,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += shadowMap1DArray.SampleCmpGrad(shadowSampler, texCoord1DArray, input.depth, ddx1, ddy1, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += shadowMap1DArray.SampleCmpGrad(shadowSampler, texCoord1DArray, input.depth, ddx1, ddy1, offset1, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpGrad
@@ -164,8 +164,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += sampler1DArrayShadow.SampleCmpGrad(texCoord1DArray, input.depth, ddx1, ddy1, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += sampler1DArrayShadow.SampleCmpGrad(texCoord1DArray, input.depth, ddx1, ddy1, offset1, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -181,8 +181,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += shadowMap1DArray.SampleCmpBias(shadowSampler, texCoord1DArray, input.depth, bias, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += shadowMap1DArray.SampleCmpBias(shadowSampler, texCoord1DArray, input.depth, bias, offset1, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -198,8 +198,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += sampler1DArrayShadow.SampleCmpBias(texCoord1DArray, input.depth, bias, offset1, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += sampler1DArrayShadow.SampleCmpBias(texCoord1DArray, input.depth, bias, offset1, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpGrad
@@ -215,8 +215,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += shadowMap2D.SampleCmpGrad(shadowSampler, input.texCoord, input.depth, ddx2, ddy2, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += shadowMap2D.SampleCmpGrad(shadowSampler, input.texCoord, input.depth, ddx2, ddy2, offset2, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpGrad
@@ -232,8 +232,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += sampler2DShadow.SampleCmpGrad(input.texCoord, input.depth, ddx2, ddy2, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += sampler2DShadow.SampleCmpGrad(input.texCoord, input.depth, ddx2, ddy2, offset2, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -249,8 +249,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += shadowMap2D.SampleCmpBias(shadowSampler, input.texCoord, input.depth, bias, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += shadowMap2D.SampleCmpBias(shadowSampler, input.texCoord, input.depth, bias, offset2, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -266,8 +266,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += sampler2DShadow.SampleCmpBias(input.texCoord, input.depth, bias, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += sampler2DShadow.SampleCmpBias(input.texCoord, input.depth, bias, offset2, 0.0, status);
 #endif
 
     float3 texCoord2DArray = float3(input.texCoord, 0);
@@ -285,8 +285,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += shadowMap2DArray.SampleCmpGrad(shadowSampler, texCoord2DArray, input.depth, ddx2, ddy2, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += shadowMap2DArray.SampleCmpGrad(shadowSampler, texCoord2DArray, input.depth, ddx2, ddy2, offset2, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpGrad
@@ -302,8 +302,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpGrad
     //CHECK_DXIL: dx.op.sampleCmpGrad.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset
-    shadow += sampler2DArrayShadow.SampleCmpGrad(texCoord2DArray, input.depth, ddx2, ddy2, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefExplicitLod {{.*}} Grad|ConstOffset|MinLod
+    shadow += sampler2DArrayShadow.SampleCmpGrad(texCoord2DArray, input.depth, ddx2, ddy2, offset2, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -320,8 +320,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += shadowMap2DArray.SampleCmpBias(shadowSampler, texCoord2DArray, input.depth, bias, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += shadowMap2DArray.SampleCmpBias(shadowSampler, texCoord2DArray, input.depth, bias, offset2, 0.0, status);
 #endif
 
     //CHECK_HLSL: SampleCmpBias
@@ -337,8 +337,8 @@ PSOutput fragmentMain(PSInput input)
 #ifdef USE_SPARSE
     //CHECK_HLSL: SampleCmpBias
     //CHECK_DXIL: dx.op.sampleCmpBias.f32
-    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset
-    shadow += sampler2DArrayShadow.SampleCmpBias(texCoord2DArray, input.depth, bias, offset2, status);
+    //CHECK_SPIRV: OpImageSparseSampleDrefImplicitLod {{.*}} Bias|ConstOffset|MinLod
+    shadow += sampler2DArrayShadow.SampleCmpBias(texCoord2DArray, input.depth, bias, offset2, 0.0, status);
 #endif
 
     // ===== TextureCube Tests =====
