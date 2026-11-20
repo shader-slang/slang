@@ -1998,7 +1998,12 @@ public:
 
     Scope* getScope(SyntaxNode* node);
 
-    /// Diagnose use of a deprecated or removed declaration at `loc`.
+    /// Diagnose use of a declaration carrying a usage attribute at `loc`.
+    ///
+    /// Covers the three usage attributes, in order: `[RemovedSince]` (an error once the
+    /// module's language version reaches the removal version), `[__diagnoseOnUse]` (an
+    /// error at any reference, version-independent), and `[deprecated]` (a warning). The
+    /// first attribute that applies is the only one reported.
     ///
     /// Requires a resolved `declRef` and a diagnostic sink. Uses the current module's language
     /// version to decide whether removal applies; reports nothing when no module is available.

@@ -1293,7 +1293,21 @@ Modifier* SemanticsVisitor::validateAttribute(
     }
     else if (auto diagnoseOnUseAttr = as<DiagnoseOnUseAttribute>(attr))
     {
-        SLANG_ASSERT(attr->args.getCount() == 1);
+        // The generic argument/parameter matching in `checkAttribute` only diagnoses a
+        // too-small argument list, so we check the count here rather than assert it:
+        // the parser accepts any comma-separated list, and this attribute is reachable
+        // from user code, where an assert would abort debug builds and be undefined
+        // behavior in release builds.
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
 
         String message;
         if (!checkLiteralStringVal(attr->args[0], &message))

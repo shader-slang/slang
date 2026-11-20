@@ -3479,21 +3479,33 @@ $}
 // The `*` shapes below have no element-wise meaning: a matrix against a vector, or two
 // matrices of different shapes. A call with those operands would otherwise fail overload
 // resolution with a plain "no overload" error and a long list of unrelated candidate notes.
-// These fallback declarations occupy exactly those shapes at a low overload rank, and carry
+// These fallback declarations cover those shapes at a low overload rank, and carry
 // `[__diagnoseOnUse]`, so referencing one is an error that names the `mul` spelling:
 //
 //     float4x4 m; float4 v;
-//     float4 r = m * v; // error: use of '*' is an error: ... use 'mul(m, v)' instead.
+//     float4 r = m * v; // error: use of '*' is an error: '*' does not define a
+//                       // matrix-vector product in Slang; use 'mul(m, v)' instead.
 //
-// They are declared here, beside the real `operator*` family, and constrained to
-// `__BuiltinArithmeticType` like the generic real overloads, so that a real overload wins
-// every resolution where both apply: overload comparison ranks conversion cost ahead of
-// overload rank, and a scalar operand can broadcast into the fallback's vector parameter,
-// so the fallback must pay at least the same witness cost as the real overloads for its
-// element-family constraint to stay behind them. The declarations have no body: there is no
-// element-wise `matrix * vector` to lower, and the algebraic product belongs to `mul`; the
-// only purpose of these declarations is to be selected by resolution when nothing real
-// applies, and report the error.
+// A fallback is only ever *selected* for the invalid shapes: overload comparison ranks the
+// per-argument conversion cost ahead of overload rank, so a real overload whose parameters
+// fit the operands exactly (including the scalar broadcast forms, which a scalar operand
+// reaches at zero cost through them) wins before the rank tie-break is ever consulted, and
+// the rank of -10 then loses every remaining tie — to the rank-10 generic forms, to the
+// unranked per-type forms, and to the glsl module's rank-15 algebraic products in GLSL
+// operator scope. The mixed-shape declaration also applies to same-shape products, where it
+// loses that same tie and the element-wise result stands.
+//
+// The `__BuiltinArithmeticType` constraint mirrors the generic real overloads' element
+// family. It keeps the hint to element families where `mul` applies, and it is what keeps
+// the fallbacks out of generic bodies with narrowly constrained element parameters (for
+// example the stdlib's `__BuiltinFloatingPointType`-constrained matrix generics): a fallback
+// constrained to that narrower family gets selected for `matrix * scalar` calls inside such
+// bodies and takes over resolutions the real overloads should win, so the constraint must
+// match the real family rather than narrow it.
+//
+// The declarations have no body: there is no element-wise `matrix * vector` to lower, and
+// the algebraic product belongs to `mul`; the only purpose of these declarations is to be
+// selected by resolution when nothing real applies, and report the error.
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [OverloadRank(-10)]
 [__diagnoseOnUse("'*' does not define a matrix-vector product in Slang; use 'mul(m, v)' instead.")]
@@ -5119,9 +5131,12 @@ attribute_syntax [RemovedSince(languageVersion: int, message: String)] : Removed
 /// @param message The diagnostic message to show when the declaration is referenced.
 ///
 /// Unlike `[deprecated]` (a warning) and `[RemovedSince]` (an error tied to a language
-/// version), this attribute is unconditional. It applies at any reference, including
-/// the reference overload resolution materializes when it selects a candidate carrying
-/// the attribute as the chosen overload.
+/// version), this attribute does not depend on the module's language version: the error
+/// applies at any reference. That includes the reference overload resolution materializes
+/// for the candidate it selects, so an overload-resolution candidate carrying the attribute
+/// reports the error when it is the chosen candidate. A declaration that also carries
+/// `[RemovedSince]` reports the removal error instead once the module's language version
+/// reaches the removal version.
 __attributeTarget(DeclBase)
 attribute_syntax [__diagnoseOnUse(message: String)] : DiagnoseOnUseAttribute;
 

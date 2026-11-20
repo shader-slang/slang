@@ -3497,7 +3497,7 @@ err(
 err(
     "diagnose-on-use",
     31233,
-    "use of a declaration with a use-diagnostic",
+    "use of a declaration marked as an error on use",
     span { loc = "location", message = "use of '~decl:Decl' is an error: ~message" }
 )
 

@@ -353,8 +353,11 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     SourceLoc loc,
     Expr* originalExpr)
 {
-    // Usage attributes depend on the language version of the module being checked.
-    // We first look for that module in the current lexical scope.
+    // Usage attributes depend on the language version of the module being checked
+    // (`[RemovedSince]` only applies once the version reaches the removal version;
+    // `[deprecated]` reports its warning version-independently, and so does
+    // `[__diagnoseOnUse]`). We first look for that module in the current lexical
+    // scope; a query with no module context reports nothing for any of the three.
     ModuleDecl* moduleDecl = getModuleDecl(getOuterScope());
 
     // Some semantic queries run outside a lexical module scope. We then try the module
@@ -423,11 +426,13 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
         }
     }
 
-    // A `[__diagnoseOnUse]` declaration is an unconditional reference error, independent of
-    // the module's language version, so we report it before the deprecation warning and stop:
-    // a declaration carrying both reports only this error. This is also the path that turns a
-    // diagnostic-carrying fallback overload into an error: overload resolution selects it as
-    // the chosen candidate only when no real overload applies, and the reference it then
+    // A `[__diagnoseOnUse]` declaration is a reference error that does not depend on the
+    // module's language version. The three usage attributes are checked in a fixed order,
+    // and the first one that applies wins: a removed declaration reports its removal error,
+    // then this attribute reports its error, and only a declaration carrying none of the
+    // first two falls through to the deprecation warning. This is also the path that turns
+    // a diagnostic-carrying fallback overload into an error: overload resolution selects it
+    // as the chosen candidate only when no real overload applies, and the reference it then
     // materializes flows through this check.
     if (auto diagnoseOnUseAttr = declRef.getDecl()->findModifier<DiagnoseOnUseAttribute>())
     {

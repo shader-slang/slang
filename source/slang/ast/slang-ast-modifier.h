@@ -2173,9 +2173,11 @@ class RemovedSinceAttribute : public Attribute
 /// the target declaration is an error that reports the given message. In
 /// particular, an overload-resolution candidate carrying this attribute can be
 /// selected as the winner (when no real overload applies), and materializing
-/// that reference reports the error. A reference formed through a type (such
-/// as constructor selection via `int4(...)`) does not flow through declaration
-/// reference checking, so the attribute is not diagnosed for those.
+/// that reference reports the error. A constructor selected through a
+/// multi-argument type call such as `int4(1, 2, 3, 4)` is materialized as a
+/// declaration reference too, so the attribute is diagnosed for it; only a
+/// single-argument coercion, which routes through `coerce()` instead of
+/// declaration reference checking, bypasses this check.
 ///
 FIDDLE()
 class DiagnoseOnUseAttribute : public Attribute
