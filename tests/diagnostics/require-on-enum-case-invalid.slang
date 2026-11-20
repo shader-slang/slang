@@ -4,7 +4,7 @@
 // checking path, so an unknown [require] capability name on a case is
 // diagnosed with E36105 (unknown capability name) and an unrecognized
 // attribute is diagnosed with warning E31000 (unknown attribute name) —
-// neither is silently swallowed now that case attributes parse.
+// both are diagnosed on the case itself.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKINVALID,non-exhaustive):-target hlsl -entry computeMain -stage compute
 

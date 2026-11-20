@@ -28,6 +28,13 @@
 // resolves under `-unscoped-enum`) references the spirv-gated case by its
 // unqualified name: the module-scope alias the name resolves to must carry
 // the case's requirements, so it must fail with E36107.
+// The eleventh mirrors the tenth's success side: the unqualified spelling of
+// a case the target satisfies must compile clean, pinning that the alias join
+// propagates exactly the case's own requirements.
+// The twelfth pins the parser design itself: case names that collide with
+// registered modifier keywords (`point`, `linear`, `sample`) must keep
+// parsing, with or without a leading attribute — a `ParseModifiers`-based
+// parse would consume them as modifiers and reject the enum.
 //
 // The `if (v == ...)` in each entry point exercises the operator-position
 // reference form in addition to the initializing assignment.
@@ -42,6 +49,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNION_CASE_ON_HLSL,exit-code=0):-target hlsl -entry computeMainUnion -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=TAG_BOUNDARY_ON_HLSL,exit-code=0):-target hlsl -entry computeMainTag -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=UNSCOPED_ON_HLSL,non-exhaustive):-target hlsl -unscoped-enum -entry computeMainUnscoped -stage compute -DTEST_UNSCOPED
+//DIAGNOSTIC_TEST:SIMPLE(diag=UNSCOPED_OK,exit-code=0):-target hlsl -unscoped-enum -entry computeMainUnscopedOk -stage compute -DTEST_UNSCOPED_OK
+//DIAGNOSTIC_TEST:SIMPLE(diag=KEYWORD_NAMES,exit-code=0):-target hlsl -entry computeMainKeywordNames -stage compute
 
 enum MyEnum
 {
@@ -75,6 +84,19 @@ enum TagEnum
     A = 0,
 
     B = A,
+};
+
+// `point`, `linear` and `sample` are registered modifier keywords, so a
+// `ParseModifiers`-based parse of enum cases would consume them as modifiers
+// and reject this enum; bracket-only attribute parsing keeps them as names.
+enum FilterMode
+{
+    [require(hlsl)]
+    point = 0,
+
+    linear = 1,
+
+    sample = 2,
 };
 
 #ifdef TEST_MIXED
@@ -154,7 +176,7 @@ void computeMainMixed(uint3 tid : SV_DispatchThreadID)
 
 #ifdef TEST_UNSCOPED
 // Under `-unscoped-enum` the unqualified `FirstValue` resolves to the
-// module-scope alias the parser synthesizes for the case.
+// enclosing-scope alias the parser synthesizes for the case.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMainUnscoped(uint3 tid : SV_DispatchThreadID)
@@ -165,6 +187,33 @@ void computeMainUnscoped(uint3 tid : SV_DispatchThreadID)
     }
 }
 #endif
+
+#ifdef TEST_UNSCOPED_OK
+// The unqualified spelling of a case the target satisfies must compile clean:
+// the alias join propagates exactly the case's own requirements, no more.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMainUnscopedOk(uint3 tid : SV_DispatchThreadID)
+{
+    MyEnum v = SecondValue;
+    if (v == SecondValue)
+    {
+    }
+}
+#endif
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMainKeywordNames(uint3 tid : SV_DispatchThreadID)
+{
+    FilterMode m = FilterMode.point;
+    if (m == FilterMode.linear)
+    {
+    }
+    if (m == FilterMode.sample)
+    {
+    }
+}
 
 //SPIRV_CASE_ON_HLSL: E36107
 //WHOLE_ENUM_ON_HLSL: E36107
