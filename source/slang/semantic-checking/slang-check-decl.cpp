@@ -2325,12 +2325,18 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
     // in case it crosses module boundaries.
     //
     //
-    if (!isScalarIntegerType(varDecl->type))
+    if (!isInitializerFoldedByDeclarationCheck(varDecl))
         return nullptr;
     return tryConstantFoldDeclRef(
         DeclRef<VarDeclBase>(varDecl),
         ConstantFoldingKind::SpecializationConstant,
-        nullptr);
+        nullptr,
+        /*isDeclarationCheck*/ true);
+}
+
+bool SemanticsVisitor::isInitializerFoldedByDeclarationCheck(VarDeclBase* varDecl)
+{
+    return isScalarIntegerType(varDecl->type);
 }
 
 void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceDecl)
@@ -3128,8 +3134,17 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
                  varDecl->findModifier<HLSLStaticModifier>()))
             {
+                // A variable whose type is inferred has its initializer checked above, so we
+                // fold it as usual. Otherwise the initializer is checked only in the body phase,
+                // and folding an unchecked expression would produce untyped values, so we fold
+                // only a literal initializer, which needs no checking.
                 varDecl->val =
-                    tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
+                    varDecl->isChecked(DeclCheckState::DefinitionChecked)
+                        ? tryConstantFoldExpr(
+                              varDecl->initExpr,
+                              ConstantFoldingKind::LinkTime,
+                              nullptr)
+                        : tryFoldUncheckedLiteralInitializer(varDecl->type.type, varDecl->initExpr);
             }
         }
     }
@@ -13601,6 +13616,14 @@ static bool _incrementEnumerator(IntegerLiteralValue& value, BaseType baseType, 
         {
             value = 1;
             return true;
+        }
+
+        // A signed tag type stores its top bit as a negative value. For example, the `int8_t`
+        // flag after 0x40 is 0x80, which is -128 in `int8_t`.
+        if (info.flags & BaseTypeInfo::Flag::Signed)
+        {
+            const unsigned excessBits = 64U - significantBits;
+            value = static_cast<int64_t>(static_cast<uint64_t>(value) << excessBits) >> excessBits;
         }
 
         return false;
