@@ -1634,6 +1634,7 @@ struct ByteAddressBufferLegalizationContext
             // element type. The layout operand is preserved when the type carries one,
             // and the default layout is used otherwise.
             auto dataLayout = structuredBufferType->getDataLayout();
+            SLANG_ASSERT(structuredBufferType->getOperandCount() <= 2);
             IRInst* typeOperands[2] = {
                 elementType,
                 dataLayout ? dataLayout : m_builder.getType(kIROp_DefaultBufferLayoutType)};
