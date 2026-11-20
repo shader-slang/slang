@@ -1,0 +1,54 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "version": "1.1",
+    "parameters": [
+
+    ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+
+        ]
+    },
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
+            "result": {
+                "stage": "fragment",
+                "binding": {"kind": "varyingOutput", "index": 0},
+                "semanticName": "SV_TARGET",
+                "type": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
+                }
+            },
+            "userAttribs": [
+                {
+                    "name": "RootSignature",
+                    "arguments": [
+                        "DescriptorTable(SRV(t0))"
+                    ]
+                }
+            ]
+        }
+    ],
+    "bindlessSpaceIndex": 0
+}
+}
