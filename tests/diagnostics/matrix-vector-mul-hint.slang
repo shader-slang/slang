@@ -74,3 +74,17 @@ void computeMain()
     // CHECK: error[E39999]: no overload for '*=' applicable to arguments of type (matrix<float,4,4>, vector<float,4>)
     // CHECK-NOT: E40026
 }
+
+// Generic bodies over narrowly constrained element types keep working: the fallback family
+// shares the real overloads' element constraint, so inside a generic with
+// T : __BuiltinFloatingPointType, `matrix * scalar` resolves to the real broadcast
+// overload without any error, while `matrix * vector` reports the fallback hint.
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+vector<T,N> genericBody(matrix<T,N,M> m, vector<T,M> v, T s)
+{
+    matrix<T,N,M> scaled = m * s; // the real scalar broadcast applies: no error
+    vector<T,N> r = m * v;
+    return r;
+}
+// CHECK: error[E31233]: use of a declaration marked as an error on use
+// CHECK: use of '*' is an error: '*' does not define a matrix-vector product in Slang; use 'mul(m, v)' instead.
