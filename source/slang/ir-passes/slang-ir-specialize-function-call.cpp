@@ -55,31 +55,25 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
 
         // The resource-heap instruction is hoisted to module scope, so any
         // specialized callee can refer to it directly, just like a global
-        // parameter. Only byte-address-buffer fetches trace into this leaf,
-        // so the sampler heap never appears here.
+        // parameter.
         if (isSPIRVResourceHeapInst(arg))
             return true;
 
         // A `SPIRVLoadDescriptorFromHeap` selects an opaque descriptor from the
-        // descriptor heap (`heap[index]`): no byte offset, no side effects, so it
+        // resource heap (`heap[index]`): no byte offset, no side effects, so it
         // is safe to move into a specialized callee exactly like an element
-        // access. We trace it only when the fetched value is a byte-address
-        // buffer, whose alternative — threading the value through the parameter —
+        // access. Threading a fetched byte-address buffer through the parameter
         // would leave a byte-address-buffer parameter behind for the byte-address
-        // legalization pass to retype. A heap fetch of any other resource type
-        // therefore leaves the whole call unspecialized (`canSpecializeCall`
-        // accepts a call only when every wanting parameter is suitable), which is
-        // a known limitation for signatures mixing, say, a heap-fetched texture
-        // with a heap-fetched byte-address buffer. The case sits before the
-        // switch so the traced heap operand re-enters the loop at the heap-leaf
-        // check above instead of falling through the switch's default.
+        // legalization pass to retype, and `canSpecializeCall` accepts a call only
+        // when every wanting parameter is suitable, so mixed-signature calls with
+        // any unsuitable fetch stay entirely unspecialized — accepting every
+        // resource-heap fetch closes both cases. The case sits before the switch
+        // so the traced heap operand re-enters the loop at the heap-leaf check
+        // above instead of falling through the switch's default.
         if (auto loadDescriptorFromHeap = as<IRSPIRVLoadDescriptorFromHeap>(arg))
         {
-            if (as<IRByteAddressBufferTypeBase>(loadDescriptorFromHeap->getDataType()))
-            {
-                arg = loadDescriptorFromHeap->getHeap();
-                continue;
-            }
+            arg = loadDescriptorFromHeap->getHeap();
+            continue;
         }
 
         // As we will see later, we can also
@@ -886,10 +880,10 @@ struct FunctionParameterSpecializationContext
     // Returns true if `inst` is an instruction of the form `base[index]` where the
     // base is a value a caller can specialize a callee on: an element access into
     // an array or structured buffer, or a descriptor selection from the resource
-    // heap. `isParamSuitableForSpecialization` decides which heap fetches a call
-    // may specialize on (byte-address-buffer-typed ones), and `canSpecializeCall`
-    // rejects the whole call when any wanting parameter's argument is unsuitable,
-    // so its callers only see heap fetches that passed that gate.
+    // heap. `isParamSuitableForSpecialization` accepts any resource-heap fetch,
+    // and `canSpecializeCall` rejects the whole call when any wanting parameter's
+    // argument is unsuitable, so its callers only see heap fetches that passed
+    // that gate.
     static bool isElementAccessInst(IRInst* inst)
     {
         switch (inst->getOp())

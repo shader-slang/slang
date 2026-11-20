@@ -12,6 +12,11 @@
 // fetch moves into the specialized callee and every access takes its own
 // element-type view.
 //
+// The last entry pins the mixed-signature shape: a heap-fetched texture and a
+// heap-fetched byte-address buffer in one call, next to a differently-typed
+// global load. Specialization is all-or-nothing, so widening the fetch form to
+// every resource-heap fetch is what lets that call specialize at all.
+//
 // Every entry is gated on spirv-val via -validate-with-downstream-compiler,
 // and the CHECK lines additionally pin the emitted typed structured-buffer
 // blocks, so the test still fails on a broken compiler on machines where the
@@ -24,6 +29,7 @@
 //TEST:SIMPLE(filecheck=HELPERS): -target spirv-asm -entry mainHeapHelpers -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
 //TEST:SIMPLE(filecheck=NOINLINE): -target spirv-asm -entry mainNoInline -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
 //TEST:SIMPLE(filecheck=RW): -target spirv-asm -entry mainRW -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
+//TEST:SIMPLE(filecheck=MIXED): -target spirv-asm -entry mainMixedSig -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
 
 ByteAddressBuffer buf;
 RWByteAddressBuffer rwBuf;
@@ -49,6 +55,14 @@ uint readWordNoInline(ByteAddressBuffer b, uint offset)
 void writeWord(RWByteAddressBuffer b, uint offset, uint value)
 {
     b.Store(offset, value);
+}
+
+void readTexAndWord(Texture2D<float4> t, ByteAddressBuffer b)
+{
+    float w, h;
+    t.GetDimensions(w, h);
+    uint i = b.Load(0);
+    outBuf[0] = w + h + float(i);
 }
 
 [shader("compute")]
@@ -110,6 +124,19 @@ void mainRW(uint3 tid : SV_DispatchThreadID)
     outBuf[0] = float(tid.z);
 }
 
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainMixedSig(uint3 tid : SV_DispatchThreadID)
+{
+    // The mixed-signature shape: a heap-fetched texture and a heap-fetched
+    // byte-address buffer passed to one helper. Specialization is all-or-nothing,
+    // so both fetches must be specializable or neither parameter survives into
+    // byte-address legalization.
+    readTexAndWord(ResourceDescriptorHeap[tid.x], ResourceDescriptorHeap[tid.y]);
+    float2 v = buf.Load<float2>(0);
+    outBuf[1] = v.x + v.y;
+}
+
 // The uint-element block is the view used by the heap-fetch callee; the
 // float-element block is `buf`'s view at the accessed element type, which the
 // broken compiler never produces (it reuses the uint view instead).
@@ -139,3 +166,9 @@ void mainRW(uint3 tid : SV_DispatchThreadID)
 // RW: %RWStructuredBuffer_0 = OpTypeStruct %_runtimearr_float
 // RW: OpAccessChain %_ptr_StorageBuffer_float %rwBuf
 // RW-NOT: ByteAddressBuffer
+
+// MIXED: OpCapability DescriptorHeapEXT
+// MIXED: %StructuredBuffer = OpTypeStruct %_runtimearr_uint
+// MIXED: %StructuredBuffer_0 = OpTypeStruct %_runtimearr_v2float
+// MIXED: OpAccessChain %_ptr_StorageBuffer_v2float %buf
+// MIXED-NOT: ByteAddressBuffer
