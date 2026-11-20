@@ -1,5 +1,5 @@
 // mutating-method-syn.slang
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):
 // Test ability to directly output SPIR-V
 
 interface IFoo
@@ -28,11 +28,11 @@ int test<T:IFoo>(inout T f, inout int y)
 RWStructuredBuffer<int> result;
 [numthreads(1,1,1)]
 void computeMain()
-{    
+{
     Val v;
     int y = 0;
     v.x = 1;
-    
+
     // CHECK: 1
     result[0] = test(v, y);
 }

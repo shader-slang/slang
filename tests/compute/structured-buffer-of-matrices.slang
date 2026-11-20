@@ -11,10 +11,8 @@
 // output on all targets, correctly respecting the user's
 // request for row-major layout via command-line option.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -compile-arg -O3 -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -xslang -matrix-layout-row-major -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -matrix-layout-row-major -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cpu):-compile-arg -O3 -xslang -matrix-layout-row-major
+//TEST:COMPARE_COMPUTE(targets=all):-xslang -matrix-layout-row-major
 
 
 // Note: we are using a buffer of floating-point matrices, but fill it with integer

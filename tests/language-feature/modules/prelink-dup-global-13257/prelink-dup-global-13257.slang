@@ -10,7 +10,7 @@
 // rejects (a `_DEBUG`-only check; Release silently tolerated the duplicate). This test must load
 // and run.
 //
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 import shading;
 

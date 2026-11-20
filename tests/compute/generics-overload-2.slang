@@ -1,5 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test overload resolution for nested generic definitions
 
@@ -27,7 +26,7 @@ struct Foo
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint tid = dispatchThreadID.x + 2;
-	
+
 	Foo<float> obj;
 
 	float outVal = obj.test(tid, 0.f);

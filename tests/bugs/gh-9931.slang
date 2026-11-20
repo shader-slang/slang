@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -bindless-space-index 2
 //TEST:SIMPLE(filecheck=CHECK_NV): -target spirv-asm -entry computeMainNV -stage compute -bindless-space-index 2 -capability spvBindlessTextureNV -DNV_HANDLE
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=RESULT): -vk -compute -shaderobj -xslang -bindless-space-index -xslang 2
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=RESULT): -xslang -bindless-space-index -xslang 2
 
 // CHECK-DAG: %[[ULONG:[A-Za-z0-9_]+]] = OpTypeInt 64 0
 // CHECK-NOT: OpTypeRuntimeArray %v2uint

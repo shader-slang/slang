@@ -3,15 +3,15 @@
 
 // std140 data layout
 //TEST:SIMPLE(filecheck=CHECK_STD140):-target spirv -entry computeMain -stage compute -DDATA_LAYOUT=Std140DataLayout
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_STD140):-vk -compute -output-using-type -xslang -DDATA_LAYOUT=Std140DataLayout
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_STD140):-output-using-type -xslang -DDATA_LAYOUT=Std140DataLayout
 
 // std430 data layout
 //TEST:SIMPLE(filecheck=CHECK_STD430):-target spirv -entry computeMain -stage compute -DDATA_LAYOUT=Std430DataLayout
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_STD430):-vk -compute -output-using-type -xslang -DDATA_LAYOUT=Std430DataLayout
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_STD430):-output-using-type -xslang -DDATA_LAYOUT=Std430DataLayout
 
 // scalar data layout
 //TEST:SIMPLE(filecheck=CHECK_SCALAR):-target spirv -entry computeMain -stage compute -DDATA_LAYOUT=ScalarDataLayout
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_SCALAR):-vk -compute -output-using-type -xslang -DDATA_LAYOUT=ScalarDataLayout
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_SCALAR):-output-using-type -xslang -DDATA_LAYOUT=ScalarDataLayout
 
 
 struct MatrixData

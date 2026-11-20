@@ -14,10 +14,7 @@
 // serialized existentials whose AnyValue payload includes a pointer to
 // another existential stored in a different buffer.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-llvm -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu+llvm, filecheck-buffer=CHECK): -output-using-type
 
 [anyValueSize(8)]
 interface IValue

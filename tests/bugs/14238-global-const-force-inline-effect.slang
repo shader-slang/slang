@@ -12,8 +12,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute -line-directive-mode none
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=BUF):-output-using-type
 
 //TEST_INPUT: set counters = out ubuffer(data=[5 10], stride=4)
 RWStructuredBuffer<Atomic<int>> counters;

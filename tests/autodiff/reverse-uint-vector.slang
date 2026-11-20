@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -12,9 +10,9 @@ typedef DifferentialPair<float2> dpfloat2;
 typedef float2.Differential dfloat2;
 
 // This test case should hit a lot of conversion insts
-// kIROp_MakeVectorFromScalar (both uint and float), 
+// kIROp_MakeVectorFromScalar (both uint and float),
 // kIROp_CastIntToFloat, etc..
-// 
+//
 [BackwardDifferentiable]
 float3 test_uint_offset(float3 x, float3 y)
 {

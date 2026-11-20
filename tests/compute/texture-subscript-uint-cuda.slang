@@ -1,6 +1,6 @@
 // Test for verifying subscript operator support with uint types in cuda.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):
 //TEST_INPUT: Texture1D(size=4, content = one):name cudaT1D_u
 Texture1D<uint> cudaT1D_u;
 //TEST_INPUT: Texture2D(size=8, content = one):name cudaT2D_u
@@ -32,15 +32,15 @@ RWStructuredBuffer<uint> cudaOutputBuffer;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
-    
+
     switch (idx)
-    {   
+    {
     case 0:
     {
         int2 var = int2(1, 2);
         uint result = cudaT2D_u[var];
         cudaOutputBuffer[idx] = result;
-            
+
         uint2 result2 = cudaT2D_u2[var];
         cudaOutputBuffer[idx] += result2.x;
 
@@ -55,7 +55,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         int3 var = int3(1, 1, 1);
         uint result = cudaT3D_u[var];
         cudaOutputBuffer[idx] = result;
-            
+
         uint2 result2 = cudaT3D_u2[var];
         cudaOutputBuffer[idx] += result2.x;
 
@@ -70,7 +70,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         int3 var = int3(0, 0, 1);
         uint result = cudaT2DArray_u[var];
         cudaOutputBuffer[idx] = result;
-            
+
         uint2 result2 = cudaT2DArray_u2[var];
         cudaOutputBuffer[idx] += result2.y;
 
@@ -80,7 +80,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     }
     break;
     }
-} 
+}
 // CHECK:FE000000
 // CHECK:FE000000
 // CHECK:FE000000

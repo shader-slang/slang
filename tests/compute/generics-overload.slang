@@ -1,5 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE: -shaderobj
-//TEST(smoke,compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Confirm that generics syntax can be used in user
 // code and generates valid output.

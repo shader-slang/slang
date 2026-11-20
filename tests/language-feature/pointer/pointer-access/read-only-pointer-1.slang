@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-stage compute -entry computeMain -target spirv
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-stage compute -entry computeMain -target spirv
 
 // Writing with a read-only pointer should be an error
 

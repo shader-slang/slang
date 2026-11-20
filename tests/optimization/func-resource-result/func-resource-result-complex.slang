@@ -1,11 +1,8 @@
 // func-resource-result-simple.slang
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all-wgpu-llvm):
 // Not supported in WGSL: Arrays of textures or buffers
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 // Not supported in LLVM: Textures
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm
 
 // Test that a function that returns a resource type can be
 // compiled for targets that don't natively support resource

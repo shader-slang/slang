@@ -1,4 +1,4 @@
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK: 1.0
 // CHECK-NEXT: 2.0

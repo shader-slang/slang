@@ -1,7 +1,6 @@
 // Load with a texel offset must read the same texel as Load at the offset coordinate (and the
 // offset must matter: the neighbouring texel differs in the gradient texture).
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -wgpu -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+wgpu, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: Texture2D(size=8, content=gradient, mipMaps=1):name t2D
 Texture2D<float4> t2D;

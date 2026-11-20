@@ -1,11 +1,11 @@
 //IGNORE:TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major -xslang -DWORKAROUND
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-xslang -matrix-layout-row-major -xslang -DWORKAROUND
 
 // removes from code all uses of pointers, this fixes the code from removal of `PhysicalStorageBuffer64` -- note that the pointer branch is unused regardless of if toggled
-//#define WORKAROUND 
+//#define WORKAROUND
 
 // ensures the matrix byte offset is 0, this 'fixes' the issue since the issue is that member memory offsets were not being respected (and offset 0 was loaded for each struct)
-//#define WORKAROUND2 
+//#define WORKAROUND2
 struct FooBar {
 #ifdef WORKAROUND2
     float4x4 c;

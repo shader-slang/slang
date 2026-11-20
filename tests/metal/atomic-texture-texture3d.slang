@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
-//TEST(compute, metal):COMPARE_COMPUTE_EX:-metal -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type
+//TEST(metal):COMPARE_COMPUTE(targets=metal):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk):-output-using-type
 
 //METALLIB: @computeMain
 

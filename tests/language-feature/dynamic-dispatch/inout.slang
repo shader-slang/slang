@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -14,17 +14,17 @@ interface IReserver
 struct Single : IReserver
 {
     uint total;
-    [mutating] uint reserve(uint x) 
-    { 
-        if (total < x) 
+    [mutating] uint reserve(uint x)
+    {
+        if (total < x)
         {
             total = 0;
             return total;
         }
         else
-        { 
-            total -= x; 
-            return x; 
+        {
+            total -= x;
+            return x;
         }
     }
 };
@@ -32,17 +32,17 @@ struct Single : IReserver
 struct Double : IReserver
 {
     uint total;
-    [mutating] uint reserve(uint x) 
-    { 
-        if (total < 2 * x) 
+    [mutating] uint reserve(uint x)
+    {
+        if (total < 2 * x)
         {
             total = 0;
             return total;
         }
         else
-        { 
-            total -= 2 * x; 
-            return 2 * x; 
+        {
+            total -= 2 * x;
+            return 2 * x;
         }
     }
 };

@@ -1,12 +1,8 @@
 // nested-switch-continue.slang
 
-// Disable FXC DX11 because currently FXC can't compile with 
+// Disable FXC DX11 because currently FXC can't compile with
 // "error X3708: 'continue' cannot be used in a switch"
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-dx12 -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-wgpu
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu+wgpu):
 
 int testWhile(int r) {
     int result = 0;

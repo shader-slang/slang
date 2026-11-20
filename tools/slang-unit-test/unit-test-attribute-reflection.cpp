@@ -82,3 +82,56 @@ SLANG_UNIT_TEST(attributeReflection)
     normalTextureAttribute->getArgumentValueFloat(1, &fvalue);
     SLANG_CHECK(fvalue == 6.0);
 }
+
+// Test that the [RootSignature] attribute on an entry point can be queried
+// through the user-attribute reflection API, with its string argument intact.
+SLANG_UNIT_TEST(rootSignatureAttributeReflection)
+{
+    const char* userSourceBody = R"rs(
+        [RootSignature("DescriptorTable(SRV(t0))")]
+        float4 main(): SV_Target
+        {
+            return 0.0.xxxx;
+        }
+        )rs";
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_6_6");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "m",
+        "m.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SlangResult findEntryPointResult = module->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_FRAGMENT,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(SLANG_SUCCEEDED(findEntryPointResult));
+    SLANG_CHECK(entryPoint != nullptr);
+
+    auto functionReflection = entryPoint->getFunctionReflection();
+    SLANG_CHECK(functionReflection != nullptr);
+
+    auto rootSignatureAttribute =
+        functionReflection->findAttributeByName(globalSession.get(), "RootSignature");
+    SLANG_CHECK(rootSignatureAttribute != nullptr);
+
+    size_t size = 0;
+    auto rootSignature = rootSignatureAttribute->getArgumentValueString(0, &size);
+    SLANG_CHECK(rootSignature != nullptr);
+    UnownedStringSlice stringSlice = UnownedStringSlice(rootSignature, size);
+    SLANG_CHECK(stringSlice == "DescriptorTable(SRV(t0))");
+}

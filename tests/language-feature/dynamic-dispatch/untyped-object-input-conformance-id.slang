@@ -9,7 +9,7 @@
 // order it is asked about them (`ImplA` first), so `p.a` dispatched to `ImplB`
 // and `p.b` to `ImplA`.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 [anyValueSize(16)]
 interface IFoo

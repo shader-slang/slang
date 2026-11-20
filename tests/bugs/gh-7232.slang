@@ -1,6 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu
+//TEST:COMPARE_COMPUTE(targets=vk+dx12+cuda+cpu, filecheck-buffer=CHECK):
 
 // CHECK: 5
 // CHECK-NEXT: 5
@@ -18,7 +16,7 @@ interface IFoo
     property uint value { get; }
 };
 
-struct Foo : IFoo 
+struct Foo : IFoo
 {
     property uint value
     {

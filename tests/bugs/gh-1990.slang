@@ -1,8 +1,8 @@
 // Stack overflow bug in type checking when using auto type deduction in a generic method.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0 -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute  -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12):-profile sm_6_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx11):-profile sm_5_0 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk):-output-using-type
 
 [anyValueSize(12)]
 interface IBSDF

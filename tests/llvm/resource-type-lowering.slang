@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
+//TEST:COMPARE_COMPUTE(targets=llvm, filecheck-buffer=CHECK):
 // Resource types are lowered into concrete types in the LLVM target.
 // This means that we should be able to get a concrete value for their size with
 // `sizeof` and that we should be able to default-initialize and bitCast them.

@@ -1,6 +1,4 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -23,12 +21,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         var dpx = diffPair(x);
         var dpy = diffPair(y);
         __bwd_diff(cross)(dpx, dpy, dOut);
-        outputBuffer[0] = dpx.d[0]; 
-        outputBuffer[1] = dpx.d[1]; 
-        outputBuffer[2] = dpx.d[2]; 
-        outputBuffer[3] = dpy.d[0]; 
-        outputBuffer[4] = dpy.d[1]; 
-        outputBuffer[5] = dpy.d[2]; 
+        outputBuffer[0] = dpx.d[0];
+        outputBuffer[1] = dpx.d[1];
+        outputBuffer[2] = dpx.d[2];
+        outputBuffer[3] = dpy.d[0];
+        outputBuffer[4] = dpy.d[1];
+        outputBuffer[5] = dpy.d[2];
 
         __bwd_diff(crossImpl)(dpx, dpy, dOut);
         outputBuffer[6] = dpx.d[0];

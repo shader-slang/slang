@@ -1,5 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Test that `swith` statement works
 
@@ -19,7 +18,7 @@ int test(int inVal)
 
 	case 4:
 		{}
-		break;		
+		break;
 
 	default:
 	case 3:

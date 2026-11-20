@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type -render-feature cooperative-matrix-conversions
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -render-feature cooperative-matrix-conversions
 
 //CHECK: type: half
 //CHECK: 1.00

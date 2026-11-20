@@ -1,6 +1,6 @@
 // Test that we can translate textures whose element type is a small integer type to valid spirv.
 
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT: RWTexture2D(format=R8Uint, size=4, content = one, mipMaps = 1):name g_Image
 RWTexture2D<uint8_t> g_Image;

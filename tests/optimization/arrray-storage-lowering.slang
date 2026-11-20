@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=SPV): -target spirv -O3
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type
 
 struct DoubleNested
 {

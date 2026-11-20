@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_VK):-vk -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_CUDA):-cuda
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHK_VK):
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHK_CUDA):
 
 //DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
 //DXIL: result code = 0

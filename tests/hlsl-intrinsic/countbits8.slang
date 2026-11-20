@@ -1,13 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
+//TEST:COMPARE_COMPUTE(targets=vk+glsl+cuda+cpu+llvm, filecheck-buffer=CHK):
 //TODO: metal was previously failing but should work now after fixing vector type names
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute -profile metallib_2_4
+//TEST:COMPARE_COMPUTE(targets=metal, filecheck-buffer=CHK):-profile metallib_2_4
 // Not testing the following:
 // -dx12/hlsl, No support for uint8_t with hlsl
 // -wgpu, only has 32-bit support
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -llvm -compute
 
 //CHK:1
 

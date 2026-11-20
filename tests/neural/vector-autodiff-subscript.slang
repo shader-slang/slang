@@ -1,8 +1,8 @@
 // Test automatic differentiation through the subscript getter and setter of both vector
 // implementations.
 //
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -xslang -experimental-feature -output-using-type -capability cuda_sm_7_0
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUFFER):-xslang -experimental-feature -output-using-type -capability cuda_sm_7_0
 
 import slang.neural;
 

@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -g0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all, filecheck-buffer=CHECK):-output-using-type -g0
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=CHECK):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBufferPrimal
 RWStructuredBuffer<float> outputBufferPrimal;
@@ -38,7 +38,7 @@ void diffCall(BufferWithGrad result)
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     BufferWithGrad bg = {outputBufferPrimal, gradBuffer};
-    diffCall(bg); 
+    diffCall(bg);
     bwd_diff(diffCall)(bg);
 
     // CHECK: type: float

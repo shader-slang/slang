@@ -191,9 +191,9 @@ in `README.md`.
 You may look at these to confirm an opcode spelling. You may **not**
 mine them for behavioral claims the doc does not make.
 
-- `source/slang/slang-ir-insts.lua` — canonical opcode list.
-- `source/slang/slang-ir-insts.h` — C++ wrapper structs.
-- `source/slang/slang-lower-to-ir.cpp` — AST-to-IR lowering.
+- `source/slang/ir/slang-ir-insts.lua` — canonical opcode list.
+- `source/slang/ir/slang-ir-insts.h` — C++ wrapper structs.
+- `source/slang/lower-to-ir/slang-lower-to-ir.cpp` — AST-to-IR lowering.
 
 The opcode spellings in the IR dump are the lowercase Lua entry
 keys for value opcodes (`atomicAdd`, `atomicMin`,

@@ -3,8 +3,8 @@
 // Separated from atomic-reduce-methods.slang because HLSL does not support
 // floating-point atomics. Only tested on CUDA and Vulkan.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=cuda, filecheck-buffer=BUF):-output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=BUF):-output-using-type -render-feature hardware-device
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=floatAddTarget
 RWStructuredBuffer<Atomic<float> > floatAddTarget;

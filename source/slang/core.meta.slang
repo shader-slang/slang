@@ -1291,8 +1291,14 @@ ${
     case BaseType::Bool:
 $}
         [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Eql)) bool equals(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
-        [__unsafeForceInlineEarly] __intrinsic_op($(kIROp_Leq)) bool lessThanOrEquals(This other);
+        // SPIR-V has no ordering comparison for Boolean operands, and GLSL and
+        // WGSL do not allow relational operators on Booleans, so the ordering
+        // `false < true` is defined with the logical operators that every
+        // target supports: `a < b` is `!a && b`, `a <= b` is `!a || b`. The
+        // non-short-circuit `and`/`or` keep both operands evaluated and the
+        // comparison branchless, as ordering comparisons are on other types.
+        [__unsafeForceInlineEarly] bool lessThan(This other) { return and(!this, other); }
+        [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return or(!this, other); }
         [__unsafeForceInlineEarly] This shl(int other) { return __intCast<This>(__shl(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This shr(int other) { return __intCast<This>(__shr(__intCast<int>(this), other)); }
         [__unsafeForceInlineEarly] This bitAnd(This other) { return __intCast<This>(__and(__intCast<int>(this), __intCast<int>(other))); }
@@ -4895,6 +4901,25 @@ enum _AttributeTargets
 /// @param target The type of declarations to which the attribute can be applied.
 __attributeTarget(StructDecl)
 attribute_syntax [__AttributeUsage(target : _AttributeTargets)] : AttributeUsageAttribute;
+
+/// Associate a root signature with a function declaration.
+///
+/// @param value A string that defines the root signature.
+///
+/// This attribute is allowed on any function declaration, but is intended
+/// for use with function declarations used as entry points.
+///
+/// This attribute is currently only intended for use when compiling for D3D12,
+/// in which case the string argument is expected to define a root signature
+/// using the root-signature DSL syntax introduced by HLSL.
+///
+/// An application can query for a root signature attribute and inspect
+/// its argument using the reflection API for user-defined attributes.
+[__AttributeUsage(_AttributeTargets.Function)]
+struct RootSignatureAttribute
+{
+    String value;
+};
 
 /// Specify the storage format of a read-write texture. Can only be used on a texture typed struct field or global parameter.
 /// @param format The storage format of the texture.

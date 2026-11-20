@@ -4,27 +4,27 @@
 
 // No matrix layout modifier with -matrix-layout-column-major option
 //TEST:SIMPLE(filecheck=CHECK_COLUMN):-target spirv -entry computeMain -stage compute -matrix-layout-column-major -DMATRIX_LAYOUT
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_COLUMN):-vk -compute -output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT
 
 // No matrix layout modifier with -matrix-layout-row-major option
 //TEST:SIMPLE(filecheck=CHECK_ROW):-target spirv -entry computeMain -stage compute -matrix-layout-row-major -DMATRIX_LAYOUT
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_ROW):-vk -compute -output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT
 
 // column_major matrix layout modifier with -matrix-column-major option
 //TEST:SIMPLE(filecheck=CHECK_COLUMN):-target spirv -entry computeMain -stage compute -matrix-layout-column-major -DMATRIX_LAYOUT=column_major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_COLUMN):-vk -compute -output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=column_major
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=column_major
 
 // column_major matrix layout modifier with -matrix-row-major option (expect column major)
 //TEST:SIMPLE(filecheck=CHECK_COLUMN):-target spirv -entry computeMain -stage compute -matrix-layout-row-major -DMATRIX_LAYOUT=column_major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_COLUMN):-vk -compute -output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=column_major
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_COLUMN):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=column_major
 
 // row_major matrix layout modifier with -matrix-column-major option (expect row major)
 //TEST:SIMPLE(filecheck=CHECK_ROW):-target spirv -entry computeMain -stage compute -matrix-layout-column-major -DMATRIX_LAYOUT=row_major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_ROW):-vk -compute -output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=row_major
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-column-major -xslang -DMATRIX_LAYOUT=row_major
 
 // row_major matrix layout modifier with -matrix-row-major option
 //TEST:SIMPLE(filecheck=CHECK_ROW):-target spirv -entry computeMain -stage compute -matrix-layout-row-major -DMATRIX_LAYOUT=row_major
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK_COMPUTE_ROW):-vk -compute -output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=row_major
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK_COMPUTE_ROW):-output-using-type -xslang -matrix-layout-row-major -xslang -DMATRIX_LAYOUT=row_major
 
 
 struct MatrixData
@@ -108,8 +108,8 @@ RWStructuredBuffer<float> outputBuffer;
 //CHECK_COLUMN: %mat3v2float = OpTypeMatrix %v2float 3
 //CHECK_ROW: %mat3v2float = OpTypeMatrix %v2float 3
 
-//CHECK_COLUMN: %MatrixData{{.*}} = OpTypeStruct %mat4v4float %mat2v4float %mat3v2float  
-//CHECK_ROW: %MatrixData{{.*}} = OpTypeStruct %mat4v4float %mat2v4float %mat3v2float  
+//CHECK_COLUMN: %MatrixData{{.*}} = OpTypeStruct %mat4v4float %mat2v4float %mat3v2float
+//CHECK_ROW: %MatrixData{{.*}} = OpTypeStruct %mat4v4float %mat2v4float %mat3v2float
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -120,13 +120,13 @@ void computeMain()
     outputBuffer[1] = cbuf.m1[0][3];
     outputBuffer[2] = cbuf.m1[3][0];
     outputBuffer[3] = cbuf.m1[3][3];
-    
+
     // m2 (float2x4) corners
     outputBuffer[4] = cbuf.m2[0][0];
     outputBuffer[5] = cbuf.m2[0][3];
     outputBuffer[6] = cbuf.m2[1][0];
     outputBuffer[7] = cbuf.m2[1][3];
-    
+
     // m3 (float3x2) corners
     outputBuffer[8] = cbuf.m3[0][0];
     outputBuffer[9] = cbuf.m3[0][1];

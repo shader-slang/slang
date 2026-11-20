@@ -6,7 +6,7 @@
 // `Hints`'s own declaration is traversed; the enum's synthesized `__EnumType` conformance must
 // still be found by the later `is_set<T : __EnumType>` call.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 module test_enum_conformance_12926;
 

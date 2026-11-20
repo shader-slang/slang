@@ -1,6 +1,5 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12  -profile cs_6_1 -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12, filecheck-buffer=CHECK): -profile cs_6_1 -output-using-type
+//TEST:COMPARE_COMPUTE(targets=vk+cuda, filecheck-buffer=CHECK): -output-using-type
 
 interface IFoo
 {

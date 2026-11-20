@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 //
 // Test for public unscoped enum constants visibility across module boundaries
 //
@@ -17,10 +17,10 @@ void computeMain()
     // These should all be visible due to the public unscoped enum
     TestEnum e1 = CASE_A; // Should work - unscoped access
     TestEnum e2 = TestEnum.CASE_B; // Should work - scoped access
-    
+
     // CHECK: 0
     outputBuffer[0] = (uint)e1;
-    // CHECK: 1  
+    // CHECK: 1
     outputBuffer[1] = (uint)e2;
     // CHECK: 0
     outputBuffer[2] = (uint)CASE_A;

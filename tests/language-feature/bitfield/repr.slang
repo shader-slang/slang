@@ -1,10 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):
 
 // Default GCC/Clang style packs from LSB to MSB
 // struct S { uint a:4; uint b:8; uint c:4; uint d:16; }
 // Memory layout (32-bit):
 // bits 0-3:   a (0x5)
-// bits 4-11:  b (0xAB) 
+// bits 4-11:  b (0xAB)
 // bits 12-15: c (0xC)
 // bits 16-31: d (0xDEF0)
 // Expected: 0xDEF0CAB5

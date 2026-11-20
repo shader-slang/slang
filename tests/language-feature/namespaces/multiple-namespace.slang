@@ -1,6 +1,6 @@
 // multiple-namespace.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 
 // Multiple namespace open/closing
 
@@ -27,19 +27,19 @@ namespace A
         int c;
     }
 }
-   
-// A few more 
+
+// A few more
 
 namespace A {}
 namespace A {}
 namespace A { namespace A {} }
-   
+
 int test(int val)
 {
     A.Struct1 s1 = {};
     A::Struct2 s2 = { val };
     A.Struct3 s3 = { val * val };
-    
+
     return s1.a + s2.b + s3.c;
 }
 

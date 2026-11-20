@@ -7,8 +7,6 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -profile sm_6_5 -line-directive-mode none -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -profile sm_6_5 -render-feature ray-query
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -output-using-type -render-feature ray-query
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;
@@ -38,7 +36,7 @@ void accumulate(inout uint value, HitObject hit)
 
 RayDesc makeRay(uint idx, uint variation)
 {
-    RayDesc ray;  
+    RayDesc ray;
     ray.Origin = float3(idx, 0, variation);
     ray.TMin = 0.01f;
     ray.Direction = float3(0, 1, 0);
@@ -51,7 +49,7 @@ HitObject myTraceRay(uint idx)
     MyRayPayload payload = { idx };
 
     RayDesc ray = makeRay(idx, 0);
-    
+
     RAY_FLAG rayFlags = RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
     uint instanceInclusionMask = 0xff;
     uint rayContributionToHitGroupIndex = 0;
@@ -60,12 +58,12 @@ HitObject myTraceRay(uint idx)
 
     // SPIRV-DAG: OpHitObjectTraceRayNV
     return HitObject::TraceRay(scene,
-        rayFlags, 
-        instanceInclusionMask, 
-        rayContributionToHitGroupIndex, 
-        multiplierForGeometryContributionToHitGroupIndex, 
-        missShaderIndex, 
-        ray, 
+        rayFlags,
+        instanceInclusionMask,
+        rayContributionToHitGroupIndex,
+        multiplierForGeometryContributionToHitGroupIndex,
+        missShaderIndex,
+        ray,
         payload);
 }
 
@@ -84,12 +82,12 @@ void myMakeMiss(
     h = HitObject::MakeMiss(idx, ray);
 }
 
-void rayGenerationMain() 
+void rayGenerationMain()
 {
     uint idx = uint(DispatchRaysIndex().x);
 
     uint r = 0;
-    
+
     HitObject hit = myTraceRay(idx);
 
     accumulate(r, hit);

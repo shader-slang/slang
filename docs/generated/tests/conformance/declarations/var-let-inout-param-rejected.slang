@@ -13,7 +13,7 @@
 // Passing the immutable `x` to `add1(inout int v)` must trigger E30047; CHECK-DAG
 // asserts the error severity and code.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK, exit-code=-1):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK, exit-code=2):
 
 void add1(inout int v) { v += 1; }
 

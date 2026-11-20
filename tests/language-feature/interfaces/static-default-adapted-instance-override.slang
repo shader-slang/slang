@@ -5,7 +5,7 @@
 // (returns 1). If the adaptation were wrongly declined for this shape, `override int f()` would be
 // marked as overriding nothing (E30854) and would also lose to the default.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(targets=cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
 
 interface IFoo

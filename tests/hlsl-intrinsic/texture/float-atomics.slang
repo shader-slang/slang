@@ -1,6 +1,6 @@
 // gather-texture2darray.slang
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -render-feature hardware-device
+//TEST:COMPARE_COMPUTE(targets=vk, filecheck-buffer=CHECK):-output-using-type -render-feature hardware-device
 //TEST(compute):SIMPLE(filecheck=HLSL):-target hlsl -profile cs_6_6 -entry computeMain
 //TEST(compute):SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
 
@@ -18,11 +18,11 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     float originalValue;
-    
+
     // HLSL: {{.*}}originalValue{{.*}} = NvInterlockedAddFp32({{.*}}t{{.*}}, {{.*}}, {{.*}}1.0{{.*}});
     // MTL: atomic_fetch_add
     t.InterlockedAddF32(uint2(1, 0), 1.0, originalValue);
-    
+
     AllMemoryBarrier();
 
     // CHECK: 4.0

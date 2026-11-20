@@ -1,6 +1,6 @@
 // legalize-struct-init.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST:COMPARE_COMPUTE(targets=all):
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 //TEST_INPUT:ubuffer(data=[4 3 2 1], stride=4):name inputBuffer
 
@@ -12,12 +12,12 @@ struct Helper
 {
     RWStructuredBuffer<uint> o;
     RWStructuredBuffer<uint> i;
-    uint                    t;  
+    uint                    t;
 };
 
 void test(Helper h)
 {
-    h.o[h.t] = h.i[h.t] * 16 + h.t;    
+    h.o[h.t] = h.i[h.t] * 16 + h.t;
 }
 
 void test(uint t)

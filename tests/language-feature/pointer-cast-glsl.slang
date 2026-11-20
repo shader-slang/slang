@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE(targets=glsl, filecheck-buffer=BUF):
 
 // Test that pointer casts in GLSL generate constructor-style casts instead of C-style casts
 // This addresses issue https://github.com/shader-slang/slang/issues/7838

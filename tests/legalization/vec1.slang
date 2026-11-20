@@ -1,5 +1,4 @@
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
-//TEST(smoke,compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -emit-spirv-directly -output-using-type
+//TEST(smoke):COMPARE_COMPUTE(targets=vk+glsl, filecheck-buffer=CHECK):-output-using-type
 
 // CHECK:      23
 // CHECK-NEXT: 23

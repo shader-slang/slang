@@ -1,4 +1,4 @@
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX:-vk -slang -compute -shaderobj
+//TEST:COMPARE_COMPUTE(targets=vk):
 
 //TEST_INPUT:ubuffer(data=[9 9 9 9], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
-//TEST(compute, metal):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk
+//TEST:COMPARE_COMPUTE(targets=vk+metal, filecheck-buffer=BUF):
 
 // METAL: (matrix<float,int(4),int(4)>{{.*}}(0) -
 

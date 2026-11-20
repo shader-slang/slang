@@ -12,7 +12,7 @@
 // Verifies the one where-term that does not tolerate a leading `optional`.
 // CHECK asserts E30315, which only the parser's optional-prefix guard emits.
 
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl
 
 void f<T>(T t) where optional __hasDiffTypeInfo(T) {}
 

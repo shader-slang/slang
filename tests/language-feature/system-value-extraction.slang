@@ -1,11 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -dx11 -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -dx12 -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cpu -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -cuda -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -wgsl -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mtl -compute
-//TEST(compute,vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
+//TEST:COMPARE_COMPUTE(targets=vk+dx11+dx12+metal+cuda+cpu+wgpu+llvm, filecheck-buffer=CHECK):
 
 // Slang allows the type of system value semantics to differ from their
 // "canonical" type - e.g. `uint8_t tid : SV_DispatchThreadID` is technically

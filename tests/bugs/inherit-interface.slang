@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=all):-output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -31,7 +31,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     Struct s;
     int v = doThing(s, int(tid));
-    
+
 	float inVal = float(tid + v);
 
 	outputBuffer[tid] = inVal;

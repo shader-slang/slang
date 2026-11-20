@@ -22,8 +22,8 @@ under a particular profile.
    ```markdown
    | Target | Format | Emit file |
    | --- | --- | --- |
-   | DXIL via DXC | HLSL text → DXIL | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) |
-   | SPIR-V (direct) | SPIR-V binary | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) |
+   | DXIL via DXC | HLSL text → DXIL | [slang-emit-hlsl.cpp](../../../../source/slang/emission/slang-emit-hlsl.cpp) |
+   | SPIR-V (direct) | SPIR-V binary | [slang-emit-spirv.cpp](../../../../source/slang/emission/slang-emit-spirv.cpp) |
    | ... | ... | ... |
    ```
 

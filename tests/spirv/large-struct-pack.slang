@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -profile glsl_460
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute
+//TEST:COMPARE_COMPUTE(targets=vk+cuda+cpu, filecheck-buffer=BUF):
 
 // Check that when generating spirv directly, we use a loop
 // to copy large arrays in a local variable to a buffer, instead of emitting

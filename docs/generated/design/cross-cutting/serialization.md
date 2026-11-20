@@ -20,32 +20,32 @@ modules.
 Three flavors of payload exist, each with its own driver file:
 
 - **AST modules** — handled by
-  [slang-serialize-ast.h](../../../../source/slang/slang-serialize-ast.h)
+  [slang-serialize-ast.h](../../../../source/slang/serialization/slang-serialize-ast.h)
   /
-  [slang-serialize-ast.cpp](../../../../source/slang/slang-serialize-ast.cpp).
+  [slang-serialize-ast.cpp](../../../../source/slang/serialization/slang-serialize-ast.cpp).
   The serialized form preserves the checked AST that backs an
   `import`-able module. Most enum-valued AST fields are handled by a
   FIDDLE template in
-  [slang-serialize-ast.cpp](../../../../source/slang/slang-serialize-ast.cpp)
+  [slang-serialize-ast.cpp](../../../../source/slang/serialization/slang-serialize-ast.cpp)
   that generates a `serialize(...)` overload (delegating to
   `serializeEnum`, which encodes the value as a `FossilUInt`) for each
   name in a single `enumTypeNames` list. Serializing a new AST enum is
   usually a matter of appending its type name to that list rather than
   writing a bespoke `serialize` function.
 - **IR modules** — handled by
-  [slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h)
+  [slang-serialize-ir.h](../../../../source/slang/serialization/slang-serialize-ir.h)
   /
-  [slang-serialize-ir.cpp](../../../../source/slang/slang-serialize-ir.cpp),
+  [slang-serialize-ir.cpp](../../../../source/slang/serialization/slang-serialize-ir.cpp),
   with the IR-specific type vocabulary in
-  [slang-serialize-ir-types.h](../../../../source/slang/slang-serialize-ir-types.h)
+  [slang-serialize-ir-types.h](../../../../source/slang/serialization/slang-serialize-ir-types.h)
   /
-  [slang-serialize-ir-types.cpp](../../../../source/slang/slang-serialize-ir-types.cpp).
+  [slang-serialize-ir-types.cpp](../../../../source/slang/serialization/slang-serialize-ir-types.cpp).
 - **Containers** — the on-disk packaging that bundles AST + IR + side
   data into a single file (the `.slang-module` format and other
   artefacts). Driver:
-  [slang-serialize-container.h](../../../../source/slang/slang-serialize-container.h)
+  [slang-serialize-container.h](../../../../source/slang/serialization/slang-serialize-container.h)
   /
-  [slang-serialize-container.cpp](../../../../source/slang/slang-serialize-container.cpp).
+  [slang-serialize-container.cpp](../../../../source/slang/serialization/slang-serialize-container.cpp).
   The underlying chunked file format is the general-purpose RIFF
   reader/writer in
   [slang-riff.h](../../../../source/core/slang-riff.h) /
@@ -53,9 +53,9 @@ Three flavors of payload exist, each with its own driver file:
   `source/core` facility rather than a serialization-specific one.
 
 Source-location streams have their own helper file
-([slang-serialize-source-loc.h](../../../../source/slang/slang-serialize-source-loc.h)
+([slang-serialize-source-loc.h](../../../../source/slang/serialization/slang-serialize-source-loc.h)
 /
-[slang-serialize-source-loc.cpp](../../../../source/slang/slang-serialize-source-loc.cpp)),
+[slang-serialize-source-loc.cpp](../../../../source/slang/serialization/slang-serialize-source-loc.cpp)),
 because preserving readable diagnostics across deserialization
 requires re-establishing the `SourceManager`'s view of files and
 expansions.
@@ -77,7 +77,7 @@ described under
 ### Generic serialize
 
 The generic interface is
-[slang-serialize.h](../../../../source/slang/slang-serialize.h). The
+[slang-serialize.h](../../../../source/slang/serialization/slang-serialize.h). The
 preamble of that header captures the central design choice: a single
 `serialize(serializer, value)` function handles both reading and
 writing, distinguished by a `SerializationMode` carried on the
@@ -110,7 +110,7 @@ the serializer maintains a graph of objects it has already visited
 and emits / resolves identifiers for shared and circular references.
 
 A backend is described by the `ISerializerImpl` interface declared in
-[slang-serialize.h](../../../../source/slang/slang-serialize.h). That
+[slang-serialize.h](../../../../source/slang/serialization/slang-serialize.h). That
 interface lists the `handleBool` / `handleInt32` / `handleString` /
 structural-scope operations a backend must provide, but its own comment
 is explicit that it is a specification rather than a required base
@@ -120,11 +120,11 @@ concrete backend with a context type through the `Serializer<Backend,
 Context>` template, so the common case dispatches statically.
 
 The generic machinery is header-only: the companion
-[slang-serialize.cpp](../../../../source/slang/slang-serialize.cpp)
+[slang-serialize.cpp](../../../../source/slang/serialization/slang-serialize.cpp)
 holds no definitions, and the sibling
-[slang-serialize-types.h](../../../../source/slang/slang-serialize-types.h)
+[slang-serialize-types.h](../../../../source/slang/serialization/slang-serialize-types.h)
 /
-[slang-serialize-types.cpp](../../../../source/slang/slang-serialize-types.cpp)
+[slang-serialize-types.cpp](../../../../source/slang/serialization/slang-serialize-types.cpp)
 pair carries the shared container vocabulary rather than value
 encoders: the RIFF chunk codes (`SerialBinary`, `PropertyKeys<Module>`,
 `PropertyKeys<IRModule>`) and the `SerialStringTableUtil` string-table
@@ -134,12 +134,12 @@ Fossil is the sole concrete backend at this commit.
 
 ### Fossil backend
 
-[slang-serialize-fossil.h](../../../../source/slang/slang-serialize-fossil.h)
+[slang-serialize-fossil.h](../../../../source/slang/serialization/slang-serialize-fossil.h)
 /
-[slang-serialize-fossil.cpp](../../../../source/slang/slang-serialize-fossil.cpp).
+[slang-serialize-fossil.cpp](../../../../source/slang/serialization/slang-serialize-fossil.cpp).
 "Fossil" is a memory-mappable binary format defined in `slang-fossil.h`
 (referenced from the fossil header). The writer in
-[slang-serialize-fossil.cpp](../../../../source/slang/slang-serialize-fossil.cpp)
+[slang-serialize-fossil.cpp](../../../../source/slang/serialization/slang-serialize-fossil.cpp)
 emits the header magic, a total-blob-size field that is filled in when the
 blob is laid out (`writeTotalBlobSize`), and the flags.
 The validation cost is configurable via the macro
@@ -161,9 +161,9 @@ pointer-fixup pass.
 
 Both module payloads go through this backend. `writeSerializedModuleAST`
 in
-[slang-serialize-ast.cpp](../../../../source/slang/slang-serialize-ast.cpp)
+[slang-serialize-ast.cpp](../../../../source/slang/serialization/slang-serialize-ast.cpp)
 and `writeSerializedModuleIR` in
-[slang-serialize-ir.cpp](../../../../source/slang/slang-serialize-ir.cpp)
+[slang-serialize-ir.cpp](../../../../source/slang/serialization/slang-serialize-ir.cpp)
 each build a `Fossil::SerialWriter` over a `BlobBuilder` and then hand
 the finished blob to `RIFF::BuildCursor::addDataChunk`, so a fossil blob
 is what a RIFF data chunk contains. The IR side names its serializer
@@ -185,19 +185,19 @@ has a `FourCC` four-character code, a length, and a payload, and
 `findDataChunk` helpers.
 
 Container-level orchestration in
-[slang-serialize-container.cpp](../../../../source/slang/slang-serialize-container.cpp)
+[slang-serialize-container.cpp](../../../../source/slang/serialization/slang-serialize-container.cpp)
 composes a serialized AST module, a serialized IR module, and the
 auxiliary data (source-location stream, file-dependency list, entry
 points, digest) into one RIFF hierarchy. The chunk codes are the
 constants in
-[slang-serialize-types.h](../../../../source/slang/slang-serialize-types.h)
+[slang-serialize-types.h](../../../../source/slang/serialization/slang-serialize-types.h)
 — for example `SerialBinary::kModuleFourCC` (`'smod'`) for a module
 list chunk, `PropertyKeys<IRModule>::IRModule` (`'ir  '`) and
 `PropertyKeys<Module>::ASTModule` (`'ast '`) for the two payloads, and
 `PropertyKeys<Module>::FileDependencies` (`'fdep'`). The reader side of
 those codes is the `ModuleChunk` / `ContainerChunk` / `DebugChunk`
 accessor types in
-[slang-serialize-container.h](../../../../source/slang/slang-serialize-container.h).
+[slang-serialize-container.h](../../../../source/slang/serialization/slang-serialize-container.h).
 
 Not every payload a `.slang-module` can carry is a chunk of its own.
 The precompiled downstream artefact that `-embed-downstream-ir`
@@ -205,7 +205,7 @@ requests is not added to the RIFF hierarchy; it rides inside the IR
 payload as an ordinary instruction. `EmbeddedDownstreamIR` carries the
 target code as an integer literal and the artefact as a blob literal,
 and it has a stable name like any other opcode
-([slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)),
+([slang-ir-insts-stable-names.lua](../../../../source/slang/ir/slang-ir-insts-stable-names.lua)),
 so it is written by the same `kIROp_StringLit` / `kIROp_BlobLit` case
 of `serializeAsFlatModule` that handles string literals — the blob's
 bytes land in `stringLengths` / `stringChars`. Reading the file back
@@ -218,12 +218,12 @@ as the container described above.
 
 ## IR flat-module read path
 
-[slang-serialize-ir.cpp](../../../../source/slang/slang-serialize-ir.cpp)
+[slang-serialize-ir.cpp](../../../../source/slang/serialization/slang-serialize-ir.cpp)
 does not serialize the IR object graph directly. `serializeAsFlatModule`
 first flattens a module into the parallel arrays of `FlatInstTable` —
 one entry per instruction, walked in preorder by
 `traverseInstsInSerializationOrder` in
-[slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h):
+[slang-serialize-ir.h](../../../../source/slang/serialization/slang-serialize-ir.h):
 `instAllocInfo`, `childCounts`, `sourceLocs`, plus a single
 `operandIndices` list (type-use slot followed by each operand, with a
 `nullptr` operand encoded as `-1`), `stringLengths`, the concatenated
@@ -276,12 +276,12 @@ see [Versioning](#versioning-and-backwards-compatibility)) would have
 consumed literal or string payloads. That case instead becomes a
 recoverable failure one level up: `readSerializedModuleIR_` checks the
 same flag after deserializing and returns `SLANG_FAIL`, so the caller in
-[slang-serialize-container.cpp](../../../../source/slang/slang-serialize-container.cpp)
+[slang-serialize-container.cpp](../../../../source/slang/serialization/slang-serialize-container.cpp)
 sees an unloadable module rather than a crash.
 
 The recursive rebuild and the write-side traversal share a recursion
 budget, `kMaxIRSerializationDepth` (512) in
-[slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h),
+[slang-serialize-ir.h](../../../../source/slang/serialization/slang-serialize-ir.h),
 asserted on each level so an adversarial module fails fast instead of
 overflowing the C++ stack.
 
@@ -327,14 +327,14 @@ per-target rendering is documented in
 [../pipeline/06-emit.md](../pipeline/06-emit.md) and the
 [../target-pipelines/](../target-pipelines) pages.
 
-Driver: [slang-serialize-source-loc.cpp](../../../../source/slang/slang-serialize-source-loc.cpp).
+Driver: [slang-serialize-source-loc.cpp](../../../../source/slang/serialization/slang-serialize-source-loc.cpp).
 
 ## Versioning and backwards compatibility
 
 Modules are expected to remain loadable by newer compilers, even
 though new IR opcodes are added over time. The constraint that makes
 this possible is at the top of
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua):
 
 > Please make sure to update the supported module versions in
 > Slang::IRModule accordingly when modifying this file.
@@ -342,18 +342,18 @@ this possible is at the top of
 Two mechanisms in the watched paths implement that. First, an opcode is
 never written as its `kIROp_*` enum value. The `serialize(S const&,
 IROp&)` overload in
-[slang-serialize-ir.cpp](../../../../source/slang/slang-serialize-ir.cpp)
+[slang-serialize-ir.cpp](../../../../source/slang/serialization/slang-serialize-ir.cpp)
 converts through `getOpcodeStableName` on write and
 `getStableNameOpcode` on read
 (declared in
-[slang-ir-insts-stable-names.h](../../../../source/slang/slang-ir-insts-stable-names.h)
+[slang-ir-insts-stable-names.h](../../../../source/slang/ir/slang-ir-insts-stable-names.h)
 and implemented in
-[slang-ir-insts-stable-names.cpp](../../../../source/slang/slang-ir-insts-stable-names.cpp),
+[slang-ir-insts-stable-names.cpp](../../../../source/slang/ir/slang-ir-insts-stable-names.cpp),
 which owns both the opcode-to-stable-name and stable-name-to-opcode
 tables; those tables are generated from
-[slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)),
+[slang-ir-insts-stable-names.lua](../../../../source/slang/ir/slang-ir-insts-stable-names.lua)),
 so inserting or reordering entries in
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) does
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua) does
 not renumber what is already on disk. Second, the whole payload carries
 `IRModuleInfo::serializationVersion`; `readSerializedModuleIR_` compares
 it against `kSupportedSerializationVersion` (currently `2`) and returns
@@ -392,7 +392,7 @@ Both numbers are now checked on the read path, in different places:
   fails, then deserialize.
 
 The `Unrecognized` opcode that appears at the head of
-[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) plays
+[slang-ir-insts.lua](../../../../source/slang/ir/slang-ir-insts.lua) plays
 a role here: when `getStableNameOpcode` yields `kIROp_Invalid` — the
 module was written by a newer compiler that knows a stable name this
 one does not — the reader substitutes `kIROp_Unrecognized` and sets
@@ -450,10 +450,10 @@ such as
 - The format-level layout of a fossil value or a RIFF chunk. The
   authoritative descriptions are in `slang-fossil.h` (referenced
   from
-  [slang-serialize-fossil.h](../../../../source/slang/slang-serialize-fossil.h))
+  [slang-serialize-fossil.h](../../../../source/slang/serialization/slang-serialize-fossil.h))
   and [slang-riff.h](../../../../source/core/slang-riff.h); the
   chunk-code constants live in
-  [slang-serialize-types.h](../../../../source/slang/slang-serialize-types.h),
+  [slang-serialize-types.h](../../../../source/slang/serialization/slang-serialize-types.h),
   not in the container `.cpp` that uses them.
 - The full backwards-compatibility policy, which lives in
   [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).

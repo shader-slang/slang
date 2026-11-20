@@ -2,9 +2,7 @@
 // the ordinary tagged-union behavior when its payload is stored as the concrete type. Exercise
 // both tags through full compilation and execution.
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST:COMPARE_COMPUTE(targets=dx12+cuda+cpu, filecheck-buffer=CHECK):-output-using-type
 
 // Keeping a resource handle in the implementation makes this a regression test for the physical
 // representation too: on non-bindless targets a resource cannot be bit-cast through AnyValue,
