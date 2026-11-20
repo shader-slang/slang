@@ -2288,7 +2288,7 @@ struct ForwardDiffTranslationContext
             as<IRFuncType>(origFunc->getFullType()));
         diffFunc->setFullType(diffFuncType);
 
-        generateName(&builder, origFunc, diffFunc, "s_fwd_");
+        addPrefixedNameHint(&builder, origFunc, diffFunc, "s_fwd_");
 
         // Transfer checkpoint hint decorations
         copyCheckpointHints(&builder, origFunc, diffFunc);
@@ -3629,8 +3629,8 @@ IRInst* maybeTranslateTrivialForwardDerivative(
     translater.generateTrivialFwdDiffFunc(targetFunc, cast<IRFunc>(fwdDiffFunc));
 
     // Name the trivial derivative after its source function, matching the naming the full
-    // forward translation uses, and give it debug info from the source function.
-    generateName(&builder, targetFunc, fwdDiffFunc, "s_fwd_");
+    // forward translation uses. The name must exist before the record below reads it.
+    addPrefixedNameHint(&builder, targetFunc, fwdDiffFunc, "s_fwd_");
     copyDebugInfoForSynthesizedFunc(&builder, targetFunc, fwdDiffFunc);
 
     return fwdDiffFunc;

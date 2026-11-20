@@ -334,7 +334,7 @@ IRInst* TranslationContext::maybeTranslateIdentityRemat(IRInst* inst)
     auto applyOperand = inst->getOperand(0);
     if (as<IRTranslateBase>(applyOperand))
         applyOperand = maybeTranslateInst(applyOperand);
-    SLANG_ASSERT(as<IRFunc>(applyOperand));
+    SLANG_RELEASE_ASSERT(as<IRFunc>(applyOperand));
     if (auto ctxNameHint = funcType->getParamType(0)->findDecoration<IRNameHintDecoration>())
     {
         StringBuilder nameSb;

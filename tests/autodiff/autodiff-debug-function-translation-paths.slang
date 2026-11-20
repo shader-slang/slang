@@ -8,7 +8,10 @@
 // add/zero witnesses (buildDifferentiablePairWitness; named only — no source function exists to
 // copy a source location from). The first four now build a distinct DebugFunction record named
 // after the function itself; their SPIR-V functions get a DebugFunctionDefinition and a
-// DebugScope, so a debugger can attribute their code. The bug is invisible to spirv-val
+// DebugScope, so a debugger can attribute their code. The remaining synthesis routes (the
+// clone-based backward translation, the full forward translation, and the existential dadd) all
+// already share a source record via copyDebugInfo or carry a name of their own — that audit is
+// what makes the list exhaustive. The bug is invisible to spirv-val
 // (NonSemantic debug info is not validated), so an explicit FileCheck guard is required. The
 // checks anchor on SPIR-V ids or the IR DebugFunction(...) record syntax rather than on bare
 // name text, so they cannot self-match the embedded-source OpString: the SPIR-V pass binds each
@@ -21,16 +24,20 @@
 // an identity remat for its context type, and its bwd_diff wrapper adapts the synthesized
 // extension function, which carries no name hint — the wrapper is then named after the context
 // type its remat passes through (s_bwd_SquareContext), keeping its record distinguishable.
+// passthrough takes a pair and is forward-differentiated with a nested pair, which materializes
+// the pair's own differential conformance — the fifth path's __diffPair_add/__diffPair_zero
+// names. GenBwd exercises the same legacy machinery inside a generic conformance (an interface
+// requirement with a member [BackwardDerivativeOf]), and the -g3 directive validates the IR.
 //
 // The DiffPair add/zero witnesses are named for mid-pass IR readability, but they are inlined
-// within the translation pass and appear at neither checkpoint (probed with a nested
-// DifferentialPair<DifferentialPair<float>> differential forcing the pair's own conformance);
-// they are the one name-only path and carry no DebugFunction record by design.
+// within the translation pass, so no committed check in this file observes those names (the
+// pair scenario below triggers their synthesis; they appear at neither checkpoint); they are
+// the one name-only path and carry no DebugFunction record by design.
 //
 // The last directive compiles without -g: no source function carries debug info, so no
 // synthesized function gets a record — pinning the helper's documented no-op.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -g3 -O0 -emit-spirv-directly -entry computeMain -stage compute -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -g3 -O0 -emit-spirv-directly -validate-ir -entry computeMain -stage compute -experimental-feature
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir-after finalizeAutoDiffPass -o - -entry computeMain -stage compute -g3 -experimental-feature
 
@@ -89,6 +96,50 @@ __func_extension __apply(applyFunc)(float x) -> Tuple<float, SquareContext>
     return makeTuple(applyFunc(x), SquareContext(x));
 }
 
+// Differentiating passthrough makes the pair-typed parameter's differential itself a pair,
+// which materializes the pair's own differential conformance (the __diffPair_add/__diffPair_zero
+// witness path).
+[Differentiable]
+float passthrough(DifferentialPair<float> x)
+{
+    return x.p;
+}
+
+// A member backward derivative behind an interface requirement runs the legacy machinery
+// inside a generic conformance.
+interface IGenBwd
+{
+    [BackwardDifferentiable]
+    float eval(float v);
+}
+
+struct GenBwd : IGenBwd
+{
+    float impl(float v)
+    {
+        return v * v;
+    }
+
+    [BackwardDerivativeOf(impl)]
+    [TreatAsDifferentiable]
+    void impl_bwd(inout DifferentialPair<float> v, float dOut)
+    {
+        v = diffPair(v.p, 2.0 * v.p * dOut);
+    }
+
+    [BackwardDifferentiable]
+    float eval(float v)
+    {
+        return impl(v);
+    }
+}
+
+[BackwardDifferentiable]
+float evalVia(IGenBwd g, float v)
+{
+    return g.eval(v);
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
@@ -99,6 +150,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     var dpa = diffPair(3.0, 0.0);
     bwd_diff(applyFunc)(dpa, 1.0);
     outputBuffer[2] = dpa.d;
+    var dpp = diffPair(diffPair(2.0, 1.0), diffPair(0.0, 0.0));
+    outputBuffer[3] = fwd_diff(passthrough)(dpp).d;
+    GenBwd g;
+    var dpv = diffPair(3.0, 0.0);
+    bwd_diff(evalVia)(g, dpv, 1.0);
+    outputBuffer[4] = dpv.d;
 }
 
 // The functions that survive to SPIR-V each own a distinct DebugFunction record, named after

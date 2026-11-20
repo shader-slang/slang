@@ -687,18 +687,13 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc);
 // location from gets a name only.
 //
 // The record is named after `destFunc`'s existing name hint — add the hint before calling; with
-// no hint it falls back to the source record's name, the same linkage-name fallback the front
-// end uses for unnamed functions. `destFunc` must already have its full type set. The helper
-// moves the builder's insertion point to just before `destFunc`.
+// no hint it reuses the source record's name. `destFunc` must already have its full type set.
+// The helper moves the builder's insertion point to just before `destFunc`.
 void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst* destFunc);
 
 // Name `dstInst` after `srcInst`'s name hint, prepending `prefix`. No-op when `srcInst` has no
 // name hint.
-void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix);
-
-// The prefix naming apply adapters ("s_apply_<primal>"): both producers of apply adapters use
-// it, and the bwd_diff wrapper recovers the primal's name by stripping it.
-extern const char kApplyAdapterNamePrefix[];
+void addPrefixedNameHint(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix);
 
 void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
 

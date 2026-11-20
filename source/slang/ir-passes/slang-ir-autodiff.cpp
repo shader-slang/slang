@@ -1361,11 +1361,9 @@ bool isDiffInst(IRInst* inst)
     return false;
 }
 
-const char kApplyAdapterNamePrefix[] = "s_apply_";
-
 // Name `dstInst` after `srcInst`'s name hint, prepending `prefix`. No-op when `srcInst` has no
 // name hint.
-void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix)
+void addPrefixedNameHint(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const char* prefix)
 {
     if (auto nameHint = srcInst->findDecoration<IRNameHintDecoration>())
     {
@@ -1375,24 +1373,31 @@ void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, const ch
     }
 }
 
+// The debug decorations both debug-info copy helpers copy from a source function onto a
+// derivative. DebugFuncDecoration is the one case they differ on — re-reference the source's
+// record vs build a fresh one — so each helper handles it itself.
+static bool isCopiedDebugDecoration(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugLocationDecoration:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
 {
     // Copy debug decorations.
     for (auto decor : srcFunc->getDecorations())
     {
-        switch (decor->getOp())
-        {
-        case kIROp_DebugInlinedAt:
-        case kIROp_DebugScope:
-        case kIROp_DebugNoScope:
-        case kIROp_DebugInlinedVariable:
-        case kIROp_DebugFuncDecoration:
-        case kIROp_DebugLocationDecoration:
+        if (decor->getOp() == kIROp_DebugFuncDecoration || isCopiedDebugDecoration(decor->getOp()))
             cloneDecoration(decor, destFunc);
-            break;
-        default:
-            break;
-        }
     }
 }
 
@@ -1417,9 +1422,8 @@ void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst
             {
                 auto srcDebugFunc = as<IRDebugFunction>(decor->getOperand(0));
                 IRInst* nameOperand = srcDebugFunc->getName();
-                // The destination's own name is the point of the record; without a name hint it
-                // falls back to the source's name, the front end's own fallback for unnamed
-                // functions.
+                // The destination's own name is the point of the record; without a name hint the
+                // record reuses the source record's name.
                 if (auto nameHint = destFunc->findDecoration<IRNameHintDecoration>())
                     nameOperand = nameHint->getNameOperand();
                 auto debugType = destFunc->getDataType();
@@ -1437,14 +1441,9 @@ void copyDebugInfoForSynthesizedFunc(IRBuilder* builder, IRInst* srcFunc, IRInst
                 builder->addDecoration(destFunc, kIROp_DebugFuncDecoration, destDebugFunc);
             }
             break;
-        case kIROp_DebugInlinedAt:
-        case kIROp_DebugScope:
-        case kIROp_DebugNoScope:
-        case kIROp_DebugInlinedVariable:
-        case kIROp_DebugLocationDecoration:
-            cloneDecoration(decor, destFunc);
-            break;
         default:
+            if (isCopiedDebugDecoration(decor->getOp()))
+                cloneDecoration(decor, destFunc);
             break;
         }
     }

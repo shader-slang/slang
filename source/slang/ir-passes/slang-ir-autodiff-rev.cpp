@@ -125,6 +125,10 @@ static IRInst* emitPoisonBackwardDiffResult(
     return builder->emitMakeTuple(operands);
 }
 
+// The prefix naming apply adapters ("s_apply_<primal>"): both producers of apply adapters use
+// it, and the bwd_diff wrapper recovers the primal's name by stripping it.
+static const char kApplyAdapterNamePrefix[] = "s_apply_";
+
 SlangResult prepareFuncForBackwardDiff(
     DifferentiableTypeConformanceContext& diffTypeContext,
     DiagnosticSink* sink,
@@ -391,10 +395,10 @@ struct BackwardDiffTranslationContext
         sortBlocksInFunc(propagateFunc);
         sortBlocksInFunc(targetFunc);
 
-        generateName(builder, targetFunc, applyFunc, kApplyAdapterNamePrefix);
-        generateName(builder, targetFunc, propagateFunc, "s_bwdProp_");
-        generateName(builder, targetFunc, rematFuncResult, "s_remat_");
-        // generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
+        addPrefixedNameHint(builder, targetFunc, applyFunc, kApplyAdapterNamePrefix);
+        addPrefixedNameHint(builder, targetFunc, propagateFunc, "s_bwdProp_");
+        addPrefixedNameHint(builder, targetFunc, rematFuncResult, "s_remat_");
+        // addPrefixedNameHint(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
 
         copyDebugInfo(targetFunc, applyFunc);
         copyDebugInfo(targetFunc, propagateFunc);
@@ -535,12 +539,12 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
         auto applyForBwdParam = applyFuncBuilder.emitParam(applyForBwdFuncType->getParamType(idx));
         auto rematFuncParam = rematFuncBuilder.emitParam(applyForBwdFuncType->getParamType(idx));
 
-        generateName(&builder, primalFuncParams[idx], applyForBwdParam, "");
+        addPrefixedNameHint(&builder, primalFuncParams[idx], applyForBwdParam, "");
         applyForBwdParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
 
         auto bwdPropParam = bwdPropFuncBuilder.emitParam(
             bwdPropFuncType->getParamType(idx + 1)); // +1 to skip the context param
-        generateName(&builder, primalFuncParams[idx], bwdPropParam, "d_");
+        addPrefixedNameHint(&builder, primalFuncParams[idx], bwdPropParam, "d_");
         bwdPropParam->sourceLoc = primalFuncParams[idx]->sourceLoc;
 
         if (!as<IROutParamType>(applyForBwdParam->getDataType()))
@@ -713,10 +717,10 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
     builder.addForceInlineDecoration(rematFunc);
 
-    generateName(&builder, primalFunc, applyFunc, kApplyAdapterNamePrefix);
-    generateName(&builder, primalFunc, rematFunc, "s_remat_");
-    generateName(&builder, primalFunc, bwdPropFunc, "s_bwdProp_");
-    generateName(&builder, primalFunc, fullContextType, "s_bwdCallableCtx_");
+    addPrefixedNameHint(&builder, primalFunc, applyFunc, kApplyAdapterNamePrefix);
+    addPrefixedNameHint(&builder, primalFunc, rematFunc, "s_remat_");
+    addPrefixedNameHint(&builder, primalFunc, bwdPropFunc, "s_bwdProp_");
+    addPrefixedNameHint(&builder, primalFunc, fullContextType, "s_bwdCallableCtx_");
 
     // Names first, then records: each fresh record reads the adapter's just-added name hint,
     // and the hoisting below must see the finished decoration set.
@@ -977,35 +981,35 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     builder.emitReturn();
 
     // The wrapper is the callable form of the primal's backward derivative, dispatched to an
-    // apply adapter. Name it after what it adapts so its debug record is distinguishable: a
-    // synthesized adapter is named "s_apply_<primal>" (both adapter producers use that prefix),
-    // so strip it; a custom `__func_extension __apply`'s adapter is the synthesized extension
-    // function, which carries no name hint, so use the context type the remat adapter passes
-    // through — the same source the identity remat's own name uses. Give it debug info from
-    // the apply adapter, which carries the user's source location. The operands are already
-    // resolved here, unlike the identity remat, whose operand the memoized translation flow
-    // may not have resolved yet.
-    String wrapperName;
+    // apply adapter. Name it "s_bwd_<primal>" so its debug record is distinguishable from the
+    // function it adapts: a synthesized adapter is named "s_apply_<primal>" (both adapter
+    // producers use that prefix — the shared constant above), so strip it; a custom
+    // `__func_extension __apply`'s adapter is the synthesized extension function, which carries
+    // no name hint, so the name comes from the context type the remat adapter passes through —
+    // the same source the identity remat's own name uses; any other named apply function (a
+    // hand-written conformance method keeps its own name) passes through intact. The debug
+    // record comes from the apply adapter, which carries the user's source location. The
+    // operands are already resolved here, unlike the identity remat's, whose site resolves
+    // them through the translation dictionary.
+    String primalName;
     if (auto applyNameHint = applyBwdFunc->findDecoration<IRNameHintDecoration>())
     {
         String name = applyNameHint->getName();
         auto applyPrefix = UnownedStringSlice(kApplyAdapterNamePrefix);
         if (name.startsWith(applyPrefix))
-            wrapperName = String(name.subString(
-                applyPrefix.getLength(),
-                name.getLength() - applyPrefix.getLength()));
+            primalName = String(name.getUnownedSlice().tail(applyPrefix.getLength()));
         else
-            wrapperName = name;
+            primalName = name;
     }
     else if (
         auto ctxNameHint = rematFuncType->getParamType(0)->findDecoration<IRNameHintDecoration>())
     {
-        wrapperName = ctxNameHint->getName();
+        primalName = ctxNameHint->getName();
     }
-    if (wrapperName.getLength() > 0)
+    if (primalName.getLength() > 0)
     {
         StringBuilder nameSb;
-        nameSb << "s_bwd_" << wrapperName;
+        nameSb << "s_bwd_" << primalName;
         builder.addNameHintDecoration(bwdDiffFunc, nameSb.getUnownedSlice());
     }
     copyDebugInfoForSynthesizedFunc(&builder, applyBwdFunc, bwdDiffFunc);
