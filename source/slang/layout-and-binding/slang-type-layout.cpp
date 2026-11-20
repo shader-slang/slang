@@ -4551,6 +4551,16 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     auto structuredBufferLayoutRules =
         context.getRulesFamily()->getStructuredBufferRules(context.targetReq->getOptionSet());
 
+    // On WGSL, `StructuredBuffer<T, Std140DataLayout>` lowers its elements with std140 rules
+    // (`getTypeLayoutRuleNameForBuffer`), so reflection reports std140 offsets and strides too.
+    if (context.getRulesFamily() == &kWGSLLayoutRulesFamilyImpl)
+    {
+        auto bufferType = as<HLSLStructuredBufferTypeBase>(structuredBufferType);
+        auto layoutType = bufferType ? bufferType->getLayoutType() : nullptr;
+        if (layoutType && layoutType->astNodeType == ASTNodeType::Std140DataLayoutType)
+            structuredBufferLayoutRules = &kStd140LayoutRulesImpl_;
+    }
+
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout =
         createTypeLayoutWith(context, structuredBufferLayoutRules, elementType);
