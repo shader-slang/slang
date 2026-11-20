@@ -43,7 +43,7 @@ SlangResult performCompilationAndReflection(
         maybeDumpDiagnostic(spProcessCommandLineArguments(request, &argv[1], argc - 1), request));
 
     // A failed compilation returns `SLANG_E_INTERNAL_FAIL`, so that the exit code of this tool is
-    // -1 as it is for `slangc` (see `TestToolUtil::getReturnCode`). An invalid command line
+    // 2 as it is for `slangc` (see `TestToolUtil::getReturnCode`). An invalid command line
     // returns `SLANG_FAIL` above, and the exit code is 1. `SLANG_E_ABORT` stays as it is, because
     // it reports an internal compiler error, which has its own exit code.
     SlangResult compileResult = maybeDumpDiagnostic(spCompile(request), request);

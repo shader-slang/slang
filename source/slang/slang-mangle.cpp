@@ -1,8 +1,8 @@
 #include "slang-mangle.h"
 
 #include "compiler-core/slang-name.h"
-#include "slang-check.h"
-#include "slang-syntax.h"
+#include "slang/ast/slang-syntax.h"
+#include "slang/semantic-checking/slang-check.h"
 
 namespace Slang
 {

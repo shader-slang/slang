@@ -3,9 +3,9 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
-#include "slang/slang-fossil.h"
-#include "slang/slang-ir.h"
-#include "slang/slang-serialize-types.h"
+#include "slang/ir/slang-ir.h"
+#include "slang/serialization/slang-fossil.h"
+#include "slang/serialization/slang-serialize-types.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>

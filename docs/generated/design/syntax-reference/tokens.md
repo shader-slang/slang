@@ -29,7 +29,7 @@ The catalog is reverse-engineered from:
 - [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h) /
   [slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
   — the tokenizer that produces them.
-- [slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+- [slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)
   — the consumer that reads the token flags, and the owner of
   angle-bracket include-path assembly in `HandleIncludeDirective`.
 
@@ -122,7 +122,7 @@ Listed by spelling; the lexer routes each through the per-character
 | `RightArrow` | `->` punctuation | Function return type, member access through pointer |
 | `DoubleRightArrow` | `=>` punctuation | Lambda syntax (its only parser consumer) |
 | `At` | `@` punctuation (`slang-lexer.cpp` lines 2418-2420) | Lexed as a distinct kind; no parser consumer at this commit |
-| `Dollar` | `$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang value operand inside a `spirv_asm` block (`$this`, `$location` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1437); also introduces the compile-time `$for` statement, which `parseCompileTimeStmt` in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) (line 7268) still reads but diagnoses as deprecated from language version 2025 and as removed from 202c |
+| `Dollar` | `$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang value operand inside a `spirv_asm` block (`$this`, `$location` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1437); also introduces the compile-time `$for` statement, which `parseCompileTimeStmt` in [slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) (line 7268) still reads but diagnoses as deprecated from language version 2025 and as removed from 202c |
 | `DollarDollar` | `$$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang *type* operand inside a `spirv_asm` block (`result:$$float2` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1437) |
 
 ### Operators
@@ -226,7 +226,7 @@ The reader-facing consequence of the `AtStartOfLine` carve-out is that
 a preprocessor directive body may be continued onto the next physical
 line. A directive body runs to the next `NewLine` *token* (`IsEndOfLine`
 in
-[slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+[slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)
 lines 2700-2712), and a folded continuation emits none, so this is one
 macro whose body is `((x) + 1)`:
 
@@ -237,7 +237,7 @@ macro whose body is `((x) + 1)`:
 
 Directive *recognition* is the reader of the flag itself: a `Pound`
 token starts a directive only when it carries `AtStartOfLine`
-([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+([slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)
 line 4896).
 
 ## Special-case lexing rules
@@ -265,7 +265,7 @@ implements several context-sensitive rules:
 - **`<...>` after `#include`.** The lexer has no include-header mode:
   it emits ordinary `OpLess`, path, and `OpGreater` tokens.
   `HandleIncludeDirective` in
-  [slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+  [slang-preprocessor.cpp](../../../../source/slang/preprocessor/slang-preprocessor.cpp)
   reassembles the path by concatenating the contents of the tokens
   between `<` and `>`; the quoted form is a single `StringLiteral`.
 - **Raw string literals.** A string opened with `R"delimiter(` is

@@ -4,7 +4,6 @@
 #include "compiler-core/slang-pretty-writer.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-performance-profiler.h"
-#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
 #include "slang-module-library.h"
@@ -12,7 +11,8 @@
 #include "slang-reflection-json.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
-#include "slang-serialize-container.h"
+#include "slang/semantic-checking/slang-check-impl.h"
+#include "slang/serialization/slang-serialize-container.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "compiler-core/slang-artifact-associated-impl.h"
@@ -228,6 +228,13 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     // pass runs later during code generation.
     if (m_passThrough == PassThroughMode::None)
     {
+        // Checking the specialization arguments runs semantic analysis, which allocates
+        // nodes through the thread-local "current" AST builder. The front-end's own
+        // `SLANG_AST_BUILDER_RAII` scope has already popped by this point, so without
+        // this scope a builder left behind by an earlier compilation on the same
+        // thread would silently become current.
+        SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
         m_specializedGlobalComponentType = createSpecializedGlobalComponentType(this);
         if (getSink()->getErrorCount() != 0)
             return SLANG_FAIL;

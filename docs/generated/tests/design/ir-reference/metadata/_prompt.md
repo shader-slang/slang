@@ -257,11 +257,11 @@ If you would cite anything else, stop and record a doc-gap finding in
 Use these to confirm a printed operand order or mnemonic. Do **not** mine them
 for claims the doc does not state.
 
-- `source/slang/slang-ir-insts.lua`
-- `source/slang/slang-ir-insts.h`
-- `source/slang/slang-ir-insts-info.cpp`
-- `source/slang/slang-ir.h`, `source/slang/slang-ir.cpp`
-- `source/slang/slang-lower-to-ir.cpp`
+- `source/slang/ir/slang-ir-insts.lua`
+- `source/slang/ir/slang-ir-insts.h`
+- `source/slang/ir/slang-ir-insts-info.cpp`
+- `source/slang/ir/slang-ir.h`, `source/slang/ir/slang-ir.cpp`
+- `source/slang/lower-to-ir/slang-lower-to-ir.cpp`
 
 ## Test directives
 

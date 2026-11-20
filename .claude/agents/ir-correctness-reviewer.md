@@ -24,7 +24,7 @@ You operate **autonomously and proactively**. Read CLAUDE.md first, then systema
 
 ## IR Architecture Context
 
-Slang uses a custom SSA-based IR (not LLVM). IR instructions are defined in `source/slang/slang-ir-insts.lua` with FIDDLE annotations. The compilation pipeline is: Lexer → Parser → Semantic Checker → IR Generation → IR Passes → Code Emission.
+Slang uses a custom SSA-based IR (not LLVM). IR instructions are defined in `source/slang/ir/slang-ir-insts.lua` with FIDDLE annotations. The compilation pipeline is: Lexer → Parser → Semantic Checker → IR Generation → IR Passes → Code Emission.
 
 ## Your Review Process
 

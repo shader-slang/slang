@@ -21,19 +21,19 @@ modifier values) lives in [values.md](values.md).
 ## Source
 
 Concrete type classes are declared in
-[slang-ast-type.h](../../../../source/slang/slang-ast-type.h). The `Type`
+[slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h). The `Type`
 and `Val` abstract bases are in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h), where
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h), where
 `Type` adds `getCanonicalType()` — a thin wrapper over `Val::resolve()` —
 and the protected `m_astBuilderForReflection` back-pointer that exists
 for the reflection API only. The sibling non-Type `Val` classes that show
 up in type operands (`IntVal`s for extents, `SubtypeWitness`es for
 conformance evidence) are declared in
-[slang-ast-val.h](../../../../source/slang/slang-ast-val.h) and are
+[slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h) and are
 documented in [values.md](values.md).
 
 The parsed type grammar enters through
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp):
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp):
 `_parseSimpleTypeSpec` reads the base type specifier,
 `parsePostfixTypeSuffix` attaches array and pointer suffixes,
 `parseFuncTypeExpr` builds function types, and `parseExpandExpr` /
@@ -51,7 +51,7 @@ magic type added only there does not mark this page stale.
 To test whether an arbitrary `Type*` is a `DeclRefType` naming a
 particular declaration, use the `isDeclRefTypeOf<T>` template declared
 immediately after `DeclRefType` in
-[slang-ast-type.h](../../../../source/slang/slang-ast-type.h) rather than
+[slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h) rather than
 re-deriving the cast at the call site.
 
 ## Family hierarchy
@@ -288,7 +288,7 @@ for that class (see
 
 ### NamedExpressionType
 
-Its `_toTextOverride` ([slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line 1392) prints the alias's `declRef`, so formatting *this* node shows the alias name. `_createCanonicalTypeOverride` (line 1400) resolves it to the aliased type, so a consumer that canonicalizes first shows the resolved type. Type-mismatch diagnostics and emitted target code are in the second category: given `typealias Celsius = float`, they say `float`.
+Its `_toTextOverride` ([slang-ast-type.cpp](../../../../source/slang/ast/slang-ast-type.cpp) line 1392) prints the alias's `declRef`, so formatting *this* node shows the alias name. `_createCanonicalTypeOverride` (line 1400) resolves it to the aliased type, so a consumer that canonicalizes first shows the resolved type. Type-mismatch diagnostics and emitted target code are in the second category: given `typealias Celsius = float`, they say `float`.
 
 ### DeclRefType
 
@@ -334,7 +334,7 @@ arithmetic at that width: an unsigned add past the top of the range
 wraps rather than saturating or being diagnosed, so a `uint` holding
 `0xFFFFFFFF` plus `1u` is `0`. The front end does step in for integer
 *literals*: `_determineIntegerLiteralType` in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) picks
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) picks
 the narrowest type that holds the value — `int`, then `int64`, for an
 unsuffixed decimal — and diagnoses `IntegerLiteralTooLarge` for an
 signed decimal literal of `INT64_MAX + 2` or more instead of truncating
@@ -386,16 +386,16 @@ the three by-reference modes), which a caller must unwrap to recover the
 plain type and the passing mode. `FuncType::getParamInfo` does that
 through `getParamInfoFromTypeWithModeWrapper`, which returns a
 `ParamInfo` (value `type` plus separate `mode`, declared in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h))
+[slang-ast-support-types.h](../../../../source/slang/ast/slang-ast-support-types.h))
 and asserts that the value type is not itself a mode wrapper, so a mode
 has exactly one representation. An `in` parameter has no wrapper type.
 The
 error-type slot is always present rather than optional: a callable that
 cannot fail records the bottom type there — spelled `never` when
 printed (`BottomType::_toTextOverride`,
-[slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line
+[slang-ast-type.cpp](../../../../source/slang/ast/slang-ast-type.cpp) line
 124) and represented by the C++ class `BottomType`
-([slang-ast-type.h](../../../../source/slang/slang-ast-type.h) line
+([slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h) line
 50). Neither spelling is surface syntax: no declaration of the name
 exists in
 [core.meta.slang](../../../../source/slang/core.meta.slang), so writing

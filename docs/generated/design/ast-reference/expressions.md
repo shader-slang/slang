@@ -13,17 +13,17 @@ The reference for every concrete `Expr` subclass in the Slang AST,
 written for a developer reading or modifying expression-handling code
 in the parser, the checker, or the IR-lowering pipeline. `Expr` itself
 is *not* declared in the expression header: it lives in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h) and is
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h) and is
 documented in [base.md](base.md#expr-syntaxnode).
 
 ## Source
 
 Concrete expression classes are declared in
-[slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h), which
+[slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h), which
 derives them all from the `Expr` base in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h). Parsing
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h). Parsing
 entry points are in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp): the
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp): the
 public entry is `Parser::ParseExpression`, which delegates to the
 precedence-climbing core `parseInfixExprWithPrecedence` and then down
 through `parsePrefixExpr`, `parsePostfixExpr`, and `parseAtomicExpr`.
@@ -298,7 +298,7 @@ operator, so `parsePrefixExpr` folds it into a copy of the literal, and
 This node is produced by overload checking, not by the parser. The
 parser builds a `GenericAppExpr` for `f<...>` generic-application
 syntax (`parseGenericApp` in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp)). When
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp)). When
 overload resolution finds a generic candidate flagged
 `IsPartiallyAppliedGeneric` — applied to fewer arguments than the
 generic declares — it rewrites that candidate into a
@@ -377,14 +377,14 @@ parses as a plain `VarExpr`, so `ThisTypeExpr` is not what `This` becomes.
 
 `HLSLUnsignedTypeExpr` is produced only for HLSL source, by
 `parseHLSLTraditionalIntegerTypeSpecifier` in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the checker
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp); the checker
 types it directly as built-in `uint`. `FuncTypeExpr` requires the `functype`
 keyword (`functype(T, T) -> T combineOp` in
 [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang)), while
 `PointerTypeExpr` (`*` suffix), `AndTypeExpr` (infix `&`), `ModifiedTypeExpr`
 (modifier prefixes) and `PackBranchTypeExpr` (`__packBranch`) have their own
 spellings. `TupleTypeExpr` is compiled out of
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp), so nothing
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp), so nothing
 constructs it at this commit.
 
 ## See also

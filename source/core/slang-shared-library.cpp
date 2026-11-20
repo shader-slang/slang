@@ -2,6 +2,7 @@
 
 #include "slang-com-ptr.h"
 #include "slang-io.h"
+#include "slang-list.h"
 #include "slang-string-util.h"
 
 #if defined(_WIN32)
@@ -132,19 +133,31 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
 {
 #if defined(_WIN32)
     HMODULE moduleHandle;
-    GetModuleHandleExA(
-        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-        (LPCSTR)symbolInLib,
-        &moduleHandle);
-    const int maxLength = 1024;
-    wchar_t filenameBuffer[maxLength];
-    auto length = GetModuleFileNameW(moduleHandle, filenameBuffer, maxLength);
-    if (length == maxLength)
+    if (!GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCSTR)symbolInLib,
+            &moduleHandle))
     {
-        // Insufficient buffer, return empty.
         return String();
     }
-    return String::fromWString(filenameBuffer);
+    // GetModuleFileNameW silently truncates a path that does not fit the buffer and returns the
+    // buffer size, so we grow the buffer until the returned length is smaller.
+    List<wchar_t> buffer;
+    buffer.setCount(1024);
+    while (true)
+    {
+        const DWORD size = DWORD(buffer.getCount());
+        const DWORD length = ::GetModuleFileNameW(moduleHandle, buffer.getBuffer(), size);
+        if (length == 0)
+        {
+            return String();
+        }
+        if (length < size)
+        {
+            return String::fromWString(buffer.getBuffer());
+        }
+        buffer.setCount(size + size / 2);
+    }
 
 #elif SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY
     Dl_info dllInfo;

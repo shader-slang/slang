@@ -4,13 +4,15 @@
 // Check that when two loop parameters receive the same back-edge resource, specializing
 // one parameter's graph rewrites only that parameter's argument slot. The graph for a
 // contains shared but not b, so b's slot keeps a resource until b is specialized.
-// The CHECK lines are deliberately light: detailed IR validation fails if b's slot is
-// given an integer while b still has a resource type.
-// CHECK-DAG: OpStore %a %int_0
-// CHECK-DAG: OpStore %b %int_1
+// Detailed IR validation checks the intermediate resource/selector types. The final integer
+// phis have distinct entry values and a shared back-edge value, and both feed their own sample.
+// CHECK: %[[A:[^ ]+]] = OpPhi %int %[[SHARED:[^ ]+]] %[[BACK_EDGE:[^ ]+]] %int_0 %[[ENTRY:[^ ]+]]
+// CHECK: %[[B:[^ ]+]] = OpPhi %int %[[SHARED]] %[[BACK_EDGE]] %int_1 %[[ENTRY]]
 // CHECK: OpLoopMerge
-// CHECK: OpSelect %int
+// CHECK: %[[SHARED]] = OpSelect %int
+// CHECK: OpAccessChain {{.*}} %samplers %[[A]]
 // CHECK: OpImageSampleExplicitLod
+// CHECK: OpAccessChain {{.*}} %samplers %[[B]]
 // CHECK: OpImageSampleExplicitLod
 
 SamplerState samplers[2];

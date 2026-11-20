@@ -10,7 +10,7 @@
 // type differs from itself, in ways that surface far from the cause. These tests
 // pin that invariant at its source.
 
-#include "slang/slang-ast-builder.h"
+#include "slang/ast/slang-ast-builder.h"
 #include "slang/slang-mangle.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"

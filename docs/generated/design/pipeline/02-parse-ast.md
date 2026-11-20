@@ -19,7 +19,7 @@ syntax, modifying an AST node, or debugging a parse error.
 - **Input**: a `TokenSpan` plus a `TranslationUnitRequest`,
   `Scope*` for the outer environment, and a `ContainerDecl*` parent
   (the receiving namespace / module decl). Entry point declared in
-  [slang-parser.h](../../../../source/slang/slang-parser.h):
+  [slang-parser.h](../../../../source/slang/parser/slang-parser.h):
 
   ```cpp
   void parseSourceFile(
@@ -39,7 +39,7 @@ syntax, modifying an AST node, or debugging a parse error.
 ## Parser
 
 Implemented in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp). The design
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp). The design
 is a recursive-descent parser. Because tokens are pre-collected into a
 flat list (see [01-lex-preprocess.md](01-lex-preprocess.md)), the
 parser can use arbitrary lookahead, although it rarely looks ahead more
@@ -57,7 +57,7 @@ Slang parses in two stages:
 1. **Decl-parse stage.** Top-level declarations are parsed normally,
    but when the parser reaches a `{ ... }` function body it does not
    recurse into it; instead, `parseOptBody`
-   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+   ([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) line
    2297) tracks brace nesting and copies the enclosed tokens into an
    `UnparsedStmt` AST node, which also records the scopes the body was
    written in (`currentScope`, `outerScope`).
@@ -65,7 +65,7 @@ Slang parses in two stages:
    `UnparsedStmt`, it spawns a new `Parser` initialized in body mode
    and re-parses those tokens with a back-pointer to the
    `SemanticsVisitor`. The auxiliary entry point declared in
-   [slang-parser.h](../../../../source/slang/slang-parser.h) is:
+   [slang-parser.h](../../../../source/slang/parser/slang-parser.h) is:
 
    ```cpp
    Stmt* parseUnparsedStmt(
@@ -88,7 +88,7 @@ Code that must behave differently between the two stages consults
 This two-stage scheme exists primarily to disambiguate `<` between a
 generic argument list and a less-than comparison: at body-parse time
 `tryParseGenericApp`
-([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) lines
 3079-3205) can hand the expression before the `<` to the checker's
 `CheckTerm` and act on what it names. The test is wider than "is this
 a generic": a base that resolves to a `GenericDecl`, to a
@@ -107,7 +107,7 @@ Slang treats most "keywords" not as lexer-level reserved words but as
 identifiers bound to syntax in the active environment. The parser keeps
 a `SyntaxParseInfo` table that maps keyword names to parse callbacks;
 the type and its accessor are declared in
-[slang-parser.h](../../../../source/slang/slang-parser.h) (lines 45-53):
+[slang-parser.h](../../../../source/slang/parser/slang-parser.h) (lines 45-53):
 
 ```cpp
 struct SyntaxParseInfo
@@ -121,7 +121,7 @@ ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos();
 ```
 
 The table itself is the static array `g_parseSyntaxEntries[]` in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) (line
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) (line
 11106), whose rows are built by the small helpers `_makeParseDecl`,
 `_makeParseModifier`, and `_makeParseExpr` (lines 11069-11104);
 `getSyntaxParseInfos()` (line 11278) hands the array out as a
@@ -164,7 +164,7 @@ throw the clause away entirely — nothing inside the angle brackets
 reaches the AST.
 
 The *declarator-level* skip, in `parseDirectAbstractDeclarator`
-([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) lines
 2729-2772), is opt-in: it runs only when
 `ParserOptions::enableEffectAnnotations` is set, which
 `-enable-effect-annotations` does (lines 10369 and 10398, one per parse
@@ -208,7 +208,7 @@ being disabled.
 ### Error recovery
 
 When the parser hits an unexpected token, `Unexpected`
-([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) lines
 372-419) emits a diagnostic through the `DiagnosticSink` (see
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)) and
 sets `Parser::isRecovering`. That flag is what suppresses a cascade:
@@ -259,7 +259,7 @@ token of whichever matched region encloses them.
 
 The AST is a strongly-typed C++ class hierarchy rooted at `NodeBase`,
 declared in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h):
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h):
 
 ```cpp
 FIDDLE(abstract)
@@ -283,37 +283,37 @@ edit the FIDDLE-marked source.**
 ### The major node families
 
 The *base* class of every family is declared alongside `NodeBase` in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h); each
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h); each
 family's *concrete* subclasses then live in their own `slang-ast-*.h`
 header ([../architecture/module-map.md](../architecture/module-map.md)
 lists them all):
 
 - `Decl` — declarations (base at
-  [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) line
+  [slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h) line
   763). Concrete and intermediate declaration classes are in
-  [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h):
+  [slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h):
   `ContainerDecl`, `FunctionDeclBase`, `VarDecl`, `AggTypeDecl`,
   `SimpleTypeDecl`, `GenericDecl`, `ExtensionDecl`, `InterfaceDecl`,
   `SyntaxDecl`, ...
 - `Expr` — expressions (base at line 815); subclasses in
-  [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h).
+  [slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h).
 - `Stmt` — statements (base at line 825); subclasses in
-  [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h),
+  [slang-ast-stmt.h](../../../../source/slang/ast/slang-ast-stmt.h),
   including `UnparsedStmt` for the deferred-body case described above.
 - `Type` — types (base at line 569; note that `Type` derives from
   `Val`, so a type *is* a compile-time value); subclasses in
-  [slang-ast-type.h](../../../../source/slang/slang-ast-type.h).
+  [slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h).
 - `Modifier` — qualifiers / attributes attached to decls (base at line
   707); subclasses in
-  [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h).
+  [slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h).
 - `Val` — compile-time values used by generics (base at line 380), with
   concrete value subclasses in
-  [slang-ast-val.h](../../../../source/slang/slang-ast-val.h). Its
+  [slang-ast-val.h](../../../../source/slang/ast/slang-ast-val.h). Its
   user-level surface is a generic *value* argument: the `3` in
   `vector<float, 3>` is the `IntVal` that
   `VectorExpressionType::getElementCount` returns, and the `4` in
   `int a[4]` is the one `ArrayExpressionType::getElementCount` returns
-  ([slang-ast-type.h](../../../../source/slang/slang-ast-type.h) lines
+  ([slang-ast-type.h](../../../../source/slang/ast/slang-ast-type.h) lines
   747 and 583).
 
 In a freshly-parsed AST, both types and expressions use `Expr`
@@ -327,9 +327,9 @@ scalar, vector, or matrix operands (or operands whose element type is a
 generic parameter constrained to a sealed builtin marker interface) is
 converted to a
 `BuiltinOperatorExpr`
-([slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)) by
+([slang-ast-expr.h](../../../../source/slang/ast/slang-ast-expr.h)) by
 `convertToBuiltinArithmeticOp`
-([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)),
+([slang-check-expr.cpp](../../../../source/slang/semantic-checking/slang-check-expr.cpp)),
 which records the resolved `BuiltinOperationKind` so the operator-name →
 kind mapping happens exactly once instead of being re-parsed by each
 consumer (constant folding, IR lowering, for-loop trip-count
@@ -337,7 +337,7 @@ inference). This node is synthesized during checking, not produced by
 the parser.
 
 AST node casts use the templated `as<T>` helpers in
-[slang-ast-base.h](../../../../source/slang/slang-ast-base.h):
+[slang-ast-base.h](../../../../source/slang/ast/slang-ast-base.h):
 
 ```cpp
 template<typename T>
@@ -349,8 +349,8 @@ than C++ RTTI.
 
 ### `ASTBuilder`
 
-[slang-ast-builder.h](../../../../source/slang/slang-ast-builder.h) /
-[slang-ast-builder.cpp](../../../../source/slang/slang-ast-builder.cpp).
+[slang-ast-builder.h](../../../../source/slang/ast/slang-ast-builder.h) /
+[slang-ast-builder.cpp](../../../../source/slang/ast/slang-ast-builder.cpp).
 
 `ASTBuilder` owns:
 
@@ -393,7 +393,7 @@ speculating on a *copy* of the `Parser` (with a throwaway
 speculative parse is error-free and the token that follows the closing
 `>` is in the generic-application FOLLOW set — `::`, `.`, `(`, `)`,
 `[`, `]`, `:`, `,`, `?`, `;`, `==`, `!=`, `>`, `>>`, or end-of-file
-([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) lines
 3181-3200), the same list given in
 [grammar.md's `<` disambiguation section](../syntax-reference/grammar.md#-disambiguation)
 — does it reparse the generic application on the real parser.
@@ -410,16 +410,16 @@ into a `GenericDecl` and continues with the inner declaration.
 An optional `where` clause may follow the parameter list to attach
 type constraints. Parsing only records the syntactic form; constraint
 solving and substitution happen during checking
-([slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp))
+([slang-check-constraint.cpp](../../../../source/slang/semantic-checking/slang-check-constraint.cpp))
 and IR specialization (see
 [05-ir-passes.md](05-ir-passes.md)).
 
 Constraints are parsed by `parseOptionalGenericConstraints` (the
 inheritance-clause form, `: Base1, Base2`) and
 `maybeParseGenericConstraints` (the `where` form), both in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp). Each
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp). Each
 produces `GenericTypeConstraintDecl` members
-([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)). For a
+([slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h)). For a
 generic, those constraint decls are siblings of the parameters under
 the enclosing `GenericDecl`. `parseOptionalGenericConstraints` takes an
 optional `constraintTarget` parameter that decouples the constrained
@@ -428,7 +428,7 @@ constraint decls are added to.
 
 `maybeParseGenericConstraints` accepts several spellings after `where`,
 each mapping to its own constraint decl class
-([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)):
+([slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h)):
 
 - a type/witness bound (`T : IBar`, `T == U`) → `GenericTypeConstraintDecl`
   (the `==` spelling sets `isEqualityConstraint`; the `:` spelling
@@ -452,7 +452,7 @@ on a `__hasDiffTypeInfo` clause is rejected with
 `Diagnostics::OptionalHasDiffTypeInfoConstraintIsInvalid`.
 
 `FuncConstraintDecl`
-([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)) is a
+([slang-ast-decl.h](../../../../source/slang/ast/slang-ast-decl.h)) is a
 subclass of `GenericTypeConstraintDecl` that the parser never produces:
 header checking synthesizes it as a sibling requirement when an
 interface's callable requirement must itself be constrained as a type
@@ -467,7 +467,7 @@ constraints — whether written as an inheritance clause
 (`associatedtype A where A : IBar`) — are relocated to the enclosing
 `InterfaceDecl` so that they become interface-level requirements,
 siblings of the associated type. `parseAssocType`
-([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) line
 4551) detects the enclosing interface through `parser->currentScope` and
 passes it as the `constraintTarget`. This yields the same representation
 as the `__constraint` syntax-as-declaration form:
@@ -478,7 +478,7 @@ interface IDerived : IBase { __constraint DataType == This; }
 
 The `__constraint` keyword is registered in the syntax-parse table
 (`g_parseSyntaxEntries` in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp), line
+[slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp), line
 11111) and handled by `parseInterfaceConstraintDecl` (line 4593), which
 builds a `GenericTypeConstraintDecl`, parsing the subject type, then
 either `==` (setting `isEqualityConstraint`) or `:` (a subtype
@@ -495,7 +495,7 @@ The deeper treatment of the disambiguation strategy lives in
 Modifiers (`in`, `out`, `static`, `const`, ...) and attributes
 (`[unroll]`, `[shader("compute")]`, ...) attach to a `Decl` through
 the `Modifier` chain rooted at `ModifiableSyntaxNode`. `ParseModifiers`
-([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) line
 1279) collects modifier tokens before the declaration keyword and
 attaches them as `Modifier` nodes — keyword modifiers through the same
 syntax-decl lookup described above, and `[...]` groups through
@@ -527,7 +527,7 @@ listed in
 [01-lex-preprocess.md](01-lex-preprocess.md#preprocessor-directives).
 
 The list of modifier classes is in
-[slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h);
+[slang-ast-modifier.h](../../../../source/slang/ast/slang-ast-modifier.h);
 attribute parsing is just modifier parsing in disguise — the
 `[name(args)]` tokens become an `AttributeBase` modifier. Adding an
 attribute that needs its own semantics is therefore a matter of giving
@@ -546,7 +546,7 @@ as an expression statement).
   emit a more specific error, rather than aborting parsing.
 - Some constructs parse cleanly but are still diagnosed because they
   could never be referenced. `maybeDiagnoseKeywordUsedAsName`
-  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+  ([slang-parser.cpp](../../../../source/slang/parser/slang-parser.cpp) line
   2626) warns (`Diagnostics::KeywordUsedAsName`) when a declarator name
   is a reserved type keyword (`struct`, `class`, `enum`, `typealias`,
   `typedef`; see `isReservedKeywordName`, line 2607). Both this check
@@ -579,7 +579,7 @@ as an expression statement).
   Being kept here is *not* acceptance overall: a second, independent nesting
   validation runs during semantic checking
   (`validateDeclNesting` in
-  [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  [slang-check-decl.cpp](../../../../source/slang/semantic-checking/slang-check-decl.cpp)
   line 317), which consults its own child/parent rule table and reports
   `Diagnostics::DeclNotAllowedInContext` (E31400, "declaration not
   allowed in this context") for a pair the table disallows. The two

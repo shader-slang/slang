@@ -1,7 +1,7 @@
 //TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.zip -g -obfuscate
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.zip
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.zip
 //TEST:COMPILE: tests/serialization/obfuscated-loc-module.slang -o tests/serialization/obfuscated-loc-module.slang-module -g -obfuscate
-//TEST:SIMPLE(filecheck=CHECK,exit-code=-1):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.slang-module
+//TEST:SIMPLE(filecheck=CHECK,exit-code=2):-target hlsl -stage compute -entry computeMain -obfuscate -r tests/serialization/obfuscated-loc-module.slang-module
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 

@@ -45,7 +45,7 @@ and how `legalizeIRForWGSL` and `WGSLSourceEmitter` cooperate.
 - **Phase C — WGSL legalization, lowering, phi elimination.**
   Anchored at `legalizeIRForWGSL` (line ~1970 of `slang-emit.cpp`,
   defined at line 215 of
-  [slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp)).
+  [slang-ir-wgsl-legalize.cpp](../../../../source/slang/ir-passes/slang-ir-wgsl-legalize.cpp)).
   Other WGSL-specific passes:
   `legalizeEntryPointVaryingParamsForWGSL` (called from
   `legalizeIRForWGSL`),
@@ -103,7 +103,7 @@ Cover at least:
   representation.
 - `eliminatePhis` with default options. Do **not** write that this
   contrasts with SPIR-V: the defaults in
-  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  [slang-ir-eliminate-phis.h](../../../../source/slang/ir-passes/slang-ir-eliminate-phis.h)
   (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
   `useRegisterAllocation = true`, and the direct-SPIR-V branch assigns
   those same two values, so there is no difference to contrast.

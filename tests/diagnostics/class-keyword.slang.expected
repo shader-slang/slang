@@ -1,4 +1,4 @@
-result code = -1
+result code = 2
 standard error = {
 tests/diagnostics/class-keyword.slang(6): error 20014: 'class' is a reserved keyword in this context; use 'struct' instead.
 class SomeClass

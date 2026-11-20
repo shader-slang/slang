@@ -4,9 +4,9 @@
 #include "core/slang-platform.h"
 #include "proxy/proxy-component-type.h"
 #include "replay-context.h"
-#include "slang/slang-ast-type.h"
+#include "slang/ast/slang-ast-type.h"
+#include "slang/ast/slang-syntax.h"
 #include "slang/slang-compiler-api.h"
-#include "slang/slang-syntax.h"
 
 #include <chrono>
 #include <cinttypes>
