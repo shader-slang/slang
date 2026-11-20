@@ -1,15 +1,23 @@
 // Regression test for https://github.com/shader-slang/slang/issues/14652.
 //
-// A ByteAddressBuffer parameter whose argument comes from the descriptor heap cannot be
-// specialized away before byte-address-buffer legalization, so its load/store operations
-// reach the pass with the parameter still in place. The pass used to retype the shared
-// ByteAddressBuffer type instruction module-wide when legalizing such a parameter, so a
-// global ByteAddressBuffer loaded at a different element type was silently retyped too and
-// its load reused the first-legalized element type, producing invalid SPIR-V that fails
-// spirv-val with a type-mismatched OpAccessChain.
+// Byte-address-buffer loads on SPIR-V legalize into loads from equivalent
+// structured-buffer views, one per (buffer, element type). A ByteAddressBuffer
+// parameter whose argument comes from the descriptor heap used to survive
+// call specialization, so legalizing its load retyped the shared
+// ByteAddressBuffer type instruction module-wide and a differently-typed load
+// elsewhere reused the wrongly-typed view, failing spirv-val with a
+// type-mismatched OpAccessChain. Call specialization now recognizes a
+// descriptor-heap fetch as a specializable argument (it is a pure opaque-handle
+// selection with the same (heap, index) shape as an element access), so the
+// fetch moves into the specialized callee and every load takes its own
+// element-type view. The first two entry points pin the reported shape
+// end-to-end; the last two pin direct heap-fetch arguments, which must
+// specialize even when the helper is [noinline].
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
 //TEST:SIMPLE(filecheck=SWAP): -target spirv-asm -entry mainSwapped -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
+//TEST:SIMPLE(filecheck=HELPERS): -target spirv-asm -entry mainHeapHelpers -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
+//TEST:SIMPLE(filecheck=NOINLINE): -target spirv-asm -entry mainNoInline -stage compute -capability spvDescriptorHeapEXT -validate-with-downstream-compiler
 
 ByteAddressBuffer buf;
 RWStructuredBuffer<float> outBuf;
@@ -22,6 +30,12 @@ uint readIndex(ByteAddressBuffer b, uint offset)
 float2 readFloat2(ByteAddressBuffer b, uint offset)
 {
     return b.Load<float2>(offset);
+}
+
+[noinline]
+uint readWordNoInline(ByteAddressBuffer b, uint offset)
+{
+    return b.Load(offset);
 }
 
 [shader("compute")]
@@ -46,6 +60,37 @@ void mainSwapped(uint tid : SV_DispatchThreadID)
     outBuf[0] = v.x + v.y + float(i);
 }
 
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainHeapHelpers(uint3 tid : SV_DispatchThreadID)
+{
+    // Two helpers, both fed directly from the descriptor heap, loading at
+    // different element types. Neither ByteAddressBuffer parameter may survive
+    // into byte-address-buffer legalization: each heap fetch specializes into
+    // its callee and each load takes its own element-type view.
+    uint i = readIndex(ResourceDescriptorHeap[tid.x], 0);
+    float2 v = readFloat2(ResourceDescriptorHeap[tid.y], 8);
+    outBuf[0] = v.x + v.y + float(i);
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainNoInline(uint3 tid : SV_DispatchThreadID)
+{
+    // A [noinline] helper keeps its function shape; specialization must still
+    // rewrite its signature so the heap fetch happens inside the callee.
+    uint i = readWordNoInline(ResourceDescriptorHeap[tid.x], 0);
+    outBuf[0] = float(i);
+}
+
 // CHECK: OpCapability DescriptorHeapEXT
+// CHECK-NOT: ByteAddressBuffer
 
 // SWAP: OpCapability DescriptorHeapEXT
+// SWAP-NOT: ByteAddressBuffer
+
+// HELPERS: OpCapability DescriptorHeapEXT
+// HELPERS-NOT: ByteAddressBuffer
+
+// NOINLINE: OpCapability DescriptorHeapEXT
+// NOINLINE-NOT: ByteAddressBuffer
