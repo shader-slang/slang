@@ -149,7 +149,7 @@ jobs:
               # the unit tests that need no GPU run here, and in a job that has
               # no tier. The GPU tiers use -compile-test false.
               api_expr="cpu+llvm"
-              slang_test_args+=("-compile-test" "true" "-api-only")
+              slang_test_args+=("-compile-test" "true")
               ;;
             t4 | sm80plus)
               # The GPU tiers run the same way, and differ only in which tests
@@ -164,7 +164,7 @@ jobs:
               # line), the lines that need NVRTC, and the unit tests that
               # declare a GPU API.
               api_expr="all-cpu-llvm"
-              slang_test_args+=("-compile-test" "false" "-api-only")
+              slang_test_args+=("-compile-test" "false")
               if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
                 # T4 runners cannot execute SM 8.0+ cooperative matrix / neural
                 # tests.
@@ -182,7 +182,7 @@ jobs:
             metal | "")
               # metal is the GPU of macOS. No tier: by default, run every test.
               api_expr="all"
-              slang_test_args+=("-compile-test" "true" "-api-only")
+              slang_test_args+=("-compile-test" "true")
               ;;
             *)
               echo "::error::unknown gpu-tier '${{ inputs.gpu-tier }}' (expected t4, sm80plus, metal or nogpu)"

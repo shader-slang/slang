@@ -47,9 +47,8 @@ A test may be in one or more categories. The categories are specified on top of 
 ### API Control Options
 
 - `-api <expr>`: Enable specific APIs (e.g., 'vk+dx12' or '+dx11')
-- `-api-only`: Only run tests that use specified APIs
 - `-compile-test [true|false]`: Run the tests that use no render API, such as `SIMPLE` tests
-  (default: true, false with `-api-only`). With `false`, a `COMPILE` line that prepares the input
+  (default: true). With `false`, a `COMPILE` line that prepares the input
   of a test that uses an API, and a line that needs NVRTC, still run.
 - `-synthesizedTestApi <expr>`: Set APIs for synthesized tests
 - `-skip-api-detection`: Skip API availability detection

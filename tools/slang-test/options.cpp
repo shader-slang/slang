@@ -73,9 +73,7 @@ static bool _isSubCommand(const char* arg)
         "  -v [level]                     Set verbosity level (verbose, info, failure)\n"
         "                                 Default: verbose when -v used, info otherwise\n"
         "  -hide-ignored                  Hide results from ignored tests\n"
-        "  -api-only                      Only run tests that use specified APIs\n"
-        "  -compile-test [true|false]     Run the tests that use no render API (default: true,\n"
-        "                                 false with -api-only)\n"
+        "  -compile-test [true|false]     Run the tests that use no render API (default: true)\n"
         "  -verbose-paths                 Use verbose paths in output\n"
         "  -category <name>               Only run tests in specified category\n"
         "  -exclude <name>                Exclude tests in specified category\n"
@@ -237,9 +235,6 @@ static bool _parseBoolOperand(const char* value)
         }
     }
 
-    // Whether `-compile-test` is on the command line, so that `-api-only` can set its default
-    bool isCompileTestGiven = false;
-
     // now iterate over arguments to collect options
     while (argCursor != argEnd)
     {
@@ -337,10 +332,6 @@ static bool _parseBoolOperand(const char* value)
         else if (strcmp(arg, "-hide-ignored") == 0)
         {
             optionsOut->hideIgnored = true;
-        }
-        else if (strcmp(arg, "-api-only") == 0)
-        {
-            optionsOut->apiOnly = true;
         }
         else if (strcmp(arg, "-verbose-paths") == 0)
         {
@@ -721,7 +712,6 @@ static bool _parseBoolOperand(const char* value)
             }
 
             optionsOut->compileTest = _parseBoolOperand(*argCursor++);
-            isCompileTestGiven = true;
         }
         else if (strcmp(arg, "-cache-rhi-device") == 0)
         {
@@ -748,14 +738,6 @@ static bool _parseBoolOperand(const char* value)
             showHelp(stdError);
             return SLANG_FAIL;
         }
-    }
-
-    // `-api-only` asks for the tests that use the specified APIs, so it turns the compile tests
-    // off, unless `-compile-test` says otherwise. For example, `-compile-test true -api-only` runs
-    // the tests of the specified APIs and the compile tests.
-    if (optionsOut->apiOnly && !isCompileTestGiven)
-    {
-        optionsOut->compileTest = false;
     }
 
     {

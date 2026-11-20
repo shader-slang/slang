@@ -269,8 +269,8 @@ SLANG_UNIT_TEST(slangTestOptionsIncludeListMustHaveEntries, NoRenderApi)
     }
 }
 
-// `-compile-test` is true by default. `-api-only` turns it off, unless it is on the command line,
-// whatever the order of the options is.
+// `-compile-test` is true by default, and the operand sets it. The option `-api-only` does not
+// exist any more, because `-compile-test false` replaces it.
 SLANG_UNIT_TEST(slangTestOptionsCompileTest, NoRenderApi)
 {
     struct Case
@@ -282,10 +282,6 @@ SLANG_UNIT_TEST(slangTestOptionsCompileTest, NoRenderApi)
         {{}, true},
         {{"-compile-test", "false"}, false},
         {{"-compile-test", "true"}, true},
-        {{"-api-only"}, false},
-        {{"-api-only", "-compile-test", "true"}, true},
-        {{"-compile-test", "true", "-api-only"}, true},
-        {{"-compile-test", "false", "-api-only"}, false},
     };
     for (const auto& c : cases)
     {
@@ -298,4 +294,9 @@ SLANG_UNIT_TEST(slangTestOptionsCompileTest, NoRenderApi)
     Options options;
     StringBuilder text;
     SLANG_CHECK(SLANG_FAILED(parseTestOptions({"-compile-test"}, options, text)));
+
+    Options removedOptions;
+    StringBuilder removedText;
+    SLANG_CHECK(SLANG_FAILED(parseTestOptions({"-api-only"}, removedOptions, removedText)));
+    SLANG_CHECK(removedText.toString().indexOf("unknown option '-api-only'") != -1);
 }

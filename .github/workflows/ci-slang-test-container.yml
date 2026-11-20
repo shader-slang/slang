@@ -174,7 +174,7 @@ jobs:
           # prepare the input of a GPU test in the same file (for example a
           # COMPILE line before a COMPARE_COMPUTE line), the lines that need
           # NVRTC, and the unit tests that declare a GPU API.
-          slang_test_args+=("-api" "all-cpu-llvm" "-compile-test" "false" "-api-only")
+          slang_test_args+=("-api" "all-cpu-llvm" "-compile-test" "false")
 
           case "${{ inputs.gpu-tier }}" in
             t4)

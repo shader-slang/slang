@@ -125,7 +125,7 @@ public:
     /// API is not available though).
     ///
     /// A test that needs no render API (requiredFlags is 0) is a compile test. It cannot run with
-    /// `-compile-test false` (which `-api-only` implies), unless the caller passes
+    /// `-compile-test false`, unless the caller passes
     /// `isNeededByGpuTests`. The caller does so for a test line that a GPU job needs although the
     /// line uses no API: a COMPILE line that prepares the input of a test that uses an API, or a
     /// line that uses a tool that only a machine with a GPU has.

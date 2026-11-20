@@ -73,10 +73,6 @@ struct Options
     // When true results from ignored tests are not shown
     bool hideIgnored = false;
 
-    // When true only tests that use an api that matches the enabledApis flags will run. This
-    // only sets the default of compileTest, which is false then (see Options::parse).
-    bool apiOnly = false;
-
     // When false the compile tests, which are the tests that use no render API, do not run. Such
     // a test line (for example a SIMPLE line) compiles code and checks the output. The compile
     // tests that GPU tests need still run (see TestContext::canRunTestWithRenderApiFlags).
